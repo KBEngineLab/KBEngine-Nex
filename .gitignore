@@ -276,25 +276,25 @@ Thumbs.db
 /kbe/src/lib/dependencies/vsopenssl/test/verify_extra_test
 /kbe/src/lib/dependencies/vsopenssl/test/wp_test
 /kbe/src/lib/dependencies/vsopenssl/tools/c_rehash.bak
-/kbe/src/lib/python/Makefile.pre
-/kbe/src/lib/python/Misc/python-config.sh
-/kbe/src/lib/python/Misc/python.pc
-/kbe/src/lib/python/Modules/Setup
-/kbe/src/lib/python/Modules/Setup.config
-/kbe/src/lib/python/Modules/Setup.local
-/kbe/src/lib/python/Modules/_testembed
-/kbe/src/lib/python/Modules/config.c
-/kbe/src/lib/python/Modules/ld_so_aix
-/kbe/src/lib/python/Parser/pgen
-/kbe/src/lib/python/build/
-/kbe/src/lib/python/config.log
-/kbe/src/lib/python/config.status
-/kbe/src/lib/python/pybuilddir.txt
-/kbe/src/lib/python/pyconfig.h
-/kbe/src/lib/python/python
-/kbe/src/lib/python/python-config
-/kbe/src/lib/python/python-config.py
-/kbe/src/lib/python/python-gdb.py
+# /kbe/src/lib/python/Makefile.pre
+# /kbe/src/lib/python/Misc/python-config.sh
+# /kbe/src/lib/python/Misc/python.pc
+# /kbe/src/lib/python/Modules/Setup
+# /kbe/src/lib/python/Modules/Setup.config
+# /kbe/src/lib/python/Modules/Setup.local
+# /kbe/src/lib/python/Modules/_testembed
+# /kbe/src/lib/python/Modules/config.c
+# /kbe/src/lib/python/Modules/ld_so_aix
+# /kbe/src/lib/python/Parser/pgen
+# /kbe/src/lib/python/build/
+# /kbe/src/lib/python/config.log
+# /kbe/src/lib/python/config.status
+# /kbe/src/lib/python/pybuilddir.txt
+# /kbe/src/lib/python/pyconfig.h
+# /kbe/src/lib/python/python
+# /kbe/src/lib/python/python-config
+# /kbe/src/lib/python/python-config.py
+# /kbe/src/lib/python/python-gdb.py
 balls_server_assets/gensdk.bat
 balls_server_assets/guiconsole.bat
 balls_server_assets/kbengine_ue4_plugins/KBEnginePlugins.uplugin
