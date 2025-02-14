@@ -1,4 +1,7 @@
+# ----[ Editor ]------- #
 .vscode
+.vs
+# .vscode/settings.json
 # ----[ Visual Studio ]------- #
 /kbe/src/_objs
 /kbe/src/ipch
@@ -411,11 +414,7 @@ kbe/tools/server/guiconsole/guiconsole.iobj
 kbe/tools/server/guiconsole/guiconsole.ipdb
 kbe/tools/server/guiconsole/python37.dll
 
-kbe/res/sdk_templates/client/ue4/Source/KBEnginePlugins/Engine/.vscode/ipch/381f0fa40e3b681c/mmap_address.bin
-kbe/res/sdk_templates/client/ue4/Source/KBEnginePlugins/Engine/.vscode/ipch/5100cf72a5744457/mmap_address.bin
-kbe/res/sdk_templates/client/ue4/Source/KBEnginePlugins/Engine/.vscode/ipch/fad5f4f0f388a9d5/mmap_address.bin
-kbe/res/sdk_templates/client/ue4/Source/KBEnginePlugins/Engine/.vscode/ipch/4b78c8ff93ff9cdf/mmap_address.bin
-kbe/res/sdk_templates/client/ue4/Source/KBEnginePlugins/Engine/.vscode/ipch/e5bd10f022f818b5/mmap_address.bin
+kbe/res/sdk_templates/client/ue4/Source/KBEnginePlugins/Engine/.vscode
 kbengine_demos_assets-def
 balls_server_assets
 kbengine_demos_assets
