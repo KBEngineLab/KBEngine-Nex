@@ -481,7 +481,8 @@ bool InterfacesHandler_Interfaces::reconnect()
 
 	if(pInterfacesChannel->pEndPoint()->connect() == -1)
 	{
-		struct timeval tv = { 0, 2000000 }; // 1000ms
+		// struct timeval tv = { 0, 2000000 }; // 1000ms
+		struct timeval tv = { 5, 0 };// 等待2s，解决docker中InterfacesHandler_Interfaces::reconnect(): couldn't connect to(interfaces server): 127.0.0.1:30099! 的问题
 		fd_set frds, fwds;
 		FD_ZERO( &frds );
 		FD_ZERO( &fwds );
@@ -499,6 +500,7 @@ bool InterfacesHandler_Interfaces::reconnect()
 #else
 			getsockopt(int(*pInterfacesChannel->pEndPoint()), SOL_SOCKET, SO_ERROR, &error, &len);
 #endif
+
 			if(0 == error)
 				connected = true;
 		}
