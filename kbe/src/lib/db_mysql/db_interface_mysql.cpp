@@ -179,6 +179,10 @@ bool DBInterfaceMysql::attach(const char* databaseName)
 			ERROR_MSG("DBInterfaceMysql::attach: mysql_init error!\n");
 			return false;
 		}
+
+		// ½ûÓÃ SSL
+		mysql_options(pMysql_, MYSQL_OPT_SSL_MODE, (const void *)SSL_MODE_DISABLED);
+
 		
 		DEBUG_MSG(fmt::format("DBInterfaceMysql::attach: connect: {}:{} starting...\n", db_ip_, db_port_));
 
@@ -213,6 +217,10 @@ __RECONNECT:
 					ERROR_MSG("DBInterfaceMysql::attach: mysql_init error!\n");
 					return false;
 				}
+
+
+				// ½ûÓÃ SSL
+				mysql_options(pMysql_, MYSQL_OPT_SSL_MODE, (const void *)SSL_MODE_DISABLED);
 
 				if (mysql_real_connect(mysql(), db_ip_, db_username_,
 					db_password_, NULL, db_port_, NULL, 0)) // CLIENT_MULTI_STATEMENTS  
