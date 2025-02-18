@@ -171,8 +171,12 @@ bool DBInterfaceMysql::attach(const char* databaseName)
 
 	hasLostConnection_ = false;
 
+
+
 	try
 	{
+		mysql_ssl_mode sslmode = SSL_MODE_DISABLED;
+		
 		pMysql_ = mysql_init(0);
 		if(pMysql_ == NULL)
 		{
@@ -181,7 +185,7 @@ bool DBInterfaceMysql::attach(const char* databaseName)
 		}
 
 		// ½ûÓÃ SSL
-		mysql_options(pMysql_, MYSQL_OPT_SSL_MODE, (const void *)SSL_MODE_DISABLED);
+		mysql_options(mysql(), MYSQL_OPT_SSL_MODE, (void *)&sslmode);
 
 		
 		DEBUG_MSG(fmt::format("DBInterfaceMysql::attach: connect: {}:{} starting...\n", db_ip_, db_port_));
@@ -220,7 +224,7 @@ __RECONNECT:
 
 
 				// ½ûÓÃ SSL
-				mysql_options(pMysql_, MYSQL_OPT_SSL_MODE, (const void *)SSL_MODE_DISABLED);
+				mysql_options(mysql(), MYSQL_OPT_SSL_MODE, (void *)&sslmode);
 
 				if (mysql_real_connect(mysql(), db_ip_, db_username_,
 					db_password_, NULL, db_port_, NULL, 0)) // CLIENT_MULTI_STATEMENTS  
