@@ -9,6 +9,7 @@
 #include "scriptobject.h"
 #include "scriptstdouterr.h"
 #include "scriptstdouterrhook.h"
+#include "resmgr/resmgr.h"
 
 namespace KBEngine{ namespace script{
 
@@ -31,11 +32,13 @@ namespace KBEngine{ namespace script{
 					L"../../res/scripts/common/DLLs;"				\
 					L"../../res/scripts/common/Lib;"				\
 					L"../../res/scripts/common/Lib/site-packages;"	\
-					L"../../res/scripts/common/Lib/dist-packages"
+					L"../../res/scripts/common/Lib/dist-packages"	
 
 #endif
 
 #define APPEND_PYSYSPATH(PY_PATHS)									\
+	std::string venvPath = Resmgr::getSingleton().getEnv().venv_path; \
+	if (venvPath != ""){ PY_PATHS +=  strutil::to_wide_string(venvPath); } \
 	std::wstring pySysPaths = SCRIPT_PATH;							\
 	wchar_t* pwpySysResPath = strutil::char2wchar(const_cast<char*>(Resmgr::getSingleton().getPySysResPath().c_str()));	\
 	strutil::kbe_replace(pySysPaths, L"../../res/", pwpySysResPath);\
