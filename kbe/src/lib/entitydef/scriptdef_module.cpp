@@ -303,7 +303,8 @@ void ScriptDefModule::autoMatchCompOwn()
 {
 	if (isComponentModule())
 	{
-		std::string fmodule = "scripts/base/components/" + name_ + ".py";
+		// std::string fmodule = "scripts/base/components/" + name_ + ".py";
+		std::string fmodule = "base/components/" + name_ + ".py";
 		std::string fmodule_pyc = fmodule + "c";
 		if (Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
 			Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)
@@ -311,7 +312,8 @@ void ScriptDefModule::autoMatchCompOwn()
 			setBase(true);
 		}
 
-		fmodule = "scripts/cell/components/" + name_ + ".py";
+		// fmodule = "scripts/cell/components/" + name_ + ".py";
+		fmodule = "cell/components/" + name_ + ".py";
 		fmodule_pyc = fmodule + "c";
 		if (Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
 			Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)
@@ -413,7 +415,8 @@ void ScriptDefModule::autoMatchCompOwn()
 		EntityDef::md5().append((void*)&assertionHasClient, sizeof(int));
 	}
 
-	std::string fmodule = "scripts/client/" + name_ + ".py";
+	std::string fmodule = "client/" + name_ + ".py";
+	// std::string fmodule = "scripts/client/" + name_ + ".py";
 	std::string fmodule_pyc = fmodule + "c";
 	if(Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
 		Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)
@@ -456,7 +459,8 @@ void ScriptDefModule::autoMatchCompOwn()
 		return;
 	}
 
-	fmodule = "scripts/base/" + name_ + ".py";
+	fmodule = "base/" + name_ + ".py";
+	// fmodule = "scripts/base/" + name_ + ".py";
 	fmodule_pyc = fmodule + "c";
 	if(Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
 		Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)
@@ -492,7 +496,8 @@ void ScriptDefModule::autoMatchCompOwn()
 		}
 	}
 
-	fmodule = "scripts/cell/" + name_ + ".py";
+	fmodule = "cell/" + name_ + ".py";
+	// fmodule = "scripts/cell/" + name_ + ".py";
 	fmodule_pyc = fmodule + "c";
 	if(Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
 		Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)

@@ -500,7 +500,7 @@ std::string Resmgr::getPyUserScriptsPath()
 
 		std::string::size_type pos = path.rfind("res");
 		path.erase(pos, path.size() - pos);
-		path += "scripts/";
+		// path += "scripts/";
 	}
 
 	return path;
