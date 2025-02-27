@@ -1,26 +1,37 @@
 #!/bin/sh
 
-currPath=$(pwd)
-keyStr="/kbengine/"
-
-bcontain=`echo $currPath|grep $keyStr|wc -l`
-
-
-if [ $bcontain = 0 ]
-then
-	export KBE_ROOT="$(cd ../; pwd)"
+# 项目路径
+projectPath=$(cd ../; pwd)
+if [ -n "$KBE_ROOT" ]; then
+  :
 else
-	export KBE_ROOT="$(pwd | awk -F "/kbengine/" '{print $1}')/kbengine"
+    # 引擎路径
+    export KBE_ROOT="$(cd ../../; pwd)"
 fi
 
 
+# 遍历子目录并查找 site-packages 目录
+for dir in $(find "$projectPath" -type d -name "site-packages"); do
+    echo "VENV: $dir"
+    KBE_VENV_PATH="$KBE_VENV_PATH$dir;"
+done
 
-export KBE_RES_PATH="$KBE_ROOT/kbe/res/:$(pwd):$(pwd)/res:$(pwd)/scripts/"
+#RES路径
+export KBE_RES_PATH="$KBE_ROOT/kbe/res/:$projectPath:$projectPath/res:$projectPath/"
+#BIN路径
 export KBE_BIN_PATH="$KBE_ROOT/kbe/bin/server/"
+#虚拟环境路径
+export KBE_VENV_PATH="$KBE_VENV_PATH"
+
+
+
 
 echo KBE_ROOT = \"${KBE_ROOT}\"
 echo KBE_RES_PATH = \"${KBE_RES_PATH}\"
 echo KBE_BIN_PATH = \"${KBE_BIN_PATH}\"
+echo KBE_VENV_PATH = \"${KBE_VENV_PATH}\"
+
+
 
 sh ./kill_server.sh
 
