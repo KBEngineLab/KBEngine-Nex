@@ -12,32 +12,32 @@
 #include "db_interface/db_interface.h"
 
 #include "mysql/mysql.h"
-
+#if KBE_PLATFORM == PLATFORM_WIN32
 #pragma comment (lib, "libmysql.lib")
 #pragma comment (lib, "mysqlclient.lib")
+#endif
 
-
-//#if KBE_PLATFORM == PLATFORM_WIN32
-//#ifdef X64
-//// added for VS2015
-//#if _MSC_VER >= 1900
-//#pragma comment (lib, "libmysql64_vs140.lib")
-//#pragma comment (lib, "mysqlclient64_vs140.lib")
-//#else
-//#pragma comment (lib, "libmysql64.lib")
-//#pragma comment (lib, "mysqlclient64.lib")
-//#endif
-//#else
-//// added for VS2015
-//#if _MSC_VER >= 1900
-//#pragma comment (lib, "libmysql32_vs140.lib")
-//#pragma comment (lib, "mysqlclient32_vs140.lib")
-//#else
-//#pragma comment (lib, "libmysql32.lib")
-//#pragma comment (lib, "mysqlclient32.lib")
-//#endif
-//#endif
-//#endif
+// #if KBE_PLATFORM == PLATFORM_WIN32
+// #ifdef X64
+// // added for VS2015
+// #if _MSC_VER >= 1900
+// #pragma comment (lib, "libmysql.lib")
+// #pragma comment (lib, "libmysql.lib")
+// #else
+// #pragma comment (lib, "libmysql.lib")
+// #pragma comment (lib, "libmysql.lib")
+// #endif
+// #else
+// // added for VS2015
+// #if _MSC_VER >= 1900
+// #pragma comment (lib, "libmysql.lib")
+// #pragma comment (lib, "libmysql.lib")
+// #else
+// #pragma comment (lib, "libmysql.lib")
+// #pragma comment (lib, "libmysql.lib")
+// #endif
+// #endif
+// #endif
 
 namespace KBEngine { 
 
