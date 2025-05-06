@@ -6,20 +6,24 @@ FROM --platform=linux/amd64 ubuntu:20.04
 # --platform=arm64
 
 
+# RUN sed -i s:/archive.ubuntu.com:/mirrors.tuna.tsinghua.edu.cn/ubuntu:g /etc/apt/sources.list
+# RUN cat /etc/apt/sources.list
+# RUN apt-get clean
 
-RUN apt-get update && \
-apt-get install -y software-properties-common && \
-add-apt-repository ppa:ubuntu-toolchain-r/test && \
-# 安装GCC
+RUN apt-get update  --fix-missing  && \
 apt-get install -y gcc g++ && \
-apt-get install -y make && \
-# 安装必备服务
+apt-get install -y make  && \
 apt-get install -y libssl-dev && \
-apt-get install -y libtirpc-dev && \
-apt-get install -y libtool && \
-apt-get install -y libmysqlclient-dev && \
-apt-get install -y autoconf && \
+apt-get install -y libtirpc-dev  && \
+apt-get install -y libtool  && \
+apt-get install -y libmysqlclient-dev  && \
+apt-get install -y autoconf  && \
+apt-get install -y vim && \
 apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# RUN apt-get install -y software-properties-common
+# RUN add-apt-repository ppa:ubuntu-toolchain-r/test 
+
 
 # RUN apt-get update
 # RUN  apt-get  install  -y gcc build-essential

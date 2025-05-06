@@ -1,4 +1,5 @@
 # ----[ makefile ]------- #
+/kbe/res/scripts/common/Lib
 # 以下文件会在make时被configure自动更新
 /kbe/src/lib/dependencies/apr/Makefile
 /kbe/src/lib/dependencies/apr-util/Makefile
