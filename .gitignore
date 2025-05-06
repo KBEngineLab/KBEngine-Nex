@@ -1,6 +1,41 @@
+# ----[ makefile ]------- #
+# 以下文件会在make时被configure自动更新
+/kbe/src/lib/dependencies/apr/Makefile
+/kbe/src/lib/dependencies/apr-util/Makefile
+/kbe/src/lib/dependencies/apr-util/xml/expat/Makefile
+/kbe/src/lib/dependencies/curl/configure
+/kbe/src/lib/dependencies/curl/ltmain.sh
+/kbe/src/lib/dependencies/curl/Makefile
+/kbe/src/lib/dependencies/curl/Makefile.in
+/kbe/src/lib/dependencies/curl/include/curl/Makefile.in
+/kbe/src/lib/dependencies/curl/m4/libtool.m4
+/kbe/src/lib/dependencies/curl/packages/Makefile.in
+/kbe/src/lib/dependencies/curl/packages/AIX/Makefile.in
+/kbe/src/lib/dependencies/curl/packages/AIX/RPM/Makefile.in
+/kbe/src/lib/dependencies/curl/packages/Linux/Makefile.in
+/kbe/src/lib/dependencies/curl/packages/Linux/RPM/Makefile.in
+/kbe/src/lib/dependencies/curl/packages/Solaris/Makefile.in
+/kbe/src/lib/dependencies/curl/packages/vms/Makefile.in
+/kbe/src/lib/dependencies/curl/packages/Win32/Makefile.in
+/kbe/src/lib/dependencies/curl/packages/Win32/cygwin/Makefile.in
+/kbe/src/lib/dependencies/curl/scripts/Makefile.in
+/kbe/src/lib/dependencies/curl/tests/Makefile.in
+/kbe/src/lib/dependencies/curl/tests/data/Makefile.in
+/kbe/src/lib/dependencies/expat/Makefile
+/kbe/src/lib/dependencies/jemalloc/Makefile
+/kbe/src/lib/dependencies/log4cxx/configure
+/kbe/src/lib/dependencies/log4cxx/Makefile
+/kbe/src/lib/dependencies/log4cxx/src/main/include/log4cxx/log4cxx.h
+/kbe/src/lib/dependencies/log4cxx/src/main/include/log4cxx/private/log4cxx_private.h
+/kbe/src/lib/dependencies/zlib/Makefile
+/kbe/src/lib/dependencies/zlib/zconf.h
+/kbe/src/lib/python/Makefile
+
+# /kbe/src/lib
 # ----[ Editor ]------- #
 .vscode
 .vs
+.idea
 # .vscode/settings.json
 # ----[ Visual Studio ]------- #
 /kbe/src/_objs
@@ -32,6 +67,8 @@ Thumbs.db
 *.pyc
 
 # -------------[ make files ]------------------------ #
+/kbe/src/lib/python/build
+.deps
 *.o
 *.d
 *.a
@@ -279,25 +316,29 @@ Thumbs.db
 /kbe/src/lib/dependencies/vsopenssl/test/verify_extra_test
 /kbe/src/lib/dependencies/vsopenssl/test/wp_test
 /kbe/src/lib/dependencies/vsopenssl/tools/c_rehash.bak
-# /kbe/src/lib/python/Makefile.pre
-# /kbe/src/lib/python/Misc/python-config.sh
-# /kbe/src/lib/python/Misc/python.pc
-# /kbe/src/lib/python/Modules/Setup
-# /kbe/src/lib/python/Modules/Setup.config
-# /kbe/src/lib/python/Modules/Setup.local
-# /kbe/src/lib/python/Modules/_testembed
-# /kbe/src/lib/python/Modules/config.c
-# /kbe/src/lib/python/Modules/ld_so_aix
-# /kbe/src/lib/python/Parser/pgen
-# /kbe/src/lib/python/build/
-# /kbe/src/lib/python/config.log
-# /kbe/src/lib/python/config.status
-# /kbe/src/lib/python/pybuilddir.txt
-# /kbe/src/lib/python/pyconfig.h
-# /kbe/src/lib/python/python
-# /kbe/src/lib/python/python-config
-# /kbe/src/lib/python/python-config.py
-# /kbe/src/lib/python/python-gdb.py
+
+/kbe/src/lib/python/Makefile.pre
+/kbe/src/lib/python/Misc/python-config.sh
+/kbe/src/lib/python/Misc/python.pc
+/kbe/src/lib/python/Modules/Setup
+/kbe/src/lib/python/Modules/Setup.config
+/kbe/src/lib/python/Modules/Setup.local
+/kbe/src/lib/python/Modules/_testembed
+/kbe/src/lib/python/Modules/config.c
+/kbe/src/lib/python/Modules/ld_so_aix
+/kbe/src/lib/python/Parser/pgen
+/kbe/src/lib/python/build/
+/kbe/src/lib/python/config.log
+/kbe/src/lib/python/config.status
+/kbe/src/lib/python/pybuilddir.txt
+/kbe/src/lib/python/pyconfig.h
+/kbe/src/lib/python/python
+/kbe/src/lib/python/python-config
+/kbe/src/lib/python/python-config.py
+/kbe/src/lib/python/python-gdb.py
+/kbe/src/lib/python/python.exe-gdb.py
+/kbe/src/lib/python/Programs/_testembed
+
 kbe/bin/server/baseapp.lib
 kbe/bin/server/baseappmgr.lib
 kbe/bin/server/bots.lib
@@ -414,7 +455,77 @@ kbe/tools/server/guiconsole/guiconsole.iobj
 kbe/tools/server/guiconsole/guiconsole.ipdb
 kbe/tools/server/guiconsole/python37.dll
 
+
+
+/kbe/src/lib/dependencies/curl/aclocal.m4.bak
+/kbe/src/lib/dependencies/curl/config.log
+/kbe/src/lib/dependencies/curl/config.status
+/kbe/src/lib/dependencies/curl/curl-config
+/kbe/src/lib/dependencies/curl/libcurl.pc
+/kbe/src/lib/dependencies/curl/libtool
+/kbe/src/lib/dependencies/curl/autom4te.cache/output.0
+/kbe/src/lib/dependencies/curl/autom4te.cache/output.1
+/kbe/src/lib/dependencies/curl/autom4te.cache/requests
+/kbe/src/lib/dependencies/curl/autom4te.cache/traces.0
+/kbe/src/lib/dependencies/curl/autom4te.cache/traces.1
+/kbe/src/lib/dependencies/curl/docs/Makefile
+/kbe/src/lib/dependencies/curl/docs/cmdline-opts/Makefile
+/kbe/src/lib/dependencies/curl/docs/examples/Makefile
+/kbe/src/lib/dependencies/curl/docs/libcurl/Makefile
+/kbe/src/lib/dependencies/curl/docs/libcurl/opts/Makefile
+/kbe/src/lib/dependencies/curl/include/Makefile
+/kbe/src/lib/dependencies/curl/include/curl/Makefile
+/kbe/src/lib/dependencies/curl/lib/curl_config.h
+/kbe/src/lib/dependencies/curl/lib/libcurl.la
+/kbe/src/lib/dependencies/curl/lib/libcurl.vers
+/kbe/src/lib/dependencies/curl/lib/Makefile
+/kbe/src/lib/dependencies/curl/lib/stamp-h1
+/kbe/src/lib/dependencies/curl/lib/.libs/libcurl.la
+/kbe/src/lib/dependencies/curl/lib/.libs/libcurl.lai
+/kbe/src/lib/dependencies/curl/lib/vauth/.dirstamp
+/kbe/src/lib/dependencies/curl/lib/vtls/.dirstamp
+/kbe/src/lib/dependencies/curl/packages/Makefile
+/kbe/src/lib/dependencies/curl/packages/AIX/Makefile
+/kbe/src/lib/dependencies/curl/packages/AIX/RPM/curl.spec
+/kbe/src/lib/dependencies/curl/packages/AIX/RPM/Makefile
+/kbe/src/lib/dependencies/curl/packages/EPM/curl.list
+/kbe/src/lib/dependencies/curl/packages/EPM/Makefile
+/kbe/src/lib/dependencies/curl/packages/Linux/Makefile
+/kbe/src/lib/dependencies/curl/packages/Linux/RPM/curl-ssl.spec
+/kbe/src/lib/dependencies/curl/packages/Linux/RPM/curl.spec
+/kbe/src/lib/dependencies/curl/packages/Linux/RPM/Makefile
+/kbe/src/lib/dependencies/curl/packages/Solaris/Makefile
+/kbe/src/lib/dependencies/curl/packages/vms/Makefile
+/kbe/src/lib/dependencies/curl/packages/Win32/Makefile
+/kbe/src/lib/dependencies/curl/packages/Win32/cygwin/Makefile
+/kbe/src/lib/dependencies/curl/scripts/Makefile
+/kbe/src/lib/dependencies/curl/src/Makefile
+/kbe/src/lib/dependencies/curl/tests/configurehelp.pm
+/kbe/src/lib/dependencies/curl/tests/Makefile
+/kbe/src/lib/dependencies/curl/tests/certs/Makefile
+/kbe/src/lib/dependencies/curl/tests/certs/scripts/Makefile
+/kbe/src/lib/dependencies/curl/tests/data/Makefile
+/kbe/src/lib/dependencies/curl/tests/libtest/Makefile
+/kbe/src/lib/dependencies/curl/tests/server/Makefile
+/kbe/src/lib/dependencies/curl/tests/unit/Makefile
+/kbe/src/lib/dependencies/jemalloc/autogen
+/kbe/src/lib/dependencies/log4cxx/autom4te.cache/output.0
+/kbe/src/lib/dependencies/log4cxx/autom4te.cache/requests
+/kbe/src/lib/dependencies/log4cxx/autom4te.cache/traces.0
+/kbe/src/lib/dependencies/zlib/configure.log
+/kbe/src/lib/dependencies/zlib/example
+/kbe/src/lib/dependencies/zlib/example64
+/kbe/src/lib/dependencies/zlib/examplesh
+/kbe/src/lib/dependencies/zlib/libz.so
+/kbe/src/lib/dependencies/zlib/libz.so.1
+/kbe/src/lib/dependencies/zlib/libz.so.1.2.11
+/kbe/src/lib/dependencies/zlib/minigzip
+/kbe/src/lib/dependencies/zlib/minigzip64
+/kbe/src/lib/dependencies/zlib/minigzipsh
+/kbe/src/lib/dependencies/zlib/zlib.pc
+
 kbe/res/sdk_templates/client/ue4/Source/KBEnginePlugins/Engine/.vscode
 kbengine_demos_assets-def
 balls_server_assets
 kbengine_demos_assets
+*server_assets*
