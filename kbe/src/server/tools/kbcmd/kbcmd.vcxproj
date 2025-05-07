@@ -210,6 +210,7 @@
     <ClCompile Include="..\..\..\lib\dependencies\vsopenssl\include\openssl\applink.c" />
     <ClCompile Include="..\..\..\lib\python\Modules\getbuildinfo.c" />
     <ClCompile Include="client_sdk.cpp" />
+    <ClCompile Include="client_sdk_plugin.cpp" />
     <ClCompile Include="client_sdk_ue4.cpp" />
     <ClCompile Include="client_sdk_unity.cpp" />
     <ClCompile Include="entity_component.cpp" />
@@ -221,6 +222,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="client_sdk.h" />
+    <ClInclude Include="client_sdk_plugin.h" />
     <ClInclude Include="client_sdk_ue4.h" />
     <ClInclude Include="client_sdk_unity.h" />
     <ClInclude Include="kbcmd.h" />
