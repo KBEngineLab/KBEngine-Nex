@@ -1,3 +1,5 @@
+# ----[ plugins ]------- #
+kbe_temp_*
 # ----[ makefile ]------- #
 /kbe/res/scripts/common/Lib
 # 以下文件会在make时被configure自动更新
