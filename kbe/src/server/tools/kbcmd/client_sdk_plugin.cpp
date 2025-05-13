@@ -1,5 +1,3 @@
-// Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
-
 #include "kbcmd.h"
 #include "client_sdk.h"
 #include "client_sdk_plugin.h"	
