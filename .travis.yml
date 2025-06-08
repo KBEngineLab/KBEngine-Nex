@@ -13,7 +13,7 @@ before_install:
    - sudo apt-get install libmysqlclient-dev
 notifications:
   recipients:
-    - kbesrv@gmail.com
+    - kbenginenex@foxmail.com
   email:
     on_success: change
     on_failure: always
