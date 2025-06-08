@@ -52,6 +52,9 @@ class MemoryStream;
 // declaration
 namespace strutil {
 
+
+	std::wstring to_wide_string(const std::string& input);
+
 	std::string &kbe_ltrim(std::string &s);
 	std::string &kbe_rtrim(std::string &s);
 	std::string kbe_trim(std::string s);

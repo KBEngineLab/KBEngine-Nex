@@ -17,7 +17,7 @@
 
 /lib/
 
-/Makefile
+# /Makefile
 
 /include/jemalloc/internal/jemalloc_preamble.h
 /include/jemalloc/internal/jemalloc_internal_defs.h

@@ -43,6 +43,7 @@ bool Resmgr::initializeWatcher()
 	WATCH_OBJECT("syspaths/KBE_ROOT", kb_env_.root_path);
 	WATCH_OBJECT("syspaths/KBE_RES_PATH", kb_env_.res_path);
 	WATCH_OBJECT("syspaths/KBE_BIN_PATH", kb_env_.bin_path);
+	WATCH_OBJECT("syspaths/KBE_VENV_PATH", kb_env_.venv_path);
 	return true;
 }
 
@@ -140,6 +141,7 @@ bool Resmgr::initialize()
 	kb_env_.root_path		= getenv("KBE_ROOT") == NULL ? "" : getenv("KBE_ROOT");
 	kb_env_.res_path		= getenv("KBE_RES_PATH") == NULL ? "" : getenv("KBE_RES_PATH"); 
 	kb_env_.bin_path		= getenv("KBE_BIN_PATH") == NULL ? "" : getenv("KBE_BIN_PATH"); 
+	kb_env_.venv_path		= getenv("KBE_VENV_PATH") == NULL ? "" : getenv("KBE_VENV_PATH"); 
 
 	//kb_env_.root			= "/home/kbengine/";
 	//kb_env_.res_path		= "/home/kbengine/kbe/res/;/home/kbengine/assets/;/home/kbengine/assets/scripts/;/home/kbengine/assets/res/"; 
@@ -175,11 +177,13 @@ void Resmgr::print(void)
 	INFO_MSG(fmt::format("Resmgr::initialize: KBE_ROOT={0}\n", kb_env_.root_path));
 	INFO_MSG(fmt::format("Resmgr::initialize: KBE_RES_PATH={0}\n", kb_env_.res_path));
 	INFO_MSG(fmt::format("Resmgr::initialize: KBE_BIN_PATH={0}\n", kb_env_.bin_path));
+	INFO_MSG(fmt::format("Resmgr::initialize: KBE_VENV_PATH={0}\n", kb_env_.venv_path));
 
 #if KBE_PLATFORM == PLATFORM_WIN32
 	printf("%s", fmt::format("KBE_ROOT = {0}\n", kb_env_.root_path).c_str());
 	printf("%s", fmt::format("KBE_RES_PATH = {0}\n", kb_env_.res_path).c_str());
 	printf("%s", fmt::format("KBE_BIN_PATH = {0}\n", kb_env_.bin_path).c_str());
+	printf("%s", fmt::format("KBE_VENV_PATH = {0}\n", kb_env_.venv_path).c_str());
 	printf("\n");
 #endif
 }
@@ -496,7 +500,7 @@ std::string Resmgr::getPyUserScriptsPath()
 
 		std::string::size_type pos = path.rfind("res");
 		path.erase(pos, path.size() - pos);
-		path += "scripts/";
+		// path += "scripts/";
 	}
 
 	return path;

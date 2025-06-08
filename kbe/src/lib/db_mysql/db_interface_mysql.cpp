@@ -171,6 +171,8 @@ bool DBInterfaceMysql::attach(const char* databaseName)
 
 	hasLostConnection_ = false;
 
+
+
 	try
 	{
 		pMysql_ = mysql_init(0);
@@ -179,6 +181,14 @@ bool DBInterfaceMysql::attach(const char* databaseName)
 			ERROR_MSG("DBInterfaceMysql::attach: mysql_init error!\n");
 			return false;
 		}
+
+
+		// ½ûÓÃ SSL
+		enum mysql_ssl_mode opt_use_ssl = SSL_MODE_DISABLED;
+		mysql_options(mysql(), MYSQL_OPT_SSL_MODE, &opt_use_ssl);
+
+
+
 		
 		DEBUG_MSG(fmt::format("DBInterfaceMysql::attach: connect: {}:{} starting...\n", db_ip_, db_port_));
 
@@ -260,7 +270,7 @@ __RECONNECT:
 	}
 	catch (std::exception& e)
 	{
-		ERROR_MSG(fmt::format("DBInterfaceMysql::attach: {}\n", e.what()));
+		ERROR_MSG(fmt::format("DBInterfaceMysql::attach: {} \n", e.what()));
 		hasLostConnection_ = true;
 		detach();
 		return false;
@@ -544,7 +554,7 @@ bool DBInterfaceMysql::write_query_result(MemoryStream * result)
 			result->wpos(wpos);
 
 			DBException e1(NULL);
-			e1.setError(fmt::format("DBException: {}, SQL({})", e.what(), lastquery_), 0);
+			e1.setError(fmt::format("DBException: {}, SQL({}) ", e.what(), lastquery_), 0);
 			throwError(&e1);
 
 			return false;

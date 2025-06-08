@@ -282,6 +282,10 @@ CXXFLAGS += -fno-strict-aliasing -Wno-non-virtual-dtor
 CXXFLAGS += -Wno-invalid-offsetof
 CXXFLAGS += -Werror
 CXXFLAGS += -std=c++11
+# CXXFLAGS += -Wno-error=c++20-compat
+# CXXFLAGS += -Wno-deprecated-declarations
+CXXFLAGS += -Wno-error=nonnull
+# CXXFLAGS += -Wno-error=stringop-overflow
 
 CPPFLAGS += -DKBE_SERVER -MMD -DKBE_CONFIG=\"${KBE_CONFIG}\"
 

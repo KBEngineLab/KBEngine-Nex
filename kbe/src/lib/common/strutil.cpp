@@ -11,8 +11,16 @@
 #include "utf8cpp/utf8.h"
 #include "memorystream.h"
 
+#include <codecvt>
+
 namespace KBEngine{ 
 namespace strutil {
+
+	std::wstring to_wide_string(const std::string& input)
+	{
+		std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+		return converter.from_bytes(input);
+	}
 
 	int bytes2string(unsigned char *src, int srcsize, unsigned char *dst, int dstsize)     
 	{     

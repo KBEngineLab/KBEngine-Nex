@@ -30,6 +30,7 @@ public:
 		std::string root_path;
 		std::string res_path;
 		std::string bin_path;
+		std::string venv_path;
 	};
 
 	static uint64 respool_timeout;
