@@ -1,18 +1,18 @@
 KBEngine
 ========
 
-[![Build Status](https://travis-ci.org/kbengine/kbengine.svg)](https://travis-ci.org/kbengine/kbengine)
-[![Appveyor (Windows) Build  Status](https://ci.appveyor.com/api/projects/status/github/kbengine/kbengine?branch=master&svg=true)](https://ci.appveyor.com/project/kbengine/kbengine/branch/master)
+[![Build Status](https://app.travis-ci.com/KBEngineLab/KBEngine-Nex.svg?token=M3r2FYhm8oaqqg7DgR5z)](https://app.travis-ci.com/KBEngineLab/KBEngine-Nex)
+[![Build status](https://ci.appveyor.com/api/projects/status/aij7ox4twu53v3v0/branch/master?svg=true)](https://ci.appveyor.com/project/KBEngineLab/kbengine-nex/branch/master)
 
 
 ## Homepage
 
-	https://kbengine.github.io/
+	https://www.kbelab.com/
 
 
 ## Releases
 
-	Sources		: https://github.com/kbengine/kbengine/releases/latest
+	Sources		: https://github.com/KBEngineLab/KBEngine-Nex/releases/latest
 
 
 ## Demo sources
