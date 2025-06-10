@@ -349,6 +349,27 @@
 						(is true, password is RSA)
 					-->
 					<encrypt> true </encrypt>
+
+					<MySQL>
+						<!--
+							mysql账号验证插件
+							- caching_sha2_password
+							- mysql_native_password
+							8.0之后，mysql新增了caching_sha2_password作为默认验证插件，
+							caching_sha2_password需要启用ssl或rsa
+						-->
+						<authPlugin> caching_sha2_password </authPlugin>
+						<!-- 为true表示启用rsa加密，注意：此处的加密和上面的encrypt不同，这里是服务端到mysql的加密 -->
+						<rsa> true </rsa>
+						<!-- rsa 证书 -->
+						<rsaPublicKey> false </rsaPublicKey>
+						<!-- 是否启用ssl -->
+						<ssl> true </ssl>
+						<!-- ssl证书 -->
+						<sslCert> false </sslCert>
+						<sslKey> false </sslKey>
+						<sslCa> false </sslCa>
+					</MySQL>
 				</auth>
 
 				<!-- 数据库名称 
