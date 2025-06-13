@@ -287,6 +287,13 @@ CXXFLAGS += -std=c++11
 CXXFLAGS += -Wno-error=nonnull
 # CXXFLAGS += -Wno-error=stringop-overflow
 
+# CXXFLAGS += -Werror=nonnull
+CXXFLAGS += -Wnonnull
+CXXFLAGS += -Wno-error=deprecated-declarations
+CXXFLAGS += -Wno-error=class-memaccess
+CXXFLAGS += -Werror=format-truncation
+CXXFLAGS += -Wdeprecated-declarations
+
 CPPFLAGS += -DKBE_SERVER -MMD -DKBE_CONFIG=\"${KBE_CONFIG}\"
 
 ifeq (,$(findstring SingleThreaded,$(KBE_CONFIG)))

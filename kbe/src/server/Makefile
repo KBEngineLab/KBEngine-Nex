@@ -3,7 +3,7 @@ export KBE_ROOT := $(subst /kbe/src/server,,$(CURDIR))
 endif
 
 # 定义所有需要构建的子目录
-SUBDIRS :=  baseapp baseappmgr cellapp cellappmgr dbmgr loginapp machine tools
+SUBDIRS := ../lib baseapp baseappmgr cellapp cellappmgr dbmgr loginapp machine tools
 
 all clean realclean all_config install::
 
