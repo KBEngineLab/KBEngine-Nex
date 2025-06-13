@@ -52,12 +52,16 @@ stage1: mkdir_target zlib_build fmt_build jemalloc_build openssl_build curl_buil
         jwsmtp_build apr_build expat_build apr_util_build log4cxx_build
 
 # 阶段2: 主项目组件
-stage2: stage1 client_lib_build common_build db_redis_build db_mysql_build \
+stage2: client_lib_build common_build db_redis_build db_mysql_build \
         db_interface_build entitydef_build math_build resmgr_build \
         pyscript_build server_build navigation_build network_build \
         helper_build thread_build xml_build
 
 # 依赖库构建规则
+
+stage2: stage1
+
+
 zlib_build:
 	cd dependencies/zlib && $(MAKE) all  && if ! test -e $(LIB_DIR)/libz.a; then cp -f "libz.a" "$(LIB_DIR)"; fi
 
@@ -158,8 +162,8 @@ navigation_build: math_build jemalloc_build
 network_build: jemalloc_build
 	cd network && $(MAKE) all 
 
-helper_build: jemalloc_build
-	cd helper && $(MAKE) all 
+helper_build: jemalloc_build log4cxx_build math_build common_build
+	cd helper && $(MAKE) all  -j1  
 
 thread_build: jemalloc_build
 	cd thread && $(MAKE) all 
