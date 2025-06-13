@@ -36,7 +36,7 @@ export C_INCLUDE_PATH := $(INCLUDE_DIR):$(C_INCLUDE_PATH)
 export CPLUS_INCLUDE_PATH := $(INCLUDE_DIR):$(CPLUS_INCLUDE_PATH)
 
 # 并行构建目标定义
-all install clean full: mkdir_target stage1 python_build 
+all install clean full: mkdir_target stage1  python_build stage2
 
 # install clean full:
 # 	$(MAKE) -j1 $@  # 非并行执行特殊目标
@@ -44,6 +44,7 @@ all install clean full: mkdir_target stage1 python_build
 # 特殊处理目标（非并行）
 mkdir_target:
 	@test -d $(LIBDIR) || mkdir -p $(LIBDIR)
+
 
 # 阶段1: 基础依赖库
 stage1: mkdir_target zlib_build fmt_build jemalloc_build openssl_build curl_build \
