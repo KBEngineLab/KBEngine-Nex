@@ -19,7 +19,7 @@ endif
 endif
 
 # 并行构建所有子目录
-	@$(MAKE) --no-print-directory $(SUBDIRS) MAKE_TARGET=$@
+	@$(MAKE)  $(SUBDIRS) MAKE_TARGET=$@
 
 # 构建完成提示（保持不变）
 ifdef KBE_CONFIG
@@ -27,7 +27,7 @@ ifdef KBE_CONFIG
 else
 	@echo completed $@
 endif
-	@$(MAKE) --no-print-directory done
+	@$(MAKE)  done
 
 # 子目录构建规则
 .PHONY: $(SUBDIRS)

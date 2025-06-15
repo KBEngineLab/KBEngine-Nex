@@ -6,11 +6,12 @@ endif
 
 all clean:
 	@start_time=$$(date +%s); \
+	start_fmt=$$(date -d "@$${start_time}" '+%Y-%m-%d %H:%M:%S'); \
 	echo "编译开始：$$(date '+%Y-%m-%d %H:%M:%S')"; \
 	$(MAKE) -C lib $@; \
 	$(MAKE) -C server $@; \
 	end_time=$$(date +%s); \
-	echo "编译开始：$$(date $(start_time) '+%Y-%m-%d %H:%M:%S')"; \
+	echo "编译开始：$${start_fmt}"; \
 	echo "编译完成：$$(date '+%Y-%m-%d %H:%M:%S')"; \
 	elapsed=$$((end_time - start_time)); \
 	hours=$$((elapsed / 3600)); \
