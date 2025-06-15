@@ -19,6 +19,9 @@ def parse(filename):
 
     with open(filename, encoding='latin1') as f:
         lines = list(f)
+    # Remove mojibake in /usr/share/X11/locale/locale.alias.
+    # b'\xef\xbf\xbd' == '\ufffd'.encode('utf-8')
+    lines = [line for line in lines if '\xef\xbf\xbd' not in line]
     data = {}
     for line in lines:
         line = line.strip()
@@ -137,6 +140,9 @@ if __name__ == '__main__':
     data = locale.locale_alias.copy()
     data.update(parse_glibc_supported(args.glibc_supported))
     data.update(parse(args.locale_alias))
+    # Hardcode 'c.utf8' -> 'C.UTF-8' because 'en_US.UTF-8' does not exist
+    # on all platforms.
+    data['c.utf8'] = 'C.UTF-8'
     while True:
         # Repeat optimization while the size is decreased.
         n = len(data)

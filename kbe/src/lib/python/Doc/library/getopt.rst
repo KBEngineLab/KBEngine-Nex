@@ -1,5 +1,5 @@
-:mod:`getopt` --- C-style parser for command line options
-=========================================================
+:mod:`!getopt` --- C-style parser for command line options
+==========================================================
 
 .. module:: getopt
    :synopsis: Portable parser for command line options; support both short and
@@ -9,19 +9,26 @@
 
 .. note::
 
-   The :mod:`getopt` module is a parser for command line options whose API is
-   designed to be familiar to users of the C :c:func:`getopt` function. Users who
-   are unfamiliar with the C :c:func:`getopt` function or who would like to write
-   less code and get better help and error messages should consider using the
-   :mod:`argparse` module instead.
+   This module is considered feature complete. A more declarative and
+   extensible alternative to this API is provided in the :mod:`optparse`
+   module. Further functional enhancements for command line parameter
+   processing are provided either as third party modules on PyPI,
+   or else as features in the :mod:`argparse` module.
 
 --------------
 
 This module helps scripts to parse the command line arguments in ``sys.argv``.
-It supports the same conventions as the Unix :c:func:`getopt` function (including
+It supports the same conventions as the Unix :c:func:`!getopt` function (including
 the special meanings of arguments of the form '``-``' and '``--``').  Long
 options similar to those supported by GNU software may be used as well via an
 optional third argument.
+
+Users who are unfamiliar with the Unix :c:func:`!getopt` function should consider
+using the :mod:`argparse` module instead. Users who are familiar with the Unix
+:c:func:`!getopt` function, but would like to get equivalent behavior while
+writing less code and getting better help and error messages should consider
+using the :mod:`optparse` module. See :ref:`choosing-an-argument-parser` for
+additional details.
 
 This module provides two functions and an
 exception:
@@ -33,11 +40,11 @@ exception:
    be parsed, without the leading reference to the running program. Typically, this
    means ``sys.argv[1:]``. *shortopts* is the string of option letters that the
    script wants to recognize, with options that require an argument followed by a
-   colon (``':'``; i.e., the same format that Unix :c:func:`getopt` uses).
+   colon (``':'``; i.e., the same format that Unix :c:func:`!getopt` uses).
 
    .. note::
 
-      Unlike GNU :c:func:`getopt`, after a non-option argument, all further
+      Unlike GNU :c:func:`!getopt`, after a non-option argument, all further
       arguments are considered also non-options. This is similar to the way
       non-GNU Unix systems work.
 
@@ -71,7 +78,7 @@ exception:
    non-option argument is encountered.
 
    If the first character of the option string is ``'+'``, or if the environment
-   variable :envvar:`POSIXLY_CORRECT` is set, then option processing stops as
+   variable :envvar:`!POSIXLY_CORRECT` is set, then option processing stops as
    soon as a non-option argument is encountered.
 
 
@@ -81,9 +88,9 @@ exception:
    an option requiring an argument is given none. The argument to the exception is
    a string indicating the cause of the error.  For long options, an argument given
    to an option which does not require one will also cause this exception to be
-   raised.  The attributes :attr:`msg` and :attr:`opt` give the error message and
+   raised.  The attributes :attr:`!msg` and :attr:`!opt` give the error message and
    related option; if there is no specific option to which the exception relates,
-   :attr:`opt` is an empty string.
+   :attr:`!opt` is an empty string.
 
 .. XXX deprecated?
 .. exception:: error
@@ -91,6 +98,8 @@ exception:
    Alias for :exc:`GetoptError`; for backward compatibility.
 
 An example using only Unix style options:
+
+.. doctest::
 
    >>> import getopt
    >>> args = '-a -b -cfoo -d bar a1 a2'.split()
@@ -104,6 +113,8 @@ An example using only Unix style options:
 
 Using long option names is equally easy:
 
+.. doctest::
+
    >>> s = '--condition=foo --testing --output-file abc.def -x a1 a2'
    >>> args = s.split()
    >>> args
@@ -115,7 +126,9 @@ Using long option names is equally easy:
    >>> args
    ['a1', 'a2']
 
-In a script, typical usage is something like this::
+In a script, typical usage is something like this:
+
+.. testcode::
 
    import getopt, sys
 
@@ -139,13 +152,29 @@ In a script, typical usage is something like this::
                output = a
            else:
                assert False, "unhandled option"
-       # ...
+       process(args, output=output, verbose=verbose)
 
    if __name__ == "__main__":
        main()
 
 Note that an equivalent command line interface could be produced with less code
-and more informative help and error messages by using the :mod:`argparse` module::
+and more informative help and error messages by using the :mod:`optparse` module:
+
+.. testcode::
+
+   import optparse
+
+   if __name__ == '__main__':
+       parser = optparse.OptionParser()
+       parser.add_option('-o', '--output')
+       parser.add_option('-v', dest='verbose', action='store_true')
+       opts, args = parser.parse_args()
+       process(args, output=opts.output, verbose=opts.verbose)
+
+A roughly equivalent command line interface for this case can also be
+produced by using the :mod:`argparse` module:
+
+.. testcode::
 
    import argparse
 
@@ -153,12 +182,18 @@ and more informative help and error messages by using the :mod:`argparse` module
        parser = argparse.ArgumentParser()
        parser.add_argument('-o', '--output')
        parser.add_argument('-v', dest='verbose', action='store_true')
+       parser.add_argument('rest', nargs='*')
        args = parser.parse_args()
-       # ... do something with args.output ...
-       # ... do something with args.verbose ..
+       process(args.rest, output=args.output, verbose=args.verbose)
+
+See :ref:`choosing-an-argument-parser` for details on how the ``argparse``
+version of this code differs in behaviour from the ``optparse`` (and
+``getopt``) version.
 
 .. seealso::
 
-   Module :mod:`argparse`
-      Alternative command line option and argument parsing library.
+   Module :mod:`optparse`
+      Declarative command line option parsing.
 
+   Module :mod:`argparse`
+      More opinionated command line option and argument parsing library.

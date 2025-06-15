@@ -74,7 +74,7 @@ PyObject *PyLong_FromSsize_t(Py_ssize_t ival)
 
 /* tainted sinks
  *
- * Coverity considers argv, environ, read() data etc as tained.
+ * Coverity considers argv, environ, read() data etc as tainted.
  */
 
 PyObject *PyErr_SetFromErrnoWithFilename(PyObject *exc, const char *filename)
@@ -90,14 +90,6 @@ wchar_t *Py_DecodeLocale(const char* arg, size_t *size)
     __coverity_tainted_data_sink__(arg);
     __coverity_tainted_data_sink__(size);
    return w;
-}
-
-/* Parser/pgenmain.c */
-grammar *getgrammar(const char *filename)
-{
-    grammar *g;
-    __coverity_tainted_data_sink__(filename);
-    return g;
 }
 
 /* Python/marshal.c */

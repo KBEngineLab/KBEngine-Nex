@@ -3,32 +3,39 @@
 Written by Cody A.W. Somerville <cody-somerville@ubuntu.com>,
 Josip Dzolonga, and Michael Otteneder for the 2007/08 GHOP contest.
 """
-
+from collections import OrderedDict
 from http.server import BaseHTTPRequestHandler, HTTPServer, \
      SimpleHTTPRequestHandler, CGIHTTPRequestHandler
 from http import server, HTTPStatus
 
 import os
+import socket
 import sys
 import re
 import base64
 import ntpath
+import pathlib
 import shutil
 import email.message
 import email.utils
 import html
-import http.client
+import http, http.client
 import urllib.parse
 import tempfile
 import time
 import datetime
 import threading
 from unittest import mock
-from io import BytesIO
+from io import BytesIO, StringIO
 
 import unittest
 from test import support
+from test.support import (
+    is_apple, os_helper, requires_subprocess, threading_helper
+)
+from test.support.testcase import ExtraAssertions
 
+support.requires_working_socket(module=True)
 
 class NoLogRequestHandler:
     def log_message(self, *args):
@@ -60,10 +67,10 @@ class TestServerThread(threading.Thread):
         self.join()
 
 
-class BaseTestCase(unittest.TestCase):
+class BaseTestCase(unittest.TestCase, ExtraAssertions):
     def setUp(self):
-        self._threads = support.threading_setup()
-        os.environ = support.EnvironmentVarGuard()
+        self._threads = threading_helper.threading_setup()
+        os.environ = os_helper.EnvironmentVarGuard()
         self.server_started = threading.Event()
         self.thread = TestServerThread(self, self.request_handler)
         self.thread.start()
@@ -73,7 +80,7 @@ class BaseTestCase(unittest.TestCase):
         self.thread.stop()
         self.thread = None
         os.environ.__exit__()
-        support.threading_cleanup(*self._threads)
+        threading_helper.threading_cleanup(*self._threads)
 
     def request(self, uri, method='GET', body=None, headers={}):
         self.connection = http.client.HTTPConnection(self.HOST, self.PORT)
@@ -154,6 +161,27 @@ class BaseHTTPServerTestCase(BaseTestCase):
 
     def test_version_digits(self):
         self.con._http_vsn_str = 'HTTP/9.9.9'
+        self.con.putrequest('GET', '/')
+        self.con.endheaders()
+        res = self.con.getresponse()
+        self.assertEqual(res.status, HTTPStatus.BAD_REQUEST)
+
+    def test_version_signs_and_underscores(self):
+        self.con._http_vsn_str = 'HTTP/-9_9_9.+9_9_9'
+        self.con.putrequest('GET', '/')
+        self.con.endheaders()
+        res = self.con.getresponse()
+        self.assertEqual(res.status, HTTPStatus.BAD_REQUEST)
+
+    def test_major_version_number_too_long(self):
+        self.con._http_vsn_str = 'HTTP/909876543210.0'
+        self.con.putrequest('GET', '/')
+        self.con.endheaders()
+        res = self.con.getresponse()
+        self.assertEqual(res.status, HTTPStatus.BAD_REQUEST)
+
+    def test_minor_version_number_too_long(self):
+        self.con._http_vsn_str = 'HTTP/1.909876543210'
         self.con.putrequest('GET', '/')
         self.con.endheaders()
         res = self.con.getresponse()
@@ -308,8 +336,7 @@ class RequestHandlerLoggingTestCase(BaseTestCase):
             self.con.request('GET', '/')
             self.con.getresponse()
 
-        self.assertTrue(
-            err.getvalue().endswith('"GET / HTTP/1.1" 200 -\n'))
+        self.assertEndsWith(err.getvalue(), '"GET / HTTP/1.1" 200 -\n')
 
     def test_err(self):
         self.con = http.client.HTTPConnection(self.HOST, self.PORT)
@@ -320,8 +347,8 @@ class RequestHandlerLoggingTestCase(BaseTestCase):
             self.con.getresponse()
 
         lines = err.getvalue().split('\n')
-        self.assertTrue(lines[0].endswith('code 404, message File not found'))
-        self.assertTrue(lines[1].endswith('"ERROR / HTTP/1.1" 404 -'))
+        self.assertEndsWith(lines[0], 'code 404, message File not found')
+        self.assertEndsWith(lines[1], '"ERROR / HTTP/1.1" 404 -')
 
 
 class SimpleHTTPServerTestCase(BaseTestCase):
@@ -329,7 +356,7 @@ class SimpleHTTPServerTestCase(BaseTestCase):
         pass
 
     def setUp(self):
-        BaseTestCase.setUp(self)
+        super().setUp()
         self.cwd = os.getcwd()
         basetempdir = tempfile.gettempdir()
         os.chdir(basetempdir)
@@ -357,7 +384,7 @@ class SimpleHTTPServerTestCase(BaseTestCase):
             except:
                 pass
         finally:
-            BaseTestCase.tearDown(self)
+            super().tearDown()
 
     def check_status_and_reason(self, response, status, data=None):
         def close_conn():
@@ -384,34 +411,169 @@ class SimpleHTTPServerTestCase(BaseTestCase):
         reader.close()
         return body
 
-    @unittest.skipIf(sys.platform == 'darwin',
-                     'undecodable name cannot always be decoded on macOS')
-    @unittest.skipIf(sys.platform == 'win32',
-                     'undecodable name cannot be decoded on win32')
-    @unittest.skipUnless(support.TESTFN_UNDECODABLE,
-                         'need support.TESTFN_UNDECODABLE')
-    def test_undecodable_filename(self):
+    def check_list_dir_dirname(self, dirname, quotedname=None):
+        fullpath = os.path.join(self.tempdir, dirname)
+        try:
+            os.mkdir(os.path.join(self.tempdir, dirname))
+        except (OSError, UnicodeEncodeError):
+            self.skipTest(f'Can not create directory {dirname!a} '
+                          f'on current file system')
+
+        if quotedname is None:
+            quotedname = urllib.parse.quote(dirname, errors='surrogatepass')
+        response = self.request(self.base_url + '/' + quotedname + '/')
+        body = self.check_status_and_reason(response, HTTPStatus.OK)
+        displaypath = html.escape(f'{self.base_url}/{dirname}/', quote=False)
         enc = sys.getfilesystemencoding()
-        filename = os.fsdecode(support.TESTFN_UNDECODABLE) + '.txt'
-        with open(os.path.join(self.tempdir, filename), 'wb') as f:
-            f.write(support.TESTFN_UNDECODABLE)
+        prefix = f'listing for {displaypath}</'.encode(enc, 'surrogateescape')
+        self.assertIn(prefix + b'title>', body)
+        self.assertIn(prefix + b'h1>', body)
+
+    def check_list_dir_filename(self, filename):
+        fullpath = os.path.join(self.tempdir, filename)
+        content = ascii(fullpath).encode() + (os_helper.TESTFN_UNDECODABLE or b'\xff')
+        try:
+            with open(fullpath, 'wb') as f:
+                f.write(content)
+        except OSError:
+            self.skipTest(f'Can not create file {filename!a} '
+                          f'on current file system')
+
         response = self.request(self.base_url + '/')
-        if sys.platform == 'darwin':
-            # On Mac OS the HFS+ filesystem replaces bytes that aren't valid
-            # UTF-8 into a percent-encoded value.
-            for name in os.listdir(self.tempdir):
-                if name != 'test': # Ignore a filename created in setUp().
-                    filename = name
-                    break
         body = self.check_status_and_reason(response, HTTPStatus.OK)
         quotedname = urllib.parse.quote(filename, errors='surrogatepass')
-        self.assertIn(('href="%s"' % quotedname)
-                      .encode(enc, 'surrogateescape'), body)
-        self.assertIn(('>%s<' % html.escape(filename, quote=False))
-                      .encode(enc, 'surrogateescape'), body)
+        enc = response.headers.get_content_charset()
+        self.assertIsNotNone(enc)
+        self.assertIn((f'href="{quotedname}"').encode('ascii'), body)
+        displayname = html.escape(filename, quote=False)
+        self.assertIn(f'>{displayname}<'.encode(enc, 'surrogateescape'), body)
+
         response = self.request(self.base_url + '/' + quotedname)
-        self.check_status_and_reason(response, HTTPStatus.OK,
-                                     data=support.TESTFN_UNDECODABLE)
+        self.check_status_and_reason(response, HTTPStatus.OK, data=content)
+
+    @unittest.skipUnless(os_helper.TESTFN_NONASCII,
+                         'need os_helper.TESTFN_NONASCII')
+    def test_list_dir_nonascii_dirname(self):
+        dirname = os_helper.TESTFN_NONASCII + '.dir'
+        self.check_list_dir_dirname(dirname)
+
+    @unittest.skipUnless(os_helper.TESTFN_NONASCII,
+                         'need os_helper.TESTFN_NONASCII')
+    def test_list_dir_nonascii_filename(self):
+        filename = os_helper.TESTFN_NONASCII + '.txt'
+        self.check_list_dir_filename(filename)
+
+    @unittest.skipIf(is_apple,
+                     'undecodable name cannot always be decoded on Apple platforms')
+    @unittest.skipIf(sys.platform == 'win32',
+                     'undecodable name cannot be decoded on win32')
+    @unittest.skipUnless(os_helper.TESTFN_UNDECODABLE,
+                         'need os_helper.TESTFN_UNDECODABLE')
+    def test_list_dir_undecodable_dirname(self):
+        dirname = os.fsdecode(os_helper.TESTFN_UNDECODABLE) + '.dir'
+        self.check_list_dir_dirname(dirname)
+
+    @unittest.skipIf(is_apple,
+                     'undecodable name cannot always be decoded on Apple platforms')
+    @unittest.skipIf(sys.platform == 'win32',
+                     'undecodable name cannot be decoded on win32')
+    @unittest.skipUnless(os_helper.TESTFN_UNDECODABLE,
+                         'need os_helper.TESTFN_UNDECODABLE')
+    def test_list_dir_undecodable_filename(self):
+        filename = os.fsdecode(os_helper.TESTFN_UNDECODABLE) + '.txt'
+        self.check_list_dir_filename(filename)
+
+    def test_list_dir_undecodable_dirname2(self):
+        dirname = '\ufffd.dir'
+        self.check_list_dir_dirname(dirname, quotedname='%ff.dir')
+
+    @unittest.skipUnless(os_helper.TESTFN_UNENCODABLE,
+                         'need os_helper.TESTFN_UNENCODABLE')
+    def test_list_dir_unencodable_dirname(self):
+        dirname = os_helper.TESTFN_UNENCODABLE + '.dir'
+        self.check_list_dir_dirname(dirname)
+
+    @unittest.skipUnless(os_helper.TESTFN_UNENCODABLE,
+                         'need os_helper.TESTFN_UNENCODABLE')
+    def test_list_dir_unencodable_filename(self):
+        filename = os_helper.TESTFN_UNENCODABLE + '.txt'
+        self.check_list_dir_filename(filename)
+
+    def test_list_dir_escape_dirname(self):
+        # Characters that need special treating in URL or HTML.
+        for name in ('q?', 'f#', '&amp;', '&amp', '<i>', '"dq"', "'sq'",
+                     '%A4', '%E2%82%AC'):
+            with self.subTest(name=name):
+                dirname = name + '.dir'
+                self.check_list_dir_dirname(dirname,
+                        quotedname=urllib.parse.quote(dirname, safe='&<>\'"'))
+
+    def test_list_dir_escape_filename(self):
+        # Characters that need special treating in URL or HTML.
+        for name in ('q?', 'f#', '&amp;', '&amp', '<i>', '"dq"', "'sq'",
+                     '%A4', '%E2%82%AC'):
+            with self.subTest(name=name):
+                filename = name + '.txt'
+                self.check_list_dir_filename(filename)
+                os_helper.unlink(os.path.join(self.tempdir, filename))
+
+    def test_list_dir_with_query_and_fragment(self):
+        prefix = f'listing for {self.base_url}/</'.encode('latin1')
+        response = self.request(self.base_url + '/#123').read()
+        self.assertIn(prefix + b'title>', response)
+        self.assertIn(prefix + b'h1>', response)
+        response = self.request(self.base_url + '/?x=123').read()
+        self.assertIn(prefix + b'title>', response)
+        self.assertIn(prefix + b'h1>', response)
+
+    def test_get_dir_redirect_location_domain_injection_bug(self):
+        """Ensure //evil.co/..%2f../../X does not put //evil.co/ in Location.
+
+        //netloc/ in a Location header is a redirect to a new host.
+        https://github.com/python/cpython/issues/87389
+
+        This checks that a path resolving to a directory on our server cannot
+        resolve into a redirect to another server.
+        """
+        os.mkdir(os.path.join(self.tempdir, 'existing_directory'))
+        url = f'/python.org/..%2f..%2f..%2f..%2f..%2f../%0a%0d/../{self.tempdir_name}/existing_directory'
+        expected_location = f'{url}/'  # /python.org.../ single slash single prefix, trailing slash
+        # Canonicalizes to /tmp/tempdir_name/existing_directory which does
+        # exist and is a dir, triggering the 301 redirect logic.
+        response = self.request(url)
+        self.check_status_and_reason(response, HTTPStatus.MOVED_PERMANENTLY)
+        location = response.getheader('Location')
+        self.assertEqual(location, expected_location, msg='non-attack failed!')
+
+        # //python.org... multi-slash prefix, no trailing slash
+        attack_url = f'/{url}'
+        response = self.request(attack_url)
+        self.check_status_and_reason(response, HTTPStatus.MOVED_PERMANENTLY)
+        location = response.getheader('Location')
+        self.assertNotStartsWith(location, '//')
+        self.assertEqual(location, expected_location,
+                msg='Expected Location header to start with a single / and '
+                'end with a / as this is a directory redirect.')
+
+        # ///python.org... triple-slash prefix, no trailing slash
+        attack3_url = f'//{url}'
+        response = self.request(attack3_url)
+        self.check_status_and_reason(response, HTTPStatus.MOVED_PERMANENTLY)
+        self.assertEqual(response.getheader('Location'), expected_location)
+
+        # If the second word in the http request (Request-URI for the http
+        # method) is a full URI, we don't worry about it, as that'll be parsed
+        # and reassembled as a full URI within BaseHTTPRequestHandler.send_head
+        # so no errant scheme-less //netloc//evil.co/ domain mixup can happen.
+        attack_scheme_netloc_2slash_url = f'https://pypi.org/{url}'
+        expected_scheme_netloc_location = f'{attack_scheme_netloc_2slash_url}/'
+        response = self.request(attack_scheme_netloc_2slash_url)
+        self.check_status_and_reason(response, HTTPStatus.MOVED_PERMANENTLY)
+        location = response.getheader('Location')
+        # We're just ensuring that the scheme and domain make it through, if
+        # there are or aren't multiple slashes at the start of the path that
+        # follows that isn't important in this Location: header.
+        self.assertStartsWith(location, 'https://pypi.org/')
 
     def test_get(self):
         #constructs the path relative to the root directory of the HTTPServer
@@ -420,10 +582,20 @@ class SimpleHTTPServerTestCase(BaseTestCase):
         # check for trailing "/" which should return 404. See Issue17324
         response = self.request(self.base_url + '/test/')
         self.check_status_and_reason(response, HTTPStatus.NOT_FOUND)
+        response = self.request(self.base_url + '/test%2f')
+        self.check_status_and_reason(response, HTTPStatus.NOT_FOUND)
+        response = self.request(self.base_url + '/test%2F')
+        self.check_status_and_reason(response, HTTPStatus.NOT_FOUND)
         response = self.request(self.base_url + '/')
+        self.check_status_and_reason(response, HTTPStatus.OK)
+        response = self.request(self.base_url + '%2f')
+        self.check_status_and_reason(response, HTTPStatus.OK)
+        response = self.request(self.base_url + '%2F')
         self.check_status_and_reason(response, HTTPStatus.OK)
         response = self.request(self.base_url)
         self.check_status_and_reason(response, HTTPStatus.MOVED_PERMANENTLY)
+        self.assertEqual(response.getheader("Location"), self.base_url + "/")
+        self.assertEqual(response.getheader("Content-Length"), "0")
         response = self.request(self.base_url + '/?hi=2')
         self.check_status_and_reason(response, HTTPStatus.OK)
         response = self.request(self.base_url + '?hi=1')
@@ -434,6 +606,9 @@ class SimpleHTTPServerTestCase(BaseTestCase):
         self.check_status_and_reason(response, HTTPStatus.NOT_FOUND)
         response = self.request('/' + 'ThisDoesNotExist' + '/')
         self.check_status_and_reason(response, HTTPStatus.NOT_FOUND)
+        os.makedirs(os.path.join(self.tempdir, 'spam', 'index.html'))
+        response = self.request(self.base_url + '/spam/')
+        self.check_status_and_reason(response, HTTPStatus.OK)
 
         data = b"Dummy index file\r\n"
         with open(os.path.join(self.tempdir_name, 'index.html'), 'wb') as f:
@@ -525,33 +700,14 @@ class SimpleHTTPServerTestCase(BaseTestCase):
         self.check_status_and_reason(response, HTTPStatus.OK)
         response = self.request(self.tempdir_name)
         self.check_status_and_reason(response, HTTPStatus.MOVED_PERMANENTLY)
+        self.assertEqual(response.getheader("Location"),
+                         self.tempdir_name + "/")
         response = self.request(self.tempdir_name + '/?hi=2')
         self.check_status_and_reason(response, HTTPStatus.OK)
         response = self.request(self.tempdir_name + '?hi=1')
         self.check_status_and_reason(response, HTTPStatus.MOVED_PERMANENTLY)
         self.assertEqual(response.getheader("Location"),
                          self.tempdir_name + "/?hi=1")
-
-    def test_html_escape_filename(self):
-        filename = '<test&>.txt'
-        fullpath = os.path.join(self.tempdir, filename)
-
-        try:
-            open(fullpath, 'w').close()
-        except OSError:
-            raise unittest.SkipTest('Can not create file %s on current file '
-                                    'system' % filename)
-
-        try:
-            response = self.request(self.base_url + '/')
-            body = self.check_status_and_reason(response, HTTPStatus.OK)
-            enc = response.headers.get_content_charset()
-        finally:
-            os.unlink(fullpath)  # avoid affecting test_undecodable_filename
-
-        self.assertIsNotNone(enc)
-        html_text = '>%s<' % html.escape(filename, quote=False)
-        self.assertIn(html_text.encode(enc), body)
 
 
 cgi_file1 = """\
@@ -564,14 +720,19 @@ print("Hello World")
 
 cgi_file2 = """\
 #!%s
-import cgi
+import os
+import sys
+import urllib.parse
 
 print("Content-type: text/html")
 print()
 
-form = cgi.FieldStorage()
-print("%%s, %%s, %%s" %% (form.getfirst("spam"), form.getfirst("eggs"),
-                          form.getfirst("bacon")))
+content_length = int(os.environ["CONTENT_LENGTH"])
+query_string = sys.stdin.buffer.read(content_length)
+params = {key.decode("utf-8"): val.decode("utf-8")
+            for key, val in urllib.parse.parse_qsl(query_string)}
+
+print("%%s, %%s, %%s" %% (params["spam"], params["eggs"], params["bacon"]))
 """
 
 cgi_file4 = """\
@@ -584,34 +745,70 @@ print()
 print(os.environ["%s"])
 """
 
+cgi_file6 = """\
+#!%s
+import os
+
+print("X-ambv: was here")
+print("Content-type: text/html")
+print()
+print("<pre>")
+for k, v in os.environ.items():
+    try:
+        k.encode('ascii')
+        v.encode('ascii')
+    except UnicodeEncodeError:
+        continue  # see: BPO-44647
+    print(f"{k}={v}")
+print("</pre>")
+"""
+
 
 @unittest.skipIf(hasattr(os, 'geteuid') and os.geteuid() == 0,
         "This test can't be run reliably as root (issue #13308).")
+@requires_subprocess()
 class CGIHTTPServerTestCase(BaseTestCase):
     class request_handler(NoLogRequestHandler, CGIHTTPRequestHandler):
-        pass
+        _test_case_self = None  # populated by each setUp() method call.
+
+        def __init__(self, *args, **kwargs):
+            with self._test_case_self.assertWarnsRegex(
+                    DeprecationWarning,
+                    r'http\.server\.CGIHTTPRequestHandler'):
+                # This context also happens to catch and silence the
+                # threading DeprecationWarning from os.fork().
+                super().__init__(*args, **kwargs)
 
     linesep = os.linesep.encode('ascii')
 
     def setUp(self):
+        self.request_handler._test_case_self = self  # practical, but yuck.
         BaseTestCase.setUp(self)
         self.cwd = os.getcwd()
         self.parent_dir = tempfile.mkdtemp()
         self.cgi_dir = os.path.join(self.parent_dir, 'cgi-bin')
         self.cgi_child_dir = os.path.join(self.cgi_dir, 'child-dir')
+        self.sub_dir_1 = os.path.join(self.parent_dir, 'sub')
+        self.sub_dir_2 = os.path.join(self.sub_dir_1, 'dir')
+        self.cgi_dir_in_sub_dir = os.path.join(self.sub_dir_2, 'cgi-bin')
         os.mkdir(self.cgi_dir)
         os.mkdir(self.cgi_child_dir)
+        os.mkdir(self.sub_dir_1)
+        os.mkdir(self.sub_dir_2)
+        os.mkdir(self.cgi_dir_in_sub_dir)
         self.nocgi_path = None
         self.file1_path = None
         self.file2_path = None
         self.file3_path = None
         self.file4_path = None
+        self.file5_path = None
 
         # The shebang line should be pure ASCII: use symlink if possible.
         # See issue #7668.
-        if support.can_symlink():
+        self._pythonexe_symlink = None
+        if os_helper.can_symlink():
             self.pythonexe = os.path.join(self.parent_dir, 'python')
-            os.symlink(sys.executable, self.pythonexe)
+            self._pythonexe_symlink = support.PythonSymlink(self.pythonexe).__enter__()
         else:
             self.pythonexe = sys.executable
 
@@ -625,7 +822,7 @@ class CGIHTTPServerTestCase(BaseTestCase):
             self.skipTest("Python executable path is not encodable to utf-8")
 
         self.nocgi_path = os.path.join(self.parent_dir, 'nocgi.py')
-        with open(self.nocgi_path, 'w') as fp:
+        with open(self.nocgi_path, 'w', encoding='utf-8') as fp:
             fp.write(cgi_file1 % self.pythonexe)
         os.chmod(self.nocgi_path, 0o777)
 
@@ -649,13 +846,24 @@ class CGIHTTPServerTestCase(BaseTestCase):
             file4.write(cgi_file4 % (self.pythonexe, 'QUERY_STRING'))
         os.chmod(self.file4_path, 0o777)
 
+        self.file5_path = os.path.join(self.cgi_dir_in_sub_dir, 'file5.py')
+        with open(self.file5_path, 'w', encoding='utf-8') as file5:
+            file5.write(cgi_file1 % self.pythonexe)
+        os.chmod(self.file5_path, 0o777)
+
+        self.file6_path = os.path.join(self.cgi_dir, 'file6.py')
+        with open(self.file6_path, 'w', encoding='utf-8') as file6:
+            file6.write(cgi_file6 % self.pythonexe)
+        os.chmod(self.file6_path, 0o777)
+
         os.chdir(self.parent_dir)
 
     def tearDown(self):
+        self.request_handler._test_case_self = None
         try:
             os.chdir(self.cwd)
-            if self.pythonexe != sys.executable:
-                os.remove(self.pythonexe)
+            if self._pythonexe_symlink:
+                self._pythonexe_symlink.__exit__(None, None, None)
             if self.nocgi_path:
                 os.remove(self.nocgi_path)
             if self.file1_path:
@@ -666,8 +874,18 @@ class CGIHTTPServerTestCase(BaseTestCase):
                 os.remove(self.file3_path)
             if self.file4_path:
                 os.remove(self.file4_path)
+            if self.file5_path:
+                os.remove(self.file5_path)
+            if self.file6_path:
+                os.remove(self.file6_path)
             os.rmdir(self.cgi_child_dir)
             os.rmdir(self.cgi_dir)
+            os.rmdir(self.cgi_dir_in_sub_dir)
+            os.rmdir(self.sub_dir_2)
+            os.rmdir(self.sub_dir_1)
+            # The 'gmon.out' file can be written in the current working
+            # directory if C-level code profiling with gprof is enabled.
+            os_helper.unlink(os.path.join(self.parent_dir, 'gmon.out'))
             os.rmdir(self.parent_dir)
         finally:
             BaseTestCase.tearDown(self)
@@ -786,12 +1004,40 @@ class CGIHTTPServerTestCase(BaseTestCase):
              'text/html', HTTPStatus.OK),
             (res.read(), res.getheader('Content-type'), res.status))
 
+    def test_cgi_path_in_sub_directories(self):
+        try:
+            CGIHTTPRequestHandler.cgi_directories.append('/sub/dir/cgi-bin')
+            res = self.request('/sub/dir/cgi-bin/file5.py')
+            self.assertEqual(
+                (b'Hello World' + self.linesep, 'text/html', HTTPStatus.OK),
+                (res.read(), res.getheader('Content-type'), res.status))
+        finally:
+            CGIHTTPRequestHandler.cgi_directories.remove('/sub/dir/cgi-bin')
+
+    def test_accept(self):
+        browser_accept = \
+                    'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        tests = (
+            ((('Accept', browser_accept),), browser_accept),
+            ((), ''),
+            # Hack case to get two values for the one header
+            ((('Accept', 'text/html'), ('ACCEPT', 'text/plain')),
+               'text/html,text/plain'),
+        )
+        for headers, expected in tests:
+            headers = OrderedDict(headers)
+            with self.subTest(headers):
+                res = self.request('/cgi-bin/file6.py', 'GET', headers=headers)
+                self.assertEqual(http.HTTPStatus.OK, res.status)
+                expected = f"HTTP_ACCEPT={expected}".encode('ascii')
+                self.assertIn(expected, res.read())
+
 
 class SocketlessRequestHandler(SimpleHTTPRequestHandler):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, directory=None):
         request = mock.Mock()
         request.makefile.return_value = BytesIO()
-        super().__init__(request, None, None)
+        super().__init__(request, None, None, directory=directory)
 
         self.get_called = False
         self.protocol_version = "HTTP/1.1"
@@ -828,7 +1074,7 @@ class AuditableBytesIO:
         return len(self.datas)
 
 
-class BaseHTTPRequestHandlerTestCase(unittest.TestCase):
+class BaseHTTPRequestHandlerTestCase(unittest.TestCase, ExtraAssertions):
     """Test the functionality of the BaseHTTPServer.
 
        Test the support for the Expect 100-continue header.
@@ -858,6 +1104,27 @@ class BaseHTTPRequestHandlerTestCase(unittest.TestCase):
     def verify_http_server_response(self, response):
         match = self.HTTPResponseMatch.search(response)
         self.assertIsNotNone(match)
+
+    def test_unprintable_not_logged(self):
+        # We call the method from the class directly as our Socketless
+        # Handler subclass overrode it... nice for everything BUT this test.
+        self.handler.client_address = ('127.0.0.1', 1337)
+        log_message = BaseHTTPRequestHandler.log_message
+        with mock.patch.object(sys, 'stderr', StringIO()) as fake_stderr:
+            log_message(self.handler, '/foo')
+            log_message(self.handler, '/\033bar\000\033')
+            log_message(self.handler, '/spam %s.', 'a')
+            log_message(self.handler, '/spam %s.', '\033\x7f\x9f\xa0beans')
+            log_message(self.handler, '"GET /foo\\b"ar\007 HTTP/1.0"')
+        stderr = fake_stderr.getvalue()
+        self.assertNotIn('\033', stderr)  # non-printable chars are caught.
+        self.assertNotIn('\000', stderr)  # non-printable chars are caught.
+        lines = stderr.splitlines()
+        self.assertIn('/foo', lines[0])
+        self.assertIn(r'/\x1bbar\x00\x1b', lines[1])
+        self.assertIn('/spam a.', lines[2])
+        self.assertIn('/spam \\x1b\\x7f\\x9f\xa0beans.', lines[3])
+        self.assertIn(r'"GET /foo\\b"ar\x07 HTTP/1.0"', lines[4])
 
     def test_http_1_1(self):
         result = self.send_typical_request(b'GET / HTTP/1.1\r\n\r\n')
@@ -895,7 +1162,7 @@ class BaseHTTPRequestHandlerTestCase(unittest.TestCase):
             b'Host: dummy\r\n'
             b'\r\n'
         )
-        self.assertTrue(result[0].startswith(b'HTTP/1.1 400 '))
+        self.assertStartsWith(result[0], b'HTTP/1.1 400 ')
         self.verify_expected_headers(result[1:result.index(b'\r\n')])
         self.assertFalse(self.handler.get_called)
 
@@ -1009,7 +1276,7 @@ class BaseHTTPRequestHandlerTestCase(unittest.TestCase):
         # Issue #10714: huge request lines are discarded, to avoid Denial
         # of Service attacks.
         result = self.send_typical_request(b'GET ' + b'x' * 65537)
-        self.assertEqual(result[0], b'HTTP/1.1 414 Request-URI Too Long\r\n')
+        self.assertEqual(result[0], b'HTTP/1.1 414 URI Too Long\r\n')
         self.assertFalse(self.handler.get_called)
         self.assertIsInstance(self.handler.requestline, str)
 
@@ -1066,49 +1333,99 @@ class BaseHTTPRequestHandlerTestCase(unittest.TestCase):
 class SimpleHTTPRequestHandlerTestCase(unittest.TestCase):
     """ Test url parsing """
     def setUp(self):
-        self.translated = os.getcwd()
-        self.translated = os.path.join(self.translated, 'filename')
-        self.handler = SocketlessRequestHandler()
+        self.translated_1 = os.path.join(os.getcwd(), 'filename')
+        self.translated_2 = os.path.join('foo', 'filename')
+        self.translated_3 = os.path.join('bar', 'filename')
+        self.handler_1 = SocketlessRequestHandler()
+        self.handler_2 = SocketlessRequestHandler(directory='foo')
+        self.handler_3 = SocketlessRequestHandler(directory=pathlib.PurePath('bar'))
 
     def test_query_arguments(self):
-        path = self.handler.translate_path('/filename')
-        self.assertEqual(path, self.translated)
-        path = self.handler.translate_path('/filename?foo=bar')
-        self.assertEqual(path, self.translated)
-        path = self.handler.translate_path('/filename?a=b&spam=eggs#zot')
-        self.assertEqual(path, self.translated)
+        path = self.handler_1.translate_path('/filename')
+        self.assertEqual(path, self.translated_1)
+        path = self.handler_2.translate_path('/filename')
+        self.assertEqual(path, self.translated_2)
+        path = self.handler_3.translate_path('/filename')
+        self.assertEqual(path, self.translated_3)
+
+        path = self.handler_1.translate_path('/filename?foo=bar')
+        self.assertEqual(path, self.translated_1)
+        path = self.handler_2.translate_path('/filename?foo=bar')
+        self.assertEqual(path, self.translated_2)
+        path = self.handler_3.translate_path('/filename?foo=bar')
+        self.assertEqual(path, self.translated_3)
+
+        path = self.handler_1.translate_path('/filename?a=b&spam=eggs#zot')
+        self.assertEqual(path, self.translated_1)
+        path = self.handler_2.translate_path('/filename?a=b&spam=eggs#zot')
+        self.assertEqual(path, self.translated_2)
+        path = self.handler_3.translate_path('/filename?a=b&spam=eggs#zot')
+        self.assertEqual(path, self.translated_3)
 
     def test_start_with_double_slash(self):
-        path = self.handler.translate_path('//filename')
-        self.assertEqual(path, self.translated)
-        path = self.handler.translate_path('//filename?foo=bar')
-        self.assertEqual(path, self.translated)
+        path = self.handler_1.translate_path('//filename')
+        self.assertEqual(path, self.translated_1)
+        path = self.handler_2.translate_path('//filename')
+        self.assertEqual(path, self.translated_2)
+        path = self.handler_3.translate_path('//filename')
+        self.assertEqual(path, self.translated_3)
+
+        path = self.handler_1.translate_path('//filename?foo=bar')
+        self.assertEqual(path, self.translated_1)
+        path = self.handler_2.translate_path('//filename?foo=bar')
+        self.assertEqual(path, self.translated_2)
+        path = self.handler_3.translate_path('//filename?foo=bar')
+        self.assertEqual(path, self.translated_3)
 
     def test_windows_colon(self):
         with support.swap_attr(server.os, 'path', ntpath):
-            path = self.handler.translate_path('c:c:c:foo/filename')
+            path = self.handler_1.translate_path('c:c:c:foo/filename')
             path = path.replace(ntpath.sep, os.sep)
-            self.assertEqual(path, self.translated)
+            self.assertEqual(path, self.translated_1)
+            path = self.handler_2.translate_path('c:c:c:foo/filename')
+            path = path.replace(ntpath.sep, os.sep)
+            self.assertEqual(path, self.translated_2)
+            path = self.handler_3.translate_path('c:c:c:foo/filename')
+            path = path.replace(ntpath.sep, os.sep)
+            self.assertEqual(path, self.translated_3)
 
-            path = self.handler.translate_path('\\c:../filename')
+            path = self.handler_1.translate_path('\\c:../filename')
             path = path.replace(ntpath.sep, os.sep)
-            self.assertEqual(path, self.translated)
+            self.assertEqual(path, self.translated_1)
+            path = self.handler_2.translate_path('\\c:../filename')
+            path = path.replace(ntpath.sep, os.sep)
+            self.assertEqual(path, self.translated_2)
+            path = self.handler_3.translate_path('\\c:../filename')
+            path = path.replace(ntpath.sep, os.sep)
+            self.assertEqual(path, self.translated_3)
 
-            path = self.handler.translate_path('c:\\c:..\\foo/filename')
+            path = self.handler_1.translate_path('c:\\c:..\\foo/filename')
             path = path.replace(ntpath.sep, os.sep)
-            self.assertEqual(path, self.translated)
+            self.assertEqual(path, self.translated_1)
+            path = self.handler_2.translate_path('c:\\c:..\\foo/filename')
+            path = path.replace(ntpath.sep, os.sep)
+            self.assertEqual(path, self.translated_2)
+            path = self.handler_3.translate_path('c:\\c:..\\foo/filename')
+            path = path.replace(ntpath.sep, os.sep)
+            self.assertEqual(path, self.translated_3)
 
-            path = self.handler.translate_path('c:c:foo\\c:c:bar/filename')
+            path = self.handler_1.translate_path('c:c:foo\\c:c:bar/filename')
             path = path.replace(ntpath.sep, os.sep)
-            self.assertEqual(path, self.translated)
+            self.assertEqual(path, self.translated_1)
+            path = self.handler_2.translate_path('c:c:foo\\c:c:bar/filename')
+            path = path.replace(ntpath.sep, os.sep)
+            self.assertEqual(path, self.translated_2)
+            path = self.handler_3.translate_path('c:c:foo\\c:c:bar/filename')
+            path = path.replace(ntpath.sep, os.sep)
+            self.assertEqual(path, self.translated_3)
 
 
 class MiscTestCase(unittest.TestCase):
     def test_all(self):
         expected = []
-        blacklist = {'executable', 'nobody_uid', 'test'}
+        denylist = {'executable', 'nobody_uid', 'test'}
         for name in dir(server):
-            if name.startswith('_') or name in blacklist:
+            if name.startswith('_') or name in denylist:
                 continue
             module_object = getattr(server, name)
             if getattr(module_object, '__module__', None) == 'http.server':
@@ -1116,20 +1433,69 @@ class MiscTestCase(unittest.TestCase):
         self.assertCountEqual(server.__all__, expected)
 
 
-def test_main(verbose=None):
-    cwd = os.getcwd()
-    try:
-        support.run_unittest(
-            RequestHandlerLoggingTestCase,
-            BaseHTTPRequestHandlerTestCase,
-            BaseHTTPServerTestCase,
-            SimpleHTTPServerTestCase,
-            CGIHTTPServerTestCase,
-            SimpleHTTPRequestHandlerTestCase,
-            MiscTestCase,
+class ScriptTestCase(unittest.TestCase):
+
+    def mock_server_class(self):
+        return mock.MagicMock(
+            return_value=mock.MagicMock(
+                __enter__=mock.MagicMock(
+                    return_value=mock.MagicMock(
+                        socket=mock.MagicMock(
+                            getsockname=lambda: ('', 0),
+                        ),
+                    ),
+                ),
+            ),
         )
-    finally:
-        os.chdir(cwd)
+
+    @mock.patch('builtins.print')
+    def test_server_test_unspec(self, _):
+        mock_server = self.mock_server_class()
+        server.test(ServerClass=mock_server, bind=None)
+        self.assertIn(
+            mock_server.address_family,
+            (socket.AF_INET6, socket.AF_INET),
+        )
+
+    @mock.patch('builtins.print')
+    def test_server_test_localhost(self, _):
+        mock_server = self.mock_server_class()
+        server.test(ServerClass=mock_server, bind="localhost")
+        self.assertIn(
+            mock_server.address_family,
+            (socket.AF_INET6, socket.AF_INET),
+        )
+
+    ipv6_addrs = (
+        "::",
+        "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+        "::1",
+    )
+
+    ipv4_addrs = (
+        "0.0.0.0",
+        "8.8.8.8",
+        "127.0.0.1",
+    )
+
+    @mock.patch('builtins.print')
+    def test_server_test_ipv6(self, _):
+        for bind in self.ipv6_addrs:
+            mock_server = self.mock_server_class()
+            server.test(ServerClass=mock_server, bind=bind)
+            self.assertEqual(mock_server.address_family, socket.AF_INET6)
+
+    @mock.patch('builtins.print')
+    def test_server_test_ipv4(self, _):
+        for bind in self.ipv4_addrs:
+            mock_server = self.mock_server_class()
+            server.test(ServerClass=mock_server, bind=bind)
+            self.assertEqual(mock_server.address_family, socket.AF_INET)
+
+
+def setUpModule():
+    unittest.addModuleCleanup(os.chdir, os.getcwd())
+
 
 if __name__ == '__main__':
-    test_main()
+    unittest.main()

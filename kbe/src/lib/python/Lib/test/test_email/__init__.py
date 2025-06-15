@@ -5,6 +5,7 @@ import email
 from email.message import Message
 from email._policybase import compat32
 from test.support import load_package_tests
+from test.support.testcase import ExtraAssertions
 from test.test_email import __file__ as landmark
 
 # Load all tests in package
@@ -20,7 +21,7 @@ def openfile(filename, *args, **kws):
 
 
 # Base test class
-class TestEmailBase(unittest.TestCase):
+class TestEmailBase(unittest.TestCase, ExtraAssertions):
 
     maxDiff = None
     # Currently the default policy is compat32.  By setting that as the default
@@ -38,7 +39,7 @@ class TestEmailBase(unittest.TestCase):
     ndiffAssertEqual = unittest.TestCase.assertEqual
 
     def _msgobj(self, filename):
-        with openfile(filename) as fp:
+        with openfile(filename, encoding="utf-8") as fp:
             return email.message_from_file(fp, policy=self.policy)
 
     def _str_msg(self, string, message=None, policy=None):
