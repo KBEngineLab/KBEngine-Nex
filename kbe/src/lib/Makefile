@@ -117,7 +117,7 @@ log4cxx_build: apr_build apr_util_build
 # Python特殊处理
 python_build: 
 	cd python && $(MAKE) all  && \
-	cp -f "$(KBE_ROOT)/kbe/src/lib/python/libpython3.7m.a" "$(LIB_DIR)/libpython.a" && \
+	cp -f "$(KBE_ROOT)/kbe/src/lib/python/libpython3.13.a" "$(LIB_DIR)/libpython.a" && \
 	mkdir -p "$(KBE_ROOT)/kbe/res/scripts/common/lib-dynload/" && \
 	cp -rf $(KBE_ROOT)/kbe/src/lib/python/build/lib.*/* "$(KBE_ROOT)/kbe/res/scripts/common/lib-dynload/" && \
 	rm -rf "$(KBE_ROOT)/kbe/res/scripts/common/Lib/*" && \
