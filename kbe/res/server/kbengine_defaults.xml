@@ -338,6 +338,10 @@
 				<host> localhost </host>										<!-- Type: String -->
 				<port> 0 </port>												<!-- Type: Integer -->
 
+
+				<!-- 数据库自增列初始值 -->
+				<autoIncrementInit> 1 </autoIncrementInit>
+
 				<!-- 数据库账号验证 
 					（Database auth)
 				-->
