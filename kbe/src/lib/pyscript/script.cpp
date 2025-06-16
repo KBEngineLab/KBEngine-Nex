@@ -141,13 +141,14 @@ bool Script::install(const wchar_t* pythonHomeDir, std::wstring pyPaths,
 #if KBE_PLATFORM != PLATFORM_WIN32
 	strutil::kbe_replace(pyPaths, L";", L":");
 
+	
+#endif
+
 	char* tmpchar = strutil::wchar2char(const_cast<wchar_t*>(pyPaths.c_str()));
 	DEBUG_MSG(fmt::format("Script::install(): paths={}.\n", tmpchar));
 	free(tmpchar);
-#endif
-
 	// Initialise python
-	// Py_VerboseFlag = 2;
+	// Py_VerboseFlag = 1;
 	Py_FrozenFlag = 1;
 
 	// Warn if tab and spaces are mixed in indentation.
@@ -155,15 +156,78 @@ bool Script::install(const wchar_t* pythonHomeDir, std::wstring pyPaths,
 	Py_NoSiteFlag = 1;
 	Py_IgnoreEnvironmentFlag = 1;
 
-	Py_SetPath(pyPaths.c_str());
+
+
+	PyStatus status;
+	PyConfig config;
+	PyConfig_InitPythonConfig(&config);
+
+	// 设置 Python home 路径
+	status = PyConfig_SetString(&config, &config.home, pythonHomeDir);
+	if (PyStatus_Exception(status)) {
+		Py_ExitStatusException(status);
+		return false;
+	}
+
+#if defined(_WIN32)
+	const wchar_t sep = L';';
+#else
+	const wchar_t sep = L':';
+#endif
+
+	// 设置 Python 路径（sys.path 替代 Py_SetPath）
+	config.module_search_paths_set = 1;
+	{
+		std::wstringstream ss(pyPaths);
+		std::wstring item;
+		while (std::getline(ss, item, sep)) {
+			if (!item.empty()) {
+				// char* pathchar = strutil::wchar2char(const_cast<wchar_t*>(item.c_str()));
+				// ERROR_MSG(fmt::format("Script::install(): Path: {}\n", pathchar));
+				// free(pathchar);
+				PyWideStringList_Append(&config.module_search_paths, item.c_str());
+			}
+		}
+	}
+
+	// 关闭 site.py 自动导入
+	config.site_import = 0;
+	
+
+
+	// 设置 argv 参数为空（替代 PySys_SetArgvEx(0, NULL, 0)）
+	const wchar_t* argv[1] = { L"" };
+	status = PyConfig_SetArgv(&config, 0, const_cast<wchar_t**>(argv));
+	if (PyStatus_Exception(status)) {
+		Py_ExitStatusException(status);
+		return false;
+	}
+
+	// 初始化解释器
+	status = Py_InitializeFromConfig(&config);
+	if (PyStatus_Exception(status)) {
+		Py_ExitStatusException(status);
+		return false;
+	}
+
+
+	if (!Py_IsInitialized()) {
+		ERROR_MSG("Script::install(): Py_InitializeFromConfig is failed!\n");
+		return false;
+	}
+
+	
+	PyConfig_Clear(&config);
+
+	// Py_SetPath(pyPaths.c_str());
 
 	// python解释器的初始化  
-	Py_Initialize();
-    if (!Py_IsInitialized())
-    {
-    	ERROR_MSG("Script::install(): Py_Initialize is failed!\n");
-        return false;
-    } 
+	// Py_Initialize();
+    // if (!Py_IsInitialized())
+    // {
+    // 	ERROR_MSG("Script::install(): Py_Initialize is failed!\n");
+    //     return false;
+    // } 
 
 	sysInitModules_ = PyDict_Copy(PySys_GetObject("modules"));
 

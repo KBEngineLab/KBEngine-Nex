@@ -1967,6 +1967,72 @@ PyObject* __py_getAppPublish(PyObject* self, PyObject* args)
 	return PyLong_FromLong(g_appPublish);
 }
 
+
+
+
+//-------------------------------------------------------------------------------------
+static void reset_sys_path_after_init(const wchar_t *pathListString)
+{
+    PyObject *sys = PyImport_ImportModule("sys");
+    if (!sys) {
+        PyErr_Print();
+        return;
+    }
+
+    PyObject *new_path_list = PyList_New(0);
+    if (!new_path_list) {
+        PyErr_Print();
+        Py_DECREF(sys);
+        return;
+    }
+
+    // 平台自动选择分隔符
+#if defined(_WIN32)
+    const wchar_t sep = L';';
+#else
+    const wchar_t sep = L':';
+#endif
+
+    std::wstring pathsStr(pathListString);
+    size_t start = 0, end;
+
+    while ((end = pathsStr.find(sep, start)) != std::wstring::npos) {
+        std::wstring path = pathsStr.substr(start, end - start);
+        if (!path.empty()) {
+            PyObject *p = PyUnicode_FromWideChar(path.c_str(), -1);
+            if (p) {
+                PyList_Append(new_path_list, p);
+                Py_DECREF(p);
+            } else {
+                PyErr_Print();
+            }
+        }
+        start = end + 1;
+    }
+
+    // 添加最后一个 path
+    std::wstring last = pathsStr.substr(start);
+    if (!last.empty()) {
+        PyObject *p = PyUnicode_FromWideChar(last.c_str(), -1);
+        if (p) {
+            PyList_Append(new_path_list, p);
+            Py_DECREF(p);
+        } else {
+            PyErr_Print();
+        }
+    }
+
+    // 设置 sys.path
+    if (PyObject_SetAttrString(sys, "path", new_path_list) != 0) {
+        PyErr_Print();
+    }
+
+    Py_DECREF(new_path_list);
+    Py_DECREF(sys);
+}
+
+
+
 //-------------------------------------------------------------------------------------
 static bool execPython(COMPONENT_TYPE componentType)
 {
@@ -1995,7 +2061,8 @@ static bool execPython(COMPONENT_TYPE componentType)
 	strutil::kbe_replace(pyPaths.second, L";", L":");
 #endif
 
-	PySys_SetPath(pyPaths.second.c_str());
+	// PySys_SetPath(pyPaths.second.c_str());
+	reset_sys_path_after_init(pyPaths.second.c_str());
 
 	PyObject* modulesNew = PySys_GetObject("modules");
 	PyDict_Merge(modulesNew, Script::getSingleton().getSysInitModules(), 0);
@@ -2108,6 +2175,7 @@ static bool execPython(COMPONENT_TYPE componentType)
 	PyInterpreterState_Delete(pNewInterpreter->interp);
 	return otherPartSuccess;
 }
+
 
 //-------------------------------------------------------------------------------------
 static bool loadAllScripts()

@@ -119,8 +119,8 @@ python_build:
 	cd python && $(MAKE) all  && \
 	cp -f "$(KBE_ROOT)/kbe/src/lib/python/libpython3.13.a" "$(LIB_DIR)/libpython.a" && \
 	mkdir -p "$(KBE_ROOT)/kbe/res/scripts/common/lib-dynload/" && \
-	cp -rf $(KBE_ROOT)/kbe/src/lib/python/build/lib.*/* "$(KBE_ROOT)/kbe/res/scripts/common/lib-dynload/" && \
-	rm -rf "$(KBE_ROOT)/kbe/res/scripts/common/Lib/*" && \
+	cp -rfL  $(KBE_ROOT)/kbe/src/lib/python/build/lib.*/* "$(KBE_ROOT)/kbe/res/scripts/common/lib-dynload/" && \
+	rm -rf "$(KBE_ROOT)/kbe/res/scripts/common/Lib" && \
 	cp -rf "$(KBE_ROOT)/kbe/src/lib/python/Lib" "$(KBE_ROOT)/kbe/res/scripts/common/Lib"
 
 # 显式定义common_build的依赖关系
