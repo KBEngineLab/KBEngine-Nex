@@ -182,9 +182,6 @@ bool Script::install(const wchar_t* pythonHomeDir, std::wstring pyPaths,
 		std::wstring item;
 		while (std::getline(ss, item, sep)) {
 			if (!item.empty()) {
-				// char* pathchar = strutil::wchar2char(const_cast<wchar_t*>(item.c_str()));
-				// ERROR_MSG(fmt::format("Script::install(): Path: {}\n", pathchar));
-				// free(pathchar);
 				PyWideStringList_Append(&config.module_search_paths, item.c_str());
 			}
 		}
