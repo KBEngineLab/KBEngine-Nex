@@ -1993,32 +1993,18 @@ static void reset_sys_path_after_init(const wchar_t *pathListString)
     const wchar_t sep = L':';
 #endif
 
-    std::wstring pathsStr(pathListString);
-    size_t start = 0, end;
-
-    while ((end = pathsStr.find(sep, start)) != std::wstring::npos) {
-        std::wstring path = pathsStr.substr(start, end - start);
-        if (!path.empty()) {
-            PyObject *p = PyUnicode_FromWideChar(path.c_str(), -1);
+    // 用 stringstream 分割 pathListString
+    std::wstringstream ss(pathListString);
+    std::wstring item;
+    while (std::getline(ss, item, sep)) {
+        if (!item.empty()) {
+            PyObject *p = PyUnicode_FromWideChar(item.c_str(), -1);
             if (p) {
                 PyList_Append(new_path_list, p);
                 Py_DECREF(p);
             } else {
                 PyErr_Print();
             }
-        }
-        start = end + 1;
-    }
-
-    // 添加最后一个 path
-    std::wstring last = pathsStr.substr(start);
-    if (!last.empty()) {
-        PyObject *p = PyUnicode_FromWideChar(last.c_str(), -1);
-        if (p) {
-            PyList_Append(new_path_list, p);
-            Py_DECREF(p);
-        } else {
-            PyErr_Print();
         }
     }
 
