@@ -1,4 +1,4 @@
-kbengine_ue4_plugins
+kbengine_ue5_plugins
 ========================
 
 Usage
@@ -6,14 +6,14 @@ Usage
 
 	1: Generate client plugins through projects
 		1: Double click to run kbengine\*assets\gensdk.bat
-		2: Copy kbengine_ue4_plugins to {UE4ProjectName}\Plugins
+		2: Copy kbengine_ue5_plugins to {UE5ProjectName}\Plugins
 
 	2: Add "KBEnginePlugins" to *.Build.cs
 		{ProjectName}\Source\{ProjectName}\{ProjectName}.Build.cs
 			PublicDependencyModuleNames.AddRange(new string[] { ..., "KBEnginePlugins" });
 
 	3: Create clientapp Blueprint
-		1: Add KBEMain Component(Reference: https://github.com/kbengine/kbengine_ue4_demo/blob/master/Content/ClientApp.uasset).
+		1: Add KBEMain Component(Reference: https://github.com/kbengine/kbengine_ue5_demo/blob/master/Content/ClientApp.uasset).
 		2: Set the component.
 
 	4: Implment the KBE defined entity (including the client part, KBEnginePlugins\Source\KBEnginePlugins\Scripts\*)
@@ -39,7 +39,7 @@ Usage
 
 	4: Monitor KBE-plugins event
 		For example:
-			class KBENGINE_UE4_DEMO_API AGameModeLogin : public AGameMode
+			class KBENGINE_UE5_DEMO_API AGameModeLogin : public AGameMode
 			{
 				// Called when the game starts or when spawned
 				virtual void BeginPlay() override
@@ -62,7 +62,7 @@ Usage
 
 
 
-KBE-Plugin fire-out events(KBE => UE4):
+KBE-Plugin fire-out events(KBE => UE5):
 ---------------------
 
 	Entity events:
@@ -303,7 +303,7 @@ KBE-Plugin fire-out events(KBE => UE4):
 
 
 
-KBE-Plugin fire-in events(UE4 => KBE):
+KBE-Plugin fire-in events(UE5 => KBE):
 ---------------------
 
 	createAccount

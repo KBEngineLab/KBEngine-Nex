@@ -22,3 +22,4 @@ echo KBE_BIN_PATH = \"${KBE_BIN_PATH}\"
 
 "$KBE_BIN_PATH/kbcmd" --clientsdk=unity --outpath="$currPath/kbengine_unity3d_plugins"
 "$KBE_BIN_PATH/kbcmd" --clientsdk=ue4 --outpath="$currPath/kbengine_ue4_plugins"
+"$KBE_BIN_PATH/kbcmd" --clientsdk=ue5 --outpath="$currPath/kbengine_ue5_plugins"
