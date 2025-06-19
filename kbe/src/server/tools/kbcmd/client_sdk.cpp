@@ -5,6 +5,7 @@
 #include "client_sdk_unity.h"	
 #include "client_sdk_ue4.h"
 #include "client_sdk_ue5.h"
+#include "client_sdk_plugin.h"
 #include "entitydef/entitydef.h"
 #include "entitydef/scriptdef_module.h"
 #include "entitydef/property.h"
