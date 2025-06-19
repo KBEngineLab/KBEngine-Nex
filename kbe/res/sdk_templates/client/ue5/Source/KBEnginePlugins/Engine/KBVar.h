@@ -211,7 +211,7 @@ public:
 		else if (GetType() == EKBVarTypes::Bool)
 		{
 			bool v = (*this);
-			return FString::Printf(TEXT("%s"), (v ? "true" : "false"));
+			return FString::Printf(TEXT("%s"), (v ? TEXT("true") : TEXT("false")));
 		}
 		else if (GetType() == EKBVarTypes::ByteArray)
 		{
