@@ -445,6 +445,9 @@ int process_help(int argc, char* argv[])
 	printf("\tkbcmd.exe --clientsdk=ue4 --zip=c:/unity_kbesdk.zip\n");
 	printf("\tkbcmd.exe --clientsdk=ue4 --tar=c:/unity_kbesdk.tgz\n");
 	printf("\tkbcmd.exe --clientsdk=ue4 --outpath=c:/unity_kbesdk --KBE_ROOT=\"*\"  --KBE_RES_PATH=\"*\"  --KBE_BIN_PATH=\"*\"\n");
+	printf("\tkbcmd.exe --clientsdk=ue5 --zip=c:/unity_kbesdk.zip\n");
+	printf("\tkbcmd.exe --clientsdk=ue5 --tar=c:/unity_kbesdk.tgz\n");
+	printf("\tkbcmd.exe --clientsdk=ue5 --outpath=c:/unity_kbesdk --KBE_ROOT=\"*\"  --KBE_RES_PATH=\"*\"  --KBE_BIN_PATH=\"*\"\n");
 
 	printf("\n--getuid\n");
 	printf("\tReturns the ID of the server group.\n");

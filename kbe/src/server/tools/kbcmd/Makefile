@@ -3,6 +3,7 @@ SRCS =					\
 	client_sdk			\
 	client_sdk_unity	\
 	client_sdk_ue4		\
+	client_sdk_ue5		\
 	client_sdk_plugin		\
 	server_assets		\
 	entity_component	\

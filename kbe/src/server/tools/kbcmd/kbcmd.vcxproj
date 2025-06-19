@@ -212,6 +212,7 @@
     <ClCompile Include="client_sdk.cpp" />
     <ClCompile Include="client_sdk_plugin.cpp" />
     <ClCompile Include="client_sdk_ue4.cpp" />
+    <ClCompile Include="client_sdk_ue5.cpp" />
     <ClCompile Include="client_sdk_unity.cpp" />
     <ClCompile Include="entity_component.cpp" />
     <ClCompile Include="kbcmd.cpp" />
@@ -224,6 +225,7 @@
     <ClInclude Include="client_sdk.h" />
     <ClInclude Include="client_sdk_plugin.h" />
     <ClInclude Include="client_sdk_ue4.h" />
+    <ClInclude Include="client_sdk_ue5.h" />
     <ClInclude Include="client_sdk_unity.h" />
     <ClInclude Include="kbcmd.h" />
     <ClInclude Include="kbcmd_interface.h" />

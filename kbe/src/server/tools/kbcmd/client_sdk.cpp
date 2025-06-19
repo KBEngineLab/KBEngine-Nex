@@ -4,6 +4,7 @@
 #include "client_sdk.h"
 #include "client_sdk_unity.h"	
 #include "client_sdk_ue4.h"
+#include "client_sdk_ue5.h"
 #include "client_sdk_plugin.h"
 #include "entitydef/entitydef.h"
 #include "entitydef/scriptdef_module.h"
@@ -57,6 +58,10 @@ ClientSDK* ClientSDK::createClientSDK(const std::string& type)
 	else if (lowerType == "ue4")
 	{
 		return new ClientSDKUE4();
+	}
+	else if (lowerType == "ue5")
+	{
+		return new ClientSDKUE5();
 	}
 	else if (lowerType == "plugin")
 	{
