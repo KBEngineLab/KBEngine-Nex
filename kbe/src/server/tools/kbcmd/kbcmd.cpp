@@ -5,6 +5,7 @@
 #include "kbcmd_interface.h"
 #include "client_sdk_unity.h"
 #include "client_sdk_ue4.h"
+#include "client_sdk_ue5.h"
 #include "network/common.h"
 #include "network/tcp_packet.h"
 #include "network/udp_packet.h"
