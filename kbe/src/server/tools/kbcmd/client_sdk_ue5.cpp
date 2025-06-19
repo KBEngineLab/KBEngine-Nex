@@ -573,9 +573,9 @@ bool ClientSDKUE5::writeEntityDefsModuleBegin()
 		++numEntity;
 
 		if(iter->get()->isComponentModule())
-			fileBody() += fmt::format("#include \"Scripts/Components/{}.h\"\n", iter->get()->getName());
+			fileBody() += fmt::format("#include \"../Scripts/Components/{}.h\"\n", iter->get()->getName());
 		else
-			fileBody() += fmt::format("#include \"Scripts/{}.h\"\n", iter->get()->getName());
+			fileBody() += fmt::format("#include \"../Scripts/{}.h\"\n", iter->get()->getName());
 	}
 
 	fileBody() += "\n";
