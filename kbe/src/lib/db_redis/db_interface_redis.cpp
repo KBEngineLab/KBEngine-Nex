@@ -410,10 +410,20 @@ void DBInterfaceRedis::write_query_result(redisReply* pRedisReply, MemoryStream 
 	if(pRedisContext_ && pRedisReply && !pRedisContext_->err)
 	{
 		uint32 nrows = 0;
-		uint32 nfields = 1;
+		uint32 nfields = 0;
 
-		if(pRedisReply->type == REDIS_REPLY_ARRAY)
+		// 根据回复类型确定结果结构
+		if (pRedisReply->type == REDIS_REPLY_ARRAY)
+		{
 			nfields = (uint32)pRedisReply->elements;
+			nrows = 1; // 数组视为单行多列
+		}
+		else
+		{
+			// 非数组类型视为单行单列
+			nfields = 1;
+			nrows = 1;
+		}
 
 		(*result) << nfields << nrows;
 		
@@ -442,34 +452,47 @@ void DBInterfaceRedis::write_query_result(redisReply* pRedisReply, MemoryStream 
 }
 
 //-------------------------------------------------------------------------------------
-void DBInterfaceRedis::write_query_result_element(redisReply* pRedisReply, MemoryStream * result)
+void DBInterfaceRedis::write_query_result_element(redisReply* pRedisReply, MemoryStream* result)
 {
-	if(pRedisReply->type == REDIS_REPLY_ARRAY)
+	switch (pRedisReply->type)
 	{
-		// 不支持元素中包含数组
-		KBE_ASSERT(false);
-	}
-	else if(pRedisReply->type == REDIS_REPLY_INTEGER)
-	{
-		std::stringstream sstream;
-		sstream << pRedisReply->integer;
-		result->appendBlob(sstream.str().c_str(), sstream.str().size());
-	}
-	else if(pRedisReply->type == REDIS_REPLY_NIL)
-	{
-		result->appendBlob("NULL", strlen("NULL"));
-	}		
-	else if(pRedisReply->type == REDIS_REPLY_STATUS)
-	{
-		result->appendBlob(pRedisReply->str, pRedisReply->len);
-	}	
-	else if(pRedisReply->type == REDIS_REPLY_ERROR)
-	{
-		result->appendBlob(pRedisReply->str, pRedisReply->len);
-	}			
-	else if(pRedisReply->type == REDIS_REPLY_STRING)
-	{
-		result->appendBlob(pRedisReply->str, pRedisReply->len);
+		case REDIS_REPLY_INTEGER:
+		{
+			std::string value = std::to_string(pRedisReply->integer);
+			result->appendBlob(value.c_str(), value.size());
+			break;
+		}
+		case REDIS_REPLY_STRING:
+			result->appendBlob(pRedisReply->str, pRedisReply->len);
+			break;
+		case REDIS_REPLY_NIL:
+			result->appendBlob("NULL", 4);
+			break;
+		case REDIS_REPLY_STATUS:
+			result->appendBlob(pRedisReply->str, pRedisReply->len);
+			break;
+		case REDIS_REPLY_ERROR:
+			result->appendBlob(pRedisReply->str, pRedisReply->len);
+			break;
+		case REDIS_REPLY_DOUBLE:
+		{
+			std::string value = std::to_string(pRedisReply->dval);
+			result->appendBlob(value.c_str(), value.size());
+			break;
+		}
+		case REDIS_REPLY_BOOL:
+		{
+			const char* value = pRedisReply->integer ? "true" : "false";
+			result->appendBlob(value, strlen(value));
+			break;
+		}
+		case REDIS_REPLY_ARRAY:
+			// 嵌套数组暂不支持
+			result->appendBlob("UNSUPPORTED_ARRAY", 17);
+			break;
+		default:
+			result->appendBlob("UNKNOWN_TYPE", 12);
+			break;
 	}
 }
 
