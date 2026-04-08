@@ -185,7 +185,12 @@ public:
 	/**
 		获得自增起始id
 	*/
-	virtual const char* getAutoIncrementInit();
+	virtual const char* getAutoIncrementInit() const;
+
+	/**
+		是否为自动增长id
+	*/
+	bool isAutoIncrementDBID() const;
 
 protected:
 	MYSQL* pMysql_;
