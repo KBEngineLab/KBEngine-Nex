@@ -102,16 +102,16 @@ public:
 				{
 					mysql::DBContext& wbox = *iter1->second.get();
 
-					KBEUnordered_map<std::string, std::vector<DBID> >::iterator iter = 
-						childTableDBIDs.find(context.tableName);
+					KBEUnordered_map<std::string, std::vector<DBID> >::iterator iter =
+						childTableDBIDs.find(wbox.tableName);
 
-					if(iter == childTableDBIDs.end())
+					if (iter == childTableDBIDs.end())
 					{
 						std::vector<DBID> v;
-						childTableDBIDs.insert(std::pair< std::string, std::vector<DBID> >(wbox.tableName, v));
+						childTableDBIDs.insert(std::pair<std::string, std::vector<DBID> >(wbox.tableName, v));
 					}
 				}
-				
+
 				if(childTableDBIDs.size() > 1)
 				{
 					std::string sqlstr_getids;
