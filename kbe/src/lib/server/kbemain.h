@@ -148,15 +148,54 @@ inline void parseLoadConfigCommandArgs(int argc, char* argv[])
 	}
 }
 
-inline void loadConfig()
+inline bool checkConfigFileExists(const std::string& fileName)
+{
+	std::string fullpath = Resmgr::getSingleton().matchRes(fileName);
+	return access(fullpath.c_str(), 0) == 0;
+}
+
+inline void printConfigFileError(const std::string& fileName)
+{
+	std::string fullpath = Resmgr::getSingleton().matchRes(fileName);
+	std::string s = fmt::format("loadConfig: config file not found: {} (resolved: {})\n",
+		fileName, fullpath);
+
+	ERROR_MSG(s);
+
+#if KBE_PLATFORM == PLATFORM_WIN32
+	printf("[ERROR]: %s", s.c_str());
+#endif
+}
+
+inline bool loadConfig()
 {
 	Resmgr::getSingleton().initialize();
 
 	// "../../res/server/kbengine_defaults.xml"
-	g_kbeSrvConfig.loadConfig("server/kbengine_defaults.xml");
+	if(!checkConfigFileExists("server/kbengine_defaults.xml"))
+	{
+		printConfigFileError("server/kbengine_defaults.xml");
+		return false;
+	}
+
+	if(!g_kbeSrvConfig.loadConfig("server/kbengine_defaults.xml"))
+	{
+		return false;
+	}
 
 	// "../../../assets/res/server/kbengine.xml" or command-line selected config.
-	g_kbeSrvConfig.loadConfig(selectedKBEngineConfig());
+	if(!checkConfigFileExists(selectedKBEngineConfig()))
+	{
+		printConfigFileError(selectedKBEngineConfig());
+		return false;
+	}
+
+	if(!g_kbeSrvConfig.loadConfig(selectedKBEngineConfig()))
+	{
+		return false;
+	}
+
+	return true;
 }
 
 inline void setEvns()
@@ -466,7 +505,8 @@ int main(int argc, char* argv[])																						\
 	int retcode = -1;																									\
 	THREAD_TRY_EXECUTION;																								\
 	parseLoadConfigCommandArgs(argc, argv);																				\
-	loadConfig();																										\
+	if(!loadConfig())																									\
+		return -1;																										\
 	g_componentID = genUUID64();																						\
 	parseMainCommandArgs(argc, argv);																					\
 	KBEngine::exception::installCrashHandler("bootstrap", g_componentID);												\
@@ -481,7 +521,8 @@ kbeMain(int argc, char* argv[]);																						\
 int main(int argc, char* argv[])																						\
 {																														\
 	parseLoadConfigCommandArgs(argc, argv);																				\
-	loadConfig();																										\
+	if(!loadConfig())																									\
+		return -1;																										\
 	g_componentID = genUUID64();																						\
 	parseMainCommandArgs(argc, argv);																					\
 	return kbeMain(argc, argv);																							\
