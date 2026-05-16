@@ -42,7 +42,7 @@ BASE_SCRIPT_INIT(Space, 0, 0, 0, 0, 0)
 Space::Space(ENTITY_ID id, const ScriptDefModule* pScriptModule):
 Entity(id, pScriptModule, getScriptType(), true)
 {
-
+	isSpace(true);
 }
 
 //-------------------------------------------------------------------------------------

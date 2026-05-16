@@ -278,11 +278,14 @@ protected:																									\
 	ScriptTimers												scriptTimers_;								\
 	PY_CALLBACKMGR												pyCallbackMgr_;								\
 	bool														isDestroyed_;								\
+	bool														isSpace_;									\
 	uint32														flags_;										\
 	ENTITY_EVENTS												events_;									\
 public:																										\
-																											\
+\
 	bool initing() const{ return hasFlags(ENTITY_FLAGS_INITING); }											\
+	bool isSpace() const{ return isSpace_; }																\
+	void isSpace(bool v){ isSpace_ = v; }																	\
 																											\
 	void onInitializeScript();																				\
 	void initializeScript()																					\
@@ -1679,6 +1682,7 @@ public:																										\
 	scriptTimers_(),																						\
 	pyCallbackMgr_(),																						\
 	isDestroyed_(false),																					\
+	isSpace_(false),																						\
 	flags_(ENTITY_FLAGS_INITING)																			\
 
 

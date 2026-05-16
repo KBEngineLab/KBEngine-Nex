@@ -179,6 +179,7 @@ bool Cellapp::installPyModules()
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		deregisterWriteFileDescriptor,	PyFileDescriptor::__py_deregisterWriteFileDescriptor,	METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		addSpaceGeometryMapping,		SpaceMemory::__py_AddSpaceGeometryMapping,				METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		getSpaceGeometryMapping,		SpaceMemory::__py_GetSpaceGeometryMapping,				METH_VARARGS,			0);
+	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		spaces,							SpaceMemorys::__py_Spaces,								METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		setSpaceData,					SpaceMemory::__py_SetSpaceData,							METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		getSpaceData,					SpaceMemory::__py_GetSpaceData,							METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		delSpaceData,					SpaceMemory::__py_DelSpaceData,							METH_VARARGS,			0);
@@ -897,7 +898,7 @@ void Cellapp::onCreateCellEntityInNewSpaceFromBaseapp(Network::Channel* pChannel
 	{
 		// 创建entity
 		Entity* e = createEntity(entityType.c_str(), NULL, false, entitycallEntityID, false);
-		
+
 		if(e == NULL)
 		{
 			s.done();
@@ -912,6 +913,8 @@ void Cellapp::onCreateCellEntityInNewSpaceFromBaseapp(Network::Channel* pChannel
 			*/
 			return;
 		}
+
+		e->isSpace(true);
 
 		PyObject* cellData = e->createCellDataFromStream(&s);
 
@@ -1010,12 +1013,14 @@ void Cellapp::onRestoreSpaceInCellFromBaseapp(Network::Channel* pChannel, KBEngi
 	{
 		// 创建entity
 		Entity* e = createEntity(entityType.c_str(), NULL, false, entitycallEntityID, false);
-		
+
 		if(e == NULL)
 		{
 			s.done();
 			return;
 		}
+
+		e->isSpace(true);
 
 		PyObject* cellData = e->createCellDataFromStream(&s);
 
