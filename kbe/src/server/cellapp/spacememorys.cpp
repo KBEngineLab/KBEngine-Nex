@@ -114,6 +114,54 @@ PyObject* SpaceMemorys::__py_Spaces(PyObject* self, PyObject* args)
 }
 
 //-------------------------------------------------------------------------------------
+PyObject* SpaceMemorys::__py_EntitiesForSpace(PyObject* self, PyObject* args)
+{
+	SPACE_ID spaceID = 0;
+
+	if(PyTuple_Size(args) != 1)
+	{
+		PyErr_Format(PyExc_TypeError, "KBEngine::entitiesForSpace: args error! argsSize != 1.");
+		PyErr_PrintEx(0);
+		return NULL;
+	}
+
+	if(!PyArg_ParseTuple(args, "I", &spaceID))
+	{
+		PyErr_Format(PyExc_TypeError, "KBEngine::entitiesForSpace: args error!");
+		PyErr_PrintEx(0);
+		return NULL;
+	}
+
+	if(SpaceMemorys::findSpace(spaceID) == NULL)
+	{
+		PyErr_Format(PyExc_AssertionError, "KBEngine::entitiesForSpace: spaceID %u not found.", spaceID);
+		PyErr_PrintEx(0);
+		return NULL;
+	}
+
+	PyObject* pyEntities = PyDict_New();
+	Entities<Entity>* pEntities = Cellapp::getSingleton().pEntities();
+
+	Entities<Entity>::ENTITYS_MAP& entities = pEntities->getEntities();
+	Entities<Entity>::ENTITYS_MAP::iterator iter = entities.begin();
+	for(; iter != entities.end(); ++iter)
+	{
+		Entity* pEntity = static_cast<Entity*>(iter->second.get());
+		if(pEntity == NULL || pEntity->isDestroyed())
+			continue;
+
+		if(pEntity->spaceID() != spaceID)
+			continue;
+
+		PyObject* pyEntityID = PyLong_FromLong(pEntity->id());
+		PyDict_SetItem(pyEntities, pyEntityID, pEntity);
+		Py_DECREF(pyEntityID);
+	}
+
+	return pyEntities;
+}
+
+//-------------------------------------------------------------------------------------
 void SpaceMemorys::update()
 {
 	SPACEMEMORYS::iterator iter = spaces_.begin();

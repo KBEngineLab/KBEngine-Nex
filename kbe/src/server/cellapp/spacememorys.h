@@ -42,6 +42,11 @@ public:
 	static PyObject* __py_Spaces(PyObject* self, PyObject* args);
 
 	/**
+		返回指定space下所有实体
+	*/
+	static PyObject* __py_EntitiesForSpace(PyObject* self, PyObject* args);
+
+	/**
 		更新所有的space
 	*/
 	static void update();

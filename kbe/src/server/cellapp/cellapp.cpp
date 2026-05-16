@@ -180,6 +180,7 @@ bool Cellapp::installPyModules()
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		addSpaceGeometryMapping,		SpaceMemory::__py_AddSpaceGeometryMapping,				METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		getSpaceGeometryMapping,		SpaceMemory::__py_GetSpaceGeometryMapping,				METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		spaces,							SpaceMemorys::__py_Spaces,								METH_VARARGS,			0);
+	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		entitiesForSpace,				SpaceMemorys::__py_EntitiesForSpace,					METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		setSpaceData,					SpaceMemory::__py_SetSpaceData,							METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		getSpaceData,					SpaceMemory::__py_GetSpaceData,							METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		delSpaceData,					SpaceMemory::__py_DelSpaceData,							METH_VARARGS,			0);
