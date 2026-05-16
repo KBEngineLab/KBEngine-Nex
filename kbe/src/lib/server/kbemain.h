@@ -25,6 +25,8 @@
 
 namespace KBEngine{
 
+inline std::string& selectedKBEngineConfig();
+
 inline void START_MSG(const char * name, uint64 appuid)
 {
 	MachineInfos machineInfo;
@@ -34,6 +36,7 @@ inline void START_MSG(const char * name, uint64 appuid)
 			"ScriptVersion: {}. "
 			"Pythoncore: {}. "
 			"Protocol: {}. "
+			"ConfigFile: {}. "
 			"Config: {} {}. "
 			"Built: {} {}. "
 			"AppID: {}. "
@@ -41,6 +44,7 @@ inline void START_MSG(const char * name, uint64 appuid)
 			"PID: {} ----\n",
 		name, KBEVersion::versionString(), KBEVersion::scriptVersionString(), PY_VERSION,
 		Network::MessageHandlers::getDigestStr(),
+		selectedKBEngineConfig(),
 		KBE_CONFIG, KBE_ARCH, __TIME__, __DATE__,
 		appuid, getUserUID(), getProcessPID()));
 
@@ -63,6 +67,87 @@ inline void START_MSG(const char * name, uint64 appuid)
 
 }
 
+inline std::string& selectedKBEngineConfig()
+{
+	static std::string configFile = "server/kbengine.xml";
+	return configFile;
+}
+
+inline bool fetchCommandArgValue(const std::string& cmd, const std::string& key, std::string& value)
+{
+	if(cmd.find(key) != 0)
+		return false;
+
+	value = cmd.substr(key.size());
+	return value.size() > 0;
+}
+
+inline void parseLoadConfigCommandArgs(int argc, char* argv[])
+{
+	if(argc < 2)
+	{
+		return;
+	}
+
+	std::string prop;
+	std::string location;
+
+	for(int argIdx=1; argIdx<argc; ++argIdx)
+	{
+		std::string cmd = argv[argIdx];
+		std::string value;
+
+		if(fetchCommandArgValue(cmd, "--KBE_ROOT=", value))
+		{
+			setenv("KBE_ROOT", value.c_str(), 1);
+			continue;
+		}
+
+		if(fetchCommandArgValue(cmd, "--KBE_RES_PATH=", value))
+		{
+			setenv("KBE_RES_PATH", value.c_str(), 1);
+			continue;
+		}
+
+		if(fetchCommandArgValue(cmd, "--KBE_BIN_PATH=", value))
+		{
+			setenv("KBE_BIN_PATH", value.c_str(), 1);
+			continue;
+		}
+
+		if(fetchCommandArgValue(cmd, "--KBE_VENV_PATH=", value))
+		{
+			setenv("KBE_VENV_PATH", value.c_str(), 1);
+			continue;
+		}
+
+		if(fetchCommandArgValue(cmd, "--prop=", value))
+		{
+			prop = strutil::kbe_trim(value);
+			continue;
+		}
+
+		if(fetchCommandArgValue(cmd, "--location=", value))
+		{
+			location = strutil::kbe_trim(value);
+			continue;
+		}
+	}
+
+	if(location.size() > 0)
+	{
+		selectedKBEngineConfig() = location;
+	}
+	else if(prop.size() > 0)
+	{
+		selectedKBEngineConfig() = "server/kbengine_" + prop + ".xml";
+	}
+	else
+	{
+		selectedKBEngineConfig() = "server/kbengine.xml";
+	}
+}
+
 inline void loadConfig()
 {
 	Resmgr::getSingleton().initialize();
@@ -70,8 +155,8 @@ inline void loadConfig()
 	// "../../res/server/kbengine_defaults.xml"
 	g_kbeSrvConfig.loadConfig("server/kbengine_defaults.xml");
 
-	// "../../../assets/res/server/kbengine.xml"
-	g_kbeSrvConfig.loadConfig("server/kbengine.xml");
+	// "../../../assets/res/server/kbengine.xml" or command-line selected config.
+	g_kbeSrvConfig.loadConfig(selectedKBEngineConfig());
 }
 
 inline void setEvns()
@@ -380,6 +465,7 @@ int main(int argc, char* argv[])																						\
 	KBEngine::exception::installCrashHandler("bootstrap", g_componentID);												\
 	int retcode = -1;																									\
 	THREAD_TRY_EXECUTION;																								\
+	parseLoadConfigCommandArgs(argc, argv);																				\
 	loadConfig();																										\
 	g_componentID = genUUID64();																						\
 	parseMainCommandArgs(argc, argv);																					\
@@ -394,6 +480,7 @@ int kbeMain
 kbeMain(int argc, char* argv[]);																						\
 int main(int argc, char* argv[])																						\
 {																														\
+	parseLoadConfigCommandArgs(argc, argv);																				\
 	loadConfig();																										\
 	g_componentID = genUUID64();																						\
 	parseMainCommandArgs(argc, argv);																					\
