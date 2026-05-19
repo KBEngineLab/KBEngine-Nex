@@ -3,7 +3,7 @@
 #ifndef KBE_IOCP_POLLER_H
 #define KBE_IOCP_POLLER_H
 
-#include "event_poller.h"
+#include "poller_completion.h"
 
 #if KBE_PLATFORM == PLATFORM_WIN32
 
@@ -13,37 +13,38 @@ namespace KBEngine {
 namespace Network
 {
 
-class IocpPoller : public EventPoller
+class IocpPoller : public CompletionPoller
 {
 public:
+	// 创建 IOCP 完成端口并初始化共享 completion 状态。
 	IocpPoller();
+
+	// 取消 outstanding IO 并释放 IOCP 相关资源。
 	~IocpPoller() override;
 
+	// 等待并处理一批 IOCP completion。
 	int processPendingEvents(double maxWait) override;
 
-	bool takeAcceptedSocket(int fd, KBESOCKET& acceptedSocket);
-	bool takeTcpReceivedData(int fd, std::vector<char>& data, bool& disconnected, DWORD& errorCode);
-	bool takeUdpReceivedData(int fd, std::vector<char>& data, Address& srcAddr, DWORD& errorCode);
-	bool queueTcpSend(int fd, const void* data, int len);
-	bool queueUdpSend(int fd, const void* data, int len, const Address& dstAddr);
-	bool hasPendingSend(int fd) const;
+	// IOCP 入队后立即尝试投递 WSASend，保留发送失败的同步反馈语义。
+	bool queueTcpSend(int fd, const void* data, int len) override;
+
+	// IOCP 入队后立即尝试投递 WSASendTo，避免 UDP/KCP 发送只滞留在队列里。
+	bool queueUdpSend(int fd, const void* data, int len, const Address& dstAddr) override;
 
 protected:
+	// 将 fd 绑定到 IOCP 并投递读侧 completion。
 	bool doRegisterForRead(int fd) override;
+
+	// 写侧注册只保存 handler，真实发送由发送队列驱动。
 	bool doRegisterForWrite(int fd) override;
 
+	// 注销读侧并取消 outstanding read/accept 操作。
 	bool doDeregisterForRead(int fd) override;
+
+	// 注销写侧并取消 outstanding send 操作。
 	bool doDeregisterForWrite(int fd) override;
 
 private:
-	enum SocketKind
-	{
-		SOCKET_KIND_UNKNOWN = 0,
-		SOCKET_KIND_TCP,
-		SOCKET_KIND_UDP,
-		SOCKET_KIND_LISTENER
-	};
-
 	enum Operation
 	{
 		// IOCP 本身只返回 OVERLAPPED 完成事件，这里用 operation 标记
@@ -80,83 +81,28 @@ private:
 		int udpAddrLen;
 	};
 
-	struct TcpReceivedData
-	{
-		// IOCP 收到数据后先放入队列，再通过 triggerRead 让原来的
-		// TCPPacketReceiver 消费。这样上层仍然沿用原来的消息分发路径，
-		// 但底层 recv 已经变成 completion 驱动。
-		std::vector<char> data;
-		bool disconnected;
-		DWORD errorCode;
-	};
-
-	struct UdpReceivedData
-	{
-		std::vector<char> data;
-		Address srcAddr;
-		DWORD errorCode;
-	};
-
-	struct PendingUdpSend
-	{
-		std::vector<char> data;
-		sockaddr_in dstAddr;
-	};
-
-	struct SocketState
-	{
-		explicit SocketState(KBESOCKET socketArg);
-
-		KBESOCKET socket;
-		SocketKind kind;
-		bool associated;
-		bool registeredRead;
-		uint64 generation;
-		// 每个 fd 同时只允许挂一个读类请求和一个写类请求。
-		// 多投递虽然 IOCP 支持，但当前上层 PacketReceiver/PacketSender
-		// 假定单线程、按序消费；这里保持单 pending 能减少乱序和销毁竞态。
-		IocpContext* pPendingReadContext;
-		IocpContext* pPendingWriteContext;
-		// TCP 发送队列保存上层已经交给 IOCP、但还没完成发送的数据。
-		// completion 回来后再触发原来的写完成流程，保证 Channel::FLAG_SENDING
-		// 的生命周期和旧实现保持一致。
-		std::deque<std::vector<char> > pendingTcpSends;
-		size_t pendingTcpSendBytes;
-		std::deque<PendingUdpSend> pendingUdpSends;
-		LPFN_ACCEPTEX acceptExFn;
-	};
-
-	typedef std::unique_ptr<SocketState> SocketStatePtr;
-	typedef std::map<int, SocketStatePtr> SocketStates;
-	typedef std::deque<KBESOCKET> AcceptedSockets;
-	typedef std::map<int, AcceptedSockets> AcceptedSocketMap;
-	typedef std::deque<TcpReceivedData> TcpReceivedQueue;
-	typedef std::map<int, TcpReceivedQueue> TcpReceivedMap;
-	typedef std::deque<UdpReceivedData> UdpReceivedQueue;
-	typedef std::map<int, UdpReceivedQueue> UdpReceivedMap;
-
-	SocketState& socketStateForFd(int fd);
+	// 确保 fd 已关联到 IOCP completion port。
 	bool ensureAssociated(SocketState& state, int fd);
+	// 根据 socket 类型投递 accept/recv/recvfrom。
 	bool ensureReadArmed(int fd, SocketState& state);
+	// 投递一次 TCP WSARecv。
 	bool armTcpRead(int fd, SocketState& state);
+	// 投递一次 UDP WSARecvFrom。
 	bool armUdpRead(int fd, SocketState& state);
+	// 投递一次 TCP WSASend。
 	bool armTcpSend(int fd, SocketState& state);
+	// 投递一次 UDP WSASendTo。
 	bool armUdpSend(int fd, SocketState& state);
+	// 投递一次 AcceptEx。
 	bool armAccept(int fd, SocketState& state);
-	// listener 必须在 listen() 之后才能被识别为 SOCKET_KIND_LISTENER。
-	// 如果过早注册，SO_ACCEPTCONN 还不是 true，会被误判成普通 TCP。
-	bool tryDetermineSocketKind(KBESOCKET socket, SocketKind& kind) const;
+	// 加载 listener socket 对应的 AcceptEx 函数指针。
 	bool loadAcceptEx(SocketState& state);
+	// 清理一次完成上下文持有的 pending 指针。
 	void cleanupContext(IocpContext& context);
+	// 处理一个 IOCP 返回的 OVERLAPPED 完成结果。
 	void handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapped, DWORD bytesTransferred, bool success, DWORD errorCode);
-	void cleanupStateIfUnused(int fd);
-	void closeAcceptedSockets(AcceptedSockets& acceptedSockets);
 
 	HANDLE completionPort_;
-	SocketStates socketStates_;
-	AcceptedSocketMap acceptedSockets_;
-	TcpReceivedMap tcpReceived_;
-	UdpReceivedMap udpReceived_;
 	uint64 lastCompletionBudgetWarningTime_;
 };
 

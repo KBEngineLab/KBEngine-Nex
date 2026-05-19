@@ -13,7 +13,6 @@
 #include "network/event_dispatcher.h"
 #include "network/network_interface.h"
 #include "network/event_poller.h"
-#include "network/poller_iocp.h"
 #include "network/error_reporter.h"
 #include "network/tcp_packet.h"
 #include "network/udp_packet.h"
@@ -123,13 +122,13 @@ Reason KCPPacketSender::processFilterPacket(Channel* pChannel, Packet * pPacket,
 	else
 	{
 		EndPoint* pEndpoint = pChannel->pEndPoint();
-#if KBE_PLATFORM == PLATFORM_WIN32
-		if (IocpPoller* pIocpPoller = dynamic_cast<IocpPoller*>(pChannel->networkInterface().dispatcher().pPoller()))
+		EventPoller* pPoller = pChannel->networkInterface().dispatcher().pPoller();
+		if (pPoller != NULL && pPoller->supportsCompletion())
 		{
-			// KCP 最终仍然落到 UDP socket。Windows 下统一交给 IOCP UDP_SEND，
+			// KCP 最终仍然落到 UDP socket。completion 模式下统一交给 poller UDP_SEND，
 			// 保证 TCP/UDP/KCP 都是 completion 驱动，避免同步 sendto 卡住主线程。
 			int sendSize = toIntSize(pPacket->length());
-			if (!pIocpPoller->queueUdpSend(static_cast<int>(*pEndpoint), pPacket->data(), sendSize, pEndpoint->addr()))
+			if (!pPoller->queueUdpSend(static_cast<int>(*pEndpoint), pPacket->data(), sendSize, pEndpoint->addr()))
 			{
 				return checkSocketErrors(pEndpoint);
 			}
@@ -138,7 +137,6 @@ Reason KCPPacketSender::processFilterPacket(Channel* pChannel, Packet * pPacket,
 			pChannel->onPacketSent(sendSize, true);
 			return REASON_SUCCESS;
 		}
-#endif
 		int retlen = pEndpoint->sendto((void*)(pPacket->data()), toIntSize(pPacket->length()));
 		bool sentCompleted = (retlen == (int)pPacket->length());
 
@@ -172,12 +170,12 @@ int KCPPacketSender::kcp_output(const char *buf, int len, ikcpcb *kcp, Channel* 
 	//KBE_ASSERT(kcp == pChannel->pKCP());
 
 	EndPoint* pEndpoint = pChannel->pEndPoint();
-#if KBE_PLATFORM == PLATFORM_WIN32
-	if (IocpPoller* pIocpPoller = dynamic_cast<IocpPoller*>(pChannel->networkInterface().dispatcher().pPoller()))
+	EventPoller* pPoller = pChannel->networkInterface().dispatcher().pPoller();
+	if (pPoller != NULL && pPoller->supportsCompletion())
 	{
 		// ikcp_output 可能在一次 tick 中被多次调用，queueUdpSend 会按调用顺序入队，
-		// 每次只挂一个 WSASendTo，completion 后继续发送下一包。
-		if (pIocpPoller->queueUdpSend(static_cast<int>(*pEndpoint), buf, len, pEndpoint->addr()))
+		// 每次只挂一个 sendto completion，completion 后继续发送下一包。
+		if (pPoller->queueUdpSend(static_cast<int>(*pEndpoint), buf, len, pEndpoint->addr()))
 		{
 			pChannel->onPacketSent(len, true);
 			return 0;
@@ -185,7 +183,6 @@ int KCPPacketSender::kcp_output(const char *buf, int len, ikcpcb *kcp, Channel* 
 
 		return -1;
 	}
-#endif
 	int retlen = pEndpoint->sendto((void*)buf, len);
 
 	bool sentCompleted = retlen == len;

@@ -6,7 +6,7 @@
 #include "network/bundle.h"
 #include "network/endpoint.h"
 #include "network/network_interface.h"
-#include "network/poller_iocp.h"
+#include "network/event_poller.h"
 #include "pyscript/script.h"
 
 #ifndef CODE_INLINE
@@ -262,48 +262,51 @@ int	TelnetHandler::handleInputNotification(int fd)
 
 	char data[1024] = {0};
 
-#if KBE_PLATFORM == PLATFORM_WIN32
-	if (Network::IocpPoller* pIocpPoller = dynamic_cast<Network::IocpPoller*>(pNetworkInterface_->dispatcher().pPoller()))
+	Network::EventPoller* pPoller = pNetworkInterface_->dispatcher().pPoller();
+	if (pPoller != NULL && pPoller->supportsCompletion())
 	{
-		// IOCP 模式下数据已经由 WSARecv completion 读入 poller 队列。
+		// completion 模式下数据已经由 poller 读入队列。
 		// 这里不能再调用同步 recv，否则会读到 WSAEWOULDBLOCK，表现为 telnet
 		// 能连接但命令永远进不到 TelnetHandler。
-		std::vector<char> recvData;
-		bool disconnected = false;
-		DWORD errorCode = 0;
-		if (!pIocpPoller->takeTcpReceivedData(fd, recvData, disconnected, errorCode))
+		// kqueue/io_uring 一次唤醒可能已经投递了多段数据。如果这里只取一段，
+		// 后续命令会留在队列里等不到新的 triggerRead。
+		while (true)
 		{
-			return 0;
-		}
+			std::vector<char> recvData;
+			bool disconnected = false;
+			int errorCode = 0;
+			if (!pPoller->takeTcpReceivedData(fd, recvData, disconnected, errorCode))
+			{
+				break;
+			}
 
-		if (errorCode != 0 || disconnected)
-		{
-			pTelnetServer_->onTelnetHandlerClosed(fd, this);
-			return 0;
-		}
+			if (errorCode != 0 || disconnected)
+			{
+				pTelnetServer_->onTelnetHandlerClosed(fd, this);
+				return 0;
+			}
 
-		if (recvData.empty())
-		{
-			return 0;
-		}
+			if (recvData.empty() || state_ == TELNET_STATE_READONLY)
+			{
+				continue;
+			}
 
-		if (state_ == TELNET_STATE_READONLY)
-		{
-			return 0;
-		}
-
-		size_t offset = 0;
-		while (offset < recvData.size())
-		{
-			const size_t chunkSize = std::min(sizeof(data), recvData.size() - offset);
-			memcpy(data, recvData.data() + offset, chunkSize);
-			onRecvInput(data, static_cast<int>(chunkSize));
-			offset += chunkSize;
+			size_t offset = 0;
+			while (offset < recvData.size())
+			{
+				memset(data, 0, sizeof(data));
+				const size_t chunkSize = std::min(sizeof(data), recvData.size() - offset);
+				memcpy(data, recvData.data() + offset, chunkSize);
+				if (!onRecvInput(data, static_cast<int>(chunkSize)))
+				{
+					return 0;
+				}
+				offset += chunkSize;
+			}
 		}
 
 		return 0;
 	}
-#endif
 
 	int recvsize = pEndPoint_->recv(data, sizeof(data));
 
@@ -329,7 +332,7 @@ int	TelnetHandler::handleInputNotification(int fd)
 }
 
 //-------------------------------------------------------------------------------------
-void TelnetHandler::onRecvInput(const char *buffer, int size)
+bool TelnetHandler::onRecvInput(const char *buffer, int size)
 {
 	int idx = 0;
 	while (idx < size)
@@ -357,7 +360,7 @@ void TelnetHandler::onRecvInput(const char *buffer, int size)
 
 			if (isEnter && !processCommand())
 			{
-				return;
+				return false;
 			}
 			break;
 		}
@@ -454,6 +457,8 @@ void TelnetHandler::onRecvInput(const char *buffer, int size)
 			}
 		};
 	}
+
+	return true;
 }
 
 //-------------------------------------------------------------------------------------

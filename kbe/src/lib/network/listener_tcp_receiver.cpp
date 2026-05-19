@@ -12,7 +12,7 @@
 #include "network/event_dispatcher.h"
 #include "network/network_interface.h"
 #include "network/packet_receiver.h"
-#include "network/poller_iocp.h"
+#include "network/event_poller.h"
 #include "network/error_reporter.h"
 
 namespace KBEngine { 
@@ -40,14 +40,18 @@ int ListenerTcpReceiver::handleInputNotification(int fd)
 	{
 		EndPoint* pNewEndPoint = NULL;
 
-#if KBE_PLATFORM == PLATFORM_WIN32
-		if (IocpPoller* pIocpPoller = dynamic_cast<IocpPoller*>(this->dispatcher().pPoller()))
+		EventPoller* pPoller = this->dispatcher().pPoller();
+		if (pPoller != NULL && pPoller->supportsCompletion())
 		{
-			// IOCP listener 的 accept socket 只来自 AcceptEx completion。
+			// completion listener 的 accept socket 只来自 poller completion。
 			// 如果队列里没有完成的连接，直接退出本轮；不能再 fallback 到 accept()，
 			// 否则会在 completion/readiness 两套模型之间制造重复接受或阻塞风险。
+#if KBE_PLATFORM == PLATFORM_WIN32
 			KBESOCKET acceptedSocket = INVALID_SOCKET;
-			if (pIocpPoller->takeAcceptedSocket(fd, acceptedSocket))
+#else
+			KBESOCKET acceptedSocket = -1;
+#endif
+			if (pPoller->takeAcceptedSocket(fd, acceptedSocket))
 			{
 				pNewEndPoint = EndPoint::createPoolObject(OBJECTPOOL_POINT);
 				pNewEndPoint->setFileDescriptor(acceptedSocket);
@@ -62,8 +66,13 @@ int ListenerTcpReceiver::handleInputNotification(int fd)
 				}
 				else
 				{
+#if KBE_PLATFORM == PLATFORM_WIN32
 					WARNING_MSG(fmt::format("ListenerTcpReceiver::handleInputNotification: getremoteaddress({}) failed: {}\n",
 						fd, kbe_strerror(WSAGetLastError())));
+#else
+					WARNING_MSG(fmt::format("ListenerTcpReceiver::handleInputNotification: getremoteaddress({}) failed: {}\n",
+						fd, kbe_strerror()));
+#endif
 				}
 			}
 
@@ -73,7 +82,6 @@ int ListenerTcpReceiver::handleInputNotification(int fd)
 			}
 		}
 		else
-#endif
 		{
 			pNewEndPoint = endpoint_.accept();
 		}

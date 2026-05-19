@@ -13,7 +13,6 @@
 #include "network/event_dispatcher.h"
 #include "network/network_interface.h"
 #include "network/event_poller.h"
-#include "network/poller_iocp.h"
 #include "network/error_reporter.h"
 #include <openssl/err.h>
 
@@ -81,16 +80,16 @@ bool TCPPacketReceiver::processRecv(bool expectingPacket)
 
 	TCPPacket* pReceiveWindow = TCPPacket::createPoolObject(OBJECTPOOL_POINT);
 
-#if KBE_PLATFORM == PLATFORM_WIN32
-	if (IocpPoller* pIocpPoller = dynamic_cast<IocpPoller*>(this->dispatcher().pPoller()))
+	EventPoller* pPoller = this->dispatcher().pPoller();
+	if (pPoller != NULL && pPoller->supportsCompletion())
 	{
-		// Windows IOCP 模式下，socket 数据已经在 WSARecv completion 中到达。
+		// completion 模式下，socket 数据已经由 poller 接收并放入队列。
 		// 这里不能再调用 recv，否则会把 completion 模型退回 readiness 模型，
-		// 并可能在第二次登录/断线时读错时序或阻塞主线程。
+		// 并可能在登录/断线 burst 时读错时序或阻塞主线程。
 		std::vector<char> data;
 		bool disconnected = false;
-		DWORD errorCode = 0;
-		if (!pIocpPoller->takeTcpReceivedData(static_cast<int>(*pEndpoint_), data, disconnected, errorCode))
+		int errorCode = 0;
+		if (!pPoller->takeTcpReceivedData(static_cast<int>(*pEndpoint_), data, disconnected, errorCode))
 		{
 			TCPPacket::reclaimPoolObject(pReceiveWindow);
 			return false;
@@ -101,7 +100,11 @@ bool TCPPacketReceiver::processRecv(bool expectingPacket)
 			// 发送 completion 失败也会通过读侧错误队列进入这里。
 			// 这样 channel 的关闭/注销仍然走 TCPPacketReceiver 原来的错误路径。
 			TCPPacket::reclaimPoolObject(pReceiveWindow);
+#if KBE_PLATFORM == PLATFORM_WIN32
 			WSASetLastError(errorCode);
+#else
+			errno = errorCode;
+#endif
 			PacketReceiver::RecvState rstate = this->checkSocketErrors(-1, expectingPacket);
 			if (rstate == PacketReceiver::RECV_STATE_INTERRUPT)
 			{
@@ -135,7 +138,6 @@ bool TCPPacketReceiver::processRecv(bool expectingPacket)
 
 		return true;
 	}
-#endif
 
 	int len = pReceiveWindow->recvFromEndPoint(*pEndpoint_);
 

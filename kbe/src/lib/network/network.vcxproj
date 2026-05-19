@@ -220,9 +220,10 @@
     <ClCompile Include="packet_reader.cpp" />
     <ClCompile Include="packet_receiver.cpp" />
     <ClCompile Include="packet_sender.cpp" />
-    <ClCompile Include="poller_epoll.cpp" />
+    <ClCompile Include="poller_completion.cpp" />
     <ClCompile Include="poller_iocp.cpp" />
-    <ClCompile Include="poller_select.cpp" />
+    <ClCompile Include="poller_io_uring.cpp" />
+    <ClCompile Include="poller_kqueue.cpp" />
     <ClCompile Include="tcp_packet.cpp" />
     <ClCompile Include="tcp_packet_receiver.cpp" />
     <ClCompile Include="tcp_packet_sender.cpp" />
@@ -265,9 +266,10 @@
     <ClInclude Include="packet_reader.h" />
     <ClInclude Include="packet_receiver.h" />
     <ClInclude Include="packet_sender.h" />
-    <ClInclude Include="poller_epoll.h" />
+    <ClInclude Include="poller_completion.h" />
     <ClInclude Include="poller_iocp.h" />
-    <ClInclude Include="poller_select.h" />
+    <ClInclude Include="poller_io_uring.h" />
+    <ClInclude Include="poller_kqueue.h" />
     <ClInclude Include="tcp_packet.h" />
     <ClInclude Include="tcp_packet_receiver.h" />
     <ClInclude Include="tcp_packet_sender.h" />

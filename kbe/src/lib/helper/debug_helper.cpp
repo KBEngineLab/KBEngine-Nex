@@ -14,9 +14,15 @@
 #include "network/tcp_packet.h"
 #include "server/serverconfig.h"
 
+#include <errno.h>
+#include <fstream>
+#include <sys/stat.h>
+
 #if KBE_PLATFORM_UNIX_FAMILY
 #include <unistd.h>
 #include <syslog.h>
+#else
+#include <direct.h>
 #endif
 
 #ifndef NO_USE_LOG4CXX
@@ -47,6 +53,136 @@ ProfileVal g_syncLogProfile("syncLog");
 
 #ifndef NO_USE_LOG4CXX
 log4cxx::LoggerPtr g_logger(log4cxx::Logger::getLogger(""));
+
+namespace
+{
+
+bool createDirectoryIfMissing(const std::string& path)
+{
+	if (path.empty())
+	{
+		return true;
+	}
+
+#if KBE_PLATFORM_UNIX_FAMILY
+	if (::mkdir(path.c_str(), 0755) == 0)
+#else
+	if (::_mkdir(path.c_str()) == 0)
+#endif
+	{
+		return true;
+	}
+
+	return errno == EEXIST;
+}
+
+void createDirectories(const std::string& path)
+{
+	if (path.empty())
+	{
+		return;
+	}
+
+	std::string normalized = path;
+	strutil::kbe_replace(normalized, "\\", "/");
+	strutil::kbe_replace(normalized, "//", "/");
+
+	std::string current;
+	size_t start = 0;
+	if (normalized[0] == '/')
+	{
+		current = "/";
+		start = 1;
+	}
+	else if (normalized.size() > 1 && normalized[1] == ':')
+	{
+		current = normalized.substr(0, 2);
+		start = 2;
+		if (normalized.size() > 2 && normalized[2] == '/')
+		{
+			current += "/";
+			start = 3;
+		}
+	}
+
+	while (start <= normalized.size())
+	{
+		size_t next = normalized.find('/', start);
+		std::string part = normalized.substr(start, next == std::string::npos ? std::string::npos : next - start);
+		if (!part.empty())
+		{
+			if (!current.empty() && current[current.size() - 1] != '/')
+			{
+				current += "/";
+			}
+
+			current += part;
+			createDirectoryIfMissing(current);
+		}
+
+		if (next == std::string::npos)
+		{
+			break;
+		}
+
+		start = next + 1;
+	}
+}
+
+std::string parentDirectory(const std::string& filePath)
+{
+	std::string normalized = strutil::kbe_trim(filePath);
+	if (normalized.size() >= 2 &&
+		((normalized[0] == '"' && normalized[normalized.size() - 1] == '"') ||
+			(normalized[0] == '\'' && normalized[normalized.size() - 1] == '\'')))
+	{
+		normalized = normalized.substr(1, normalized.size() - 2);
+	}
+
+	strutil::kbe_replace(normalized, "\\", "/");
+	size_t pos = normalized.find_last_of('/');
+	if (pos == std::string::npos)
+	{
+		return "";
+	}
+
+	return normalized.substr(0, pos);
+}
+
+void ensureLog4cxxAppenderDirectories(const std::string& configPath)
+{
+	std::ifstream file(configPath.c_str());
+	if (!file.is_open())
+	{
+		return;
+	}
+
+	std::string line;
+	while (std::getline(file, line))
+	{
+		line = strutil::kbe_trim(line);
+		if (line.empty() || line[0] == '#')
+		{
+			continue;
+		}
+
+		size_t splitPos = line.find('=');
+		if (splitPos == std::string::npos)
+		{
+			continue;
+		}
+
+		std::string key = strutil::kbe_trim(line.substr(0, splitPos));
+		if (key.find("log4j.appender.") != 0 || key.rfind(".File") != key.size() - 5)
+		{
+			continue;
+		}
+
+		createDirectories(parentDirectory(line.substr(splitPos + 1)));
+	}
+}
+
+}
 
 #define KBE_LOG4CXX_ERROR(logger, s)	\
 	{	\
@@ -373,7 +509,9 @@ void DebugHelper::initialize(COMPONENT_TYPE componentType)
 	if(componentType == CLIENT_TYPE || componentType == CONSOLE_TYPE)
 	{
 		kbe_snprintf(helpConfig, MAX_PATH, "log4j.properties");
-		log4cxx::PropertyConfigurator::configure(Resmgr::getSingleton().matchRes(helpConfig).c_str());
+		std::string cfg = Resmgr::getSingleton().matchRes(helpConfig);
+		ensureLog4cxxAppenderDirectories(cfg);
+		log4cxx::PropertyConfigurator::configure(cfg.c_str());
 	}
 	else
 	{
@@ -403,6 +541,7 @@ void DebugHelper::initialize(COMPONENT_TYPE componentType)
 			cfg = Resmgr::getSingleton().matchRes(helpConfig);
 		}
 
+		ensureLog4cxxAppenderDirectories(cfg);
 		log4cxx::PropertyConfigurator::configure(cfg.c_str());
 	}
 

@@ -19,7 +19,6 @@ namespace Network
 namespace
 {
 const size_t IOCP_TCP_SEND_BATCH_BYTES = 64 * 1024;
-const size_t IOCP_TCP_SEND_BACKLOG_BYTES = 1024 * 1024;
 // 预算告警只是诊断“主循环被 completion 回调拖太久”，不是限流开关。
 // 真正的处理上限来自配置里的 g_maxCompletionsPerTick / g_maxCompletionProcessingTimeMS。
 const uint64 COMPLETION_BUDGET_WARNING_INTERVAL = 10 * stampsPerSecond();
@@ -66,29 +65,9 @@ IocpPoller::IocpContext::IocpContext(int fdArg, KBESOCKET socketArg, SocketKind 
 }
 
 //-------------------------------------------------------------------------------------
-IocpPoller::SocketState::SocketState(KBESOCKET socketArg) :
-	socket(socketArg),
-	kind(SOCKET_KIND_UNKNOWN),
-	associated(false),
-	registeredRead(false),
-	generation(0),
-	pPendingReadContext(NULL),
-	pPendingWriteContext(NULL),
-	pendingTcpSends(),
-	pendingTcpSendBytes(0),
-	pendingUdpSends(),
-	acceptExFn(NULL)
-{
-}
-
-//-------------------------------------------------------------------------------------
 IocpPoller::IocpPoller() :
-	EventPoller(),
+	CompletionPoller(),
 	completionPort_(CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0)),
-	socketStates_(),
-	acceptedSockets_(),
-	tcpReceived_(),
-	udpReceived_(),
 	lastCompletionBudgetWarningTime_(0)
 {
 	if (completionPort_ == NULL)
@@ -101,27 +80,24 @@ IocpPoller::IocpPoller() :
 //-------------------------------------------------------------------------------------
 IocpPoller::~IocpPoller()
 {
-	for (auto& item : acceptedSockets_)
-	{
-		closeAcceptedSockets(item.second);
-	}
-
 	for (auto& item : socketStates_)
 	{
 		SocketState& state = *item.second;
 		if (state.pPendingReadContext != NULL)
 		{
-			CancelIoEx(reinterpret_cast<HANDLE>(state.socket), &state.pPendingReadContext->overlapped);
-			cleanupContext(*state.pPendingReadContext);
-			delete state.pPendingReadContext;
+			IocpContext* pContext = reinterpret_cast<IocpContext*>(state.pPendingReadContext);
+			CancelIoEx(reinterpret_cast<HANDLE>(state.socket), &pContext->overlapped);
+			cleanupContext(*pContext);
+			delete pContext;
 			state.pPendingReadContext = NULL;
 		}
 
 		if (state.pPendingWriteContext != NULL)
 		{
-			CancelIoEx(reinterpret_cast<HANDLE>(state.socket), &state.pPendingWriteContext->overlapped);
-			cleanupContext(*state.pPendingWriteContext);
-			delete state.pPendingWriteContext;
+			IocpContext* pContext = reinterpret_cast<IocpContext*>(state.pPendingWriteContext);
+			CancelIoEx(reinterpret_cast<HANDLE>(state.socket), &pContext->overlapped);
+			cleanupContext(*pContext);
+			delete pContext;
 			state.pPendingWriteContext = NULL;
 		}
 	}
@@ -134,154 +110,29 @@ IocpPoller::~IocpPoller()
 }
 
 //-------------------------------------------------------------------------------------
-bool IocpPoller::takeAcceptedSocket(int fd, KBESOCKET& acceptedSocket)
-{
-	auto iter = acceptedSockets_.find(fd);
-	if (iter == acceptedSockets_.end() || iter->second.empty())
-	{
-		return false;
-	}
-
-	acceptedSocket = iter->second.front();
-	iter->second.pop_front();
-
-	if (iter->second.empty())
-	{
-		acceptedSockets_.erase(iter);
-	}
-
-	return true;
-}
-
-//-------------------------------------------------------------------------------------
-bool IocpPoller::takeTcpReceivedData(int fd, std::vector<char>& data, bool& disconnected, DWORD& errorCode)
-{
-	auto iter = tcpReceived_.find(fd);
-	if (iter == tcpReceived_.end() || iter->second.empty())
-	{
-		return false;
-	}
-
-	TcpReceivedData& item = iter->second.front();
-	data.swap(item.data);
-	disconnected = item.disconnected;
-	errorCode = item.errorCode;
-	iter->second.pop_front();
-
-	if (iter->second.empty())
-	{
-		tcpReceived_.erase(iter);
-	}
-
-	return true;
-}
-
-//-------------------------------------------------------------------------------------
-bool IocpPoller::takeUdpReceivedData(int fd, std::vector<char>& data, Address& srcAddr, DWORD& errorCode)
-{
-	auto iter = udpReceived_.find(fd);
-	if (iter == udpReceived_.end() || iter->second.empty())
-	{
-		return false;
-	}
-
-	UdpReceivedData& item = iter->second.front();
-	data.swap(item.data);
-	srcAddr = item.srcAddr;
-	errorCode = item.errorCode;
-	iter->second.pop_front();
-
-	if (iter->second.empty())
-	{
-		udpReceived_.erase(iter);
-	}
-
-	return true;
-}
-
-//-------------------------------------------------------------------------------------
 bool IocpPoller::queueTcpSend(int fd, const void* data, int len)
 {
-	if (len <= 0)
+	// 共享基类只负责排队；IOCP 需要尽快投递 WSASend，让调用方能感知立即失败。
+	if (!CompletionPoller::queueTcpSend(fd, data, len))
 	{
-		return true;
+		return false;
 	}
 
 	SocketState& state = socketStateForFd(fd);
-	if (state.kind == SOCKET_KIND_UNKNOWN)
-	{
-		state.kind = SOCKET_KIND_TCP;
-	}
-
-	// 这里给 IOCP 自己的发送积压设置硬上限。
-	// Channel 层还有 send-window 检查，但 IOCP completion 模型里，
-	// 数据会先进入 pendingTcpSends 等待 WSASend 完成；如果没有这个上限，
-	// 对端卡住时内存会绕过旧的同步 send 压力反馈继续增长。
-	if (state.pendingTcpSendBytes + static_cast<size_t>(len) > IOCP_TCP_SEND_BACKLOG_BYTES)
-	{
-		WSASetLastError(WSAEWOULDBLOCK);
-		return false;
-	}
-
-	std::vector<char> sendData(static_cast<const char*>(data), static_cast<const char*>(data) + len);
-	state.pendingTcpSendBytes += sendData.size();
-	state.pendingTcpSends.push_back(std::move(sendData));
-
-	// 如果当前没有挂起的写请求，立即投递 WSASend；
-	// 如果已有写请求，则只入队，等发送 completion 后继续 armTcpSend。
 	return armTcpSend(fd, state);
 }
 
 //-------------------------------------------------------------------------------------
 bool IocpPoller::queueUdpSend(int fd, const void* data, int len, const Address& dstAddr)
 {
-	if (len <= 0)
-	{
-		return true;
-	}
-
-	SocketState& state = socketStateForFd(fd);
-	state.kind = SOCKET_KIND_UDP;
-
-	PendingUdpSend pending;
-	pending.data.assign(static_cast<const char*>(data), static_cast<const char*>(data) + len);
-	memset(&pending.dstAddr, 0, sizeof(pending.dstAddr));
-	pending.dstAddr.sin_family = AF_INET;
-	pending.dstAddr.sin_addr.s_addr = dstAddr.ip;
-	pending.dstAddr.sin_port = dstAddr.port;
-	state.pendingUdpSends.push_back(std::move(pending));
-
-	// UDP 也走 completion，避免 Windows 下 KCP/UDP 发送路径退回同步 sendto。
-	return armUdpSend(fd, state);
-}
-
-//-------------------------------------------------------------------------------------
-bool IocpPoller::hasPendingSend(int fd) const
-{
-	auto iter = socketStates_.find(fd);
-	if (iter == socketStates_.end())
+	// UDP/KCP 也保持入队后立即投递，避免等待下一次主循环才开始发送。
+	if (!CompletionPoller::queueUdpSend(fd, data, len, dstAddr))
 	{
 		return false;
 	}
 
-	const SocketState& state = *iter->second;
-	return state.pPendingWriteContext != NULL || !state.pendingTcpSends.empty() ||
-		state.pendingTcpSendBytes > 0 || !state.pendingUdpSends.empty();
-}
-
-//-------------------------------------------------------------------------------------
-IocpPoller::SocketState& IocpPoller::socketStateForFd(int fd)
-{
-	auto iter = socketStates_.find(fd);
-	if (iter == socketStates_.end())
-	{
-		SocketStatePtr state(new SocketState(static_cast<KBESOCKET>(fd)));
-		iter = socketStates_.insert(std::make_pair(fd, std::move(state))).first;
-	}
-
-	SocketState& state = *iter->second;
-	state.socket = static_cast<KBESOCKET>(fd);
-	return state;
+	SocketState& state = socketStateForFd(fd);
+	return armUdpSend(fd, state);
 }
 
 //-------------------------------------------------------------------------------------
@@ -302,40 +153,6 @@ bool IocpPoller::ensureAssociated(SocketState& state, int fd)
 
 	state.associated = true;
 	return true;
-}
-
-//-------------------------------------------------------------------------------------
-bool IocpPoller::tryDetermineSocketKind(KBESOCKET socket, SocketKind& kind) const
-{
-	int socketType = 0;
-	int acceptConn = 0;
-	int socketTypeLen = sizeof(socketType);
-	int acceptConnLen = sizeof(acceptConn);
-
-	if (getsockopt(socket, SOL_SOCKET, SO_TYPE, reinterpret_cast<char*>(&socketType), &socketTypeLen) != 0)
-	{
-		return false;
-	}
-
-	if (socketType == SOCK_DGRAM)
-	{
-		kind = SOCKET_KIND_UDP;
-		return true;
-	}
-
-	if (getsockopt(socket, SOL_SOCKET, SO_ACCEPTCONN, reinterpret_cast<char*>(&acceptConn), &acceptConnLen) == 0 && acceptConn != 0)
-	{
-		kind = SOCKET_KIND_LISTENER;
-		return true;
-	}
-
-	if (socketType == SOCK_STREAM)
-	{
-		kind = SOCKET_KIND_TCP;
-		return true;
-	}
-
-	return false;
 }
 
 //-------------------------------------------------------------------------------------
@@ -435,26 +252,13 @@ bool IocpPoller::armTcpSend(int fd, SocketState& state)
 	}
 
 	IocpContext* pContext = new IocpContext(fd, state.socket, SOCKET_KIND_TCP, OP_TCP_SEND, state.generation);
-	size_t batchBytes = 0;
 	// 合并多个小包为一次 WSASend，减少 IOCP completion 数量。
 	// 不能无限合并，否则一次 completion 回调可能占用过久，也会增加
 	// 断线时被取消的 outstanding buffer 大小。
-	while (!state.pendingTcpSends.empty() && batchBytes < IOCP_TCP_SEND_BATCH_BYTES)
+	if (!popTcpSendBatch(state, IOCP_TCP_SEND_BATCH_BYTES, pContext->data))
 	{
-		std::vector<char>& front = state.pendingTcpSends.front();
-		const size_t bytesToAppend = std::min(front.size(), IOCP_TCP_SEND_BATCH_BYTES - batchBytes);
-		pContext->data.insert(pContext->data.end(), front.begin(), front.begin() + bytesToAppend);
-		batchBytes += bytesToAppend;
-		state.pendingTcpSendBytes -= bytesToAppend;
-
-		if (bytesToAppend == front.size())
-		{
-			state.pendingTcpSends.pop_front();
-		}
-		else
-		{
-			front.erase(front.begin(), front.begin() + bytesToAppend);
-		}
+		delete pContext;
+		return true;
 	}
 
 	pContext->buffer.buf = pContext->data.data();
@@ -495,6 +299,7 @@ bool IocpPoller::armUdpSend(int fd, SocketState& state)
 	IocpContext* pContext = new IocpContext(fd, state.socket, SOCKET_KIND_UDP, OP_UDP_SEND, state.generation);
 	PendingUdpSend pending = std::move(state.pendingUdpSends.front());
 	state.pendingUdpSends.pop_front();
+	state.pendingUdpSendBytes -= pending.data.size();
 	pContext->data.swap(pending.data);
 	pContext->udpAddr = pending.dstAddr;
 	pContext->udpAddrLen = sizeof(pContext->udpAddr);
@@ -571,6 +376,9 @@ bool IocpPoller::armAccept(int fd, SocketState& state)
 //-------------------------------------------------------------------------------------
 bool IocpPoller::ensureReadArmed(int fd, SocketState& state)
 {
+	// IOCP 本身就是 completion 模型，每个 fd 同时只保留一个读侧 OVERLAPPED。
+	// 这里不使用用户态队列水位暂停 WSARecv/AcceptEx；completion 到达后立即
+	// triggerRead，上层只通过短暂 handoff 队列取走结果。
 	if (!state.registeredRead || state.pPendingReadContext != NULL)
 	{
 		return true;
@@ -623,10 +431,10 @@ bool IocpPoller::doRegisterForRead(int fd)
 	// 旧连接迟到的 completion 被新连接消费。
 	if (isNewState ||
 		(state.pPendingReadContext == NULL && state.pPendingWriteContext == NULL &&
-			state.pendingTcpSends.empty() && state.pendingTcpSendBytes == 0 && state.pendingUdpSends.empty()))
+			state.pendingTcpSends.empty() && state.pendingTcpSendBytes == 0 &&
+			state.pendingUdpSends.empty() && state.pendingUdpSendBytes == 0))
 	{
-		tcpReceived_.erase(fd);
-		udpReceived_.erase(fd);
+		clearReceivedData(fd);
 		state.kind = SOCKET_KIND_UNKNOWN;
 		state.associated = false;
 		++state.generation;
@@ -655,27 +463,26 @@ bool IocpPoller::doDeregisterForRead(int fd)
 
 	SocketState& state = *iter->second;
 	state.registeredRead = false;
-	tcpReceived_.erase(fd);
-	udpReceived_.erase(fd);
+	clearReceivedData(fd);
 
 	// 读注销表示 channel/socket 生命周期结束，读写 outstanding IO 都要取消。
 	// CancelIoEx 后 completion 仍可能异步返回，所以这里只断开 state 引用，
 	// 真正的 context 内存在 handleCompletion 收到 ERROR_OPERATION_ABORTED 后释放。
 	if (state.pPendingReadContext != NULL)
 	{
-		CancelIoEx(reinterpret_cast<HANDLE>(state.socket), &state.pPendingReadContext->overlapped);
+		IocpContext* pContext = reinterpret_cast<IocpContext*>(state.pPendingReadContext);
+		CancelIoEx(reinterpret_cast<HANDLE>(state.socket), &pContext->overlapped);
 		state.pPendingReadContext = NULL;
 	}
 
 	if (state.pPendingWriteContext != NULL)
 	{
-		CancelIoEx(reinterpret_cast<HANDLE>(state.socket), &state.pPendingWriteContext->overlapped);
+		IocpContext* pContext = reinterpret_cast<IocpContext*>(state.pPendingWriteContext);
+		CancelIoEx(reinterpret_cast<HANDLE>(state.socket), &pContext->overlapped);
 		state.pPendingWriteContext = NULL;
 	}
 
-	state.pendingTcpSends.clear();
-	state.pendingTcpSendBytes = 0;
-	state.pendingUdpSends.clear();
+	clearPendingSends(state);
 	++state.generation;
 
 	cleanupStateIfUnused(fd);
@@ -693,62 +500,20 @@ bool IocpPoller::doDeregisterForWrite(int fd)
 	}
 
 	SocketState& state = *iter->second;
-	state.pendingTcpSends.clear();
-	state.pendingTcpSendBytes = 0;
-	state.pendingUdpSends.clear();
+	clearPendingSends(state);
 
 	// 写注销只停止发送队列，不能清 tcpReceived_/udpReceived_。
 	// completion 线程在 handleCompletion 中会先把 recv 数据入队再 triggerRead；
 	// 如果 onSendCompleted/stopSend 清掉接收队列，登录/断线消息会被吞掉。
 	if (state.pPendingWriteContext != NULL)
 	{
-		CancelIoEx(reinterpret_cast<HANDLE>(state.socket), &state.pPendingWriteContext->overlapped);
+		IocpContext* pContext = reinterpret_cast<IocpContext*>(state.pPendingWriteContext);
+		CancelIoEx(reinterpret_cast<HANDLE>(state.socket), &pContext->overlapped);
 		state.pPendingWriteContext = NULL;
 	}
 
 	cleanupStateIfUnused(fd);
 	return true;
-}
-
-//-------------------------------------------------------------------------------------
-void IocpPoller::cleanupStateIfUnused(int fd)
-{
-	auto iter = socketStates_.find(fd);
-	if (iter == socketStates_.end())
-	{
-		return;
-	}
-
-	SocketState& state = *iter->second;
-	if (state.registeredRead || state.pPendingReadContext != NULL || state.pPendingWriteContext != NULL ||
-		!state.pendingTcpSends.empty() || state.pendingTcpSendBytes > 0 ||
-		!state.pendingUdpSends.empty() || this->findForWrite(fd) != NULL)
-	{
-		return;
-	}
-
-	auto acceptedIter = acceptedSockets_.find(fd);
-	if (acceptedIter != acceptedSockets_.end())
-	{
-		closeAcceptedSockets(acceptedIter->second);
-		acceptedSockets_.erase(acceptedIter);
-	}
-
-	socketStates_.erase(iter);
-}
-
-//-------------------------------------------------------------------------------------
-void IocpPoller::closeAcceptedSockets(AcceptedSockets& acceptedSockets)
-{
-	while (!acceptedSockets.empty())
-	{
-		KBESOCKET acceptedSocket = acceptedSockets.front();
-		acceptedSockets.pop_front();
-		if (acceptedSocket != INVALID_SOCKET)
-		{
-			closesocket(acceptedSocket);
-		}
-	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -776,7 +541,7 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 	auto iter = socketStates_.find(fd);
 	const bool hasState = (iter != socketStates_.end());
 	SocketState* pState = hasState ? iter->second.get() : NULL;
-	IocpContext** ppCurrentContext = NULL;
+	void** ppCurrentContext = NULL;
 	if (pState != NULL)
 	{
 		ppCurrentContext = (pContext->operation == OP_TCP_SEND || pContext->operation == OP_UDP_SEND) ?
@@ -827,9 +592,14 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 			setsockopt(pContext->acceptSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
 				reinterpret_cast<const char*>(&pContext->socket), sizeof(pContext->socket));
 
-			acceptedSockets_[fd].push_back(pContext->acceptSocket);
+			// pushAcceptedSocket 可能因为 accept 队列满而关闭 acceptSocket。
+			// 无论是否成功入队，context 都不再拥有这个 socket，避免 cleanupContext 二次关闭。
+			bool queued = pushAcceptedSocket(fd, pContext->acceptSocket);
 			pContext->acceptSocket = INVALID_SOCKET;
-			this->triggerRead(fd);
+			if (queued)
+			{
+				this->triggerRead(fd);
+			}
 		}
 		else if (!success)
 		{
@@ -837,28 +607,40 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 				fd, kbe_strerror(errorCode)));
 		}
 	}
-	else if (pContext->operation == OP_TCP_RECV)
-	{
-		// TCP_RECV completion 不直接调用 recv。
-		// 数据先进入 tcpReceived_，再 triggerRead，让 TCPPacketReceiver
-		// 通过原有 PacketReader/Channel 逻辑解析消息。
-		TcpReceivedData item;
-		item.disconnected = (success && bytesTransferred == 0);
-		item.errorCode = success ? 0 : errorCode;
-		if (success && bytesTransferred > 0)
+		else if (pContext->operation == OP_TCP_RECV)
 		{
-			item.data.assign(pContext->data.begin(), pContext->data.begin() + bytesTransferred);
-		}
+			// TCP_RECV completion 不直接调用 recv。
+			// 数据先进入 tcpReceived_，再 triggerRead，让 TCPPacketReceiver
+			// 通过原有 PacketReader/Channel 逻辑解析消息。
+			// bytesTransferred==0 是有序断开，也会入队为零字节 completion；
+			// 公共层用 item 上限限制这类空 completion，防止错误/断开风暴。
+			std::vector<char> data;
+			if (success && bytesTransferred > 0)
+			{
+				data.assign(pContext->data.begin(), pContext->data.begin() + bytesTransferred);
+			}
 
-		if (!success && errorCode != 0)
-		{
-			WARNING_MSG(fmt::format("IocpPoller::handleCompletion: read completion failed on fd {}: {}\n",
-				fd, kbe_strerror(errorCode)));
-		}
+			if (!success && errorCode != 0)
+			{
+				WARNING_MSG(fmt::format("IocpPoller::handleCompletion: read completion failed on fd {}: {}\n",
+					fd, kbe_strerror(errorCode)));
+			}
 
-		tcpReceived_[fd].push_back(std::move(item));
-		this->triggerRead(fd);
-	}
+			const bool terminal = !success || bytesTransferred == 0;
+			if (terminal)
+			{
+				// IOCP 每个 fd 只挂一个读侧 OVERLAPPED。
+				// 一旦这个 completion 表示 EOF/错误，就说明 TCP 读生命周期结束；
+				// 这里先关掉内部 registeredRead，防止函数尾部自动 ensureReadArmed 再投递一次
+				// WSARecv，造成断开的 socket 反复产生 0 字节 completion。
+				pState->registeredRead = false;
+			}
+
+			if (pushTcpReceivedData(fd, data, success && bytesTransferred == 0, success ? 0 : static_cast<int>(errorCode)))
+			{
+				this->triggerRead(fd);
+			}
+		}
 	else if (pContext->operation == OP_UDP_RECV)
 	{
 		if (!success && errorCode != 0 && !isUdpPortUnreachable)
@@ -869,13 +651,11 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 
 		if (success && bytesTransferred > 0)
 		{
-			UdpReceivedData item;
-			item.errorCode = 0;
-			item.srcAddr.ip = pContext->udpAddr.sin_addr.s_addr;
-			item.srcAddr.port = pContext->udpAddr.sin_port;
-			item.data.assign(pContext->data.begin(), pContext->data.begin() + bytesTransferred);
-			udpReceived_[fd].push_back(std::move(item));
-			this->triggerRead(fd);
+			std::vector<char> data(pContext->data.begin(), pContext->data.begin() + bytesTransferred);
+			if (pushUdpReceivedData(fd, data, pContext->udpAddr, 0))
+			{
+				this->triggerRead(fd);
+			}
 		}
 		else if (!success && isUdpPortUnreachable)
 		{
@@ -892,11 +672,13 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 			WARNING_MSG(fmt::format("IocpPoller::handleCompletion: send completion failed on fd {}: {}\n",
 				fd, kbe_strerror(errorCode)));
 
-			TcpReceivedData item;
-			item.disconnected = false;
-			item.errorCode = errorCode;
-			tcpReceived_[fd].push_back(std::move(item));
-			this->triggerRead(fd);
+			// 发送失败仍然转成读侧错误 completion，让 Channel 销毁路径和旧同步 send
+			// 保持一致，避免写侧直接销毁打断 buffered receive 遍历。
+			std::vector<char> data;
+			if (pushTcpReceivedData(fd, data, false, static_cast<int>(errorCode)))
+			{
+				this->triggerRead(fd);
+			}
 
 			cleanupContext(*pContext);
 			delete pContext;
@@ -908,8 +690,7 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 			// WSASend completion 允许只完成部分字节。
 			// 未发送完的数据必须放回队首，保持 TCP 字节流顺序。
 			std::vector<char> remaining(pContext->data.begin() + bytesTransferred, pContext->data.end());
-			pState->pendingTcpSendBytes += remaining.size();
-			pState->pendingTcpSends.push_front(std::move(remaining));
+			pushTcpSendFront(*pState, remaining);
 		}
 
 		if (!pState->pendingTcpSends.empty())

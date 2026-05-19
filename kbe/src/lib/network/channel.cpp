@@ -22,7 +22,7 @@
 #include "network/udp_packet.h"
 #include "network/message_handler.h"
 #include "network/network_stats.h"
-#include "network/poller_iocp.h"
+#include "network/event_poller.h"
 #include "helper/profile.h"
 #include "common/ssl.h"
 
@@ -811,23 +811,22 @@ void Channel::send(Bundle* pBundle)
 		pPacketSender_->processSend(this, 0);
 
 		// 如果不能立即发送到系统缓冲区，那么交给poller处理
-#if KBE_PLATFORM == PLATFORM_WIN32
 		if (bundles_.size() == 0 && condemn() == 0 && !isDestroyed())
 		{
-			if (IocpPoller* pIocpPoller = dynamic_cast<IocpPoller*>(pNetworkInterface_->dispatcher().pPoller()))
+			EventPoller* pPoller = pNetworkInterface_->dispatcher().pPoller();
+			if (pPoller != NULL && pPoller->supportsCompletion())
 			{
-				// processSend 在 IOCP 下会把 bundle 数据移动到 poller 的
-				// pendingTcpSends 中，此时 bundles_ 可能已经为空，但 WSASend
+				// processSend 在 completion 模式下会把 bundle 数据移动到 poller 的
+				// pendingTcpSends 中，此时 bundles_ 可能已经为空，但 send
 				// completion 还没回来。这里仍注册写事件并设置 FLAG_SENDING，
 				// 让 completion 最终能触发 onSendCompleted，保持 Channel 状态一致。
-				if (pIocpPoller->hasPendingSend(static_cast<int>(*pEndPoint_)))
+				if (pPoller->hasPendingSend(static_cast<int>(*pEndPoint_)))
 				{
 					flags_ |= FLAG_SENDING;
 					pNetworkInterface_->dispatcher().registerWriteFileDescriptor(*pEndPoint_, pPacketSender_);
 				}
 			}
 		}
-#endif
 		if (bundles_.size() > 0 && condemn() == 0 && !isDestroyed())
 		{
 			flags_ |= FLAG_SENDING;
@@ -1127,15 +1126,14 @@ bool Channel::handshake(Packet* pPacket)
 			{
 				UDPPacket* pHelloAckUDPPacket = UDPPacket::createPoolObject(OBJECTPOOL_POINT);
 				(*pHelloAckUDPPacket) << Network::UDP_HELLO_ACK << KBEVersion::versionString() << (uint32)id();
-#if KBE_PLATFORM == PLATFORM_WIN32
-				if (IocpPoller* pIocpPoller = dynamic_cast<IocpPoller*>(this->networkInterface().dispatcher().pPoller()))
+				EventPoller* pPoller = this->networkInterface().dispatcher().pPoller();
+				if (pPoller != NULL && pPoller->supportsCompletion())
 				{
-					// KCP 握手 ACK 也走 IOCP UDP_SEND，避免握手阶段混入同步 sendto。
-					pIocpPoller->queueUdpSend(static_cast<int>(*pEndPoint()), pHelloAckUDPPacket->data(),
+					// KCP 握手 ACK 也走 completion UDP_SEND，避免握手阶段混入同步 sendto。
+					pPoller->queueUdpSend(static_cast<int>(*pEndPoint()), pHelloAckUDPPacket->data(),
 						static_cast<int>(pHelloAckUDPPacket->length()), pEndPoint()->addr());
 				}
 				else
-#endif
 				{
 				pEndPoint()->sendto(pHelloAckUDPPacket->data(), static_cast<int>(pHelloAckUDPPacket->length()));
 				}

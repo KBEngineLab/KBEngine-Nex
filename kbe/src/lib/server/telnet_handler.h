@@ -98,7 +98,7 @@ private:
 	void checkAfterStr();
 
 	int	handleInputNotification(int fd);
-	void onRecvInput(const char *buffer, int size);
+	bool onRecvInput(const char *buffer, int size);
 	bool processCommand();
 	void processPythonCommand(std::string command);
 	void processBackSpace();

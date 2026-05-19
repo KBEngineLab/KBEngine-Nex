@@ -2,20 +2,15 @@
 
 
 #include "event_poller.h"
-#include "poller_select.h"
-#include "poller_epoll.h"
 #include "poller_iocp.h"
 #include "poller_kqueue.h"
+#include "poller_io_uring.h"
 #include "helper/profile.h"
 
 namespace KBEngine { 
 namespace Network
 {
 	
-#if defined(__linux__)
-#define HAS_EPOLL
-#endif
-
 #if KBE_PLATFORM == PLATFORM_APPLE
 #define HAS_KQUEUE
 #endif
@@ -154,6 +149,88 @@ int EventPoller::getFileDescriptor() const
 }
 
 //-------------------------------------------------------------------------------------
+bool EventPoller::takeAcceptedSocket(int fd, KBESOCKET& acceptedSocket)
+{
+	// 默认 poller 不保存 accept completion，保留接口给 completion adapter 覆盖。
+	(void)fd;
+	(void)acceptedSocket;
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
+bool EventPoller::takeTcpReceivedData(int fd, std::vector<char>& data, bool& disconnected, int& errorCode)
+{
+	// 默认 poller 不保存 TCP completion，调用方会按旧同步路径处理。
+	(void)fd;
+	(void)data;
+	(void)disconnected;
+	(void)errorCode;
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
+bool EventPoller::takeUdpReceivedData(int fd, std::vector<char>& data, Address& srcAddr, int& errorCode)
+{
+	// 默认 poller 不保存 UDP completion，调用方会按旧同步路径处理。
+	(void)fd;
+	(void)data;
+	(void)srcAddr;
+	(void)errorCode;
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
+bool EventPoller::queueTcpSend(int fd, const void* data, int len)
+{
+	// 默认 poller 不接管发送，返回 false 让调用方继续使用 EndPoint::send。
+	(void)fd;
+	(void)data;
+	(void)len;
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
+bool EventPoller::queueUdpSend(int fd, const void* data, int len, const Address& dstAddr)
+{
+	// 默认 poller 不接管发送，返回 false 让调用方继续使用 EndPoint::sendto。
+	(void)fd;
+	(void)data;
+	(void)len;
+	(void)dstAddr;
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
+bool EventPoller::hasPendingSend(int fd) const
+{
+	// 默认 poller 没有内部发送队列。
+	(void)fd;
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
+bool EventPoller::supportsCompletion() const
+{
+	// 只有 IOCP/io_uring/kqueue adapter 会声明自己完整接管 completion。
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
+const char* EventPoller::defaultIOModelName()
+{
+	// 统一描述当前平台默认 IO 模型，启动日志和诊断代码都从这里取值。
+#if KBE_PLATFORM == PLATFORM_WIN32
+	return "IOCP completion";
+#elif defined(__linux__)
+	return "io_uring completion";
+#elif defined(HAS_KQUEUE)
+	return "kqueue completion adapter";
+#else
+	return "unsupported completion";
+#endif
+}
+
+//-------------------------------------------------------------------------------------
 int EventPoller::maxFD() const
 {
 	int readMaxFD = -1;
@@ -188,14 +265,23 @@ int EventPoller::maxFD() const
 //-------------------------------------------------------------------------------------
 EventPoller * EventPoller::create()
 {
+	static bool s_reportedIOModel = false;
+	if (!s_reportedIOModel)
+	{
+		// 每个进程只输出一次当前 IO 模型，避免多 dispatcher 组件重复刷启动日志。
+		INFO_MSG(fmt::format("EventPoller::create: using IO model: {}.\n", EventPoller::defaultIOModelName()));
+		s_reportedIOModel = true;
+	}
+
 #if KBE_PLATFORM == PLATFORM_WIN32
 	return new IocpPoller();
-#elif defined(HAS_EPOLL)
-	return new EpollPoller();
+#elif defined(__linux__)
+	return new IoUringPoller();
 #elif defined(HAS_KQUEUE)
 	return new KqueuePoller();
 #else
-	return new SelectPoller();
+	ERROR_MSG("EventPoller::create: unsupported platform without completion poller.\n");
+	return NULL;
 #endif
 }
 

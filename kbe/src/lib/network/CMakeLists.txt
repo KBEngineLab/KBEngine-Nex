@@ -23,9 +23,9 @@ set(SRCS
 	packet_reader.cpp
 	packet_sender.cpp
 	packet_receiver.cpp
-	poller_epoll.cpp
+	poller_completion.cpp
+	poller_io_uring.cpp
 	poller_kqueue.cpp
-	poller_select.cpp
 	endpoint.cpp
 	tcp_packet.cpp
 	tcp_packet_receiver.cpp

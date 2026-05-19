@@ -5,7 +5,7 @@
 #include "telnet_handler.h"
 #include "network/bundle.h"
 #include "network/endpoint.h"
-#include "network/poller_iocp.h"
+#include "network/event_poller.h"
 #include "network/network_interface.h"
 
 #ifndef CODE_INLINE
@@ -152,13 +152,17 @@ int	TelnetServer::handleInputNotification(int fd)
 	{
 		Network::EndPoint* pNewEndPoint = NULL;
 
-#if KBE_PLATFORM == PLATFORM_WIN32
-		if (Network::IocpPoller* pIocpPoller = dynamic_cast<Network::IocpPoller*>(pDispatcher_->pPoller()))
+		Network::EventPoller* pPoller = pDispatcher_->pPoller();
+		if (pPoller != NULL && pPoller->supportsCompletion())
 		{
-			// IOCP listener 只消费 AcceptEx completion。
+			// completion listener 只消费 poller completion。
 			// 没有完成的 accepted socket 时直接退出本轮，避免和同步 accept 混用。
+#if KBE_PLATFORM == PLATFORM_WIN32
 			KBESOCKET acceptedSocket = INVALID_SOCKET;
-			if (pIocpPoller->takeAcceptedSocket(fd, acceptedSocket))
+#else
+			KBESOCKET acceptedSocket = -1;
+#endif
+			if (pPoller->takeAcceptedSocket(fd, acceptedSocket))
 			{
 				pNewEndPoint = Network::EndPoint::createPoolObject(OBJECTPOOL_POINT);
 				pNewEndPoint->setFileDescriptor(acceptedSocket);
@@ -173,8 +177,13 @@ int	TelnetServer::handleInputNotification(int fd)
 				}
 				else
 				{
+#if KBE_PLATFORM == PLATFORM_WIN32
 					WARNING_MSG(fmt::format("TelnetServer::handleInputNotification: getremoteaddress({}) failed: {}\n",
 						fd, kbe_strerror(WSAGetLastError())));
+#else
+					WARNING_MSG(fmt::format("TelnetServer::handleInputNotification: getremoteaddress({}) failed: {}\n",
+						fd, kbe_strerror()));
+#endif
 				}
 			}
 
@@ -184,7 +193,6 @@ int	TelnetServer::handleInputNotification(int fd)
 			}
 		}
 		else
-#endif
 		{
 			pNewEndPoint = listener_.accept();
 		}

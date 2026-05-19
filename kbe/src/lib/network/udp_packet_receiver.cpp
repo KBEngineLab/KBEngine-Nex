@@ -13,7 +13,6 @@
 #include "network/event_dispatcher.h"
 #include "network/network_interface.h"
 #include "network/event_poller.h"
-#include "network/poller_iocp.h"
 #include "network/error_reporter.h"
 
 namespace KBEngine { 
@@ -78,14 +77,14 @@ bool UDPPacketReceiver::processRecv(bool expectingPacket)
 	Address	srcAddr;
 	UDPPacket* pChannelReceiveWindow = UDPPacket::createPoolObject(OBJECTPOOL_POINT);
 
-#if KBE_PLATFORM == PLATFORM_WIN32
-	if (IocpPoller* pIocpPoller = dynamic_cast<IocpPoller*>(this->dispatcher().pPoller()))
+	EventPoller* pPoller = this->dispatcher().pPoller();
+	if (pPoller != NULL && pPoller->supportsCompletion())
 	{
-		// UDP/KCP 在 Windows 下也消费 IOCP completion 队列。
-		// srcAddr 来自 WSARecvFrom 的 completion context，避免这里再次 recvfrom。
+		// UDP/KCP 在 completion 模式下消费 poller 队列。
+		// srcAddr 来自 completion context，避免这里再次 recvfrom。
 		std::vector<char> data;
-		DWORD errorCode = 0;
-		if (!pIocpPoller->takeUdpReceivedData(static_cast<int>(*pEndpoint_), data, srcAddr, errorCode))
+		int errorCode = 0;
+		if (!pPoller->takeUdpReceivedData(static_cast<int>(*pEndpoint_), data, srcAddr, errorCode))
 		{
 			UDPPacket::reclaimPoolObject(pChannelReceiveWindow);
 			return false;
@@ -94,7 +93,11 @@ bool UDPPacketReceiver::processRecv(bool expectingPacket)
 		if (errorCode != 0)
 		{
 			UDPPacket::reclaimPoolObject(pChannelReceiveWindow);
+#if KBE_PLATFORM == PLATFORM_WIN32
 			WSASetLastError(errorCode);
+#else
+			errno = errorCode;
+#endif
 			PacketReceiver::RecvState rstate = this->checkSocketErrors(-1, expectingPacket);
 			return rstate == PacketReceiver::RECV_STATE_CONTINUE;
 		}
@@ -109,7 +112,6 @@ bool UDPPacketReceiver::processRecv(bool expectingPacket)
 		pChannelReceiveWindow->wpos(static_cast<uint32>(data.size()));
 	}
 	else
-#endif
 	{
 	int len = pChannelReceiveWindow->recvFromEndPoint(*pEndpoint_, &srcAddr);
 
