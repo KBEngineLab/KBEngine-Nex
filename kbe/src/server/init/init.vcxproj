@@ -130,17 +130,17 @@
     <PostBuildEvent>
       <Command>if exist "..\..\lib\python\PCbuild\amd64\pyconfig.h" (
 
-    if exist "..\..\libs\python313_d.lib" (
-        echo [INFO] python313_d.lib found, no need to copy, skipping.
+    if exist "..\..\libs\python313.lib" (
+        echo [INFO] python313.lib found, no need to copy, skipping.
     ) else (
         echo [INFO] Copying files...
 
-        copy /Y "..\..\lib\python\PCbuild\amd64\python313_d.lib" "..\..\libs"
-        copy /Y "..\..\lib\python\PCbuild\amd64\python313_d.exp" "..\..\libs"
+        copy /Y "..\..\lib\python\PCbuild\amd64\python313.lib" "..\..\libs"
+        copy /Y "..\..\lib\python\PCbuild\amd64\python313.exp" "..\..\libs"
 
-        copy /Y "..\..\lib\python\PCbuild\amd64\python313_d.dll" "..\..\..\bin\server"
-        copy /Y "..\..\lib\python\PCbuild\amd64\python313_d.ilk" "..\..\..\bin\server"
-        copy /Y "..\..\lib\python\PCbuild\amd64\python313_d.pdb" "..\..\..\bin\server"
+        copy /Y "..\..\lib\python\PCbuild\amd64\python313.dll" "..\..\..\bin\server"
+        copy /Y "..\..\lib\python\PCbuild\amd64\python313.ilk" "..\..\..\bin\server"
+        copy /Y "..\..\lib\python\PCbuild\amd64\python313.pdb" "..\..\..\bin\server"
 
         copy /Y "..\..\lib\python\PCbuild\amd64\vcruntime140.dll" "..\..\..\bin\server"
         copy /Y "..\..\lib\python\PCbuild\amd64\vcruntime140_1.dll" "..\..\..\bin\server"
@@ -159,15 +159,15 @@
 </Command>
     </PostBuildEvent>
     <PreLinkEvent>
-      <Command>if not exist "..\..\libs\python313_d.lib" (
-    echo [INFO] python313_d.lib not found, building Python...
-    call "..\..\lib\python\PCbuild\build.bat" -c Debug
+      <Command>if not exist "..\..\libs\python313.lib" (
+    echo [INFO] python313.lib not found, building Python Release ABI for KBE Debug build...
+    call "..\..\lib\python\PCbuild\build.bat" -c Release
     if errorlevel 1 (
         echo [ERROR] Python build failed!
         exit /b 1
     )
 ) else (
-    echo [INFO] python313_d.lib found, skipping Python build.
+    echo [INFO] python313.lib found, skipping Python build.
 )
 </Command>
     </PreLinkEvent>

@@ -27,6 +27,15 @@ namespace KBEngine{
 
 inline std::string& selectedKBEngineConfig();
 
+inline const char* pythonCoreBuildType()
+{
+#ifdef Py_DEBUG
+	return "Debug";
+#else
+	return "Release";
+#endif
+}
+
 inline void START_MSG(const char * name, uint64 appuid)
 {
 	MachineInfos machineInfo;
@@ -34,7 +43,7 @@ inline void START_MSG(const char * name, uint64 appuid)
 	std::string s = (fmt::format("---- {} "
 			"Version: {}. "
 			"ScriptVersion: {}. "
-			"Pythoncore: {}. "
+			"Pythoncore: {}({}). "
 			"Protocol: {}. "
 			"ConfigFile: {}. "
 			"Config: {} {}. "
@@ -42,7 +51,7 @@ inline void START_MSG(const char * name, uint64 appuid)
 			"AppID: {}. "
 			"UID: {}. "
 			"PID: {} ----\n",
-		name, KBEVersion::versionString(), KBEVersion::scriptVersionString(), PY_VERSION,
+		name, KBEVersion::versionString(), KBEVersion::scriptVersionString(), PY_VERSION, pythonCoreBuildType(),
 		Network::MessageHandlers::getDigestStr(),
 		selectedKBEngineConfig(),
 		KBE_CONFIG, KBE_ARCH, __TIME__, __DATE__,

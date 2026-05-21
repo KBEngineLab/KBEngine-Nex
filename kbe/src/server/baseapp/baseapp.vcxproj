@@ -126,7 +126,7 @@
       <AdditionalOptions>/ignore:4049
 /ignore:4217
 /ignore:4996 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>crypt32.lib;jwsmtp_d.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr_d.lib;python313_d.lib;server_d.lib;pyscript_d.lib;entitydef_d.lib;xml_d.lib;common_d.lib;helper_d.lib;math_d.lib;network_d.lib;thread_d.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>crypt32.lib;jwsmtp_d.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr_d.lib;python313.lib;server_d.lib;pyscript_d.lib;entitydef_d.lib;xml_d.lib;common_d.lib;helper_d.lib;math_d.lib;network_d.lib;thread_d.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>../../libs;../../lib/dependencies/vld;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
@@ -157,7 +157,7 @@
       <AdditionalOptions>/ignore:4049
 /ignore:4217
 /ignore:4996 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>secur32.lib;Rpcrt4.lib;openssl_uptable.obj;crypt32.lib;jwsmtp_d.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr_d.lib;python313_d.lib;server_d.lib;pyscript_d.lib;entitydef_d.lib;xml_d.lib;common_d.lib;helper_d.lib;math_d.lib;network_d.lib;thread_d.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>secur32.lib;Rpcrt4.lib;openssl_uptable.obj;crypt32.lib;jwsmtp_d.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr_d.lib;python313.lib;server_d.lib;pyscript_d.lib;entitydef_d.lib;xml_d.lib;common_d.lib;helper_d.lib;math_d.lib;network_d.lib;thread_d.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>../../libs;../../lib/dependencies/vld;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>

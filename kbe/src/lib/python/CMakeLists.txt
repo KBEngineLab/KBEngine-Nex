@@ -6,15 +6,10 @@ project(embed_python NONE)
 set(PYTHON_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(PYTHON_BUILD_DIR ${PYTHON_SRC_DIR}/build)
 
-# 按配置区分不同的库文件名
+# KBE 的 Debug 构建仍使用 Python Release ABI，避免第三方 Release wheel/.so
+# 在 Debug Python ABI 下无法加载。
 set(PYTHON_LIB_RELEASE ${PYTHON_SRC_DIR}/libpython3.13.a)
-set(PYTHON_LIB_DEBUG   ${PYTHON_SRC_DIR}/libpython3.13d.a)
-
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(PYTHON_LIB ${PYTHON_LIB_DEBUG})
-else()
-    set(PYTHON_LIB ${PYTHON_LIB_RELEASE})
-endif()
+set(PYTHON_LIB ${PYTHON_LIB_RELEASE})
 
 # --------------------------------------------------------
 # 1) KBE Python 配置
@@ -107,19 +102,6 @@ add_custom_command(
     COMMENT "Building embedded Python (Release)..."
 )
 
-# Debug 版本
-add_custom_command(
-    OUTPUT ${PYTHON_LIB_DEBUG}
-    COMMAND test -f ${PYTHON_LIB_DEBUG} || (
-        chmod +x configure &&
-        ${CMAKE_COMMAND} -E env ${PYTHON_BUILD_ENV}
-        ./configure --with-pydebug --without-ensurepip &&
-        make -j
-    )
-    WORKING_DIRECTORY ${PYTHON_SRC_DIR}
-    COMMENT "Building embedded Python (Debug)..."
-)
-
 # 定义构建目标
 add_custom_target(python_build ALL
     DEPENDS ${PYTHON_LIB}
@@ -130,14 +112,14 @@ add_custom_target(python_build ALL
 # --------------------------------------------------------
 add_custom_command(TARGET python_build POST_BUILD
     BYPRODUCTS
-        ${LIB_DIR}/libpython$<$<CONFIG:Debug>:_d>.a
+        ${LIB_DIR}/libpython.a
     COMMAND ${CMAKE_COMMAND} -E make_directory ${LIB_DIR}
     COMMAND ${CMAKE_COMMAND} -E remove -f
-        ${LIB_DIR}/libpython$<$<CONFIG:Debug>:_d>.a
+        ${LIB_DIR}/libpython.a
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${PYTHON_LIB}
-        ${LIB_DIR}/libpython$<$<CONFIG:Debug>:_d>.a
-    COMMENT "Copying libpython<$<CONFIG:Debug>:_d>.a to ${LIB_DIR}"
+        ${LIB_DIR}/libpython.a
+    COMMENT "Copying libpython.a to ${LIB_DIR}"
 )
 
 # --------------------------------------------------------
@@ -164,9 +146,8 @@ add_dependencies(python_interface python_build)
 
 target_include_directories(python_interface INTERFACE ${KBE_PYTHON_INCLUDE_DIRS})
 
-# Debug / Release 自动切换不同库
+# Debug / Release 都链接 Python Release ABI
 target_link_libraries(python_interface INTERFACE
-    debug ${PYTHON_LIB_DEBUG}
-    optimized ${PYTHON_LIB_RELEASE}
+    ${PYTHON_LIB_RELEASE}
     ${KBE_PYTHON_EXTRA_LIBS}
 )
