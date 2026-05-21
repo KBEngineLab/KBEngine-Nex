@@ -571,7 +571,7 @@ namespace KBEngine {
 		/**
 		从数据库删除entity
 		*/
-		bool removeEntity(DBInterface* pdbi, DBID dbid, ScriptDefModule* pModule) { return true; }
+		bool removeEntity(DBInterface* pdbi, DBID dbid, ScriptDefModule* pModule);
 
 		/**
 		获取所有的数据放到流中
@@ -581,14 +581,13 @@ namespace KBEngine {
 		/**
 		设置是否自动加载
 		*/
-		virtual void entityShouldAutoLoad(DBInterface* pdbi, DBID dbid, bool shouldAutoLoad) {}
+		virtual void entityShouldAutoLoad(DBInterface* pdbi, DBID dbid, bool shouldAutoLoad);
 
 		/**
 		查询自动加载的实体
 		*/
 		virtual void queryAutoLoadEntities(DBInterface* pdbi, ScriptDefModule* pModule,
-			ENTITY_ID start, ENTITY_ID end, std::vector<DBID>& outs) {
-		}
+			ENTITY_ID start, ENTITY_ID end, std::vector<DBID>& outs);
 
 		/**
 		获取某个表所有的数据放到流中

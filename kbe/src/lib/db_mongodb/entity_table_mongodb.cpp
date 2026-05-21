@@ -12,6 +12,25 @@
 #endif
 
 namespace KBEngine {
+	namespace
+	{
+		bool bson_iter_to_dbid(const bson_iter_t* iter, DBID& dbid)
+		{
+			if (BSON_ITER_HOLDS_INT32(iter))
+			{
+				dbid = static_cast<DBID>(bson_iter_int32(iter));
+				return true;
+			}
+
+			if (BSON_ITER_HOLDS_INT64(iter))
+			{
+				dbid = static_cast<DBID>(bson_iter_int64(iter));
+				return true;
+			}
+
+			return false;
+		}
+	}
 
 	EntityTableMongodb::EntityTableMongodb(EntityTables* pEntityTables) :
 		EntityTable(pEntityTables)
@@ -373,6 +392,50 @@ namespace KBEngine {
 		return true;
 	}
 
+	void EntityTableMongodb::queryAutoLoadEntities(DBInterface* pdbi, ScriptDefModule* pModule,
+		ENTITY_ID start, ENTITY_ID end, std::vector<DBID>& outs)
+	{
+		if (end <= start)
+			return;
+
+		DBInterfaceMongodb* pdbiMongodb = static_cast<DBInterfaceMongodb*>(pdbi);
+
+		char name[MAX_BUF];
+		kbe_snprintf(name, MAX_BUF, ENTITY_TABLE_PERFIX "_%s", tableName());
+
+		bson_t query;
+		bson_init(&query);
+		BSON_APPEND_INT32(&query, TABLE_ITEM_PERFIX"_" TABLE_AUTOLOAD_CONST_STR, 1);
+
+		bson_t fields;
+		bson_init(&fields);
+		BSON_APPEND_INT32(&fields, TABLE_ID_CONST_STR, 1);
+		BSON_APPEND_INT32(&fields, "_id", 0);
+
+		const uint32_t skip = static_cast<uint32_t>(start);
+		const uint32_t limit = static_cast<uint32_t>(end - start);
+		std::unique_ptr<MongoCursorGuard> guard =
+			pdbiMongodb->collectionFind(name, MONGOC_QUERY_NONE, skip, limit, 0, &query, &fields, NULL);
+
+		const bson_t* doc = NULL;
+		while (mongoc_cursor_next(guard->cursor(), &doc))
+		{
+			bson_iter_t iter;
+			DBID dbid = 0;
+			if (bson_iter_init_find(&iter, doc, TABLE_ID_CONST_STR) && bson_iter_to_dbid(&iter, dbid))
+				outs.push_back(dbid);
+		}
+
+		bson_error_t error;
+		if (mongoc_cursor_error(guard->cursor(), &error))
+		{
+			ERROR_MSG(fmt::format("EntityTableMongodb::queryAutoLoadEntities: {}\n", error.message));
+		}
+
+		bson_destroy(&fields);
+		bson_destroy(&query);
+	}
+
 	EntityTableItem* EntityTableMongodb::createItem(std::string type, std::string defaultVal)
 	{
 
@@ -610,6 +673,8 @@ namespace KBEngine {
 		//char* json = bson_as_json(&doc, &len);
 
 
+		bool writeOK = false;
+
 		if (context.dbid > 0) //更新
 		{
 			bson_t query;
@@ -621,8 +686,6 @@ namespace KBEngine {
 			kbe_snprintf(name, MAX_BUF, ENTITY_TABLE_PERFIX "_%s", context.tableName.c_str());
 
 			BSON_APPEND_INT64(&doc, "id", context.dbid);
-			if (shouldAutoLoad > -1)
-				BSON_APPEND_INT32(&doc, TABLE_ITEM_PERFIX"_" TABLE_AUTOLOAD_CONST_STR, shouldAutoLoad);
 
 
 			// 用 $set 包住 doc
@@ -631,7 +694,7 @@ namespace KBEngine {
 			BSON_APPEND_DOCUMENT(&update, "$set", &doc);
 
 
-			pdbiMongodb->updateCollection(name, MONGOC_UPDATE_NONE, &query, &update, NULL);
+			writeOK = pdbiMongodb->updateCollection(name, MONGOC_UPDATE_NONE, &query, &update, NULL);
 
 			bson_destroy(&update);
 			bson_destroy(&query);
@@ -645,19 +708,71 @@ namespace KBEngine {
 
 			context.dbid = genUUID64();
 			BSON_APPEND_INT64(&doc, TABLE_ID_CONST_STR, context.dbid);
-			BSON_APPEND_INT32(&doc, TABLE_ITEM_PERFIX"_" TABLE_AUTOLOAD_CONST_STR, shouldAutoLoad);
-			pdbiMongodb->insertCollection(name, MONGOC_INSERT_NONE, &doc, NULL);
+			BSON_APPEND_INT32(&doc, TABLE_ITEM_PERFIX"_" TABLE_AUTOLOAD_CONST_STR, 0);
+			writeOK = pdbiMongodb->insertCollection(name, MONGOC_INSERT_NONE, &doc, NULL);
 		}
 
 		bson_destroy(&doc);
 
+		if (!writeOK)
+			return 0;
+
 		dbid = context.dbid;
 
-		// // 设置实体是否自动加载
-		// if (shouldAutoLoad > -1)
-		// 	entityShouldAutoLoad(pdbi, dbid, shouldAutoLoad > 0);
+		// 设置实体是否自动加载
+		if (shouldAutoLoad > -1)
+			entityShouldAutoLoad(pdbi, dbid, shouldAutoLoad > 0);
 
 		return dbid;
+	}
+
+	void EntityTableMongodb::entityShouldAutoLoad(DBInterface* pdbi, DBID dbid, bool shouldAutoLoad)
+	{
+		if (dbid == 0)
+			return;
+
+		DBInterfaceMongodb* pdbiMongodb = static_cast<DBInterfaceMongodb*>(pdbi);
+
+		char name[MAX_BUF];
+		kbe_snprintf(name, MAX_BUF, ENTITY_TABLE_PERFIX "_%s", tableName());
+
+		bson_t query;
+		bson_init(&query);
+		BSON_APPEND_INT64(&query, TABLE_ID_CONST_STR, dbid);
+
+		bson_t values;
+		bson_init(&values);
+		BSON_APPEND_INT32(&values, TABLE_ITEM_PERFIX"_" TABLE_AUTOLOAD_CONST_STR, shouldAutoLoad ? 1 : 0);
+
+		bson_t update;
+		bson_init(&update);
+		BSON_APPEND_DOCUMENT(&update, "$set", &values);
+
+		pdbiMongodb->updateCollection(name, MONGOC_UPDATE_NONE, &query, &update, NULL);
+
+		bson_destroy(&update);
+		bson_destroy(&values);
+		bson_destroy(&query);
+	}
+
+	bool EntityTableMongodb::removeEntity(DBInterface* pdbi, DBID dbid, ScriptDefModule* pModule)
+	{
+		KBE_ASSERT(pModule && dbid > 0);
+
+		DBInterfaceMongodb* pdbiMongodb = static_cast<DBInterfaceMongodb*>(pdbi);
+
+		char name[MAX_BUF];
+		kbe_snprintf(name, MAX_BUF, ENTITY_TABLE_PERFIX "_%s", pModule->getName());
+
+		bson_t query;
+		bson_init(&query);
+		BSON_APPEND_INT64(&query, TABLE_ID_CONST_STR, dbid);
+
+		bool ret = pdbiMongodb->collectionRemove(name, MONGOC_REMOVE_SINGLE_REMOVE, &query, NULL);
+		KBE_ASSERT(ret);
+
+		bson_destroy(&query);
+		return ret;
 	}
 
 	/**

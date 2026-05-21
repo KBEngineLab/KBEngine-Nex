@@ -55,6 +55,9 @@ namespace KBEngine {
 
 		bool clearServers(DBInterface* pdbi, const std::vector<COMPONENT_ID>& cids) override;
 
+		std::map<COMPONENT_ID, bool> queryAllServerShareDBState(DBInterface* pdbi);
+		int isShareDB(DBInterface* pdbi);
+
 	protected:
 
 	};
