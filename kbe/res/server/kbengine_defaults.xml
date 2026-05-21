@@ -981,12 +981,24 @@
 		<SOMAXCONN> 511 </SOMAXCONN>
 	</logger>
 
-	<!-- 自定义配置参数，脚本层可通过 KBEngine.getCustomCfg("key", default) 获取
-	     (Custom configuration, accessible via KBEngine.getCustomCfg("key", default) from Python scripts)
-	     支持类型: int, str, bool -->
+	<!-- 自定义配置参数，脚本层只读，可通过 KBEngine.getCustomCfg("key") 或 KBEngine.getCustomCfg("key", default) 获取。
+	     (Read-only custom configuration, accessible from Python scripts via KBEngine.getCustomCfg("key").)
+
+	     结构说明:
+	     name: 配置项名称，建议使用battle.maxPlayers这类分组式命名，脚本查询时传入同一个字符串。
+	     type: 返回给Python脚本的类型，支持bool、int、float、string、dict、list。
+	     desc: 给配置维护者阅读的说明文字，不参与运行时解析。
+	     节点文本: 配置值本身；dict/list使用Python字面量格式，例如{"gold": 1.2}或[1, 2, 3]。
+
+	     行为说明:
+	     配置存在时，返回值类型只由type决定，不通过default推断。
+	     配置不存在时，如果脚本传了default则返回default，否则返回None。 -->
 	<customCfg>
-		<!-- <param1> 1 </param1> -->
-		<!-- <param2> "hello" </param2> -->
-		<!-- <param3> true </param3> -->
+		<!-- <param name="battle.maxPlayers" type="int" desc="max players per battle">100</param> -->
+		<!-- <param name="battle.enableRank" type="bool" desc="enable battle rank">true</param> -->
+		<!-- <param name="battle.speedScale" type="float" desc="battle speed scale">1.0</param> -->
+		<!-- <param name="battle.welcome" type="string" desc="welcome text">hello</param> -->
+		<!-- <param name="battle.dropRates" type="dict" desc="drop rate config">{"gold": 1.2, "item": 0.05}</param> -->
+		<!-- <param name="battle.spawnPoints" type="list" desc="spawn point ids">[1, 2, 3]</param> -->
 	</customCfg>
 </root>

@@ -16,10 +16,11 @@
 #include "helper/debug_helper.h"
 #include "helper/script_loglevel.h"
 #include "helper/profile.h"
-#include "server/kbemain.h"	
+#include "server/kbemain.h"
 #include "server/script_timers.h"
 #include "server/asyncio_helper.h"
 #include "server/idallocate.h"
+#include "server/python_app.h"
 #include "server/serverconfig.h"
 #include "server/globaldata_client.h"
 #include "server/globaldata_server.h"
@@ -166,7 +167,9 @@ public:
 	static PyObject* __py_getAppPublish(PyObject* self, PyObject* args);
 
 	/**
-		获取自定义配置参数
+		获取自定义配置参数。
+		EntityApp与PythonApp暴露同一个KBEngine.getCustomCfg接口，这里只做入口转发，
+		实际解析逻辑统一放在PythonApp中，避免baseapp/cellapp与其他PythonApp组件出现两套类型规则。
 	*/
 	static PyObject* __py_getCustomCfg(PyObject* self, PyObject* args);
 
@@ -438,7 +441,7 @@ bool EntityApp<E>::installPyModules()
 	// 向脚本注册app发布状态
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	publish,			__py_getAppPublish,						METH_VARARGS,	0);
 
-	// 获取自定义配置参数
+	// 获取自定义配置参数，只读访问server配置中的<customCfg>节点。
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	getCustomCfg,		__py_getCustomCfg,						METH_VARARGS,	0);
 
 	// 注册设置脚本输出类型
@@ -772,54 +775,8 @@ PyObject* EntityApp<E>::__py_getAppPublish(PyObject* self, PyObject* args)
 template<class E>
 PyObject* EntityApp<E>::__py_getCustomCfg(PyObject* self, PyObject* args)
 {
-	Py_ssize_t argCount = PyTuple_Size(args);
-	if(argCount != 2)
-	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::getCustomCfg(): requires 2 args (key, default)!");
-		PyErr_PrintEx(0);
-		S_Return;
-	}
-
-		const char* key = NULL;
-		PyObject* pyDefault = NULL;
-
-		if(!PyArg_ParseTuple(args, "sO", &key, &pyDefault))
-		{
-			PyErr_Format(PyExc_TypeError, "KBEngine::getCustomCfg(): args error!");
-			PyErr_PrintEx(0);
-			S_Return;
-		}
-
-		const std::map<std::string, std::string>& cfg = g_kbeSrvConfig.customCfg();
-		auto it = cfg.find(key);
-
-	if(it == cfg.end())
-	{
-		Py_INCREF(pyDefault);
-		return pyDefault;
-	}
-
-	std::string val = it->second;
-
-	if(PyLong_Check(pyDefault))
-	{
-		return PyLong_FromLong(atoi(val.c_str()));
-	}
-	else if(PyBool_Check(pyDefault))
-	{
-			std::string lowerVal = val;
-			std::transform(lowerVal.begin(), lowerVal.end(), lowerVal.begin(), ::tolower);
-			if(lowerVal == "true" || lowerVal == "1")
-				Py_RETURN_TRUE;
-			else
-				Py_RETURN_FALSE;
-	}
-	else
-	{
-		if(val.size() >= 2 && val.front() == '"' && val.back() == '"')
-			val = val.substr(1, val.size() - 2);
-		return PyUnicode_FromString(val.c_str());
-	}
+	// EntityApp组件复用PythonApp的实现，保证所有服务端组件读取customCfg时的缺省值、类型转换和错误处理完全一致。
+	return PythonApp::__py_getCustomCfg(self, args);
 }
 
 template<class E>
