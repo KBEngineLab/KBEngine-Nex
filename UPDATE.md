@@ -2,12 +2,16 @@
 # 更新日志
 
 ## 2.8.2
+- [feat] 新增添加额外配置参数  [Pull request #176](https://github.com/KBEngineLab/KBEngine-Nex/pull/176)
 - [feat] GitHub Actions  [Issue #109](https://github.com/KBEngineLab/KBEngine-Nex/issues/109)
 - [feat] 重构 Python async 调度，移除 py 层独立线程和空 timer 保活逻辑，统一由 C++ 底层 dispatcher timer 驱动 asyncio，避免 GIL 争抢并降低 aiohttp 等协程任务延迟  [Issue #166](https://github.com/KBEngineLab/KBEngine-Nex/issues/166)
 - [feat] 提供当前cellapp下所有space的py层接口：KBEngine.spaces() [Issue #170](https://github.com/KBEngineLab/KBEngine-Nex/issues/170)
 - [feat] 增加方法获取指定space的所有实体：KBEngine.entitiesForSpace(spaceid) [Issue #76](https://github.com/KBEngineLab/KBEngine-Nex/issues/76)
 - [feat] 按需启动服务配置，方便分布式/k8s启动配置管理 [Issue #171](https://github.com/KBEngineLab/KBEngine-Nex/issues/171)
 - [feat] io_uring 与 kqueue completion adapter，底层完全completion化 [Issue #173](https://github.com/KBEngineLab/KBEngine-Nex/issues/173)
+- [feat] 【kbex】 app启动失败后，logger不会转发日志，这个时候应该自动读取原始日志并输出 [Issue #158](https://github.com/KBEngineLab/KBEngine-Nex/issues/158)
+- [feat] registerReadFileDescriptor等接口废弃，新增registerAcceptFileDescriptor等 completion API [Issue #172](https://github.com/KBEngineLab/KBEngine-Nex/issues/172)
+- [perf] Debug下编译Release Python，防止一些第三方包无法使用 [Issue #175](https://github.com/KBEngineLab/KBEngine-Nex/issues/175)
 - [fix] 修复 urlopen 传入 None 时可能崩溃的问题 [Issue #167](https://github.com/KBEngineLab/KBEngine-Nex/issues/167)
 - [fix] log4cxx 初始化前自动创建日志目录，避免Linux下首次启动时日志创建失败的问题
 
