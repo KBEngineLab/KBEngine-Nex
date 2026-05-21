@@ -2,7 +2,7 @@
 # 更新日志
 
 ## 2.8.2
-- [feat] 新增添加额外配置参数  [Pull request #176](https://github.com/KBEngineLab/KBEngine-Nex/pull/176)
+- [feat] 新增添加额外配置参数 @Smile010110   [Pull request #176](https://github.com/KBEngineLab/KBEngine-Nex/pull/176)
 - [feat] GitHub Actions  [Issue #109](https://github.com/KBEngineLab/KBEngine-Nex/issues/109)
 - [feat] 重构 Python async 调度，移除 py 层独立线程和空 timer 保活逻辑，统一由 C++ 底层 dispatcher timer 驱动 asyncio，避免 GIL 争抢并降低 aiohttp 等协程任务延迟  [Issue #166](https://github.com/KBEngineLab/KBEngine-Nex/issues/166)
 - [feat] 提供当前cellapp下所有space的py层接口：KBEngine.spaces() [Issue #170](https://github.com/KBEngineLab/KBEngine-Nex/issues/170)
