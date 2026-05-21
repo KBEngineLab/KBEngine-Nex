@@ -6,7 +6,7 @@
 #include "helper/memory_helper.h"
 
 #include "serverapp.h"
-#include "Python.h"
+#include "pyscript/kbe_python.h"
 #include "common/common.h"
 #include "common/kbekey.h"
 #include "common/stringconv.h"

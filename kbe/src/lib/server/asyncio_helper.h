@@ -4,7 +4,7 @@
 #define KBE_ASYNCIO_HELPER_HANDLER_H
 
 #include "common/common.h"
-#include "Python.h"
+#include "pyscript/kbe_python.h"
 
 namespace KBEngine {
 

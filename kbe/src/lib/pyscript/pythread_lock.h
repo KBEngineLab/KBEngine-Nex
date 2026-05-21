@@ -3,7 +3,7 @@
 #ifndef KBENGINE_SCRIPT_LOCK_H
 #define KBENGINE_SCRIPT_LOCK_H
 
-#include "Python.h"
+#include "pyscript/kbe_python.h"
 
 namespace KBEngine{ namespace script{
 
