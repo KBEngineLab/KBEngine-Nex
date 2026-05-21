@@ -18,7 +18,8 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <iostream>	
-#include <stdarg.h> 
+#include <stdarg.h>
+#include <map>
 #include "common/singleton.h"
 #include "thread/threadmutex.h"
 #include "thread/threadguard.h"
@@ -294,6 +295,8 @@ public:
 	
 	INLINE float asyncioRepeatOffset(void) const;
 
+	INLINE const std::map<std::string, std::string>& customCfg(void) const { return customCfg_; }
+
 private:
 	void _updateEmailInfos();
 
@@ -340,12 +343,13 @@ public:
 
 	
 	float asyncioRepeatOffset_; // asyncio调度频率（秒）
+	std::map<std::string, std::string> customCfg_;
+
 
 };
 
 #define g_kbeSrvConfig ServerConfig::getSingleton()
 }
-
 
 #ifdef CODE_INLINE
 #include "serverconfig.inl"

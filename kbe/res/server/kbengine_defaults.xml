@@ -980,4 +980,13 @@
 		 -->
 		<SOMAXCONN> 511 </SOMAXCONN>
 	</logger>
+
+	<!-- 自定义配置参数，脚本层可通过 KBEngine.getCustomCfg("key", default) 获取
+	     (Custom configuration, accessible via KBEngine.getCustomCfg("key", default) from Python scripts)
+	     支持类型: int, str, bool -->
+	<customCfg>
+		<!-- <param1> 1 </param1> -->
+		<!-- <param2> "hello" </param2> -->
+		<!-- <param3> true </param3> -->
+	</customCfg>
 </root>

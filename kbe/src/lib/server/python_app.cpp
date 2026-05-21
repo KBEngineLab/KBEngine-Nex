@@ -5,6 +5,7 @@
 #include "asyncio_helper.h"
 #include "pyscript/py_memorystream.h"
 #include "server/py_file_descriptor.h"
+#include <algorithm>
 
 namespace KBEngine{
 
@@ -283,6 +284,9 @@ bool PythonApp::installPyModules()
 	// 向脚本注册app发布状态
 	APPEND_SCRIPT_MODULE_METHOD(module, publish, __py_getAppPublish, METH_VARARGS, 0);
 
+	// 获取自定义配置参数
+	APPEND_SCRIPT_MODULE_METHOD(module, getCustomCfg, __py_getCustomCfg, METH_VARARGS, 0);
+
 	// 注册设置脚本输出类型
 	APPEND_SCRIPT_MODULE_METHOD(module, scriptLogType, __py_setScriptLogType, METH_VARARGS, 0);
 	
@@ -378,6 +382,60 @@ bool PythonApp::uninstallPyModules()
 PyObject* PythonApp::__py_getAppPublish(PyObject* self, PyObject* args)
 {
 	return PyLong_FromLong(g_appPublish);
+}
+
+//-------------------------------------------------------------------------------------
+PyObject* PythonApp::__py_getCustomCfg(PyObject* self, PyObject* args)
+{
+	Py_ssize_t argCount = PyTuple_Size(args);
+	if(argCount != 2)
+	{
+		PyErr_Format(PyExc_TypeError, "KBEngine::getCustomCfg(): requires 2 args (key, default)!");
+		PyErr_PrintEx(0);
+		S_Return;
+	}
+
+	const char* key = NULL;
+	PyObject* pyDefault = NULL;
+
+	if(!PyArg_ParseTuple(args, "sO", &key, &pyDefault))
+	{
+		PyErr_Format(PyExc_TypeError, "KBEngine::getCustomCfg(): args error!");
+		PyErr_PrintEx(0);
+		S_Return;
+	}
+
+	const std::map<std::string, std::string>& cfg = g_kbeSrvConfig.customCfg();
+	auto it = cfg.find(key);
+
+	if(it == cfg.end())
+	{
+		Py_INCREF(pyDefault);
+		return pyDefault;
+	}
+
+	std::string val = it->second;
+
+	if(PyLong_Check(pyDefault))
+	{
+		return PyLong_FromLong(atoi(val.c_str()));
+	}
+	else if(PyBool_Check(pyDefault))
+	{
+		std::string lowerVal = val;
+		std::transform(lowerVal.begin(), lowerVal.end(), lowerVal.begin(), ::tolower);
+		if(lowerVal == "true" || lowerVal == "1")
+			Py_RETURN_TRUE;
+		else
+			Py_RETURN_FALSE;
+	}
+	else
+	{
+		// string: 去除可能存在的引号
+		if(val.size() >= 2 && val.front() == '"' && val.back() == '"')
+			val = val.substr(1, val.size() - 2);
+		return PyUnicode_FromString(val.c_str());
+	}
 }
 
 //-------------------------------------------------------------------------------------

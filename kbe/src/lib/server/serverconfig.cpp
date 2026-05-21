@@ -1733,6 +1733,27 @@ bool ServerConfig::loadConfig(std::string fileName)
 		}
 	}
 
+
+		// 自定义配置参数
+		rootNode = xml->getRootNode("customCfg");
+		if(rootNode != NULL)
+		{
+			TiXmlNode* childnode = rootNode;
+			while(childnode)
+			{
+				if(childnode->Type() == TiXmlNode::TINYXML_ELEMENT)
+				{
+					std::string key = childnode->Value();
+					TiXmlNode* textNode = childnode->FirstChild();
+					if(textNode)
+					{
+						std::string val = xml->getValStr(textNode);
+						customCfg_[key] = val;
+					}
+				}
+				childnode = childnode->NextSibling();
+			}
+		}
 	return true;
 }
 

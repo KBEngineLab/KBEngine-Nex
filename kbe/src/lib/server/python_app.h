@@ -83,6 +83,11 @@ public:
 	static PyObject* __py_getAppPublish(PyObject* self, PyObject* args);
 
 	/**
+		获取自定义配置参数
+	*/
+	static PyObject* __py_getCustomCfg(PyObject* self, PyObject* args);
+
+	/**
 		设置脚本输出类型前缀
 	*/
 	static PyObject* __py_setScriptLogType(PyObject* self, PyObject* args);
