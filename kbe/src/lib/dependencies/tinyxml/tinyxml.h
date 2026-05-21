@@ -38,9 +38,9 @@ distribution.
 #include <string.h>
 #include <assert.h>
 
-// Help out windows:
-#if defined( _DEBUG ) && !defined( DEBUG )
-#define DEBUG
+// Help out MSVC debug builds without breaking SDK headers that use #if DEBUG.
+#if defined( _MSC_VER ) && defined( _DEBUG ) && !defined( DEBUG )
+#define DEBUG 1
 #endif
 
 #ifdef TIXML_USE_STL
