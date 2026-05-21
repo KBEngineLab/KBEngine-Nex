@@ -1,7 +1,7 @@
 // Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
-#ifndef KBE_ENTITY_APP_H
-#define KBE_ENTITY_APP_H
+#ifndef KBE_PYTHON_APP_H
+#define KBE_PYTHON_APP_H
 
 // common include
 #include "pyscript/py_gc.h"
@@ -83,6 +83,16 @@ public:
 	static PyObject* __py_getAppPublish(PyObject* self, PyObject* args);
 
 	/**
+		获取自定义配置参数。
+		脚本调用格式:
+		KBEngine.getCustomCfg("battle.maxPlayers")
+		KBEngine.getCustomCfg("battle.maxPlayers", 100)
+		配置存在时按XML中<param type="...">声明的类型返回Python对象；配置不存在时返回default或None。
+		该接口只读，不提供任何脚本层写入配置的能力。
+	*/
+	static PyObject* __py_getCustomCfg(PyObject* self, PyObject* args);
+
+	/**
 		设置脚本输出类型前缀
 	*/
 	static PyObject* __py_setScriptLogType(PyObject* self, PyObject* args);
@@ -140,4 +150,4 @@ protected:
 
 }
 
-#endif // KBE_ENTITY_APP_H
+#endif // KBE_PYTHON_APP_H

@@ -1733,6 +1733,64 @@ bool ServerConfig::loadConfig(std::string fileName)
 		}
 	}
 
+
+	// 自定义配置参数。
+	// 约定XML结构为：
+	// <customCfg>
+	//     <param name="battle.maxPlayers" type="int" desc="max players per battle">100</param>
+	// </customCfg>
+	//
+	// name: Python脚本查询时使用的key，允许使用battle.maxPlayers这类更适合配置分组的名字。
+	// type: 控制KBEngine.getCustomCfg返回的Python对象类型，目前支持bool、int、float、string、dict、list。
+	// desc: 只用于人工阅读和工具展示，运行时不读取到内存，避免保存脚本访问不到的无用元数据。
+	// value: 节点文本内容，先按字符串保存，真正的类型转换在Python导出接口中按需执行。
+	rootNode = xml->getRootNode("customCfg");
+	if(rootNode != NULL)
+	{
+		TiXmlNode* childnode = rootNode;
+		while(childnode)
+		{
+			if(childnode->Type() == TiXmlNode::TINYXML_ELEMENT)
+			{
+				TiXmlElement* element = childnode->ToElement();
+				if(element == NULL)
+				{
+					childnode = childnode->NextSibling();
+					continue;
+				}
+
+				// customCfg只识别统一的param节点，避免把XML标签名本身当作配置key后受到标签命名规则限制。
+				if(std::string(element->Value()) != "param")
+				{
+					WARNING_MSG(fmt::format("ServerConfig::loadConfig: customCfg only supports <param>, ignore <{}>.\n", element->Value()));
+					childnode = childnode->NextSibling();
+					continue;
+				}
+
+				const char* name = element->Attribute("name");
+				if(name == NULL || strlen(name) == 0)
+				{
+					WARNING_MSG("ServerConfig::loadConfig: customCfg param missing name, ignored.\n");
+					childnode = childnode->NextSibling();
+					continue;
+				}
+
+				ServerConfig::CustomCfgItem item;
+				item.name = name;
+
+				// type缺省时按string处理，便于只想传简单文本配置的场景，也保持较温和的兼容性。
+				const char* type = element->Attribute("type");
+				item.type = (type != NULL && strlen(type) > 0) ? type : "string";
+
+				TiXmlNode* textNode = childnode->FirstChild();
+				item.value = textNode != NULL ? xml->getValStr(textNode) : "";
+
+				// 多个配置文件会按加载顺序覆盖同名配置，保留KBEngine默认配置被业务配置覆盖的既有习惯。
+				customCfg_[item.name] = item;
+			}
+			childnode = childnode->NextSibling();
+		}
+	}
 	return true;
 }
 

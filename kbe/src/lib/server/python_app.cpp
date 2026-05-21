@@ -5,10 +5,194 @@
 #include "asyncio_helper.h"
 #include "pyscript/py_memorystream.h"
 #include "server/py_file_descriptor.h"
+#include <algorithm>
+#include <cerrno>
+#include <cctype>
+#include <cstring>
+#include <cstdlib>
 
 namespace KBEngine{
 
 KBEngine::ScriptTimers KBEngine::PythonApp::scriptTimers_;
+
+namespace
+{
+
+// 将customCfg中的type统一转成小写，避免配置里写Int、FLOAT等大小写差异导致解析失败。
+std::string normalizeCustomCfgType(const std::string& type)
+{
+	std::string lowerType = type;
+	std::transform(lowerType.begin(), lowerType.end(), lowerType.begin(), [](unsigned char ch) {
+		return static_cast<char>(std::tolower(ch));
+	});
+	return lowerType;
+}
+
+// 解析bool配置值。这里显式支持true/false、1/0、yes/no，便于配置文件保持可读性。
+// 解析失败时返回false，并由调用方决定是否返回None和输出具体错误。
+bool parseCustomCfgBool(const std::string& value, bool& result)
+{
+	std::string lowerValue = normalizeCustomCfgType(value);
+	if(lowerValue == "true" || lowerValue == "1" || lowerValue == "yes")
+	{
+		result = true;
+		return true;
+	}
+
+	if(lowerValue == "false" || lowerValue == "0" || lowerValue == "no")
+	{
+		result = false;
+		return true;
+	}
+
+	return false;
+}
+
+// 解析float配置值。使用strtod并检查尾部字符，避免"3.5abc"这类配置被静默截断为3.5。
+bool parseCustomCfgFloat(const std::string& value, double& result)
+{
+	char* end = NULL;
+	errno = 0;
+	result = std::strtod(value.c_str(), &end);
+	return end != value.c_str() && end != NULL && *end == '\0' && errno != ERANGE;
+}
+
+// dict/list使用Python标准库ast.literal_eval解析。
+// 这样脚本可以按Python字面量书写{"rate": 1.2}或[1, 2, 3]，同时避免eval执行任意代码。
+PyObject* parseCustomCfgLiteral(const ServerConfig::CustomCfgItem& item, const char* expectedType)
+{
+	PyObject* astModule = PyImport_ImportModule("ast");
+	if(astModule == NULL)
+	{
+		ERROR_MSG("KBEngine::getCustomCfg(): unable to import ast module for customCfg literal parsing.\n");
+		PyErr_PrintEx(0);
+		Py_RETURN_NONE;
+	}
+
+	PyObject* literalEval = PyObject_GetAttrString(astModule, "literal_eval");
+	Py_DECREF(astModule);
+	if(literalEval == NULL)
+	{
+		ERROR_MSG("KBEngine::getCustomCfg(): unable to get ast.literal_eval for customCfg literal parsing.\n");
+		PyErr_PrintEx(0);
+		Py_RETURN_NONE;
+	}
+
+	PyObject* pyValueText = PyUnicode_FromString(item.value.c_str());
+	if(pyValueText == NULL)
+	{
+		ERROR_MSG(fmt::format("KBEngine::getCustomCfg(): customCfg[{}] unable to build unicode value, value={}.\n",
+			item.name, item.value));
+		Py_DECREF(literalEval);
+		PyErr_PrintEx(0);
+		Py_RETURN_NONE;
+	}
+
+	PyObject* pyValue = PyObject_CallFunctionObjArgs(literalEval, pyValueText, NULL);
+	Py_DECREF(literalEval);
+	Py_DECREF(pyValueText);
+
+	if(pyValue == NULL)
+	{
+		ERROR_MSG(fmt::format("KBEngine::getCustomCfg(): customCfg[{}] value parse failed, type={}, value={}.\n",
+			item.name, item.type, item.value));
+		PyErr_PrintEx(0);
+		Py_RETURN_NONE;
+	}
+
+	// 配置声明为dict/list时，解析结果必须严格匹配声明类型，避免写错后脚本拿到意外对象。
+	if(strcmp(expectedType, "dict") == 0 && !PyDict_Check(pyValue))
+	{
+		ERROR_MSG(fmt::format("KBEngine::getCustomCfg(): customCfg[{}] expects dict, value={}.\n",
+			item.name, item.value));
+		Py_DECREF(pyValue);
+		Py_RETURN_NONE;
+	}
+
+	if(strcmp(expectedType, "list") == 0 && !PyList_Check(pyValue))
+	{
+		ERROR_MSG(fmt::format("KBEngine::getCustomCfg(): customCfg[{}] expects list, value={}.\n",
+			item.name, item.value));
+		Py_DECREF(pyValue);
+		Py_RETURN_NONE;
+	}
+
+	return pyValue;
+}
+
+// 按XML中声明的type把字符串配置转换成Python对象。
+// default参数只用于key不存在时的兜底值，不参与已存在配置项的类型推断，避免不同脚本传不同default导致类型不一致。
+PyObject* customCfgItemToPyObject(const ServerConfig::CustomCfgItem& item)
+{
+	std::string type = normalizeCustomCfgType(item.type);
+
+	if(type == "bool")
+	{
+		bool value = false;
+		if(!parseCustomCfgBool(item.value, value))
+		{
+			ERROR_MSG(fmt::format("KBEngine::getCustomCfg(): customCfg[{}] bool parse failed, value={}.\n",
+				item.name, item.value));
+			Py_RETURN_NONE;
+		}
+
+		if(value)
+			Py_RETURN_TRUE;
+
+		Py_RETURN_FALSE;
+	}
+
+	if(type == "int")
+	{
+		// PyLong_FromString负责生成Python int，同时比atoi更严格，非法输入不会被静默转换成0。
+		char* end = NULL;
+		PyObject* pyValue = PyLong_FromString(const_cast<char*>(item.value.c_str()), &end, 10);
+		if(pyValue == NULL || end == NULL || *end != '\0')
+		{
+			Py_XDECREF(pyValue);
+			PyErr_Clear();
+			ERROR_MSG(fmt::format("KBEngine::getCustomCfg(): customCfg[{}] int parse failed, value={}.\n",
+				item.name, item.value));
+			Py_RETURN_NONE;
+		}
+
+		return pyValue;
+	}
+
+	if(type == "float")
+	{
+		double value = 0.0;
+		if(!parseCustomCfgFloat(item.value, value))
+		{
+			ERROR_MSG(fmt::format("KBEngine::getCustomCfg(): customCfg[{}] float parse failed, value={}.\n",
+				item.name, item.value));
+			Py_RETURN_NONE;
+		}
+
+		return PyFloat_FromDouble(value);
+	}
+
+	if(type == "string" || type == "str")
+	{
+		return PyUnicode_FromString(item.value.c_str());
+	}
+
+	if(type == "dict")
+	{
+		return parseCustomCfgLiteral(item, "dict");
+	}
+
+	if(type == "list")
+	{
+		return parseCustomCfgLiteral(item, "list");
+	}
+
+	ERROR_MSG(fmt::format("KBEngine::getCustomCfg(): customCfg[{}] unsupported type={}, value={}.\n",
+		item.name, item.type, item.value));
+	Py_RETURN_NONE;
+}
+
+}
 
 /**
 内部定时器处理类
@@ -283,6 +467,9 @@ bool PythonApp::installPyModules()
 	// 向脚本注册app发布状态
 	APPEND_SCRIPT_MODULE_METHOD(module, publish, __py_getAppPublish, METH_VARARGS, 0);
 
+	// 获取自定义配置参数
+	APPEND_SCRIPT_MODULE_METHOD(module, getCustomCfg, __py_getCustomCfg, METH_VARARGS, 0);
+
 	// 注册设置脚本输出类型
 	APPEND_SCRIPT_MODULE_METHOD(module, scriptLogType, __py_setScriptLogType, METH_VARARGS, 0);
 	
@@ -378,6 +565,44 @@ bool PythonApp::uninstallPyModules()
 PyObject* PythonApp::__py_getAppPublish(PyObject* self, PyObject* args)
 {
 	return PyLong_FromLong(g_appPublish);
+}
+
+//-------------------------------------------------------------------------------------
+PyObject* PythonApp::__py_getCustomCfg(PyObject* self, PyObject* args)
+{
+	Py_ssize_t argCount = PyTuple_Size(args);
+	if(argCount != 1 && argCount != 2)
+	{
+		PyErr_Format(PyExc_TypeError, "KBEngine::getCustomCfg(): requires 1 or 2 args (key[, default])!");
+		return NULL;
+	}
+
+	const char* key = NULL;
+	PyObject* pyDefault = NULL;
+
+	// default是可选参数：key不存在时返回default；如果没有传default，则按需求返回Python None。
+	// 已存在的配置项始终使用XML里的type转换，不再通过default类型推断。
+	if(!PyArg_ParseTuple(args, "s|O", &key, &pyDefault))
+	{
+		PyErr_Format(PyExc_TypeError, "KBEngine::getCustomCfg(): args error!");
+		return NULL;
+	}
+
+	const std::map<std::string, ServerConfig::CustomCfgItem>& cfg = g_kbeSrvConfig.customCfg();
+	auto it = cfg.find(key);
+
+	if(it == cfg.end())
+	{
+		if(pyDefault != NULL)
+		{
+			Py_INCREF(pyDefault);
+			return pyDefault;
+		}
+
+		Py_RETURN_NONE;
+	}
+
+	return customCfgItemToPyObject(it->second);
 }
 
 //-------------------------------------------------------------------------------------

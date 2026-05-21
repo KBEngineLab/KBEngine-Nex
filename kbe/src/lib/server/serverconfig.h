@@ -17,8 +17,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include <iostream>	
-#include <stdarg.h> 
+#include <iostream>
+#include <stdarg.h>
+#include <map>
 #include "common/singleton.h"
 #include "thread/threadmutex.h"
 #include "thread/threadguard.h"
@@ -243,6 +244,19 @@ typedef struct EngineComponentInfo
 class ServerConfig : public Singleton<ServerConfig>
 {
 public:
+	/**
+		脚本层自定义配置项。
+		customCfg只面向Python脚本读取，不参与实体属性同步、网络协议序列化或数据库持久化。
+		name用于脚本查询，type用于决定返回的Python对象类型，value保留XML中的原始文本值。
+		XML中的desc只作为配置文件注释信息存在，不读入内存，避免运行时保存无用元数据。
+	*/
+	struct CustomCfgItem
+	{
+		std::string name;
+		std::string type;
+		std::string value;
+	};
+
 	ServerConfig();
 	~ServerConfig();
 	
@@ -294,6 +308,12 @@ public:
 	
 	INLINE float asyncioRepeatOffset(void) const;
 
+	/**
+		返回所有自定义配置项。
+		这里返回const引用，保证脚本导出层只能读取配置，不能通过该接口修改底层配置表。
+	*/
+	INLINE const std::map<std::string, CustomCfgItem>& customCfg(void) const { return customCfg_; }
+
 private:
 	void _updateEmailInfos();
 
@@ -340,12 +360,14 @@ public:
 
 	
 	float asyncioRepeatOffset_; // asyncio调度频率（秒）
+	// 自定义配置项表，key为<param name="...">中的name，便于Python层按名称快速查找。
+	std::map<std::string, CustomCfgItem> customCfg_;
+
 
 };
 
 #define g_kbeSrvConfig ServerConfig::getSingleton()
 }
-
 
 #ifdef CODE_INLINE
 #include "serverconfig.inl"

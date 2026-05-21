@@ -16,10 +16,11 @@
 #include "helper/debug_helper.h"
 #include "helper/script_loglevel.h"
 #include "helper/profile.h"
-#include "server/kbemain.h"	
+#include "server/kbemain.h"
 #include "server/script_timers.h"
 #include "server/asyncio_helper.h"
 #include "server/idallocate.h"
+#include "server/python_app.h"
 #include "server/serverconfig.h"
 #include "server/globaldata_client.h"
 #include "server/globaldata_server.h"
@@ -164,6 +165,13 @@ public:
 		获取apps发布状态, 可在脚本中获取该值
 	*/
 	static PyObject* __py_getAppPublish(PyObject* self, PyObject* args);
+
+	/**
+		获取自定义配置参数。
+		EntityApp与PythonApp暴露同一个KBEngine.getCustomCfg接口，这里只做入口转发，
+		实际解析逻辑统一放在PythonApp中，避免baseapp/cellapp与其他PythonApp组件出现两套类型规则。
+	*/
+	static PyObject* __py_getCustomCfg(PyObject* self, PyObject* args);
 
 	/**
 		设置脚本输出类型前缀
@@ -432,6 +440,9 @@ bool EntityApp<E>::installPyModules()
 	
 	// 向脚本注册app发布状态
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	publish,			__py_getAppPublish,						METH_VARARGS,	0);
+
+	// 获取自定义配置参数，只读访问server配置中的<customCfg>节点。
+	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	getCustomCfg,		__py_getCustomCfg,						METH_VARARGS,	0);
 
 	// 注册设置脚本输出类型
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	scriptLogType,		__py_setScriptLogType,					METH_VARARGS,	0);
@@ -759,6 +770,13 @@ template<class E>
 PyObject* EntityApp<E>::__py_getAppPublish(PyObject* self, PyObject* args)
 {
 	return PyLong_FromLong(g_appPublish);
+}
+
+template<class E>
+PyObject* EntityApp<E>::__py_getCustomCfg(PyObject* self, PyObject* args)
+{
+	// EntityApp组件复用PythonApp的实现，保证所有服务端组件读取customCfg时的缺省值、类型转换和错误处理完全一致。
+	return PythonApp::__py_getCustomCfg(self, args);
 }
 
 template<class E>
