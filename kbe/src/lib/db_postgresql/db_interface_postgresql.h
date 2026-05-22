@@ -55,6 +55,8 @@ public:
 
 	PGconn* pgconn() { return pConn_; }
 	const std::string& lastSqlState() const { return lastSqlState_; }
+	bool inTransaction() const { return inTransaction_; }
+	void inTransaction(bool value);
 
 	std::string escapeString(const char* data, size_t size);
 	std::string quoteIdentifier(const char* identifier);
@@ -71,6 +73,7 @@ private:
 	std::string collation_;
 	std::string lastError_;
 	std::string lastSqlState_;
+	bool inTransaction_;
 	char cstr_[MAX_BUF * 2];
 };
 

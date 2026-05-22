@@ -52,6 +52,18 @@ static uint32 watcher_create() { return watcher_query("CREATE"); }
 static uint32 watcher_drop() { return watcher_query("DROP"); }
 static uint32 watcher_alter() { return watcher_query("ALTER"); }
 
+// PostgreSQL 没有 MySQL 的 utf8mb4 名称，完整 UTF-8 编码统一映射成 UTF8。
+static std::string normalizeClientEncoding(const std::string& characterSet)
+{
+	std::string encoding = characterSet;
+	std::transform(encoding.begin(), encoding.end(), encoding.begin(), tolower);
+
+	if (encoding == "utf8" || encoding == "utf8mb4")
+		return "UTF8";
+
+	return characterSet;
+}
+
 // 初始化 PostgreSQL 后端自己的 SQL 统计 watcher。
 static void initializeWatcher()
 {
@@ -79,6 +91,7 @@ DBInterfacePostgresql::DBInterfacePostgresql(const char* name, std::string chara
 	collation_(collation),
 	lastError_(),
 	lastSqlState_(),
+	inTransaction_(false),
 	cstr_()
 {
 	DEBUG_MSG(fmt::format("DBInterfacePostgresql::DBInterfacePostgresql: {}\n", name));
@@ -122,6 +135,14 @@ bool DBInterfacePostgresql::connectToDatabase(const char* databaseName)
 {
 	detach();
 	pConn_ = PQconnectdb(buildConnInfo(databaseName).c_str());
+	if (pConn_ == NULL)
+	{
+		lastError_ = "PQconnectdb returned NULL";
+		ERROR_MSG(fmt::format("DBInterfacePostgresql::connectToDatabase: connect failed, db={}, error={}\n",
+			databaseName ? databaseName : db_name_, lastError_));
+		return false;
+	}
+
 	if (PQstatus(pConn_) != CONNECTION_OK)
 	{
 		lastError_ = PQerrorMessage(pConn_);
@@ -158,11 +179,12 @@ bool DBInterfacePostgresql::attach(const char* databaseName)
 	}
 
 	// PostgreSQL 连接编码使用 UTF8 名称，不读取 MySQL collation。
-	if (PQsetClientEncoding(pConn_, characterSet_ == "utf8" ? "UTF8" : characterSet_.c_str()) != 0)
+	std::string clientEncoding = normalizeClientEncoding(characterSet_);
+	if (PQsetClientEncoding(pConn_, clientEncoding.c_str()) != 0)
 	{
 		lastError_ = PQerrorMessage(pConn_);
 		ERROR_MSG(fmt::format("DBInterfacePostgresql::attach: set client encoding failed, encoding={}, error={}\n",
-			characterSet_, lastError_));
+			clientEncoding, lastError_));
 		return false;
 	}
 
@@ -180,6 +202,13 @@ bool DBInterfacePostgresql::ensureDatabaseExists()
 	// 数据库名按 identifier 转义，避免特殊字符破坏 CREATE DATABASE。
 	std::string sql = fmt::format("CREATE DATABASE {}", quoteIdentifier(db_name_));
 	PGresult* result = PQexec(pConn_, sql.c_str());
+	if (result == NULL)
+	{
+		updateLastError(NULL);
+		detach();
+		return false;
+	}
+
 	ExecStatusType status = PQresultStatus(result);
 
 	// 42P04=duplicate_database，说明并发或上次尝试已经建好。
@@ -202,6 +231,7 @@ bool DBInterfacePostgresql::detach()
 		pConn_ = NULL;
 	}
 
+	inTransaction_ = false;
 	return true;
 }
 
@@ -265,6 +295,18 @@ bool DBInterfacePostgresql::query(const char* cmd, uint32 size, bool printlog, M
 
 	// 上层仍负责生成 SQL，这里只通过 libpq 执行。
 	PGresult* pgResult = PQexec(pConn_, lastquery_.c_str());
+	if (pgResult == NULL)
+	{
+		updateLastError(NULL);
+		if (printlog)
+		{
+			ERROR_MSG(fmt::format("DBInterfacePostgresql::query: PQexec returned NULL, error({})!\nsql:({})\n",
+				lastError_, lastquery_));
+		}
+
+		throw DBExceptionPostgresql(this, lastError_, lastSqlState_);
+	}
+
 	ExecStatusType status = PQresultStatus(pgResult);
 	bool ok = status == PGRES_TUPLES_OK || status == PGRES_COMMAND_OK;
 
@@ -352,6 +394,12 @@ bool DBInterfacePostgresql::getTableNames(std::vector<std::string>& tableNames, 
 		like);
 
 	PGresult* result = PQexec(pConn_, sql.c_str());
+	if (result == NULL)
+	{
+		updateLastError(NULL);
+		return false;
+	}
+
 	if (PQresultStatus(result) != PGRES_TUPLES_OK)
 	{
 		updateLastError(result);
@@ -377,6 +425,12 @@ bool DBInterfacePostgresql::getTableItemNames(const char* tableName, std::vector
 		escapeString(tableName, strlen(tableName)));
 
 	PGresult* result = PQexec(pConn_, sql.c_str());
+	if (result == NULL)
+	{
+		updateLastError(NULL);
+		return false;
+	}
+
 	if (PQresultStatus(result) != PGRES_TUPLES_OK)
 	{
 		updateLastError(result);
@@ -427,6 +481,12 @@ const char* DBInterfacePostgresql::getstrerror()
 	return lastError_.c_str();
 }
 
+void DBInterfacePostgresql::inTransaction(bool value)
+{
+	KBE_ASSERT(inTransaction_ != value);
+	inTransaction_ = value;
+}
+
 // DBInterface 的整型错误码入口，PostgreSQL 错误细节以 SQLSTATE 字符串保存。
 int DBInterfacePostgresql::getlasterror()
 {
@@ -437,13 +497,25 @@ int DBInterfacePostgresql::getlasterror()
 // 开启事务。
 bool DBInterfacePostgresql::lock()
 {
-	return query("BEGIN");
+	if (query("BEGIN"))
+	{
+		inTransaction(true);
+		return true;
+	}
+
+	return false;
 }
 
 // 提交事务。
 bool DBInterfacePostgresql::unlock()
 {
-	return query("COMMIT");
+	if (query("COMMIT"))
+	{
+		inTransaction(false);
+		return true;
+	}
+
+	return false;
 }
 
 // 处理 PostgreSQL 异常，断线时重连，可重试错误交回 DB 任务队列重跑。

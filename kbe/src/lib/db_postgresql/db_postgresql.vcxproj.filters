@@ -11,10 +11,19 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="common.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="db_exception_postgresql.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="db_interface_postgresql.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="db_transaction.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="entity_sqlstatement_mapping.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="entity_table_postgresql.cpp">
@@ -23,18 +32,33 @@
     <ClCompile Include="kbe_table_postgresql.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="sqlstatement.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="db_exception_postgresql.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="db_interface_postgresql.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="db_transaction.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="entity_sqlstatement_mapping.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="entity_table_postgresql.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="kbe_table_postgresql.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sqlstatement.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

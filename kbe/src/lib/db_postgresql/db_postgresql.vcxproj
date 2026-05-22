@@ -192,16 +192,24 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="common.cpp" />
     <ClCompile Include="db_exception_postgresql.cpp" />
     <ClCompile Include="db_interface_postgresql.cpp" />
+    <ClCompile Include="db_transaction.cpp" />
+    <ClCompile Include="entity_sqlstatement_mapping.cpp" />
     <ClCompile Include="entity_table_postgresql.cpp" />
     <ClCompile Include="kbe_table_postgresql.cpp" />
+    <ClCompile Include="sqlstatement.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="common.h" />
     <ClInclude Include="db_exception_postgresql.h" />
     <ClInclude Include="db_interface_postgresql.h" />
+    <ClInclude Include="db_transaction.h" />
+    <ClInclude Include="entity_sqlstatement_mapping.h" />
     <ClInclude Include="entity_table_postgresql.h" />
     <ClInclude Include="kbe_table_postgresql.h" />
+    <ClInclude Include="sqlstatement.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ReadMe.txt" />
