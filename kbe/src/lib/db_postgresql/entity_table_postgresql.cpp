@@ -401,18 +401,6 @@ std::string EntityTableItemPostgresql::binarySqlValue(const std::string& data)
 
 bool EntityTableItemPostgresql::readSqlValues(DBInterface* pdbi, MemoryStream* s, std::vector<std::pair<std::string, std::string> >& values)
 {
-	if (dataSType_ == "FIXED_DICT")
-	{
-		FIXEDDICT_KEYTYPES::iterator iter = keyTypes_.begin();
-		for (; iter != keyTypes_.end(); ++iter)
-		{
-			if (!static_cast<EntityTableItemPostgresql*>(iter->second.get())->readSqlValues(pdbi, s, values))
-				return false;
-		}
-
-		return true;
-	}
-
 	if (dataSType_ == "ENTITYCALL")
 		return true;
 
@@ -1145,10 +1133,8 @@ DBID EntityTablePostgresql::writeTable(DBInterface* pdbi, DBID dbid, int8 should
 		dbid = sqlcmd.dbid();
 	}
 
-	bool wroteAnyItem = false;
 	while (s->length() > 0)
 	{
-		size_t itemStart = s->rpos();
 		ENTITY_PROPERTY_UID pid;
 		ENTITY_PROPERTY_UID child_pid;
 		(*s) >> pid >> child_pid;
@@ -1160,19 +1146,6 @@ DBID EntityTablePostgresql::writeTable(DBInterface* pdbi, DBID dbid, int8 should
 		EntityTableItem* pTableItem = findItem(child_pid);
 		if (pTableItem == NULL)
 		{
-			/*
-				账号默认实体流有两种来源：新的流会带 parent/child uid，旧模板可能只按
-				表字段顺序写属性值。固定顺序值流的开头经常是数组 size=0，按 uid 读出来就是 0,0。
-			*/
-			if (!wroteAnyItem && pid == 0 && child_pid == 0)
-			{
-				KBE_ASSERT(itemStart <= static_cast<size_t>(std::numeric_limits<int>::max()));
-				s->rpos(static_cast<int>(itemStart));
-				if (!writeFixedOrderItems(pdbi, dbid, s, pModule))
-					return 0;
-				break;
-			}
-
 			ERROR_MSG(fmt::format("EntityTablePostgresql::writeTable: not found item, table={}, parent={}, child={}, items={}\n",
 				tableName(), pid, child_pid, describeTableItemUtypes(tableItems_)));
 			return 0;
@@ -1180,8 +1153,6 @@ DBID EntityTablePostgresql::writeTable(DBInterface* pdbi, DBID dbid, int8 should
 
 		if (!pTableItem->writeItem(pdbi, dbid, s, pModule))
 			return 0;
-
-		wroteAnyItem = true;
 	}
 
 	if (shouldAutoLoad > -1)
