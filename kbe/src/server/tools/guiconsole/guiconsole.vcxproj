@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -139,7 +139,7 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>../../../lib/python/PC;../../../lib/python/Include;../../../lib/python/Include/internal;../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies;../../../lib/dependencies/jsoncpp/include;../../../lib/dependencies/vsopenssl/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../../lib/python/PC;../../../lib/python/Include;../../../lib/python/Include/internal;../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies;../../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>ENABLE_WATCHERS;WIN32;_WINDOWS;USE_PYTHON;_DEBUG;KBE_USE_ASSERTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -180,7 +180,7 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>../../../lib/python/PC;../../../lib/python/Include;../../../lib/python/Include/internal;../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies;../../../lib/dependencies/jsoncpp/include;../../../lib/dependencies/vsopenssl/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../../lib/python/PC;../../../lib/python/Include;../../../lib/python/Include/internal;../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies;../../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>ENABLE_WATCHERS;WIN32;_WINDOWS;USE_PYTHON;_DEBUG;KBE_USE_ASSERTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -204,7 +204,7 @@
       <AdditionalOptions>/ignore:4049
 /ignore:4217
 /ignore:4244 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>Secur32.lib;Rpcrt4.lib;openssl_uptable.obj;entitydef_d.lib;crypt32.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr_d.lib;python313.lib;pyscript_d.lib;xml_d.lib;common_d.lib;helper_d.lib;network_d.lib;thread_d.lib;client_lib_d.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Secur32.lib;Rpcrt4.lib;entitydef_d.lib;crypt32.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr_d.lib;python313.lib;pyscript_d.lib;xml_d.lib;common_d.lib;helper_d.lib;network_d.lib;thread_d.lib;client_lib_d.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>../../../libs;../../../lib/dependencies/vld;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
@@ -224,7 +224,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>../../../lib/python/PC;../../../lib/python/Include;../../../lib/python/Include/internal;../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies;../../../lib/dependencies/jsoncpp/include;../../../lib/dependencies/vsopenssl/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../../lib/python/PC;../../../lib/python/Include;../../../lib/python/Include/internal;../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies;../../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>ENABLE_WATCHERS;WIN32;_WINDOWS;NDEBUG;USE_PYTHON;KBE_USE_ASSERTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -270,7 +270,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>../../../lib/python/PC;../../../lib/python/Include;../../../lib/python/Include/internal;../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies;../../../lib/dependencies/jsoncpp/include;../../../lib/dependencies/vsopenssl/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../../lib/python/PC;../../../lib/python/Include;../../../lib/python/Include/internal;../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies;../../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>ENABLE_WATCHERS;WIN32;_WINDOWS;NDEBUG;USE_PYTHON;KBE_USE_ASSERTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -295,7 +295,7 @@
       <AdditionalOptions>/ignore:4049
 /ignore:4217
 /ignore:4244 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>Secur32.lib;Rpcrt4.lib;entitydef.lib;openssl_uptable.obj;crypt32.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr.lib;python313.lib;pyscript.lib;xml.lib;common.lib;helper.lib;network.lib;thread.lib;client_lib.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Secur32.lib;Rpcrt4.lib;entitydef.lib;crypt32.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr.lib;python313.lib;pyscript.lib;xml.lib;common.lib;helper.lib;network.lib;thread.lib;client_lib.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>../../../libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
@@ -424,3 +424,4 @@
     </VisualStudio>
   </ProjectExtensions>
 </Project>
+

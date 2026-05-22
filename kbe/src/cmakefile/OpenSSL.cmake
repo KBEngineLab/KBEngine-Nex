@@ -1,26 +1,12 @@
-# cmake/FindOrBuildOpenSSL.cmake
-# 自动查找系统 OpenSSL 或使用自带 OpenSSL，并创建 INTERFACE 库 KBEOpenSSL::SSL
+# cmake/OpenSSL.cmake
+# OpenSSL 统一走 vcpkg，避免和 libpq 带进来的 OpenSSL 版本混在一起。
 
-# 优先查找系统 OpenSSL
-find_package(OpenSSL QUIET)
+find_package(OpenSSL REQUIRED)
 
-if(OpenSSL_FOUND)
-    set(USE_SELF_OPENSSL 0)
-    set(OPENSSL_INCLUDE_DIRS ${OPENSSL_INCLUDE_DIR})
-    set(OPENSSL_LIBRARIES ${OPENSSL_LIBRARIES})
-    message(STATUS "Using system OpenSSL: ${OPENSSL_VERSION}")
-else()
-    set(USE_SELF_OPENSSL 1)
-    set(OPENSSL_DIR "${KBE_ROOT}/kbe/src/lib/dependencies/openssl")
-    set(OPENSSL_INCLUDE_DIRS "${OPENSSL_DIR}/include")
-    set(OPENSSL_LIBRARIES ssl crypto dl)
-    message(WARNING "System OpenSSL not found, using self-built OpenSSL in ${OPENSSL_DIR}")
-endif()
-
-# 创建 INTERFACE 库
+# 继续保留 KBEOpenSSL::SSL 这个目标名，现有 CMake 子工程不用跟着改。
 add_library(KBEOpenSSL::SSL INTERFACE IMPORTED)
 set_target_properties(KBEOpenSSL::SSL PROPERTIES
-    INTERFACE_INCLUDE_DIRECTORIES "${OPENSSL_INCLUDE_DIRS}"
-    INTERFACE_LINK_LIBRARIES "${OPENSSL_LIBRARIES}"
+    INTERFACE_INCLUDE_DIRECTORIES "${OPENSSL_INCLUDE_DIR}"
+    INTERFACE_LINK_LIBRARIES "OpenSSL::SSL;OpenSSL::Crypto"
     INTERFACE_COMPILE_DEFINITIONS "USE_OPENSSL"
 )

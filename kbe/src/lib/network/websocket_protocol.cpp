@@ -11,11 +11,7 @@
 
 #if KBE_PLATFORM == PLATFORM_WIN32
 #ifdef _DEBUG
-#pragma comment(lib, "libeay32_d.lib")
-#pragma comment(lib, "ssleay32_d.lib")
 #else
-#pragma comment(lib, "libeay32.lib")
-#pragma comment(lib, "ssleay32.lib")
 #endif
 #endif
 
@@ -444,3 +440,4 @@ std::string WebSocketProtocol::getFrameTypeName(FrameType frame_type)
 }
 }
 }
+
