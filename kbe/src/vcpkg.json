@@ -10,7 +10,9 @@
     "apr",
     "apr-util",
     "curl",
+    "openssl",
     "mongo-c-driver",
+    "libpq",
     "recastnavigation",
     {
       "name": "jemalloc",
