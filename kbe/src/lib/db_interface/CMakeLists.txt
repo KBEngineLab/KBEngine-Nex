@@ -17,6 +17,7 @@ target_link_libraries(db_interface PRIVATE
 	fmt::fmt
 	db_mongodb
 	db_mysql
+	db_postgresql
 	python_interface
 )
 

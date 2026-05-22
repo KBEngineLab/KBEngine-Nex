@@ -7,6 +7,7 @@
 #include "common/kbekey.h"
 #include "db_mongodb/db_interface_mongodb.h"
 #include "db_mysql/db_interface_mysql.h"
+#include "db_postgresql/db_interface_postgresql.h"
 #include "server/serverconfig.h"
 #include "thread/threadpool.h"
 
@@ -45,6 +46,7 @@ bool DBUtil::initThread(const std::string& dbinterfaceName)
 	DBInterfaceInfo* pDBInfo = g_kbeSrvConfig.dbInterface(dbinterfaceName);
 	if (strcmp(pDBInfo->db_type, "mysql") == 0)
 	{
+		// MySQL 客户端库需要每个数据库线程初始化线程上下文。
 		if (!mysql_thread_safe()) 
 		{
 			KBE_ASSERT(false);
@@ -53,6 +55,10 @@ bool DBUtil::initThread(const std::string& dbinterfaceName)
 		{
 			mysql_thread_init();
 		}
+	}
+	else if (strcmp(pDBInfo->db_type, "postgresql") == 0)
+	{
+		// libpq 本身可跨线程使用，PGconn 不共享；KBE 每个 DB 线程持有自己的连接。
 	}
 	
 	return true;
@@ -64,7 +70,12 @@ bool DBUtil::finiThread(const std::string& dbinterfaceName)
 	DBInterfaceInfo* pDBInfo = g_kbeSrvConfig.dbInterface(dbinterfaceName);
 	if (strcmp(pDBInfo->db_type, "mysql") == 0)
 	{
+		// 释放 MySQL 当前线程上下文。
 		mysql_thread_end();
+	}
+	else if (strcmp(pDBInfo->db_type, "postgresql") == 0)
+	{
+		// PostgreSQL 连接资源跟随 PGconn 生命周期释放。
 	}
 
 	return true;
@@ -151,6 +162,10 @@ DBInterface* DBUtil::createInterface(const std::string& name, bool showinfo)
 	{
 		dbinterface = new DBInterfaceMongodb(name.c_str());
 	}
+	else if (strcmp(pDBInfo->db_type, "postgresql") == 0)
+	{
+		dbinterface = new DBInterfacePostgresql(name.c_str(), pDBInfo->db_unicodeString_characterSet, pDBInfo->db_unicodeString_collation);
+	}
 
 	if(dbinterface == NULL)
 	{
@@ -222,6 +237,10 @@ bool DBUtil::initInterface(DBInterface* pdbi)
 	else if (strcmp(pDBInfo->db_type, "mongodb") == 0)
 	{
 		DBInterfaceMongodb::initInterface(pdbi);
+	}
+	else if (strcmp(pDBInfo->db_type, "postgresql") == 0)
+	{
+		DBInterfacePostgresql::initInterface(pdbi);
 	}
 	
 	thread::ThreadPool* pThreadPool = pThreadPoolMaps_[pdbi->name()];

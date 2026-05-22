@@ -355,8 +355,8 @@
 				-->
 				<pure> false </pure>
 
-				<!-- 数据库类型 （mysql、redis（已废弃）、mongodb）
-					（Database type(mysql, redis(deprecated), mongodb))
+				<!-- 数据库类型 （mysql、redis（已废弃）、mongodb、postgresql）
+					（Database type(mysql, redis(deprecated), mongodb, postgresql))
 				-->
 				<type> mysql </type>											<!-- Type: String -->
 

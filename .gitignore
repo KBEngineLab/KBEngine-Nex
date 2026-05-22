@@ -120,6 +120,8 @@ kbe/src/libs/thread_d.lib
 kbe/src/libs/tmxparser_d.lib
 kbe/src/libs/xml_d.lib
 kbe/src/libs/zlib_d.lib
+kbe/src/libs/db_postgresql_d.lib
+kbe/src/libs/db_postgresql.lib
 kbe/tools/server/guiconsole/guiconsole.lib
 kbe/tools/server/guiconsole/guiconsole.log
 kbe/tools/server/guiconsole/guiconsole.log.1

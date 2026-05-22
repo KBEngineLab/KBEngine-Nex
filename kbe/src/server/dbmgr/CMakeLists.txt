@@ -26,6 +26,7 @@ target_link_libraries(dbmgr
 		db_interface
 		db_mongodb
 		db_mysql
+		db_postgresql
         server
         resmgr
         entitydef

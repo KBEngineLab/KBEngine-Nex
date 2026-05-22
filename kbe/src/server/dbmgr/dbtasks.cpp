@@ -10,8 +10,6 @@
 #include "server/serverconfig.h"
 #include "db_interface/db_interface.h"
 #include "db_interface/kbe_tables.h"
-#include "db_mysql/db_exception.h"
-#include "db_mysql/db_interface_mysql.h"
 #include "entitydef/scriptdef_module.h"
 #include "openssl/md5.h"
 
@@ -24,11 +22,7 @@
 
 #if KBE_PLATFORM == PLATFORM_WIN32
 #ifdef _DEBUG
-#pragma comment(lib, "libeay32_d.lib")
-#pragma comment(lib, "ssleay32_d.lib")
 #else
-#pragma comment(lib, "libeay32.lib")
-#pragma comment(lib, "ssleay32.lib")
 #endif
 #endif
 
@@ -115,10 +109,9 @@ bool DBTaskExecuteRawDatabaseCommand::db_thread_process()
 	}
 	catch (std::exception & e)
 	{
-		DBException& dbe = static_cast<DBException&>(e);
-		if(dbe.isLostConnection())
+		// 异常恢复由当前数据库后端处理，避免把非 MySQL 异常强转成 DBException。
+		if(pdbi_->processException(e))
 		{
-			static_cast<DBInterfaceMysql*>(pdbi_)->processException(e);
 			return true;
 		}
 
@@ -163,10 +156,9 @@ bool DBTaskExecuteRawDatabaseCommandByEntity::db_thread_process()
 	}
 	catch (std::exception & e)
 	{
-		DBException& dbe = static_cast<DBException&>(e);
-		if(dbe.isLostConnection())
+		// 异常恢复由当前数据库后端处理，避免 PostgreSQL 异常走 MySQL 分支。
+		if(pdbi_->processException(e))
 		{
-			static_cast<DBInterfaceMysql*>(pdbi_)->processException(e);
 			return true;
 		}
 
@@ -1777,10 +1769,9 @@ bool DBTaskQueryEntity::db_thread_process()
 		}
 		catch (std::exception & e)
 		{
-			DBException& dbe = static_cast<DBException&>(e);
-			if(dbe.isLostConnection())
+			// 断线和可重试错误交给当前数据库后端判断。
+			if(pdbi_->processException(e))
 			{
-				static_cast<DBInterfaceMysql*>(pdbi_)->processException(e);
 				return true;
 			}
 			else
@@ -1797,10 +1788,9 @@ bool DBTaskQueryEntity::db_thread_process()
 			}
 			catch (std::exception & e)
 			{
-				DBException& dbe = static_cast<DBException&>(e);
-				if(dbe.isLostConnection())
+				// 断线和可重试错误交给当前数据库后端判断。
+				if(pdbi_->processException(e))
 				{
-					static_cast<DBInterfaceMysql*>(pdbi_)->processException(e);
 					return true;
 				}
 				else
@@ -1945,3 +1935,4 @@ thread::TPTask::TPTaskState DBTaskEraseBaseappEntityLog::presentMainThread()
 
 //-------------------------------------------------------------------------------------
 }
+

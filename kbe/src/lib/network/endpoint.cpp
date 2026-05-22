@@ -831,9 +831,9 @@ static long ssl_bio_callback(BIO *bio, int cmd, const char *argp, int argi, long
 
 bool EndPoint::setupSSL(int sslVersion, Packet* pPacket)
 {
+#if (OPENSSL_VERSION_NUMBER <  0x1000207fL)
 	switch (sslVersion)
 	{
-#if (OPENSSL_VERSION_NUMBER <  0x1000207fL)
 #ifndef OPENSSL_NO_SSL2
 	case SSL2_VERSION:
 		sslContext_ = SSL_CTX_new(SSLv2_server_method());
@@ -853,11 +853,14 @@ bool EndPoint::setupSSL(int sslVersion, Packet* pPacket)
 	case TLS1_2_VERSION:
 		sslContext_ = SSL_CTX_new(TLSv1_2_server_method());
 		break;
-#endif
 	default:
 		sslContext_ = SSL_CTX_new(SSLv23_server_method());
 		break;
 	};
+#else
+	// 新版 OpenSSL 已经不再暴露旧协议 method，统一用协商入口创建 server context。
+	sslContext_ = SSL_CTX_new(SSLv23_server_method());
+#endif
 
 	if (!sslContext_)
 	{
