@@ -13,7 +13,6 @@
 // #endif
 #include "mongoc/mongoc.h"
 //#include <bson.h>
-#include <unordered_set>
 
 class MongoCursorGuard;
 
@@ -171,8 +170,5 @@ namespace KBEngine
 
 
 		static bool                  s_mongocInited_;
-
-		static const std::vector<std::string> kDangerTokens;
-		static const std::unordered_set<std::string> kForbiddenCommands;
 	};
 }

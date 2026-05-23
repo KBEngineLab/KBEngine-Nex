@@ -17,6 +17,31 @@ KBE_SINGLETON_INIT(ServerConfig);
 
 static bool g_dbmgr_addDefaultAddress = true;
 
+static void loadRawDatabaseCommandBlacklist(XML* xml, TiXmlNode* rootNode, const char* dbType,
+	std::map<std::string, std::vector<std::string> >& blacklist)
+{
+	TiXmlNode* node = xml->enterNode(rootNode, dbType);
+	if (node == NULL)
+		return;
+
+	std::string dbTypeName = strutil::toLower(dbType);
+	std::vector<std::string>& words = blacklist[dbTypeName];
+	words.clear();
+
+	std::vector<std::string> values;
+	strutil::kbe_splits(xml->getValStr(node), ",", values, false);
+
+	for (std::vector<std::string>::iterator iter = values.begin(); iter != values.end(); ++iter)
+	{
+		std::string word = strutil::toLower(strutil::kbe_trim(*iter));
+		if (!word.empty())
+			words.push_back(word);
+	}
+
+	INFO_MSG(fmt::format("ServerConfig::loadConfig: loaded executeRawDatabaseCommand blacklist, dbType={}, count={}.\n",
+		dbTypeName, words.size()));
+}
+
 //-------------------------------------------------------------------------------------
 ServerConfig::ServerConfig():
 	gameUpdateHertz_(10),
@@ -985,7 +1010,29 @@ bool ServerConfig::loadConfig(std::string fileName)
 			}
 		}
 
-		node = xml->enterNode(rootNode, "internalInterface");	
+		node = xml->enterNode(rootNode, "rawDatabaseCommandBlacklist");
+		if (node != NULL)
+		{
+			TiXmlNode* childnode = xml->enterNode(node, "enable");
+			_dbmgrInfo.enableRawDatabaseCommandBlacklist = childnode != NULL && xml->getValStr(childnode) == "true";
+
+			INFO_MSG(fmt::format("ServerConfig::loadConfig: executeRawDatabaseCommand blacklist enabled={}.\n",
+				_dbmgrInfo.enableRawDatabaseCommandBlacklist ? "true" : "false"));
+
+			if (_dbmgrInfo.enableRawDatabaseCommandBlacklist)
+			{
+				INFO_MSG("ServerConfig::loadConfig: loading executeRawDatabaseCommand blacklist config.\n");
+				loadRawDatabaseCommandBlacklist(xml.get(), node, "mysql", _dbmgrInfo.rawDatabaseCommandBlacklist);
+				loadRawDatabaseCommandBlacklist(xml.get(), node, "mongodb", _dbmgrInfo.rawDatabaseCommandBlacklist);
+				loadRawDatabaseCommandBlacklist(xml.get(), node, "postgresql", _dbmgrInfo.rawDatabaseCommandBlacklist);
+			}
+			else
+			{
+				_dbmgrInfo.rawDatabaseCommandBlacklist.clear();
+			}
+		}
+
+		node = xml->enterNode(rootNode, "internalInterface");
 		if(node != NULL)
 			strncpy((char*)&_dbmgrInfo.internalInterface, xml->getValStr(node).c_str(), MAX_NAME - 1);
 
@@ -2087,5 +2134,30 @@ void ServerConfig::updateInfos(bool isPrint, COMPONENT_TYPE componentType, COMPO
 #endif
 }
 
-//-------------------------------------------------------------------------------------		
+bool ServerConfig::enableRawDatabaseCommandBlacklist() const
+{
+	return _dbmgrInfo.enableRawDatabaseCommandBlacklist;
+}
+
+const std::vector<std::string>& ServerConfig::rawDatabaseCommandBlacklist(const std::string& dbType) const
+{
+	static const std::vector<std::string> emptyList;
+
+	if (!_dbmgrInfo.enableRawDatabaseCommandBlacklist)
+		return emptyList;
+
+	std::string dbTypeName = strutil::toLower(strutil::kbe_trim(dbType));
+	if (dbTypeName == "pgsql")
+		dbTypeName = "postgresql";
+
+	std::map<std::string, std::vector<std::string> >::const_iterator iter =
+		_dbmgrInfo.rawDatabaseCommandBlacklist.find(dbTypeName);
+
+	if (iter == _dbmgrInfo.rawDatabaseCommandBlacklist.end())
+		return emptyList;
+
+	return iter->second;
+}
+
+//-------------------------------------------------------------------------------------
 }

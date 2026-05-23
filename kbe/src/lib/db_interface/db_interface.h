@@ -37,6 +37,12 @@ public:
 	db_numConnections_(1),
 	lastquery_()
 	{
+		memset(name_, 0, sizeof(name_));
+		memset(db_type_, 0, sizeof(db_type_));
+		memset(db_ip_, 0, sizeof(db_ip_));
+		memset(db_username_, 0, sizeof(db_username_));
+		memset(db_password_, 0, sizeof(db_password_));
+		memset(db_name_, 0, sizeof(db_name_));
 		strncpy(name_, name, MAX_NAME - 1);
 		int dbIndex = g_kbeSrvConfig.dbInterfaceName2dbInterfaceIndex(this->name());
 		KBE_ASSERT(dbIndex >= 0);
@@ -89,9 +95,19 @@ public:
 	}
 
 	/**
+		Check whether executeRawDatabaseCommand can run on this database interface.
+	*/
+	bool checkRawDatabaseCommandAllowed(const std::string& command, std::string& error) const;
+
+	/**
 		返回这个接口的名称
 	*/
 	const char* name() const { return name_; }
+
+	/**
+		返回数据库类型，executeRawDatabaseCommand的安全检查会按这个类型读取黑名单。
+	*/
+	const char* dbType() const { return db_type_; }
 
 	/**
 		返回这个接口的索引

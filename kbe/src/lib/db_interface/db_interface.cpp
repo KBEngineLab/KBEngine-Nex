@@ -11,12 +11,75 @@
 #include "server/serverconfig.h"
 #include "thread/threadpool.h"
 
-namespace KBEngine { 
+#include <cctype>
+
+namespace KBEngine {
 KBE_SINGLETON_INIT(DBUtil);
 
 DBUtil g_DBUtil;
 
 DBUtil::DBThreadPoolMap DBUtil::pThreadPoolMaps_;
+
+static bool isCommandBoundary(char c)
+{
+	return !std::isalnum(static_cast<unsigned char>(c)) && c != '_';
+}
+
+static bool rawDatabaseCommandHitBlacklist(const std::string& command,
+	const std::vector<std::string>& blacklist, std::string& hitWord)
+{
+	if (command.empty() || blacklist.empty())
+		return false;
+
+	std::string lowerCommand = strutil::toLower(command);
+
+	for (std::vector<std::string>::const_iterator iter = blacklist.begin(); iter != blacklist.end(); ++iter)
+	{
+		const std::string& word = *iter;
+		if (word.empty())
+			continue;
+
+		std::string::size_type pos = 0;
+		while ((pos = lowerCommand.find(word, pos)) != std::string::npos)
+		{
+			bool leftOk = pos == 0 || isCommandBoundary(lowerCommand[pos - 1]);
+			std::string::size_type end = pos + word.size();
+			bool rightOk = end >= lowerCommand.size() || isCommandBoundary(lowerCommand[end]);
+
+			if (leftOk && rightOk)
+			{
+				hitWord = word;
+				return true;
+			}
+
+			++pos;
+		}
+	}
+
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
+bool DBInterface::checkRawDatabaseCommandAllowed(const std::string& command, std::string& error) const
+{
+	if (!g_kbeSrvConfig.enableRawDatabaseCommandBlacklist())
+		return true;
+
+	const std::vector<std::string>& blacklist = g_kbeSrvConfig.rawDatabaseCommandBlacklist(dbType());
+	if (blacklist.empty())
+		return true;
+
+	std::string hitWord;
+
+	if (command.empty() || !rawDatabaseCommandHitBlacklist(command, blacklist, hitWord))
+		return true;
+
+	error = fmt::format("executeRawDatabaseCommand blocked by blacklist: dbInterface={}, dbType={}, hit={}",
+		name(), dbType(), hitWord);
+
+	WARNING_MSG(fmt::format("{}, command={}.\n", error, command));
+	return false;
+}
 
 //-------------------------------------------------------------------------------------
 DBUtil::DBUtil()

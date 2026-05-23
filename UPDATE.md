@@ -3,7 +3,7 @@
 
 ## 2.8.2
 - [feat] PostgreSQL 支持  [Issue #21](https://github.com/KBEngineLab/KBEngine-Nex/pull/21)
-- [feat] SQL命令黑名单  [Issue #179](https://github.com/KBEngineLab/KBEngine-Nex/pull/179)
+- [feat] executeRawDatabaseCommand 命令黑名单  [Issue #179](https://github.com/KBEngineLab/KBEngine-Nex/pull/179)
 - [feat] 新增添加额外配置参数 @Smile010110   [Pull request #176](https://github.com/KBEngineLab/KBEngine-Nex/pull/176)
 - [feat] GitHub Actions  [Issue #109](https://github.com/KBEngineLab/KBEngine-Nex/issues/109)
 - [feat] 重构 Python async 调度，移除 py 层独立线程和空 timer 保活逻辑，统一由 C++ 底层 dispatcher timer 驱动 asyncio，避免 GIL 争抢并降低 aiohttp 等协程任务延迟  [Issue #166](https://github.com/KBEngineLab/KBEngine-Nex/issues/166)
@@ -15,6 +15,7 @@
 - [feat] registerReadFileDescriptor等接口废弃，新增registerAcceptFileDescriptor等 completion API [Issue #172](https://github.com/KBEngineLab/KBEngine-Nex/issues/172)
 - [fix] 修复 urlopen 传入 None 时可能崩溃的问题 [Issue #167](https://github.com/KBEngineLab/KBEngine-Nex/issues/167)
 - [fix] log4cxx 初始化前自动创建日志目录，避免Linux下首次启动时日志创建失败的问题
+- [perf] openssl 彻底vcpkg引入，不再依赖系统以及vsopenssl
 - [perf] Debug下编译Release Python，防止一些第三方包无法使用 [Issue #175](https://github.com/KBEngineLab/KBEngine-Nex/issues/175)
 - [perf] db_mongodb 功能优化 [Issue #177](https://github.com/KBEngineLab/KBEngine-Nex/issues/177)
   - **Entity 表**

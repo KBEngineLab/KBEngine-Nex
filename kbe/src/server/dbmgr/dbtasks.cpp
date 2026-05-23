@@ -100,6 +100,9 @@ bool DBTaskExecuteRawDatabaseCommand::db_thread_process()
 	(*pDatas_) >> callbackID_;
 	(*pDatas_).readBlob(sdatas_);
 
+	if (!pdbi_->checkRawDatabaseCommandAllowed(sdatas_, error_))
+		return false;
+
 	try
 	{
 		if (!pdbi_->query(sdatas_.data(), (uint32)sdatas_.size(), false, pExecret_))
@@ -146,6 +149,9 @@ bool DBTaskExecuteRawDatabaseCommandByEntity::db_thread_process()
 	(*pDatas_) >> componentID_ >> componentType_;
 	(*pDatas_) >> callbackID_;
 	(*pDatas_).readBlob(sdatas_);
+
+	if (!pdbi_->checkRawDatabaseCommandAllowed(sdatas_, error_))
+		return false;
 
 	try
 	{

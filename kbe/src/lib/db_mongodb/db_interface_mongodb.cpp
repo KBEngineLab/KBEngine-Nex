@@ -15,30 +15,6 @@ namespace KBEngine {
 	static bool _g_debug = false;
 	bool   KBEngine::DBInterfaceMongodb::s_mongocInited_ = false;
 
-	const std::unordered_set<std::string> DBInterfaceMongodb::kForbiddenCommands = {
-		"drop",
-		"dropDatabase",
-		"shutdown",
-		"shutdownServer",
-		"eval",
-		"renameCollection",
-		"createUser",
-		"updateUser",
-		"grantRolesToUser",
-		"revokeRolesFromUser",
-		"logout",
-		"auth",
-		"fsync"
-	};
-
-	const std::vector<std::string> DBInterfaceMongodb::kDangerTokens = {
-		"drop",
-		"shutdown",
-		"eval",
-		"fsync"
-	};
-
-
 	static void querystatistics(const char* strCommand)
 	{
 		std::string op(strCommand);
@@ -371,15 +347,6 @@ namespace KBEngine {
 		}
 
 		std::string strCommand(cmd);
-
-		for (const auto& tok : kDangerTokens)
-		{
-			if (strCommand.find(tok) != std::string::npos)
-			{
-				strError = "dangerous keyword detected";
-				return false;
-			}
-		}
 
 		std::size_t index = strCommand.find_first_of(".");
 		std::string str_tableName = strCommand.substr(0, index);
@@ -1033,14 +1000,6 @@ namespace KBEngine {
 		{
 			bson_destroy(q);
 			strError = "invalid mongo command";
-			return false;
-		}
-
-		if (kForbiddenCommands.count(topKey))
-		{
-			bson_destroy(q);
-			strError = ("mongo command forbidden: " + topKey).c_str();
-			ERROR_MSG(fmt::format("{}\n", strError));
 			return false;
 		}
 
