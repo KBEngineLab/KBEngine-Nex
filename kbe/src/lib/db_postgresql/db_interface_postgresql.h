@@ -36,6 +36,8 @@ public:
 
 	virtual bool query(const char* cmd, uint32 size, bool printlog = true, MemoryStream* result = NULL);
 	bool write_query_result(PGresult* pgResult, MemoryStream* result);
+	PGresult* queryResult(const std::string& sql, const char* caller,
+		ExecStatusType expectedStatus = PGRES_TUPLES_OK, bool traceQuery = true);
 
 	virtual bool getTableNames(std::vector<std::string>& tableNames, const char* pattern);
 	virtual bool getTableItemNames(const char* tableName, std::vector<std::string>& itemNames);

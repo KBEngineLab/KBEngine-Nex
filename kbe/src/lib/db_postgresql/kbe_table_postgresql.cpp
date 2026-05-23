@@ -12,20 +12,14 @@
 
 namespace KBEngine {
 using postgresql::esc;
+using postgresql::hexEncode;
 using postgresql::pg;
 
 namespace
 {
 PGresult* execSystemTableQuery(DBInterface* pdbi, const std::string& sql, const char* caller)
 {
-	PGresult* result = PQexec(pg(pdbi)->pgconn(), sql.c_str());
-	if (result == NULL)
-	{
-		ERROR_MSG(fmt::format("{}: PQexec returned NULL, error={}, sql={}\n",
-			caller, pdbi->getstrerror(), sql));
-	}
-
-	return result;
+	return pg(pdbi)->queryResult(sql, caller);
 }
 
 // 系统表里还有少量直接读 PGresult 的查询，这里统一把失败 SQL 打清楚。
@@ -84,6 +78,29 @@ bool isVerificationExpired(uint64 logtime, uint64 deadline)
 {
 	uint64 now = (uint64)time(NULL);
 	return logtime > 0 && now > logtime && now - logtime > deadline;
+}
+
+std::string byteaSqlValue(const std::string& data)
+{
+	return fmt::format("decode('{}', 'hex')", hexEncode(data.data(), data.size()));
+}
+
+bool assignByteaValue(PGresult* result, int row, int column, std::string& out)
+{
+	if (PQgetisnull(result, row, column))
+	{
+		out.clear();
+		return true;
+	}
+
+	size_t size = 0;
+	unsigned char* data = PQunescapeBytea(reinterpret_cast<const unsigned char*>(PQgetvalue(result, row, column)), &size);
+	if (data == NULL)
+		return false;
+
+	out.assign(reinterpret_cast<const char*>(data), size);
+	PQfreemem(data);
+	return true;
 }
 }
 
@@ -436,12 +453,18 @@ KBEAccountTablePostgresql::KBEAccountTablePostgresql(EntityTables* pEntityTables
 // 同步 kbe_accountinfos 表，保存账号到实体 DBID 的映射。
 bool KBEAccountTablePostgresql::syncToDB(DBInterface* pdbi)
 {
-	// 账号表保留 KBE 现有字段语义，datas 使用 TEXT 存储扩展数据。
+	/*
+		账号表保留 KBE 的现有字段语义：name 对应 MySQL 的 accountName，
+		bindata 对应 MySQL 的 bindata/blob，不能用 TEXT 顶替，否则二进制内容会被编码规则影响。
+		MySQL 版本对 email 和 entityDBID 都有唯一键，
+		PostgreSQL 这里也补上同等约束，避免同一邮箱或同一实体 DBID 被多条账号记录占用。
+		dbid=0 是“还没有绑定实体”的占位值，不能建普通唯一索引，否则多个未完成账号会互相冲突。
+	*/
 	if (!pdbi->query(
 		"CREATE TABLE IF NOT EXISTS kbe_accountinfos ("
 		"name VARCHAR(255) PRIMARY KEY, "
 		"password VARCHAR(255) NOT NULL, "
-		"datas TEXT NOT NULL DEFAULT '', "
+		"bindata BYTEA, "
 		"email VARCHAR(255) NOT NULL DEFAULT '', "
 		"dbid BIGINT NOT NULL DEFAULT 0, "
 		"flags BIGINT NOT NULL DEFAULT 0, "
@@ -454,7 +477,18 @@ bool KBEAccountTablePostgresql::syncToDB(DBInterface* pdbi)
 
 	return pdbi->query("ALTER TABLE kbe_accountinfos ADD COLUMN IF NOT EXISTS regtime BIGINT NOT NULL DEFAULT 0")
 		&& pdbi->query("ALTER TABLE kbe_accountinfos ADD COLUMN IF NOT EXISTS lasttime BIGINT NOT NULL DEFAULT 0")
-		&& pdbi->query("ALTER TABLE kbe_accountinfos ADD COLUMN IF NOT EXISTS numlogin BIGINT NOT NULL DEFAULT 0");
+		&& pdbi->query("ALTER TABLE kbe_accountinfos ADD COLUMN IF NOT EXISTS numlogin BIGINT NOT NULL DEFAULT 0")
+		&& pdbi->query("ALTER TABLE kbe_accountinfos ADD COLUMN IF NOT EXISTS bindata BYTEA")
+		&& pdbi->query(
+			"DO $$ "
+			"BEGIN "
+			"IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='kbe_accountinfos' AND column_name='datas') THEN "
+			"UPDATE kbe_accountinfos SET bindata=convert_to(datas, 'UTF8') WHERE bindata IS NULL; "
+			"ALTER TABLE kbe_accountinfos DROP COLUMN datas; "
+			"END IF; "
+			"END $$")
+		&& pdbi->query("CREATE UNIQUE INDEX IF NOT EXISTS uk_kbe_accountinfos_email ON kbe_accountinfos(email) WHERE email<>''")
+		&& pdbi->query("CREATE UNIQUE INDEX IF NOT EXISTS uk_kbe_accountinfos_dbid ON kbe_accountinfos(dbid) WHERE dbid<>0");
 }
 
 // 查询账号基础信息。
@@ -468,7 +502,7 @@ bool KBEAccountTablePostgresql::queryAccountAllInfos(DBInterface* pdbi, const st
 {
 	std::string qname = esc(pdbi, name);
 	std::string sql = fmt::format(
-		"SELECT name, password, datas, email, dbid, flags, deadline FROM kbe_accountinfos "
+		"SELECT name, password, bindata, email, dbid, flags, deadline FROM kbe_accountinfos "
 		"WHERE name='{}' OR email='{}' LIMIT 1",
 		qname, qname);
 	PGresult* result = execSystemTableQuery(pdbi, sql, "KBEAccountTablePostgresql::queryAccountAllInfos");
@@ -480,7 +514,13 @@ bool KBEAccountTablePostgresql::queryAccountAllInfos(DBInterface* pdbi, const st
 	{
 		info.name = PQgetvalue(result, 0, 0);
 		info.password = PQgetvalue(result, 0, 1);
-		info.datas = PQgetvalue(result, 0, 2);
+		if (!assignByteaValue(result, 0, 2, info.datas))
+		{
+			ERROR_MSG("KBEAccountTablePostgresql::queryAccountAllInfos: bindata bytea decode failed.\n");
+			PQclear(result);
+			return false;
+		}
+
 		info.email = PQgetvalue(result, 0, 3);
 		KBEngine::StringConv::str2value(info.dbid, PQgetvalue(result, 0, 4));
 		KBEngine::StringConv::str2value(info.flags, PQgetvalue(result, 0, 5));
@@ -496,11 +536,11 @@ bool KBEAccountTablePostgresql::logAccount(DBInterface* pdbi, ACCOUNT_INFOS& inf
 	uint64 now = (uint64)time(NULL);
 	std::string password = KBE_MD5::getDigest(info.password.data(), (int)info.password.length());
 	std::string sql = fmt::format(
-		"INSERT INTO kbe_accountinfos(name, password, datas, email, dbid, flags, deadline, regtime, lasttime, numlogin) "
-		"VALUES('{}', '{}', '{}', '{}', {}, {}, {}, {}, {}, 0) "
-		"ON CONFLICT(name) DO UPDATE SET password=EXCLUDED.password, datas=EXCLUDED.datas, "
+		"INSERT INTO kbe_accountinfos(name, password, bindata, email, dbid, flags, deadline, regtime, lasttime, numlogin) "
+		"VALUES('{}', '{}', {}, '{}', {}, {}, {}, {}, {}, 0) "
+		"ON CONFLICT(name) DO UPDATE SET password=EXCLUDED.password, bindata=EXCLUDED.bindata, "
 		"email=EXCLUDED.email, dbid=EXCLUDED.dbid, flags=EXCLUDED.flags, deadline=EXCLUDED.deadline, lasttime=EXCLUDED.lasttime",
-		esc(pdbi, info.name), esc(pdbi, password), esc(pdbi, info.datas), esc(pdbi, info.email),
+		esc(pdbi, info.name), esc(pdbi, password), byteaSqlValue(info.datas), esc(pdbi, info.email),
 		info.dbid, info.flags, info.deadline, now, now);
 	return pdbi->query(sql);
 }

@@ -130,17 +130,11 @@ SqlStatementInsert::SqlStatementInsert(DBInterface* pdbi, std::string tableName,
 bool SqlStatementInsert::query(DBInterface* pdbi)
 {
 	DBInterface* pQueryDBI = queryDBI(pdbi);
-	PGresult* result = PQexec(pg(pQueryDBI)->pgconn(), sqlstr_.c_str());
-	if (result == NULL)
-	{
-		ERROR_MSG(fmt::format("postgresql::SqlStatementInsert::query: query returned NULL, sql={}\n", sqlstr_));
-		return false;
-	}
+	PGresult* result = pg(pQueryDBI)->queryResult(sqlstr_, "postgresql::SqlStatementInsert::query");
 
-	if (PQresultStatus(result) != PGRES_TUPLES_OK || PQntuples(result) == 0)
+	if (PQntuples(result) == 0)
 	{
-		ERROR_MSG(fmt::format("postgresql::SqlStatementInsert::query: {}, sql={}\n",
-			PQresultErrorMessage(result), sqlstr_));
+		ERROR_MSG(fmt::format("postgresql::SqlStatementInsert::query: RETURNING id returned no rows, sql={}\n", sqlstr_));
 		PQclear(result);
 		return false;
 	}
@@ -194,20 +188,7 @@ bool SqlStatementQueryIDs::query(DBInterface* pdbi)
 	dbids_.clear();
 
 	DBInterface* pQueryDBI = queryDBI(pdbi);
-	PGresult* result = PQexec(pg(pQueryDBI)->pgconn(), sqlstr_.c_str());
-	if (result == NULL)
-	{
-		ERROR_MSG(fmt::format("postgresql::SqlStatementQueryIDs::query: query returned NULL, sql={}\n", sqlstr_));
-		return false;
-	}
-
-	if (PQresultStatus(result) != PGRES_TUPLES_OK)
-	{
-		ERROR_MSG(fmt::format("postgresql::SqlStatementQueryIDs::query: {}, sql={}\n",
-			PQresultErrorMessage(result), sqlstr_));
-		PQclear(result);
-		return false;
-	}
+	PGresult* result = pg(pQueryDBI)->queryResult(sqlstr_, "postgresql::SqlStatementQueryIDs::query");
 
 	for (int i = 0; i < PQntuples(result); ++i)
 	{
@@ -272,19 +253,7 @@ bool SqlStatementQuery::query(DBInterface* pdbi)
 	}
 
 	DBInterface* pQueryDBI = queryDBI(pdbi);
-	result_ = PQexec(pg(pQueryDBI)->pgconn(), sqlstr_.c_str());
-	if (result_ == NULL)
-	{
-		ERROR_MSG(fmt::format("postgresql::SqlStatementQuery::query: query returned NULL, sql={}\n", sqlstr_));
-		return false;
-	}
-
-	if (PQresultStatus(result_) != PGRES_TUPLES_OK)
-	{
-		ERROR_MSG(fmt::format("postgresql::SqlStatementQuery::query: {}, sql={}\n",
-			PQresultErrorMessage(result_), sqlstr_));
-		return false;
-	}
+	result_ = pg(pQueryDBI)->queryResult(sqlstr_, "postgresql::SqlStatementQuery::query");
 
 	return true;
 }

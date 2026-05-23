@@ -329,6 +329,48 @@ bool DBInterfacePostgresql::query(const char* cmd, uint32 size, bool printlog, M
 	return ret;
 }
 
+// 少数调用方需要直接读取 PGresult，例如系统表查询和 RETURNING id。
+// 这里把这类 SQL 也收回 DBInterfacePostgresql，避免绕过 lastquery、watcher 和断线重试判断。
+PGresult* DBInterfacePostgresql::queryResult(const std::string& sql, const char* caller,
+	ExecStatusType expectedStatus, bool traceQuery)
+{
+	if (pConn_ == NULL)
+	{
+		lastError_ = "PostgreSQL connection is not attached";
+		ERROR_MSG(fmt::format("{}: {}\nsql:({})\n", caller, lastError_, sql));
+		throw DBExceptionPostgresql(this, lastError_, lastSqlState_);
+	}
+
+	if (traceQuery)
+	{
+		querystatistics(sql.c_str(), static_cast<uint32>(sql.size()));
+		lastquery_ = sql;
+	}
+
+	if (g_pgDebug && traceQuery)
+		DEBUG_MSG(fmt::format("DBInterfacePostgresql::queryResult({:p}, {}): {}\n", (void*)this, caller, sql));
+
+	PGresult* result = PQexec(pConn_, sql.c_str());
+	if (result == NULL)
+	{
+		updateLastError(NULL);
+		ERROR_MSG(fmt::format("{}: PQexec returned NULL, error={}!\nsql:({})\n", caller, lastError_, lastquery_));
+		throw DBExceptionPostgresql(this, lastError_, lastSqlState_);
+	}
+
+	if (PQresultStatus(result) != expectedStatus)
+	{
+		updateLastError(result);
+		ERROR_MSG(fmt::format("{}: error({})!\nsql:({})\n", caller, lastError_, lastquery_));
+
+		DBExceptionPostgresql e(this, lastError_, lastSqlState_);
+		PQclear(result);
+		throw e;
+	}
+
+	return result;
+}
+
 // 将 PGresult 转成 DBInterface 约定的查询返回格式。
 bool DBInterfacePostgresql::write_query_result(PGresult* pgResult, MemoryStream* result)
 {
@@ -455,6 +497,10 @@ EntityTable* DBInterfacePostgresql::createEntityTable(EntityTables* pEntityTable
 // 删除实体表。
 bool DBInterfacePostgresql::dropEntityTableFromDB(const char* tableName)
 {
+	KBE_ASSERT(tableName != NULL);
+
+	DEBUG_MSG(fmt::format("DBInterfacePostgresql::dropEntityTableFromDB: {}.\n", tableName));
+
 	std::string sql = fmt::format("DROP TABLE IF EXISTS {}", quoteIdentifier(tableName));
 	return query(sql);
 }
@@ -462,6 +508,11 @@ bool DBInterfacePostgresql::dropEntityTableFromDB(const char* tableName)
 // 删除实体表字段。
 bool DBInterfacePostgresql::dropEntityTableItemFromDB(const char* tableName, const char* tableItemName)
 {
+	KBE_ASSERT(tableName != NULL && tableItemName != NULL);
+
+	DEBUG_MSG(fmt::format("DBInterfacePostgresql::dropEntityTableItemFromDB: {} {}.\n",
+		tableName, tableItemName));
+
 	std::string sql = fmt::format("ALTER TABLE {} DROP COLUMN IF EXISTS {}",
 		quoteIdentifier(tableName), quoteIdentifier(tableItemName));
 	return query(sql);

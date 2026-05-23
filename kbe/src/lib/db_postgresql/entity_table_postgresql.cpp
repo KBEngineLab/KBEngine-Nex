@@ -39,6 +39,126 @@ std::string normalizeDataSType(const std::string& type)
 	return type;
 }
 
+std::string columnBaseType(const std::string& columnType)
+{
+	size_t end = columnType.size();
+	size_t notNull = columnType.find(" NOT NULL");
+	size_t defaultPos = columnType.find(" DEFAULT ");
+
+	if (notNull != std::string::npos)
+		end = std::min(end, notNull);
+	if (defaultPos != std::string::npos)
+		end = std::min(end, defaultPos);
+
+	return columnType.substr(0, end);
+}
+
+std::string normalizedTypeName(const std::string& type)
+{
+	std::string value = type;
+	std::transform(value.begin(), value.end(), value.begin(), tolower);
+
+	KBEngine::strutil::kbe_replace(value, "character varying", "varchar");
+	KBEngine::strutil::kbe_replace(value, " without time zone", "");
+	KBEngine::strutil::kbe_trim(value);
+	return value;
+}
+
+std::string normalizedDefaultValue(const std::string& value)
+{
+	std::string normalized = value;
+	KBEngine::strutil::kbe_trim(normalized);
+
+	size_t castPos = normalized.find("::");
+	if (castPos != std::string::npos)
+		normalized = normalized.substr(0, castPos);
+
+	return normalized;
+}
+
+bool columnWantsNotNull(const std::string& columnType)
+{
+	return columnType.find("NOT NULL") != std::string::npos;
+}
+
+bool columnDefaultValue(const std::string& columnType, std::string& defaultValue)
+{
+	size_t defaultPos = columnType.find(" DEFAULT ");
+	if (defaultPos == std::string::npos)
+		return false;
+
+	defaultValue = columnType.substr(defaultPos + strlen(" DEFAULT "));
+	return true;
+}
+
+bool loadPostgresqlColumnInfos(DBInterface* pdbi, const std::string& tableName, PostgreSQLColumnInfos& columnInfos)
+{
+	std::string sql = fmt::format(
+		"SELECT a.attname, format_type(a.atttypid, a.atttypmod), a.attnotnull, pg_get_expr(d.adbin, d.adrelid) "
+		"FROM pg_attribute a "
+		"JOIN pg_class c ON c.oid=a.attrelid "
+		"JOIN pg_namespace n ON n.oid=c.relnamespace "
+		"LEFT JOIN pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum "
+		"WHERE n.nspname='public' AND c.relname='{}' AND a.attnum>0 AND NOT a.attisdropped "
+		"ORDER BY a.attnum",
+		pg(pdbi)->escapeString(tableName.c_str(), tableName.size()));
+
+	/*
+		字段同步需要知道当前类型、默认值、NOT NULL 状态。这里一次查完整张表，
+		后面逐列判断是否真的需要 ALTER，避免“什么都没改”时也反复 SET NOT NULL。
+	*/
+	PGresult* result = pg(pdbi)->queryResult(sql, "loadPostgresqlColumnInfos", PGRES_TUPLES_OK, false);
+	for (int i = 0; i < PQntuples(result); ++i)
+	{
+		PostgreSQLColumnInfo& info = columnInfos[PQgetvalue(result, i, 0)];
+		info.type = normalizedTypeName(PQgetvalue(result, i, 1));
+		info.notNull = strcmp(PQgetvalue(result, i, 2), "t") == 0;
+		info.hasDefault = PQgetisnull(result, i, 3) == 0;
+		if (info.hasDefault)
+			info.defaultValue = normalizedDefaultValue(PQgetvalue(result, i, 3));
+	}
+
+	PQclear(result);
+	return true;
+}
+
+std::string indexSqlType(const char* indexType)
+{
+	if (kbe_stricmp(indexType, "UNIQUE") == 0)
+		return "UNIQUE INDEX";
+
+	return "INDEX";
+}
+
+bool stringVectorContains(const std::vector<std::string>& values, const std::string& value)
+{
+	for (size_t i = 0; i < values.size(); ++i)
+	{
+		if (kbe_stricmp(values[i].c_str(), value.c_str()) == 0)
+			return true;
+	}
+
+	return false;
+}
+
+bool loadPostgresqlIndexNames(DBInterface* pdbi, const std::string& tableName, std::vector<std::string>& indexNames)
+{
+	std::string sql = fmt::format(
+		"SELECT indexname FROM pg_indexes WHERE schemaname='public' AND tablename='{}'",
+		pg(pdbi)->escapeString(tableName.c_str(), tableName.size()));
+
+	/*
+		这是同步阶段的元数据探测，不代表真正执行的业务 SQL。
+		不写 lastquery_，否则 DBTask 慢任务日志会把这条探测 SQL 打出来，排查时容易误判。
+	*/
+	PGresult* result = pg(pdbi)->queryResult(sql, "loadPostgresqlIndexNames", PGRES_TUPLES_OK, false);
+	for (int i = 0; i < PQntuples(result); ++i)
+		indexNames.push_back(PQgetvalue(result, i, 0));
+
+	PQclear(result);
+	return true;
+}
+
 std::string describeTableItemUtypes(const EntityTable::TABLEITEM_MAP& items)
 {
 	std::string text;
@@ -340,27 +460,100 @@ uint32 EntityTableItemPostgresql::getItemDatabaseLength(const std::string& name)
 	return 0;
 }
 
-bool EntityTableItemPostgresql::syncOneColumn(DBInterface* pdbi, const std::string& columnName, const std::string& columnType)
+bool EntityTableItemPostgresql::syncOneColumn(DBInterface* pdbi, const std::string& columnName, const std::string& columnType,
+	const PostgreSQLColumnInfo* pColumnInfo)
 {
+	std::string sqlTable = tableSqlName(pdbi, tableName());
+	std::string sqlColumn = columnSqlName(pdbi, columnName.c_str());
+	bool columnExists = pColumnInfo != NULL;
+
+	if (!columnExists)
+	{
+		DEBUG_MSG(fmt::format("syncToDB(): {}->{}({}).\n", tableName(), columnName, columnType));
+	}
+
 	std::string sql = fmt::format("ALTER TABLE {} ADD COLUMN IF NOT EXISTS {} {}",
-		tableSqlName(pdbi, tableName()).c_str(),
-		columnSqlName(pdbi, columnName.c_str()).c_str(),
+		sqlTable.c_str(),
+		sqlColumn.c_str(),
 		columnType.c_str());
 
-	return pdbi->query(sql);
+	if (!pdbi->query(sql))
+		return false;
+
+	/*
+		MySQL 后端在字段已存在时会继续 MODIFY COLUMN；PostgreSQL 的
+		ADD COLUMN IF NOT EXISTS 只负责补字段，不会管类型、长度、默认值是否已经变了。
+		实体 def 调整 DatabaseLength 或基础类型后，如果这里不跟进，运行期读写就会和定义脱节。
+		因此每次同步都再执行一组幂等 ALTER：类型相同基本无成本，类型不兼容则让数据库明确报错。
+	*/
+	std::string baseType = columnBaseType(columnType);
+	std::string expectedType = normalizedTypeName(baseType);
+	if (!columnExists || pColumnInfo->type != expectedType)
+	{
+		sql = fmt::format("ALTER TABLE {} ALTER COLUMN {} TYPE {} USING {}::{}",
+			sqlTable.c_str(), sqlColumn.c_str(), baseType.c_str(), sqlColumn.c_str(), baseType.c_str());
+
+		if (!pdbi->query(sql))
+			return false;
+	}
+
+	std::string defaultValue;
+	bool hasDefault = false;
+	if (columnDefaultValue(columnType, defaultValue))
+	{
+		hasDefault = true;
+		if (!columnExists || !pColumnInfo->hasDefault || pColumnInfo->defaultValue != normalizedDefaultValue(defaultValue))
+		{
+			sql = fmt::format("ALTER TABLE {} ALTER COLUMN {} SET DEFAULT {}",
+				sqlTable.c_str(), sqlColumn.c_str(), defaultValue.c_str());
+			if (!pdbi->query(sql))
+				return false;
+		}
+	}
+	else
+	{
+		if (columnExists && pColumnInfo->hasDefault)
+		{
+			sql = fmt::format("ALTER TABLE {} ALTER COLUMN {} DROP DEFAULT",
+				sqlTable.c_str(), sqlColumn.c_str());
+			if (!pdbi->query(sql))
+				return false;
+		}
+	}
+
+	// 老表字段如果曾经允许 NULL，先按当前默认值补齐，再切成 NOT NULL，少一次人工清表。
+	bool wantsNotNull = columnWantsNotNull(columnType);
+	if (wantsNotNull && hasDefault && (!columnExists || !pColumnInfo->notNull))
+	{
+		sql = fmt::format("UPDATE {} SET {}={} WHERE {} IS NULL",
+			sqlTable.c_str(), sqlColumn.c_str(), defaultValue.c_str(), sqlColumn.c_str());
+		if (!pdbi->query(sql))
+			return false;
+	}
+
+	if (!columnExists || pColumnInfo->notNull != wantsNotNull)
+	{
+		sql = fmt::format("ALTER TABLE {} ALTER COLUMN {} {} NOT NULL",
+			sqlTable.c_str(), sqlColumn.c_str(), wantsNotNull ? "SET" : "DROP");
+		return pdbi->query(sql);
+	}
+
+	return true;
 }
 
-bool EntityTableItemPostgresql::syncToDB(DBInterface* pdbi, void* /*pData*/)
+bool EntityTableItemPostgresql::syncToDB(DBInterface* pdbi, void* pData)
 {
 	if (dataSType_ == "ARRAY" || dataSType_ == "ENTITY_COMPONENT")
 		return true;
+
+	PostgreSQLColumnInfos* pColumnInfos = static_cast<PostgreSQLColumnInfos*>(pData);
 
 	if (dataSType_ == "FIXED_DICT")
 	{
 		FIXEDDICT_KEYTYPES::iterator iter = keyTypes_.begin();
 		for (; iter != keyTypes_.end(); ++iter)
 		{
-			if (!iter->second->syncToDB(pdbi))
+			if (!iter->second->syncToDB(pdbi, pData))
 				return false;
 		}
 
@@ -382,7 +575,15 @@ bool EntityTableItemPostgresql::syncToDB(DBInterface* pdbi, void* /*pData*/)
 
 	for (size_t i = 0; i < db_item_names_.size(); ++i)
 	{
-		if (!syncOneColumn(pdbi, db_item_names_[i], type))
+		PostgreSQLColumnInfo* pColumnInfo = NULL;
+		if (pColumnInfos != NULL)
+		{
+			PostgreSQLColumnInfos::iterator iter = pColumnInfos->find(db_item_names_[i]);
+			if (iter != pColumnInfos->end())
+				pColumnInfo = &iter->second;
+		}
+
+		if (!syncOneColumn(pdbi, db_item_names_[i], type, pColumnInfo))
 			return false;
 	}
 
@@ -949,10 +1150,49 @@ bool EntityTablePostgresql::syncToDB(DBInterface* pdbi)
 	if (!pdbi->query(sql))
 		return false;
 
+	std::vector<std::string> dbTableItemNames;
+	std::string sqlTableName = std::string(ENTITY_TABLE_PERFIX "_") + tableName();
+	if (!pdbi->getTableItemNames(sqlTableName.c_str(), dbTableItemNames))
+		return false;
+
+	PostgreSQLColumnInfos columnInfos;
+	if (!loadPostgresqlColumnInfos(pdbi, sqlTableName, columnInfos))
+		return false;
+
 	std::vector<EntityTableItem*>::iterator iter = tableFixedOrderItems_.begin();
 	for (; iter != tableFixedOrderItems_.end(); ++iter)
 	{
-		if (!(*iter)->syncToDB(pdbi))
+		if (!(*iter)->syncToDB(pdbi, &columnInfos))
+			return false;
+	}
+
+	/*
+		对齐 MySQL 后端的字段清理逻辑：def 里删掉普通属性后，数据库里对应的列也要删掉。
+		id、sm_autoLoad、parentID 是框架列，不能按属性删除；FIXED_DICT 的子字段会通过
+		isSameKey() 逐列识别，组件/数组是独立子表，表级清理由 EntityTables::syncToDB() 统一处理。
+	*/
+	for (size_t i = 0; i < dbTableItemNames.size(); ++i)
+	{
+		std::string columnName = dbTableItemNames[i];
+		if (columnName == TABLE_ID_CONST_STR ||
+			columnName == TABLE_ITEM_PERFIX "_" TABLE_AUTOLOAD_CONST_STR ||
+			columnName == TABLE_PARENTID_CONST_STR)
+		{
+			continue;
+		}
+
+		bool found = false;
+		EntityTable::TABLEITEM_MAP::iterator titer = tableItems_.begin();
+		for (; titer != tableItems_.end(); ++titer)
+		{
+			if (titer->second->isSameKey(columnName))
+			{
+				found = true;
+				break;
+			}
+		}
+
+		if (!found && !pdbi->dropEntityTableItemFromDB(sqlTableName.c_str(), columnName.c_str()))
 			return false;
 	}
 
@@ -982,23 +1222,78 @@ bool EntityTablePostgresql::syncToDB(DBInterface* pdbi)
 bool EntityTablePostgresql::syncIndexToDB(DBInterface* pdbi)
 {
 	std::string idxName = std::string("idx_") + ENTITY_TABLE_PERFIX "_" + tableName() + "_" TABLE_ITEM_PERFIX "_" TABLE_AUTOLOAD_CONST_STR;
-	std::string sql = fmt::format("CREATE INDEX IF NOT EXISTS {} ON {} ({})",
-		columnSqlName(pdbi, idxName.c_str()).c_str(),
-		tableSqlName(pdbi, tableName()).c_str(),
-		columnSqlName(pdbi, TABLE_ITEM_PERFIX "_" TABLE_AUTOLOAD_CONST_STR).c_str());
+	std::string sql;
+	std::string rawTableName = std::string(ENTITY_TABLE_PERFIX "_") + tableName();
+	std::vector<std::string> indexNames;
 
-	if (!pdbi->query(sql))
+	if (!loadPostgresqlIndexNames(pdbi, rawTableName, indexNames))
 		return false;
+
+	if (!stringVectorContains(indexNames, idxName))
+	{
+		sql = fmt::format("CREATE INDEX IF NOT EXISTS {} ON {} ({})",
+			columnSqlName(pdbi, idxName.c_str()).c_str(),
+			tableSqlName(pdbi, tableName()).c_str(),
+			columnSqlName(pdbi, TABLE_ITEM_PERFIX "_" TABLE_AUTOLOAD_CONST_STR).c_str());
+
+		if (!pdbi->query(sql))
+			return false;
+	}
 
 	if (isChild())
 	{
 		idxName = std::string("idx_") + ENTITY_TABLE_PERFIX "_" + tableName() + "_" TABLE_PARENTID_CONST_STR;
-		sql = fmt::format("CREATE INDEX IF NOT EXISTS {} ON {} ({})",
+		if (!stringVectorContains(indexNames, idxName))
+		{
+			sql = fmt::format("CREATE INDEX IF NOT EXISTS {} ON {} ({})",
+				columnSqlName(pdbi, idxName.c_str()).c_str(),
+				tableSqlName(pdbi, tableName()).c_str(),
+				columnSqlName(pdbi, TABLE_PARENTID_CONST_STR).c_str());
+
+			if (!pdbi->query(sql))
+				return false;
+		}
+	}
+
+	/*
+		MySQL 版本会按 def 里的 indexType() 同步普通字段索引。PostgreSQL 之前只建了
+		autoLoad/parentID 两个内部索引，业务字段上的 UNIQUE/INDEX 会被悄悄忽略。
+		这里不主动删除旧索引，先做到“定义里要求的索引一定存在”；删索引涉及线上数据和查询计划，
+		应该由迁移脚本显式处理，更稳一点。
+	*/
+	EntityTable::TABLEITEM_MAP::iterator iter = tableItems_.begin();
+	for (; iter != tableItems_.end(); ++iter)
+	{
+		if (strlen(iter->second->indexType()) == 0)
+			continue;
+
+		std::vector<std::string> columns;
+		static_cast<EntityTableItemPostgresql*>(iter->second.get())->collectDBItemNames(columns);
+		if (columns.empty())
+			continue;
+
+		std::string sqlColumns;
+		for (size_t i = 0; i < columns.size(); ++i)
+		{
+			if (i > 0)
+				sqlColumns += ",";
+
+			sqlColumns += columnSqlName(pdbi, columns[i].c_str());
+		}
+
+		idxName = fmt::format("{}_{}_{}", kbe_stricmp(iter->second->indexType(), "UNIQUE") == 0 ? "uk" : "idx",
+			ENTITY_TABLE_PERFIX "_" + std::string(tableName()), iter->second->itemName());
+		if (stringVectorContains(indexNames, idxName))
+			continue;
+
+		sql = fmt::format("CREATE {} IF NOT EXISTS {} ON {} ({})",
+			indexSqlType(iter->second->indexType()).c_str(),
 			columnSqlName(pdbi, idxName.c_str()).c_str(),
 			tableSqlName(pdbi, tableName()).c_str(),
-			columnSqlName(pdbi, TABLE_PARENTID_CONST_STR).c_str());
+			sqlColumns.c_str());
 
-		return pdbi->query(sql);
+		if (!pdbi->query(sql))
+			return false;
 	}
 
 	return true;

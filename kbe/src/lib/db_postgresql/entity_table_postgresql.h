@@ -13,6 +13,24 @@ namespace postgresql {
 class SqlStatementQuery;
 }
 
+struct PostgreSQLColumnInfo
+{
+	PostgreSQLColumnInfo() :
+		type(),
+		defaultValue(),
+		notNull(false),
+		hasDefault(false)
+	{
+	}
+
+	std::string type;
+	std::string defaultValue;
+	bool notNull;
+	bool hasDefault;
+};
+
+typedef KBEUnordered_map<std::string, PostgreSQLColumnInfo> PostgreSQLColumnInfos;
+
 class EntityTableItemPostgresql : public EntityTableItem
 {
 	friend class EntityTablePostgresql;
@@ -39,7 +57,8 @@ public:
 	bool removeChildRows(DBInterface* pdbi, DBID parentID);
 
 private:
-	bool syncOneColumn(DBInterface* pdbi, const std::string& columnName, const std::string& columnType);
+	bool syncOneColumn(DBInterface* pdbi, const std::string& columnName, const std::string& columnType,
+		const PostgreSQLColumnInfo* pColumnInfo);
 	bool writeSimpleItem(DBInterface* pdbi, DBID dbid, MemoryStream* s);
 	bool writeFixedDictItem(DBInterface* pdbi, DBID dbid, MemoryStream* s, ScriptDefModule* pModule);
 	bool readFixedDictWriteValues(DBInterface* pdbi, DBID dbid, MemoryStream* s, ScriptDefModule* pModule,
