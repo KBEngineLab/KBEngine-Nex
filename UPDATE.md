@@ -2,6 +2,8 @@
 # 更新日志
 
 ## 2.8.2
+- [feat] PostgreSQL 支持  [Issue #21](https://github.com/KBEngineLab/KBEngine-Nex/pull/21)
+- [feat] SQL命令黑名单  [Issue #179](https://github.com/KBEngineLab/KBEngine-Nex/pull/179)
 - [feat] 新增添加额外配置参数 @Smile010110   [Pull request #176](https://github.com/KBEngineLab/KBEngine-Nex/pull/176)
 - [feat] GitHub Actions  [Issue #109](https://github.com/KBEngineLab/KBEngine-Nex/issues/109)
 - [feat] 重构 Python async 调度，移除 py 层独立线程和空 timer 保活逻辑，统一由 C++ 底层 dispatcher timer 驱动 asyncio，避免 GIL 争抢并降低 aiohttp 等协程任务延迟  [Issue #166](https://github.com/KBEngineLab/KBEngine-Nex/issues/166)
@@ -11,9 +13,49 @@
 - [feat] io_uring 与 kqueue completion adapter，底层完全completion化 [Issue #173](https://github.com/KBEngineLab/KBEngine-Nex/issues/173)
 - [feat] 【kbex】 app启动失败后，logger不会转发日志，这个时候应该自动读取原始日志并输出 [Issue #158](https://github.com/KBEngineLab/KBEngine-Nex/issues/158)
 - [feat] registerReadFileDescriptor等接口废弃，新增registerAcceptFileDescriptor等 completion API [Issue #172](https://github.com/KBEngineLab/KBEngine-Nex/issues/172)
-- [perf] Debug下编译Release Python，防止一些第三方包无法使用 [Issue #175](https://github.com/KBEngineLab/KBEngine-Nex/issues/175)
 - [fix] 修复 urlopen 传入 None 时可能崩溃的问题 [Issue #167](https://github.com/KBEngineLab/KBEngine-Nex/issues/167)
 - [fix] log4cxx 初始化前自动创建日志目录，避免Linux下首次启动时日志创建失败的问题
+- [perf] Debug下编译Release Python，防止一些第三方包无法使用 [Issue #175](https://github.com/KBEngineLab/KBEngine-Nex/issues/175)
+- [perf] db_mongodb 功能优化 [Issue #177](https://github.com/KBEngineLab/KBEngine-Nex/issues/177)
+  - **Entity 表**
+    - 补了 `EntityTableMongodb::removeEntity()`：按 `id` 删除实体文档。
+    - 补了 `entityShouldAutoLoad()`：更新 `sm_autoLoad`。
+    - 补了 `queryAutoLoadEntities()`：查询自动加载实体 DBID。
+    - 修了 `writeTable()`：
+        - 插入时 `sm_autoLoad` 默认写 `0`，再统一走 `entityShouldAutoLoad()`。
+        - `insert/update` 失败时返回 `0`，避免调用方误判成功。
+  - **KBE 表**
+    - `KBEEntityLogTableMongodb`
+        - 补 entity log 写入、查询、按 entityType 删除、按 baseapp 删除。
+        - 修了 `eraseEntityLog()` 成功返回值反了的问题。
+        - 同步时不再粗暴清空全部日志，改为参考 MySQL 的过期/无效 serverGroup 清理逻辑。
+
+    - `KBEServerLogTableMongodb`
+        - 补 serverlog collection 创建、唯一索引。
+        - 补 server 心跳 upsert。
+        - 补查询当前 server、所有 server、超时 server、清理 server。
+        - 补 `isShareDB()` 和所有 server 的共享 DB 状态检查。
+
+    - `KBEAccountTableMongodb`
+        - 补账号表索引：`accountName`、`email`、`entityDBID`。
+        - 查询账号支持 `accountName` 或 `email`。
+        - 补完整账号信息查询。
+        - 修 `setFlagsDeadline()` 没有 `$set` 的问题。
+        - 修 `updatePassword()` 错用 `entityDBID` 匹配账号名的问题。
+        - 补 `updateCount()`：更新 `lasttime` 并递增 `numlogin`。
+        - `bindata` 改为 BSON binary 存储和读取。
+
+    - `KBEEmailVerificationTableMongodb`
+        - 补验证码 collection 创建、`code` 唯一索引。
+        - 补过期验证码清理。
+        - 补 `queryAccount()`、`logAccount()`、`delAccount()`。
+        - 补邮箱激活账号、绑定邮箱、重置密码流程。
+
+  - **辅助修正**
+    - 增加了一些 BSON 读取 helper：读 `int32/int64/bool/utf8/binary`、`find_one()`、账号名/邮箱 `$or` 查询等，避免重复写不稳定的 iterator 逻辑。
+      - 修了几处 BSON iterator 复用可能导致字段漏读的问题。
+      - 保持 MongoDB 实现尽量贴近 MySQL 语义。
+
 
 ## 2.8.1
 - [fix] 修复使用navigateToDetour时，结束移动后navigateToDetour不被同步导致entity乱跳跃的的bug
