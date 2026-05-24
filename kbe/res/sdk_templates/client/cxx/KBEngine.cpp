@@ -46,12 +46,12 @@ KBEngineApp::KBEngineApp() :
 	clientVersion_(KBTEXT("")),
 	serverScriptVersion_(KBTEXT("")),
 	clientScriptVersion_(KBTEXT("")),
-	serverProtocolMD5_(KBTEXT("EB8AE9F114C8797B1E70E1A629686A27")),
-	serverEntitydefMD5_(KBTEXT("46596D3750651E9F679C7775CD577E35")),
+	serverProtocolMD5_(KBTEXT("@{KBE_SERVER_PROTO_MD5}")),
+	serverEntitydefMD5_(KBTEXT("@{KBE_SERVER_ENTITYDEF_MD5}")),
 	entity_uuid_(0),
 	entity_id_(0),
 	entity_type_(KBTEXT("")),
-	useAliasEntityID_(true),
+	useAliasEntityID_(@{KBE_USE_ALIAS_ENTITYID}),
 	controlledEntities_(),
 	entityServerPos_(),
 	spacedatas_(),
@@ -93,12 +93,12 @@ KBEngineApp::KBEngineApp(KBEngineArgs* pArgs):
 	clientVersion_(KBTEXT("")),
 	serverScriptVersion_(KBTEXT("")),
 	clientScriptVersion_(KBTEXT("")),
-	serverProtocolMD5_(KBTEXT("EB8AE9F114C8797B1E70E1A629686A27")),
-	serverEntitydefMD5_(KBTEXT("46596D3750651E9F679C7775CD577E35")),
+	serverProtocolMD5_(KBTEXT("@{KBE_SERVER_PROTO_MD5}")),
+	serverEntitydefMD5_(KBTEXT("@{KBE_SERVER_ENTITYDEF_MD5}")),
 	entity_uuid_(0),
 	entity_id_(0),
 	entity_type_(KBTEXT("")),
-	useAliasEntityID_(true),
+	useAliasEntityID_(@{KBE_USE_ALIAS_ENTITYID}),
 	controlledEntities_(),
 	entityServerPos_(),
 	spacedatas_(),
@@ -258,9 +258,9 @@ void KBEngineApp::reset()
 	serverdatas_.Clear();
 
 	serverVersion_ = KBTEXT("");
-	clientVersion_ = KBTEXT("2.8.1");
+	clientVersion_ = KBTEXT("@{KBE_VERSION}");
 	serverScriptVersion_ = KBTEXT("");
-	clientScriptVersion_ = KBTEXT("0.1.0");
+	clientScriptVersion_ = KBTEXT("@{KBE_SCRIPT_VERSION}");
 
 	entity_uuid_ = 0;
 	entity_id_ = 0;
