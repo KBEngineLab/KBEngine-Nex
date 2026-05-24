@@ -56,32 +56,8 @@ bool KBEMain::init()
 		return false;
 	}
 
-	// installEvents();
-
 	return true;
 }
-
-
-// void KBEMain::installEvents()
-// {
-// 	KBENGINE_REGISTER_EVENT(KBEngine::KBEventTypes::onScriptVersionNotMatch, onScriptVersionNotMatch);
-// 	KBENGINE_REGISTER_EVENT(KBEngine::KBEventTypes::onVersionNotMatch, onVersionNotMatch);
-// }
-
-// void KBEMain::deregisterEvents()
-// {
-// 	KBENGINE_DEREGISTER_EVENT(KBEngine::KBEventTypes::onScriptVersionNotMatch);
-// 	KBENGINE_DEREGISTER_EVENT(KBEngine::KBEventTypes::onVersionNotMatch);
-// }
-
-// void KBEMain::onVersionNotMatch(std::shared_ptr<UKBEventData> pEventData)
-// {
-// }
-
-// void KBEMain::onScriptVersionNotMatch(std::shared_ptr<UKBEventData> pEventData)
-// {
-// }
-
 
 
 KBString KBEMain::getClientVersion()
