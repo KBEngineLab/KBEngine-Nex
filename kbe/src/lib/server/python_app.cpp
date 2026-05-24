@@ -3,6 +3,7 @@
 
 #include "python_app.h"
 #include "asyncio_helper.h"
+#include "server/plugins/plugin_manager.h"
 #include "pyscript/py_memorystream.h"
 #include "server/py_file_descriptor.h"
 #include <algorithm>
@@ -237,8 +238,8 @@ private:
 };
 
 //-------------------------------------------------------------------------------------
-PythonApp::PythonApp(Network::EventDispatcher& dispatcher, 
-					 Network::NetworkInterface& ninterface, 
+PythonApp::PythonApp(Network::EventDispatcher& dispatcher,
+					 Network::NetworkInterface& ninterface,
 					 COMPONENT_TYPE componentType,
 					 COMPONENT_ID componentID):
 ServerApp(dispatcher, ninterface, componentType, componentID),
@@ -261,11 +262,11 @@ bool PythonApp::inInitialize()
 
 	if(!installPyModules())
 		return false;
-	
+
 	return true;
 }
 
-//-------------------------------------------------------------------------------------	
+//-------------------------------------------------------------------------------------
 bool PythonApp::initializeEnd()
 {
 	gameTickTimerHandle_ = this->dispatcher().addTimer(1000000 / g_kbeSrvConfig.gameUpdateHertz(), this,
@@ -274,17 +275,17 @@ bool PythonApp::initializeEnd()
 	// PythonApp类组件在主线程安装底层dispatcher timer，用来周期性推进协程。
 	if (!AsyncioHelper::installTimer(this->dispatcher()))
 		return false;
-	
+
 	return true;
 }
 
-//-------------------------------------------------------------------------------------	
+//-------------------------------------------------------------------------------------
 void PythonApp::onShutdownBegin()
 {
 	ServerApp::onShutdownBegin();
 }
 
-//-------------------------------------------------------------------------------------	
+//-------------------------------------------------------------------------------------
 void PythonApp::onShutdownEnd()
 {
 	ServerApp::onShutdownEnd();
@@ -323,21 +324,21 @@ void PythonApp::handleTimeout(TimerHandle handle, void * arg)
 
 //-------------------------------------------------------------------------------------
 int PythonApp::registerPyObjectToScript(const char* attrName, PyObject* pyObj)
-{ 
-	return script_.registerToModule(attrName, pyObj); 
+{
+	return script_.registerToModule(attrName, pyObj);
 }
 
 //-------------------------------------------------------------------------------------
 int PythonApp::unregisterPyObjectToScript(const char* attrName)
-{ 
-	return script_.unregisterToModule(attrName); 
+{
+	return script_.unregisterToModule(attrName);
 }
 
 //-------------------------------------------------------------------------------------
 bool PythonApp::installPyScript()
 {
-	if(Resmgr::getSingleton().respaths().size() <= 0 || 
-		Resmgr::getSingleton().getPyUserResPath().size() == 0 || 
+	if(Resmgr::getSingleton().respaths().size() <= 0 ||
+		Resmgr::getSingleton().getPyUserResPath().size() == 0 ||
 		Resmgr::getSingleton().getPySysResPath().size() == 0 ||
 		Resmgr::getSingleton().getPyUserScriptsPath().size() == 0)
 	{
@@ -398,7 +399,22 @@ bool PythonApp::installPyScript()
 		pyPaths += user_scripts_path + L"client/components;";
 		break;
 	};
-	
+
+	if (!PluginManager::instance().initialize())
+		return false;
+
+	std::vector<std::string> pluginPaths = PluginManager::instance().getComponentPythonPaths(componentType_);
+	for (std::vector<std::string>::iterator iter = pluginPaths.begin(); iter != pluginPaths.end(); ++iter)
+	{
+		tbuf = KBEngine::strutil::char2wchar(const_cast<char*>(iter->c_str()));
+		if (tbuf)
+		{
+			pyPaths += tbuf;
+			pyPaths += L";";
+			free(tbuf);
+		}
+	}
+
 	std::string kbe_res_path = Resmgr::getSingleton().getPySysResPath();
 	kbe_res_path += "scripts/common";
 
@@ -472,7 +488,7 @@ bool PythonApp::installPyModules()
 
 	// 注册设置脚本输出类型
 	APPEND_SCRIPT_MODULE_METHOD(module, scriptLogType, __py_setScriptLogType, METH_VARARGS, 0);
-	
+
 	// 获得资源全路径
 	APPEND_SCRIPT_MODULE_METHOD(module, getResFullPath, __py_getResFullPath, METH_VARARGS, 0);
 
@@ -520,7 +536,7 @@ bool PythonApp::installPyModules()
 	{
 		ERROR_MSG( "PythonApp::installPyModules: Unable to set KBEngine.NEXT_ONLY.\n");
 	}
-	
+
 	// 注册所有pythonApp都要用到的通用接口
 	APPEND_SCRIPT_MODULE_METHOD(module,		addTimer,						__py_addTimer,											METH_VARARGS,	0);
 	APPEND_SCRIPT_MODULE_METHOD(module,		delTimer,						__py_delTimer,											METH_VARARGS,	0);
@@ -548,12 +564,17 @@ bool PythonApp::installPyModules()
 		}
 	}
 
+	if (!PluginManager::instance().importComponentEntries(componentType_))
+		return false;
+
 	return true;
 }
 
 //-------------------------------------------------------------------------------------
 bool PythonApp::uninstallPyModules()
 {
+	PluginManager::instance().dispatch(componentType_, "onFini");
+
 	// script::PyGC::set_debug(script::PyGC::DEBUG_STATS|script::PyGC::DEBUG_LEAK);
 	// script::PyGC::collect();
 
@@ -705,13 +726,13 @@ PyObject* PythonApp::__py_kbeOpen(PyObject* self, PyObject* args)
 	PyObject *ioMod = PyImport_ImportModule("io");
 
 	// SCOPED_PROFILE(SCRIPTCALL_PROFILE);
-	PyObject *openedFile = PyObject_CallMethod(ioMod, const_cast<char*>("open"), 
-		const_cast<char*>("ss"), 
-		const_cast<char*>(sfullpath.c_str()), 
+	PyObject *openedFile = PyObject_CallMethod(ioMod, const_cast<char*>("open"),
+		const_cast<char*>("ss"),
+		const_cast<char*>(sfullpath.c_str()),
 		fargs);
 
 	Py_DECREF(ioMod);
-	
+
 	if(openedFile == NULL)
 	{
 		SCRIPT_ERROR_CHECK();
@@ -776,7 +797,7 @@ PyObject* PythonApp::__py_listPathRes(PyObject* self, PyObject* args)
 			PyErr_PrintEx(0);
 			S_Return;
 		}
-		
+
 		if(PyUnicode_Check(path_argsobj))
 		{
 			wchar_t* fargs = NULL;
@@ -799,7 +820,7 @@ PyObject* PythonApp::__py_listPathRes(PyObject* self, PyObject* args)
 						PyErr_PrintEx(0);
 						S_Return;
 					}
-					
+
 					wchar_t* wtemp = NULL;
 					wtemp = PyUnicode_AsWideCharString(pyobj, NULL);
 					wExtendName += wtemp;
@@ -875,12 +896,12 @@ PyObject* PythonApp::__py_listPathRes(PyObject* self, PyObject* args)
 }
 
 //-------------------------------------------------------------------------------------
-void PythonApp::startProfile_(Network::Channel* pChannel, std::string profileName, 
+void PythonApp::startProfile_(Network::Channel* pChannel, std::string profileName,
 	int8 profileType, uint32 timelen)
 {
 	if(pChannel->isExternal())
 		return;
-	
+
 	switch(profileType)
 	{
 	case 0:	// pyprofile
@@ -898,7 +919,7 @@ void PythonApp::onExecScriptCommand(Network::Channel* pChannel, KBEngine::Memory
 {
 	if(pChannel->isExternal())
 		return;
-	
+
 	std::string cmd;
 	s.readBlob(cmd);
 
@@ -909,7 +930,7 @@ void PythonApp::onExecScriptCommand(Network::Channel* pChannel, KBEngine::Memory
 		return;
 	}
 
-	DEBUG_MSG(fmt::format("PythonApp::onExecScriptCommand: size({}), command={}.\n", 
+	DEBUG_MSG(fmt::format("PythonApp::onExecScriptCommand: size({}), command={}.\n",
 		cmd.size(), cmd));
 
 	std::string retbuf = "";
@@ -947,7 +968,7 @@ void PythonApp::reloadScript(bool fullReload)
 	// 所有脚本都加载完毕
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(),
 										const_cast<char*>("onInit"),
-										const_cast<char*>("i"), 
+										const_cast<char*>("i"),
 										1);
 
 	if(pyResult != NULL) {
@@ -956,6 +977,9 @@ void PythonApp::reloadScript(bool fullReload)
 	}
 	else
 		SCRIPT_ERROR_CHECK();
+
+	PluginManager::instance().unloadComponentEntries(componentType_);
+	PluginManager::instance().dispatch(componentType_, "onInit", true);
 }
 
 //-------------------------------------------------------------------------------------
@@ -969,7 +993,7 @@ PyObject* PythonApp::__py_addTimer(PyObject* self, PyObject* args)
 
 	if (!PyCallable_Check(pyCallback))
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::addTimer: '%.200s' object is not callable", 
+		PyErr_Format(PyExc_TypeError, "KBEngine::addTimer: '%.200s' object is not callable",
 			(pyCallback ? pyCallback->ob_type->tp_name : "NULL"));
 
 		PyErr_PrintEx(0);

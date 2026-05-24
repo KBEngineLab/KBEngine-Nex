@@ -1,5 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
+﻿
 #include "KBEMain.h"
 #include "KBEngine.h"
 #include "KBEngineArgs.h"
@@ -11,7 +10,7 @@
 
 KBEMain::KBEMain()
 {
-	ip = TEXT("127.0.0.1");
+	ip = KBTEXT("127.0.0.1");
 	port = @{KBE_LOGIN_PORT};
 	syncPlayerMS = 1000 / @{KBE_UPDATEHZ};
 	useAliasEntityID = @{KBE_USE_ALIAS_ENTITYID};
@@ -88,7 +87,7 @@ bool KBEMain::init()
 KBString KBEMain::getClientVersion()
 {
 	if (!KBEngine::KBEngineApp::getSingleton().isInitialized())
-		return TEXT("");
+		return KBTEXT("");
 
 	return KBEngine::KBEngineApp::getSingleton().clientVersion();
 }
@@ -96,7 +95,7 @@ KBString KBEMain::getClientVersion()
 KBString KBEMain::getClientScriptVersion()
 {
 	if (!KBEngine::KBEngineApp::getSingleton().isInitialized())
-		return TEXT("");
+		return KBTEXT("");
 
 	return KBEngine::KBEngineApp::getSingleton().clientScriptVersion();
 }
@@ -104,7 +103,7 @@ KBString KBEMain::getClientScriptVersion()
 KBString KBEMain::getServerVersion()
 {
 	if (!KBEngine::KBEngineApp::getSingleton().isInitialized())
-		return TEXT("");
+		return KBTEXT("");
 
 	return KBEngine::KBEngineApp::getSingleton().serverVersion();
 }
@@ -112,7 +111,7 @@ KBString KBEMain::getServerVersion()
 KBString KBEMain::getServerScriptVersion()
 {
 	if (!KBEngine::KBEngineApp::getSingleton().isInitialized())
-		return TEXT("");
+		return KBTEXT("");
 
 	return KBEngine::KBEngineApp::getSingleton().serverScriptVersion();
 }
@@ -120,7 +119,7 @@ KBString KBEMain::getServerScriptVersion()
 KBString KBEMain::getComponentName()
 {
 	if (!KBEngine::KBEngineApp::getSingleton().isInitialized())
-		return TEXT("");
+		return KBTEXT("");
 
 	return KBEngine::KBEngineApp::getSingleton().component();
 }

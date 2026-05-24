@@ -24,6 +24,7 @@
 #include "server/serverconfig.h"
 #include "server/globaldata_client.h"
 #include "server/globaldata_server.h"
+#include "server/plugins/plugin_manager.h"
 #include "server/callbackmgr.h"	
 #include "entitydef/entitydef.h"
 #include "entitydef/entities.h"
@@ -323,6 +324,8 @@ bool EntityApp<E>::initializeWatcher()
 template<class E>
 void EntityApp<E>::finalise(void)
 {
+	PluginManager::instance().dispatch(componentType(), "onFini");
+
 	// 先关闭asyncio，取消未完成协程，避免实体和组件卸载时仍被Task持有。
 	AsyncioHelper::shutdown();
 
@@ -543,6 +546,9 @@ bool EntityApp<E>::installPyModules()
 			return false;
 		}
 	}
+
+	if (!PluginManager::instance().importComponentEntries(componentType()))
+		return false;
 
 	onInstallPyModules();
 	return true;
@@ -1494,6 +1500,9 @@ void EntityApp<E>::reloadScript(bool fullReload)
 	}
 	else
 		SCRIPT_ERROR_CHECK();
+
+	PluginManager::instance().unloadComponentEntries(componentType());
+	PluginManager::instance().dispatch(componentType(), "onInit", true);
 }
 
 }

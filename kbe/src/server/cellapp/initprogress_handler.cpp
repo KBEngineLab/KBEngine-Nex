@@ -1,6 +1,7 @@
 // Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
 #include "cellapp.h"
+#include "server/plugins/plugin_manager.h"
 #include "initprogress_handler.h"
 #include "network/bundle.h"
 #include "network/channel.h"
@@ -145,6 +146,9 @@ bool InitProgressHandler::process()
 		}
 		else
 			SCRIPT_ERROR_CHECK();
+
+		PluginManager::instance().dispatch(CELLAPP_TYPE, "onInit", false);
+		PluginManager::instance().dispatch(CELLAPP_TYPE, "onComponentReady", (g_componentGroupOrder == 1));
 
 		return true;
 	}

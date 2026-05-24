@@ -69,6 +69,15 @@
     <ClCompile Include="py_entitydef.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\server\plugins\plugin_descriptor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\server\plugins\plugin_manifest.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\server\plugins\plugin_manager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="common.h">
@@ -129,6 +138,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="py_entitydef.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\server\plugins\plugin_descriptor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\server\plugins\plugin_manifest.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\server\plugins\plugin_manager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

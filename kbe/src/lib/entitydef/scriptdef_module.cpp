@@ -9,6 +9,7 @@
 #include "common/smartpointer.h"
 #include "entitydef/entity_call.h"
 #include "resmgr/resmgr.h"
+#include "server/plugins/plugin_manager.h"
 #include "pyscript/script.h"
 #include "server/serverconfig.h"
 #include "client_lib/config.h"
@@ -345,6 +346,20 @@ void ScriptDefModule::autoMatchCompOwn()
 	int assertionHasBase = -1;
 	int assertionHasCell = -1;
 
+	bool pluginHasBase = false;
+	bool pluginHasCell = false;
+	bool pluginHasClient = false;
+	if (PluginManager::instance().getComponentAssertion(name_, pluginHasBase, pluginHasCell, pluginHasClient))
+	{
+		assertionHasBase = pluginHasBase ? 1 : 0;
+		assertionHasCell = pluginHasCell ? 1 : 0;
+		assertionHasClient = pluginHasClient ? 1 : 0;
+
+		EntityDef::md5().append((void*)&assertionHasClient, sizeof(int));
+		EntityDef::md5().append((void*)&assertionHasCell, sizeof(int));
+		EntityDef::md5().append((void*)&assertionHasBase, sizeof(int));
+	}
+
 	std::string entitiesFile = Resmgr::getSingleton().getPyUserScriptsPath() + "entities.xml";
 
 	// 打开这个entities.xml文件
@@ -416,10 +431,16 @@ void ScriptDefModule::autoMatchCompOwn()
 		EntityDef::md5().append((void*)&assertionHasClient, sizeof(int));
 	}
 
+	bool pluginEntity = PluginManager::instance().findEntity(name_) != NULL;
+	bool pluginHasClientScript = pluginEntity && PluginManager::instance().hasComponentScript(name_, CLIENT_TYPE);
+	bool pluginHasBaseScript = pluginEntity && PluginManager::instance().hasComponentScript(name_, BASEAPP_TYPE);
+	bool pluginHasCellScript = pluginEntity && PluginManager::instance().hasComponentScript(name_, CELLAPP_TYPE);
+
 	std::string fmodule = (Resmgr::getSingleton().isKBEngineNexAssets() ? "" : "scripts/") + ("client/" + name_ + ".py");
 	// std::string fmodule = "scripts/client/" + name_ + ".py";
 	std::string fmodule_pyc = fmodule + "c";
-	if(Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
+	if(pluginHasClientScript ||
+		Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
 		Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)
 	{
 		if (assertionHasClient < 0)
@@ -463,7 +484,8 @@ void ScriptDefModule::autoMatchCompOwn()
 	fmodule = (Resmgr::getSingleton().isKBEngineNexAssets() ? "" : "scripts/") + ("base/" + name_ + ".py");
 	// fmodule = "scripts/base/" + name_ + ".py";
 	fmodule_pyc = fmodule + "c";
-	if(Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
+	if(pluginHasBaseScript ||
+		Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
 		Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)
 	{
 		if (assertionHasBase < 0)
@@ -500,7 +522,8 @@ void ScriptDefModule::autoMatchCompOwn()
 	fmodule = (Resmgr::getSingleton().isKBEngineNexAssets() ? "" : "scripts/") + ("cell/" + name_ + ".py");
 	// fmodule = "scripts/cell/" + name_ + ".py";
 	fmodule_pyc = fmodule + "c";
-	if(Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
+	if(pluginHasCellScript ||
+		Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
 		Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)
 	{
 		if (assertionHasCell < 0)

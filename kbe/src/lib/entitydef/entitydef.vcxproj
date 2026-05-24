@@ -209,6 +209,9 @@
     <ClCompile Include="remote_entity_method.cpp" />
     <ClCompile Include="scriptdef_module.cpp" />
     <ClCompile Include="volatileinfo.cpp" />
+    <ClCompile Include="..\server\plugins\plugin_descriptor.cpp" />
+    <ClCompile Include="..\server\plugins\plugin_manifest.cpp" />
+    <ClCompile Include="..\server\plugins\plugin_manager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="common.h" />
@@ -231,6 +234,9 @@
     <ClInclude Include="remote_entity_method.h" />
     <ClInclude Include="scriptdef_module.h" />
     <ClInclude Include="volatileinfo.h" />
+    <ClInclude Include="..\server\plugins\plugin_descriptor.h" />
+    <ClInclude Include="..\server\plugins\plugin_manifest.h" />
+    <ClInclude Include="..\server\plugins\plugin_manager.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="datatype.inl" />

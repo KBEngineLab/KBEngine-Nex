@@ -23,6 +23,7 @@
 #include "network/fixed_messages.h"
 #include "network/encryption_filter.h"
 #include "server/components.h"
+#include "server/plugins/plugin_manager.h"
 #include "server/telnet_server.h"
 #include "server/py_file_descriptor.h"
 #include "server/sendmail_threadtasks.h"
@@ -3621,6 +3622,8 @@ void Baseapp::onDbmgrInitCompleted(Network::Channel* pChannel,
 	}
 	else
 		SCRIPT_ERROR_CHECK();
+
+	PluginManager::instance().dispatch(componentType(), "onInit", false);
 
 	if (!pInitProgressHandler_)
 		pInitProgressHandler_ = new InitProgressHandler(this->networkInterface());
