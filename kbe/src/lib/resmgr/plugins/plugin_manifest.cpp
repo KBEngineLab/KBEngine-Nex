@@ -38,28 +38,6 @@ static std::string joinPath(const std::string& a, const std::string& b)
 	return a + "/" + b;
 }
 
-static COMPONENT_TYPE componentTypeFromName(const std::string& name)
-{
-	if (name == "base")
-		return BASEAPP_TYPE;
-	if (name == "cell")
-		return CELLAPP_TYPE;
-	if (name == "db")
-		return DBMGR_TYPE;
-	if (name == "interface")
-		return INTERFACES_TYPE;
-	if (name == "login")
-		return LOGINAPP_TYPE;
-	if (name == "logger")
-		return LOGGER_TYPE;
-	if (name == "bots")
-		return BOTS_TYPE;
-	if (name == "client")
-		return CLIENT_TYPE;
-
-	return UNKNOWN_COMPONENT_TYPE;
-}
-
 static bool getString(const nlohmann::json& object, const std::string& key, std::string& out, bool required)
 {
 	nlohmann::json::const_iterator value = object.find(key);
@@ -181,7 +159,7 @@ bool PluginManifest::load(const std::string& file, const std::string& pluginRoot
 
 		for (nlohmann::json::const_iterator iter = components->begin(); iter != components->end(); ++iter)
 		{
-			COMPONENT_TYPE componentType = componentTypeFromName(iter.key());
+			COMPONENT_TYPE componentType = getComponentTypeFromFolder(iter.key());
 			if (componentType == UNKNOWN_COMPONENT_TYPE || !iter.value().is_object())
 			{
 				ERROR_MSG(fmt::format("PluginManifest::load: invalid component [{}] in [{}]\n", iter.key(), file));

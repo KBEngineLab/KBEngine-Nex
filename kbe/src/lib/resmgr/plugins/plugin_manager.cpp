@@ -44,26 +44,6 @@ static void appendUnique(std::vector<std::string>& values, const std::string& va
 		values.push_back(value);
 }
 
-static std::string componentFolder(COMPONENT_TYPE componentType)
-{
-	if (componentType == BASEAPP_TYPE)
-		return "base";
-	if (componentType == CELLAPP_TYPE)
-		return "cell";
-	if (componentType == DBMGR_TYPE)
-		return "db";
-	if (componentType == INTERFACES_TYPE)
-		return "interface";
-	if (componentType == LOGINAPP_TYPE)
-		return "login";
-	if (componentType == LOGGER_TYPE)
-		return "logger";
-	if (componentType == BOTS_TYPE)
-		return "bots";
-	if (componentType == CLIENT_TYPE)
-		return "client";
-	return "";
-}
 
 }
 
@@ -145,17 +125,17 @@ bool PluginManager::discover()
 
 		if (!descriptor.enabled)
 		{
-			INFO_MSG(fmt::format("PluginManager::discover: plugin [{}] is declared in plugins.xml but disabled by plugin.json.\n",
-				descriptor.name));
+			INFO_MSG(fmt::format("PluginManager::discover: plugin [{}] version [{}] is declared in plugins.xml but disabled by plugin.json, skipping.\n",
+				descriptor.name, descriptor.version.empty() ? "unknown" : descriptor.version));
 			continue;
 		}
 
 		if (!addPlugin(descriptor, manifestFile))
 			return false;
 
-		INFO_MSG(fmt::format("PluginManager::discover: loaded plugin [{}] prefix [{}] version [{}], entities={}, manifest=[{}].\n",
+		INFO_MSG(fmt::format("PluginManager::discover: loaded plugin [{}] prefix [{}] version [{}], entities={}, components={}, manifest=[{}].\n",
 			descriptor.name, descriptor.prefix, descriptor.version.empty() ? "unknown" : descriptor.version,
-			descriptor.entities.size(), manifestFile));
+			descriptor.entities.size(), descriptor.components.size(), manifestFile));
 	}
 
 	if (!plugins_.empty())
@@ -328,6 +308,11 @@ bool PluginManager::addPlugin(const PluginDescriptor& descriptor, const std::str
 
 	plugins_.push_back(normalizedDescriptor);
 	prefixSet_.insert(descriptor.prefix);
+
+	INFO_MSG(fmt::format("PluginManager::addPlugin: registered plugin [{}] prefix [{}], {} entity(s), {} component(s), manifest [{}]\n",
+		descriptor.name, descriptor.prefix, normalizedDescriptor.entities.size(),
+		descriptor.components.size(), manifestFile));
+
 	return true;
 }
 
@@ -363,8 +348,8 @@ bool PluginManager::validatePrefixedName(const std::string& name, const std::str
 	if (boundary == '_' || (boundary >= 'A' && boundary <= 'Z'))
 		return true;
 
-	ERROR_MSG(fmt::format("PluginManager::validatePrefixedName: {} name [{}] uses prefix [{}] but has invalid boundary [{}], valid examples: [{}Item], [{}_Item], manifest [{}]\n",
-		label, name, prefix, boundary, prefix, prefix, manifestFile));
+	ERROR_MSG(fmt::format("PluginManager::validatePrefixedName: {} name [{}] uses prefix [{}] but has invalid boundary char (0x{:02x}), valid examples: [{}Item], [{}_Item], manifest [{}]\n",
+		label, name, prefix, static_cast<unsigned char>(boundary), prefix, prefix, manifestFile));
 	return false;
 }
 
@@ -410,7 +395,7 @@ std::vector<std::string> PluginManager::getComponentPythonPaths(COMPONENT_TYPE c
 				(componentType == CLIENT_TYPE && entityIter->hasClient);
 
 			if (needsComponentPath)
-				appendUnique(paths, normalizePath(iter->rootPath + "/" + componentFolder(componentType)));
+				appendUnique(paths, normalizePath(iter->rootPath + "/" + getComponentFolder(componentType)));
 		}
 
 		if (componentType == BOTS_TYPE)
@@ -435,9 +420,12 @@ std::vector<std::string> PluginManager::getTypeFiles() const
 {
 	std::vector<std::string> files;
 
-	std::vector<PluginTypeFileDescriptor> descriptors = getTypeFileDescriptors();
-	for (std::vector<PluginTypeFileDescriptor>::const_iterator iter = descriptors.begin(); iter != descriptors.end(); ++iter)
-		files.push_back(iter->file);
+	for (std::vector<PluginDescriptor>::const_iterator iter = plugins_.begin(); iter != plugins_.end(); ++iter)
+	{
+		std::string file = normalizePath(iter->rootPath + "/entity_defs/types.xml");
+		if (fileExists(file))
+			files.push_back(file);
+	}
 
 	return files;
 }
