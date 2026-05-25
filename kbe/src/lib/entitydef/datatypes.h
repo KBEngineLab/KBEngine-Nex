@@ -9,9 +9,9 @@
 #pragma warning (disable : 4910)
 #pragma warning (disable : 4251)
 #endif
-// common include	
+// common include
 #include "datatype.h"
-#include "xml/xml.h"	
+#include "xml/xml.h"
 #include "common/smartpointer.h"
 
 namespace KBEngine{
@@ -19,18 +19,20 @@ typedef SmartPointer<DataType> DataTypePtr;
 
 class DataTypes
 {
-public:	
+public:
 	typedef std::map<std::string, DataTypePtr> DATATYPE_MAP;
 	typedef std::map<DATATYPE_UID, DataType*> UID_DATATYPE_MAP;
 	typedef std::vector< std::string > DATATYPE_ORDERS;
 
 	DataTypes();
-	virtual ~DataTypes();	
+	virtual ~DataTypes();
 
-	static bool initialize(std::string file);
+	static bool initialize(const std::string& file);
+	static bool initialize(const std::string& file, const std::string& requiredPrefix, const std::string& sourceName);
 	static void finalise(void);
 
 	static bool addDataType(std::string name, DataType* dataType);
+	static bool addDataType(std::string name, DataType* dataType, const std::string& sourceName);
 	static bool addDataType(DATATYPE_UID uid, DataType* dataType);
 	static void delDataType(std::string name);
 
@@ -39,9 +41,12 @@ public:
 	static DataType* getDataType(DATATYPE_UID uid);
 
 	static bool validTypeName(const std::string& typeName);
+	static bool validTypeNameWithPrefix(const std::string& typeName, const std::string& prefix);
 
-	static bool loadTypes(std::string& file);
+	static bool loadTypes(const std::string& file);
+	static bool loadTypes(const std::string& file, const std::string& requiredPrefix, const std::string& sourceName);
 	static bool loadTypes(SmartPointer<XML>& xml);
+	static bool loadTypes(SmartPointer<XML>& xml, const std::string& requiredPrefix, const std::string& sourceName);
 
 	static const DATATYPE_MAP& dataTypes() { return dataTypes_; }
 	static const UID_DATATYPE_MAP& uid_dataTypes() { return uid_dataTypes_; }
@@ -52,6 +57,7 @@ public:
 protected:
 	static DATATYPE_MAP dataTypes_;
 	static DATATYPE_MAP dataTypesLowerName_;
+	static std::map<std::string, std::string> dataTypeSourceLowerName_;
 	static UID_DATATYPE_MAP uid_dataTypes_;
 
 	// 类型定义的先后顺序，用于代码生成， c++等语言需要先后顺序依赖

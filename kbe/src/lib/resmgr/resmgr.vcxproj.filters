@@ -24,12 +24,27 @@
     <ClCompile Include="resourceobject.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="plugins\plugin_manifest.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="plugins\plugin_manager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resmgr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="resourceobject.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="plugins\plugin_descriptor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="plugins\plugin_manifest.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="plugins\plugin_manager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

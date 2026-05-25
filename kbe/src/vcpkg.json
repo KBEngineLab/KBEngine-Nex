@@ -14,6 +14,7 @@
     "mongo-c-driver",
     "libpq",
     "recastnavigation",
+    "nlohmann-json",
     {
       "name": "jemalloc",
       "platform": "!windows"
@@ -21,48 +22,48 @@
   ],
   "builtin-baseline": "2825cdd8fe079a9538032fd78c3102d033195a2c",
   "overrides": [
-    { 
-        "name": "fmt", 
+    {
+        "name": "fmt",
         "version": "12.1.0"
     },
-    { 
-        "name": "log4cxx", 
+    {
+        "name": "log4cxx",
         "version": "1.6.1"
     },
-    { 
-        "name": "zlib", 
+    {
+        "name": "zlib",
         "version": "1.3.1"
     },
-    { 
-        "name": "hiredis", 
+    {
+        "name": "hiredis",
         "version": "1.3.0"
     },
-    { 
-        "name": "expat", 
+    {
+        "name": "expat",
         "version": "2.7.4"
     },
-    { 
-        "name": "apr", 
+    {
+        "name": "apr",
         "version": "1.7.6"
     },
-    { 
-        "name": "apr-util", 
+    {
+        "name": "apr-util",
         "version": "1.6.3"
     },
-    { 
-        "name": "curl", 
+    {
+        "name": "curl",
         "version": "8.18.0"
     },
-    { 
-        "name": "mongo-c-driver", 
+    {
+        "name": "mongo-c-driver",
         "version": "2.2.2"
     },
-    { 
-        "name": "recastnavigation", 
+    {
+        "name": "recastnavigation",
         "version": "1.6.0"
     },
-    { 
-        "name": "jemalloc", 
+    {
+        "name": "jemalloc",
         "version": "5.3.0"
     }
   ]

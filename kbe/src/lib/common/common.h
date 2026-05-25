@@ -151,7 +151,7 @@ const char COMPONENT_NAME_2[][255] = {
 };
 
 inline const char* COMPONENT_NAME_EX(COMPONENT_TYPE CTYPE)
-{									
+{
 	if(CTYPE < 0 || CTYPE >= COMPONENT_END_TYPE)
 	{
 		return COMPONENT_NAME[UNKNOWN_COMPONENT_TYPE];
@@ -161,7 +161,7 @@ inline const char* COMPONENT_NAME_EX(COMPONENT_TYPE CTYPE)
 }
 
 inline const char* COMPONENT_NAME_EX_1(COMPONENT_TYPE CTYPE)
-{									
+{
 	if(CTYPE < 0 || CTYPE >= COMPONENT_END_TYPE)
 	{
 		return COMPONENT_NAME_1[UNKNOWN_COMPONENT_TYPE];
@@ -171,7 +171,7 @@ inline const char* COMPONENT_NAME_EX_1(COMPONENT_TYPE CTYPE)
 }
 
 inline const char* COMPONENT_NAME_EX_2(COMPONENT_TYPE CTYPE)
-{									
+{
 	if(CTYPE < 0 || CTYPE >= COMPONENT_END_TYPE)
 	{
 		return COMPONENT_NAME_2[UNKNOWN_COMPONENT_TYPE];
@@ -192,17 +192,17 @@ inline COMPONENT_TYPE ComponentName2ComponentType(const char* name)
 }
 
 // 所有的组件列表
-const COMPONENT_TYPE ALL_COMPONENT_TYPES[] = {BASEAPPMGR_TYPE, CELLAPPMGR_TYPE, DBMGR_TYPE, CELLAPP_TYPE, 
+const COMPONENT_TYPE ALL_COMPONENT_TYPES[] = {BASEAPPMGR_TYPE, CELLAPPMGR_TYPE, DBMGR_TYPE, CELLAPP_TYPE,
 						BASEAPP_TYPE, LOGINAPP_TYPE, MACHINE_TYPE, CONSOLE_TYPE, TOOL_TYPE, LOGGER_TYPE,
 						WATCHER_TYPE, INTERFACES_TYPE, BOTS_TYPE, UNKNOWN_COMPONENT_TYPE};
 
 // 所有的后端组件列表
-const COMPONENT_TYPE ALL_SERVER_COMPONENT_TYPES[] = {BASEAPPMGR_TYPE, CELLAPPMGR_TYPE, DBMGR_TYPE, CELLAPP_TYPE, 
-						BASEAPP_TYPE, LOGINAPP_TYPE, MACHINE_TYPE, LOGGER_TYPE, 
+const COMPONENT_TYPE ALL_SERVER_COMPONENT_TYPES[] = {BASEAPPMGR_TYPE, CELLAPPMGR_TYPE, DBMGR_TYPE, CELLAPP_TYPE,
+						BASEAPP_TYPE, LOGINAPP_TYPE, MACHINE_TYPE, LOGGER_TYPE,
 						WATCHER_TYPE, INTERFACES_TYPE, BOTS_TYPE, UNKNOWN_COMPONENT_TYPE};
 
 // 所有的后端组件列表
-const COMPONENT_TYPE ALL_GAME_SERVER_COMPONENT_TYPES[] = {BASEAPPMGR_TYPE, CELLAPPMGR_TYPE, DBMGR_TYPE, CELLAPP_TYPE, 
+const COMPONENT_TYPE ALL_GAME_SERVER_COMPONENT_TYPES[] = {BASEAPPMGR_TYPE, CELLAPPMGR_TYPE, DBMGR_TYPE, CELLAPP_TYPE,
 						BASEAPP_TYPE, LOGINAPP_TYPE, INTERFACES_TYPE, UNKNOWN_COMPONENT_TYPE};
 
 // 所有的辅助性组件
@@ -244,11 +244,11 @@ enum COMPONENT_CLIENT_TYPE
 	// 独立的Linux应用程序
 	// Linux Application program
 	CLIENT_TYPE_LINUX				= 3,
-		
+
 	// Mac应用程序
 	// Mac Application program
 	CLIENT_TYPE_MAC					= 4,
-				
+
 	// Web, HTML5, Flash
 	CLIENT_TYPE_BROWSER				= 5,
 
@@ -275,7 +275,7 @@ const char COMPONENT_CLIENT_NAME[][255] = {
 };
 
 // 所有前端应用的类别
-const COMPONENT_CLIENT_TYPE ALL_CLIENT_TYPES[] = {CLIENT_TYPE_MOBILE, CLIENT_TYPE_WIN, CLIENT_TYPE_LINUX, CLIENT_TYPE_MAC, 
+const COMPONENT_CLIENT_TYPE ALL_CLIENT_TYPES[] = {CLIENT_TYPE_MOBILE, CLIENT_TYPE_WIN, CLIENT_TYPE_LINUX, CLIENT_TYPE_MAC,
 												CLIENT_TYPE_BROWSER, CLIENT_TYPE_BOTS, CLIENT_TYPE_MINI, UNKNOWN_CLIENT_COMPONENT_TYPE};
 
 typedef int8 CLIENT_CTYPE;
@@ -392,7 +392,7 @@ inline bool validName(const std::string& name)
 	return validName(name.c_str(), (int)name.size());
 }
 
-/** 检查email地址合法性 
+/** 检查email地址合法性
 严格匹配请用如下表达式
 [a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?
 */
@@ -400,11 +400,11 @@ inline bool validName(const std::string& name)
 #include <regex>
 #endif
 
-inline bool email_isvalid(const char *address) 
+inline bool email_isvalid(const char *address)
 {
 #ifdef USE_REGEX
-	std::tr1::regex _mail_pattern("^[_a-z0-9-]+(\\.[_a-z0-9-]+)*@[a-z0-9-]+(\\.[a-z0-9-]+)*(\\.[a-z]{2,4})$");
-	return std::tr1::regex_match(address, _mail_pattern);
+	std::regex _mail_pattern("^[_a-z0-9-]+(\\.[_a-z0-9-]+)*@[a-z0-9-]+(\\.[a-z0-9-]+)*(\\.[a-z]{2,4})$");
+	return std::regex_match(address, _mail_pattern);
 #endif
 	int len = (int)strlen(address);
 	if(len <= 3)
@@ -420,7 +420,7 @@ inline bool email_isvalid(const char *address)
 
 	/* first we validate the name portion (name@domain) */
 	for (c = address;  *c;  c++) {
-	if (*c == '\"' && (c == address || *(c - 1) == '.' || *(c - 1) == 
+	if (*c == '\"' && (c == address || *(c - 1) == '.' || *(c - 1) ==
 		'\"')) {
 	  while (*++c) {
 		if (*c == '\"') break;
@@ -453,7 +453,7 @@ inline bool email_isvalid(const char *address)
 }
 
 //组件ID的扩展倍数
-#define COMPONENT_ID_MULTIPLE	1000000000 
+#define COMPONENT_ID_MULTIPLE	1000000000
 
 }
 #endif // KBE_COMMON_H

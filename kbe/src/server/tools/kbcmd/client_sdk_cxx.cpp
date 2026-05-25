@@ -794,7 +794,7 @@ bool ClientSDKCXX::writeEntityCallBegin(ScriptDefModule* pScriptDefModule)
 		}
 	}
 
-	fileBody() += std::string("\n// defined in */scripts/entity_defs/") + pScriptDefModule->getName() + ".def\n\n";
+	fileBody() += std::string("\n// defined in ") + pScriptDefModule->getDefSourceFile() + "\n\n";
 	fileBody() += namespaceNameBegin;
 	return true;
 }
@@ -2171,7 +2171,7 @@ bool ClientSDKCXX::writeEntityModuleBegin(ScriptDefModule* pEntityScriptDefModul
 
 	
 
-	fileBody() += std::string("\n// defined in */scripts/entity_defs/") + pEntityScriptDefModule->getName() + ".def\n";
+	fileBody() += std::string("\n// defined in ") + pEntityScriptDefModule->getDefSourceFile() + "\n";
 
 	if (pEntityScriptDefModule->isComponentModule())
 	{

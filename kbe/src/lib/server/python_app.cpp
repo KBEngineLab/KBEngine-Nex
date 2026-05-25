@@ -3,7 +3,7 @@
 
 #include "python_app.h"
 #include "asyncio_helper.h"
-#include "server/plugins/plugin_manager.h"
+#include "resmgr/plugins/plugin_manager.h"
 #include "pyscript/py_memorystream.h"
 #include "server/py_file_descriptor.h"
 #include <algorithm>
@@ -18,6 +18,73 @@ KBEngine::ScriptTimers KBEngine::PythonApp::scriptTimers_;
 
 namespace
 {
+
+std::string normalizePluginPath(std::string path)
+{
+	std::replace(path.begin(), path.end(), '\\', '/');
+	return path;
+}
+
+bool pluginPathExists(const std::string& path)
+{
+	return access(path.c_str(), 0) == 0;
+}
+
+std::string componentPluginFolder(COMPONENT_TYPE componentType)
+{
+	if (componentType == BASEAPP_TYPE)
+		return "base";
+	if (componentType == CELLAPP_TYPE)
+		return "cell";
+	if (componentType == DBMGR_TYPE)
+		return "db";
+	if (componentType == INTERFACES_TYPE)
+		return "interface";
+	if (componentType == LOGINAPP_TYPE)
+		return "login";
+	if (componentType == LOGGER_TYPE)
+		return "logger";
+	if (componentType == BOTS_TYPE)
+		return "bots";
+	if (componentType == CLIENT_TYPE)
+		return "client";
+	return "";
+}
+
+std::string safePluginModuleName(std::string value)
+{
+	for (std::string::iterator iter = value.begin(); iter != value.end(); ++iter)
+	{
+		if (!isalnum((unsigned char)*iter))
+			*iter = '_';
+	}
+	return value;
+}
+
+std::string getPluginEntryPath(const PluginDescriptor& plugin, COMPONENT_TYPE componentType, const std::string& entry)
+{
+	if (entry.find('/') != std::string::npos || entry.find('\\') != std::string::npos)
+		return normalizePluginPath(plugin.rootPath + "/" + entry);
+
+	return normalizePluginPath(plugin.rootPath + "/" + componentPluginFolder(componentType) + "/" + entry + ".py");
+}
+
+void callPluginEntry(PyObject* pyEntry, const std::string& eventName, const char* format, bool arg)
+{
+	if (PyObject_HasAttrString(pyEntry, eventName.c_str()) <= 0)
+		return;
+
+	PyObject* pyResult = NULL;
+	if (format && strlen(format) > 0)
+		pyResult = PyObject_CallMethod(pyEntry, const_cast<char*>(eventName.c_str()), const_cast<char*>(format), arg ? 1 : 0);
+	else
+		pyResult = PyObject_CallMethod(pyEntry, const_cast<char*>(eventName.c_str()), const_cast<char*>(""));
+
+	if (pyResult)
+		Py_DECREF(pyResult);
+	else
+		SCRIPT_ERROR_CHECK();
+}
 
 // 将customCfg中的type统一转成小写，避免配置里写Int、FLOAT等大小写差异导致解析失败。
 std::string normalizeCustomCfgType(const std::string& type)
@@ -403,6 +470,7 @@ bool PythonApp::installPyScript()
 	if (!PluginManager::instance().initialize())
 		return false;
 
+	// 插件路径由资源侧统一去重和排序；PythonApp 只负责把路径交给脚本解释器。
 	std::vector<std::string> pluginPaths = PluginManager::instance().getComponentPythonPaths(componentType_);
 	for (std::vector<std::string>::iterator iter = pluginPaths.begin(); iter != pluginPaths.end(); ++iter)
 	{
@@ -564,16 +632,122 @@ bool PythonApp::installPyModules()
 		}
 	}
 
-	if (!PluginManager::instance().importComponentEntries(componentType_))
+	if (!installPluginModules())
 		return false;
 
 	return true;
 }
 
 //-------------------------------------------------------------------------------------
+bool PythonApp::installPluginModules()
+{
+	// PythonApp 覆盖 dbmgr/interfaces/login/logger 等非 EntityApp 组件。
+	// 插件 entry 由当前组件自己导入和派发，PluginManager 只提供 manifest 索引。
+	if (!pluginEntryScripts_.empty())
+		return true;
+
+	PyObject* importlibUtil = NULL;
+	const std::vector<PluginDescriptor>& plugins = PluginManager::instance().plugins();
+	for (std::vector<PluginDescriptor>::const_iterator iter = plugins.begin(); iter != plugins.end(); ++iter)
+	{
+		std::map<COMPONENT_TYPE, PluginComponentDescriptor>::const_iterator componentIter = iter->components.find(componentType_);
+		if (componentIter == iter->components.end() || componentIter->second.entry.empty())
+			continue;
+
+		std::string entryPath = getPluginEntryPath(*iter, componentType_, componentIter->second.entry);
+		if (!pluginPathExists(entryPath))
+			continue;
+
+		if (!importlibUtil)
+		{
+			importlibUtil = PyImport_ImportModule("importlib.util");
+			if (!importlibUtil)
+			{
+				SCRIPT_ERROR_CHECK();
+				return false;
+			}
+		}
+
+		std::string moduleName = "_kbe_plugin_" + safePluginModuleName(iter->name) + "_" +
+			safePluginModuleName(COMPONENT_NAME_EX(componentType_)) + "_" + safePluginModuleName(componentIter->second.entry);
+
+		PyObject* spec = PyObject_CallMethod(importlibUtil,
+			const_cast<char*>("spec_from_file_location"),
+			const_cast<char*>("ss"),
+			moduleName.c_str(),
+			entryPath.c_str());
+
+		if (!spec)
+		{
+			SCRIPT_ERROR_CHECK();
+			Py_XDECREF(importlibUtil);
+			return false;
+		}
+
+		PyObject* pyModule = PyObject_CallMethod(importlibUtil,
+			const_cast<char*>("module_from_spec"),
+			const_cast<char*>("O"),
+			spec);
+
+		if (!pyModule)
+		{
+			SCRIPT_ERROR_CHECK();
+			Py_DECREF(spec);
+			Py_XDECREF(importlibUtil);
+			return false;
+		}
+
+		PyObject* loader = PyObject_GetAttrString(spec, "loader");
+		PyObject* pyRet = loader ? PyObject_CallMethod(loader, const_cast<char*>("exec_module"), const_cast<char*>("O"), pyModule) : NULL;
+		Py_XDECREF(loader);
+		Py_DECREF(spec);
+
+		if (!pyRet)
+		{
+			ERROR_MSG(fmt::format("PythonApp::installPluginModules: could not import [{}] for plugin [{}]\n",
+				entryPath, iter->name));
+			SCRIPT_ERROR_CHECK();
+			Py_DECREF(pyModule);
+			Py_XDECREF(importlibUtil);
+			return false;
+		}
+
+		Py_DECREF(pyRet);
+		pluginEntryScripts_.push_back(pyModule);
+	}
+
+	Py_XDECREF(importlibUtil);
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
+void PythonApp::dispatchPluginEvent(const std::string& eventName)
+{
+	for (std::vector<PyObject*>::iterator iter = pluginEntryScripts_.begin(); iter != pluginEntryScripts_.end(); ++iter)
+		callPluginEntry(*iter, eventName, "", false);
+}
+
+//-------------------------------------------------------------------------------------
+void PythonApp::dispatchPluginEvent(const std::string& eventName, bool arg)
+{
+	for (std::vector<PyObject*>::iterator iter = pluginEntryScripts_.begin(); iter != pluginEntryScripts_.end(); ++iter)
+		callPluginEntry(*iter, eventName, "i", arg);
+}
+
+//-------------------------------------------------------------------------------------
+void PythonApp::uninstallPluginModules()
+{
+	for (std::vector<PyObject*>::iterator iter = pluginEntryScripts_.begin(); iter != pluginEntryScripts_.end(); ++iter)
+		Py_XDECREF(*iter);
+
+	pluginEntryScripts_.clear();
+}
+
+//-------------------------------------------------------------------------------------
 bool PythonApp::uninstallPyModules()
 {
-	PluginManager::instance().dispatch(componentType_, "onFini");
+	dispatchPluginEvent("onFini");
+	uninstallPluginModules();
 
 	// script::PyGC::set_debug(script::PyGC::DEBUG_STATS|script::PyGC::DEBUG_LEAK);
 	// script::PyGC::collect();
@@ -978,8 +1152,9 @@ void PythonApp::reloadScript(bool fullReload)
 	else
 		SCRIPT_ERROR_CHECK();
 
-	PluginManager::instance().unloadComponentEntries(componentType_);
-	PluginManager::instance().dispatch(componentType_, "onInit", true);
+	uninstallPluginModules();
+	if (installPluginModules())
+		dispatchPluginEvent("onInit", true);
 }
 
 //-------------------------------------------------------------------------------------

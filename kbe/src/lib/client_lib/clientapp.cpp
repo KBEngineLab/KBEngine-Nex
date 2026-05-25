@@ -34,8 +34,8 @@ GAME_TIME g_kbetime = 0;
 
 KBE_SINGLETON_INIT(ClientApp);
 //-------------------------------------------------------------------------------------
-ClientApp::ClientApp(Network::EventDispatcher& dispatcher, 
-					 Network::NetworkInterface& ninterface, 
+ClientApp::ClientApp(Network::EventDispatcher& dispatcher,
+					 Network::NetworkInterface& ninterface,
 					 COMPONENT_TYPE componentType,
 					 COMPONENT_ID componentID):
 ClientObjectBase(ninterface, getScriptType()),
@@ -58,8 +58,8 @@ state_(C_STATE_INIT)
 	networkInterface_.pChannelDeregisterHandler(this);
 
 	// 初始化entityCall模块获取channel函数地址
-	EntityCallAbstract::setFindChannelFunc(std::tr1::bind(&ClientApp::findChannelByEntityCall, this,
-		std::tr1::placeholders::_1));
+	EntityCallAbstract::setFindChannelFunc(std::bind(&ClientApp::findChannelByEntityCall, this,
+		std::placeholders::_1));
 
 	KBEngine::Network::MessageHandlers::pMainMessageHandlers = &ClientInterface::messageHandlers;
 
@@ -73,7 +73,7 @@ ClientApp::~ClientApp()
 	SAFE_RELEASE(pBlowfishFilter_);
 }
 
-//-------------------------------------------------------------------------------------		
+//-------------------------------------------------------------------------------------
 void ClientApp::reset(void)
 {
 	state_ = C_STATE_INIT;
@@ -98,17 +98,17 @@ void ClientApp::reset(void)
 
 //-------------------------------------------------------------------------------------
 int ClientApp::registerPyObjectToScript(const char* attrName, PyObject* pyObj)
-{ 
-	return getScript().registerToModule(attrName, pyObj); 
+{
+	return getScript().registerToModule(attrName, pyObj);
 }
 
 //-------------------------------------------------------------------------------------
 int ClientApp::unregisterPyObjectToScript(const char* attrName)
-{ 
-	return getScript().unregisterToModule(attrName); 
+{
+	return getScript().unregisterToModule(attrName);
 }
 
-//-------------------------------------------------------------------------------------	
+//-------------------------------------------------------------------------------------
 bool ClientApp::initializeBegin()
 {
 	gameTimer_ = this->dispatcher().addTimer(1000000 / g_kbeConfig.gameUpdateHertz(), this,
@@ -124,13 +124,13 @@ bool ClientApp::initializeBegin()
 	return true;
 }
 
-//-------------------------------------------------------------------------------------	
+//-------------------------------------------------------------------------------------
 bool ClientApp::initializeEnd()
 {
 	// 所有脚本都加载完毕
-	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
-										const_cast<char*>("onInit"), 
-										const_cast<char*>("i"), 
+	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(),
+										const_cast<char*>("onInit"),
+										const_cast<char*>("i"),
 										0);
 
 	if(pyResult != NULL)
@@ -153,18 +153,18 @@ bool ClientApp::initializeEnd()
 	return true;
 }
 
-//-------------------------------------------------------------------------------------		
+//-------------------------------------------------------------------------------------
 bool ClientApp::initialize()
 {
 	if(!threadPool_.isInitialize())
 		threadPool_.createThreadPool(1, 1, 4);
-	
+
 	if(!initializeBegin())
 		return false;
 
 	if(!installPyModules())
 		return false;
-	
+
 	if(!installEntityDef())
 		return false;
 
@@ -296,11 +296,11 @@ bool ClientApp::uninstallPyModules()
 	return true;
 }
 
-//-------------------------------------------------------------------------------------		
+//-------------------------------------------------------------------------------------
 void ClientApp::finalise(void)
 {
 	// 结束通知脚本
-	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
+	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(),
 										const_cast<char*>("onFinish"),
 										const_cast<char*>(""));
 
@@ -323,7 +323,7 @@ void ClientApp::finalise(void)
 	pServerChannel_->pPacketSender(NULL);
 	SAFE_RELEASE(pTCPPacketSender_);
 	SAFE_RELEASE(pTCPPacketReceiver_);
-	
+
 	gameTimer_.cancel();
 	threadPool_.finalise();
 	ClientObjectBase::finalise();
@@ -333,7 +333,7 @@ void ClientApp::finalise(void)
 	uninstallPyScript();
 }
 
-//-------------------------------------------------------------------------------------		
+//-------------------------------------------------------------------------------------
 double ClientApp::gameTimeInSeconds() const
 {
 	return double(g_kbetime) / 10;
@@ -365,7 +365,7 @@ void ClientApp::handleGameTick()
 {
 	++g_kbetime;
 	threadPool_.onMainThreadTick();
-	
+
 	networkInterface().processChannels(KBEngine::Network::MessageHandlers::pMainMessageHandlers);
 	tickSend();
 
@@ -438,14 +438,14 @@ void ClientApp::handleGameTick()
 	};
 }
 
-//-------------------------------------------------------------------------------------		
+//-------------------------------------------------------------------------------------
 bool ClientApp::run(void)
 {
 	dispatcher_.processUntilBreak();
 	return true;
 }
 
-//-------------------------------------------------------------------------------------		
+//-------------------------------------------------------------------------------------
 int ClientApp::processOnce(bool shouldIdle)
 {
 	return dispatcher_.processOnce(shouldIdle);
@@ -453,11 +453,11 @@ int ClientApp::processOnce(bool shouldIdle)
 
 //-------------------------------------------------------------------------------------
 void ClientApp::onTargetChanged()
-{ 
+{
 	// 所有脚本都加载完毕
-	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
-										const_cast<char*>("onTargetChanged"), 
-										const_cast<char*>("i"), 
+	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(),
+										const_cast<char*>("onTargetChanged"),
+										const_cast<char*>("i"),
 										targetID_);
 
 	if(pyResult != NULL)
@@ -470,13 +470,13 @@ void ClientApp::onTargetChanged()
 	}
 }
 
-//-------------------------------------------------------------------------------------		
+//-------------------------------------------------------------------------------------
 PyObject* ClientApp::__py_getAppPublish(PyObject* self, PyObject* args)
 {
 	return PyLong_FromLong(g_appPublish);
 }
 
-//-------------------------------------------------------------------------------------		
+//-------------------------------------------------------------------------------------
 PyObject* ClientApp::__py_getPlayer(PyObject* self, PyObject* args)
 {
 	client::Entity* pEntity = ClientApp::getSingleton().pPlayer();
@@ -489,7 +489,7 @@ PyObject* ClientApp::__py_getPlayer(PyObject* self, PyObject* args)
 	S_Return;
 }
 
-//-------------------------------------------------------------------------------------		
+//-------------------------------------------------------------------------------------
 PyObject* ClientApp::__py_fireEvent(PyObject* self, PyObject* args)
 {
 	if(PyTuple_Size(args) < 1)
@@ -530,7 +530,7 @@ PyObject* ClientApp::__py_fireEvent(PyObject* self, PyObject* args)
 	S_Return;
 }
 
-//-------------------------------------------------------------------------------------	
+//-------------------------------------------------------------------------------------
 PyObject* ClientApp::__py_setScriptLogType(PyObject* self, PyObject* args)
 {
 	Py_ssize_t argCount = PyTuple_Size(args);
@@ -553,19 +553,19 @@ PyObject* ClientApp::__py_setScriptLogType(PyObject* self, PyObject* args)
 	S_Return;
 }
 
-//-------------------------------------------------------------------------------------	
+//-------------------------------------------------------------------------------------
 void ClientApp::shutDown()
 {
 	INFO_MSG("ClientApp::shutDown: shutting down\n");
 	dispatcher_.breakProcessing();
 }
 
-//-------------------------------------------------------------------------------------	
+//-------------------------------------------------------------------------------------
 void ClientApp::onChannelDeregister(Network::Channel * pChannel)
 {
 }
 
-//-------------------------------------------------------------------------------------	
+//-------------------------------------------------------------------------------------
 void ClientApp::onChannelTimeOut(Network::Channel * pChannel)
 {
 	INFO_MSG(fmt::format("ClientApp::onChannelTimeOut: "
@@ -577,8 +577,8 @@ void ClientApp::onChannelTimeOut(Network::Channel * pChannel)
 	Network::Channel::reclaimPoolObject(pChannel);
 }
 
-//-------------------------------------------------------------------------------------	
-bool ClientApp::updateChannel(bool loginapp, std::string accountName, std::string passwd, 
+//-------------------------------------------------------------------------------------
+bool ClientApp::updateChannel(bool loginapp, std::string accountName, std::string passwd,
 								   std::string ip, KBEngine::uint32 port)
 {
 	if(pServerChannel_->pEndPoint())
@@ -611,7 +611,7 @@ bool ClientApp::updateChannel(bool loginapp, std::string accountName, std::strin
 	return ret;
 }
 
-//-------------------------------------------------------------------------------------	
+//-------------------------------------------------------------------------------------
 bool ClientApp::createAccount(std::string accountName, std::string passwd, std::string datas,
 								   std::string ip, KBEngine::uint32 port)
 {
@@ -631,7 +631,7 @@ bool ClientApp::createAccount(std::string accountName, std::string passwd, std::
 	return ret;
 }
 
-//-------------------------------------------------------------------------------------	
+//-------------------------------------------------------------------------------------
 bool ClientApp::login(std::string accountName, std::string passwd, std::string datas,
 								   std::string ip, KBEngine::uint32 port)
 {
@@ -670,9 +670,9 @@ bool ClientApp::login(std::string accountName, std::string passwd, std::string d
 	return ret;
 }
 
-//-------------------------------------------------------------------------------------	
-void ClientApp::onHelloCB_(Network::Channel* pChannel, const std::string& verInfo, 
-		const std::string& scriptVerInfo, const std::string& protocolMD5, const std::string& entityDefMD5, 
+//-------------------------------------------------------------------------------------
+void ClientApp::onHelloCB_(Network::Channel* pChannel, const std::string& verInfo,
+		const std::string& scriptVerInfo, const std::string& protocolMD5, const std::string& entityDefMD5,
 		COMPONENT_TYPE componentType)
 {
 	if(Network::g_channelExternalEncryptType == 1)
@@ -691,19 +691,19 @@ void ClientApp::onHelloCB_(Network::Channel* pChannel, const std::string& verInf
 	}
 }
 
-//-------------------------------------------------------------------------------------	
+//-------------------------------------------------------------------------------------
 void ClientApp::onVersionNotMatch(Network::Channel * pChannel, MemoryStream& s)
 {
 	ClientObjectBase::onVersionNotMatch(pChannel, s);
 }
 
-//-------------------------------------------------------------------------------------	
+//-------------------------------------------------------------------------------------
 void ClientApp::onScriptVersionNotMatch(Network::Channel * pChannel, MemoryStream& s)
 {
 	ClientObjectBase::onScriptVersionNotMatch(pChannel, s);
 }
 
-//-------------------------------------------------------------------------------------	
+//-------------------------------------------------------------------------------------
 void ClientApp::onLoginSuccessfully(Network::Channel * pChannel, MemoryStream& s)
 {
 	ClientObjectBase::onLoginSuccessfully(pChannel, s);
@@ -712,34 +712,34 @@ void ClientApp::onLoginSuccessfully(Network::Channel * pChannel, MemoryStream& s
 	state_ = C_STATE_LOGIN_BASEAPP_CHANNEL;
 }
 
-//-------------------------------------------------------------------------------------	
+//-------------------------------------------------------------------------------------
 void ClientApp::onLoginFailed(Network::Channel * pChannel, MemoryStream& s)
 {
 	ClientObjectBase::onLoginFailed(pChannel, s);
 	canReset_ = true;
 }
 
-//-------------------------------------------------------------------------------------	
+//-------------------------------------------------------------------------------------
 void ClientApp::onLoginBaseappFailed(Network::Channel * pChannel, SERVER_ERROR_CODE failedcode)
 {
 	ClientObjectBase::onLoginBaseappFailed(pChannel, failedcode);
 	canReset_ = true;
 }
 
-//-------------------------------------------------------------------------------------	
+//-------------------------------------------------------------------------------------
 void ClientApp::onReloginBaseappFailed(Network::Channel * pChannel, SERVER_ERROR_CODE failedcode)
 {
 	ClientObjectBase::onReloginBaseappFailed(pChannel, failedcode);
 	canReset_ = true;
 }
 
-//-------------------------------------------------------------------------------------	
+//-------------------------------------------------------------------------------------
 void ClientApp::onReloginBaseappSuccessfully(Network::Channel * pChannel, MemoryStream& s)
 {
 	ClientObjectBase::onReloginBaseappSuccessfully(pChannel, s);
 }
 
-//-------------------------------------------------------------------------------------	
+//-------------------------------------------------------------------------------------
 void ClientApp::onAddSpaceGeometryMapping(SPACE_ID spaceID, std::string& respath)
 {
 }
@@ -826,12 +826,12 @@ PyObject* ClientApp::__py_kbeOpen(PyObject* self, PyObject* args)
 		fargs);
 
 	Py_DECREF(ioMod);
-	
+
 	if(openedFile == NULL)
 	{
 		SCRIPT_ERROR_CHECK();
 	}
-	
+
 	return openedFile;
 }
 
@@ -988,5 +988,5 @@ PyObject* ClientApp::__py_listPathRes(PyObject* self, PyObject* args)
 	free(respath);
 	return pyresults;
 }
-//-------------------------------------------------------------------------------------		
+//-------------------------------------------------------------------------------------
 }

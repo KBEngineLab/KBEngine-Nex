@@ -3,7 +3,7 @@
 
 #ifndef KBE_ENTITY_COMPONENT_H
 #define KBE_ENTITY_COMPONENT_H
-	
+
 #include "common/common.h"
 #include "common/timer.h"
 #include "pyscript/scriptobject.h"
@@ -84,8 +84,8 @@ public:
 	EntityComponent(ENTITY_ID ownerID, ScriptDefModule* pComponentDescrs, COMPONENT_TYPE assignmentToComponentType/*属性所属实体的哪一部分，cell或者base?*/);
 	~EntityComponent();
 
-	/** 
-		获取entityID 
+	/**
+		获取entityID
 	*/
 	ENTITY_ID ownerID() const;
 
@@ -111,8 +111,8 @@ public:
 	DECLARE_PY_MOTHOD_ARG3(pyAddTimer, float, float, int32);
 	DECLARE_PY_MOTHOD_ARG1(pyDelTimer, PyObject_ptr);
 
-	/** 
-		获得描述 
+	/**
+		获得描述
 	*/
 	INLINE ScriptDefModule* pComponentDescrs(void) const;
 
@@ -121,11 +121,11 @@ public:
 	*/
 	static void onInstallScript(PyObject* mod);
 
-	/** 
-		支持pickler 方法 
+	/**
+		支持pickler 方法
 	*/
 	static PyObject* __py_reduce_ex__(PyObject* self, PyObject* protocol);
-	
+
 	/**
 		unpickle方法
 	*/
@@ -171,7 +171,7 @@ public:
 	PyObject* createFromPersistentStream(ScriptDefModule* pScriptModule, MemoryStream* mstream);
 
 	PropertyDescription* getProperty(ENTITY_PROPERTY_UID child_uid);
-	
+
 	void componentType(COMPONENT_TYPE ctype) {
 		componentType_ = ctype;
 	}
@@ -186,7 +186,7 @@ public:
 		return pComponentDescrs_;
 	}
 
-	typedef std::tr1::function<void (EntityComponent*, const PropertyDescription*, PyObject*)> OnDataChangedEvent;
+	typedef std::function<void (EntityComponent*, const PropertyDescription*, PyObject*)> OnDataChangedEvent;
 
 	static void onEntityDestroy(PyObject* pEntity, ScriptDefModule* pEntityScriptDescrs, bool callScript, bool beforeDestroy);
 	void onOwnerDestroyBegin(PyObject* pEntity, ScriptDefModule* pEntityScriptDescrs, bool callScript);

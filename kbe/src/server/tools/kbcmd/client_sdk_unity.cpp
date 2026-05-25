@@ -569,7 +569,7 @@ bool ClientSDKUnity::writeEntityCallBegin(ScriptDefModule* pScriptDefModule)
 	sourcefileBody_ += "\tusing System.Collections;\n";
 	sourcefileBody_ += "\tusing System.Collections.Generic;\n\n";
 
-	sourcefileBody_ += std::string("\t// defined in */scripts/entity_defs/") + pScriptDefModule->getName() + ".def\n";
+	sourcefileBody_ += std::string("\t// defined in ") + pScriptDefModule->getDefSourceFile() + "\n";
 	return true;
 }
 
@@ -1752,7 +1752,7 @@ bool ClientSDKUnity::writeEntityModuleBegin(ScriptDefModule* pEntityScriptDefMod
 	sourcefileBody_ += "\tusing System.Collections;\n";
 	sourcefileBody_ += "\tusing System.Collections.Generic;\n\n";
 
-	sourcefileBody_ += std::string("\t// defined in */scripts/entity_defs/") + pEntityScriptDefModule->getName() + ".def\n";
+	sourcefileBody_ += std::string("\t// defined in ") + pEntityScriptDefModule->getDefSourceFile() + "\n";
 
 	if (pEntityScriptDefModule->isComponentModule())
 	{

@@ -1,7 +1,5 @@
 // Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
-
-#include "jwsmtp.h"
 #include "loginapp.h"
 #include "profile.h"	
 #include "http_cb_handler.h"

@@ -58,6 +58,10 @@ public:
 	virtual void onInstallPyModules() {};
 	virtual bool uninstallPyModules();
 	bool uninstallPyScript();
+	bool installPluginModules();
+	void uninstallPluginModules();
+	void dispatchPluginEvent(const std::string& eventName);
+	void dispatchPluginEvent(const std::string& eventName, bool arg);
 
 	virtual void finalise();
 	virtual bool inInitialize();
@@ -144,6 +148,7 @@ protected:
 	KBEngine::script::Script								script_;
 
 	PyObjectPtr												entryScript_;
+	std::vector<PyObject*>									pluginEntryScripts_;
 
 };
 

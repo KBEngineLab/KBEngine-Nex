@@ -58,6 +58,10 @@ public:
 	virtual bool installPyModules();
 	virtual void onInstallPyModules() {};
 	virtual bool uninstallPyModules();
+	bool installPluginModules();
+	void uninstallPluginModules();
+	void dispatchPluginEvent(const std::string& eventName);
+	void dispatchPluginEvent(const std::string& eventName, bool arg);
 
 	void onAddComponent(const Components::ComponentInfos*);
 	void onRemoveComponent(const Components::ComponentInfos*);
@@ -387,6 +391,7 @@ protected:
 	TelnetServer*											pTelnetServer_;
 
 	BotsActiveReportHandler* pActiveTimerHandle_;
+	std::vector<PyObject*> pluginEntryScripts_;
 
 };
 

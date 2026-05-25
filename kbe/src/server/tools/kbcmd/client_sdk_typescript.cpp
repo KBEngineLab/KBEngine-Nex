@@ -1351,7 +1351,7 @@ bool ClientSDKTypeScript::writeEntityCallBegin(ScriptDefModule* pScriptDefModule
 	}
 
 
-	sourcefileBody_ += std::string("// defined in */scripts/entity_defs/") + pScriptDefModule->getName() + ".def\n";
+	sourcefileBody_ += std::string("// defined in ") + pScriptDefModule->getDefSourceFile() + "\n";
 	return true;
 }
 
@@ -2728,7 +2728,7 @@ import { Vector2, Vector3, Vector4 } from './KBEMath';
 	}
 
 
-	sourcefileBody_ += std::string("// defined in */scripts/entity_defs/") + pEntityScriptDefModule->getName() + ".def\n";
+	sourcefileBody_ += std::string("// defined in ") + pEntityScriptDefModule->getDefSourceFile() + "\n";
 
 	if (pEntityScriptDefModule->isComponentModule())
 	{

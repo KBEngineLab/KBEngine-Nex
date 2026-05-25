@@ -149,6 +149,18 @@ INLINE const char* ScriptDefModule::getName()
 }
 
 //-------------------------------------------------------------------------------------
+INLINE const std::string& ScriptDefModule::getDefSourceFile() const
+{
+	return defSourceFile_;
+}
+
+//-------------------------------------------------------------------------------------
+INLINE void ScriptDefModule::setDefSourceFile(const std::string& file)
+{
+	defSourceFile_ = file;
+}
+
+//-------------------------------------------------------------------------------------
 INLINE bool ScriptDefModule::isPersistent() const
 {
 	return persistent_;

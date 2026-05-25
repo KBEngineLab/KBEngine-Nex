@@ -17,9 +17,6 @@ set(SRCS
 	remote_entity_method.cpp
 	scriptdef_module.cpp
 	volatileinfo.cpp
-	../server/plugins/plugin_descriptor.cpp
-	../server/plugins/plugin_manifest.cpp
-	../server/plugins/plugin_manager.cpp
 )
 # ---------------- 创建静态库 ----------------
 add_library(entitydef STATIC ${SRCS})
@@ -30,6 +27,7 @@ target_link_libraries(entitydef PUBLIC
 	xml
 	python_interface
 )
+target_link_libraries(entitydef PRIVATE resmgr)
 
 
 

@@ -3,16 +3,16 @@
 
 #ifndef KBE_ENTITY_COMPONENT_CELL_BASE_CLIENT__CALL_H
 #define KBE_ENTITY_COMPONENT_CELL_BASE_CLIENT__CALL_H
-	
+
 #include "common/common.h"
 #include "pyscript/scriptobject.h"
 #include "entitydef/entitycallabstract.h"
-	
+
 #ifdef KBE_SERVER
 #include "server/components.h"
 #endif
 
-	
+
 namespace KBEngine{
 
 namespace Network
@@ -31,8 +31,8 @@ class EntityComponentCall : public EntityCallAbstract
 	/** 子类化 将一些py操作填充进派生类 */
 	INSTANCE_SCRIPT_HREADER(EntityComponentCall, EntityCallAbstract)
 public:
-	typedef std::tr1::function<RemoteEntityMethod* (MethodDescription* pMethodDescription, EntityComponentCall* pEntityCall)> EntityCallCallHookFunc;
-	typedef std::tr1::function<Network::Channel* (EntityComponentCall&)> FindChannelFunc;
+	typedef std::function<RemoteEntityMethod* (MethodDescription* pMethodDescription, EntityComponentCall* pEntityCall)> EntityCallCallHookFunc;
+	typedef std::function<Network::Channel* (EntityComponentCall&)> FindChannelFunc;
 
 	EntityComponentCall(EntityCall* pEntityCall, PropertyDescription* pComponentPropertyDescription);
 
@@ -42,21 +42,21 @@ public:
 		return ENTITYCALL_CLASS_ENTITY_COMPONENT;
 	}
 
-	/** 
-		脚本请求获取属性或者方法 
+	/**
+		脚本请求获取属性或者方法
 	*/
-	PyObject* onScriptGetAttribute(PyObject* attr);						
+	PyObject* onScriptGetAttribute(PyObject* attr);
 
-	/** 
-		获得对象的描述 
+	/**
+		获得对象的描述
 	*/
 	PyObject* tp_repr();
 	PyObject* tp_str();
-	
+
 	void c_str(char* s, size_t size);
 
-	/** 
-		脚本被安装时被调用 
+	/**
+		脚本被安装时被调用
 	*/
 	static void onInstallScript(PyObject* mod);
 

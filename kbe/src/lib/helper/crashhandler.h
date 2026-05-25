@@ -7,7 +7,7 @@
 //#define NDEBUG
 #include "common/common.h"
 // windows include	
-#ifdef WIN32
+#ifdef _WIN32
 #include <windows.h>
 #include <tchar.h>
 #include <dbghelp.h>
@@ -25,7 +25,7 @@ namespace KBEngine{ namespace exception {
 /** 安装 */
 void installCrashHandler(const char* dumpType, COMPONENT_ID componentID);
 
-#ifdef WIN32
+#ifdef _WIN32
 /** 处理SEH异常并生成崩溃文件 */
 LONG WINAPI handleStructuredException(EXCEPTION_POINTERS* pep);
 

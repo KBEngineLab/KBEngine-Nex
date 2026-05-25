@@ -13,6 +13,7 @@
 #include "server/serverconfig.h"
 #include "pyscript/py_gc.h"
 #include "resmgr/resmgr.h"
+#include "resmgr/plugins/plugin_manager.h"
 #include "client_lib/config.h"
 #include "entitydef/entity_component.h"
 #if KBE_PLATFORM == PLATFORM_WIN32
@@ -96,6 +97,23 @@ inline bool installPyScript(KBEngine::script::Script& script, COMPONENT_TYPE com
 		pyPaths += user_scripts_path + L"bots;";
 		pyPaths += user_scripts_path + L"bots/interfaces;";
 		pyPaths += user_scripts_path + L"bots/components;";
+
+		if (!PluginManager::instance().initialize())
+			return false;
+
+		// bots 复用 client_lib 的脚本安装入口；这里仅在 bots 分支追加插件路径，不影响 CLIENT_TYPE。
+		std::vector<std::string> pluginPaths = PluginManager::instance().getComponentPythonPaths(BOTS_TYPE);
+
+		for (std::vector<std::string>::iterator iter = pluginPaths.begin(); iter != pluginPaths.end(); ++iter)
+		{
+			wchar_t* wpluginPath = KBEngine::strutil::char2wchar(const_cast<char*>(iter->c_str()));
+			if (wpluginPath)
+			{
+				pyPaths += wpluginPath;
+				pyPaths += L";";
+				free(wpluginPath);
+			}
+		}
 	}
 
 	std::string kbe_res_path = Resmgr::getSingleton().getPySysResPath();

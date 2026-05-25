@@ -3,7 +3,7 @@
 
 #ifndef KBE_ENTITYCALL_BASE_H
 #define KBE_ENTITYCALL_BASE_H
-	
+
 #include "common/common.h"
 #include "pyscript/scriptobject.h"
 #include "entitydef/common.h"
@@ -30,17 +30,17 @@ class EntityCallAbstract : public script::ScriptObject
 	/** 子类化 将一些py操作填充进派生类 */
 	INSTANCE_SCRIPT_HREADER(EntityCallAbstract, ScriptObject)
 public:
-	EntityCallAbstract(PyTypeObject* scriptType, 
-		const Network::Address* pAddr, 
-		COMPONENT_ID componentID, 
-		ENTITY_ID eid, 
-		uint16 utype, 
+	EntityCallAbstract(PyTypeObject* scriptType,
+		const Network::Address* pAddr,
+		COMPONENT_ID componentID,
+		ENTITY_ID eid,
+		uint16 utype,
 		ENTITYCALL_TYPE type);
-	
+
 	virtual ~EntityCallAbstract();
 
-	typedef std::tr1::function<RemoteEntityMethod* (MethodDescription* pMethodDescription, EntityCallAbstract* pEntityCall)> EntityCallCallHookFunc;
-	typedef std::tr1::function<Network::Channel* (EntityCallAbstract&)> FindChannelFunc;
+	typedef std::function<RemoteEntityMethod* (MethodDescription* pMethodDescription, EntityCallAbstract* pEntityCall)> EntityCallCallHookFunc;
+	typedef std::function<Network::Channel* (EntityCallAbstract&)> FindChannelFunc;
 
 	enum ENTITYCALL_CLASS
 	{
@@ -71,8 +71,8 @@ public:
 		return ENTITYCALL_CLASS_ENTITY;
 	}
 
-	/** 
-		获取entityID 
+	/**
+		获取entityID
 	*/
 	INLINE ENTITY_ID id() const;
 
@@ -80,31 +80,31 @@ public:
 
 	DECLARE_PY_GET_MOTHOD(pyGetID);
 
-	/** 
-		获得组件ID 
+	/**
+		获得组件ID
 	*/
 	INLINE COMPONENT_ID componentID(void) const;
 
-	/** 
-		设置组件的ID 
+	/**
+		设置组件的ID
 	*/
 	INLINE void componentID(COMPONENT_ID cid);
 
-	/** 
-		获得utype 
+	/**
+		获得utype
 	*/
 	INLINE ENTITY_SCRIPT_UID utype(void) const;
 
-	/** 
-		获得type 
+	/**
+		获得type
 	*/
 	INLINE ENTITYCALL_TYPE type(void) const;
 
-	/** 
-		支持pickler 方法 
+	/**
+		支持pickler 方法
 	*/
 	static PyObject* __py_reduce_ex__(PyObject* self, PyObject* protocol);
-	
+
 	virtual Network::Channel* getChannel(void);
 
 	virtual bool sendCall(Network::Bundle* pBundle);
@@ -122,7 +122,7 @@ public:
 	INLINE bool isBase() const;
 	INLINE bool isBaseReal() const;
 	INLINE bool isBaseViaCell() const;
-	
+
 	ScriptDefModule* pScriptDefModule();
 
 protected:
@@ -142,4 +142,4 @@ protected:
 #include "entitycallabstract.inl"
 #endif
 #endif // KBE_ENTITYCALL_BASE_H
- 
+

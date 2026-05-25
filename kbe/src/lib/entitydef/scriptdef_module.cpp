@@ -9,11 +9,12 @@
 #include "common/smartpointer.h"
 #include "entitydef/entity_call.h"
 #include "resmgr/resmgr.h"
-#include "server/plugins/plugin_manager.h"
+#include "resmgr/plugins/plugin_manager.h"
 #include "pyscript/script.h"
 #include "server/serverconfig.h"
 #include "client_lib/config.h"
 #include "network/bundle.h"
+#include <algorithm>
 
 #ifndef CODE_INLINE
 #include "scriptdef_module.inl"
@@ -21,6 +22,68 @@
 
 
 namespace KBEngine{
+
+namespace
+{
+
+std::string normalizePluginPath(std::string path)
+{
+	std::replace(path.begin(), path.end(), '\\', '/');
+	return path;
+}
+
+bool pluginFileExists(const std::string& path)
+{
+	return access(path.c_str(), 0) == 0;
+}
+
+std::string componentPluginFolder(COMPONENT_TYPE componentType)
+{
+	if (componentType == BASEAPP_TYPE)
+		return "base";
+	if (componentType == CELLAPP_TYPE)
+		return "cell";
+	if (componentType == CLIENT_TYPE)
+		return "client";
+	if (componentType == BOTS_TYPE)
+		return "bots";
+	return "";
+}
+
+const PluginEntityDescriptor* findPluginEntityInLoadedPlugins(const std::string& entityName, const PluginDescriptor** plugin)
+{
+	const std::vector<PluginDescriptor>& plugins = PluginManager::instance().plugins();
+	for (std::vector<PluginDescriptor>::const_iterator iter = plugins.begin(); iter != plugins.end(); ++iter)
+	{
+		for (std::vector<PluginEntityDescriptor>::const_iterator entityIter = iter->entities.begin(); entityIter != iter->entities.end(); ++entityIter)
+		{
+			if (entityIter->name == entityName)
+			{
+				if (plugin)
+					*plugin = &(*iter);
+				return &(*entityIter);
+			}
+		}
+	}
+
+	return NULL;
+}
+
+bool hasPluginComponentScript(const std::string& entityName, COMPONENT_TYPE componentType)
+{
+	const PluginDescriptor* plugin = NULL;
+	if (!findPluginEntityInLoadedPlugins(entityName, &plugin))
+		return false;
+
+	std::string folder = componentPluginFolder(componentType);
+	if (folder.empty())
+		return false;
+
+	std::string file = normalizePluginPath(plugin->rootPath + "/" + folder + "/" + entityName + ".py");
+	return pluginFileExists(file) || pluginFileExists(file + "c");
+}
+
+}
 
 //-------------------------------------------------------------------------------------
 ScriptDefModule::ScriptDefModule(std::string name, ENTITY_SCRIPT_UID utype):
@@ -49,6 +112,7 @@ hasBase_(false),
 hasClient_(false),
 pVolatileinfo_(new VolatileInfo()),
 name_(name),
+defSourceFile_(),
 usePropertyDescrAlias_(false),
 useMethodDescrAlias_(false),
 useComponentDescrAlias_(false),
@@ -346,14 +410,14 @@ void ScriptDefModule::autoMatchCompOwn()
 	int assertionHasBase = -1;
 	int assertionHasCell = -1;
 
-	bool pluginHasBase = false;
-	bool pluginHasCell = false;
-	bool pluginHasClient = false;
-	if (PluginManager::instance().getComponentAssertion(name_, pluginHasBase, pluginHasCell, pluginHasClient))
+	// 插件实体不在 entities.xml 中声明 hasBase/hasCell/hasClient，
+	// 因此这里从 manifest 读取组件断言，并像 entities.xml 属性一样写入 MD5。
+	const PluginEntityDescriptor* pluginEntityInfo = findPluginEntityInLoadedPlugins(name_, NULL);
+	if (pluginEntityInfo)
 	{
-		assertionHasBase = pluginHasBase ? 1 : 0;
-		assertionHasCell = pluginHasCell ? 1 : 0;
-		assertionHasClient = pluginHasClient ? 1 : 0;
+		assertionHasBase = pluginEntityInfo->hasBase ? 1 : 0;
+		assertionHasCell = pluginEntityInfo->hasCell ? 1 : 0;
+		assertionHasClient = pluginEntityInfo->hasClient ? 1 : 0;
 
 		EntityDef::md5().append((void*)&assertionHasClient, sizeof(int));
 		EntityDef::md5().append((void*)&assertionHasCell, sizeof(int));
@@ -431,10 +495,11 @@ void ScriptDefModule::autoMatchCompOwn()
 		EntityDef::md5().append((void*)&assertionHasClient, sizeof(int));
 	}
 
-	bool pluginEntity = PluginManager::instance().findEntity(name_) != NULL;
-	bool pluginHasClientScript = pluginEntity && PluginManager::instance().hasComponentScript(name_, CLIENT_TYPE);
-	bool pluginHasBaseScript = pluginEntity && PluginManager::instance().hasComponentScript(name_, BASEAPP_TYPE);
-	bool pluginHasCellScript = pluginEntity && PluginManager::instance().hasComponentScript(name_, CELLAPP_TYPE);
+	// 原逻辑只检查根目录 client/base/cell/<Entity>.py。
+	// 插件实体脚本保持在 plugins/<Plugin>/<component>/<Entity>.py，所以额外检查插件目录。
+	bool pluginHasClientScript = pluginEntityInfo && hasPluginComponentScript(name_, CLIENT_TYPE);
+	bool pluginHasBaseScript = pluginEntityInfo && hasPluginComponentScript(name_, BASEAPP_TYPE);
+	bool pluginHasCellScript = pluginEntityInfo && hasPluginComponentScript(name_, CELLAPP_TYPE);
 
 	std::string fmodule = (Resmgr::getSingleton().isKBEngineNexAssets() ? "" : "scripts/") + ("client/" + name_ + ".py");
 	// std::string fmodule = "scripts/client/" + name_ + ".py";

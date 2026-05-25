@@ -565,7 +565,7 @@ bool ClientSDKCSharp::writeEntityCallBegin(ScriptDefModule* pScriptDefModule)
 	sourcefileBody_ += "\tusing System.Collections;\n";
 	sourcefileBody_ += "\tusing System.Collections.Generic;\n\n";
 
-	sourcefileBody_ += std::string("\t// defined in */scripts/entity_defs/") + pScriptDefModule->getName() + ".def\n";
+	sourcefileBody_ += std::string("\t// defined in ") + pScriptDefModule->getDefSourceFile() + "\n";
 	return true;
 }
 
@@ -1745,7 +1745,7 @@ bool ClientSDKCSharp::writeEntityModuleBegin(ScriptDefModule* pEntityScriptDefMo
 	sourcefileBody_ += "\tusing System.Collections;\n";
 	sourcefileBody_ += "\tusing System.Collections.Generic;\n\n";
 
-	sourcefileBody_ += std::string("\t// defined in */scripts/entity_defs/") + pEntityScriptDefModule->getName() + ".def\n";
+	sourcefileBody_ += std::string("\t// defined in ") + pEntityScriptDefModule->getDefSourceFile() + "\n";
 
 	if (pEntityScriptDefModule->isComponentModule())
 	{

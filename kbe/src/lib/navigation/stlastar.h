@@ -48,7 +48,7 @@ using namespace std;
 
 // disable warning that debugging information has lines that are truncated
 // occurs in stl headers
-#if defined(WIN32) && defined(_WINDOWS)
+#if defined(_WIN32) && defined(_WINDOWS)
 #pragma warning( disable : 4786 )
 #endif
 

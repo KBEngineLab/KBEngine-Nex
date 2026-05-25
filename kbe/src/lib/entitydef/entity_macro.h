@@ -5,7 +5,7 @@
 #define KBE_ENTITY_MACRO_H
 
 #include "common/common.h"
-#include "server/callbackmgr.h"		
+#include "server/callbackmgr.h"
 
 namespace KBEngine{
 
@@ -23,7 +23,7 @@ namespace KBEngine{
 	SCRIPT_METHOD_DECLARE("fireEvent",						pyFireEvent,						METH_VARARGS | METH_KEYWORDS,	0)	\
 	SCRIPT_METHOD_DECLARE("getComponent",					pyGetComponent,						METH_VARARGS | METH_KEYWORDS,	0)	\
 
-	
+
 #define ENTITY_METHOD_DECLARE_END()																									\
 	SCRIPT_METHOD_DECLARE_END()																										\
 
@@ -48,7 +48,7 @@ namespace KBEngine{
 	SCRIPT_METHOD_DECLARE("deregisterEvent",				pyDeregisterEvent,					METH_VARARGS | METH_KEYWORDS,	0)	\
 	SCRIPT_METHOD_DECLARE("fireEvent",						pyFireEvent,						METH_VARARGS | METH_KEYWORDS,	0)	\
 
-	
+
 #define CLIENT_ENTITY_METHOD_DECLARE_END()																							\
 	SCRIPT_METHOD_DECLARE_END()																										\
 
@@ -65,7 +65,7 @@ namespace KBEngine{
 	SCRIPT_GETSET_DECLARE_END()																				\
 
 
-#ifdef CLIENT_NO_FLOAT																					
+#ifdef CLIENT_NO_FLOAT
 	#define ADD_POS_DIR_TO_STREAM(s, pos, dir)																\
 		int32 x = (int32)pos.x;																				\
 		int32 y = (int32)pos.y;																				\
@@ -116,7 +116,7 @@ namespace KBEngine{
 	}																										\
 
 
-#else																									
+#else
 	#define ADD_POS_DIR_TO_STREAM(s, pos, dir)																\
 		s << (ENTITY_PROPERTY_UID)0 << posuid << pos.x << pos.y << pos.z;									\
 		s << (ENTITY_PROPERTY_UID)0 << diruid << dir.x << dir.y << dir.z;									\
@@ -127,7 +127,7 @@ namespace KBEngine{
 		s << (uint8)0 << aliasID << pos.x << pos.y << pos.z;												\
 		aliasID = ENTITY_BASE_PROPERTY_ALIASID_DIRECTION_ROLL_PITCH_YAW;									\
 		s << (uint8)0 << aliasID << dir.x << dir.y << dir.z;												\
-	
+
 
 	#define STREAM_TO_POS_DIR(s, pos, dir)																	\
 	{																										\
@@ -137,7 +137,7 @@ namespace KBEngine{
 	}																										\
 
 
-#endif	
+#endif
 
 
 #define ADD_POSDIR_TO_STREAM(s, pos, dir)																	\
@@ -240,7 +240,7 @@ namespace KBEngine{
 
 
 #else
-	#define DEBUG_CREATE_ENTITY_NAMESPACE			
+	#define DEBUG_CREATE_ENTITY_NAMESPACE
 	#define DEBUG_OP_ATTRIBUTE(op, ccattr)
 	#define DEBUG_PERSISTENT_PROPERTY(op, ccattr)
 	#define DEBUG_REDUCE_EX(tentity)
@@ -642,15 +642,15 @@ public:																										\
 				if(pScriptModule()->usePropertyDescrAlias())												\
 				{																							\
 					(*s) << (uint8)0;																		\
-	    			(*s) << propertyDescription->aliasIDAsUint8();											\
+					(*s) << propertyDescription->aliasIDAsUint8();											\
 				}																							\
 				else																						\
 				{																							\
 					(*s) << (ENTITY_PROPERTY_UID)0;															\
-	    			(*s) << propertyDescription->getUType();												\
+					(*s) << propertyDescription->getUType();												\
 				}																							\
 																											\
-	    		propertyDescription->getDataType()->addToStream(s, PyDict_GetItem(pydict, key));			\
+				propertyDescription->getDataType()->addToStream(s, PyDict_GetItem(pydict, key));			\
 			}																								\
 																											\
 			Py_DECREF(key);																					\
@@ -1047,8 +1047,8 @@ public:																										\
 	{																										\
 		CLASS* pobj = static_cast<CLASS*>(self);															\
 		static EntityComponent::OnDataChangedEvent dataChangedEvent;										\
-			dataChangedEvent = std::tr1::bind(&CLASS::onDefDataChanged, pobj,								\
-			std::tr1::placeholders::_1, std::tr1::placeholders::_2, std::tr1::placeholders::_3);			\
+			dataChangedEvent = std::bind(&CLASS::onDefDataChanged, pobj,								\
+			std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);			\
 		return PyLong_FromVoidPtr((void*)&dataChangedEvent);												\
 	}																										\
 																											\

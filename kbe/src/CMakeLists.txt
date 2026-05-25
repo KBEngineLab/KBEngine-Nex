@@ -198,6 +198,7 @@ endif()
 
 
 find_package(fmt CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 find_package(CURL REQUIRED)
 find_package(EXPAT  REQUIRED COMPONENTS core)
 
@@ -254,15 +255,15 @@ add_subdirectory(lib/db_mysql)
 add_subdirectory(lib/db_mongodb)
 add_subdirectory(lib/db_postgresql)
 add_subdirectory(lib/db_interface)
+add_subdirectory(lib/xml)
+add_subdirectory(lib/resmgr)
 add_subdirectory(lib/entitydef)
 add_subdirectory(lib/math)
 add_subdirectory(lib/navigation)
 add_subdirectory(lib/network)
 add_subdirectory(lib/pyscript)
-add_subdirectory(lib/resmgr)
 add_subdirectory(lib/server)
 add_subdirectory(lib/thread)
-add_subdirectory(lib/xml)
 
 
 add_subdirectory(server/baseapp)

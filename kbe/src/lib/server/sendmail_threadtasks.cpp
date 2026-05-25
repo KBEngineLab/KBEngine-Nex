@@ -1,6 +1,14 @@
 // Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
+#if defined(_WIN32) && !defined(WIN32)
+#define WIN32
+#define KBE_UNDEFINE_WIN32_AFTER_JWSMTP
+#endif
 #include "jwsmtp.h"
+#ifdef KBE_UNDEFINE_WIN32_AFTER_JWSMTP
+#undef WIN32
+#undef KBE_UNDEFINE_WIN32_AFTER_JWSMTP
+#endif
 #include "sendmail_threadtasks.h"
 #include "server/serverconfig.h"
 #include "common/deadline.h"

@@ -3,7 +3,7 @@
 
 #include "common.h"
 #include "resmgr/resmgr.h"
-#include "server/plugins/plugin_manager.h"
+#include "resmgr/plugins/plugin_manager.h"
 
 namespace KBEngine{
 
@@ -119,6 +119,7 @@ std::pair<std::wstring, std::wstring> getComponentPythonPaths(COMPONENT_TYPE com
 	if (!PluginManager::instance().initialize())
 		return pathPair;
 
+	// 插件路径只由 resmgr/plugins 计算，当前函数仍按 KBE 原流程负责安装 Python path。
 	std::vector<std::string> pluginPaths = PluginManager::instance().getComponentPythonPaths(componentType);
 	for (std::vector<std::string>::iterator iter = pluginPaths.begin(); iter != pluginPaths.end(); ++iter)
 	{

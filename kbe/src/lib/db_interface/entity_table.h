@@ -9,7 +9,7 @@
 #include "entitydef/common.h"
 #include "thread/threadmutex.h"
 
-namespace KBEngine { 
+namespace KBEngine {
 
 class DBUtil;
 class DBInterface;
@@ -104,7 +104,7 @@ public:
 
 	void indexType(std::string index) { indexType_ = index; }
 	const char* indexType() { return indexType_.c_str(); }
-	
+
 	const char* itemDBType() { return itemDBType_.c_str(); }
 
 	void utype(int32/*ENTITY_PROPERTY_UID*/ utype) { utype_ = utype; }
@@ -128,7 +128,7 @@ public:
 	/**
 		初始化
 	*/
-	virtual bool initialize(const PropertyDescription* pPropertyDescription, 
+	virtual bool initialize(const PropertyDescription* pPropertyDescription,
 		const DataType* pDataType, std::string itemName) = 0;
 
 	void tableName(std::string name) { tableName_ = name; }
@@ -187,7 +187,7 @@ public:
 	};
 
 	virtual ~EntityTable(){};
-	
+
 	void tableName(std::string name){ tableName_ = name; }
 	const char* tableName(){ return tableName_.c_str(); }
 
@@ -206,12 +206,12 @@ public:
 	*/
 	virtual bool syncIndexToDB(DBInterface* pdbi) = 0;
 
-	/** 
+	/**
 		创建一个表item
 	*/
 	virtual EntityTableItem* createItem(std::string type, std::string defaultVal) = 0;
 
-	/** 
+	/**
 		获得所有表字段
 	*/
 	const EntityTable::TABLEITEM_MAP& tableItems() const { return tableItems_; }
@@ -249,7 +249,7 @@ public:
 	/**
 		查询自动加载的实体
 	*/
-	virtual void queryAutoLoadEntities(DBInterface* pdbi, ScriptDefModule* pModule, 
+	virtual void queryAutoLoadEntities(DBInterface* pdbi, ScriptDefModule* pModule,
 		ENTITY_ID start, ENTITY_ID end, std::vector<DBID>& outs){}
 
 	EntityTables* pEntityTables() const { return pEntityTables_; }
@@ -264,10 +264,10 @@ protected:
 	TABLEITEM_MAP tableItems_;
 
 	// 和ScriptDefModule中保持一致秩序的item引用
-	std::vector<EntityTableItem*> tableFixedOrderItems_; 
+	std::vector<EntityTableItem*> tableFixedOrderItems_;
 
 	// 是否为子表
-	bool isChild_; 
+	bool isChild_;
 
 	bool sync_;
 
@@ -283,7 +283,7 @@ public:
 		{
 			std::string keyCopy(key);
 			std::transform(keyCopy.begin(), keyCopy.end(), keyCopy.begin(), tolower);
-			return std::tr1::hash<std::string>()(keyCopy);
+			return std::hash<std::string>()(keyCopy);
 		}
 	};
 
@@ -303,7 +303,7 @@ public:
 
 	EntityTables();
 	virtual ~EntityTables();
-	
+
 	bool load(DBInterface* pdbi);
 	bool syncToDB(DBInterface* pdbi);
 
@@ -311,7 +311,7 @@ public:
 		dbInterfaceName_ = dbInterfaceName;
 	}
 
-	/** 
+	/**
 		获得所有表
 	*/
 	const EntityTables::TABLES_MAP& tables() const { return tables_; }
@@ -344,7 +344,7 @@ public:
 	/**
 		查询自动加载的实体
 	*/
-	void queryAutoLoadEntities(DBInterface* pdbi, ScriptDefModule* pModule, 
+	void queryAutoLoadEntities(DBInterface* pdbi, ScriptDefModule* pModule,
 		ENTITY_ID start, ENTITY_ID end, std::vector<DBID>& outs);
 
 protected:

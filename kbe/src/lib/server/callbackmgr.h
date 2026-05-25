@@ -1,13 +1,13 @@
 // Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
-	
+
 /*
 	CallbackMgr( 回调管理器 )
 		由于一些回调操作都是异步的， 我们通过一个管理器将这些回调管理起来， 并对外返回一个
 		标识该回调的唯一id， 外部可以通过该id来触发这个回调。
-		
+
 	用法:
-	typedef CallbackMgr<std::tr1::function<void(Entity*, int64, bool)>> CALLBACK_MGR;
+	typedef CallbackMgr<std::function<void(Entity*, int64, bool)>> CALLBACK_MGR;
 	CALLBACK_MGR callbackMgr;
 	void xxx(Entity*, int64, bool){}
 	CALLBACK_ID callbackID = callbackMgr.save(&xxx); // 可以使用bind来绑定一个类成员函数
@@ -15,7 +15,7 @@
 
 #ifndef KBE_CALLBACKMGR_H
 #define KBE_CALLBACKMGR_H
-	
+
 #include "pyscript/kbe_python.h"
 #include "idallocate.h"
 #include "serverconfig.h"
@@ -25,7 +25,7 @@
 #include "common/timer.h"
 #include "pyscript/pyobject_pointer.h"
 #include "pyscript/pickler.h"
-	
+
 namespace KBEngine{
 
 template<typename T>
@@ -44,8 +44,8 @@ public:
 	~CallbackMgr()
 	{
 		finalise();
-	}	
-	
+	}
+
 	void finalise()
 	{
 		cbMap_.clear();
@@ -56,8 +56,8 @@ public:
 
 	void createFromStream(KBEngine::MemoryStream& s);
 
-	/** 
-		向管理器添加一个回调 
+	/**
+		向管理器添加一个回调
 	*/
 	CALLBACK_ID save(T callback, uint64 timeout = 0/*secs*/)
 	{
@@ -65,15 +65,15 @@ public:
 			timeout = uint64(ServerConfig::getSingleton().callback_timeout_);
 
 		CALLBACK_ID cbID = idAlloc_.alloc();
-		cbMap_.insert(typename CALLBACKS::value_type(cbID, 
+		cbMap_.insert(typename CALLBACKS::value_type(cbID,
 			std::pair< T, uint64 >(callback, timestamp() + (timeout * stampsPerSecond()))));
 
 		tick();
 		return cbID;
 	}
-	
-	/** 
-		通过callbackID取走回调 
+
+	/**
+		通过callbackID取走回调
 	*/
 	T take(CALLBACK_ID cbID)
 	{
@@ -84,7 +84,7 @@ public:
 			cbMap_.erase(itr);
 			return t;
 		}
-		
+
 		tick();
 		return NULL;
 	}
@@ -97,7 +97,7 @@ public:
 		if(timestamp() - lastTimestamp_ < (ServerConfig::getSingleton().callback_timeout_ * stampsPerSecond()))
 			return;
 
-		lastTimestamp_ = timestamp(); 
+		lastTimestamp_ = timestamp();
 		typename CALLBACKS::iterator iter = cbMap_.begin();
 		for(; iter!= cbMap_.end(); )
 		{
@@ -166,10 +166,10 @@ inline void CallbackMgr<PyObjectPtr>::createFromStream(KBEngine::MemoryStream& s
 		s.readBlob(data);
 
 		PyObject* pyCallback = NULL;
-		
+
 		if(data.size() > 0)
 			pyCallback = script::Pickler::unpickle(data);
-		
+
 		uint64 timeout;
 		s >> timeout;
 
@@ -179,7 +179,7 @@ inline void CallbackMgr<PyObjectPtr>::createFromStream(KBEngine::MemoryStream& s
 			continue;
 		}
 
-		cbMap_.insert(CallbackMgr<PyObjectPtr>::CALLBACKS::value_type(cbID, 
+		cbMap_.insert(CallbackMgr<PyObjectPtr>::CALLBACKS::value_type(cbID,
 			std::pair< PyObjectPtr, uint64 >(pyCallback, timeout)));
 
 		Py_DECREF(pyCallback);
@@ -196,7 +196,7 @@ inline void CallbackMgr<PyObject*>::finalise()
 	}
 
 	cbMap_.clear();
-}	
+}
 
 template<>
 inline bool CallbackMgr<PyObject*>::processTimeout(CALLBACK_ID cbID, PyObject* callback)

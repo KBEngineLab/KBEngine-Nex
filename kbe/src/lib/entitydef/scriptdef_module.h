@@ -140,6 +140,8 @@ public:
 	INLINE METHODDESCRIPTION_MAP& getCellExposedMethodDescriptions(void);
 
 	INLINE const char* getName();
+	INLINE const std::string& getDefSourceFile() const;
+	INLINE void setDefSourceFile(const std::string& file);
 
 	void autoMatchCompOwn();
 
@@ -227,6 +229,11 @@ protected:
 
 	// 这个模块的名称
 	std::string							name_;
+
+	// 当前模块主 .def 的来源文件。
+	// 根实体一般是 assets/entity_defs/X.def；插件实体会记录 plugins/<Plugin>/entity_defs/X.def，
+	// SDK 生成器据此输出准确注释，避免插件实体仍被标成根 entity_defs。
+	std::string							defSourceFile_;
 
 	bool								usePropertyDescrAlias_;
 	bool								useMethodDescrAlias_;

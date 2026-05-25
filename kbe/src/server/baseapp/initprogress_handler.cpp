@@ -1,7 +1,6 @@
 // Copyright 2008-2018 Yolo Technologies, Inc. All Rights Reserved. https://www.comblockengine.com
 
 #include "baseapp.h"
-#include "server/plugins/plugin_manager.h"
 #include "initprogress_handler.h"
 #include "entity_autoloader.h"
 #include "network/bundle.h"
@@ -195,7 +194,7 @@ bool InitProgressHandler::process()
 		else
 			SCRIPT_ERROR_CHECK();
 
-		PluginManager::instance().dispatch(BASEAPP_TYPE, "onComponentReady", (g_componentGroupOrder == 1));
+		Baseapp::getSingleton().dispatchPluginEvent("onComponentReady", (g_componentGroupOrder == 1));
 
 		return true;
 	}

@@ -3,28 +3,28 @@
 
 #include "cellapp.h"
 #include "entity.h"
-#include "witness.h"	
+#include "witness.h"
 #include "profile.h"
 #include "spacememory.h"
 #include "range_trigger.h"
 #include "all_clients.h"
 #include "client_entity.h"
-#include "controllers.h"	
+#include "controllers.h"
 #include "real_entity_method.h"
 #include "entity_coordinate_node.h"
 #include "proximity_controller.h"
-#include "move_controller.h"	
-#include "moveto_point_handler.h"	
-#include "moveto_entity_handler.h"	
-#include "navigate_handler.h"	
+#include "move_controller.h"
+#include "moveto_point_handler.h"
+#include "moveto_entity_handler.h"
+#include "navigate_handler.h"
 #include "rotator_handler.h"
 #include "turn_controller.h"
 #include "pyscript/py_gc.h"
 #include "entitydef/volatileinfo.h"
 #include "entitydef/entity_call.h"
 #include "entitydef/entity_component.h"
-#include "network/channel.h"	
-#include "network/bundle.h"	
+#include "network/channel.h"
+#include "network/bundle.h"
 #include "network/fixed_messages.h"
 #include "network/network_stats.h"
 #include "client_lib/client_interface.h"
@@ -47,7 +47,7 @@ ENTITY_METHOD_DECLARE_BEGIN(Cellapp, Entity)
 SCRIPT_METHOD_DECLARE("setViewRadius",				pySetViewRadius,				METH_VARARGS,				0)
 SCRIPT_METHOD_DECLARE("getViewRadius",				pyGetViewRadius,				METH_VARARGS,				0)
 SCRIPT_METHOD_DECLARE("getViewHystArea",			pyGetViewHystArea,				METH_VARARGS,				0)
-SCRIPT_METHOD_DECLARE("isReal",						pyIsReal,						METH_VARARGS,				0)	
+SCRIPT_METHOD_DECLARE("isReal",						pyIsReal,						METH_VARARGS,				0)
 SCRIPT_METHOD_DECLARE("addProximity",				pyAddProximity,					METH_VARARGS,				0)
 SCRIPT_METHOD_DECLARE("addYawRotator",				pyAddYawRotator,				METH_VARARGS,				0)
 SCRIPT_METHOD_DECLARE("clientEntity",				pyClientEntity,					METH_VARARGS,				0)
@@ -88,7 +88,7 @@ SCRIPT_GETSET_DECLARE("topSpeedY",					pyGetTopSpeedY,					pySetTopSpeedY,				0,
 SCRIPT_GETSET_DECLARE("controlledBy",				pyGetControlledBy,				pySetControlledBy,			0,		0)
 SCRIPT_GETSET_DECLARE("volatileInfo",				pyGetVolatileinfo,				pySetVolatileinfo,			0,		0)
 ENTITY_GETSET_DECLARE_END()
-BASE_SCRIPT_INIT(Entity, 0, 0, 0, 0, 0)	
+BASE_SCRIPT_INIT(Entity, 0, 0, 0, 0, 0)
 
 Entity::BufferedScriptCallArray Entity::_scriptCallbacksBuffer;
 int32 Entity::_scriptCallbacksBufferCount = 0;
@@ -128,8 +128,8 @@ pCustomVolatileinfo_(NULL)
 {
 	setDirty();
 
-	pyPositionChangedCallback_ = std::tr1::bind(&Entity::onPyPositionChanged, this);
-	pyDirectionChangedCallback_ = std::tr1::bind(&Entity::onPyDirectionChanged, this);
+	pyPositionChangedCallback_ = std::bind(&Entity::onPyPositionChanged, this);
+	pyDirectionChangedCallback_ = std::bind(&Entity::onPyDirectionChanged, this);
 	pPyPosition_ = new script::ScriptVector3(&position(), &pyPositionChangedCallback_);
 	pPyDirection_ = new script::ScriptVector3(&direction().dir, &pyDirectionChangedCallback_);
 
@@ -154,7 +154,7 @@ Entity::~Entity()
 	S_RELEASE(baseEntityCall_);
 	S_RELEASE(allClients_);
 	S_RELEASE(otherClients_);
-	
+
 	KBE_ASSERT(pWitness_ == NULL);
 
 	SAFE_RELEASE(pControllers_);
@@ -162,7 +162,7 @@ Entity::~Entity()
 
 	Py_DECREF(pPyPosition_);
 	pPyPosition_ = NULL;
-	
+
 	Py_DECREF(pPyDirection_);
 	pPyDirection_ = NULL;
 
@@ -170,7 +170,7 @@ Entity::~Entity()
 		Cellapp::getSingleton().pEntities()->pGetbages()->erase(id());
 
 	script::PyGC::decTracing("Entity");
-}	
+}
 
 //-------------------------------------------------------------------------------------
 void Entity::onInitializeScript()
@@ -243,17 +243,17 @@ void Entity::onDestroy(bool callScript)
 	}
 	else
 	{
-		WARNING_MSG(fmt::format("{}::onDestroy(): {}, not found space({})!\n", 
+		WARNING_MSG(fmt::format("{}::onDestroy(): {}, not found space({})!\n",
 			this->scriptName(), this->id(), spaceID()));
 	}
-	
+
 	// 在进程强制关闭时这里可能不为0
 	//KBE_ASSERT(spaceID() == 0);
 
 	// 此时不应该还有witnesses，否则为View BUG
 	if (witnesses_count_ > 0)
 	{
-		ERROR_MSG(fmt::format("{}::onDestroy(): id={}, witnesses_count({}/{}) != 0, isReal={}, spaceID={}, position=({},{},{})\n", 
+		ERROR_MSG(fmt::format("{}::onDestroy(): id={}, witnesses_count({}/{}) != 0, isReal={}, spaceID={}, position=({},{},{})\n",
 			scriptName(), id(), witnesses_count_, witnesses_.size(), isReal(), this->spaceID(), position().x, position().y, position().z));
 
 		std::list<ENTITY_ID> witnesses_copy = witnesses_;
@@ -283,15 +283,15 @@ void Entity::onDestroy(bool callScript)
 				{
 					ent->delWitnessed(this);
 				}
-				
-				ERROR_MSG(fmt::format("\t=>witnessed={}({}), isDestroyed={}, isReal={}, inTargetView={}, spaceID={}, position=({},{},{})\n", 
+
+				ERROR_MSG(fmt::format("\t=>witnessed={}({}), isDestroyed={}, isReal={}, inTargetView={}, spaceID={}, position=({},{},{})\n",
 					ent->scriptName(), (*it), ent->isDestroyed(), ent->isReal(), inTargetView, ent->spaceID(), ent->position().x, ent->position().y, ent->position().z));
 			}
 			else
 			{
 				ERROR_MSG(fmt::format("\t=> witnessed={}, not found entity!\n", (*it)));
 			}
-			
+
 			witnesses_count_ = 0;
 			witnesses_.clear();
 		}
@@ -329,7 +329,7 @@ PyObject* Entity::__py_pyDestroyEntity(PyObject* self, PyObject* args, PyObject 
 	else if(currargsSize > 0)
 	{
 		PyErr_Format(PyExc_AssertionError,
-			"%s: args max require %d args, gived %d! is script(%s), id(%d)!\n",	
+			"%s: args max require %d args, gived %d! is script(%s), id(%d)!\n",
 			__FUNCTION__, 0, currargsSize, pobj->scriptName(), pobj->id());
 		PyErr_PrintEx(0);
 		return NULL;
@@ -345,7 +345,7 @@ PyObject* Entity::pyDestroySpace()
 {
 	if(!isReal())
 	{
-		PyErr_Format(PyExc_AssertionError, "%s::destroySpace: not is real entity(%d).", 
+		PyErr_Format(PyExc_AssertionError, "%s::destroySpace: not is real entity(%d).",
 			scriptName(), id());
 		PyErr_PrintEx(0);
 		return 0;
@@ -354,11 +354,11 @@ PyObject* Entity::pyDestroySpace()
 	if (!hasFlags(ENTITY_FLAGS_DESTROYING) && this->isDestroyed())
 	{
 		PyErr_Format(PyExc_AssertionError, "%s::destroySpace: %d is destroyed!\n",
-			scriptName(), id());		
+			scriptName(), id());
 		PyErr_PrintEx(0);
 		return 0;
 	}
-	
+
 	if(spaceID() == 0)
 	{
 		PyErr_Format(PyExc_TypeError, "%s::destroySpace: spaceID is 0.\n", scriptName());
@@ -368,7 +368,7 @@ PyObject* Entity::pyDestroySpace()
 
 	destroySpace();
 	S_Return;
-}	
+}
 
 //-------------------------------------------------------------------------------------
 void Entity::destroySpace()
@@ -388,13 +388,13 @@ void Entity::onSpaceGone()
 
 //-------------------------------------------------------------------------------------
 PyObject* Entity::pyGetBaseEntityCall()
-{ 
+{
 	EntityCall* entityCall = baseEntityCall();
 	if(entityCall == NULL)
 		S_Return;
 
 	Py_INCREF(entityCall);
-	return entityCall; 
+	return entityCall;
 }
 
 //-------------------------------------------------------------------------------------
@@ -405,7 +405,7 @@ PyObject* Entity::pyGetControlledBy()
 		S_Return;
 
 	Py_INCREF(entityCall);
-	return entityCall; 
+	return entityCall;
 }
 
 //-------------------------------------------------------------------------------------
@@ -413,8 +413,8 @@ int Entity::pySetControlledBy(PyObject *value)
 {
 	if (isDestroyed())
 	{
-		PyErr_Format(PyExc_AssertionError, "%s: %d is destroyed!\n",		
-			scriptName(), id());		
+		PyErr_Format(PyExc_AssertionError, "%s: %d is destroyed!\n",
+			scriptName(), id());
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -516,10 +516,10 @@ bool Entity::setControlledBy(EntityCall* controllerBaseEntityCall)
 	else if (controllerBaseEntityCall != NULL)
 	{
 		controlledBy(controllerBaseEntityCall);
-		
+
 		// 既然有新的控制者了，系统的移动行为也就必须停止了
 		stopMove();
-		
+
 		// 如果是恢复自我控制，那么需要通知我的客户端：没有人控制你了
 		if (controllerBaseEntityCall->id() == id())
 		{
@@ -570,67 +570,67 @@ void Entity::sendControlledByStatusMessage(EntityCall* baseEntityCall, int8 isCo
 
 //-------------------------------------------------------------------------------------
 PyObject* Entity::pyGetClientEntityCall()
-{ 
+{
 	EntityCall* entityCall = clientEntityCall();
 	if(entityCall == NULL)
 		S_Return;
 
 	Py_INCREF(entityCall);
-	return entityCall; 
+	return entityCall;
 }
 
 //-------------------------------------------------------------------------------------
 PyObject* Entity::pyGetAllClients()
-{ 
+{
 	AllClients* clients = allClients();
 	if(clients == NULL)
 		S_Return;
 
 	Py_INCREF(clients);
-	return clients; 
+	return clients;
 }
 
 //-------------------------------------------------------------------------------------
 PyObject* Entity::pyGetOtherClients()
-{ 
+{
 	AllClients* clients = otherClients();
 	if(clients == NULL)
 		S_Return;
 
 	Py_INCREF(clients);
-	return clients; 
+	return clients;
 }
 
 //-------------------------------------------------------------------------------------
 PyObject* Entity::pyGetIsOnGround()
-{ 
+{
 	return PyBool_FromLong(isOnGround());
 }
 
 //-------------------------------------------------------------------------------------
 int Entity::pySetTopSpeedY(PyObject *value)
 {
-	topSpeedY(float(PyFloat_AsDouble(value)) / g_kbeSrvConfig.gameUpdateHertz()); 
-	return 0; 
+	topSpeedY(float(PyFloat_AsDouble(value)) / g_kbeSrvConfig.gameUpdateHertz());
+	return 0;
 };
 
 //-------------------------------------------------------------------------------------
 PyObject* Entity::pyGetTopSpeedY()
-{ 
-	return PyFloat_FromDouble(topSpeedY() * g_kbeSrvConfig.gameUpdateHertz()); 
+{
+	return PyFloat_FromDouble(topSpeedY() * g_kbeSrvConfig.gameUpdateHertz());
 }
 
 //-------------------------------------------------------------------------------------
 PyObject* Entity::pyGetTopSpeed()
-{ 
-	return PyFloat_FromDouble(topSpeed() * g_kbeSrvConfig.gameUpdateHertz()); 
+{
+	return PyFloat_FromDouble(topSpeed() * g_kbeSrvConfig.gameUpdateHertz());
 }
 
 //-------------------------------------------------------------------------------------
 int Entity::pySetTopSpeed(PyObject *value)
-{ 
-	topSpeed(float(PyFloat_AsDouble(value)) / g_kbeSrvConfig.gameUpdateHertz()); 
-	return 0; 
+{
+	topSpeed(float(PyFloat_AsDouble(value)) / g_kbeSrvConfig.gameUpdateHertz());
+	return 0;
 }
 
 //-------------------------------------------------------------------------------------
@@ -643,7 +643,7 @@ PyObject* Entity::onScriptGetAttribute(PyObject* attr)
 	{
 		const char* ccattr = PyUnicode_AsUTF8AndSize(attr, NULL);
 		MethodDescription* pMethodDescription = const_cast<ScriptDefModule*>(pScriptModule())->findCellMethodDescription(ccattr);
-		
+
 		if(pMethodDescription)
 		{
 			return new RealEntityMethod(NULL, pMethodDescription, this);
@@ -654,7 +654,7 @@ PyObject* Entity::onScriptGetAttribute(PyObject* attr)
 	}
 
 	return ScriptObject::onScriptGetAttribute(attr);
-}	
+}
 
 //-------------------------------------------------------------------------------------
 void Entity::onDefDataChanged(EntityComponent* pEntityComponent, const PropertyDescription* propertyDescription, PyObject* pyData)
@@ -665,7 +665,7 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent, const PropertyD
 
 	if(propertyDescription->isPersistent())
 		setDirty();
-	
+
 	ENTITY_PROPERTY_UID componentPropertyUID =0;
 	int8 componentPropertyAliasID = 0;
 
@@ -711,15 +711,15 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent, const PropertyD
 			}
 
 			// 记录这个事件产生的数据量大小
-			g_publicCellEventHistoryStats.trackEvent(scriptName(), 
-				propertyDescription->getName(), 
+			g_publicCellEventHistoryStats.trackEvent(scriptName(),
+				propertyDescription->getName(),
 				pForwardBundle->currMsgLength());
 
 			gm->pushMessage(ghostCell(), pForwardBundle);
 		}
 	}
-	
-	const Position3D& basePos = this->position(); 
+
+	const Position3D& basePos = this->position();
 	if((flags & ENTITY_BROADCAST_OTHER_CLIENT_FLAGS) > 0)
 	{
 		DETAIL_TYPE propertyDetailLevel = propertyDescription->getDetailLevel();
@@ -751,13 +751,13 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent, const PropertyD
 			{
 				Network::Bundle* pSendBundle = pChannel->createSendBundle();
 				NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pEntity->id(), (*pSendBundle));
-				
+
 				int ialiasID = -1;
-				const Network::MessageHandler& msgHandler = pEntity->pWitness()->getViewEntityMessageHandler(ClientInterface::onUpdatePropertys, 
+				const Network::MessageHandler& msgHandler = pEntity->pWitness()->getViewEntityMessageHandler(ClientInterface::onUpdatePropertys,
 					ClientInterface::onUpdatePropertysOptimized, id(), ialiasID);
-				
+
 				ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, msgHandler, viewEntityMessage);
-				
+
 				if(ialiasID != -1)
 				{
 					KBE_ASSERT(msgHandler.msgID == ClientInterface::onUpdatePropertysOptimized.msgID);
@@ -768,7 +768,7 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent, const PropertyD
 					KBE_ASSERT(msgHandler.msgID == ClientInterface::onUpdatePropertys.msgID);
 					(*pSendBundle)  << id();
 				}
-				
+
 				if (pScriptModule_->usePropertyDescrAlias())
 				{
 					(*pSendBundle) << componentPropertyAliasID;
@@ -781,10 +781,10 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent, const PropertyD
 				}
 
 				pSendBundle->append(*mstream);
-				
+
 				// 记录这个事件产生的数据量大小
-				g_publicClientEventHistoryStats.trackEvent(scriptName(), 
-					propertyDescription->getName(), 
+				g_publicClientEventHistoryStats.trackEvent(scriptName(),
+					propertyDescription->getName(),
 					pSendBundle->currMsgLength());
 
 				ENTITY_MESSAGE_FORWARD_CLIENT_END(pSendBundle, msgHandler, viewEntityMessage);
@@ -842,7 +842,7 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent, const PropertyD
 				std::string event_name = this->scriptName();
 				event_name += ".";
 				event_name += propertyDescription->getName();
-				
+
 				g_publicClientEventHistoryStats.add(scriptName(), propertyDescription->getName(), pSendBundle->currMsgLength());
 			}
 		}
@@ -853,15 +853,15 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent, const PropertyD
 	if((flags & ENTITY_BROADCAST_OWN_CLIENT_FLAGS) > 0 && clientEntityCall_ != NULL && pWitness_)
 	{
 		Network::Bundle* pSendBundle = NULL;
-		
+
 		Network::Channel* pChannel = pWitness_->pChannel();
 		if(!pChannel)
 			pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		else
 			pSendBundle = pChannel->createSendBundle();
-		
+
 		NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(id(), (*pSendBundle));
-		
+
 		ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onUpdatePropertys, updatePropertys);
 		(*pSendBundle) << id();
 
@@ -877,12 +877,12 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent, const PropertyD
 		}
 
 		pSendBundle->append(*mstream);
-		
+
 		// 记录这个事件产生的数据量大小
 		if((flags & ENTITY_BROADCAST_OTHER_CLIENT_FLAGS) <= 0)
 		{
-			g_privateClientEventHistoryStats.trackEvent(scriptName(), 
-				propertyDescription->getName(), 
+			g_privateClientEventHistoryStats.trackEvent(scriptName(),
+				propertyDescription->getName(),
 				pSendBundle->currMsgLength());
 		}
 
@@ -983,7 +983,7 @@ void Entity::onRemoteCallMethodFromClient(Network::Channel* pChannel, ENTITY_ID 
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::onRemoteMethodCall_(PropertyDescription* pComponentPropertyDescription, 
+void Entity::onRemoteMethodCall_(PropertyDescription* pComponentPropertyDescription,
 	MethodDescription* pMethodDescription, ENTITY_ID srcEntityID, MemoryStream& s)
 {
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
@@ -1115,7 +1115,7 @@ void Entity::addCellDataToStream(COMPONENT_TYPE sendTo, uint32 flags, MemoryStre
 			}
 
 			if (PyErr_Occurred())
- 			{	
+			{
 				PyErr_PrintEx(0);
 				DEBUG_MSG(fmt::format("{}::addCellDataToStream: {} error!\n", this->scriptName(),
 					propertyDescription->getName()));
@@ -1183,7 +1183,7 @@ void Entity::backupCellData()
 	}
 	else
 	{
-		WARNING_MSG(fmt::format("Entity::backupCellData(): {} {} has no base!\n", 
+		WARNING_MSG(fmt::format("Entity::backupCellData(): {} {} has no base!\n",
 			this->scriptName(), this->id()));
 	}
 
@@ -1255,7 +1255,7 @@ void Entity::onWriteToDB()
 {
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-	//DEBUG_MSG(fmt::format("{}::onWriteToDB(): {}.\n", 
+	//DEBUG_MSG(fmt::format("{}::onWriteToDB(): {}.\n",
 	//	this->scriptName(), this->id()));
 
 	CALL_ENTITY_AND_COMPONENTS_METHOD(this, SCRIPT_OBJECT_CALL_ARGS0(pyTempObj, const_cast<char*>("onWriteToDB"), GETERR));
@@ -1481,7 +1481,7 @@ void Entity::addWitnessed(Entity* entity)
 	WitnessInfo* info = new WitnessInfo(detailLevel, entity, range);
 	ENTITY_ID id = entity->id();
 
-	DEBUG_MSG("Entity[%s:%ld]::onWitnessed:%s %ld enter detailLevel %d. range=%f.\n", scriptName(), id_, 
+	DEBUG_MSG("Entity[%s:%ld]::onWitnessed:%s %ld enter detailLevel %d. range=%f.\n", scriptName(), id_,
 			entity->scriptName(), id, detailLevel, range);
 
 #ifdef _DEBUG
@@ -1489,7 +1489,7 @@ void Entity::addWitnessed(Entity* entity)
 	if(iter != witnessEntityDetailLevelMap_.end())
 		ERROR_MSG("Entity::onWitnessed: %s %ld is exist.\n", entity->scriptName(), id);
 #endif
-	
+
 	witnessEntityDetailLevelMap_[id] = info;
 	witnessEntities_[detailLevel][id] = entity;
 	onEntityInitDetailLevel(entity, detailLevel);
@@ -1597,15 +1597,15 @@ uint32 Entity::addProximity(float range_xz, float range_y, int32 userarg)
 {
 	if(range_xz <= 0.0f || (CoordinateSystem::hasY && range_y <= 0.0f))
 	{
-		ERROR_MSG(fmt::format("Entity::addProximity: range(xz={}, y={}) <= 0.0f! entity[{}:{}]\n", 
+		ERROR_MSG(fmt::format("Entity::addProximity: range(xz={}, y={}) <= 0.0f! entity[{}:{}]\n",
 			range_xz, range_y, scriptName(), id()));
 
 		return 0;
 	}
-	
+
 	if(this->pEntityCoordinateNode() == NULL || this->pEntityCoordinateNode()->pCoordinateSystem() == NULL)
 	{
-		ERROR_MSG(fmt::format("Entity::addProximity: {}({}) not in world!\n", 
+		ERROR_MSG(fmt::format("Entity::addProximity: {}({}) not in world!\n",
 			scriptName(), id()));
 
 		return 0;
@@ -1624,7 +1624,7 @@ PyObject* Entity::pyAddProximity(float range_xz, float range_y, int32 userarg)
 {
 	if(!isReal())
 	{
-		PyErr_Format(PyExc_AssertionError, "%s::addProximity: not is real entity(%d).", 
+		PyErr_Format(PyExc_AssertionError, "%s::addProximity: not is real entity(%d).",
 			scriptName(), id());
 		PyErr_PrintEx(0);
 		return 0;
@@ -1632,8 +1632,8 @@ PyObject* Entity::pyAddProximity(float range_xz, float range_y, int32 userarg)
 
 	if(this->isDestroyed())
 	{
-		PyErr_Format(PyExc_AssertionError, "%s::addProximity: %d is destroyed!\n",		
-			scriptName(), id());		
+		PyErr_Format(PyExc_AssertionError, "%s::addProximity: %d is destroyed!\n",
+			scriptName(), id());
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -1646,7 +1646,7 @@ PyObject* Entity::pyClientEntity(ENTITY_ID entityID)
 {
 	if(!isReal())
 	{
-		PyErr_Format(PyExc_AssertionError, "%s::clientEntity: not is real entity(%d).", 
+		PyErr_Format(PyExc_AssertionError, "%s::clientEntity: not is real entity(%d).",
 			scriptName(), id());
 		PyErr_PrintEx(0);
 		return 0;
@@ -1654,8 +1654,8 @@ PyObject* Entity::pyClientEntity(ENTITY_ID entityID)
 
 	if(this->isDestroyed())
 	{
-		PyErr_Format(PyExc_AssertionError, "%s::clientEntity: %d is destroyed!\n",		
-			scriptName(), id());		
+		PyErr_Format(PyExc_AssertionError, "%s::clientEntity: %d is destroyed!\n",
+			scriptName(), id());
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -1681,7 +1681,7 @@ void Entity::cancelController(uint32 id)
 
 	if(!pControllers_->remove(id))
 	{
-		ERROR_MSG(fmt::format("{}::cancel: {} not found {}.\n", 
+		ERROR_MSG(fmt::format("{}::cancel: {} not found {}.\n",
 			this->scriptName(), this->id(), id));
 	}
 }
@@ -1691,10 +1691,10 @@ PyObject* Entity::__py_pyCancelController(PyObject* self, PyObject* args)
 {
 	Py_ssize_t currargsSize = PyTuple_Size(args);
 	Entity* pobj = static_cast<Entity*>(self);
-	
+
 	if(!pobj->isReal())
 	{
-		PyErr_Format(PyExc_AssertionError, "%s::clientEntity: not is real entity(%d).", 
+		PyErr_Format(PyExc_AssertionError, "%s::clientEntity: not is real entity(%d).",
 			pobj->scriptName(), pobj->id());
 		PyErr_PrintEx(0);
 		return 0;
@@ -1705,11 +1705,11 @@ PyObject* Entity::__py_pyCancelController(PyObject* self, PyObject* args)
 
 	if(currargsSize != 1)
 	{
-		PyErr_Format(PyExc_AssertionError, "%s::cancel: args require 1 args(controllerID|int or \"Movement\"|str), gived %d! is script[%s].\n",								
-			pobj->scriptName(), currargsSize);														
-																																
-		PyErr_PrintEx(0);																										
-		return 0;																								
+		PyErr_Format(PyExc_AssertionError, "%s::cancel: args require 1 args(controllerID|int or \"Movement\"|str), gived %d! is script[%s].\n",
+			pobj->scriptName(), currargsSize);
+
+		PyErr_PrintEx(0);
+		return 0;
 	}
 
 	if(!PyArg_ParseTuple(args, "O", &pyargobj))
@@ -1718,7 +1718,7 @@ PyObject* Entity::__py_pyCancelController(PyObject* self, PyObject* args)
 		PyErr_PrintEx(0);
 		return 0;
 	}
-	
+
 	if(pyargobj == NULL)
 	{
 		PyErr_Format(PyExc_TypeError, "%s::cancel: args(controllerID|int or \"Movement\"|str) error!", pobj->scriptName());
@@ -1754,7 +1754,7 @@ PyObject* Entity::__py_pyCancelController(PyObject* self, PyObject* args)
 	}
 
 	// 只要是属于移动控制器的范畴，就应该走stopMove()，以避免多种方式的存在引发调用上的歧议
-	if ((pobj->pMoveController_ && pobj->pMoveController_->id() == id) || 
+	if ((pobj->pMoveController_ && pobj->pMoveController_->id() == id) ||
 		(pobj->pTurnController_ && pobj->pTurnController_->id() == id))
 	{
 		pobj->stopMove();
@@ -1772,7 +1772,7 @@ void Entity::onEnterTrap(Entity* entity, float range_xz, float range_y, uint32 c
 {
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-	bufferOrExeCallback(const_cast<char*>("onEnterTrap"), 
+	bufferOrExeCallback(const_cast<char*>("onEnterTrap"),
 		Py_BuildValue(const_cast<char*>("(OffIi)"), entity, range_xz, range_y, controllerID, userarg));
 }
 
@@ -1781,7 +1781,7 @@ void Entity::onLeaveTrap(Entity* entity, float range_xz, float range_y, uint32 c
 {
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-	bufferOrExeCallback(const_cast<char*>("onLeaveTrap"), 
+	bufferOrExeCallback(const_cast<char*>("onLeaveTrap"),
 		Py_BuildValue(const_cast<char*>("(OffIi)"), entity, range_xz, range_y, controllerID, userarg));
 }
 
@@ -1790,7 +1790,7 @@ void Entity::onLeaveTrapID(ENTITY_ID entityID, float range_xz, float range_y, ui
 {
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-	bufferOrExeCallback(const_cast<char*>("onLeaveTrapID"), 
+	bufferOrExeCallback(const_cast<char*>("onLeaveTrapID"),
 		Py_BuildValue(const_cast<char*>("(kffIi)"), entityID, range_xz, range_y, controllerID, userarg));
 }
 
@@ -1806,12 +1806,12 @@ void Entity::onEnteredView(Entity* entity)
 //-------------------------------------------------------------------------------------
 int Entity::pySetPosition(PyObject *value)
 {
-	if(isDestroyed())	
+	if(isDestroyed())
 	{
-		PyErr_Format(PyExc_AssertionError, "%s: %d is destroyed!\n",		
-			scriptName(), id());		
+		PyErr_Format(PyExc_AssertionError, "%s: %d is destroyed!\n",
+			scriptName(), id());
 		PyErr_PrintEx(0);
-		return -1;																				
+		return -1;
 	}
 
 	if(!script::ScriptVector3::check(value))
@@ -1889,12 +1889,12 @@ void Entity::setPosition_XYZ_float(Network::Channel* pChannel, float x, float y,
 //-------------------------------------------------------------------------------------
 int Entity::pySetDirection(PyObject *value)
 {
-	if(isDestroyed())	
+	if(isDestroyed())
 	{
-		PyErr_Format(PyExc_AssertionError, "%s: %d is destroyed!\n",		
-			scriptName(), id());		
+		PyErr_Format(PyExc_AssertionError, "%s: %d is destroyed!\n",
+			scriptName(), id());
 		PyErr_PrintEx(0);
-		return -1;																				
+		return -1;
 	}
 
 	if(PySequence_Check(value) <= 0)
@@ -1957,7 +1957,7 @@ int Entity::pySetDirection(PyObject *value)
 	{
 		diruid = ENTITY_BASE_PROPERTY_UTYPE_DIRECTION_ROLL_PITCH_YAW;
 		Network::FixedMessages::MSGInfo* msgInfo = Network::FixedMessages::getSingleton().isFixed("Property::direction");
-		if(msgInfo != NULL)	
+		if(msgInfo != NULL)
 			diruid = msgInfo->msgid;
 	}
 
@@ -2058,7 +2058,7 @@ void Entity::onPyDirectionChanged()
 	{
 		diruid = ENTITY_BASE_PROPERTY_UTYPE_DIRECTION_ROLL_PITCH_YAW;
 		Network::FixedMessages::MSGInfo* msgInfo = Network::FixedMessages::getSingleton().isFixed("Property::direction");
-		if(msgInfo != NULL)	
+		if(msgInfo != NULL)
 			diruid = msgInfo->msgid;
 	}
 
@@ -2121,7 +2121,7 @@ void Entity::onGetWitness(bool fromBase)
 			PyObject* clientMB = PyObject_GetAttrString(baseEntityCall(), "client");
 			KBE_ASSERT(clientMB != Py_None);
 
-			EntityCall* client = static_cast<EntityCall*>(clientMB);	
+			EntityCall* client = static_cast<EntityCall*>(clientMB);
 			// Py_INCREF(clientEntityCall); 这里不需要增加引用， 因为每次都会产生一个新的对象
 			clientEntityCall(client);
 		}
@@ -2190,7 +2190,7 @@ void Entity::onGetWitness(bool fromBase)
 
 	// 最后，设置controlledBy为自己的base
 	controlledBy(baseEntityCall());
-	
+
 	{
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 		CALL_ENTITY_AND_COMPONENTS_METHOD(this, SCRIPT_OBJECT_CALL_ARGS0(pyTempObj, const_cast<char*>("onGetWitness"), GETERR));
@@ -2202,7 +2202,7 @@ void Entity::onGetWitness(bool fromBase)
 //-------------------------------------------------------------------------------------
 void Entity::onLoseWitness(Network::Channel* pChannel)
 {
-	//INFO_MSG(fmt::format("{}::onLoseWitness: {}.\n", 
+	//INFO_MSG(fmt::format("{}::onLoseWitness: {}.\n",
 	//	this->scriptName(), this->id()));
 
 	if (!isReal())
@@ -2237,20 +2237,20 @@ void Entity::onLoseWitness(Network::Channel* pChannel)
 //-------------------------------------------------------------------------------------
 int Entity::pySetLayer(PyObject *value)
 {
-	if(isDestroyed())	
+	if(isDestroyed())
 	{
-		PyErr_Format(PyExc_AssertionError, "%s: %d is destroyed!\n",		
-			scriptName(), id());		
+		PyErr_Format(PyExc_AssertionError, "%s: %d is destroyed!\n",
+			scriptName(), id());
 		PyErr_PrintEx(0);
-		return 0;																				
+		return 0;
 	}
 
 	if(!PyLong_Check(value))
 	{
-		PyErr_Format(PyExc_AssertionError, "%s: %d set layer value is not int!\n",		
-			scriptName(), id());		
+		PyErr_Format(PyExc_AssertionError, "%s: %d set layer value is not int!\n",
+			scriptName(), id());
 		PyErr_PrintEx(0);
-		return 0;	
+		return 0;
 	}
 
 	layer_ = (int8)PyLong_AsLong(value);
@@ -2320,7 +2320,7 @@ PyObject* Entity::pyGetVolatileinfo()
 		VolatileInfo* pVolatileInfo = const_cast<ScriptDefModule*>(pScriptModule())->getPVolatileInfo();
 		pCustomVolatileinfo_ = new VolatileInfo(*pVolatileInfo);
 	}
-		
+
 	Py_INCREF(pCustomVolatileinfo_);
 	return pCustomVolatileinfo_;
 }
@@ -2330,7 +2330,7 @@ bool Entity::checkMoveForTopSpeed(const Position3D& position)
 {
 	Position3D movment = position - this->position();
 	bool move = true;
-	
+
 	// 检查移动
 	if(topSpeedY_ > 0.01f && movment.y > topSpeedY_)
 	{
@@ -2340,7 +2340,7 @@ bool Entity::checkMoveForTopSpeed(const Position3D& position)
 	if(move && topSpeed_ > 0.01f)
 	{
 		movment.y = 0.f;
-		
+
 		if(movment.length() > topSpeed_)
 			move = false;
 	}
@@ -2391,13 +2391,13 @@ void Entity::onUpdateDataFromClient(KBEngine::MemoryStream& s)
 		float ydist = fabs(movment.y);
 		movment.y = 0.f;
 
-		DEBUG_MSG(fmt::format("{}::onUpdateDataFromClient: {} position[({},{},{}) -> ({},{},{}), (xzDist={})>(topSpeed={}) || (yDist={})>(topSpeedY={})] invalid. reset client!\n", 
+		DEBUG_MSG(fmt::format("{}::onUpdateDataFromClient: {} position[({},{},{}) -> ({},{},{}), (xzDist={})>(topSpeed={}) || (yDist={})>(topSpeedY={})] invalid. reset client!\n",
 			this->scriptName(), this->id(),
 			this->position().x, this->position().y, this->position().z,
 			pos.x, pos.y, pos.z,
 			movment.length(), topSpeed_,
 			ydist, topSpeedY_));
-		
+
 		// this->position(currpos);
 
 		// 如果我已经被控制，那么，数据的来源则是控制者的客户端，
@@ -2409,25 +2409,25 @@ void Entity::onUpdateDataFromClient(KBEngine::MemoryStream& s)
 		{
 			targetID = controlledBy_->id();
 			Entity* entity = Cellapp::getSingleton().findEntity(targetID);
-			
+
 			if(entity->isReal())
 				pW = entity->pWitness();
 		}
 		else
 		{
 			targetID = id();
-			
+
 			if(isReal())
 				pW = this->pWitness();
 		}
-		
+
 		// 在跨进程teleport时，极端情况（ghost）在某种状态下witness此时可能为None
 		if(pW)
 		{
 			// 通知重置
 			Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 			NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(targetID, (*pSendBundle));
-			
+
 			ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onSetEntityPosAndDir, setEntityPosAndDir);
 
 			(*pSendBundle) << id();
@@ -2459,7 +2459,7 @@ PyObject* Entity::pySetViewRadius(float radius, float hyst)
 {
 	if(!isReal())
 	{
-		PyErr_Format(PyExc_AssertionError, "%s::setViewRadius: not is real entity(%d).", 
+		PyErr_Format(PyExc_AssertionError, "%s::setViewRadius: not is real entity(%d).",
 			scriptName(), id());
 		PyErr_PrintEx(0);
 		return 0;
@@ -2473,8 +2473,8 @@ float Entity::getViewRadius(void) const
 {
 	if(pWitness_)
 		return pWitness_->viewRadius();
-		
-	return 0.0; 
+
+	return 0.0;
 }
 
 //-------------------------------------------------------------------------------------
@@ -2529,8 +2529,8 @@ float Entity::getViewHystArea(void) const
 {
 	if(pWitness_)
 		return pWitness_->viewHysteresisArea();
-		
-	return 0.0; 
+
+	return 0.0;
 }
 
 //-------------------------------------------------------------------------------------
@@ -2543,7 +2543,7 @@ PyObject* Entity::pyGetViewHystArea()
 bool Entity::stopMove()
 {
 	bool done = false;
-	
+
 	if(pMoveController_)
 	{
 		cancelController(pMoveController_->id());
@@ -2663,7 +2663,7 @@ PyObject* Entity::pyNavigatePathPoints(PyObject_ptr pyDestination, float maxSear
 
 	std::vector<Position3D> outPaths;
 	navigatePathPoints(outPaths, destination, maxSearchDistance, layer);
-	
+
 	PyObject* pyList = PyList_New(outPaths.size());
 
 	int i = 0;
@@ -2703,11 +2703,11 @@ uint32 Entity::navigate(const Position3D& destination, float velocity, float dis
 		handler = new NavigateHandler(p, destination, velocity,
 		distance, faceMovement, maxMoveDistance, paths_ptr, userData);
 	}
-	
+
 
 	bool ret = pControllers_->add(p);
 	KBE_ASSERT(ret);
-	
+
 	pMoveController_ = p;
 	// 立即执行一次 update（避免空帧）
 	if (handler && !handler->isDestroyed())
@@ -2855,7 +2855,7 @@ PyObject* Entity::pyGetRandomPoints(PyObject_ptr pyCenterPos, float maxRadius, u
 
 	std::vector<Position3D> outPoints;
 	getRandomPoints(outPoints, centerPos, maxRadius, maxPoints, layer);
-	
+
 	PyObject* pyList = PyList_New(outPoints.size());
 
 	int i = 0;
@@ -2870,7 +2870,7 @@ PyObject* Entity::pyGetRandomPoints(PyObject_ptr pyCenterPos, float maxRadius, u
 }
 
 //-------------------------------------------------------------------------------------
-uint32 Entity::moveToPoint(const Position3D& destination, float velocity, float distance, PyObject* userData, 
+uint32 Entity::moveToPoint(const Position3D& destination, float velocity, float distance, PyObject* userData,
 						 bool faceMovement, bool moveVertically)
 {
 	stopMove();
@@ -2879,12 +2879,12 @@ uint32 Entity::moveToPoint(const Position3D& destination, float velocity, float 
 
 	KBEShared_ptr<Controller> p(new MoveController(this, NULL));
 
-	new MoveToPointHandler(p, layer(), destination, velocity, 
+	new MoveToPointHandler(p, layer(), destination, velocity,
 		distance, faceMovement, moveVertically, userData);
 
 	bool ret = pControllers_->add(p);
 	KBE_ASSERT(ret);
-	
+
 	pMoveController_ = p;
 	return p->id();
 }
@@ -2895,7 +2895,7 @@ PyObject* Entity::pyMoveToPoint(PyObject_ptr pyDestination, float velocity, floa
 {
 	if(!isReal())
 	{
-		PyErr_Format(PyExc_AssertionError, "%s::moveToPoint: not is real entity(%d).", 
+		PyErr_Format(PyExc_AssertionError, "%s::moveToPoint: not is real entity(%d).",
 			scriptName(), id());
 		PyErr_PrintEx(0);
 		return 0;
@@ -2903,8 +2903,8 @@ PyObject* Entity::pyMoveToPoint(PyObject_ptr pyDestination, float velocity, floa
 
 	if(this->isDestroyed())
 	{
-		PyErr_Format(PyExc_AssertionError, "%s::moveToPoint: %d is destroyed!\n",		
-			scriptName(), id());		
+		PyErr_Format(PyExc_AssertionError, "%s::moveToPoint: %d is destroyed!\n",
+			scriptName(), id());
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -2932,7 +2932,7 @@ PyObject* Entity::pyMoveToPoint(PyObject_ptr pyDestination, float velocity, floa
 }
 
 //-------------------------------------------------------------------------------------
-uint32 Entity::moveToEntity(ENTITY_ID targetID, float velocity, float distance, PyObject* userData, 
+uint32 Entity::moveToEntity(ENTITY_ID targetID, float velocity, float distance, PyObject* userData,
 						 bool faceMovement, bool moveVertically, const Position3D& offsetPos)
 {
 	stopMove();
@@ -2946,7 +2946,7 @@ uint32 Entity::moveToEntity(ENTITY_ID targetID, float velocity, float distance, 
 
 	bool ret = pControllers_->add(p);
 	KBE_ASSERT(ret);
-	
+
 	pMoveController_ = p;
 	return p->id();
 }
@@ -3028,8 +3028,8 @@ void Entity::onMoveOver(uint32 controllerId, int layer, const Position3D& oldPos
 		return;
 
 	if(pMoveController_ == NULL)
-		return; 
-	
+		return;
+
 	pMoveController_->destroy();
 	pMoveController_.reset();
 
@@ -3047,7 +3047,7 @@ void Entity::onMoveFailure(uint32 controllerId, PyObject* userarg)
 
 	if(pMoveController_ == NULL)
 		return;
-	
+
 	pMoveController_->destroy();
 	pMoveController_.reset();
 
@@ -3181,7 +3181,7 @@ void Entity::debugView()
 		Cellapp::getSingleton().getScript().pyPrint(fmt::format("{}::debugView: {} has no witness!", scriptName(), this->id()));
 		return;
 	}
-	
+
 	int pending = 0;
 	Witness::VIEW_ENTITIES::iterator iter = pWitness_->viewEntities().begin();
 	for (; iter != pWitness_->viewEntities().end(); ++iter)
@@ -3195,7 +3195,7 @@ void Entity::debugView()
 		}
 	}
 
-	Cellapp::getSingleton().getScript().pyPrint(fmt::format("{}::debugView: {} size={}, Seen={}, Pending={}, viewRadius={}, viewHyst={}", scriptName(), this->id(), 
+	Cellapp::getSingleton().getScript().pyPrint(fmt::format("{}::debugView: {} size={}, Seen={}, Pending={}, viewRadius={}, viewHyst={}", scriptName(), this->id(),
 		pWitness_->viewEntitiesMap().size(), pWitness_->viewEntitiesMap().size() - pending, pending, pWitness_->viewRadius(), pWitness_->viewHysteresisArea()));
 
 	iter = pWitness_->viewEntities().begin();
@@ -3212,8 +3212,8 @@ void Entity::debugView()
 			dist = KBEVec3Length(&distvec);
 		}
 
-		Cellapp::getSingleton().getScript().pyPrint(fmt::format("{7}::debugView: {0} {1}({2}), position({3}.{4}.{5}), dist={6}, Seen={8}", 
-			this->id(), 
+		Cellapp::getSingleton().getScript().pyPrint(fmt::format("{7}::debugView: {0} {1}({2}), position({3}.{4}.{5}), dist={6}, Seen={8}",
+			this->id(),
 			(pEntity != NULL ? pEntity->scriptName() : "unknown"),
 			(*iter)->id(),
 			epos.x, epos.y, epos.z,
@@ -3227,7 +3227,7 @@ PyObject* Entity::pyDebugView()
 {
 	if(!isReal())
 	{
-		PyErr_Format(PyExc_AssertionError, "%s::debugView: not is real entity(%d).", 
+		PyErr_Format(PyExc_AssertionError, "%s::debugView: not is real entity(%d).",
 			scriptName(), id());
 		PyErr_PrintEx(0);
 		return 0;
@@ -3235,8 +3235,8 @@ PyObject* Entity::pyDebugView()
 
 	if (!hasFlags(ENTITY_FLAGS_DESTROYING) && this->isDestroyed())
 	{
-		PyErr_Format(PyExc_AssertionError, "%s::debugView: %d is destroyed!\n",		
-			scriptName(), id());		
+		PyErr_Format(PyExc_AssertionError, "%s::debugView: %d is destroyed!\n",
+			scriptName(), id());
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -3274,7 +3274,7 @@ PyObject* Entity::entitiesInView(bool pending)
 {
 	if(!isReal())
 	{
-		PyErr_Format(PyExc_AssertionError, "%s::entitiesInView: not is real entity(%d).", 
+		PyErr_Format(PyExc_AssertionError, "%s::entitiesInView: not is real entity(%d).",
 			scriptName(), id());
 		PyErr_PrintEx(0);
 		return 0;
@@ -3282,8 +3282,8 @@ PyObject* Entity::entitiesInView(bool pending)
 
 	if(this->isDestroyed())
 	{
-		PyErr_Format(PyExc_AssertionError, "%s::entitiesInView: %d is destroyed!\n",		
-			scriptName(), id());		
+		PyErr_Format(PyExc_AssertionError, "%s::entitiesInView: %d is destroyed!\n",
+			scriptName(), id());
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -3298,11 +3298,11 @@ PyObject* Entity::entitiesInView(bool pending)
 
 	PyObject* pyList = PyList_New(0);
 	Witness::VIEW_ENTITIES::iterator iter = pWitness_->viewEntities().begin();
-	
+
 	for(; iter != pWitness_->viewEntities().end(); ++iter)
 	{
 		Entity* pEntity = (*iter)->pEntity();
-		
+
 		if(pEntity && (pending || (pEntity->flags() & ENTITYREF_FLAG_ENTER_CLIENT_PENDING) <= 0))
 		{
 			PyList_Append(pyList, pEntity);
@@ -3470,7 +3470,7 @@ PyObject* Entity::pyTeleport(PyObject* nearbyMBRef, PyObject* pyposition, PyObje
 {
 	if(!isReal())
 	{
-		PyErr_Format(PyExc_AssertionError, "%s::teleport: not is real entity(%d).", 
+		PyErr_Format(PyExc_AssertionError, "%s::teleport: not is real entity(%d).",
 			scriptName(), id());
 		PyErr_PrintEx(0);
 		return 0;
@@ -3478,8 +3478,8 @@ PyObject* Entity::pyTeleport(PyObject* nearbyMBRef, PyObject* pyposition, PyObje
 
 	if(this->isDestroyed())
 	{
-		PyErr_Format(PyExc_AssertionError, "%s::teleport: %d is destroyed!\n",		
-			scriptName(), id());		
+		PyErr_Format(PyExc_AssertionError, "%s::teleport: %d is destroyed!\n",
+			scriptName(), id());
 		PyErr_PrintEx(0);
 		return 0;
 	}
@@ -3491,7 +3491,7 @@ PyObject* Entity::pyTeleport(PyObject* nearbyMBRef, PyObject* pyposition, PyObje
 		PyErr_PrintEx(0);
 		return 0;
 	}
-	
+
 	if(!PySequence_Check(pyposition) || PySequence_Size(pyposition) != 3)
 	{
 		PyErr_Format(PyExc_Exception, "%s::teleport: %d position not is Sequence!\n", scriptName(), id());
@@ -3532,7 +3532,7 @@ PyObject* Entity::pyTeleport(PyObject* nearbyMBRef, PyObject* pyposition, PyObje
 	pyitem = PySequence_GetItem(pydirection, 2);
 	dir.yaw((float)PyFloat_AsDouble(pyitem));
 	Py_DECREF(pyitem);
-	
+
 	teleport(nearbyMBRef, pos, dir);
 	S_Return;
 }
@@ -3548,9 +3548,9 @@ void Entity::teleportRefEntity(Entity* entity, Position3D& pos, Direction3D& dir
 		onTeleportFailure();
 		return;
 	}
-	
+
 	SPACE_ID lastSpaceID = this->spaceID();
-	
+
 	/* 即使entity已经销毁， 但内存未释放时spaceID应该是正确的， 所以理论可以找到space
 	if(entity->isDestroyed())
 	{
@@ -3613,20 +3613,20 @@ void Entity::teleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Dir
 {
 	if(hasFlags(ENTITY_FLAGS_TELEPORT_START))
 	{
-		PyErr_Format(PyExc_Exception, "%s::teleport: %d, In transit!\n", 
+		PyErr_Format(PyExc_Exception, "%s::teleport: %d, In transit!\n",
 			scriptName(), id());
 
 		PyErr_PrintEx(0);
 
 		onTeleportFailure();
 	}
-	
+
 	if (!nearbyMBRef->isCellReal())
 	{
 		char buf[1024];
 		nearbyMBRef->c_str(buf, 1024);
 
-		PyErr_Format(PyExc_Exception, "%s::teleport: %d, nearbyRef error, not is cellEntityCall! curr=%s\n", 
+		PyErr_Format(PyExc_Exception, "%s::teleport: %d, nearbyRef error, not is cellEntityCall! curr=%s\n",
 			scriptName(), id(), buf);
 
 		PyErr_PrintEx(0);
@@ -3647,7 +3647,7 @@ void Entity::teleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Dir
 		// 由于ghost功能会addCellDataToStream一次数据流，并且在传送失败时能重用该实体
 		// 因此这里不需要进行备份
 		// this->backupCellData();
-		
+
 		Network::Channel* pBaseChannel = baseEntityCall()->getChannel();
 		if(pBaseChannel)
 		{
@@ -3690,7 +3690,7 @@ void Entity::onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, D
 	MemoryStream* s = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 
 	try
-	{ 
+	{
 		changeToGhost(nearbyMBRef->componentID(), *s);
 	}
 	catch (MemoryStreamWriteOverflow & err)
@@ -3735,7 +3735,7 @@ void Entity::teleportLocal(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3
 		// 通知位置强制改变
 		Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(id(), (*pSendBundle));
-		
+
 		ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onSetEntityPosAndDir, setEntityPosAndDir);
 		(*pSendBundle) << id();
 		(*pSendBundle) << pos.x << pos.y << pos.z;
@@ -3770,7 +3770,7 @@ void Entity::teleportLocal(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3
 		// 通知位置强制改变
 		Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pEntity->id(), (*pSendBundle));
-		
+
 		ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onSetEntityPosAndDir, setEntityPosAndDir);
 		(*pSendBundle) << id();
 		(*pSendBundle) << pos.x << pos.y << pos.z;
@@ -3793,12 +3793,12 @@ void Entity::teleport(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& di
 
 		2: 如果是当前space上跳转则立即进行移动操作
 
-		3: 如果是跳转到其他space上, 但是那个space也在当前cellapp上的情况时， 立即执行跳转操作(因为不需要进行任何其他关系的维护， 直接切换就好了)。 
-		
+		3: 如果是跳转到其他space上, 但是那个space也在当前cellapp上的情况时， 立即执行跳转操作(因为不需要进行任何其他关系的维护， 直接切换就好了)。
+
 		4: 如果要跳转的目标space在另一个cellapp上：
 			4.1: 当前entity没有base部分， 不考虑维护base部分的关系， 但是还是要考虑意外情况导致跳转失败， 那么此时应该返回跳转失败回调并且继续
 			正常存在于当前space上。
-		
+
 			4.2: 当前entity有base部分， 那么我们需要改变base所映射的cell部分(并且在未正式切换关系时baseapp上所有送达cell的消息都应该不被丢失)， 为了安全我们需要做一些工作
 	*/
 
@@ -3827,7 +3827,7 @@ void Entity::teleport(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& di
 			{
 				EntityCall* mb = static_cast<EntityCall*>(nearbyMBRef);
 				Entity* entity = Cellapp::getSingleton().findEntity(mb->id());
-				
+
 				if(entity)
 				{
 					teleportRefEntity(entity, pos, dir);
@@ -3847,7 +3847,7 @@ void Entity::teleport(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& di
 			}
 		}
 	}
-	
+
 	Py_DECREF(this);
 }
 
@@ -3863,7 +3863,7 @@ void Entity::onTeleport()
 //-------------------------------------------------------------------------------------
 void Entity::onTeleportFailure()
 {
-	ERROR_MSG(fmt::format("{}::onTeleportFailure(): entityID={}\n", 
+	ERROR_MSG(fmt::format("{}::onTeleportFailure(): entityID={}\n",
 		this->scriptName(), id()));
 
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
@@ -3962,20 +3962,20 @@ void Entity::onUpdateGhostPropertys(KBEngine::MemoryStream& s)
 	PropertyDescription* pPropertyDescription = pScriptModule()->findCellPropertyDescription(utype);
 	if(pPropertyDescription == NULL)
 	{
-		ERROR_MSG(fmt::format("{}::onUpdateGhostPropertys: not found propertyID({}), entityID({})\n", 
+		ERROR_MSG(fmt::format("{}::onUpdateGhostPropertys: not found propertyID({}), entityID({})\n",
 			scriptName(), utype, id()));
 
 		s.done();
 		return;
 	}
 
-	DEBUG_MSG(fmt::format("{}::onUpdateGhostPropertys: property({}), entityID({})\n", 
+	DEBUG_MSG(fmt::format("{}::onUpdateGhostPropertys: property({}), entityID({})\n",
 		scriptName(), pPropertyDescription->getName(), id()));
 
 	PyObject* pyVal = pPropertyDescription->createFromStream(&s);
 	if(pyVal == NULL)
 	{
-		ERROR_MSG(fmt::format("{}::onUpdateGhostPropertys: entityID={}, create({}) error!\n", 
+		ERROR_MSG(fmt::format("{}::onUpdateGhostPropertys: entityID={}, create({}) error!\n",
 			scriptName(), id(), pPropertyDescription->getName()));
 
 		s.done();
@@ -4016,8 +4016,8 @@ void Entity::onRemoteRealMethodCall(KBEngine::MemoryStream& s)
 	MethodDescription* pMethodDescription = pCurrScriptModule->findCellMethodDescription(utype);
 	if(pMethodDescription == NULL)
 	{
-		ERROR_MSG(fmt::format("{}::onRemoteRealMethodCall: not found {} method({}), entityID({})\n", 
-			scriptName(), (pComponentPropertyDescription ? (std::string("component[") + 
+		ERROR_MSG(fmt::format("{}::onRemoteRealMethodCall: not found {} method({}), entityID({})\n",
+			scriptName(), (pComponentPropertyDescription ? (std::string("component[") +
 				std::string(pCurrScriptModule->getName()) + "] ") : ""), utype, id()));
 
 		s.done();
@@ -4030,7 +4030,7 @@ void Entity::onRemoteRealMethodCall(KBEngine::MemoryStream& s)
 //-------------------------------------------------------------------------------------
 void Entity::onUpdateGhostVolatileData(KBEngine::MemoryStream& s)
 {
-	DEBUG_MSG(fmt::format("{}::onUpdateGhostVolatileData: entityID({})\n", 
+	DEBUG_MSG(fmt::format("{}::onUpdateGhostVolatileData: entityID({})\n",
 		scriptName(), id()));
 }
 
@@ -4047,16 +4047,16 @@ void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s)
 
 	realCell_ = realCell;
 	ghostCell_ = 0;
-	
+
 	GhostManager* gm = Cellapp::getSingleton().pGhostManager();
 	if(gm)
 	{
 		gm->addRoute(id(), realCell_);
 	}
 
-	DEBUG_MSG(fmt::format("{}::changeToGhost(): {}, realCell={}, spaceID={}, position=({},{},{}).\n", 
+	DEBUG_MSG(fmt::format("{}::changeToGhost(): {}, realCell={}, spaceID={}, position=({},{},{}).\n",
 		scriptName(), id(), realCell_, spaceID_, position().x, position().y, position().z));
-	
+
 	// 必须放在前面
 	addToStream(s);
 
@@ -4110,9 +4110,9 @@ void Entity::addToStream(KBEngine::MemoryStream& s)
 
 	bool hasCustomVolatileinfo = (pCustomVolatileinfo_ != NULL);
 	ENTITY_ID controlledByID = (controlledBy_ != NULL ? controlledBy_->id() : 0);
-		
-	s << pScriptModule_->getUType() << spaceID_ << isDestroyed_ << 
-		isOnGround_ << topSpeed_ << topSpeedY_ << 
+
+	s << pScriptModule_->getUType() << spaceID_ << isDestroyed_ <<
+		isOnGround_ << topSpeed_ << topSpeedY_ <<
 		layer_ << baseEntityCallComponentID << hasCustomVolatileinfo << controlledByID;
 
 	s << persistentDigest_[0] << persistentDigest_[1] << persistentDigest_[2] << persistentDigest_[3] << persistentDigest_[4];
@@ -4121,7 +4121,7 @@ void Entity::addToStream(KBEngine::MemoryStream& s)
 		pCustomVolatileinfo_->addToStream(s);
 
 	addCellDataToStream(CELLAPP_TYPE, ENTITY_CELL_DATA_FLAGS, &s);
-	
+
 	addMovementHandlerToStream(s);
 	addControllersToStream(s);
 	addWitnessToStream(s);
@@ -4139,7 +4139,7 @@ void Entity::createFromStream(KBEngine::MemoryStream& s)
 	bool hasCustomVolatileinfo;
 	ENTITY_ID controlledByID;
 
-	s >> scriptUType >> spaceID_ >> isDestroyed_ >> isOnGround_ >> topSpeed_ >> 
+	s >> scriptUType >> spaceID_ >> isDestroyed_ >> isOnGround_ >> topSpeed_ >>
 		topSpeedY_ >> layer_ >> baseEntityCallComponentID >> hasCustomVolatileinfo >> controlledByID;
 
 	s >> persistentDigest_[0] >> persistentDigest_[1] >> persistentDigest_[2] >> persistentDigest_[3] >> persistentDigest_[4];
@@ -4185,7 +4185,7 @@ void Entity::createFromStream(KBEngine::MemoryStream& s)
 	Py_XDECREF(cellData);
 
 	removeFlags(ENTITY_FLAGS_INITING);
-	
+
 	createMovementHandlerFromStream(s);
 	createControllersFromStream(s);
 	createWitnessFromStream(s);
@@ -4296,7 +4296,7 @@ void Entity::createWitnessFromStream(KBEngine::MemoryStream& s)
 
 		KBE_ASSERT(witnesses_count_ == 0);
 		*/
-		
+
 		for (uint32 i = 0; i < size; ++i)
 		{
 			ENTITY_ID entityID;
@@ -4327,7 +4327,7 @@ void Entity::createWitnessFromStream(KBEngine::MemoryStream& s)
 		PyObject* clientMB = PyObject_GetAttrString(baseEntityCall(), "client");
 		KBE_ASSERT(clientMB != Py_None);
 
-		EntityCall* client = static_cast<EntityCall*>(clientMB);	
+		EntityCall* client = static_cast<EntityCall*>(clientMB);
 		clientEntityCall(client);
 
 		// 不要使用setWitness，因为此时不需要走onAttach流程，客户端不需要重新enterworld。
@@ -4350,7 +4350,7 @@ void Entity::addMovementHandlerToStream(KBEngine::MemoryStream& s)
 	{
 		s << false;
 	}
-	
+
 	if(pTurnController_)
 	{
 		s << true;
@@ -4359,7 +4359,7 @@ void Entity::addMovementHandlerToStream(KBEngine::MemoryStream& s)
 	else
 	{
 		s << false;
-	}	
+	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -4376,7 +4376,7 @@ void Entity::createMovementHandlerFromStream(KBEngine::MemoryStream& s)
 		pMoveController_->createFromStream(s);
 		pControllers_->add(pMoveController_);
 	}
-	
+
 	bool hasTurnHandler;
 	s >> hasTurnHandler;
 
@@ -4384,11 +4384,11 @@ void Entity::createMovementHandlerFromStream(KBEngine::MemoryStream& s)
 	{
 		if(!hasMoveHandler)
 			stopMove();
-		
+
 		pTurnController_ = KBEShared_ptr<Controller>(new TurnController(this));
 		pTurnController_->createFromStream(s);
 		pControllers_->add(pTurnController_);
-	}	
+	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -4444,7 +4444,7 @@ void Entity::createTimersFromStream(KBEngine::MemoryStream& s)
 		TimerHandle timerHandle = Cellapp::getSingleton().timers().add(
 				time, interval,
 				pEntityScriptTimerHandler, (void *)(intptr_t)userData);
-		
+
 		scriptTimers_.directAddTimer(tid, timerHandle);
 	}
 }

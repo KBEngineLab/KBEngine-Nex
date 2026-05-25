@@ -3,18 +3,18 @@
 #ifndef KBE_PLATFORM_H
 #define KBE_PLATFORM_H
 
-// common include	
+// common include
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h> 
+#include <stdarg.h>
 #include <math.h>
-#include <assert.h> 
+#include <assert.h>
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
-#include <string>  
-#include <cstring>  
+#include <string>
+#include <cstring>
 #include <vector>
 #include <map>
 #include <list>
@@ -31,28 +31,28 @@
 #include <unordered_map>
 #include <unordered_set>
 #include "common/strutil.h"
-// windows include	
+// windows include
 #if defined( __WIN32__ ) || defined( WIN32 ) || defined( _WIN32 )
 #pragma warning(disable:4996)
 #pragma warning(disable:4819)
 #pragma warning(disable:4049)
 #pragma warning(disable:4217)
 #include <io.h>
-#include <time.h> 
+#include <time.h>
 #include <chrono>
 //#define FD_SETSIZE 1024
-#ifndef WIN32_LEAN_AND_MEAN 
+#ifndef WIN32_LEAN_AND_MEAN
 #include <winsock2.h>		// 必须在windows.h之前包含， 否则网络模块编译会出错
-#include <mswsock.h> 
+#include <mswsock.h>
 #define WIN32_LEAN_AND_MEAN
 #endif
-#include <windows.h> 
+#include <windows.h>
 #define _SCL_SECURE_NO_WARNINGS
 #else
 // linux include
 #include <errno.h>
 #include <float.h>
-#include <pthread.h>	
+#include <pthread.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <signal.h>
@@ -63,7 +63,7 @@
 #include <signal.h>
 #include <net/if.h>
 #include <netinet/in.h>
-#include <netinet/tcp.h> 
+#include <netinet/tcp.h>
 #include <netinet/ip.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
@@ -80,25 +80,6 @@
 
 #include <signal.h>
 
-#if __cplusplus >= 201103L || (defined(_MSVC_LANG) && _MSVC_LANG >= 201103L)
-namespace std
-{
-	namespace tr1
-	{
-		using ::std::bind;
-		using ::std::function;
-		using ::std::hash;
-		using ::std::regex;
-		using ::std::regex_match;
-		using ::std::shared_ptr;
-		using ::std::unordered_map;
-		using ::std::unordered_set;
-		using ::std::weak_ptr;
-		namespace placeholders = ::std::placeholders;
-	}
-}
-#endif
-
 #if !defined( _WIN32 )
 # include <pwd.h>
 #else
@@ -113,7 +94,7 @@ namespace std
 
 /** 定义引擎名字空间 */
 namespace KBEngine
-{ 
+{
 
 /** 定义引擎字节序 */
 #define KBENGINE_LITTLE_ENDIAN							0
@@ -121,9 +102,9 @@ namespace KBEngine
 #if !defined(KBENGINE_ENDIAN)
 #  if defined (USE_BIG_ENDIAN)
 #    define KBENGINE_ENDIAN KBENGINE_BIG_ENDIAN
-#  else 
+#  else
 #    define KBENGINE_ENDIAN KBENGINE_LITTLE_ENDIAN
-#  endif 
+#  endif
 #endif
 
 
@@ -169,7 +150,7 @@ namespace KBEngine
 #  define KBE_COMPILER COMPILER_GNU
 #elif defined( __clang__ )
 #  define KBE_COMPILER COMPILER_CLANG
-	
+
 #else
 #  pragma error "FATAL ERROR: Unknown compiler."
 #endif
@@ -360,7 +341,7 @@ typedef KBEUnordered_map< std::string, std::string >			SPACE_DATA;												//
 #endif
 	typedef unsigned short										u_int16_t;
 	typedef unsigned long										u_int32_t;
-	
+
 #ifndef IFF_UP
 	enum
 	{
@@ -393,7 +374,7 @@ typedef KBEUnordered_map< std::string, std::string >			SPACE_DATA;												//
 	#define THREAD_MUTEX_INIT(x)								InitializeCriticalSection(&x)
 	#define THREAD_MUTEX_DELETE(x)								DeleteCriticalSection(&x)
 	#define THREAD_MUTEX_LOCK(x)								EnterCriticalSection(&x)
-	#define THREAD_MUTEX_UNLOCK(x)								LeaveCriticalSection(&x)	
+	#define THREAD_MUTEX_UNLOCK(x)								LeaveCriticalSection(&x)
 #else
 	#define THREAD_ID											pthread_t
 	#define THREAD_SINGNAL										pthread_cond_t
@@ -404,7 +385,7 @@ typedef KBEUnordered_map< std::string, std::string >			SPACE_DATA;												//
 	#define THREAD_MUTEX_INIT(x)								pthread_mutex_init (&x, NULL)
 	#define THREAD_MUTEX_DELETE(x)								pthread_mutex_destroy(&x)
 	#define THREAD_MUTEX_LOCK(x)								pthread_mutex_lock(&x)
-	#define THREAD_MUTEX_UNLOCK(x)								pthread_mutex_unlock(&x)		
+	#define THREAD_MUTEX_UNLOCK(x)								pthread_mutex_unlock(&x)
 #endif
 
 /*---------------------------------------------------------------------------------
@@ -505,7 +486,7 @@ inline const T & max( const T & a, const T & b )
 #endif
 
 // 所有名称字符串的最大长度
-#define MAX_NAME 256	
+#define MAX_NAME 256
 
 // ip字符串的最大长度
 #define MAX_IP 256
@@ -528,7 +509,7 @@ inline char* kbe_strerror(int ierrorno = 0)
 		ierrorno = GetLastError();
 
 	static char lpMsgBuf[256] = {0};
-	
+
 	/*
 	FormatMessage(
 		FORMAT_MESSAGE_FROM_SYSTEM |
@@ -539,7 +520,7 @@ inline char* kbe_strerror(int ierrorno = 0)
 		(LPTSTR) &lpMsgBuf,
 		1024,
 		NULL
-	); 
+	);
 	*/
 	kbe_snprintf(lpMsgBuf, 256, "errorno=%d",  ierrorno);
 	return lpMsgBuf;
@@ -642,10 +623,10 @@ inline int32 getProcessPID()
 
 /** 获取系统时间(精确到毫秒) */
 #if KBE_PLATFORM == PLATFORM_WIN32
-	inline uint32 getSystemTime() 
-	{ 
+	inline uint32 getSystemTime()
+	{
 		// 注意这个函数windows上只能正确维持49天。
-		return ::GetTickCount(); 
+		return ::GetTickCount();
 	};
 #else
 	inline uint32 getSystemTime()
@@ -725,7 +706,7 @@ inline uint64 getTimeMs()
 #endif
 }
 
-/* 产生一个64位的uuid 
+/* 产生一个64位的uuid
 */
 extern COMPONENT_ORDER g_componentGlobalOrder;
 extern COMPONENT_ORDER g_componentGroupOrder;
@@ -744,7 +725,7 @@ inline uint64 genUUID64()
 		tv = now;
 		lastNum = 0;
 	}
-	
+
 	if(g_genuuid_sections <= 0)
 	{
 		// 时间戳32位，随机数16位，16位迭代数（最大为65535-1）
@@ -754,18 +735,18 @@ inline uint64 genUUID64()
 			srand(getSystemTime());
 			rnd = (uint32)(rand() << 16);
 		}
-		
+
 		assert(lastNum < 65535 && "genUUID64(): overflow!");
-		
+
 		return (tv << 32) | rnd | lastNum++;
 	}
 	else
 	{
 		// 时间戳32位，app组ID16位，16位迭代数（最大为65535-1）
 		static uint32 sections = g_genuuid_sections << 16;
-		
+
 		assert(lastNum < 65535 && "genUUID64(): overflow!");
-		
+
 		return (tv << 32) | sections | lastNum++;
 	}
 }
@@ -773,17 +754,17 @@ inline uint64 genUUID64()
 /** sleep 跨平台 */
 #if KBE_PLATFORM == PLATFORM_WIN32
 	inline void sleep(uint32 ms)
-	{ 
-		::Sleep(ms); 
+	{
+		::Sleep(ms);
 	}
 #else
 	inline void sleep(uint32 ms)
-	{ 
+	{
 	  struct timeval tval;
 	  tval.tv_sec	= ms / 1000;
 	  tval.tv_usec	= ( ms * 1000) % 1000000;
 	  select(0, NULL, NULL, NULL, &tval);
-	}	
+	}
 #endif
 
 /** 判断平台是否为小端字节序 */

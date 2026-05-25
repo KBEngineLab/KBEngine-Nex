@@ -32,6 +32,7 @@ add_library(server STATIC ${SRCS})
 target_link_libraries(server PRIVATE 
 	fmt::fmt
 	python_interface
+	resmgr
 )
 target_link_libraries(server PRIVATE jwsmtp)
 

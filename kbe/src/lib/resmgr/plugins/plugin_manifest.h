@@ -3,7 +3,7 @@
 #ifndef KBE_PLUGIN_MANIFEST_H
 #define KBE_PLUGIN_MANIFEST_H
 
-#include "server/plugins/plugin_descriptor.h"
+#include "resmgr/plugins/plugin_descriptor.h"
 
 namespace KBEngine {
 

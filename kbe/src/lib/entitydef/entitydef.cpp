@@ -9,17 +9,41 @@
 #include "entity_component.h"
 #include "pyscript/py_memorystream.h"
 #include "resmgr/resmgr.h"
-#include "server/plugins/plugin_manager.h"
+#include "resmgr/plugins/plugin_manager.h"
 #include "common/smartpointer.h"
 #include "entitydef/volatileinfo.h"
 #include "entitydef/entity_call.h"
 #include "entitydef/entity_component_call.h"
+#include <algorithm>
 
 #ifndef CODE_INLINE
 #include "entitydef.inl"
 #endif
 
 namespace KBEngine{
+
+namespace
+{
+
+std::string normalizePluginPath(std::string path)
+{
+	std::replace(path.begin(), path.end(), '\\', '/');
+	return path;
+}
+
+bool pluginFileExists(const std::string& path)
+{
+	return access(path.c_str(), 0) == 0;
+}
+
+bool pluginEntityScriptExists(const PluginEntityDescriptor& entity, const std::string& folder)
+{
+	std::string file = normalizePluginPath(entity.pluginRootPath + "/" + folder + "/" + entity.name + ".py");
+	return pluginFileExists(file) || pluginFileExists(file + "c");
+}
+
+}
+
 std::vector<ScriptDefModulePtr>	EntityDef::__scriptModules;
 std::vector<ScriptDefModulePtr>	EntityDef::__oldScriptModules;
 
@@ -176,20 +200,135 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 
 	std::string entitiesFile = __entitiesPath + "entities.xml";
 	std::string defFilePath = __entitiesPath + "entity_defs/";
+	std::string assetsTypesFile = defFilePath + "types.xml";
 
 	if (!PluginManager::instance().initialize())
 		return false;
 
-	// 初始化数据类别
-	// assets/scripts/entity_defs/types.xml
-	if(!DataTypes::initialize(defFilePath + "types.xml"))
-		return false;
-
-	std::vector<std::string> pluginTypeFiles = PluginManager::instance().getTypeFiles();
-	for (std::vector<std::string>::iterator iter = pluginTypeFiles.begin(); iter != pluginTypeFiles.end(); ++iter)
+	// 插件 schema 前置：插件 types.xml 先于 assets/entity_defs/types.xml 加载。
+	// 这样 assets 的 .def 和 types.xml 可以直接引用启用插件提供的类型；启用插件即表示修改当前 assets schema。
+	const std::vector<PluginDescriptor>& plugins = PluginManager::instance().plugins();
+	if (!plugins.empty())
 	{
-		if (!DataTypes::loadTypes(*iter))
+		INFO_MSG(fmt::format("EntityDef::initialize: loading plugin type files before assets types, plugins={}.\n",
+			plugins.size()));
+
+		bool dataTypesInitialized = false;
+
+		std::vector<PluginTypeFileDescriptor> pluginTypeFiles = PluginManager::instance().getTypeFileDescriptors();
+		for (std::vector<PluginTypeFileDescriptor>::const_iterator iter = pluginTypeFiles.begin(); iter != pluginTypeFiles.end(); ++iter)
+		{
+			INFO_MSG(fmt::format("EntityDef::initialize: loading plugin [{}] types [{}] with prefix [{}].\n",
+				iter->pluginName, iter->file, iter->pluginPrefix));
+
+			if (!dataTypesInitialized)
+			{
+				if (!DataTypes::initialize(iter->file, iter->pluginPrefix, iter->file))
+					return false;
+
+				dataTypesInitialized = true;
+			}
+			else
+			{
+				if (!DataTypes::loadTypes(iter->file, iter->pluginPrefix, iter->file))
+					return false;
+			}
+		}
+
+		if (!dataTypesInitialized)
+		{
+			if (!DataTypes::initialize(assetsTypesFile))
+				return false;
+		}
+		else
+		{
+			if (!DataTypes::loadTypes(assetsTypesFile))
+				return false;
+		}
+	}
+	else
+	{
+		// 没有启用插件类型时保持原 KBE 路径：初始化基础类型，然后读取 assets/entity_defs/types.xml。
+		if(!DataTypes::initialize(assetsTypesFile))
 			return false;
+	}
+
+	// 插件实体同样前置注册。plugins.xml 的顺序就是插件实体的 utype/MD5 顺序；
+	// assets/entities.xml 随后加载，若出现同名实体会启动失败，避免静默覆盖插件 schema。
+	const std::vector<PluginEntityDescriptor>& pluginEntities = PluginManager::instance().entities();
+	if (!pluginEntities.empty())
+	{
+		INFO_MSG(fmt::format("EntityDef::initialize: loading {} plugin entity definition(s) before assets entities.\n",
+			pluginEntities.size()));
+	}
+
+	for (std::vector<PluginEntityDescriptor>::const_iterator iter = pluginEntities.begin(); iter != pluginEntities.end(); ++iter)
+	{
+		if (findScriptModule(iter->name.c_str(), false))
+		{
+			ERROR_MSG(fmt::format("EntityDef::initialize: plugin entity [{}] conflicts with an existing entity.\n",
+				iter->name));
+			return false;
+		}
+
+		ScriptDefModule* pScriptModule = registerNewScriptDefModule(iter->name);
+		pScriptModule->setDefSourceFile(iter->defFullPath);
+		SmartPointer<XML> defxml(new XML());
+
+		if (!pluginFileExists(iter->defFullPath))
+		{
+			ERROR_MSG(fmt::format("EntityDef::initialize: plugin entity [{}] def not found [{}]\n",
+				iter->name, iter->defFullPath));
+			return false;
+		}
+
+		if (iter->hasBase && !pluginEntityScriptExists(*iter, "base"))
+		{
+			ERROR_MSG(fmt::format("EntityDef::initialize: plugin [{}] entity [{}] declared base but script not found, manifest [{}].\n",
+				iter->pluginName, iter->name, iter->manifestFile));
+			return false;
+		}
+
+		if (iter->hasCell && !pluginEntityScriptExists(*iter, "cell"))
+		{
+			ERROR_MSG(fmt::format("EntityDef::initialize: plugin [{}] entity [{}] declared cell but script not found, manifest [{}].\n",
+				iter->pluginName, iter->name, iter->manifestFile));
+			return false;
+		}
+
+		if (iter->hasClient && !pluginEntityScriptExists(*iter, "client"))
+		{
+			ERROR_MSG(fmt::format("EntityDef::initialize: plugin [{}] entity [{}] declared client but script not found, manifest [{}].\n",
+				iter->pluginName, iter->name, iter->manifestFile));
+			return false;
+		}
+
+		if (!defxml->openSection(iter->defFullPath.c_str()))
+			return false;
+
+		TiXmlNode* defNode = defxml->getRootNode();
+		if (defNode != NULL)
+		{
+			std::string pluginDefPath = iter->defFullPath;
+			std::string::size_type pos = pluginDefPath.find_last_of("/\\");
+			pluginDefPath = (pos == std::string::npos) ? "" : pluginDefPath.substr(0, pos + 1);
+
+			if (!loadDefInfo(pluginDefPath, iter->name, defxml.get(), defNode, pScriptModule))
+			{
+				ERROR_MSG(fmt::format("EntityDef::initialize: failed to load plugin entity({}) module!\n",
+					iter->name));
+				return false;
+			}
+
+			if (!loadDetailLevelInfo(pluginDefPath, iter->name, defxml.get(), defNode, pScriptModule))
+			{
+				ERROR_MSG(fmt::format("EntityDef::initialize: failed to load plugin entity({}) DetailLevelInfo!\n",
+					iter->name));
+				return false;
+			}
+		}
+
+		pScriptModule->onLoaded();
 	}
 
 	// 打开这个entities.xml文件
@@ -205,14 +344,31 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 		if (node == NULL)
 			return true;
 
-		// 开始遍历所有的entity节点
+		// 开始遍历所有的entity节点。插件实体已经前置注册，因此这里必须显式检查重名。
 		XML_FOR_BEGIN(node)
 		{
 			std::string moduleName = xml.get()->getKey(node);
 
+			if (findScriptModule(moduleName.c_str(), false))
+			{
+				const PluginEntityDescriptor* pluginEntity = PluginManager::instance().findEntity(moduleName);
+				if (pluginEntity)
+				{
+					ERROR_MSG(fmt::format("EntityDef::initialize: assets entity [{}] conflicts with plugin [{}] entity [{}], pluginManifest=[{}], assetsFile=[{}].\n",
+						moduleName, pluginEntity->pluginName, pluginEntity->name, pluginEntity->manifestFile, entitiesFile));
+				}
+				else
+				{
+					ERROR_MSG(fmt::format("EntityDef::initialize: assets entity [{}] is duplicated in assetsFile=[{}].\n",
+						moduleName, entitiesFile));
+				}
+				return false;
+			}
+
 			ScriptDefModule* pScriptModule = registerNewScriptDefModule(moduleName);
 
 			std::string deffile = defFilePath + moduleName + ".def";
+			pScriptModule->setDefSourceFile(deffile);
 			SmartPointer<XML> defxml(new XML());
 
 			if (!defxml->openSection(deffile.c_str()))
@@ -246,47 +402,6 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 			pScriptModule->onLoaded();
 		}
 		XML_FOR_END(node);
-	}
-
-	const std::vector<PluginEntityDescriptor>& pluginEntities = PluginManager::instance().entities();
-	for (std::vector<PluginEntityDescriptor>::const_iterator iter = pluginEntities.begin(); iter != pluginEntities.end(); ++iter)
-	{
-		if (findScriptModule(iter->name.c_str(), false))
-		{
-			ERROR_MSG(fmt::format("EntityDef::initialize: plugin entity [{}] conflicts with an existing entity.\n",
-				iter->name));
-			return false;
-		}
-
-		ScriptDefModule* pScriptModule = registerNewScriptDefModule(iter->name);
-		SmartPointer<XML> defxml(new XML());
-
-		if (!defxml->openSection(iter->defFullPath.c_str()))
-			return false;
-
-		TiXmlNode* defNode = defxml->getRootNode();
-		if (defNode != NULL)
-		{
-			std::string pluginDefPath = iter->defFullPath;
-			std::string::size_type pos = pluginDefPath.find_last_of("/\\");
-			pluginDefPath = (pos == std::string::npos) ? "" : pluginDefPath.substr(0, pos + 1);
-
-			if (!loadDefInfo(pluginDefPath, iter->name, defxml.get(), defNode, pScriptModule))
-			{
-				ERROR_MSG(fmt::format("EntityDef::initialize: failed to load plugin entity({}) module!\n",
-					iter->name));
-				return false;
-			}
-
-			if (!loadDetailLevelInfo(pluginDefPath, iter->name, defxml.get(), defNode, pScriptModule))
-			{
-				ERROR_MSG(fmt::format("EntityDef::initialize: failed to load plugin entity({}) DetailLevelInfo!\n",
-					iter->name));
-				return false;
-			}
-		}
-
-		pScriptModule->onLoaded();
 	}
 
 	if (!script::entitydef::initialize())
@@ -2327,6 +2442,13 @@ bool EntityDef::loadAllEntityScriptModules(std::string entitiesPath,
 	std::set<std::string> checkedComponentTypes;
 
 	std::vector<std::string> moduleNames;
+	const std::vector<PluginEntityDescriptor>& pluginEntities = PluginManager::instance().entities();
+	for (std::vector<PluginEntityDescriptor>::const_iterator iter = pluginEntities.begin(); iter != pluginEntities.end(); ++iter)
+	{
+		// EntityDef 注册已经按插件前置完成，这里导入 Python Entity 脚本时保持相同顺序。
+		moduleNames.push_back(iter->name);
+	}
+
 	if (access(entitiesFile.c_str(), 0) == 0)
 	{
 		SmartPointer<XML> xml(new XML());
@@ -2342,12 +2464,6 @@ bool EntityDef::loadAllEntityScriptModules(std::string entitiesPath,
 			}
 			XML_FOR_END(node);
 		}
-	}
-
-	const std::vector<PluginEntityDescriptor>& pluginEntities = PluginManager::instance().entities();
-	for (std::vector<PluginEntityDescriptor>::const_iterator iter = pluginEntities.begin(); iter != pluginEntities.end(); ++iter)
-	{
-		moduleNames.push_back(iter->name);
 	}
 
 	for (std::vector<std::string>::iterator moduleIter = moduleNames.begin(); moduleIter != moduleNames.end(); ++moduleIter)
