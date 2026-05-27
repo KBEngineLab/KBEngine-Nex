@@ -73,6 +73,7 @@ public:
 		例如 cell 进程只扫描 cell 目录，base 进程只扫描 base 目录；interfaces 下的 mixin 会在
 		Avatar/Monster 等主脚本重新导入前先 reload，避免 class 继承链继续引用旧的 interface 类。
 		注意：这里只 reload sys.modules 中已存在的模块，不主动 import 未加载模块，避免触发跨组件脚本副作用。
+		同时会根据文件修改时间过滤，只有 mtime 变化的模块才会真正 reload，并在日志中打印变更文件。
 	*/
 	static bool reloadDependencyScriptModules(std::string entitiesPath);
 

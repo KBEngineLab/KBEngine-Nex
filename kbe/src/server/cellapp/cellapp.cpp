@@ -1838,7 +1838,9 @@ void Cellapp::lookApp(Network::Channel* pChannel)
 //-------------------------------------------------------------------------------------
 PyObject* Cellapp::__py_reloadScript(PyObject* self, PyObject* args)
 {
-	bool fullReload = true;
+	// reloadScript() 默认只热更逻辑层，避免不传参时误触发属性补齐/数据层 reload。
+	// 需要开发期完整 reload 时可以显式调用 reloadScript(True)。
+	bool fullReload = false;
 	Py_ssize_t argCount = PyTuple_Size(args);
 	if(argCount == 1)
 	{

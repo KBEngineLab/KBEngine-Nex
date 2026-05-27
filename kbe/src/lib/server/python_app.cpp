@@ -1330,6 +1330,15 @@ void PythonApp::onReloadScript(bool fullReload)
 //-------------------------------------------------------------------------------------
 void PythonApp::reloadScript(bool fullReload)
 {
+	if (g_appPublish != 0 && fullReload)
+	{
+		// 非 EntityApp 进程同样遵守生产环境只热更逻辑的约束。
+		// 目前 PythonApp 基类没有数据层 reload，但这里统一收口语义，避免后续扩展时绕过限制。
+		WARNING_MSG(fmt::format("{}::reloadScript: production mode forces fullReload=false, requested fullReload=true.\n",
+			COMPONENT_NAME_EX(g_componentType)));
+		fullReload = false;
+	}
+
 	onReloadScript(fullReload);
 	// 非 EntityApp 组件也可能持有脚本 Timer；脚本 reload 完成后立即刷新 Timer 回调，
 	// 保证后续触发时尽量进入新脚本实现。

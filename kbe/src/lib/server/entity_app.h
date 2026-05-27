@@ -1803,6 +1803,15 @@ ReloadScriptEntityStats EntityApp<E>::reloadScriptEntitiesAndNotify(bool fullRel
 template<class E>
 void EntityApp<E>::reloadScript(bool fullReload)
 {
+	if (g_appPublish != 0 && fullReload)
+	{
+		// 生产环境只允许逻辑层热更。即使运维误传 True 或脚本不传参数走默认值，
+		// 这里也强制降级为 fullReload=false，避免线上触碰属性补齐、数据重建等高风险路径。
+		WARNING_MSG(fmt::format("{}::reloadScript: production mode forces fullReload=false, requested fullReload=true.\n",
+			COMPONENT_NAME_EX(g_componentType)));
+		fullReload = false;
+	}
+
 	INFO_MSG(fmt::format("{}::reloadScript: begin, fullReload={}.\n",
 		COMPONENT_NAME_EX(g_componentType), fullReload));
 
