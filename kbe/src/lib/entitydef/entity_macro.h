@@ -389,7 +389,10 @@ public:																										\
 			return false;																					\
 		}																									\
 																											\
-		initProperty(true);																					\
+		/* 普通 reloadScript(False) 只更新脚本行为层，不能重新初始化属性，						\
+		   否则在线实体数据会被默认值覆盖；只有 fullReload 才做属性差异补齐。 */					\
+		if(fullReload)																						\
+			initProperty(true);																				\
 		return _reload(fullReload);																			\
 	}																										\
 																											\
@@ -1588,9 +1591,11 @@ public:																										\
 										EntityDef::findOldScriptModule(pScriptModule_->getName());			\
 			if(!pOldScriptDefModule)																		\
 			{																								\
-				ERROR_MSG(fmt::format("{}::initProperty: not found old_module!\n",							\
+				/* fullReload 需要旧模块描述用于属性差异比对；如果旧描述缺失，							\
+				   为了保留在线数据，跳过本次属性 reload，不再 assert 终止进程。 */						\
+				WARNING_MSG(fmt::format("{}::initProperty: not found old_module, skip property reload.\n",	\
 					pScriptModule_->getName()));															\
-				KBE_ASSERT(false && "Entity::initProperty: not found old_module");							\
+				return;																						\
 			}																								\
 																											\
 			oldpropers =																					\

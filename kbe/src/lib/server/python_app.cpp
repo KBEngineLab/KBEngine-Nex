@@ -268,19 +268,61 @@ PyObject* customCfgItemToPyObject(const ServerConfig::CustomCfgItem& item)
 class ScriptTimerHandler : public TimerHandler
 {
 public:
+	// Timer 创建时记录回调的“可重新定位路径”：
+	// 绑定方法保存 owner + 方法名，模块函数保存 module + qualname。
+	// 热更后通过这条路径重新获取 Python 对象，Timer 句柄和调度状态保持不变。
 	ScriptTimerHandler(ScriptTimers* scriptTimers, PyObject * callback) :
 		pyCallback_(callback),
+		pyCallbackOwner_(NULL),
 		scriptTimers_(scriptTimers)
 	{
 		Py_INCREF(pyCallback_);
+		captureReloadPath(callback);
+		handlers_.push_back(this);
 	}
 
 	~ScriptTimerHandler()
 	{
+		// handlers_ 是热更时遍历所有存活 Timer 的全局索引。
+		// Timer 删除时必须同步摘除，避免热更过程中访问已释放的 handler。
+		std::vector<ScriptTimerHandler*>::iterator iter =
+			std::find(handlers_.begin(), handlers_.end(), this);
+
+		if (iter != handlers_.end())
+			handlers_.erase(iter);
+
+		Py_XDECREF(pyCallbackOwner_);
 		Py_DECREF(pyCallback_);
 	}
 
+	static ReloadScriptTimerStats reloadAllCallbacks()
+	{
+		ReloadScriptTimerStats stats;
+
+		// 复制一份快照再遍历：reloadCallback 理论上可能触发脚本逻辑间接删除 Timer，
+		// 因此每次操作前用 isAlive 再确认原 handler 仍在 handlers_ 中。
+		std::vector<ScriptTimerHandler*> handlers = handlers_;
+		std::vector<ScriptTimerHandler*>::iterator iter = handlers.begin();
+		for (; iter != handlers.end(); ++iter)
+		{
+			if (isAlive(*iter))
+			{
+				if ((*iter)->reloadCallback())
+					++stats.refreshed;
+				else
+					++stats.keptOld;
+			}
+		}
+
+		return stats;
+	}
+
 private:
+	static bool isAlive(ScriptTimerHandler* handler)
+	{
+		return std::find(handlers_.begin(), handlers_.end(), handler) != handlers_.end();
+	}
+
 	virtual void handleTimeout(TimerHandle handle, void * pUser)
 	{
 		int id = ScriptTimersUtil::getIDForHandle(scriptTimers_, handle);
@@ -300,9 +342,162 @@ private:
 		delete this;
 	}
 
+	bool getStringAttr(PyObject* pyObj, const char* attrName, std::string& out)
+	{
+		// Python 回调并不一定都有 __module__/__qualname__/__name__，
+		// 例如部分 C 扩展对象或局部闭包。这里失败只代表无法热更刷新，不影响原 Timer。
+		PyObject* pyAttr = PyObject_GetAttrString(pyObj, attrName);
+		if (!pyAttr)
+		{
+			PyErr_Clear();
+			return false;
+		}
+
+		const char* attr = PyUnicode_AsUTF8AndSize(pyAttr, NULL);
+		if (!attr)
+		{
+			PyErr_Clear();
+			Py_DECREF(pyAttr);
+			return false;
+		}
+
+		out = attr;
+		Py_DECREF(pyAttr);
+		return true;
+	}
+
+	void captureReloadPath(PyObject* callback)
+	{
+		// 绑定方法（entity.onTimer / object.method）在热更后应从原 owner 上重新取同名方法，
+		// 这样可以拿到 owner 当前 __class__ 下的新函数实现。
+		if (PyMethod_Check(callback))
+		{
+			PyObject* pySelf = PyMethod_GET_SELF(callback);
+			if (pySelf && getStringAttr(callback, "__name__", callbackName_))
+			{
+				pyCallbackOwner_ = pySelf;
+				Py_INCREF(pyCallbackOwner_);
+			}
+
+			return;
+		}
+
+		// 普通模块函数使用 __module__ + __qualname__ 定位。
+		// 后续 reload 后会沿 qualname 逐级取属性，支持 Class.staticMethod 这类路径。
+		getStringAttr(callback, "__module__", callbackModule_);
+		getStringAttr(callback, "__qualname__", callbackQualName_);
+	}
+
+	PyObject* resolveModuleCallback()
+	{
+		// 局部函数/闭包的 qualname 中会包含 <locals>，无法从模块命名空间稳定找回；
+		// 这种回调继续保留旧对象，避免热更时误替换成错误函数。
+		if (callbackModule_.empty() || callbackQualName_.empty() ||
+			callbackQualName_.find("<locals>") != std::string::npos)
+		{
+			return NULL;
+		}
+
+		PyObject* pyModules = PyImport_GetModuleDict();
+		PyObject* pyObj = PyDict_GetItemString(pyModules, callbackModule_.c_str());
+		if (!pyObj)
+			return NULL;
+
+		Py_INCREF(pyObj);
+
+		std::string::size_type start = 0;
+		while (start < callbackQualName_.size())
+		{
+			// 按 qualname 的点号逐级解析属性，例如 Foo.bar.baz。
+			// 每一层都重新从当前模块对象上取，确保拿到 reload 后的新对象图。
+			std::string::size_type end = callbackQualName_.find('.', start);
+			std::string attrName = callbackQualName_.substr(start,
+				end == std::string::npos ? std::string::npos : end - start);
+
+			PyObject* pyNext = PyObject_GetAttrString(pyObj, attrName.c_str());
+			Py_DECREF(pyObj);
+
+			if (!pyNext)
+			{
+				PyErr_Clear();
+				return NULL;
+			}
+
+			pyObj = pyNext;
+
+			if (end == std::string::npos)
+				break;
+
+			start = end + 1;
+		}
+
+		return pyObj;
+	}
+
+	bool reloadCallback()
+	{
+		PyObject* pyNewCallback = NULL;
+
+		if (pyCallbackOwner_ && !callbackName_.empty())
+		{
+			// 绑定方法优先从原 owner 上取同名方法。Entity/Component 在热更时已经换过 __class__，
+			// 因此这里取到的是新类上的方法绑定，而不是旧函数对象。
+			pyNewCallback = PyObject_GetAttrString(pyCallbackOwner_, callbackName_.c_str());
+			if (!pyNewCallback)
+			{
+				PyErr_Clear();
+			}
+		}
+		else
+		{
+			pyNewCallback = resolveModuleCallback();
+		}
+
+		if (!pyNewCallback)
+		{
+			// 无法解析新回调时保留旧回调。Timer 语义上“继续跑”比“丢失回调”更安全，
+			// 日志会记录 keptOld，方便开发环境确认哪些 Timer 仍指向旧函数。
+			if (!callbackModule_.empty() || pyCallbackOwner_)
+			{
+				WARNING_MSG(fmt::format("ScriptTimerHandler::reloadCallback: unable to refresh callback({}.{}), keep old callback.\n",
+					callbackModule_, pyCallbackOwner_ ? callbackName_ : callbackQualName_));
+			}
+
+			return false;
+		}
+
+		if (!PyCallable_Check(pyNewCallback))
+		{
+			// 解析成功但目标不是 callable，说明脚本侧重命名或改类型了。
+			// 此时也保留旧回调，避免 Timer 下一次触发直接调用非函数对象。
+			WARNING_MSG(fmt::format("ScriptTimerHandler::reloadCallback: refreshed callback({}.{}) is not callable, keep old callback.\n",
+				callbackModule_, pyCallbackOwner_ ? callbackName_ : callbackQualName_));
+
+			Py_DECREF(pyNewCallback);
+			return false;
+		}
+
+		// 替换为新回调。pyNewCallback 已经是新引用，直接接管给 pyCallback_。
+		Py_DECREF(pyCallback_);
+		pyCallback_ = pyNewCallback;
+		return true;
+	}
+
 	PyObject* pyCallback_;
+	// 绑定方法的 owner。热更时通过 owner + 方法名重新解析，保证实体换类后 Timer 跟着更新。
+	PyObject* pyCallbackOwner_;
+	// 普通函数的模块名与限定名，用于 reload 后从 sys.modules 重新定位回调对象。
+	std::string callbackModule_;
+	std::string callbackQualName_;
+	// 绑定方法名，例如 onTimer。
+	std::string callbackName_;
 	ScriptTimers* scriptTimers_;
+
+	// 当前进程内所有存活的 ScriptTimerHandler。热更时用它批量刷新回调对象。
+	static std::vector<ScriptTimerHandler*> handlers_;
 };
+
+std::vector<ScriptTimerHandler*> ScriptTimerHandler::handlers_;
 
 //-------------------------------------------------------------------------------------
 PythonApp::PythonApp(Network::EventDispatcher& dispatcher,
@@ -1136,6 +1331,12 @@ void PythonApp::onReloadScript(bool fullReload)
 void PythonApp::reloadScript(bool fullReload)
 {
 	onReloadScript(fullReload);
+	// 非 EntityApp 组件也可能持有脚本 Timer；脚本 reload 完成后立即刷新 Timer 回调，
+	// 保证后续触发时尽量进入新脚本实现。
+	ReloadScriptTimerStats timerStats = reloadScriptTimers();
+
+	INFO_MSG(fmt::format("{}::reloadScript: fullReload={}, timersRefreshed={}, timersKeptOld={}\n",
+		COMPONENT_NAME_EX(g_componentType), fullReload, timerStats.refreshed, timerStats.keptOld));
 
 	// SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
@@ -1155,6 +1356,13 @@ void PythonApp::reloadScript(bool fullReload)
 	uninstallPluginModules();
 	if (installPluginModules())
 		dispatchPluginEvent("onInit", true);
+}
+
+//-------------------------------------------------------------------------------------
+ReloadScriptTimerStats PythonApp::reloadScriptTimers()
+{
+	// 统一入口，EntityApp 和普通 PythonApp 都通过这里刷新 Timer 回调。
+	return ScriptTimerHandler::reloadAllCallbacks();
 }
 
 //-------------------------------------------------------------------------------------

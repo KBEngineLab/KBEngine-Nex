@@ -14,7 +14,9 @@
 #include "entitydef/volatileinfo.h"
 #include "entitydef/entity_call.h"
 #include "entitydef/entity_component_call.h"
+#include "pyscript/py_platform.h"
 #include <algorithm>
+#include <set>
 
 #ifndef CODE_INLINE
 #include "entitydef.inl"
@@ -142,11 +144,226 @@ bool EntityDef::isReload()
 }
 
 //-------------------------------------------------------------------------------------
+bool EntityDef::reloadDependencyScriptModules(std::string entitiesPath)
+{
+	// __entitiesPath 指向用户 scripts 根目录。依赖热更必须收敛到当前进程所属目录：
+	// cellapp 只处理 scripts/cell，baseapp 只处理 scripts/base。
+	// 如果扫描整个 scripts，会在 cell 进程误 import base.Account，导致 KBEngine.Proxy 不存在。
+	std::string dependencyPath = normalizePluginPath(entitiesPath);
+	while (dependencyPath.size() > 0 && dependencyPath[dependencyPath.size() - 1] != '/' && dependencyPath[dependencyPath.size() - 1] != '\\')
+		dependencyPath += "/";
+
+	switch (g_componentType)
+	{
+	case BASEAPP_TYPE:
+		dependencyPath += "base";
+		break;
+	case CELLAPP_TYPE:
+		dependencyPath += "cell";
+		break;
+	case CLIENT_TYPE:
+	case BOTS_TYPE:
+		dependencyPath += "client";
+		break;
+	default:
+		INFO_MSG(fmt::format("EntityDef::reloadDependencyScriptModules: skip componentType={}.\n",
+			COMPONENT_NAME_EX(g_componentType)));
+		return true;
+	}
+
+	if (access(dependencyPath.c_str(), 0) != 0)
+	{
+		// 某些组件或工具进程可能没有对应脚本目录，这不应阻断 reload。
+		WARNING_MSG(fmt::format("EntityDef::reloadDependencyScriptModules: dependency path({}) not found.\n",
+			dependencyPath));
+		return true;
+	}
+
+	// Entity/Component 主模块由 loadAllEntityScriptModules/loadAllComponentScriptModules 负责。
+	// 这里记录它们的名字，后续扫描到同名根目录脚本时跳过，避免重复 reload 破坏原有检查流程。
+	std::set<std::string> ownedScriptModules;
+	std::vector<ScriptDefModulePtr>::iterator iter = EntityDef::__scriptModules.begin();
+	for (; iter != EntityDef::__scriptModules.end(); ++iter)
+	{
+		ownedScriptModules.insert((*iter)->getName());
+
+		const ScriptDefModule::COMPONENTDESCRIPTION_MAP& componentDescrs = (*iter)->getComponentDescrs();
+		ScriptDefModule::COMPONENTDESCRIPTION_MAP::const_iterator compIter = componentDescrs.begin();
+		for (; compIter != componentDescrs.end(); ++compIter)
+		{
+			ownedScriptModules.insert(compIter->second->getName());
+		}
+	}
+
+	wchar_t* wentitiesPath = strutil::char2wchar(dependencyPath.c_str());
+	if (!wentitiesPath)
+	{
+		ERROR_MSG("EntityDef::reloadDependencyScriptModules: char2wchar entitiesPath failed.\n");
+		return false;
+	}
+
+	std::vector<std::wstring> results;
+	Resmgr::getSingleton().listPathRes(wentitiesPath, L"py", results);
+	free(wentitiesPath);
+
+	// rootPath 用来把绝对路径裁剪为相对模块路径，例如：
+	// D:/.../scripts/cell/interfaces/Teleport.py -> interfaces.Teleport。
+	std::string rootPath = dependencyPath;
+	while (rootPath.size() > 0 && (rootPath[rootPath.size() - 1] == '/' || rootPath[rootPath.size() - 1] == '\\'))
+		rootPath.erase(rootPath.size() - 1, 1);
+
+	// rootModules：cell/SpaceContext.py 这类当前组件根目录 helper。
+	// interfaceModules：cell/interfaces/Teleport.py 这类 mixin/interface，必须在 Entity 主脚本前 reload。
+	// otherModules：当前组件目录下其他子包，放在最后处理。
+	std::vector<std::string> rootModules;
+	std::vector<std::string> interfaceModules;
+	std::vector<std::string> otherModules;
+	// 兼容历史脚本曾经通过 import Teleport 直接导入 interface 文件的情况。
+	// 正常路径是 interfaces.Teleport，但 sys.modules 里可能还留有裸模块 Teleport。
+	std::vector<std::string> aliasModules;
+	std::vector<std::wstring>::iterator resultIter = results.begin();
+	for (; resultIter != results.end(); ++resultIter)
+	{
+		std::wstring wstrpath = (*resultIter);
+
+		if (wstrpath.find(L"__pycache__") != std::wstring::npos)
+			continue;
+
+		if (wstrpath.find(L"__init__.") != std::wstring::npos)
+			continue;
+
+		std::pair<std::wstring, std::wstring> pathPair = script::PyPlatform::splitPath(wstrpath);
+		std::pair<std::wstring, std::wstring> filePair = script::PyPlatform::splitText(pathPair.second);
+
+		if (filePair.first.size() == 0)
+			continue;
+
+		char* cpacketPath = strutil::wchar2char(pathPair.first.c_str());
+		char* cmoduleName = strutil::wchar2char(filePair.first.c_str());
+
+		if (!cpacketPath || !cmoduleName)
+		{
+			free(cpacketPath);
+			free(cmoduleName);
+			continue;
+		}
+
+		std::string packetPath = normalizePluginPath(cpacketPath);
+		std::string moduleName = cmoduleName;
+		free(cpacketPath);
+		free(cmoduleName);
+
+		if (packetPath.find(rootPath) == 0)
+			packetPath.erase(0, rootPath.size());
+
+		while (packetPath.size() > 0 && (packetPath[0] == '/' || packetPath[0] == '\\'))
+			packetPath.erase(0, 1);
+
+		strutil::kbe_replace(packetPath, "/", ".");
+		strutil::kbe_replace(packetPath, "\\", ".");
+
+		if (packetPath == "components")
+			continue;
+
+		// 根目录下的 Entity 主模块要交给原始 EntityDef 加载流程。
+		// 非 fullReload 时主模块会被 loadScriptModule 重新 import/reload 并做 def 校验。
+		if (packetPath.size() == 0 && ownedScriptModules.find(moduleName) != ownedScriptModules.end())
+			continue;
+
+		std::string fullModuleName = packetPath.size() == 0 ? moduleName : packetPath + "." + moduleName;
+
+		if (packetPath == "interfaces" || packetPath.find("interfaces.") == 0)
+			interfaceModules.push_back(fullModuleName);
+		else if (packetPath.size() == 0)
+			rootModules.push_back(fullModuleName);
+		else
+			otherModules.push_back(fullModuleName);
+
+		if (packetPath == "interfaces")
+			aliasModules.push_back(moduleName);
+	}
+
+	std::vector<std::string> modules;
+	// reload 顺序很重要：helper -> interfaces -> other -> Entity/Component 主脚本。
+	// 例如 Teleport.py import SpaceContext，则 SpaceContext 必须先刷新。
+	modules.insert(modules.end(), rootModules.begin(), rootModules.end());
+	modules.insert(modules.end(), interfaceModules.begin(), interfaceModules.end());
+	modules.insert(modules.end(), otherModules.begin(), otherModules.end());
+
+	PyObject* sysModules = PyImport_GetModuleDict();
+	uint32 reloaded = 0;
+	uint32 skippedNotLoaded = 0;
+	uint32 aliasReloaded = 0;
+	bool ok = true;
+
+	std::vector<std::string>::iterator moduleIter = modules.begin();
+	for (; moduleIter != modules.end(); ++moduleIter)
+	{
+		PyObject* pyModule = PyDict_GetItemString(sysModules, moduleIter->c_str());
+		if (pyModule)
+		{
+			// 只 reload 已经加载过的模块。热更不主动 import 新模块，避免执行未参与当前进程的脚本顶层代码。
+			PyObject* pyReloadedModule = PyImport_ReloadModule(pyModule);
+			if (!pyReloadedModule)
+			{
+				ERROR_MSG(fmt::format("EntityDef::reloadDependencyScriptModules: reload module({}) failed.\n",
+					(*moduleIter)));
+				PyErr_Print();
+				ok = false;
+				continue;
+			}
+
+			Py_DECREF(pyReloadedModule);
+			++reloaded;
+		}
+		else
+		{
+			// 未加载模块说明当前进程尚未用到它，跳过即可。
+			// 后续如果 Entity 主脚本 import 它，会由 Python 正常 import 到最新文件。
+			++skippedNotLoaded;
+		}
+	}
+
+	// 兼容 sys.path 中 interfaces 目录直接可见时产生的裸模块名。
+	// 如果不存在裸模块，说明脚本一直使用 interfaces.X 路径，直接跳过。
+	std::vector<std::string>::iterator aliasIter = aliasModules.begin();
+	for (; aliasIter != aliasModules.end(); ++aliasIter)
+	{
+		PyObject* pyModule = PyDict_GetItemString(sysModules, aliasIter->c_str());
+		if (!pyModule)
+			continue;
+
+		PyObject* pyReloadedModule = PyImport_ReloadModule(pyModule);
+		if (!pyReloadedModule)
+		{
+			ERROR_MSG(fmt::format("EntityDef::reloadDependencyScriptModules: reload alias module({}) failed.\n",
+				(*aliasIter)));
+			PyErr_Print();
+			ok = false;
+			continue;
+		}
+
+		Py_DECREF(pyReloadedModule);
+		++aliasReloaded;
+	}
+
+	INFO_MSG(fmt::format("EntityDef::reloadDependencyScriptModules: path={}, modules={}, reloaded={}, skippedNotLoaded={}, aliasReloaded={}, ok={}.\n",
+		dependencyPath, modules.size(), reloaded, skippedNotLoaded, aliasReloaded, ok));
+
+	return ok;
+}
+
+//-------------------------------------------------------------------------------------
 void EntityDef::reload(bool fullReload)
 {
 	g_isReload = true;
 
 	script::entitydef::reload(fullReload);
+
+	// 先刷新当前组件目录下的 helper/interface 依赖模块，再刷新 Entity/Component 主模块。
+	// 这样 Avatar.py 重新定义 class 时继承到的是新的 interfaces.Teleport.Teleport。
+	if (!reloadDependencyScriptModules(EntityDef::__entitiesPath))
+		WARNING_MSG("EntityDef::reload: dependency script reload has errors, continue entity reload.\n");
 
 	if(fullReload)
 	{

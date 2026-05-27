@@ -29,6 +29,23 @@
 	
 namespace KBEngine{
 
+/**
+	脚本热更时刷新 Timer 回调的统计信息。
+	Timer 本身仍然保留原来的 handle、触发时间和 userArg，只替换它保存的 Python 回调对象；
+	refreshed 表示已经成功指向新脚本对象的回调数量，keptOld 表示无法安全解析新对象、继续沿用旧回调的数量。
+*/
+struct ReloadScriptTimerStats
+{
+	ReloadScriptTimerStats() :
+		refreshed(0),
+		keptOld(0)
+	{
+	}
+
+	uint32 refreshed;
+	uint32 keptOld;
+};
+
 class PythonApp : public ServerApp
 {
 public:
@@ -106,6 +123,13 @@ public:
 	*/
 	virtual void reloadScript(bool fullReload);
 	virtual void onReloadScript(bool fullReload);
+
+	/**
+		刷新当前进程内所有脚本 Timer 保存的 Python 回调。
+		该接口只处理脚本函数/绑定方法对象，不重新创建 Timer，因此不会改变剩余触发时间；
+		当回调无法解析到新对象时会保留旧对象并计入 keptOld，避免热更导致 Timer 丢失。
+	*/
+	static ReloadScriptTimerStats reloadScriptTimers();
 
 	/**
 		通过相对路径获取资源的全路径

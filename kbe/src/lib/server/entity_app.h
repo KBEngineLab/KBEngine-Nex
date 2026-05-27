@@ -14,6 +14,7 @@
 #include "pyscript/pyobject_pointer.h"
 #include "pyscript/pywatcher.h"
 #include "helper/debug_helper.h"
+#include "helper/debug_option.h"
 #include "helper/script_loglevel.h"
 #include "helper/profile.h"
 #include "server/kbemain.h"
@@ -45,6 +46,23 @@
 
 
 namespace KBEngine{
+
+/**
+	EntityApp 热更在线实体后的统计信息。
+	entitiesReloaded 统计已经切换到新脚本类型的在线 Entity 数量；
+	onReloadCallbacks 统计开发模式下成功调用脚本 onReload(fullReload) 的 Entity 数量。
+*/
+struct ReloadScriptEntityStats
+{
+	ReloadScriptEntityStats() :
+		entitiesReloaded(0),
+		onReloadCallbacks(0)
+	{
+	}
+
+	uint32 entitiesReloaded;
+	uint32 onReloadCallbacks;
+};
 
 namespace entityapp_plugins
 {
@@ -271,6 +289,13 @@ public:
 	virtual void onReloadScript(bool fullReload);
 
 	/**
+		刷新当前 EntityApp 内所有在线 Entity，并在开发模式下发出 onReload 回调。
+		该函数会先更新 Entity 本身的 Python __class__，再刷新 EntityCall/EntityComponent，
+		最后才调用脚本层 onReload，确保脚本收到回调时已经处于新类实现上。
+	*/
+	ReloadScriptEntityStats reloadScriptEntitiesAndNotify(bool fullReload);
+
+	/**
 		通过相对路径获取资源的全路径
 	*/
 	static PyObject* __py_getResFullPath(PyObject* self, PyObject* args);
@@ -306,6 +331,13 @@ public:
 	uint64 checkTickPeriod();
 
 protected:
+	/**
+		调用单个 Entity 的 onReload(fullReload)。
+		只在 g_appPublish == 0 的开发模式下生效；线上环境不会触发脚本层额外回调，
+		避免生产热更改变业务时序或引入不可预期副作用。
+	*/
+	bool callEntityOnReload(E* entity, bool fullReload);
+
 	KBEngine::script::Script								script_;
 	std::vector<PyTypeObject*>								scriptBaseTypes_;
 
@@ -1653,24 +1685,151 @@ void EntityApp<E>::calcLoad(float spareTime)
 template<class E>
 void EntityApp<E>::onReloadScript(bool fullReload)
 {
+	INFO_MSG(fmt::format("{}::onReloadScript: begin, fullReload={}.\n",
+		COMPONENT_NAME_EX(g_componentType), fullReload));
+
+	// EntityCall 持有脚本类型/方法描述相关缓存，Entity 脚本换类之后必须同步刷新，
+	// 否则跨进程调用可能仍按旧的 method/property 描述打包。
 	EntityCall::ENTITYCALLS::iterator iter = EntityCall::entityCalls.begin();
 	for(; iter != EntityCall::entityCalls.end(); ++iter)
 	{
 		(*iter)->reload();
 	}
 
+	INFO_MSG(fmt::format("{}::onReloadScript: entitycalls reloaded, count={}.\n",
+		COMPONENT_NAME_EX(g_componentType), EntityCall::entityCalls.size()));
+
+	// 全局组件列表中既包含挂在 Entity 上的组件，也可能包含反序列化/临时引用过的组件。
+	// 每个组件用 reloadGeneration_ 去重，所以即使 Entity::reload 过程中已经刷新过，
+	// 这里再次遍历也不会重复初始化同一代热更。
 	EntityComponent::ENTITY_COMPONENTS::iterator iter1 = EntityComponent::entity_components.begin();
 	for (; iter1 != EntityComponent::entity_components.end(); ++iter1)
 	{
-		(*iter1)->reload();
+		(*iter1)->reload(fullReload);
 	}
+
+	INFO_MSG(fmt::format("{}::onReloadScript: components reloaded, count={}.\n",
+		COMPONENT_NAME_EX(g_componentType), EntityComponent::reloadCount()));
+}
+
+template<class E>
+bool EntityApp<E>::callEntityOnReload(E* entity, bool fullReload)
+{
+	// onReload 是开发期辅助回调，不参与线上逻辑。线上跳过可以避免热更时引入额外脚本执行点。
+	if (g_appPublish != 0)
+		return false;
+
+	// 脚本层完全无侵入：没有 onReload 方法就静默跳过，不要求所有 Entity 实现该接口。
+	PyObject* pyFunc = PyObject_GetAttrString(static_cast<PyObject*>(entity), "onReload");
+	if (!pyFunc)
+	{
+		PyErr_Clear();
+		return false;
+	}
+
+	if (!PyCallable_Check(pyFunc))
+	{
+		// 属性存在但不可调用通常是脚本写错，例如 onReload = 1。
+		// 这里只告警，不中断整个热更流程。
+		WARNING_MSG(fmt::format("{}::callEntityOnReload: {} {}.onReload is not callable.\n",
+			COMPONENT_NAME_EX(g_componentType), entity->scriptName(), entity->id()));
+
+		Py_DECREF(pyFunc);
+		return false;
+	}
+
+	PyObject* pyResult = PyObject_CallFunction(pyFunc, const_cast<char*>("i"), fullReload ? 1 : 0);
+	Py_DECREF(pyFunc);
+
+	if (pyResult != NULL)
+	{
+		// 兼容同步函数和 coroutine：如果脚本返回 awaitable，由 AsyncioHelper 接管；
+		// 如果是普通返回值，submitCoroutine 内部会按现有逻辑处理。
+		AsyncioHelper::submitCoroutine(pyResult);
+		Py_DECREF(pyResult);
+	}
+	else
+	{
+		SCRIPT_ERROR_CHECK();
+	}
+
+	return true;
+}
+
+template<class E>
+ReloadScriptEntityStats EntityApp<E>::reloadScriptEntitiesAndNotify(bool fullReload)
+{
+	ReloadScriptEntityStats stats;
+
+	typename Entities<E>::ENTITYS_MAP& entities = pEntities_->getEntities();
+	INFO_MSG(fmt::format("{}::reloadScriptEntitiesAndNotify: begin, fullReload={}, entities={}.\n",
+		COMPONENT_NAME_EX(g_componentType), fullReload, entities.size()));
+
+	typename Entities<E>::ENTITYS_MAP::iterator eiter = entities.begin();
+	for (; eiter != entities.end(); ++eiter)
+	{
+		// Entity::reload 会把在线 Entity 的 __class__ 切到新脚本类型。
+		// 非 fullReload 时不会重置数据属性，只更新行为层；fullReload 才做属性差异补齐。
+		static_cast<E*>(eiter->second.get())->reload(fullReload);
+		++stats.entitiesReloaded;
+	}
+
+	INFO_MSG(fmt::format("{}::reloadScriptEntitiesAndNotify: entities reloaded, count={}.\n",
+		COMPONENT_NAME_EX(g_componentType), stats.entitiesReloaded));
+
+	EntityApp<E>::onReloadScript(fullReload);
+
+	if (g_appPublish == 0)
+	{
+		// onReload 放在 Entity/Component/EntityCall 都刷新之后调用，
+		// 这样脚本回调内访问自身方法、组件方法、EntityCall 都会尽量拿到新实现。
+		INFO_MSG(fmt::format("{}::reloadScriptEntitiesAndNotify: begin onReload callbacks.\n",
+			COMPONENT_NAME_EX(g_componentType)));
+
+		eiter = entities.begin();
+		for (; eiter != entities.end(); ++eiter)
+		{
+			if (callEntityOnReload(static_cast<E*>(eiter->second.get()), fullReload))
+				++stats.onReloadCallbacks;
+		}
+
+		INFO_MSG(fmt::format("{}::reloadScriptEntitiesAndNotify: onReload callbacks done, count={}.\n",
+			COMPONENT_NAME_EX(g_componentType), stats.onReloadCallbacks));
+	}
+
+	return stats;
 }
 
 template<class E>
 void EntityApp<E>::reloadScript(bool fullReload)
 {
+	INFO_MSG(fmt::format("{}::reloadScript: begin, fullReload={}.\n",
+		COMPONENT_NAME_EX(g_componentType), fullReload));
+
+	// 先重载 EntityDef 及脚本模块。EntityDef 内部会先刷新当前组件目录下已加载的依赖模块，
+	// 再加载 Entity/Component 主脚本，避免 interface/mixin 仍停留在旧实现。
 	EntityDef::reload(fullReload);
+
+	INFO_MSG(fmt::format("{}::reloadScript: EntityDef::reload done.\n",
+		COMPONENT_NAME_EX(g_componentType)));
+
+	// 开启组件热更代次。组件可能从 Entity::reload 和全局组件遍历两条路径被访问，
+	// 代次标记用于保证同一轮 reload 中每个组件只刷新一次。
+	EntityComponent::beginReload();
+	INFO_MSG(fmt::format("{}::reloadScript: EntityComponent::beginReload done.\n",
+		COMPONENT_NAME_EX(g_componentType)));
+
+	// 派生类 Baseapp/Cellapp 会在这里刷新在线 Entity，并触发开发模式 onReload。
 	onReloadScript(fullReload);
+	INFO_MSG(fmt::format("{}::reloadScript: onReloadScript done.\n",
+		COMPONENT_NAME_EX(g_componentType)));
+
+	// Timer 不重新创建，只把保存的 Python 回调对象重新定位到新脚本实现。
+	ReloadScriptTimerStats timerStats = PythonApp::reloadScriptTimers();
+
+	INFO_MSG(fmt::format("{}::reloadScript: fullReload={}, componentsReloaded={}, timersRefreshed={}, timersKeptOld={}\n",
+		COMPONENT_NAME_EX(g_componentType), fullReload, EntityComponent::reloadCount(),
+		timerStats.refreshed, timerStats.keptOld));
 
 	// SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 

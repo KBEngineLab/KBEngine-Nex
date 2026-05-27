@@ -156,7 +156,24 @@ public:
 
 	void c_str(char* s, size_t size);
 
-	void reload();
+	/**
+		开启一轮组件热更。
+		Entity reload 和全局组件遍历都可能触达同一个 EntityComponent；
+		reloadGeneration_ 用于标记本轮热更代次，避免同一组件重复换类/补属性。
+	*/
+	static void beginReload();
+
+	/**
+		返回本轮热更中实际刷新过的组件数量，用于 reload 日志统计。
+	*/
+	static uint32 reloadCount() { return reloadCount_; }
+
+	/**
+		刷新在线 EntityComponent 的脚本类型和描述信息。
+		fullReload=false 时只更新行为层，不重置组件数据；
+		fullReload=true 时在旧描述存在的前提下补齐新增属性。
+	*/
+	void reload(bool fullReload);
 
 	typedef std::vector<EntityComponent*> ENTITY_COMPONENTS;
 	static ENTITY_COMPONENTS entity_components;
@@ -259,6 +276,8 @@ protected:
 	}
 
 	ENTITY_COMPONENTS::size_type			atIdx_;
+	// 最近一次刷新该组件的热更代次，用于防止同一轮 reload 重复处理。
+	uint32									lastReloadGeneration_;
 
 	OnDataChangedEvent						onDataChangedEvent_;
 
@@ -266,6 +285,10 @@ protected:
 
 private:
 	int32									clientappID_;
+	// 当前全局组件热更代次，每次 EntityComponent::beginReload 自增。
+	static uint32							reloadGeneration_;
+	// 当前热更代次实际刷新成功的组件数量，用于日志输出。
+	static uint32							reloadCount_;
 };
 
 }

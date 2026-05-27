@@ -5136,14 +5136,12 @@ void Baseapp::reloadScript(bool fullReload)
 //-------------------------------------------------------------------------------------
 void Baseapp::onReloadScript(bool fullReload)
 {
-	Entities<Entity>::ENTITYS_MAP& entities = pEntities_->getEntities();
-	Entities<Entity>::ENTITYS_MAP::iterator eiter = entities.begin();
-	for(; eiter != entities.end(); ++eiter)
-	{
-		static_cast<Entity*>(eiter->second.get())->reload(fullReload);
-	}
+	// Baseapp 热更需要处理在线 Base Entity、EntityCall、EntityComponent 以及开发模式 onReload。
+	// 具体顺序统一放在 EntityApp::reloadScriptEntitiesAndNotify 中，避免 base/cell 两边实现漂移。
+	ReloadScriptEntityStats stats = reloadScriptEntitiesAndNotify(fullReload);
 
-	EntityApp<Entity>::onReloadScript(fullReload);
+	INFO_MSG(fmt::format("Baseapp::onReloadScript: fullReload={}, entitiesReloaded={}, onReloadCallbacks={}, devMode={}\n",
+		fullReload, stats.entitiesReloaded, stats.onReloadCallbacks, g_appPublish == 0));
 }
 
 //-------------------------------------------------------------------------------------

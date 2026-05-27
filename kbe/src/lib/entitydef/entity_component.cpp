@@ -30,6 +30,10 @@ BASE_SCRIPT_INIT(EntityComponent, 0, 0, 0, 0, 0)
 */
 
 EntityComponent::ENTITY_COMPONENTS EntityComponent::entity_components;
+// 组件热更全局代次。每次 reloadScript 开始时自增，用于判断某个组件本轮是否已经处理过。
+uint32 EntityComponent::reloadGeneration_ = 0;
+// 当前代次中实际完成 reload 的组件数量，最终写入 reload 日志。
+uint32 EntityComponent::reloadCount_ = 0;
 
 
 #define DEBUG_OP_ATTRIBUTE(op, ccattr)																		\
@@ -68,6 +72,7 @@ ownerID_(-1),
 owner_(NULL),
 pComponentDescrs_(pComponentDescrs),
 atIdx_(ENTITY_COMPONENTS::size_type(-1)),
+lastReloadGeneration_(0),
 onDataChangedEvent_(),
 pPropertyDescription_(NULL),
 clientappID_(0)
@@ -293,10 +298,11 @@ void EntityComponent::initProperty(bool isReload)
 
 		if (!pOldScriptDefModule)
 		{
-			ERROR_MSG(fmt::format("{}::initProperty: not found old_module!\n",
+			// fullReload 期间理论上应存在旧模块描述；如果没有，说明脚本结构变化超出可比对范围。
+			// 为了保证在线数据不被默认值覆盖，这里只跳过属性补齐，不再 assert 杀进程。
+			WARNING_MSG(fmt::format("{}::initProperty: not found old_module, skip component property reload.\n",
 				pComponentDescrs_->getName()));
-
-			KBE_ASSERT(false && "EntityComponent::initProperty: not found old_module");
+			return;
 		}
 
 		oldpropers = &pOldScriptDefModule->getPropertyDescrs();
@@ -672,9 +678,91 @@ PyObject* EntityComponent::tp_str()
 }
 
 //-------------------------------------------------------------------------------------
-void EntityComponent::reload()
+void EntityComponent::beginReload()
 {
-	pComponentDescrs_ = EntityDef::findScriptModule(pComponentDescrs_->getName());
+	// 开启新的热更代次，同时清零统计值。
+	// lastReloadGeneration_ 与 reloadGeneration_ 相等的组件会跳过，避免重复处理。
+	++reloadGeneration_;
+	reloadCount_ = 0;
+}
+
+//-------------------------------------------------------------------------------------
+void EntityComponent::reload(bool fullReload)
+{
+	// 同一轮 reload 中，一个组件可能先被 owner Entity 刷新，又在全局组件列表中再次遇到。
+	// 代次相同代表已经处理过，直接返回即可。
+	if (reloadGeneration_ > 0 && lastReloadGeneration_ == reloadGeneration_)
+		return;
+
+	lastReloadGeneration_ = reloadGeneration_;
+
+	// 先保存旧描述中的组件名和实体属性名。后面会把描述对象替换成新 EntityDef 中的对象，
+	// 因此必须在替换前拿到查找新描述所需的信息。
+	const char* componentName = pComponentDescrs_ ? pComponentDescrs_->getName() : "";
+	const char* componentPropertyName = pPropertyDescription_ ? pPropertyDescription_->getName() : "";
+
+	// 组件脚本模块已经由 EntityDef::reload 重新载入，这里只把在线对象指向新的 ScriptDefModule。
+	ScriptDefModule* pNewComponentDescrs = EntityDef::findScriptModule(componentName);
+	if (!pNewComponentDescrs)
+	{
+		ERROR_MSG(fmt::format("EntityComponent::reload: not found component module({})!\n",
+			componentName));
+
+		return;
+	}
+
+	PyObject* pOwner = owner(true);
+	if (pOwner && componentPropertyName[0] != '\0')
+	{
+		// 组件属性描述属于 owner Entity 的 ScriptDefModule。
+		// 热更后 owner 的描述表也换了，组件必须重新绑定到新的 PropertyDescription，
+		// 否则属性同步/持久化可能继续使用旧 uid/flags/type 信息。
+		ScriptDefModule* pOwnerScriptModule = EntityDef::findScriptModule(pOwner->ob_type->tp_name);
+		if (pOwnerScriptModule)
+		{
+			PropertyDescription* pNewPropertyDescription =
+				pOwnerScriptModule->findComponentPropertyDescription(componentPropertyName);
+
+			if (!pNewPropertyDescription)
+				pNewPropertyDescription =
+					pOwnerScriptModule->findPropertyDescription(componentPropertyName, g_componentType);
+
+			if (pNewPropertyDescription)
+			{
+				pPropertyDescription_ = pNewPropertyDescription;
+			}
+			else
+			{
+				WARNING_MSG(fmt::format("EntityComponent::reload: owner({}) has no component property({})!\n",
+					pOwner->ob_type->tp_name, componentPropertyName));
+			}
+		}
+		else
+		{
+			WARNING_MSG(fmt::format("EntityComponent::reload: not found owner module({})!\n",
+				pOwner->ob_type->tp_name));
+		}
+	}
+
+	pComponentDescrs_ = pNewComponentDescrs;
+
+	// 关键步骤：把已有的 Python 组件实例切换到新脚本类。
+	// 这样旧实例上的方法查找会走新类定义，脚本层无需重新创建组件对象。
+	if (PyObject_SetAttrString(this, "__class__", (PyObject*)pComponentDescrs_->getScriptType()) == -1)
+	{
+		WARNING_MSG(fmt::format("EntityComponent::reload: {} could not change __class__ to new class!\n",
+			pComponentDescrs_->getName()));
+
+		PyErr_Print();
+		return;
+	}
+
+	// 只有 fullReload 才允许做数据层面的属性补齐。
+	// 普通 reloadScript(False) 只更新行为层，不能把在线数据重置为默认值。
+	if (fullReload && EntityDef::findOldScriptModule(pComponentDescrs_->getName(), false))
+		initProperty(true);
+
+	++reloadCount_;
 }
 
 //-------------------------------------------------------------------------------------
@@ -1116,9 +1204,21 @@ void EntityComponent::addToClientStream(MemoryStream* mstream, PyObject* pyValue
 				if ((propertyDescription->getFlags() & ENTITY_CELLAPP_ANDA_CLIENT_DATA_FLAGS) == 0)
 					continue;
 			}
+			else if (componentType() == CLIENT_TYPE || componentType() == BOTS_TYPE)
+			{
+				// reload 后可能遇到客户端/机器人域组件参与 client stream 打包。
+				// 旧逻辑在非 base/cell 时直接 assert，会导致 cell reload 后同步路径崩溃；
+				// 这里按客户端标记过滤即可。
+				if ((propertyDescription->getFlags() & ENTITY_CLIENT_DATA_FLAGS) == 0)
+					continue;
+			}
 			else
 			{
-				KBE_ASSERT(false);
+				// 未知域不再 assert 终止进程，只跳过该属性并输出日志。
+				// 这样热更后的异常脚本定义能暴露在日志中，而不是直接 SIGABRT。
+				WARNING_MSG(fmt::format("EntityComponent::addToClientStream: unsupported componentType({}) for component({}), ownerID={}.\n",
+					static_cast<int>(componentType()), pComponentDescrs_ ? pComponentDescrs_->getName() : "", ownerID()));
+				continue;
 			}
 
 			propertys.push_back(propertyDescription);
@@ -1143,9 +1243,18 @@ void EntityComponent::addToClientStream(MemoryStream* mstream, PyObject* pyValue
 				if ((propertyDescription->getFlags() & ENTITY_CELLAPP_ANDA_CLIENT_DATA_FLAGS) == 0)
 					continue;
 			}
+			else if (componentType() == CLIENT_TYPE || componentType() == BOTS_TYPE)
+			{
+				// 第二轮真正写入属性值时保持和前面计数阶段一致的过滤规则，
+				// 避免 count 与实际写入数量不一致。
+				if ((propertyDescription->getFlags() & ENTITY_CLIENT_DATA_FLAGS) == 0)
+					continue;
+			}
 			else
 			{
-				KBE_ASSERT(false);
+				WARNING_MSG(fmt::format("EntityComponent::addToClientStream: unsupported componentType({}) for component({}), ownerID={}.\n",
+					static_cast<int>(componentType()), pComponentDescrs_ ? pComponentDescrs_->getName() : "", ownerID()));
+				continue;
 			}
 
 			PyObject* pyVal = PyObject_GetAttrString(this, propertyDescription->getName());

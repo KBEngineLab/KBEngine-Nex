@@ -68,6 +68,14 @@ public:
 	static bool loadAllComponentScriptModules(std::string entitiesPath,
 		std::vector<PyTypeObject*>& scriptBaseTypes);
 
+	/**
+		热更 Entity/Component 主脚本之前，先刷新当前组件目录下已经加载过的普通依赖模块。
+		例如 cell 进程只扫描 cell 目录，base 进程只扫描 base 目录；interfaces 下的 mixin 会在
+		Avatar/Monster 等主脚本重新导入前先 reload，避免 class 继承链继续引用旧的 interface 类。
+		注意：这里只 reload sys.modules 中已存在的模块，不主动 import 未加载模块，避免触发跨组件脚本副作用。
+	*/
+	static bool reloadDependencyScriptModules(std::string entitiesPath);
+
 	static bool loadAllDefDescriptions(const std::string& moduleName,
 		XML* defxml,
 		TiXmlNode* defNode,
@@ -271,4 +279,3 @@ private:
 #include "entitydef.inl"
 #endif
 #endif // KBE_ENTITYDEF_H
-
