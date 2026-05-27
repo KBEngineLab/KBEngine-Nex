@@ -44,6 +44,7 @@ struct ReloadScriptTimerStats
 
 	uint32 refreshed;
 	uint32 keptOld;
+	std::vector<std::string> keptOldCallbacks;
 };
 
 class PythonApp : public ServerApp

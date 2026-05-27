@@ -50,7 +50,7 @@ namespace KBEngine{
 /**
 	EntityApp 热更在线实体后的统计信息。
 	entitiesReloaded 统计已经切换到新脚本类型的在线 Entity 数量；
-	onReloadCallbacks 统计开发模式下成功调用脚本 onReload(fullReload) 的 Entity 数量。
+	onReloadCallbacks 统计成功调用脚本 onReload(fullReload) 的 Entity 数量。
 */
 struct ReloadScriptEntityStats
 {
@@ -289,7 +289,7 @@ public:
 	virtual void onReloadScript(bool fullReload);
 
 	/**
-		刷新当前 EntityApp 内所有在线 Entity，并在开发模式下发出 onReload 回调。
+		刷新当前 EntityApp 内所有在线 Entity，并发出 onReload(fullReload) 回调。
 		该函数会先更新 Entity 本身的 Python __class__，再刷新 EntityCall/EntityComponent，
 		最后才调用脚本层 onReload，确保脚本收到回调时已经处于新类实现上。
 	*/
@@ -333,8 +333,8 @@ public:
 protected:
 	/**
 		调用单个 Entity 的 onReload(fullReload)。
-		只在 g_appPublish == 0 的开发模式下生效；线上环境不会触发脚本层额外回调，
-		避免生产热更改变业务时序或引入不可预期副作用。
+		fullReload=true 表示完整 reload，fullReload=false 表示逻辑 reload。
+		没有 onReload 方法会静默跳过，不要求所有 Entity 实现。
 	*/
 	bool callEntityOnReload(E* entity, bool fullReload);
 
@@ -1715,10 +1715,6 @@ void EntityApp<E>::onReloadScript(bool fullReload)
 template<class E>
 bool EntityApp<E>::callEntityOnReload(E* entity, bool fullReload)
 {
-	// onReload 是开发期辅助回调，不参与线上逻辑。线上跳过可以避免热更时引入额外脚本执行点。
-	if (g_appPublish != 0)
-		return false;
-
 	// 脚本层完全无侵入：没有 onReload 方法就静默跳过，不要求所有 Entity 实现该接口。
 	PyObject* pyFunc = PyObject_GetAttrString(static_cast<PyObject*>(entity), "onReload");
 	if (!pyFunc)
@@ -1779,12 +1775,12 @@ ReloadScriptEntityStats EntityApp<E>::reloadScriptEntitiesAndNotify(bool fullRel
 
 	EntityApp<E>::onReloadScript(fullReload);
 
-	if (g_appPublish == 0)
 	{
 		// onReload 放在 Entity/Component/EntityCall 都刷新之后调用，
 		// 这样脚本回调内访问自身方法、组件方法、EntityCall 都会尽量拿到新实现。
-		INFO_MSG(fmt::format("{}::reloadScriptEntitiesAndNotify: begin onReload callbacks.\n",
-			COMPONENT_NAME_EX(g_componentType)));
+		// 生产环境也会触发，但 fullReload 在生产会被强制降级为 false。
+		INFO_MSG(fmt::format("{}::reloadScriptEntitiesAndNotify: begin onReload callbacks, fullReload={}, publish={}.\n",
+			COMPONENT_NAME_EX(g_componentType), fullReload, g_appPublish));
 
 		eiter = entities.begin();
 		for (; eiter != entities.end(); ++eiter)
@@ -1803,6 +1799,25 @@ ReloadScriptEntityStats EntityApp<E>::reloadScriptEntitiesAndNotify(bool fullRel
 template<class E>
 void EntityApp<E>::reloadScript(bool fullReload)
 {
+	static bool isReloading = false;
+	if (isReloading)
+	{
+		// reload 过程中脚本的 onInit、Timer 或 telnet 命令如果再次触发 reload，
+		// 会和当前这轮 EntityDef/Entity/Timer 刷新交叉执行，容易产生半新半旧状态。
+		// 这里直接拒绝重入，要求上一轮完整结束后再发起下一次热更。
+		WARNING_MSG(fmt::format("{}::reloadScript: ignored reentrant reload request, fullReload={}.\n",
+			COMPONENT_NAME_EX(g_componentType), fullReload));
+		return;
+	}
+
+	isReloading = true;
+	struct ReloadScriptGuard
+	{
+		bool& value;
+		ReloadScriptGuard(bool& v) : value(v) {}
+		~ReloadScriptGuard() { value = false; }
+	} reloadScriptGuard(isReloading);
+
 	if (g_appPublish != 0 && fullReload)
 	{
 		// 生产环境只允许逻辑层热更。即使运维误传 True 或脚本不传参数走默认值，
@@ -1817,10 +1832,28 @@ void EntityApp<E>::reloadScript(bool fullReload)
 
 	// 先重载 EntityDef 及脚本模块。EntityDef 内部会先刷新当前组件目录下已加载的依赖模块，
 	// 再加载 Entity/Component 主脚本，避免 interface/mixin 仍停留在旧实现。
-	EntityDef::reload(fullReload);
+	ReloadScriptDefStats defStats = EntityDef::reload(fullReload);
 
-	INFO_MSG(fmt::format("{}::reloadScript: EntityDef::reload done.\n",
-		COMPONENT_NAME_EX(g_componentType)));
+	INFO_MSG(fmt::format("{}::reloadScript: EntityDef::reload done, ok={}, changedFiles={}, skippedFiles={}, reloadedModules={}, duplicateModulePatches={}, staleAttrsKept={}.\n",
+		COMPONENT_NAME_EX(g_componentType), defStats.ok, defStats.changedFiles, defStats.skippedFiles,
+		defStats.reloadedModules, defStats.duplicateModulePatches, defStats.staleAttrsKept));
+
+	if (!defStats.ok)
+	{
+		// 脚本模块 reload 已经失败时不能继续刷新在线对象，否则会把 Entity/Timer 推到半新半旧状态。
+		ERROR_MSG(fmt::format("{}::reloadScript: aborted because EntityDef::reload failed.\n",
+			COMPONENT_NAME_EX(g_componentType)));
+		return;
+	}
+
+	if (defStats.changedFiles == 0)
+	{
+		// 没有任何脚本文件变化时，不刷新在线 Entity/Component/Timer，也不触发 onInit。
+		// 这样空 reload 只作为一次检查，不会给线上对象制造额外扰动。
+		INFO_MSG(fmt::format("{}::reloadScript: no changed script files, skip entity/component/timer/onInit refresh.\n",
+			COMPONENT_NAME_EX(g_componentType)));
+		return;
+	}
 
 	// 开启组件热更代次。组件可能从 Entity::reload 和全局组件遍历两条路径被访问，
 	// 代次标记用于保证同一轮 reload 中每个组件只刷新一次。
@@ -1828,7 +1861,7 @@ void EntityApp<E>::reloadScript(bool fullReload)
 	INFO_MSG(fmt::format("{}::reloadScript: EntityComponent::beginReload done.\n",
 		COMPONENT_NAME_EX(g_componentType)));
 
-	// 派生类 Baseapp/Cellapp 会在这里刷新在线 Entity，并触发开发模式 onReload。
+	// 派生类 Baseapp/Cellapp 会在这里刷新在线 Entity，并触发 onReload(fullReload)。
 	onReloadScript(fullReload);
 	INFO_MSG(fmt::format("{}::reloadScript: onReloadScript done.\n",
 		COMPONENT_NAME_EX(g_componentType)));
@@ -1839,6 +1872,13 @@ void EntityApp<E>::reloadScript(bool fullReload)
 	INFO_MSG(fmt::format("{}::reloadScript: fullReload={}, componentsReloaded={}, timersRefreshed={}, timersKeptOld={}\n",
 		COMPONENT_NAME_EX(g_componentType), fullReload, EntityComponent::reloadCount(),
 		timerStats.refreshed, timerStats.keptOld));
+
+	for (std::vector<std::string>::const_iterator iter = timerStats.keptOldCallbacks.begin();
+		iter != timerStats.keptOldCallbacks.end(); ++iter)
+	{
+		WARNING_MSG(fmt::format("{}::reloadScript: timer kept old callback: {}\n",
+			COMPONENT_NAME_EX(g_componentType), (*iter)));
+	}
 
 	// SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 

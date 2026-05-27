@@ -1865,12 +1865,12 @@ void Cellapp::reloadScript(bool fullReload)
 //-------------------------------------------------------------------------------------
 void Cellapp::onReloadScript(bool fullReload)
 {
-	// Cellapp 热更需要处理在线 Cell Entity、EntityCall、EntityComponent 以及开发模式 onReload。
+	// Cellapp 热更需要处理在线 Cell Entity、EntityCall、EntityComponent 以及 onReload(fullReload)。
 	// 具体顺序统一放在 EntityApp::reloadScriptEntitiesAndNotify 中，避免 base/cell 两边实现漂移。
 	ReloadScriptEntityStats stats = reloadScriptEntitiesAndNotify(fullReload);
 
-	INFO_MSG(fmt::format("Cellapp::onReloadScript: fullReload={}, entitiesReloaded={}, onReloadCallbacks={}, devMode={}\n",
-		fullReload, stats.entitiesReloaded, stats.onReloadCallbacks, g_appPublish == 0));
+	INFO_MSG(fmt::format("Cellapp::onReloadScript: fullReload={}, entitiesReloaded={}, onReloadCallbacks={}, publish={}\n",
+		fullReload, stats.entitiesReloaded, stats.onReloadCallbacks, g_appPublish));
 }
 
 //-------------------------------------------------------------------------------------

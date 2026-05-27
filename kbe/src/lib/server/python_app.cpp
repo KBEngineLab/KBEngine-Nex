@@ -310,7 +310,10 @@ public:
 				if ((*iter)->reloadCallback())
 					++stats.refreshed;
 				else
+				{
 					++stats.keptOld;
+					stats.keptOldCallbacks.push_back((*iter)->describeCallback());
+				}
 			}
 		}
 
@@ -481,6 +484,23 @@ private:
 		Py_DECREF(pyCallback_);
 		pyCallback_ = pyNewCallback;
 		return true;
+	}
+
+	std::string describeCallback() const
+	{
+		// keptOld 汇总使用的人类可读路径。绑定方法优先显示 owner 类型和方法名；
+		// 普通函数显示 module.qualname；无法解析路径时给出 <unknown>，方便发现不可热更 Timer。
+		if (pyCallbackOwner_ && !callbackName_.empty())
+		{
+			return fmt::format("{}.{}", pyCallbackOwner_->ob_type->tp_name, callbackName_);
+		}
+
+		if (!callbackModule_.empty() || !callbackQualName_.empty())
+		{
+			return fmt::format("{}.{}", callbackModule_, callbackQualName_);
+		}
+
+		return "<unknown>";
 	}
 
 	PyObject* pyCallback_;
@@ -1330,6 +1350,18 @@ void PythonApp::onReloadScript(bool fullReload)
 //-------------------------------------------------------------------------------------
 void PythonApp::reloadScript(bool fullReload)
 {
+	static bool isReloading = false;
+	if (isReloading)
+	{
+		// reload 期间拒绝重入，避免 Timer/onInit/控制台命令再次进入 reload 流程，
+		// 导致脚本模块、Timer 回调和插件事件处于交叉刷新状态。
+		WARNING_MSG(fmt::format("{}::reloadScript: ignored reentrant reload request, fullReload={}.\n",
+			COMPONENT_NAME_EX(g_componentType), fullReload));
+		return;
+	}
+
+	isReloading = true;
+
 	if (g_appPublish != 0 && fullReload)
 	{
 		// 非 EntityApp 进程同样遵守生产环境只热更逻辑的约束。
@@ -1346,6 +1378,13 @@ void PythonApp::reloadScript(bool fullReload)
 
 	INFO_MSG(fmt::format("{}::reloadScript: fullReload={}, timersRefreshed={}, timersKeptOld={}\n",
 		COMPONENT_NAME_EX(g_componentType), fullReload, timerStats.refreshed, timerStats.keptOld));
+
+	for (std::vector<std::string>::const_iterator iter = timerStats.keptOldCallbacks.begin();
+		iter != timerStats.keptOldCallbacks.end(); ++iter)
+	{
+		WARNING_MSG(fmt::format("{}::reloadScript: timer kept old callback: {}\n",
+			COMPONENT_NAME_EX(g_componentType), (*iter)));
+	}
 
 	// SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
@@ -1365,6 +1404,8 @@ void PythonApp::reloadScript(bool fullReload)
 	uninstallPluginModules();
 	if (installPluginModules())
 		dispatchPluginEvent("onInit", true);
+
+	isReloading = false;
 }
 
 //-------------------------------------------------------------------------------------

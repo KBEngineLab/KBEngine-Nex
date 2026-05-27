@@ -5138,12 +5138,12 @@ void Baseapp::reloadScript(bool fullReload)
 //-------------------------------------------------------------------------------------
 void Baseapp::onReloadScript(bool fullReload)
 {
-	// Baseapp 热更需要处理在线 Base Entity、EntityCall、EntityComponent 以及开发模式 onReload。
+	// Baseapp 热更需要处理在线 Base Entity、EntityCall、EntityComponent 以及 onReload(fullReload)。
 	// 具体顺序统一放在 EntityApp::reloadScriptEntitiesAndNotify 中，避免 base/cell 两边实现漂移。
 	ReloadScriptEntityStats stats = reloadScriptEntitiesAndNotify(fullReload);
 
-	INFO_MSG(fmt::format("Baseapp::onReloadScript: fullReload={}, entitiesReloaded={}, onReloadCallbacks={}, devMode={}\n",
-		fullReload, stats.entitiesReloaded, stats.onReloadCallbacks, g_appPublish == 0));
+	INFO_MSG(fmt::format("Baseapp::onReloadScript: fullReload={}, entitiesReloaded={}, onReloadCallbacks={}, publish={}\n",
+		fullReload, stats.entitiesReloaded, stats.onReloadCallbacks, g_appPublish));
 }
 
 //-------------------------------------------------------------------------------------

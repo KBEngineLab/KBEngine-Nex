@@ -80,9 +80,10 @@ ENTITY_SCRIPT_UID g_scriptUtype = 1;
 EntityDef::GetEntityFunc EntityDef::__getEntityFunc;
 
 static std::map<std::string, std::vector<PropertyDescription*> > g_logComponentPropertys;
-// 记录脚本模块文件的最后修改时间。key 使用 Python 模块名，例如 Avatar、interfaces.Teleport。
-// 初始化加载时建立基线；热更时只有 mtime 变化的模块才真正 PyImport_ReloadModule。
-static std::map<std::string, int64> g_scriptModuleMtims;
+// 记录脚本模块文件的版本戳。key 使用 Python 模块名，例如 Avatar、interfaces.Teleport。
+// 初始化加载时建立基线；热更时只有版本戳变化的模块才真正 PyImport_ReloadModule。
+static std::map<std::string, uint64> g_scriptModuleStamps;
+static std::map<std::string, uint64> g_scriptFileStamps;
 // 本轮 reload 中实际检测到变更并执行 reload 的脚本文件列表，用于最终日志输出。
 static std::vector<std::string> g_reloadChangedFiles;
 // 本轮 reload 中检查过但未变化的脚本文件列表，只在汇总中输出数量，避免日志刷屏。
@@ -91,18 +92,36 @@ static std::vector<std::string> g_reloadSkippedFiles;
 // 它们指向同一个 Teleport.py；reload 可以分别处理两个模块对象，但汇总日志只展示一个文件。
 static std::set<std::string> g_reloadChangedFileKeys;
 static std::set<std::string> g_reloadSkippedFileKeys;
+// 本轮 reload 的结构化统计。EntityDef::reload 返回它，上层据此决定是否继续刷新在线对象。
+static ReloadScriptDefStats g_reloadStats;
 
 //-------------------------------------------------------------------------------------
-static int64 getScriptFileMTime(const std::string& filePath)
+static uint64 getScriptFileStamp(const std::string& filePath)
 {
-	// 使用文件最后修改时间作为热更判断依据。
-	// 秒级精度足够覆盖当前 Windows/Linux 的脚本编辑场景；如果后续需要更细粒度，
-	// 可以在这里统一替换成平台相关的纳秒级接口。
+	// 使用“最后修改时间 + 文件大小”作为热更判断依据。
+	// Windows 下优先读取 FILETIME，精度高于 stat 的秒级 st_mtime，避免连续快速保存时漏判。
+#if KBE_PLATFORM == PLATFORM_WIN32
+	WIN32_FILE_ATTRIBUTE_DATA fileInfo;
+	if (GetFileAttributesExA(filePath.c_str(), GetFileExInfoStandard, &fileInfo))
+	{
+		ULARGE_INTEGER mtime;
+		mtime.HighPart = fileInfo.ftLastWriteTime.dwHighDateTime;
+		mtime.LowPart = fileInfo.ftLastWriteTime.dwLowDateTime;
+
+		ULARGE_INTEGER size;
+		size.HighPart = fileInfo.nFileSizeHigh;
+		size.LowPart = fileInfo.nFileSizeLow;
+
+		return (uint64)(mtime.QuadPart ^ (size.QuadPart << 1));
+	}
+#endif
+
+	// 非 Windows 平台保留 stat 兜底；加入 st_size 后，即使同一秒内保存且大小变化也能识别。
 	struct stat st;
 	if (stat(filePath.c_str(), &st) != 0)
 		return 0;
 
-	return (int64)st.st_mtime;
+	return ((uint64)st.st_mtime << 32) ^ (uint64)st.st_size;
 }
 
 //-------------------------------------------------------------------------------------
@@ -128,31 +147,41 @@ static std::string getPyModuleFilePath(PyObject* pyModule)
 }
 
 //-------------------------------------------------------------------------------------
-static bool isTrackedScriptFileChanged(const std::string& moduleName, const std::string& filePath, int64& currMTime, bool& firstTrack)
+static bool isTrackedScriptFileChanged(const std::string& moduleName, const std::string& filePath, uint64& currStamp, bool& firstTrack)
 {
 	// 返回 true 表示需要 reload。
-	// 如果模块第一次进入跟踪表，只记录当前 mtime 作为基线，不把它当成变更。
+	// 如果模块第一次进入跟踪表，只记录当前文件版本戳作为基线，不把它当成变更。
 	// 这样第一次 reloadScript(False) 不会因为“没有历史记录”而把所有已加载依赖都 reload 一遍。
 	// 正常启动加载完成后会提前建立依赖模块基线；这里仍然保留懒加载兜底，覆盖后续才 import 的脚本。
 	firstTrack = false;
-	currMTime = getScriptFileMTime(filePath);
-	if (currMTime <= 0)
+	currStamp = getScriptFileStamp(filePath);
+	if (currStamp == 0)
 		return true;
 
-	std::map<std::string, int64>::iterator iter = g_scriptModuleMtims.find(moduleName);
-	if (iter == g_scriptModuleMtims.end())
+	std::map<std::string, uint64>::iterator iter = g_scriptModuleStamps.find(moduleName);
+	if (iter == g_scriptModuleStamps.end())
 	{
-		g_scriptModuleMtims[moduleName] = currMTime;
+		g_scriptModuleStamps[moduleName] = currStamp;
+		std::map<std::string, uint64>::iterator fileIter = g_scriptFileStamps.find(filePath);
+		if (fileIter != g_scriptFileStamps.end() && fileIter->second != currStamp)
+		{
+			fileIter->second = currStamp;
+			return true;
+		}
+
+		g_scriptFileStamps[filePath] = currStamp;
 		firstTrack = true;
 		return false;
 	}
 
-	if (iter->second != currMTime)
+	if (iter->second != currStamp)
 	{
-		iter->second = currMTime;
+		iter->second = currStamp;
+		g_scriptFileStamps[filePath] = currStamp;
 		return true;
 	}
 
+	g_scriptFileStamps[filePath] = currStamp;
 	return false;
 }
 
@@ -242,6 +271,16 @@ static bool shouldSkipTypeAttr(const std::string& attrName)
 }
 
 //-------------------------------------------------------------------------------------
+static bool shouldReportStaleTypeAttr(const std::string& attrName)
+{
+	// 删除方法时旧类上会保留旧属性。为了让开发者知道“删除没有真正生效”，
+	// 只报告普通业务属性/方法；Python 内部双下划线属性噪声较大，不计入 stale attrs。
+	return !(attrName.size() >= 4 &&
+		attrName[0] == '_' && attrName[1] == '_' &&
+		attrName[attrName.size() - 1] == '_' && attrName[attrName.size() - 2] == '_');
+}
+
+//-------------------------------------------------------------------------------------
 static void patchOldTypeFromNewType(PyObject* pyOldType, PyObject* pyNewType)
 {
 	// 将 reload 后新类对象上的属性同步到 reload 前的旧类对象。
@@ -255,9 +294,9 @@ static void patchOldTypeFromNewType(PyObject* pyOldType, PyObject* pyNewType)
 	}
 
 	PyObject* pyItems = PyMapping_Items(pyNewDict);
-	Py_DECREF(pyNewDict);
 	if (!pyItems)
 	{
+		Py_DECREF(pyNewDict);
 		PyErr_Clear();
 		return;
 	}
@@ -292,6 +331,54 @@ static void patchOldTypeFromNewType(PyObject* pyOldType, PyObject* pyNewType)
 	}
 
 	Py_DECREF(pyItems);
+
+	PyObject* pyOldDict = PyObject_GetAttrString(pyOldType, "__dict__");
+	if (pyOldDict)
+	{
+		PyObject* pyOldItems = PyMapping_Items(pyOldDict);
+		if (pyOldItems)
+		{
+			Py_ssize_t oldSize = PyList_Size(pyOldItems);
+			for (Py_ssize_t i = 0; i < oldSize; ++i)
+			{
+				PyObject* pyItem = PyList_GetItem(pyOldItems, i);
+				if (!pyItem || !PyTuple_Check(pyItem) || PyTuple_Size(pyItem) != 2)
+					continue;
+
+				PyObject* pyKey = PyTuple_GET_ITEM(pyItem, 0);
+				if (!PyUnicode_Check(pyKey))
+					continue;
+
+				const char* key = PyUnicode_AsUTF8(pyKey);
+				if (!key)
+				{
+					PyErr_Clear();
+					continue;
+				}
+
+				if (!shouldReportStaleTypeAttr(key) || PyMapping_HasKey(pyNewDict, pyKey))
+					continue;
+
+				++g_reloadStats.staleAttrsKept;
+				WARNING_MSG(fmt::format("EntityDef::patchOldTypeFromNewType: stale attr kept on old class, attr={}. "
+					"Deleted script attributes are not removed during safe reload.\n", key));
+			}
+
+			Py_DECREF(pyOldItems);
+		}
+		else
+		{
+			PyErr_Clear();
+		}
+
+		Py_DECREF(pyOldDict);
+	}
+	else
+	{
+		PyErr_Clear();
+	}
+
+	Py_DECREF(pyNewDict);
 	PyType_Modified((PyTypeObject*)pyOldType);
 }
 
@@ -329,16 +416,19 @@ static void releaseCollectedTypes(std::map<std::string, PyObject*>& oldTypes)
 }
 
 //-------------------------------------------------------------------------------------
-static void rememberInitialScriptFileMTime(const std::string& moduleName, const std::string& filePath)
+static void rememberInitialScriptFileStamp(const std::string& moduleName, const std::string& filePath)
 {
 	// 进程启动时导入 Entity/Component 主模块会经过 loadScriptModule，
-	// 在这里记录初始 mtime，后续 reloadScript(False) 才能判断主模块是否真的变化。
+	// 在这里记录初始文件版本戳，后续 reloadScript(False) 才能判断主模块是否真的变化。
 	if (filePath.empty())
 		return;
 
-	int64 currMTime = getScriptFileMTime(filePath);
-	if (currMTime > 0)
-		g_scriptModuleMtims[moduleName] = currMTime;
+	uint64 currStamp = getScriptFileStamp(filePath);
+	if (currStamp > 0)
+	{
+		g_scriptModuleStamps[moduleName] = currStamp;
+		g_scriptFileStamps[filePath] = currStamp;
+	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -358,10 +448,6 @@ static std::string getCurrentComponentScriptPath(const std::string& entitiesPath
 	case CELLAPP_TYPE:
 		dependencyPath += "cell";
 		break;
-	case CLIENT_TYPE:
-	case BOTS_TYPE:
-		dependencyPath += "client";
-		break;
 	default:
 		return "";
 	}
@@ -370,10 +456,10 @@ static std::string getCurrentComponentScriptPath(const std::string& entitiesPath
 }
 
 //-------------------------------------------------------------------------------------
-static void rememberLoadedDependencyScriptFileMTimes(const std::string& entitiesPath)
+static void rememberLoadedDependencyScriptFileStamps(const std::string& entitiesPath)
 {
 	// 启动阶段 Entity 主脚本 import 的 interface/helper 模块不会经过 loadScriptModule。
-	// 如果不给这些已加载模块建立 mtime 基线，第一次 reloadScript(False) 就只能把它们当成未知模块。
+	// 如果不给这些已加载模块建立文件版本戳基线，第一次 reloadScript(False) 就只能把它们当成未知模块。
 	// 这里直接遍历 sys.modules，将当前组件脚本目录下已经加载的 .py 全部纳入追踪。
 	std::string dependencyPath = getCurrentComponentScriptPath(entitiesPath);
 	if (dependencyPath.empty() || access(dependencyPath.c_str(), 0) != 0)
@@ -404,11 +490,11 @@ static void rememberLoadedDependencyScriptFileMTimes(const std::string& entities
 		if (filePath.empty() || filePath.find(rootPath) != 0)
 			continue;
 
-		rememberInitialScriptFileMTime(moduleName, filePath);
+		rememberInitialScriptFileStamp(moduleName, filePath);
 		++tracked;
 	}
 
-	INFO_MSG(fmt::format("EntityDef::rememberLoadedDependencyScriptFileMTimes: path={}, tracked={}.\n",
+	INFO_MSG(fmt::format("EntityDef::rememberLoadedDependencyScriptFileStamps: path={}, tracked={}.\n",
 		dependencyPath, tracked));
 }
 
@@ -417,6 +503,9 @@ static void logReloadChangedFiles()
 {
 	// 本轮 EntityDef reload 完成后输出变更文件汇总。
 	// 只逐条打印真正 reload 的文件，未变化文件只给数量，方便从日志里直接定位本次热更内容。
+	g_reloadStats.changedFiles = (uint32)g_reloadChangedFiles.size();
+	g_reloadStats.skippedFiles = (uint32)g_reloadSkippedFiles.size();
+
 	if (g_reloadChangedFiles.empty())
 	{
 		INFO_MSG(fmt::format("EntityDef::reload: no changed script files, skippedFiles={}.\n",
@@ -431,6 +520,12 @@ static void logReloadChangedFiles()
 	for (; iter != g_reloadChangedFiles.end(); ++iter)
 	{
 		INFO_MSG(fmt::format("EntityDef::reload: changed script file: {}\n", (*iter)));
+	}
+
+	if (g_reloadStats.duplicateModulePatches > 0 || g_reloadStats.staleAttrsKept > 0)
+	{
+		INFO_MSG(fmt::format("EntityDef::reload: duplicateModulePatches={}, staleAttrsKept={}.\n",
+			g_reloadStats.duplicateModulePatches, g_reloadStats.staleAttrsKept));
 	}
 }
 
@@ -637,6 +732,7 @@ bool EntityDef::reloadDependencyScriptModules(std::string entitiesPath)
 	uint32 aliasReloaded = 0;
 	uint32 aliasUnchanged = 0;
 	bool ok = true;
+	std::map<std::string, PyObject*> reloadedModulesByFile;
 
 	std::vector<std::string>::iterator moduleIter = modules.begin();
 	for (; moduleIter != modules.end(); ++moduleIter)
@@ -646,9 +742,9 @@ bool EntityDef::reloadDependencyScriptModules(std::string entitiesPath)
 		{
 			// 只 reload 已经加载过的模块。热更不主动 import 新模块，避免执行未参与当前进程的脚本顶层代码。
 			std::string filePath = getPyModuleFilePath(pyModule);
-			int64 currMTime = 0;
+			uint64 currStamp = 0;
 			bool firstTrack = false;
-			bool changed = filePath.empty() || isTrackedScriptFileChanged(*moduleIter, filePath, currMTime, firstTrack);
+			bool changed = filePath.empty() || isTrackedScriptFileChanged(*moduleIter, filePath, currStamp, firstTrack);
 			rememberReloadFile(changed, *moduleIter, filePath);
 
 			if (!changed)
@@ -659,6 +755,19 @@ bool EntityDef::reloadDependencyScriptModules(std::string entitiesPath)
 
 			std::map<std::string, PyObject*> oldTypes;
 			collectModuleTypes(pyModule, *moduleIter, oldTypes);
+
+			std::map<std::string, PyObject*>::iterator reloadedIter = reloadedModulesByFile.find(filePath);
+			if (!filePath.empty() && reloadedIter != reloadedModulesByFile.end())
+			{
+				// 同一个物理文件可能被 Python 以多个模块名加载。文件已经 reload 过时，
+				// 不再重复执行顶层代码，只用已 reload 模块的新类去 patch 当前模块名下的旧类对象。
+				patchReloadedModuleTypes(reloadedIter->second, oldTypes);
+				releaseCollectedTypes(oldTypes);
+				++g_reloadStats.duplicateModulePatches;
+				INFO_MSG(fmt::format("EntityDef::reloadDependencyScriptModules: patch duplicate module={}, file={} without second reload.\n",
+					(*moduleIter), filePath));
+				continue;
+			}
 
 			PyObject* pyReloadedModule = PyImport_ReloadModule(pyModule);
 			if (!pyReloadedModule)
@@ -673,11 +782,17 @@ bool EntityDef::reloadDependencyScriptModules(std::string entitiesPath)
 
 			patchReloadedModuleTypes(pyReloadedModule, oldTypes);
 			releaseCollectedTypes(oldTypes);
+			if (!filePath.empty())
+			{
+				Py_INCREF(pyReloadedModule);
+				reloadedModulesByFile[filePath] = pyReloadedModule;
+			}
 			Py_DECREF(pyReloadedModule);
 			++reloaded;
+			++g_reloadStats.reloadedModules;
 
-			INFO_MSG(fmt::format("EntityDef::reloadDependencyScriptModules: reload changed module={}, file={}, firstTrack={}, mtime={}.\n",
-				(*moduleIter), filePath, firstTrack, currMTime));
+			INFO_MSG(fmt::format("EntityDef::reloadDependencyScriptModules: reload changed module={}, file={}, firstTrack={}, stamp={}.\n",
+				(*moduleIter), filePath, firstTrack, currStamp));
 		}
 		else
 		{
@@ -697,9 +812,9 @@ bool EntityDef::reloadDependencyScriptModules(std::string entitiesPath)
 			continue;
 
 		std::string filePath = getPyModuleFilePath(pyModule);
-		int64 currMTime = 0;
+		uint64 currStamp = 0;
 		bool firstTrack = false;
-		bool changed = filePath.empty() || isTrackedScriptFileChanged(*aliasIter, filePath, currMTime, firstTrack);
+		bool changed = filePath.empty() || isTrackedScriptFileChanged(*aliasIter, filePath, currStamp, firstTrack);
 		rememberReloadFile(changed, *aliasIter, filePath);
 
 		if (!changed)
@@ -710,6 +825,19 @@ bool EntityDef::reloadDependencyScriptModules(std::string entitiesPath)
 
 		std::map<std::string, PyObject*> oldTypes;
 		collectModuleTypes(pyModule, *aliasIter, oldTypes);
+
+		std::map<std::string, PyObject*>::iterator reloadedIter = reloadedModulesByFile.find(filePath);
+		if (!filePath.empty() && reloadedIter != reloadedModulesByFile.end())
+		{
+			// 裸模块别名指向已 reload 的同一个文件时，只 patch 旧类，不重复执行模块顶层代码。
+			patchReloadedModuleTypes(reloadedIter->second, oldTypes);
+			releaseCollectedTypes(oldTypes);
+			++aliasReloaded;
+			++g_reloadStats.duplicateModulePatches;
+			INFO_MSG(fmt::format("EntityDef::reloadDependencyScriptModules: patch duplicate alias module={}, file={} without second reload.\n",
+				(*aliasIter), filePath));
+			continue;
+		}
 
 		PyObject* pyReloadedModule = PyImport_ReloadModule(pyModule);
 		if (!pyReloadedModule)
@@ -724,23 +852,34 @@ bool EntityDef::reloadDependencyScriptModules(std::string entitiesPath)
 
 		patchReloadedModuleTypes(pyReloadedModule, oldTypes);
 		releaseCollectedTypes(oldTypes);
+		if (!filePath.empty())
+		{
+			Py_INCREF(pyReloadedModule);
+			reloadedModulesByFile[filePath] = pyReloadedModule;
+		}
 		Py_DECREF(pyReloadedModule);
 		++aliasReloaded;
+		++g_reloadStats.reloadedModules;
 
-		INFO_MSG(fmt::format("EntityDef::reloadDependencyScriptModules: reload changed alias module={}, file={}, firstTrack={}, mtime={}.\n",
-			(*aliasIter), filePath, firstTrack, currMTime));
+		INFO_MSG(fmt::format("EntityDef::reloadDependencyScriptModules: reload changed alias module={}, file={}, firstTrack={}, stamp={}.\n",
+			(*aliasIter), filePath, firstTrack, currStamp));
 	}
 
 	INFO_MSG(fmt::format("EntityDef::reloadDependencyScriptModules: path={}, modules={}, reloaded={}, unchanged={}, skippedNotLoaded={}, aliasReloaded={}, aliasUnchanged={}, ok={}.\n",
 		dependencyPath, modules.size(), reloaded, unchanged, skippedNotLoaded, aliasReloaded, aliasUnchanged, ok));
 
+	std::map<std::string, PyObject*>::iterator reloadedIter = reloadedModulesByFile.begin();
+	for (; reloadedIter != reloadedModulesByFile.end(); ++reloadedIter)
+		Py_DECREF(reloadedIter->second);
+
 	return ok;
 }
 
 //-------------------------------------------------------------------------------------
-void EntityDef::reload(bool fullReload)
+ReloadScriptDefStats EntityDef::reload(bool fullReload)
 {
 	g_isReload = true;
+	g_reloadStats = ReloadScriptDefStats();
 	g_reloadChangedFiles.clear();
 	g_reloadSkippedFiles.clear();
 	g_reloadChangedFileKeys.clear();
@@ -751,7 +890,13 @@ void EntityDef::reload(bool fullReload)
 	// 先刷新当前组件目录下的 helper/interface 依赖模块，再刷新 Entity/Component 主模块。
 	// 这样 Avatar.py 重新定义 class 时继承到的是新的 interfaces.Teleport.Teleport。
 	if (!reloadDependencyScriptModules(EntityDef::__entitiesPath))
-		WARNING_MSG("EntityDef::reload: dependency script reload has errors, continue entity reload.\n");
+	{
+		g_reloadStats.ok = false;
+		WARNING_MSG("EntityDef::reload: dependency script reload has errors, abort current reload before entity refresh.\n");
+		logReloadChangedFiles();
+		g_isReload = false;
+		return g_reloadStats;
+	}
 
 	if(fullReload)
 	{
@@ -773,11 +918,14 @@ void EntityDef::reload(bool fullReload)
 	}
 	else
 	{
-		loadAllEntityScriptModules(EntityDef::__entitiesPath, EntityDef::__scriptBaseTypes);
+		if (!loadAllEntityScriptModules(EntityDef::__entitiesPath, EntityDef::__scriptBaseTypes))
+			g_reloadStats.ok = false;
 	}
 
 	EntityDef::_isInit = true;
 	logReloadChangedFiles();
+	g_isReload = false;
+	return g_reloadStats;
 }
 
 //-------------------------------------------------------------------------------------
@@ -1021,7 +1169,7 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 	if (!loadAllEntityScriptModules(__entitiesPath, scriptBaseTypes))
 		return false;
 
-	rememberLoadedDependencyScriptFileMTimes(__entitiesPath);
+	rememberLoadedDependencyScriptFileStamps(__entitiesPath);
 
 	return initializeWatcher();
 }
@@ -2736,12 +2884,12 @@ PyObject* EntityDef::loadScriptModule(std::string moduleName)
 
 	if (g_isReload && pyModule)
 	{
-		// Entity/Component 主模块也走 mtime 过滤。
+		// Entity/Component 主模块也走文件版本戳过滤。
 		// 文件未变化时只返回当前 sys.modules 中的模块对象，不再执行 PyImport_ReloadModule。
 		std::string filePath = getPyModuleFilePath(pyModule);
-		int64 currMTime = 0;
+		uint64 currStamp = 0;
 		bool firstTrack = false;
-		bool changed = filePath.empty() || isTrackedScriptFileChanged(moduleName, filePath, currMTime, firstTrack);
+		bool changed = filePath.empty() || isTrackedScriptFileChanged(moduleName, filePath, currStamp, firstTrack);
 		rememberReloadFile(changed, moduleName, filePath);
 
 		if (changed)
@@ -2754,8 +2902,13 @@ PyObject* EntityDef::loadScriptModule(std::string moduleName)
 
 			if (pyModule)
 			{
-				INFO_MSG(fmt::format("EntityDef::loadScriptModule: reload changed module={}, file={}, firstTrack={}, mtime={}.\n",
-					moduleName, filePath, firstTrack, currMTime));
+				++g_reloadStats.reloadedModules;
+				INFO_MSG(fmt::format("EntityDef::loadScriptModule: reload changed module={}, file={}, firstTrack={}, stamp={}.\n",
+					moduleName, filePath, firstTrack, currStamp));
+			}
+			else
+			{
+				g_reloadStats.ok = false;
 			}
 		}
 	}
@@ -2766,9 +2919,9 @@ PyObject* EntityDef::loadScriptModule(std::string moduleName)
 		std::string userScriptsPath = Resmgr::getSingleton().getPyUserScriptsPath();
 		std::string pyModulePath = getPyModuleFilePath(pyModule);
 
-		// 非 reload 的首次导入阶段建立 mtime 基线；后续 reloadScript 才能只刷新变更文件。
+		// 非 reload 的首次导入阶段建立文件版本戳基线；后续 reloadScript 才能只刷新变更文件。
 		if (!g_isReload)
-			rememberInitialScriptFileMTime(moduleName, pyModulePath);
+			rememberInitialScriptFileStamp(moduleName, pyModulePath);
 
 		strutil::kbe_replace(userScriptsPath, "/", "");
 		strutil::kbe_replace(userScriptsPath, "\\", "");
