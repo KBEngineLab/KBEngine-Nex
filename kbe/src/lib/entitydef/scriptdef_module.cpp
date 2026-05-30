@@ -83,6 +83,27 @@ bool hasPluginComponentScript(const std::string& entityName, COMPONENT_TYPE comp
 	return pluginFileExists(file) || pluginFileExists(file + "c");
 }
 
+bool hasPluginEntityComponentScript(const std::string& componentName, COMPONENT_TYPE componentType)
+{
+	std::string folder = componentPluginFolder(componentType);
+	if (folder.empty())
+		return false;
+
+	const std::vector<PluginDescriptor>& plugins = PluginManager::instance().plugins();
+	for (std::vector<PluginDescriptor>::const_iterator iter = plugins.begin(); iter != plugins.end(); ++iter)
+	{
+		std::string file = normalizePluginPath(iter->rootPath + "/" + folder + "/components/" + componentName + ".py");
+		if (pluginFileExists(file) || pluginFileExists(file + "c"))
+		{
+			INFO_MSG(fmt::format("ScriptDefModule::autoMatchCompOwn: component [{}] uses plugin [{}] script [{}].\n",
+				componentName, iter->name, file));
+			return true;
+		}
+	}
+
+	return false;
+}
+
 }
 
 //-------------------------------------------------------------------------------------
@@ -372,7 +393,8 @@ void ScriptDefModule::autoMatchCompOwn()
 		// std::string fmodule = "scripts/base/components/" + name_ + ".py";
 		std::string fmodule = (Resmgr::getSingleton().isKBEngineNexAssets() ? "" : "scripts/") + ("base/components/" + name_ + ".py");
 		std::string fmodule_pyc = fmodule + "c";
-		if (Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
+		if (hasPluginEntityComponentScript(name_, BASEAPP_TYPE) ||
+			Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
 			Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)
 		{
 			setBase(true);
@@ -381,7 +403,8 @@ void ScriptDefModule::autoMatchCompOwn()
 		// fmodule = "scripts/cell/components/" + name_ + ".py";
 		fmodule = (Resmgr::getSingleton().isKBEngineNexAssets() ? "" : "scripts/") + ("cell/components/" + name_ + ".py");
 		fmodule_pyc = fmodule + "c";
-		if (Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
+		if (hasPluginEntityComponentScript(name_, CELLAPP_TYPE) ||
+			Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
 			Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)
 		{
 			setCell(true);

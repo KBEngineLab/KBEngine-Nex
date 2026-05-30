@@ -45,6 +45,26 @@ bool pluginEntityScriptExists(const PluginEntityDescriptor& entity, const std::s
 	return pluginFileExists(file) || pluginFileExists(file + "c");
 }
 
+std::string findPluginComponentDefFile(const std::string& componentTypeName, std::string* pluginDefFilePath)
+{
+	const std::vector<PluginDescriptor>& plugins = PluginManager::instance().plugins();
+	for (std::vector<PluginDescriptor>::const_iterator iter = plugins.begin(); iter != plugins.end(); ++iter)
+	{
+		std::string defFile = normalizePluginPath(iter->rootPath + "/entity_defs/components/" + componentTypeName + ".def");
+		if (!pluginFileExists(defFile))
+			continue;
+
+		if (pluginDefFilePath)
+			*pluginDefFilePath = normalizePluginPath(iter->rootPath + "/entity_defs/");
+
+		INFO_MSG(fmt::format("EntityDef::loadComponents: use plugin component def [{}] from plugin [{}].\n",
+			defFile, iter->name));
+		return defFile;
+	}
+
+	return "";
+}
+
 }
 
 std::vector<ScriptDefModulePtr>	EntityDef::__scriptModules;
@@ -1603,7 +1623,23 @@ bool EntityDef::loadComponents(const std::string& defFilePath,
 			return false;
 		}
 
+		// 组件默认仍按 KBE 原规则从宿主实体同级 entity_defs/components 读取。
+		// 如果根 assets 没有该组件定义，则允许启用插件提供自己的组件 def：
+		// plugins/<Plugin>/entity_defs/components/<Component>.def。
+		// 这样 Avatar.def 只需要声明 <Type>BagComponent</Type>，组件的结构仍由插件目录维护。
+		std::string componentDefFilePath = defFilePath;
 		std::string componentfile = defFilePath + "components/" + componentTypeName + ".def";
+		if (!pluginFileExists(componentfile))
+		{
+			std::string pluginDefFilePath;
+			std::string pluginComponentFile = findPluginComponentDefFile(componentTypeName, &pluginDefFilePath);
+			if (!pluginComponentFile.empty())
+			{
+				componentfile = pluginComponentFile;
+				componentDefFilePath = pluginDefFilePath;
+			}
+		}
+
 		SmartPointer<XML> componentXml(new XML());
 		if (!componentXml.get()->openSection(componentfile.c_str()))
 			return false;
@@ -1687,7 +1723,7 @@ bool EntityDef::loadComponents(const std::string& defFilePath,
 		}
 
 		// 遍历所有的interface， 并将他们的方法和属性加入到模块中
-		if (!loadInterfaces(defFilePath, componentTypeName, componentXml.get(), componentRootNode, pCompScriptDefModule, true))
+		if (!loadInterfaces(componentDefFilePath, componentTypeName, componentXml.get(), componentRootNode, pCompScriptDefModule, true))
 		{
 			ERROR_MSG(fmt::format("EntityDef::loadComponents: failed to load component:{} interface.\n",
 				componentTypeName.c_str()));
@@ -1696,7 +1732,7 @@ bool EntityDef::loadComponents(const std::string& defFilePath,
 		}
 
 		// 加载父类所有的内容
-		if (!loadParentClass(defFilePath + "components/", componentTypeName, componentXml.get(), componentRootNode, pCompScriptDefModule))
+		if (!loadParentClass(componentDefFilePath + "components/", componentTypeName, componentXml.get(), componentRootNode, pCompScriptDefModule))
 		{
 			ERROR_MSG(fmt::format("EntityDef::loadComponents: failed to load component:{} parentClass.\n",
 				componentTypeName.c_str()));
@@ -1705,7 +1741,7 @@ bool EntityDef::loadComponents(const std::string& defFilePath,
 		}
 
 		// 尝试加载detailLevel数据
-		if (!loadDetailLevelInfo(defFilePath, componentTypeName, componentXml.get(), componentRootNode, pCompScriptDefModule))
+		if (!loadDetailLevelInfo(componentDefFilePath, componentTypeName, componentXml.get(), componentRootNode, pCompScriptDefModule))
 		{
 			ERROR_MSG(fmt::format("EntityDef::loadComponents: failed to load component:{} DetailLevelInfo.\n",
 				componentTypeName.c_str()));
