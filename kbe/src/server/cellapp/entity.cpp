@@ -114,6 +114,11 @@ isOnGround_(false),
 isOnNavigate_(false),
 topSpeed_(-0.1f),
 topSpeedY_(-0.1f),
+lastTopSpeedCheckTick_(0),
+accumulatedMoveForTick_(),
+topSpeedWindowAccumDist_(0.f),
+topSpeedWindowAccumDistY_(0.f),
+topSpeedWindowTickCount_(0),
 witnesses_(),
 witnesses_count_(0),
 pWitness_(NULL),
@@ -1868,6 +1873,31 @@ void Entity::setPosition_XZ_float(Network::Channel* pChannel, float x, float z)
 	if(almostEqual(x, pos.x) && almostEqual(z, pos.z))
 		return;
 
+	Position3D newPos = pos;
+	newPos.x = x;
+	newPos.z = z;
+
+	if(!checkMoveForTopSpeed(newPos))
+	{
+		Position3D movment = newPos - pos;
+		movment.y = 0.f;
+		float xzDist = movment.length();
+
+		DEBUG_MSG(fmt::format("{}::setPosition_XZ_float: {} position[({},{},{}) -> ({},{},{}), xzDist={} > topSpeed={}] invalid. reset client!\n",
+			this->scriptName(), this->id(),
+			pos.x, pos.y, pos.z,
+			x, pos.y, z,
+			xzDist, topSpeed_));
+
+		{
+			SCOPED_PROFILE(SCRIPTCALL_PROFILE);
+			bufferOrExeCallback(const_cast<char*>("onMoveOverTopSpeed"),
+				Py_BuildValue(const_cast<char*>("(fffff)"),
+					x, pos.y, z, xzDist, 0.f));
+		}
+		return;
+	}
+
 	pos.x = x;
 	pos.z = z;
 	onPositionChanged();
@@ -1880,8 +1910,33 @@ void Entity::setPosition_XYZ_float(Network::Channel* pChannel, float x, float y,
 	if(almostEqual(x, pos.x) && almostEqual(y, pos.y) && almostEqual(z, pos.z))
 		return;
 
+	Position3D newPos(x, y, z);
+
+	if(!checkMoveForTopSpeed(newPos))
+	{
+		Position3D movment = newPos - pos;
+		float ydist = fabs(movment.y);
+		movment.y = 0.f;
+		float xzDist = movment.length();
+
+		DEBUG_MSG(fmt::format("{}::setPosition_XYZ_float: {} position[({},{},{}) -> ({},{},{}), (xzDist={})>(topSpeed={}) || (yDist={})>(topSpeedY={})] invalid. reset client!\n",
+			this->scriptName(), this->id(),
+			pos.x, pos.y, pos.z,
+			x, y, z,
+			xzDist, topSpeed_,
+			ydist, topSpeedY_));
+
+		{
+			SCOPED_PROFILE(SCRIPTCALL_PROFILE);
+			bufferOrExeCallback(const_cast<char*>("onMoveOverTopSpeed"),
+				Py_BuildValue(const_cast<char*>("(fffff)"),
+					x, y, z, xzDist, ydist));
+		}
+		return;
+	}
+
 	pos.x = x;
-	pos.x = y;
+	pos.y = y;
 	pos.z = z;
 	onPositionChanged();
 }
@@ -2329,6 +2384,53 @@ PyObject* Entity::pyGetVolatileinfo()
 bool Entity::checkMoveForTopSpeed(const Position3D& position)
 {
 	Position3D movment = position - this->position();
+
+	// 同帧累积：防止客户端通过高频发包将一次超速拆成多个小包绕过单包检测
+	if (g_kbetime == lastTopSpeedCheckTick_)
+	{
+		accumulatedMoveForTick_ += movment;
+		movment = accumulatedMoveForTick_;
+	}
+	else
+	{
+		// tick 切换：将上一 tick 的累计移动量汇入滑动窗口
+		Position3D oldTickMove = accumulatedMoveForTick_;
+		Position3D oldTickXZ = oldTickMove;
+		oldTickXZ.y = 0.f;
+
+		topSpeedWindowAccumDist_ += oldTickXZ.length();
+		topSpeedWindowAccumDistY_ += fabs(oldTickMove.y);
+		topSpeedWindowTickCount_++;
+
+		// 窗口满（gameUpdateHertz 帧 = 1秒）：检测是否渐进式超速
+		int windowSize = g_kbeSrvConfig.gameUpdateHertz();
+		if (topSpeedWindowTickCount_ >= windowSize)
+		{
+			bool windowViolation = false;
+			if (topSpeed_ > 0.01f && topSpeedWindowAccumDist_ > topSpeed_ * windowSize)
+				windowViolation = true;
+			if (topSpeedY_ > 0.01f && topSpeedWindowAccumDistY_ > topSpeedY_ * windowSize)
+				windowViolation = true;
+
+			if (windowViolation)
+			{
+				SCOPED_PROFILE(SCRIPTCALL_PROFILE);
+				bufferOrExeCallback(const_cast<char*>("onMoveOverTopSpeed"),
+					Py_BuildValue(const_cast<char*>("(fffff)"),
+						this->position().x, this->position().y, this->position().z,
+						topSpeedWindowAccumDist_, topSpeedWindowAccumDistY_));
+			}
+
+			// 重置窗口
+			topSpeedWindowAccumDist_ = 0.f;
+			topSpeedWindowAccumDistY_ = 0.f;
+			topSpeedWindowTickCount_ = 0;
+		}
+
+		accumulatedMoveForTick_ = movment;
+		lastTopSpeedCheckTick_ = g_kbetime;
+	}
+
 	bool move = true;
 
 	// 检查移动
@@ -2383,19 +2485,28 @@ void Entity::onUpdateDataFromClient(KBEngine::MemoryStream& s)
 	}
 	else
 	{
-		if (this->pWitness() == NULL && this->controlledBy_ == NULL)
-			return;
-
 		Position3D currpos = this->position();
 		Position3D movment = pos - currpos;
 		float ydist = fabs(movment.y);
 		movment.y = 0.f;
+		float xzDist = movment.length();
+
+		// 通知脚本层：玩家移动超速
+		{
+			SCOPED_PROFILE(SCRIPTCALL_PROFILE);
+			bufferOrExeCallback(const_cast<char*>("onMoveOverTopSpeed"),
+				Py_BuildValue(const_cast<char*>("(fffff)"),
+					pos.x, pos.y, pos.z, xzDist, ydist));
+		}
+
+		if (this->pWitness() == NULL && this->controlledBy_ == NULL)
+			return;
 
 		DEBUG_MSG(fmt::format("{}::onUpdateDataFromClient: {} position[({},{},{}) -> ({},{},{}), (xzDist={})>(topSpeed={}) || (yDist={})>(topSpeedY={})] invalid. reset client!\n",
 			this->scriptName(), this->id(),
 			this->position().x, this->position().y, this->position().z,
 			pos.x, pos.y, pos.z,
-			movment.length(), topSpeed_,
+			xzDist, topSpeed_,
 			ydist, topSpeedY_));
 
 		// this->position(currpos);
