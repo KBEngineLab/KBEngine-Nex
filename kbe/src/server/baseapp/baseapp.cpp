@@ -3037,6 +3037,24 @@ void Baseapp::createCellEntity(EntityCallAbstract* createToCellEntityCall, Entit
 		return;
 	}
 
+	// 如果传入的是 CELL_VIA_BASE（如 baseEntityCall.cell），尝试解析为直接 CELL call
+	if(createToCellEntityCall->type() == ENTITYCALL_TYPE_CELL_VIA_BASE)
+	{
+		// 先尝试在本进程查找 Space 实体
+		Entity* pSpaceEntity = pEntities_->find(createToCellEntityCall->id());
+		if(pSpaceEntity && pSpaceEntity->cellEntityCall())
+		{
+			// 同 baseapp：替换为直接 cell call，后续原逻辑照旧
+			createToCellEntityCall = pSpaceEntity->cellEntityCall();
+		}
+		else
+		{
+			// 跨 baseapp：转发到 Space 所在 baseapp
+			this->forwardCreateCellEntityToOtherBaseapp(createToCellEntityCall, pEntity);
+			return;
+		}
+	}
+
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(CellappInterface::onCreateCellEntityFromBaseapp);
 
@@ -3102,6 +3120,105 @@ void Baseapp::onCreateCellFailure(Network::Channel* pChannel, ENTITY_ID entityID
 	}
 
 	pEntity->onCreateCellFailure();
+}
+
+//-------------------------------------------------------------------------------------
+void Baseapp::forwardCreateCellEntityToOtherBaseapp(EntityCallAbstract* createToCellEntityCall, Entity* pEntity)
+{
+	Network::Channel* pChannel = createToCellEntityCall->getChannel();
+	if(pChannel == NULL)
+	{
+		ERROR_MSG(fmt::format("Baseapp::forwardCreateCellEntityToOtherBaseapp: not found channel "
+			"(createToCellEntityCall: componentID={}, entityID={}), create error!\n",
+			createToCellEntityCall->componentID(), createToCellEntityCall->id()));
+
+		pEntity->onCreateCellFailure();
+		return;
+	}
+
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	(*pBundle).newMessage(BaseappInterface::onForwardCreateCellEntity);
+
+	EntityCall* clientEntityCall = pEntity->clientEntityCall();
+	bool hasClient = (clientEntityCall != NULL);
+
+	(*pBundle) << createToCellEntityCall->id();		// spaceEntityID
+	(*pBundle) << pEntity->ob_type->tp_name;			// entityType
+	(*pBundle) << pEntity->id();						// newEntityID
+	(*pBundle) << componentID_;						// sourceComponentID
+	(*pBundle) << hasClient;
+	(*pBundle) << pEntity->inRestore();
+
+	MemoryStream* s = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
+
+	try
+	{
+		pEntity->addCellDataToStream(CELLAPP_TYPE, ED_FLAG_ALL, s);
+	}
+	catch (MemoryStreamWriteOverflow & err)
+	{
+		ERROR_MSG(fmt::format("Baseapp::forwardCreateCellEntityToOtherBaseapp({}): {}\n",
+			pEntity->scriptName(), pEntity->id(), err.what()));
+
+		MemoryStream::reclaimPoolObject(s);
+		Network::Bundle::reclaimPoolObject(pBundle);
+		pEntity->onCreateCellFailure();
+		return;
+	}
+
+	(*pBundle).append(*s);
+	MemoryStream::reclaimPoolObject(s);
+
+	pChannel->send(pBundle);
+}
+
+//-------------------------------------------------------------------------------------
+void Baseapp::onForwardCreateCellEntity(Network::Channel* pChannel, MemoryStream& s)
+{
+	ENTITY_ID spaceEntityID;
+	std::string entityType;
+	ENTITY_ID newEntityID;
+	COMPONENT_ID sourceComponentID;
+	bool hasClient;
+	bool inRestore;
+
+	s >> spaceEntityID >> entityType >> newEntityID
+	  >> sourceComponentID >> hasClient >> inRestore;
+	// s 剩余部分 = cellData
+
+	Entity* pSpaceEntity = pEntities_->find(spaceEntityID);
+	EntityCallAbstract* cellCall = (pSpaceEntity ? pSpaceEntity->cellEntityCall() : NULL);
+
+	if(cellCall == NULL || cellCall->getChannel() == NULL)
+	{
+		ERROR_MSG(fmt::format("Baseapp::onForwardCreateCellEntity: not found space entity({}) "
+			"or its cell, create error!\n", spaceEntityID));
+
+		// 回发 onCreateCellFailure 到源 baseapp
+		Components::ComponentInfos* cinfos =
+			Components::getSingleton().findComponent(BASEAPP_TYPE, sourceComponentID);
+		if(cinfos != NULL && cinfos->pChannel != NULL)
+		{
+			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+			pBundle->newMessage(BaseappInterface::onCreateCellFailure);
+			BaseappInterface::onCreateCellFailureArgs1::staticAddToBundle(*pBundle, newEntityID);
+			cinfos->pChannel->send(pBundle);
+		}
+		return;
+	}
+
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	(*pBundle).newMessage(CellappInterface::onCreateCellEntityFromBaseapp);
+
+	(*pBundle) << cellCall->id();		// space 的 cell entity ID
+	(*pBundle) << entityType;
+	(*pBundle) << newEntityID;
+	(*pBundle) << sourceComponentID;
+	(*pBundle) << hasClient;
+	(*pBundle) << inRestore;
+	(*pBundle).append(s);				// 剩余 cellData
+
+	cellCall->getChannel()->send(pBundle);
 }
 
 //-------------------------------------------------------------------------------------

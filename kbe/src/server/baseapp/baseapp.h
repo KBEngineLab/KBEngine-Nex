@@ -243,6 +243,16 @@ public:
 	*/
 	void onCreateCellFailure(Network::Channel* pChannel, ENTITY_ID entityID);
 
+	/** 
+		转发createCellEntity请求到Space所在的baseapp（支持 CELL_VIA_BASE）
+	*/
+	void forwardCreateCellEntityToOtherBaseapp(EntityCallAbstract* createToCellEntityCall, Entity* pEntity);
+	
+	/** 网络接口
+		收到来自其他baseapp转发的createCellEntity请求
+	*/
+	void onForwardCreateCellEntity(Network::Channel* pChannel, MemoryStream& s);
+
 	/** 网络接口
 		createCellEntity的cell实体创建成功回调。
 	*/
