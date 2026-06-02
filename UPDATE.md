@@ -13,6 +13,13 @@
 - [feat] io_uring 与 kqueue completion adapter，底层完全completion化 [Issue #173](https://github.com/KBEngineLab/KBEngine-Nex/issues/173)
 - [feat] 【kbex】 app启动失败后，logger不会转发日志，这个时候应该自动读取原始日志并输出 [Issue #158](https://github.com/KBEngineLab/KBEngine-Nex/issues/158)
 - [feat] registerReadFileDescriptor等接口废弃，新增registerAcceptFileDescriptor等 completion API [Issue #172](https://github.com/KBEngineLab/KBEngine-Nex/issues/172)
+- [feat] 增强 topSpeed 超速检测并通知脚本层 [Issue #168](https://github.com/KBEngineLab/KBEngine-Nex/issues/168)
+  - 单包检测（原有）：逐包比较移动距离与 topSpeed 阈值
+  - 同帧累积（新增）：同一 game tick 内多次位置更新的移动量累加后检测，防止客户端将超速拆成多个小包绕过单包检查
+  - 滑动窗口（新增）：统计 gameUpdateHertz 帧窗口内的总移动距离，若超出 topSpeed × 窗口帧数则触发回调，防御跨帧渐进式加速
+  - 新增 Python 回调 onMoveOverTopSpeed(clientX, clientY, clientZ, xzDist, yDist)：
+    - 单包/同帧超速时，在重置客户端位置之前回调
+    - 滑动窗口超速时，在窗口满时回调
 - [fix] 修复 urlopen 传入 None 时可能崩溃的问题 [Issue #167](https://github.com/KBEngineLab/KBEngine-Nex/issues/167)
 - [fix] log4cxx 初始化前自动创建日志目录，避免Linux下首次启动时日志创建失败的问题
 - [perf] openssl 彻底vcpkg引入，不再依赖系统以及vsopenssl
