@@ -214,7 +214,7 @@ public:
 	/**
 		传送成功和失败相关回调
 	*/
-	void onTeleport();
+	bool onTeleport();
 	void onTeleportFailure();
 	void onTeleportSuccess(PyObject* nearbyEntity, SPACE_ID lastSpaceID);
 	void onReqTeleportOtherAck(Network::Channel* pChannel, ENTITY_ID nearbyMBRefID, 

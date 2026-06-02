@@ -3915,6 +3915,14 @@ void Entity::teleport(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& di
 
 	Py_INCREF(this);
 
+	// 传送前回调，脚本层可以返回False来拒绝传送
+	if (!onTeleport())
+	{
+		onTeleportFailure();
+		Py_DECREF(this);
+		return;
+	}
+
 	// 如果为None则是entity自己想在本space上跳转到某位置
 	if(nearbyMBRef == Py_None)
 	{
@@ -3963,12 +3971,104 @@ void Entity::teleport(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& di
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::onTeleport()
+bool Entity::onTeleport()
 {
-	// 这个方法仅在base.teleport跳转之前被调用， cell.teleport是不会被调用的。
+	// 在所有检测通过后，真正开始传送前调用。
+	// base.teleport和cell.teleport都会触发此回调。
+	// 脚本层可以返回False来拒绝传送，默认为True（允许传送）。
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-	bufferOrExeCallback(const_cast<char*>("onTeleport"), NULL);
+	bool result = true;
+
+	PyObject* pyCallable = PyObject_GetAttrString(this, const_cast<char*>("onTeleport"));
+
+	if (pyCallable)
+	{
+		Py_INCREF(this);
+		PyObject* pyResult = PyObject_CallObject(pyCallable, NULL);
+		Py_DECREF(pyCallable);
+
+		if (pyResult)
+		{
+			if (PyBool_Check(pyResult))
+				result = (pyResult == Py_True);
+			else
+				Py_DECREF(pyResult);
+		}
+		else
+		{
+			PyErr_PrintEx(0);
+		}
+
+		Py_DECREF(this);
+	}
+	else
+	{
+		PyErr_Clear();
+	}
+
+	// 通知组件，任一组件返回False则拒绝传送
+	if (result)
+	{
+		ScriptDefModule::COMPONENTDESCRIPTION_MAP& componentDescrs =
+			pScriptModule_->getComponentDescrs();
+
+		ScriptDefModule::COMPONENTDESCRIPTION_MAP::iterator comps_iter =
+			componentDescrs.begin();
+
+		for (; comps_iter != componentDescrs.end(); ++comps_iter)
+		{
+			if (!comps_iter->second->hasCell())
+				continue;
+
+			PyObject* pyCompObj =
+				PyObject_GetAttrString(this, comps_iter->first.c_str());
+
+			if (!pyCompObj)
+			{
+				SCRIPT_ERROR_CHECK();
+				continue;
+			}
+
+			PyObject* pyCompCallable =
+				PyObject_GetAttrString(pyCompObj, const_cast<char*>("onTeleport"));
+
+			if (!pyCompCallable)
+			{
+				PyErr_Clear();
+				Py_DECREF(pyCompObj);
+				continue;
+			}
+
+			PyObject* pyCompResult =
+				PyObject_CallObject(pyCompCallable, NULL);
+
+			Py_DECREF(pyCompCallable);
+
+			if (pyCompResult)
+			{
+				if (PyBool_Check(pyCompResult))
+				{
+					if (pyCompResult != Py_True)
+					{
+						Py_DECREF(pyCompResult);
+						Py_DECREF(pyCompObj);
+						result = false;
+						break;
+					}
+				}
+				Py_DECREF(pyCompResult);
+			}
+			else
+			{
+				PyErr_PrintEx(0);
+			}
+
+			Py_DECREF(pyCompObj);
+		}
+	}
+
+	return result;
 }
 
 //-------------------------------------------------------------------------------------
