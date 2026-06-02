@@ -3042,7 +3042,8 @@ void Baseapp::createCellEntity(EntityCallAbstract* createToCellEntityCall, Entit
 	{
 		// 先尝试在本进程查找 Space 实体
 		Entity* pSpaceEntity = pEntities_->find(createToCellEntityCall->id());
-		if(pSpaceEntity && pSpaceEntity->cellEntityCall())
+		if(pSpaceEntity && pSpaceEntity->cellEntityCall() && 
+		   pSpaceEntity->cellEntityCall()->getChannel())
 		{
 			// 同 baseapp：替换为直接 cell call，后续原逻辑照旧
 			createToCellEntityCall = pSpaceEntity->cellEntityCall();
@@ -3128,8 +3129,8 @@ void Baseapp::forwardCreateCellEntityToOtherBaseapp(EntityCallAbstract* createTo
 	Network::Channel* pChannel = createToCellEntityCall->getChannel();
 	if(pChannel == NULL)
 	{
-		ERROR_MSG(fmt::format("Baseapp::forwardCreateCellEntityToOtherBaseapp: not found channel "
-			"(createToCellEntityCall: componentID={}, entityID={}), create error!\n",
+		ERROR_MSG(fmt::format("Baseapp::forwardCreateCellEntityToOtherBaseapp: not found "
+			"Space baseapp channel (componentID={}, entityID={}), create error!\n",
 			createToCellEntityCall->componentID(), createToCellEntityCall->id()));
 
 		pEntity->onCreateCellFailure();
