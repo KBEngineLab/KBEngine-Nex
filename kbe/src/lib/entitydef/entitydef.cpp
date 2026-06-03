@@ -801,6 +801,21 @@ bool EntityDef::reloadDependencyScriptModules(std::string entitiesPath)
 			}
 
 			patchReloadedModuleTypes(pyReloadedModule, oldTypes);
+
+			// 关键修复：patch 完后必须把模块里的属性指回被 patch 的旧类对象。
+			// 否则下次 reload 时 collectModuleTypes 会从模块里拿到第一次 reload 创建的新类对象，
+			// 而不是 Entity 实际继承的原始类。连续两次 reload 只有第一次能生效。
+			// 注意：只在这里（主模块路径）执行，alias duplicate 路径不执行，避免覆盖。
+			for (std::map<std::string, PyObject*>::const_iterator ot = oldTypes.begin(); ot != oldTypes.end(); ++ot)
+			{
+				if (PyObject_SetAttrString(pyReloadedModule, ot->first.c_str(), ot->second) == -1)
+				{
+					WARNING_MSG(fmt::format("EntityDef::reloadDependencyScriptModules: "
+						"reset module attr '{}' to old type failed.\n", ot->first));
+					PyErr_Clear();
+				}
+			}
+
 			releaseCollectedTypes(oldTypes);
 			if (!filePath.empty())
 			{
