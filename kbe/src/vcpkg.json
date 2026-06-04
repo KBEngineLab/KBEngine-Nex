@@ -15,7 +15,10 @@
     "libpq",
     "recastnavigation",
     "nlohmann-json",
-    "libmariadb",
+    {
+      "name": "libmariadb",
+      "features": ["openssl"]
+    },
     {
       "name": "jemalloc",
       "platform": "!windows"
