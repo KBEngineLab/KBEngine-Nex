@@ -641,7 +641,8 @@ bool PythonApp::installPyScript()
 		return false;
 	}
 
-	std::wstring pyPaths = user_scripts_path + L"common;";
+	std::wstring pyPaths = user_scripts_path + L";";
+	pyPaths += user_scripts_path + L"common;";
 	pyPaths += user_scripts_path + L"data;";
 	pyPaths += user_scripts_path + L"user_type;";
 

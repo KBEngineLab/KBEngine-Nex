@@ -4,6 +4,7 @@
 #define KBE_ENTITY_APP_H
 
 // common include
+#include <sys/stat.h>
 #include "pyscript/py_gc.h"
 #include "pyscript/script.h"
 #include "pyscript/pyprofile.h"
@@ -1663,6 +1664,27 @@ void EntityApp<E>::updateLoad()
 		{
 			CRITICAL_MSG(fmt::format("EntityApp::handleGameTick: Invalid timing result {:.3f}.\n",
 					spareTime));
+		}
+	}
+
+	// 文件触发热更：在 assets 目录下 touch/修改 .hotreload 文件即可触发所有 app 的 reloadScript
+	// 仅在开发模式（publish=0）下生效；PyCharm 插件只需写入该文件即可
+	if (g_appPublish == 0)
+	{
+		static uint64 s_hotreloadStamp = 0;
+		std::string hotreloadFile = Resmgr::getSingleton().getPyUserScriptsPath() + ".hotreload";
+
+		struct stat st;
+		if (stat(hotreloadFile.c_str(), &st) == 0)
+		{
+			uint64 stamp = ((uint64)st.st_mtime << 32) ^ (uint64)st.st_size;
+			if (s_hotreloadStamp != 0 && stamp != s_hotreloadStamp)
+			{
+				INFO_MSG(fmt::format("{}::updateLoad: .hotreload changed, triggering reloadScript.\n",
+					COMPONENT_NAME_EX(g_componentType)));
+				reloadScript(false);
+			}
+			s_hotreloadStamp = stamp;
 		}
 	}
 
