@@ -204,14 +204,14 @@ bool DBInterfaceMysql::attach(const char* databaseName)
 
 		// 启用“允许向服务器请求 RSA 公钥”
 		const bool get_pubkey = 1;
-		mysql_options(mysql(), MYSQL_OPT_GET_SERVER_PUBLIC_KEY, &get_pubkey);
+		mysql_options(mysql(), MYSQL_SERVER_PUBLIC_KEY, &get_pubkey);
 
 
 		unsigned long clientflag = 0;
 
 		if (db_mysql_ssl_) {
-			const enum mysql_ssl_mode opt_use_ssl = SSL_MODE_REQUIRED;
-			mysql_options(mysql(), MYSQL_OPT_SSL_MODE, &opt_use_ssl);
+			const bool opt_use_ssl = 1;
+			mysql_options(mysql(), MYSQL_OPT_SSL_ENFORCE, &opt_use_ssl);
 			mysql_ssl_set(mysql(),
 				db_mysql_clientKeyPath_.c_str(),
 				db_mysql_clientCertPath_.c_str(),
@@ -225,9 +225,7 @@ bool DBInterfaceMysql::attach(const char* databaseName)
 			DEBUG_MSG(fmt::format("DBInterfaceMysql::Enable SSL: sslCert: {}; sslKey:{}; sslCa:{} ...\n", db_mysql_clientKeyPath_, db_mysql_clientCertPath_, db_mysql_caPath_));
 		}
 		else {
-			// 禁用 SSL
-			const enum mysql_ssl_mode opt_use_ssl = SSL_MODE_DISABLED;
-			mysql_options(mysql(), MYSQL_OPT_SSL_MODE, &opt_use_ssl);
+			// 禁用 SSL (MariaDB: default is no SSL)
 		}
 
 		

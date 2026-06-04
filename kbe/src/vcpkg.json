@@ -15,6 +15,7 @@
     "libpq",
     "recastnavigation",
     "nlohmann-json",
+    "libmariadb",
     {
       "name": "jemalloc",
       "platform": "!windows"

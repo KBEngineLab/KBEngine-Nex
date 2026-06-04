@@ -157,7 +157,6 @@ include_directories(
     ${KBE_ROOT}/kbe/src/lib
     ${KBE_ROOT}/kbe/src/server
     ${KBE_ROOT}/kbe/src/lib/dependencies
-    ${KBE_ROOT}/kbe/src/lib/dependencies/mysql
     ${KBE_ROOT}/kbe/src/lib/dependencies/g3dlite
     ${KBE_ROOT}/kbe/src/lib/dependencies/fmt/include
     ${KBE_ROOT}/kbe/src/lib/dependencies/curl/include

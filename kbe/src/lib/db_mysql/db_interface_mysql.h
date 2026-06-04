@@ -12,10 +12,7 @@
 #include "db_interface/db_interface.h"
 
 #include "mysql/mysql.h"
-#if KBE_PLATFORM == PLATFORM_WIN32
-#pragma comment (lib, "libmysql.lib")
-#pragma comment (lib, "mysqlclient.lib")
-#endif
+// vcpkg MSBuild integration auto-links libmariadb
 
 // #if KBE_PLATFORM == PLATFORM_WIN32
 // #ifdef X64
