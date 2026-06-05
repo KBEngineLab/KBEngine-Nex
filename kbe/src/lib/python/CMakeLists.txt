@@ -90,21 +90,17 @@ configure_file(
 # 2) 编译 Python
 # --------------------------------------------------------
 # Release 版本
-add_custom_command(
-    OUTPUT ${PYTHON_LIB_RELEASE}
+add_custom_target(python_build ALL
     COMMAND test -f ${PYTHON_LIB_RELEASE} || (
         chmod +x configure &&
         ${CMAKE_COMMAND} -E env ${PYTHON_BUILD_ENV}
         ./configure --without-ensurepip &&
         make -j
     )
+    BYPRODUCTS ${PYTHON_LIB_RELEASE}
     WORKING_DIRECTORY ${PYTHON_SRC_DIR}
     COMMENT "Building embedded Python (Release)..."
-)
-
-# 定义构建目标
-add_custom_target(python_build ALL
-    DEPENDS ${PYTHON_LIB}
+    USES_TERMINAL
 )
 
 # --------------------------------------------------------
