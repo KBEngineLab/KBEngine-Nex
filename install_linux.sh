@@ -139,6 +139,8 @@ install_dep "UUID"  false uuid-dev libuuid-devel util-linux-dev
 install_dep "BZip2"  false libbz2-dev bzip2-devel libbz2-devel bzip2
 install_dep "Zlib"  false zlib1g-dev zlib-devel zlib-dev
 install_dep "CURL Dev"  false libcurl4-openssl-dev libcurl-devel curl-dev
+install_dep "Bison"  false bison
+install_dep "Flex"   false flex
 
 if is_centos; then
     # Install Perl
