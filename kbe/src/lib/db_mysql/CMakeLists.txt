@@ -18,4 +18,4 @@ target_link_libraries(db_mysql PUBLIC
 
 # MariaDB client library via vcpkg
 find_package(unofficial-libmariadb CONFIG REQUIRED)
-target_link_libraries(db_mysql PUBLIC unofficial::libmariadb::libmariadb)
+target_link_libraries(db_mysql PUBLIC unofficial::libmariadb)
