@@ -1272,6 +1272,7 @@ RESTART_RECV:
 				if(bhandler.receive(&args, 0, timeout, showerr))
 				{
 					bool isContinue = false;
+					bool foundTarget = false;
 					showerr = false;
 					timeout = 1000000;
 
@@ -1304,10 +1305,29 @@ RESTART_RECV:
 							continue;
 						}
 
-						INFO_MSG(fmt::format("Components::findComponents: found {}, addr:{}:{}\n",
-							COMPONENT_NAME_EX((COMPONENT_TYPE)args.componentType),
-							inet_ntoa((struct in_addr&)args.intaddr),
-							ntohs(args.intport)));
+						// 如果该组件已注册，跳过
+						if(Components::getSingleton().findComponent((COMPONENT_TYPE)args.componentType, args.componentID) != NULL)
+						{
+							isContinue = true;
+							continue;
+						}
+
+						if(args.componentType == findComponentType)
+						{
+							foundTarget = true;
+							INFO_MSG(fmt::format("Components::findComponents: found {}, addr:{}:{}\n",
+								COMPONENT_NAME_EX((COMPONENT_TYPE)args.componentType),
+								inet_ntoa((struct in_addr&)args.intaddr),
+								ntohs(args.intport)));
+						}
+						else
+						{
+							DEBUG_MSG(fmt::format("Components::findComponents: found {}, addr:{}:{} (searching for {})\n",
+								COMPONENT_NAME_EX((COMPONENT_TYPE)args.componentType),
+								inet_ntoa((struct in_addr&)args.intaddr),
+								ntohs(args.intport),
+								COMPONENT_NAME_EX((COMPONENT_TYPE)findComponentType)));
+						}
 
 						Components::getSingleton().addComponent(args.uid, args.username.c_str(), 
 							(KBEngine::COMPONENT_TYPE)args.componentType, args.componentID, args.globalorderid, args.grouporderid, args.gus,
@@ -1318,7 +1338,7 @@ RESTART_RECV:
 					}while(bhandler.pCurrPacket()->length() > 0);
 
 					// 防止接收到的数据不是想要的数据
-					if(findComponentType == args.componentType)
+					if(foundTarget)
 					{
 						// 这里做个特例， 是logger则优先连接上去， 这样可以尽早同步日志
 						if(findComponentType == (int8)LOGGER_TYPE)

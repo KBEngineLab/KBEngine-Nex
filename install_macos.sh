@@ -61,15 +61,11 @@ install_brew_dep automake
 install_brew_dep libtool
 install_brew_dep pkg-config
 install_brew_dep libtirpc
-install_brew_dep mysql-client
 install_brew_dep zstd
 
 BREW_PREFIX="$(brew --prefix)"
-MYSQL_CLIENT_PREFIX="$(brew --prefix mysql-client)"
 ZSTD_PREFIX="$(brew --prefix zstd)"
 
-export PATH="$MYSQL_CLIENT_PREFIX/bin:$PATH"
-export PKG_CONFIG_PATH="$MYSQL_CLIENT_PREFIX/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 export LDFLAGS="-L$ZSTD_PREFIX/lib ${LDFLAGS:-}"
 export CPPFLAGS="-I$ZSTD_PREFIX/include ${CPPFLAGS:-}"
 

@@ -134,23 +134,11 @@ fi
 
 
 install_dep "TIRPC"  false libtirpc-dev libtirpc-devel
-install_dep "MySQL/MariaDB"  false \
-    libmysqlclient-dev libmariadb-dev \
-    mariadb-devel mysql-devel mariadb-connector-c-devel \
-    libmariadb-devel libmysqlclient-devel \
-    mariadb-clients mariadb-libs \
-    mariadb-connector-c-dev mysql-dev
 install_dep "libffi"  false libffi-dev libffi-devel libffi
 install_dep "UUID"  false uuid-dev libuuid-devel util-linux-dev
 install_dep "BZip2"  false libbz2-dev bzip2-devel libbz2-devel bzip2
-install_dep "OpenSSL"  false libssl-dev openssl-devel openssl-dev
 install_dep "Zlib"  false zlib1g-dev zlib-devel zlib-dev
 install_dep "CURL Dev"  false libcurl4-openssl-dev libcurl-devel curl-dev
-
-if $PKG_CHECK "libmariadb-dev" >/dev/null 2>&1; then
-    install_dep "libmariadb-dev-compat"  true libmariadb-dev-compat
-fi
-
 
 if is_centos; then
     # Install Perl
