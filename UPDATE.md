@@ -2,14 +2,18 @@
 # 更新日志
 
 ## 2.8.2
-- [feat] 为 cellapp teleport 接入 onTeleport 回调，支持脚本层拒绝传送 [Issue #178](https://github.com/KBEngineLab/KBEngine-Nex/pull/178)
+- [feat] 背包插件 [KBEngineNex-Plugin-Bag](https://github.com/KBEngineLab/KBEngineNex-Plugin-Bag)
+- [feat] 数据库压测插件 [KBEngineNex-Plugin-DbStress](https://github.com/KBEngineLab/KBEngineNex-Plugin-DbStress)
+- [feat] 客户端实体创建快捷入口 [Issue #181](https://github.com/KBEngineLab/KBEngine-Nex/issues/181)
+- [feat] 快速热更入口：工具栏刷新按钮 + 自动热更（可配置检测目录与间隔） [Issue #183](https://github.com/KBEngineLab/KBEngine-Nex/issues/183)
+- [feat] 为 cellapp teleport 接入 onTeleport 回调，支持脚本层拒绝传送 [Issue #178](https://github.com/KBEngineLab/KBEngine-Nex/issues/178)
   - cellapp Entity::onTeleport() 从预留的死方法改为实际生效，在 Entity::teleport() 所有前置检查通过后、分支执行前调用，只触发一次。
   - onTeleport() 返回 bool，脚本层返回 True/None 允许传送（默认兼容旧工程），返回 False 则拒绝并触发 onTeleportFailure。entity 和所有 cell 组件都会被询问，任一返回 False 即中断传送。
-- [feat] createCellEntity 支持 CELL_VIA_BASE 类型（baseCall.cell） [Issue #182](https://github.com/KBEngineLab/KBEngine-Nex/pull/182)
+- [feat] createCellEntity 支持 CELL_VIA_BASE 类型（baseCall.cell） [Issue #182](https://github.com/KBEngineLab/KBEngine-Nex/issues/182)
   - 允许 createCellEntity 接收 baseEntityCall.cell 作为参数， 不再强制要求直接 CellEntityCall。
   - 使用方式：avatar.createCellEntity(spaceBaseCall.cell)
-- [feat] PostgreSQL 支持  [Issue #21](https://github.com/KBEngineLab/KBEngine-Nex/pull/21)
-- [feat] executeRawDatabaseCommand 命令黑名单  [Issue #179](https://github.com/KBEngineLab/KBEngine-Nex/pull/179)
+- [feat] PostgreSQL 支持  [Issue #21](https://github.com/KBEngineLab/KBEngine-Nex/issues/21)
+- [feat] executeRawDatabaseCommand 命令黑名单  [Issue #179](https://github.com/KBEngineLab/KBEngine-Nex/issues/179)
 - [feat] 新增添加额外配置参数 [@Smile010110](https://github.com/Smile010110)   [Pull request #176](https://github.com/KBEngineLab/KBEngine-Nex/pull/176)
 - [feat] GitHub Actions  [Issue #109](https://github.com/KBEngineLab/KBEngine-Nex/issues/109)
 - [feat] 重构 Python async 调度，移除 py 层独立线程和空 timer 保活逻辑，统一由 C++ 底层 dispatcher timer 驱动 asyncio，避免 GIL 争抢并降低 aiohttp 等协程任务延迟  [Issue #166](https://github.com/KBEngineLab/KBEngine-Nex/issues/166)
