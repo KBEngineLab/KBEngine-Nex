@@ -4,8 +4,8 @@
 ## 2.8.2
 - [feat] 背包插件 [KBEngineNex-Plugin-Bag](https://github.com/KBEngineLab/KBEngineNex-Plugin-Bag)
 - [feat] 数据库压测插件 [KBEngineNex-Plugin-DbStress](https://github.com/KBEngineLab/KBEngineNex-Plugin-DbStress)
-- [feat] 客户端实体创建快捷入口 [Issue #181](https://github.com/KBEngineLab/KBEngine-Nex/issues/181)
-- [feat] 快速热更入口：工具栏刷新按钮 + 自动热更（可配置检测目录与间隔） [Issue #183](https://github.com/KBEngineLab/KBEngine-Nex/issues/183)
+- [feat] KBEX 客户端实体创建快捷入口（暂不支持插件） [Issue #181](https://github.com/KBEngineLab/KBEngine-Nex/issues/181)
+- [feat] KBEX 快速热更入口：工具栏刷新按钮 + 自动热更（可配置检测目录与间隔） [Issue #183](https://github.com/KBEngineLab/KBEngine-Nex/issues/183)
 - [feat] 为 cellapp teleport 接入 onTeleport 回调，支持脚本层拒绝传送 [Issue #178](https://github.com/KBEngineLab/KBEngine-Nex/issues/178)
   - cellapp Entity::onTeleport() 从预留的死方法改为实际生效，在 Entity::teleport() 所有前置检查通过后、分支执行前调用，只触发一次。
   - onTeleport() 返回 bool，脚本层返回 True/None 允许传送（默认兼容旧工程），返回 False 则拒绝并触发 onTeleportFailure。entity 和所有 cell 组件都会被询问，任一返回 False 即中断传送。
