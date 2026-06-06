@@ -1671,20 +1671,28 @@ void EntityApp<E>::updateLoad()
 	// 仅在开发模式（publish=0）下生效；PyCharm 插件只需写入该文件即可
 	if (g_appPublish == 0)
 	{
-		static uint64 s_hotreloadStamp = 0;
+		static enum { UNINIT, ABSENT, PRESENT } s_state = UNINIT;
+		static uint64 s_stamp = 0;
 		std::string hotreloadFile = Resmgr::getSingleton().getPyUserScriptsPath() + ".hotreload";
 
 		struct stat st;
 		if (stat(hotreloadFile.c_str(), &st) == 0)
 		{
 			uint64 stamp = ((uint64)st.st_mtime << 32) ^ (uint64)st.st_size;
-			if (s_hotreloadStamp != 0 && stamp != s_hotreloadStamp)
+
+			if ((s_state == ABSENT) || (s_state == PRESENT && stamp != s_stamp))
 			{
 				INFO_MSG(fmt::format("{}::updateLoad: .hotreload changed, triggering reloadScript.\n",
 					COMPONENT_NAME_EX(g_componentType)));
 				reloadScript(false);
 			}
-			s_hotreloadStamp = stamp;
+
+			s_stamp = stamp;
+			s_state = PRESENT;
+		}
+		else
+		{
+			s_state = ABSENT;
 		}
 	}
 
