@@ -1007,29 +1007,42 @@ namespace KBEngine
 				if(runclass == null)
 					return;
 				
-				Entity entity = (Entity)Activator.CreateInstance(runclass);
-				entity.id = eid;
-				entity.className = entityType;
-				entity.onGetBase();
-
-				entities[eid] = entity;
-				
-				MemoryStream entityMessage = null;
-				_bufferedCreateEntityMessages.TryGetValue(eid, out entityMessage);
-				
-				if(entityMessage != null)
+				Entity entity = null;
+				try
 				{
-					Client_onUpdatePropertys(entityMessage);
-					_bufferedCreateEntityMessages.Remove(eid);
-					entityMessage.reclaimObject();
+					entity = (Entity)Activator.CreateInstance(runclass);
+					entity.id = eid;
+					entity.className = entityType;
+					entity.onGetBase();
+
+					MemoryStream entityMessage = null;
+					_bufferedCreateEntityMessages.TryGetValue(eid, out entityMessage);
+					
+					if(entityMessage != null)
+					{
+						Client_onUpdatePropertys(entityMessage);
+						_bufferedCreateEntityMessages.Remove(eid);
+						entityMessage.reclaimObject();
+					}
+					
+					entity.__init__();
+					entity.attachComponents();
+					entity.inited = true;
+
+					entities[eid] = entity;
+					
+					if(_args.isOnInitCallPropertysSetMethods)
+						entity.callPropertysSetMethods();
 				}
-				
-				entity.__init__();
-				entity.attachComponents();
-				entity.inited = true;
-				
-				if(_args.isOnInitCallPropertysSetMethods)
-					entity.callPropertysSetMethods();
+				catch(Exception e)
+				{
+					KBELog.ERROR_MSG("KBEngine::Client_onCreatedProxies: init entity failed! eid(" + eid + "), entityType(" + entityType + "), error=" + e.ToString());
+					if(entity != null)
+					{
+						entities.Remove(eid);
+						entity.destroy();
+					}
+				}
 			}
 			else
 			{
@@ -1200,35 +1213,49 @@ namespace KBEngine
 				if(!EntityDef.moduledefs.TryGetValue(entityType, out module))
 				{
 					KBELog.ERROR_MSG("KBEngine::Client_onEntityEnterWorld: not found module(" + entityType + ")!");
+					return;
 				}
 				
 				Type runclass = module.entityScript;
 				if(runclass == null)
 					return;
 				
-				entity = (Entity)Activator.CreateInstance(runclass);
-				entity.id = eid;
-				entity.className = entityType;
-				entity.onGetCell();
+				entity = null;
+				try
+				{
+					entity = (Entity)Activator.CreateInstance(runclass);
+					entity.id = eid;
+					entity.className = entityType;
+					entity.onGetCell();
 
-				entities[eid] = entity;
-				
-				Client_onUpdatePropertys(entityMessage);
-				_bufferedCreateEntityMessages.Remove(eid);
-				entityMessage.reclaimObject();
-				
-				entity.isOnGround = isOnGround > 0;
-				entity.onDirectionChanged(entity.direction);
-				entity.onPositionChanged(entity.position);
-								
-				entity.__init__();
-				entity.attachComponents();
-				entity.inited = true;
-				entity.inWorld = true;
-				entity.enterWorld();
-				
-				if(_args.isOnInitCallPropertysSetMethods)
-					entity.callPropertysSetMethods();
+					Client_onUpdatePropertys(entityMessage);
+					_bufferedCreateEntityMessages.Remove(eid);
+					entityMessage.reclaimObject();
+					
+					entity.isOnGround = isOnGround > 0;
+					entity.onDirectionChanged(entity.direction);
+					entity.onPositionChanged(entity.position);
+									
+					entity.__init__();
+					entity.attachComponents();
+					entity.inited = true;
+					entity.inWorld = true;
+					entity.enterWorld();
+
+					entities[eid] = entity;
+					
+					if(_args.isOnInitCallPropertysSetMethods)
+						entity.callPropertysSetMethods();
+				}
+				catch(Exception e)
+				{
+					KBELog.ERROR_MSG("KBEngine::Client_onEntityEnterWorld: init entity failed! eid(" + eid + "), entityType(" + entityType + "), error=" + e.ToString());
+					if(entity != null)
+					{
+						entities.Remove(eid);
+						entity.destroy();
+					}
+				}
 			}
 			else
 			{

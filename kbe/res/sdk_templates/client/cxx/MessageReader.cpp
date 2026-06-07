@@ -154,8 +154,10 @@ void MessageReader::process(const uint8* datas, MessageLengthEx offset, MessageL
 				if (pMsg == NULL)
 				{
 					SCREEN_ERROR_MSG("MessageReader::process(): not found Message(%d)!", msgid_);
-					// 重置状态机，避免残留状态导致后续消息解析错位
+					// 重置状态机，跳过未知消息的body，避免残留状态导致后续消息解析错位
 					pMemoryStream_->clear(false);
+					totallen += expectSize_;
+					length -= expectSize_;
 					state_ = READ_STATE_MSGID;
 					expectSize_ = 2;
 					continue;
