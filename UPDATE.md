@@ -2,6 +2,14 @@
 # 更新日志
 
 ## 2.8.2
+- [feat] KBEX增加插件管理功能
+  - 插件管理面板：支持 GitHub / Gitee 双仓库源切换
+  - 插件商城浏览：左侧插件列表（名称、作者、tags，状态靠右），右侧详情（描述、版本选择、README）
+  - 插件安装：下载 zip 并解压到 assets/plugins/{id}/，自动注册到 plugins.xml
+  - 插件卸载：删除插件目录并从 plugins.xml 移除
+  - 插件启用/禁用：通过 plugins.xml 控制加载
+  - 安装时支持版本选择
+
 - [feat] 背包插件 [KBEngineNex-Plugin-Bag](https://github.com/KBEngineLab/KBEngineNex-Plugin-Bag)
   - 将背包从"独立实体"改为"组件 + 独立数据表"模式，挂载在 Avatar 上的 BagComponent 组件。
   - 背包数据落在独立数据库表 `kbe_plugin_bag_items`，不走 KBE 自动持久化，容量/堆叠/绑定/过期/锁定等业务点均保留结构。
@@ -18,7 +26,7 @@
   - concurrency 与 numConnections 关系：concurrency 超过 dbmgr 线程池大小时请求在内部排队，报告中提供 TPS / P50 / P95 / P99 延迟分布和按操作类型分组的统计。
   - 支持通过 dbInterface 参数指定 kbengine.xml 中配置的数据库接口名称，同一时间只允许一个压测实例运行。
 
-- [feat] KBEX 客户端实体创建快捷入口（暂不支持插件） [Issue #181](https://github.com/KBEngineLab/KBEngine-Nex/issues/181)
+- [feat] KBEX 客户端实体创建快捷入口 [Issue #181](https://github.com/KBEngineLab/KBEngine-Nex/issues/181)
   - KBEX 新增一键创建 Client Entity 的快捷入口：选择客户端实体路径后，根据 hasClient 标记和挂载的组件自动生成客户端实体模板。
 
 - [feat] KBEX 快速热更入口：工具栏刷新按钮 + 自动热更（可配置检测目录与间隔） [Issue #183](https://github.com/KBEngineLab/KBEngine-Nex/issues/183)
