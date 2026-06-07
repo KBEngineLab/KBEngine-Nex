@@ -45,7 +45,11 @@ void MessageReader::process(const uint8* datas, MessageLengthEx offset, MessageL
 				if (pMsg == NULL)
 				{
 					SCREEN_ERROR_MSG("MessageReader::process(): not found Message(%d)!", msgid_);
-					break;
+					// 重置状态机，避免残留状态导致后续消息解析错位
+					pMemoryStream_->clear(false);
+					state_ = READ_STATE_MSGID;
+					expectSize_ = 2;
+					continue;
 				}
 
 				if (pMsg->msglen == -1)
@@ -150,7 +154,11 @@ void MessageReader::process(const uint8* datas, MessageLengthEx offset, MessageL
 				if (pMsg == NULL)
 				{
 					SCREEN_ERROR_MSG("MessageReader::process(): not found Message(%d)!", msgid_);
-					break;
+					// 重置状态机，避免残留状态导致后续消息解析错位
+					pMemoryStream_->clear(false);
+					state_ = READ_STATE_MSGID;
+					expectSize_ = 2;
+					continue;
 				}
 
 				// pMsg->handleMessage(*pMemoryStream_);
@@ -216,7 +224,14 @@ void MessageReader::dispatchMessageToGameThread(
 	GameThreadDispatcher::Instance().Post(
 		[pMsg, msgStream]()
 		{
-			pMsg->handleMessage(*msgStream);
+			try
+			{
+				pMsg->handleMessage(*msgStream);
+			}
+			catch (...)
+			{
+				SCREEN_ERROR_MSG("MessageReader::dispatchMessageToGameThread(): handleMessage exception! msgid=%d", pMsg->id);
+			}
 		}
 	);
 }

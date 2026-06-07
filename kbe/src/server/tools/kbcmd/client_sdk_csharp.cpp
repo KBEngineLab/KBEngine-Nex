@@ -270,6 +270,7 @@ bool ClientSDKCSharp::writeEngineMessagesModuleMessage(Network::ExposedMessageIn
 
 	sourcefileBody_ += "\t\tpublic override void handleMessage(MemoryStream msgstream)\n";
 	sourcefileBody_ += "\t\t{\n";
+	sourcefileBody_ += "\t\t\ttry\n\t\t\t{\n";
 
 	if (messageInfos.argsTypes.size() == 0)
 	{
@@ -338,6 +339,11 @@ bool ClientSDKCSharp::writeEngineMessagesModuleMessage(Network::ExposedMessageIn
 		initBody_ += fmt::format("\t\t\tMessages.baseappMessages[{}] = Messages.messages[\"{}\"];\n\n", messageInfos.id, messageInfos.name);
 	}
 
+	sourcefileBody_ += "\t\t\t}\n";
+	sourcefileBody_ += "\t\t\tcatch(Exception e)\n";
+	sourcefileBody_ += "\t\t\t{\n";
+	sourcefileBody_ += fmt::format("\t\t\t\tKBELog.ERROR_MSG(\"Message_%s::handleMessage: \" + e.ToString());\n", messageInfos.name);
+	sourcefileBody_ += "\t\t\t}\n";
 	sourcefileBody_ += "\t\t}\n";
 
 	sourcefileBody_ += "\t}\n\n";

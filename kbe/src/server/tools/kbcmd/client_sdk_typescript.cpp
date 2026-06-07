@@ -1000,6 +1000,8 @@ bool ClientSDKTypeScript::writeEngineMessagesModuleMessage(Network::ExposedMessa
     }
 
 	public override handleMessage(msgstream: MemoryStream) {
+		try
+		{
 )delimiter";
 
 
@@ -1085,6 +1087,10 @@ bool ClientSDKTypeScript::writeEngineMessagesModuleMessage(Network::ExposedMessa
 		initBody_ += fmt::format("\t\tMessages.baseappMessages[{}] = Messages.messages[\"{}\"];\n\n", messageInfos.id, messageInfos.name);
 	}
 
+	sourcefileBody_ += "\t\t}\n";
+	sourcefileBody_ += "\t\tcatch(e)\n\t\t{\n";
+	sourcefileBody_ += fmt::format("\t\t\tKBELog.ERROR_MSG(\"Message_%s::handleMessage: \" + e);\n", messageInfos.name);
+	sourcefileBody_ += "\t\t}\n";
 	sourcefileBody_ += "\t}\n";
 
 	sourcefileBody_ += "}\n\n";

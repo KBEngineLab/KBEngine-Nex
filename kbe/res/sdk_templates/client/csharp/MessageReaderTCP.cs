@@ -56,7 +56,15 @@
 						msgid = stream.readUint16();
 						stream.clear();
 
-						Message msg = Messages.clientMessages[msgid];
+						Message msg = null;
+						if(!Messages.clientMessages.TryGetValue(msgid, out msg))
+						{
+							KBELog.ERROR_MSG("MessageReaderTCP::process(): not found Message(" + msgid + ")!");
+							stream.clear();
+							state = READ_STATE.READ_STATE_MSGID;
+							expectSize = 2;
+							continue;
+						}
 
 						if(msg.msglen == -1)
 						{
@@ -68,7 +76,14 @@
 							// 如果是0个参数的消息，那么没有后续内容可读了，处理本条消息并且直接跳到下一条消息
 							Dbg.profileStart(msg.name);
 
-							msg.handleMessage(stream);
+							try
+							{
+								msg.handleMessage(stream);
+							}
+							catch(Exception e)
+							{
+								KBELog.ERROR_MSG("MessageReaderTCP::process(): handleMessage exception! msg=" + msg.name + ", " + e.ToString());
+							}
 
 							Dbg.profileEnd(msg.name);
 
@@ -151,11 +166,26 @@
 						totallen += expectSize;
 						length -= expectSize;
 
-						Message msg = Messages.clientMessages[msgid];
+						Message msg = null;
+						if(!Messages.clientMessages.TryGetValue(msgid, out msg))
+						{
+							KBELog.ERROR_MSG("MessageReaderTCP::process(): not found Message(" + msgid + ") in body state!");
+							stream.clear();
+							state = READ_STATE.READ_STATE_MSGID;
+							expectSize = 2;
+							continue;
+						}
 						
 						Dbg.profileStart(msg.name);
 
-						msg.handleMessage(stream);
+						try
+						{
+							msg.handleMessage(stream);
+						}
+						catch(Exception e)
+						{
+							KBELog.ERROR_MSG("MessageReaderTCP::process(): handleMessage exception! msg=" + msg.name + ", " + e.ToString());
+						}
 
 						Dbg.profileEnd(msg.name);
 						

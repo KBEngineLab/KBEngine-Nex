@@ -108,6 +108,8 @@ export default class NetworkInterface
             if(!handler)
             {
                 KBELog.ERROR_MSG("NetworkInterface::onmessage:message(%d) has not found.", msgID);
+                // msgID已消费但无法确定body长度→ 跳出循环防止流位置错位
+                break;
             }
             else
             {
@@ -124,7 +126,14 @@ export default class NetworkInterface
                 let wpos = stream.wpos;
                 let rpos = stream.rpos + msgLen;
                 stream.wpos = rpos;
-                handler.handleMessage(stream);
+                try
+                {
+                    handler.handleMessage(stream);
+                }
+                catch(e)
+                {
+                    KBELog.ERROR_MSG("NetworkInterface::onmessage: handleMessage exception! msg=" + handler.name + ", error=" + e);
+                }
                 stream.wpos = wpos;
                 stream.rpos = rpos;
             }
