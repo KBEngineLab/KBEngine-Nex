@@ -1,0 +1,2 @@
+# This file ensures the libs output directory exists on fresh checkout,
+# preventing MSBuild MSB3191 race conditions during parallel builds.
