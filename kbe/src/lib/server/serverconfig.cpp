@@ -38,8 +38,8 @@ static void loadRawDatabaseCommandBlacklist(XML* xml, TiXmlNode* rootNode, const
 			words.push_back(word);
 	}
 
-	INFO_MSG(fmt::format("ServerConfig::loadConfig: loaded executeRawDatabaseCommand blacklist, dbType={}, count={}.\n",
-		dbTypeName, words.size()));
+	// INFO_MSG(fmt::format("ServerConfig::loadConfig: loaded executeRawDatabaseCommand blacklist, dbType={}, count={}.\n",
+	// 	dbTypeName, words.size()));
 }
 
 //-------------------------------------------------------------------------------------
@@ -1016,12 +1016,12 @@ bool ServerConfig::loadConfig(std::string fileName)
 			TiXmlNode* childnode = xml->enterNode(node, "enable");
 			_dbmgrInfo.enableRawDatabaseCommandBlacklist = childnode != NULL && xml->getValStr(childnode) == "true";
 
-			INFO_MSG(fmt::format("ServerConfig::loadConfig: executeRawDatabaseCommand blacklist enabled={}.\n",
-				_dbmgrInfo.enableRawDatabaseCommandBlacklist ? "true" : "false"));
+			// INFO_MSG(fmt::format("ServerConfig::loadConfig: executeRawDatabaseCommand blacklist enabled={}.\n",
+			// 	_dbmgrInfo.enableRawDatabaseCommandBlacklist ? "true" : "false"));
 
 			if (_dbmgrInfo.enableRawDatabaseCommandBlacklist)
 			{
-				INFO_MSG("ServerConfig::loadConfig: loading executeRawDatabaseCommand blacklist config.\n");
+				// INFO_MSG("ServerConfig::loadConfig: loading executeRawDatabaseCommand blacklist config.\n");
 				loadRawDatabaseCommandBlacklist(xml.get(), node, "mysql", _dbmgrInfo.rawDatabaseCommandBlacklist);
 				loadRawDatabaseCommandBlacklist(xml.get(), node, "mongodb", _dbmgrInfo.rawDatabaseCommandBlacklist);
 				loadRawDatabaseCommandBlacklist(xml.get(), node, "postgresql", _dbmgrInfo.rawDatabaseCommandBlacklist);
