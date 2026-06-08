@@ -75,6 +75,12 @@ jobs:
         run: |
           call install_windows.bat %BUILD_CONFIG%
 
+      - name: Build GUICONSOLE on Windows
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          call install_windows.bat %BUILD_CONFIG% "" GUICONSOLE
+
       - name: Verify server binaries
         run: |
           test -d kbe/bin/server
