@@ -31,7 +31,7 @@ if errorlevel 1 (
     echo [Error] Cannot access GitHub repository!
     echo         There may be a network issue or proxy required. Please resolve network issues before running the script.
     echo.
-    echo         There is also a domestic Gitee mirror. You can try running gitee\install_windows.bat.
+    echo         There is also a domestic Gitee mirror. You can try running install\gitee\install_windows.bat.
     rd /s /q "%TMP_TEST_DIR%" >nul 2>nul
     if not defined CI (
         pause
@@ -47,11 +47,11 @@ REM Default parameters
 REM =========================================
 set "CONFIG=Debug"
 set "PLATFORM=x64"
-set "PROJECT_ROOT=%~dp0"
+set "PROJECT_ROOT=%~dp0..\"
 set "INIT_BUILD_PROJ=%PROJECT_ROOT%kbe\src\server\init\init.vcxproj"
 set "SOLUTION_FILE=%PROJECT_ROOT%kbe\src\kbengine nex.sln"
 set "GUICONSOLE_SOLUTION_FILE=%PROJECT_ROOT%kbe\src\guiconsole.sln"
-set "LOG_FILE=%PROJECT_ROOT%build.log"
+set "LOG_FILE=%~dp0build.log"
 set "VCPKG_PATH="
 
 REM =========================================

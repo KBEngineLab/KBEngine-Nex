@@ -47,7 +47,7 @@ REM Default parameters
 REM =========================================
 set "CONFIG=Debug"
 set "PLATFORM=x64"
-set "PROJECT_ROOT=%~dp0..\" 
+set "PROJECT_ROOT=%~dp0..\..\" 
 set "INIT_BUILD_PROJ=%PROJECT_ROOT%kbe\src\server\init\init.vcxproj"
 set "SOLUTION_FILE=%PROJECT_ROOT%kbe\src\kbengine nex.sln"
 set "GUICONSOLE_SOLUTION_FILE=%PROJECT_ROOT%kbe\src\guiconsole.sln"
