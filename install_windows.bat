@@ -109,7 +109,7 @@ if defined VCPKG_PATH (
     )
 ) else (
     REM 2) Search default installation directory
-    if exist "%USERPROFILE%\AppData\Local\kbe-vcpkg\vcpkg.exe" (
+    if exist "%USERPROFILE%\AppData\Local\kbe-vcpkg\.git\" (
 
 
         set "VCPKG_EXE=%USERPROFILE%\AppData\Local\kbe-vcpkg\vcpkg.exe"
@@ -146,6 +146,22 @@ if defined VCPKG_PATH (
 echo [Found] vcpkg path: %VCPKG_EXE%
 echo [Executing] vcpkg integrate install ...
 "%VCPKG_EXE%" integrate install
+if errorlevel 1 (
+    echo [Error] vcpkg integrate install failed
+    exit /b 1
+)
+
+echo [Executing] vcpkg install x64-windows-static manifest dependencies ...
+pushd "%PROJECT_ROOT%kbe\src"
+"%VCPKG_EXE%" install --triplet x64-windows-static
+set "VCPKG_INSTALL_RESULT=%ERRORLEVEL%"
+popd
+if not "%VCPKG_INSTALL_RESULT%"=="0" (
+    echo [Error] vcpkg install failed
+    exit /b 1
+)
+
+set "VCPKG_MSBUILD_PROPS=/p:VcpkgUseStatic=true /p:VcpkgTriplet=x64-windows-static /p:VcpkgApplocalDeps=false"
 
 REM =========================================
 REM 2. Find Visual Studio installation path and all MSVC toolsets
@@ -320,7 +336,7 @@ echo Log file: %LOG_FILE%
 echo.
 
 echo [Step 1] Building KBEMain.vcxproj ...
-msbuild "%INIT_BUILD_PROJ%" /p:Configuration=%CONFIG% %MSVC_VER_VAR% %PLATFORM_TOOLSET% /p:Platform=%PLATFORM% /m    ^
+msbuild "%INIT_BUILD_PROJ%" /p:Configuration=%CONFIG% %MSVC_VER_VAR% %PLATFORM_TOOLSET% %VCPKG_MSBUILD_PROPS% /p:Platform=%PLATFORM% /m    ^
     /fileLogger /fileLoggerParameters:LogFile=%LOG_FILE%;Append;Encoding=UTF-8 ^
     /consoleloggerparameters:DisableConsoleColor 
 if errorlevel 1 (
@@ -338,7 +354,7 @@ if "%~3"=="GUICONSOLE" (
 
 echo.
 echo [Step 2] Building kbengine nex.sln ...
-msbuild "%SOLUTION_FILE%" /p:Configuration=%CONFIG% %MSVC_VER_VAR%  %PLATFORM_TOOLSET% /p:Platform=Win64 /m   ^
+msbuild "%SOLUTION_FILE%" /p:Configuration=%CONFIG% %MSVC_VER_VAR%  %PLATFORM_TOOLSET% %VCPKG_MSBUILD_PROPS% /p:Platform=Win64 /m   ^
     /fileLogger /fileLoggerParameters:LogFile=%LOG_FILE%;Append;Encoding=UTF-8 ^
     /consoleloggerparameters:DisableConsoleColor
 if errorlevel 1 (
@@ -359,7 +375,7 @@ exit /b 0
 :GUICONSOLE
 echo.
 echo [Step 2] Installing GUICONSOLE
-msbuild "%GUICONSOLE_SOLUTION_FILE%" /p:Configuration=%CONFIG% %MSVC_VER_VAR%  %PLATFORM_TOOLSET% /p:Platform=Win64 /m   ^
+msbuild "%GUICONSOLE_SOLUTION_FILE%" /p:Configuration=%CONFIG% %MSVC_VER_VAR%  %PLATFORM_TOOLSET% %VCPKG_MSBUILD_PROPS% /p:Platform=Win64 /m   ^
     /fileLogger /fileLoggerParameters:LogFile=%LOG_FILE%;Append;Encoding=UTF-8 ^
     /consoleloggerparameters:DisableConsoleColor
 if errorlevel 1 (
