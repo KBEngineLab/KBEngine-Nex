@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BIN_DIR="$SCRIPT_DIR/../../bin/server"
+BIN_DIR="$SCRIPT_DIR/../../kbe/bin/server"
 
 if [[ ! -d "$BIN_DIR" ]]; then
     echo "❌ 目录不存在: $BIN_DIR"
