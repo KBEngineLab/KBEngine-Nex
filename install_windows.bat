@@ -153,7 +153,7 @@ if errorlevel 1 (
 
 echo [Executing] vcpkg install x64-windows-static manifest dependencies ...
 pushd "%PROJECT_ROOT%kbe\src"
-"%VCPKG_EXE%" install --triplet x64-windows-static
+"%VCPKG_EXE%" install --triplet x64-windows-static --x-install-root="%PROJECT_ROOT%kbe\src\vcpkg_installed\x64-windows-static"
 set "VCPKG_INSTALL_RESULT=%ERRORLEVEL%"
 popd
 if not "%VCPKG_INSTALL_RESULT%"=="0" (
