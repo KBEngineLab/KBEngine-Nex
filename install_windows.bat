@@ -161,7 +161,7 @@ if not "%VCPKG_INSTALL_RESULT%"=="0" (
     exit /b 1
 )
 
-set "VCPKG_MSBUILD_PROPS=/p:VcpkgUseStatic=true /p:VcpkgTriplet=x64-windows-static /p:VcpkgApplocalDeps=false"
+set "VCPKG_MSBUILD_PROPS=/p:VcpkgUseStatic=true /p:VcpkgTriplet=x64-windows-static /p:VcpkgManifestInstall=false /p:VcpkgApplocalDeps=false"
 
 REM =========================================
 REM 2. Find Visual Studio installation path and all MSVC toolsets
