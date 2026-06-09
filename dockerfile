@@ -17,7 +17,7 @@ ADD . /KBE
 WORKDIR /KBE
 
 # 运行编译脚本
-RUN sed -i 's/sudo //g' /KBE/install_linux.sh && bash /KBE/install_linux.sh
+RUN sed -i 's/sudo //g' /KBE/install_linux.sh && bash /KBE/install/install_linux.sh
 
 
 # 清理编译缓存和不必要文件

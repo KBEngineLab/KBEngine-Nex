@@ -62,24 +62,24 @@ jobs:
       - name: Build on Linux
         if: runner.os == 'Linux'
         run: |
-          bash ./install_linux.sh "$BUILD_CONFIG"
+          bash ./install/install_linux.sh "$BUILD_CONFIG"
 
       - name: Build on macOS
         if: runner.os == 'macOS'
         run: |
-          bash ./install_macos.sh "$BUILD_CONFIG"
+          bash ./install/install_macos.sh "$BUILD_CONFIG"
 
       - name: Build on Windows
         if: runner.os == 'Windows'
         shell: cmd
         run: |
-          call install_windows.bat %BUILD_CONFIG%
+          call install\install_windows.bat %BUILD_CONFIG%
 
       - name: Build GUICONSOLE on Windows
         if: runner.os == 'Windows'
         shell: cmd
         run: |
-          call install_windows.bat %BUILD_CONFIG% "" GUICONSOLE
+          call install\install_windows.bat %BUILD_CONFIG% "" GUICONSOLE
 
       - name: Verify server binaries
         run: |

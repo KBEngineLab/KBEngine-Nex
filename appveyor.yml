@@ -15,6 +15,6 @@ environment:
 
 # 自定义构建步骤
 build_script:
-  - cmd: if "%APPVEYOR_BUILD_WORKER_IMAGE%"=="Visual Studio 2022" call install_windows.bat
-  - sh: if [ "$APPVEYOR_BUILD_WORKER_IMAGE" = "Ubuntu2204" ]; then bash install_linux.sh; fi
+  - cmd: if "%APPVEYOR_BUILD_WORKER_IMAGE%"=="Visual Studio 2022" call install\install_windows.bat
+  - sh: if [ "$APPVEYOR_BUILD_WORKER_IMAGE" = "Ubuntu2204" ]; then bash install/install_linux.sh; fi
 
