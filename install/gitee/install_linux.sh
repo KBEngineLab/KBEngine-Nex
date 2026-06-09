@@ -219,7 +219,7 @@ cd "$OLDPWD"
 # 构建 KBEngine-Nex
 # =========================================
 echo "[INFO] 进入 ../../kbe/src/"
-cd "../../kbe/src/"
+cd "$(dirname "$0")/../../kbe/src/"
 
 echo "[INFO] 配置 CMake"
 

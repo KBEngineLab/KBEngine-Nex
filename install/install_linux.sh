@@ -193,8 +193,8 @@ cd "$OLDPWD"
 # =========================================
 # Build KBEngine-Nex
 # =========================================
-echo "[INFO] Entering ./kbe/src/"
-cd "../kbe/src/"
+echo "[INFO] Entering ../kbe/src/"
+cd "$(dirname "$0")/../kbe/src/"
 
 echo "[INFO] Configuring CMake"
 cmake -G Ninja -B build -S . \
