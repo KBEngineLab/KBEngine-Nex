@@ -1015,6 +1015,8 @@ namespace KBEngine
 					entity.className = entityType;
 					entity.onGetBase();
 
+					entities[eid] = entity;
+
 					MemoryStream entityMessage = null;
 					_bufferedCreateEntityMessages.TryGetValue(eid, out entityMessage);
 					
@@ -1028,8 +1030,6 @@ namespace KBEngine
 					entity.__init__();
 					entity.attachComponents();
 					entity.inited = true;
-
-					entities[eid] = entity;
 					
 					if(_args.isOnInitCallPropertysSetMethods)
 						entity.callPropertysSetMethods();
@@ -1228,6 +1228,8 @@ namespace KBEngine
 					entity.className = entityType;
 					entity.onGetCell();
 
+					entities[eid] = entity;
+
 					Client_onUpdatePropertys(entityMessage);
 					_bufferedCreateEntityMessages.Remove(eid);
 					entityMessage.reclaimObject();
@@ -1241,8 +1243,6 @@ namespace KBEngine
 					entity.inited = true;
 					entity.inWorld = true;
 					entity.enterWorld();
-
-					entities[eid] = entity;
 					
 					if(_args.isOnInitCallPropertysSetMethods)
 						entity.callPropertysSetMethods();

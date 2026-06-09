@@ -992,6 +992,8 @@ void KBEngineApp::Client_onCreatedProxies(uint64 rndUUID, int32 eid, KBString& e
 
 		try
 		{
+			entities_.Add(eid, pEntity);
+
 			MemoryStream** entityMessageFind = bufferedCreateEntityMessages_.Find(eid);
 			if (entityMessageFind)
 			{
@@ -1004,8 +1006,6 @@ void KBEngineApp::Client_onCreatedProxies(uint64 rndUUID, int32 eid, KBString& e
 			pEntity->__init__();
 			pEntity->attachComponents();
 			pEntity->inited(true);
-
-			entities_.Add(eid, pEntity);
 
 			if (pArgs_->isOnInitCallPropertysSetMethods)
 				pEntity->callPropertysSetMethods();
@@ -1617,6 +1617,8 @@ void KBEngineApp::Client_onEntityEnterWorld(MemoryStream& stream)
 
 		try
 		{
+			entities_.Add(eid, pEntity);
+
 			Client_onUpdatePropertys(*(*entityMessageFind));
 			MemoryStream::reclaimObject((*entityMessageFind));
 			bufferedCreateEntityMessages_.Remove(eid);
@@ -1630,8 +1632,6 @@ void KBEngineApp::Client_onEntityEnterWorld(MemoryStream& stream)
 			pEntity->inited(true);
 			pEntity->inWorld(true);
 			pEntity->enterWorld();
-
-			entities_.Add(eid, pEntity);
 
 			if (pArgs_->isOnInitCallPropertysSetMethods)
 				pEntity->callPropertysSetMethods();
