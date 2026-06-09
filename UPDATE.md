@@ -2,6 +2,8 @@
 # 更新日志
 
 ## 2.8.2
+- [feat] SDK 异常处理，避免被上层错误导致stream错乱 [Issue #189](https://github.com/KBEngineLab/KBEngine-Nex/issues/189)
+
 - [feat] KBEX增加插件管理功能
   - 插件管理面板：支持 GitHub / Gitee 双仓库源切换
   - 插件商城浏览：左侧插件列表（名称、作者、tags，状态靠右），右侧详情（描述、版本选择、README）
