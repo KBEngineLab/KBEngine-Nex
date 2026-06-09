@@ -225,9 +225,9 @@ bool DBInterfaceMysql::attach(const char* databaseName)
 			DEBUG_MSG(fmt::format("DBInterfaceMysql::Enable SSL: sslCert: {}; sslKey:{}; sslCa:{} ...\n", db_mysql_clientKeyPath_, db_mysql_clientCertPath_, db_mysql_caPath_));
 		}
 		else {
-			// 显式禁用 SSL，避免 MySQL 8.0+ 服务端自动协商 SSL 导致自签名证书错误
-			int ssl_mode = SSL_MODE_DISABLED;
-			mysql_options(mysql(), MYSQL_OPT_SSL_MODE, &ssl_mode);
+			// 显式禁用 SSL，避免服务端自动协商 SSL 导致自签名证书错误
+			unsigned int opt_use_ssl = 0;
+			mysql_options(mysql(), MYSQL_OPT_SSL_ENFORCE, &opt_use_ssl);
 		}
 
 		
