@@ -223,7 +223,8 @@ bool DBInterfaceMysql::attach(const char* databaseName)
 			clientflag = CLIENT_SSL ;
 
 
-			DEBUG_MSG(fmt::format("DBInterfaceMysql::Enable SSL: sslCert: {}; sslKey:{}; sslCa:{} ...\n", db_mysql_clientKeyPath_, db_mysql_clientCertPath_, db_mysql_caPath_));
+			DEBUG_MSG(fmt::format("DBInterfaceMysql::Enable SSL: sslCert: {}; sslKey:{}; sslCa:{} ...\n", db_mysql_clientCertPath_, db_mysql_clientKeyPath_, db_mysql_caPath_));
+			
 		}
 		else {
 			// 不强制 SSL，且跳过证书验证，避免自签名证书导致 mysql_errno=2026
@@ -242,6 +243,15 @@ __RECONNECT:
 		if(mysql_real_connect(mysql(), db_ip_, db_username_, 
     		db_password_, db_name_, db_port_, NULL, clientflag)) // CLIENT_MULTI_STATEMENTS  
 		{
+			if (db_mysql_ssl_)
+			{
+				const char* cipher = mysql_get_ssl_cipher(mysql());
+
+				DEBUG_MSG(fmt::format(
+					"DBInterfaceMysql::SSL Cipher={}\n",
+					cipher ? cipher : "NULL"));
+			}
+			
 			if(mysql_select_db(mysql(), db_name_) != 0)
 			{
 				ERROR_MSG(fmt::format("DBInterfaceMysql::attach: Could not set active db[{}]\n",
