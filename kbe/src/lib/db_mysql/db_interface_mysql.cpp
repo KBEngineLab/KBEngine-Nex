@@ -202,9 +202,10 @@ bool DBInterfaceMysql::attach(const char* databaseName)
 		SSL_MODE_VERIFY_IDENTITY	同上，额外验证服务器主机名匹配证书*/
 		
 
+		// MariaDB Connector/C 自动处理认证流程，无需显式设置 RSA 公钥
 		// 启用“允许向服务器请求 RSA 公钥”
-		const bool get_pubkey = 1;
-		mysql_options(mysql(), MYSQL_SERVER_PUBLIC_KEY, &get_pubkey);
+		// const bool get_pubkey = 1;
+		// mysql_options(mysql(), MYSQL_SERVER_PUBLIC_KEY, &get_pubkey);
 
 
 		unsigned long clientflag = 0;
