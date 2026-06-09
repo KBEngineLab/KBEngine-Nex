@@ -225,9 +225,10 @@ bool DBInterfaceMysql::attach(const char* databaseName)
 			DEBUG_MSG(fmt::format("DBInterfaceMysql::Enable SSL: sslCert: {}; sslKey:{}; sslCa:{} ...\n", db_mysql_clientKeyPath_, db_mysql_clientCertPath_, db_mysql_caPath_));
 		}
 		else {
-			// 显式禁用 SSL，避免服务端自动协商 SSL 导致自签名证书错误
-			unsigned int opt_use_ssl = 0;
-			mysql_options(mysql(), MYSQL_OPT_SSL_ENFORCE, &opt_use_ssl);
+			// 不强制 SSL，且跳过证书验证，避免自签名证书导致 mysql_errno=2026
+			unsigned int opt = 0;
+			mysql_options(mysql(), MYSQL_OPT_SSL_ENFORCE, &opt);
+			mysql_options(mysql(), MYSQL_OPT_SSL_VERIFY_SERVER_CERT, &opt);
 		}
 
 		
