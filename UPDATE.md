@@ -2,6 +2,8 @@
 # 更新日志
 
 ## 2.8.2
+- [feat] 官网重构，更简洁，更直观
+
 - [feat] SDK 异常处理，避免被上层错误导致stream错乱 [Issue #189](https://github.com/KBEngineLab/KBEngine-Nex/issues/189)
 
 - [feat] KBEX增加插件管理功能
