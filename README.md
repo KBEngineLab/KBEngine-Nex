@@ -18,7 +18,7 @@
 
 ## Pycharm 插件
 
-**Pycharm插件已发布，支持 2024.2 - 2025.\***
+**Pycharm插件已发布.\***
 
 [![JetBrains Plugins](https://img.shields.io/jetbrains/plugin/v/27963-kbenginex.svg)](https://plugins.jetbrains.com/plugin/27963-kbenginex)
 
