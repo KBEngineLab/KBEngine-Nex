@@ -152,6 +152,7 @@ set DOWNLOADS_PATH=%USERPROFILE%\AppData\Local\kbe-vcpkg-gitcode\downloads
 if not exist "%DOWNLOADS_PATH%" (
     echo Downloads directory not found, cloning repository...
     git clone https://gitcode.com/KBEngineLab/kbe-vcpkg-proxy-win64-download.git "%DOWNLOADS_PATH%"
+    git -C "%DOWNLOADS_PATH%" lfs pull
 ) else (
     if not exist "%DOWNLOADS_PATH%\.git" (
         echo .git directory not found, removing existing downloads directory...
@@ -161,6 +162,7 @@ if not exist "%DOWNLOADS_PATH%" (
     ) else (
         echo Downloads directory exists, updating...
         git -C "%DOWNLOADS_PATH%" pull
+        git -C "%DOWNLOADS_PATH%" lfs pull
     )
 )
 

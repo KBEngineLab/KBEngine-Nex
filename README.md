@@ -118,7 +118,7 @@ KBEngine Nex 是在KBEngine 2.5.12 的基础上社区继续维护的版本
 
 **注意：VCPKG强依赖于Github，需要网络支持，请自行解决网络问题！**
 
-**install/gitee/ 目录提供了国内镜像安装脚本**
+**install/proxy/ 目录提供了国内镜像安装脚本**
 
 ### 执行编译脚本 `install_*.bat/sh`
 
