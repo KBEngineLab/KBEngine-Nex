@@ -84,18 +84,18 @@ check_required_tool ninja
 check_required_tool pkg-config
 
 # =========================================
-# GitHub 可访问性检查
+# GitCode 可访问性检查
 # =========================================
 echo "[检测] 尝试访问 GitHub 仓库..."
 if ! command -v git >/dev/null 2>&1; then
     echo "[WARN] 未安装 git，稍后会自动安装"
 fi
 
-if ! git ls-remote https://gitee.com/KBEngineLab/kbe-vcpkg-gitee.git >/dev/null 2>&1; then
-    echo "[ERROR] 无法访问 Gitee 仓库，请确保网络可用"
+if ! git ls-remote https://gitcode.com/KBEngineLab/kbe-vcpkg-gitee.git >/dev/null 2>&1; then
+    echo "[ERROR] 无法访问 代理仓库（GitCode），请确保网络可用"
     exit 1
 fi
-echo "[成功] Gitee 仓库可访问"
+echo "[成功] 代理仓库（GitCode）可访问"
 
 
 # =========================================
@@ -106,7 +106,7 @@ echo "[INFO] 检查vcpkg目录..."
 
 if [ ! -d "$VCPKG_DIR" ] || [ ! -f "$VCPKG_DIR/bootstrap-vcpkg.sh" ]; then
     echo "[INFO] 克隆 vcpkg"
-    git clone https://gitee.com/KBEngineLab/kbe-vcpkg-gitee.git "$VCPKG_DIR"
+    git clone https://gitcode.com/KBEngineLab/kbe-vcpkg-gitee.git "$VCPKG_DIR"
 else
     echo "[INFO] vcpkg 已存在: $VCPKG_DIR"
 fi
@@ -116,28 +116,28 @@ git -C "$VCPKG_DIR" reset --hard HEAD
 git -C "$VCPKG_DIR" pull
 
 
-# # =========================================
-# # downloads目录处理
-# # =========================================
-# DOWNLOADS_PATH="$VCPKG_DIR/downloads"
-# echo "[INFO] 检查downloads目录..."
+# =========================================
+# downloads目录处理
+# =========================================
+DOWNLOADS_PATH="$VCPKG_DIR/downloads"
+echo "[INFO] 检查downloads目录..."
 
-# if [ ! -d "$DOWNLOADS_PATH" ]; then
-#     echo "[INFO] Downloads目录不存在，克隆仓库..."
-#     git clone -b v27x https://gitee.com/KBEngineLab/kbe-vcpkg-gitee-download.git "$DOWNLOADS_PATH"
-# else
-#     echo "[INFO] Downloads目录已存在，检查.git目录..."
-#     if [ ! -d "$DOWNLOADS_PATH/.git" ]; then
-#         echo "[INFO] .git目录不存在，删除并重新克隆..."
-#         rm -rf "$DOWNLOADS_PATH"
-#         git clone -b v27x https://gitee.com/KBEngineLab/kbe-vcpkg-gitee-download.git "$DOWNLOADS_PATH"
-#     else
-#         echo "[INFO] 更新downloads仓库..."
-#         cd "$DOWNLOADS_PATH"
-#         git pull
-#         cd -
-#     fi
-# fi
+if [ ! -d "$DOWNLOADS_PATH" ]; then
+    echo "[INFO] Downloads目录不存在，克隆仓库..."
+    git clone https://gitcode.com/KBEngineLab/kbe-vcpkg-gitee-macos-download.git "$DOWNLOADS_PATH"
+else
+    echo "[INFO] Downloads目录已存在，检查.git目录..."
+    if [ ! -d "$DOWNLOADS_PATH/.git" ]; then
+        echo "[INFO] .git目录不存在，删除并重新克隆..."
+        rm -rf "$DOWNLOADS_PATH"
+        git clone https://gitcode.com/KBEngineLab/kbe-vcpkg-gitee-macos-download.git "$DOWNLOADS_PATH"
+    else
+        echo "[INFO] 更新downloads仓库..."
+        cd "$DOWNLOADS_PATH"
+        git pull
+        cd -
+    fi
+fi
 
 # =========================================
 # 运行bootstrap脚本
