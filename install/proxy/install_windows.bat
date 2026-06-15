@@ -19,16 +19,16 @@ if %ERRORLEVEL% NEQ 0 (
 
 
 REM =========================================
-REM Check Gitee network accessibility (Git clone test)
+REM Check Proxy network accessibility (Git clone test)
 REM =========================================
-echo [Check] Trying to access Gitee ...
+echo [Check] Trying to access Proxy ...
 set "TMP_TEST_DIR=%TEMP%\gh_test"
 if exist "%TMP_TEST_DIR%" rd /s /q "%TMP_TEST_DIR%"
 mkdir "%TMP_TEST_DIR%"
 
-git ls-remote https://gitee.com/KBEngineLab/kbe-vcpkg-gitee.git >nul 2>nul
+git ls-remote https://gitcode.com/KBEngineLab/kbe-vcpkg-proxy.git >nul 2>nul
 if errorlevel 1 (
-    echo [Error] Failed to access Gitee repository!
+    echo [Error] Failed to access Proxy repository!
     echo        Possibly a network issue, please fix your network and rerun the script.
     rd /s /q "%TMP_TEST_DIR%" >nul 2>nul
     pause
@@ -36,7 +36,7 @@ if errorlevel 1 (
 )
 
 rd /s /q "%TMP_TEST_DIR%" >nul 2>nul
-echo [Success] Gitee repository is accessible
+echo [Success] Proxy repository is accessible
 
 
 
@@ -112,20 +112,20 @@ if defined VCPKG_PATH (
     )
 ) else (
     REM 2) Search in common installation directory for kbe-vcpkg
-    if exist "%USERPROFILE%\AppData\Local\kbe-vcpkg-gitee\vcpkg.exe" (
-        set "VCPKG_EXE=%USERPROFILE%\AppData\Local\kbe-vcpkg-gitee\vcpkg.exe"
-        set "VCPKG_PATH=%USERPROFILE%\AppData\Local\kbe-vcpkg-gitee"
+    if exist "%USERPROFILE%\AppData\Local\kbe-vcpkg-gitcode\vcpkg.exe" (
+        set "VCPKG_EXE=%USERPROFILE%\AppData\Local\kbe-vcpkg-gitcode\vcpkg.exe"
+        set "VCPKG_PATH=%USERPROFILE%\AppData\Local\kbe-vcpkg-gitcode"
         goto :found_vcpkg
     )
 
     REM 3) If not found, download and install to default directory
     echo.
-    echo [Notice] kbe-vcpkg-gitee not detected
+    echo [Notice] kbe-vcpkg-gitcode not detected
     
     echo [Download] Start downloading vcpkg...
-    set "VCPKG_PATH=%USERPROFILE%\AppData\Local\kbe-vcpkg-gitee"
+    set "VCPKG_PATH=%USERPROFILE%\AppData\Local\kbe-vcpkg-gitcode"
     echo VCPKG_PATH=!VCPKG_PATH!
-    git clone https://gitee.com/KBEngineLab/kbe-vcpkg-gitee.git "!VCPKG_PATH!"
+    git clone https://gitcode.com/KBEngineLab/kbe-vcpkg-proxy.git "!VCPKG_PATH!"
     if errorlevel 1 (
         echo [Error] vcpkg download failed
         exit /b 1
@@ -141,23 +141,23 @@ if defined VCPKG_PATH (
 :found_vcpkg
 
 @REM Update kbe-vcpkg
-git -C "%USERPROFILE%\AppData\Local\kbe-vcpkg-gitee" reset --hard HEAD
-git -C "%USERPROFILE%\AppData\Local\kbe-vcpkg-gitee" pull
+git -C "%USERPROFILE%\AppData\Local\kbe-vcpkg-gitcode" reset --hard HEAD
+git -C "%USERPROFILE%\AppData\Local\kbe-vcpkg-gitcode" pull
 
 
 
 
-set DOWNLOADS_PATH=%USERPROFILE%\AppData\Local\kbe-vcpkg-gitee\downloads
+set DOWNLOADS_PATH=%USERPROFILE%\AppData\Local\kbe-vcpkg-gitcode\downloads
 
 if not exist "%DOWNLOADS_PATH%" (
     echo Downloads directory not found, cloning repository...
-    git clone -b v27x https://gitee.com/KBEngineLab/kbe-vcpkg-gitee-download.git "%DOWNLOADS_PATH%"
+    git clone https://gitcode.com/KBEngineLab/kbe-vcpkg-proxy-win64-download.git "%DOWNLOADS_PATH%"
 ) else (
     if not exist "%DOWNLOADS_PATH%\.git" (
         echo .git directory not found, removing existing downloads directory...
         rmdir /s /q "%DOWNLOADS_PATH%"
         echo Re-cloning repository...
-        git clone -b v27x https://gitee.com/KBEngineLab/kbe-vcpkg-gitee-download.git "%DOWNLOADS_PATH%"
+        git clone https://gitcode.com/KBEngineLab/kbe-vcpkg-proxy-win64-download.git "%DOWNLOADS_PATH%"
     ) else (
         echo Downloads directory exists, updating...
         git -C "%DOWNLOADS_PATH%" pull
