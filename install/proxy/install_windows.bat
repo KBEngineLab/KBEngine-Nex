@@ -404,9 +404,7 @@ echo Log File: %LOG_FILE%
 echo.
 
 echo [Step 1] Building KBEMain.vcxproj ...
-msbuild "%INIT_BUILD_PROJ%" /p:Configuration=%CONFIG% %MSVC_VER_VAR% %PLATFORM_TOOLSET%  /p:Platform=%PLATFORM% /m    ^
-    /fileLogger /fileLoggerParameters:LogFile=%LOG_FILE%;Append;Encoding=UTF-8 ^
-    /consoleloggerparameters:DisableConsoleColor 
+msbuild "%INIT_BUILD_PROJ%" /p:Configuration=%CONFIG% %MSVC_VER_VAR% %PLATFORM_TOOLSET%  /p:Platform=%PLATFORM% /m /fileLogger /fileLoggerParameters:LogFile=%LOG_FILE%;Append;Encoding=UTF-8 /consoleloggerparameters:DisableConsoleColor 
 if errorlevel 1 (
     echo [Error] KBEMain.vcxproj build failed, check %LOG_FILE%
     pause
@@ -422,9 +420,7 @@ if "%~3"=="GUICONSOLE" (
 
 echo.
 echo [Step 2] Building kbengine nex.sln ...
-msbuild "%SOLUTION_FILE%" /p:Configuration=%CONFIG% %MSVC_VER_VAR% %PLATFORM_TOOLSET%  /p:Platform=Win64 /m   ^
-    /fileLogger /fileLoggerParameters:LogFile=%LOG_FILE%;Append;Encoding=UTF-8 ^
-    /consoleloggerparameters:DisableConsoleColor
+msbuild "%SOLUTION_FILE%" /p:Configuration=%CONFIG% %MSVC_VER_VAR% %PLATFORM_TOOLSET%  /p:Platform=Win64 /m  /fileLogger /fileLoggerParameters:LogFile=%LOG_FILE%;Append;Encoding=UTF-8 consoleloggerparameters:DisableConsoleColor
 if errorlevel 1 (
     echo [Error] kbengine nex.sln build failed, check %LOG_FILE%
     pause
@@ -441,9 +437,7 @@ exit /b 0
 :GUICONSOLE
 echo.
 echo [Step 2] Building GUICONSOLE
-msbuild "%GUICONSOLE_SOLUTION_FILE%" /p:Configuration=%CONFIG% %MSVC_VER_VAR% %PLATFORM_TOOLSET%  /p:Platform=Win64 /m   ^
-    /fileLogger /fileLoggerParameters:LogFile=%LOG_FILE%;Append;Encoding=UTF-8 ^
-    /consoleloggerparameters:DisableConsoleColor
+msbuild "%GUICONSOLE_SOLUTION_FILE%" /p:Configuration=%CONFIG% %MSVC_VER_VAR% %PLATFORM_TOOLSET%  /p:Platform=Win64 /m /fileLogger /fileLoggerParameters:LogFile=%LOG_FILE%;Append;Encoding=UTF-8 /consoleloggerparameters:DisableConsoleColor
 if errorlevel 1 (
     echo [Error] guiconsole.sln build failed, check %LOG_FILE%
     pause
