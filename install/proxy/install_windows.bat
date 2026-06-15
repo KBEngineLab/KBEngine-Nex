@@ -231,8 +231,8 @@ if exist "%NUGET_EXE%" (
         git -C "%CLONE_DIR%" reset --hard HEAD
         git -C "%CLONE_DIR%" pull
     ) else (
-        echo [INFO] Cloning python-externals from gitee...
-        git clone https://gitee.com/KBEngineLab/python-externals.git "%CLONE_DIR%"
+        echo [INFO] Cloning python-externals from proxy...
+        git clone https://gitcode.com/KBEngineLab/python-externals.git "%CLONE_DIR%"
         if errorlevel 1 (
             echo [ERROR] git clone failed!
             exit /b 1
