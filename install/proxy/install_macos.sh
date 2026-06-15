@@ -86,7 +86,7 @@ check_required_tool pkg-config
 # =========================================
 # GitCode 可访问性检查
 # =========================================
-echo "[检测] 尝试访问 GitHub 仓库..."
+echo "[检测] 尝试访问代理仓库..."
 if ! command -v git >/dev/null 2>&1; then
     echo "[WARN] 未安装 git，稍后会自动安装"
 fi
@@ -106,7 +106,7 @@ echo "[INFO] 检查vcpkg目录..."
 
 if [ ! -d "$VCPKG_DIR" ] || [ ! -f "$VCPKG_DIR/bootstrap-vcpkg.sh" ]; then
     echo "[INFO] 克隆 vcpkg"
-    git clone -b macos  https://gitcode.com/KBEngineLab/kbe-vcpkg-gitee.git "$VCPKG_DIR"
+    git clone https://gitcode.com/KBEngineLab/kbe-vcpkg-gitee.git "$VCPKG_DIR"
 else
     echo "[INFO] vcpkg 已存在: $VCPKG_DIR"
 fi
