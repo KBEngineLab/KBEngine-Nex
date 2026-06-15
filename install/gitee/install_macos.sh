@@ -101,12 +101,12 @@ echo "[成功] 代理仓库（GitCode）可访问"
 # =========================================
 # vcpkg 安装
 # =========================================
-VCPKG_DIR="$HOME/kbe-vcpkg-gitee"
+VCPKG_DIR="$HOME/kbe-vcpkg-gitcode"
 echo "[INFO] 检查vcpkg目录..."
 
 if [ ! -d "$VCPKG_DIR" ] || [ ! -f "$VCPKG_DIR/bootstrap-vcpkg.sh" ]; then
     echo "[INFO] 克隆 vcpkg"
-    git clone https://gitcode.com/KBEngineLab/kbe-vcpkg-gitee.git "$VCPKG_DIR"
+    git clone -b macos  https://gitcode.com/KBEngineLab/kbe-vcpkg-gitee.git "$VCPKG_DIR"
 else
     echo "[INFO] vcpkg 已存在: $VCPKG_DIR"
 fi
