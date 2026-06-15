@@ -82,7 +82,7 @@ install_dep() {
 
 # Check if system is CentOS / RHEL / Fedora
 is_centos() {
-    [ -f /etc/os-release ] && grep -qiE 'centos\|rhel\|fedora' /etc/os-release
+    [ -f /etc/os-release ] && grep -qiE 'centos|rhel|fedora' /etc/os-release
 }
 
 # =========================================
