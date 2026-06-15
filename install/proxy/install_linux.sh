@@ -191,13 +191,13 @@ echo "[INFO] 检查downloads目录..."
 
 if [ ! -d "$DOWNLOADS_PATH" ]; then
     echo "[INFO] Downloads目录不存在，克隆仓库..."
-    git clone https://gitcode.com/KBEngineLab/kbe-vcpkg-gitee-linux-download.git "$DOWNLOADS_PATH"
+    git clone https://gitcode.com/KBEngineLab/kbe-vcpkg-proxy-linux-download.git "$DOWNLOADS_PATH"
 else
     echo "[INFO] Downloads目录已存在，检查.git目录..."
     if [ ! -d "$DOWNLOADS_PATH/.git" ]; then
         echo "[INFO] .git目录不存在，删除并重新克隆..."
         rm -rf "$DOWNLOADS_PATH"
-        git clone https://gitcode.com/KBEngineLab/kbe-vcpkg-gitee-linux-download.git "$DOWNLOADS_PATH"
+        git clone https://gitcode.com/KBEngineLab/kbe-vcpkg-proxy-linux-download.git "$DOWNLOADS_PATH"
     else
         echo "[INFO] 更新downloads仓库..."
         cd "$DOWNLOADS_PATH"

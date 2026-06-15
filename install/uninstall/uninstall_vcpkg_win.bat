@@ -6,13 +6,15 @@ echo ============================================
 echo.
 
 set "vcpkg1=%LOCALAPPDATA%\kbe-vcpkg-gitcode"
-set "vcpkg2=%LOCALAPPDATA%\kbe-vcpkg"
-set "vcpkg3=%LOCALAPPDATA%\vcpkg"
+set "vcpkg2=%LOCALAPPDATA%\kbe-vcpkg-gitee"
+set "vcpkg3=%LOCALAPPDATA%\kbe-vcpkg"
+set "vcpkg4=%LOCALAPPDATA%\vcpkg"
 
 echo The following directories will be removed:
 echo   %vcpkg1%
 echo   %vcpkg2%
 echo   %vcpkg3%
+echo   %vcpkg4%
 echo.
 
 set /p confirm="Continue? [Y/N]: "
@@ -23,7 +25,7 @@ if /i not "%confirm%"=="Y" (
 
 echo.
 
-for %%d in ("%vcpkg1%" "%vcpkg2%" "%vcpkg3%") do (
+for %%d in ("%vcpkg1%" "%vcpkg2%" "%vcpkg3%" "%vcpkg4%") do (
     if exist %%d (
         echo Removing %%d ...
         rmdir /s /q %%d

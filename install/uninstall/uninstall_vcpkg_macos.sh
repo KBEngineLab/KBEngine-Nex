@@ -8,12 +8,14 @@ echo ""
 
 VCPKG1="$HOME/.cache/vcpkg"
 VCPKG2="$HOME/kbe-vcpkg-gitcode"
-VCPKG3="$HOME/kbe-vcpkg"
+VCPKG3="$HOME/kbe-vcpkg-gitee"
+VCPKG4="$HOME/kbe-vcpkg"
 
 echo "The following directories will be removed:"
 echo "  $VCPKG1"
 echo "  $VCPKG2"
 echo "  $VCPKG3"
+echo "  $VCPKG4"
 echo ""
 
 read -p "Continue? [Y/N]: " confirm
@@ -24,7 +26,7 @@ fi
 
 echo ""
 
-for dir in "$VCPKG1" "$VCPKG2" "$VCPKG3"; do
+for dir in "$VCPKG1" "$VCPKG2" "$VCPKG3" "$VCPKG4"; do
     if [ -d "$dir" ]; then
         echo "Removing $dir ..."
         rm -rf "$dir"
