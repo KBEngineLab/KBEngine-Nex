@@ -151,18 +151,18 @@ else
 fi
 
 # =========================================
-# GitHub 可访问性检查
+# Proxy 可访问性检查
 # =========================================
-echo "[检测] 尝试访问 GitHub 仓库..."
+echo "[检测] 尝试访问 Proxy 仓库..."
 if ! command -v git >/dev/null 2>&1; then
     echo "[WARN] 未安装 git，稍后会自动安装"
 fi
 
 if ! git ls-remote https://gitee.com/KBEngineLab/kbe-vcpkg-gitee.git >/dev/null 2>&1; then
-    echo "[ERROR] 无法访问 Gitee 仓库，请确保网络可用"
+    echo "[ERROR] 无法访问 Proxy 仓库，请确保网络可用"
     exit 1
 fi
-echo "[成功] Gitee 仓库可访问"
+echo "[成功] Proxy 仓库可访问"
 
 
 # =========================================

@@ -89,7 +89,7 @@ check_required_tool pkg-config
 echo "[CHECK] Trying to access GitHub repository..."
 if ! git ls-remote https://github.com/microsoft/vcpkg.git >/dev/null 2>&1; then
     echo "[ERROR] Cannot access GitHub repository, please check network or proxy"
-    echo "[INFO] You can also use the domestic Gitee mirror, try running install/gitee/install_linux.sh."
+    echo "[INFO] You can also use the domestic proxy mirror, try running install/proxy/install_macos.sh."
     exit 1
 fi
 echo "[SUCCESS] GitHub repository is accessible"

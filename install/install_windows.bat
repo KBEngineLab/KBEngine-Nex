@@ -31,7 +31,7 @@ if errorlevel 1 (
     echo [Error] Cannot access GitHub repository!
     echo         There may be a network issue or proxy required. Please resolve network issues before running the script.
     echo.
-    echo         There is also a domestic Gitee mirror. You can try running install\gitee\install_windows.bat.
+    echo         There is also a domestic proxy mirror. You can try running install\proxy\install_windows.bat.
     rd /s /q "%TMP_TEST_DIR%" >nul 2>nul
     if not defined CI (
         pause
