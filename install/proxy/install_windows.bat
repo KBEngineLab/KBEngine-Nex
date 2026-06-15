@@ -420,7 +420,7 @@ if "%~3"=="GUICONSOLE" (
 
 echo.
 echo [Step 2] Building kbengine nex.sln ...
-msbuild "%SOLUTION_FILE%" /p:Configuration=%CONFIG% %MSVC_VER_VAR% %PLATFORM_TOOLSET%  /p:Platform=Win64 /m  /fileLogger /fileLoggerParameters:LogFile=%LOG_FILE%;Append;Encoding=UTF-8 consoleloggerparameters:DisableConsoleColor
+msbuild "%SOLUTION_FILE%" /p:Configuration=%CONFIG% %MSVC_VER_VAR% %PLATFORM_TOOLSET%  /p:Platform=Win64 /m  /fileLogger /fileLoggerParameters:LogFile=%LOG_FILE%;Append;Encoding=UTF-8 /consoleloggerparameters:DisableConsoleColor
 if errorlevel 1 (
     echo [Error] kbengine nex.sln build failed, check %LOG_FILE%
     pause
