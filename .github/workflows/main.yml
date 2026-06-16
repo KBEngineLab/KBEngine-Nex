@@ -31,7 +31,7 @@ jobs:
       matrix:
         include:
           - platform: windows-x64
-            os: windows-latest
+            os: windows-2022
             archive_ext: zip
           - platform: macos
             os: macos-latest
