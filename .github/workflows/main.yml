@@ -248,3 +248,101 @@ jobs:
               --title "KBEngine-Nex $VERSION" \
               --notes "Release binaries for Windows, macOS, and Linux."
           fi
+
+  publish-gitcode:
+    name: Publish GitCode Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && secrets.GITCODE_TOKEN != ''
+    env:
+      GITCODE_OWNER: KBEngineLab
+      GITCODE_REPO: KBEngine-Nex
+      GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+
+    steps:
+      - name: Resolve release version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            VERSION="${{ github.event.inputs.tag_name }}"
+          else
+            VERSION="${GITHUB_REF_NAME}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push tag to GitCode
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -e
+          git remote add gitcode "https://oauth2:${GITCODE_TOKEN}@gitcode.com/${GITCODE_OWNER}/${GITCODE_REPO}.git"
+          git push gitcode "refs/tags/${VERSION}" --force
+
+      - name: Download packaged binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum * > SHA256SUMS.txt
+
+      - name: Create release on GitCode
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -e
+          RESP=$(curl -sS -w "\n%{http_code}" -X POST \
+            "https://api.gitcode.com/api/v5/repos/${GITCODE_OWNER}/${GITCODE_REPO}/releases?access_token=${GITCODE_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"tag_name\":\"${VERSION}\",\"name\":\"KBEngine-Nex ${VERSION}\",\"body\":\"Release binaries for Windows, macOS, and Linux.\",\"release_status\":\"latest\"}")
+
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | sed '$d')
+
+          echo "Create release: HTTP $HTTP_CODE"
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+            echo "Release created"
+          elif [ "$HTTP_CODE" = "409" ]; then
+            echo "Release already exists, continuing"
+          else
+            echo "Failed: $BODY"
+            exit 1
+          fi
+
+      - name: Upload assets to GitCode
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -e
+          for f in dist/*; do
+            fname=$(basename "$f")
+            echo "::group::Uploading $fname"
+
+            UPLOAD_INFO=$(curl -sS \
+              "https://api.gitcode.com/api/v5/repos/${GITCODE_OWNER}/${GITCODE_REPO}/releases/${VERSION}/upload_url?access_token=${GITCODE_TOKEN}&file_name=${fname}")
+
+            UPLOAD_URL=$(echo "$UPLOAD_INFO" | jq -r '.url')
+            if [ -z "$UPLOAD_URL" ] || [ "$UPLOAD_URL" = "null" ]; then
+              echo "Failed to get upload URL: $UPLOAD_INFO"
+              exit 1
+            fi
+
+            # Build -H args from returned headers object
+            HDR_ARGS=""
+            while IFS= read -r line; do
+              [ -z "$line" ] && continue
+              HDR_ARGS="$HDR_ARGS -H \"$line\""
+            done < <(echo "$UPLOAD_INFO" | jq -r '.headers | to_entries[] | "\(.key): \(.value)"')
+
+            eval "curl -sS -X PUT \"$UPLOAD_URL\" $HDR_ARGS --data-binary @\"$f\" -w '\nHTTP %{http_code}'"
+            echo
+            echo "::endgroup::"
+          done
