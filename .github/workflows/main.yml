@@ -253,13 +253,20 @@ jobs:
     name: Publish GitCode Release
     needs: build
     runs-on: ubuntu-latest
-    if: (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && secrets.GITCODE_TOKEN != ''
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     env:
       GITCODE_OWNER: KBEngineLab
       GITCODE_REPO: KBEngine-Nex
       GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
 
     steps:
+      - name: Check GitCode token
+        run: |
+          if [ -z "${GITCODE_TOKEN}" ]; then
+            echo "GITCODE_TOKEN not configured, skipping GitCode publish"
+            exit 0
+          fi
+
       - name: Resolve release version
         id: version
         run: |
