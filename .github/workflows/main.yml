@@ -30,15 +30,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: windows-x64
-            os: windows-2022
-            archive_ext: zip
+          # - platform: windows-x64
+          #   os: windows-2022
+          #   archive_ext: zip
           - platform: macos
             os: macos-latest
             archive_ext: tar.gz
-          - platform: linux
-            os: ubuntu-22.04
-            archive_ext: tar.gz
+          # - platform: linux
+          #   os: ubuntu-22.04
+          #   archive_ext: tar.gz
 
     steps:
       - name: Checkout
@@ -352,14 +352,28 @@ jobs:
               exit 1
             fi
 
-            # Build -H args from returned headers object
+            # Build curl -H args
             HDR_ARGS=""
             while IFS= read -r line; do
               [ -z "$line" ] && continue
               HDR_ARGS="$HDR_ARGS -H \"$line\""
             done < <(echo "$UPLOAD_INFO" | jq -r '.headers | to_entries[] | "\(.key): \(.value)"')
 
-            eval "curl -sS -X PUT \"$UPLOAD_URL\" $HDR_ARGS --data-binary @\"$f\" -w '\nHTTP %{http_code}'"
-            echo
+            upload_with_retry() {
+              local retry=0 max=3
+              while [ $retry -lt $max ]; do
+                local resp
+                resp=$(eval "curl -sS -w '%{http_code}' -o /dev/null -X PUT \"$UPLOAD_URL\" $HDR_ARGS --data-binary @\"$f\"")
+                echo "Upload $fname (attempt $((retry+1))): HTTP $resp"
+                case "$resp" in
+                  200|201|204) return 0 ;;
+                  5*) sleep 5; retry=$((retry+1)) ;;
+                  *) return 1 ;;
+                esac
+              done
+              return 1
+            }
+
+            upload_with_retry || exit 1
             echo "::endgroup::"
           done
