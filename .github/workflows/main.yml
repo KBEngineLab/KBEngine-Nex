@@ -288,6 +288,8 @@ jobs:
         run: |
           set -e
           git remote add gitcode "https://oauth2:${GITCODE_TOKEN}@gitcode.com/${GITCODE_OWNER}/${GITCODE_REPO}.git"
+          git config user.name  "GitHub Actions"
+          git config user.email "actions@github.com"
 
           # Create tag locally if needed (workflow_dispatch doesn't have it yet)
           if ! git rev-parse "refs/tags/${VERSION}" >/dev/null 2>&1; then
