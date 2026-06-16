@@ -46,15 +46,14 @@ jobs:
       - name: Package source
         id: package
         run: |
+          set -x
           VERSION="${{ steps.version.outputs.version }}"
           PKG="KBEngine-Nex-${VERSION}-source"
           mkdir -p dist
-          tar -czf "dist/${PKG}.tar.gz" \
-            --exclude='.git' --exclude='kbe/src/build' \
-            --exclude='kbe/src/vcpkg_installed' \
-            .
+          tar -czf "dist/${PKG}.tar.gz" --exclude='.git' --exclude='kbe/src/build' --exclude='kbe/src/vcpkg_installed' .
           echo "archive=dist/${PKG}.tar.gz" >> "$GITHUB_OUTPUT"
           echo "archive_name=${PKG}.tar.gz" >> "$GITHUB_OUTPUT"
+          ls -lh "dist/${PKG}.tar.gz"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
