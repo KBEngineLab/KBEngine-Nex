@@ -23,9 +23,23 @@ env:
 
 jobs:
   build:
-    name: Package source
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            os: windows-2022
+            archive_ext: zip
+          - platform: macos
+            os: macos-latest
+            archive_ext: tar.gz
+          - platform: linux
+            os: ubuntu-22.04
+            archive_ext: tar.gz
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,17 +57,126 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Package source
-        id: package
+      - name: Build on Linux
+        if: runner.os == 'Linux'
         run: |
-          set -x
-          VERSION="${{ steps.version.outputs.version }}"
-          PKG="KBEngine-Nex-${VERSION}-source"
-          mkdir -p dist
-          tar -czf "dist/${PKG}.tar.gz" --exclude='.git' --exclude='kbe/src/build' --exclude='kbe/src/vcpkg_installed' --exclude='dist' .
-          echo "archive=dist/${PKG}.tar.gz" >> "$GITHUB_OUTPUT"
-          echo "archive_name=${PKG}.tar.gz" >> "$GITHUB_OUTPUT"
-          ls -lh "dist/${PKG}.tar.gz"
+          bash ./install/install_linux.sh "$BUILD_CONFIG"
+
+      - name: Build on macOS
+        if: runner.os == 'macOS'
+        run: |
+          bash ./install/install_macos.sh "$BUILD_CONFIG"
+
+      - name: Build on Windows
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          call install\install_windows.bat %BUILD_CONFIG%
+
+      - name: Build GUICONSOLE on Windows
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          call install\install_windows.bat %BUILD_CONFIG% "" GUICONSOLE
+
+      - name: Verify server binaries
+        run: |
+          test -d kbe/bin/server
+          find kbe/bin/server -maxdepth 1 -type f | sort
+
+      - name: Audit Linux runtime dependencies
+        if: runner.os == 'Linux'
+        run: |
+          set -e
+          for bin in kbe/bin/server/*; do
+            if [ -f "$bin" ] && file "$bin" | grep -q "ELF"; then
+              echo "::group::ldd $bin"
+              ldd "$bin"
+              echo "::endgroup::"
+            fi
+          done
+
+      - name: Bundle Linux runtime libraries
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y patchelf
+          lib_dir="kbe/bin/server/lib"
+          mkdir -p "$lib_dir"
+          : > /tmp/kbe-runtime-libs.txt
+          for bin in kbe/bin/server/*; do
+            if [ -f "$bin" ] && file "$bin" | grep -q "ELF"; then
+              ldd "$bin" | awk '
+                /=> \// { print $3 }
+                /^[[:space:]]*\// { print $1 }
+              ' >> /tmp/kbe-runtime-libs.txt
+            fi
+          done
+          sort -u /tmp/kbe-runtime-libs.txt | while read -r lib; do
+            [ -n "$lib" ] || continue
+            [ -f "$lib" ] || continue
+            base="$(basename "$lib")"
+            case "$base" in
+              ld-linux*.so.*|libc.so.*|libm.so.*|libdl.so.*|libpthread.so.*|librt.so.*|libresolv.so.*|linux-vdso*.so.*)
+                continue ;;
+            esac
+            cp -L "$lib" "$lib_dir/"
+          done
+          for bin in kbe/bin/server/*; do
+            if [ -f "$bin" ] && file "$bin" | grep -q "ELF"; then
+              patchelf --set-rpath '$ORIGIN/lib:$ORIGIN' "$bin"
+            fi
+          done
+          echo "::group::bundled Linux runtime libraries"
+          find "$lib_dir" -maxdepth 1 -type f -printf '%f\n' | sort || true
+          echo "::endgroup::"
+
+      - name: Audit macOS runtime dependencies
+        if: runner.os == 'macOS'
+        run: |
+          set -e
+          for bin in kbe/bin/server/*; do
+            if [ -f "$bin" ] && file "$bin" | grep -q "Mach-O"; then
+              echo "::group::otool -L $bin"
+              otool -L "$bin"
+              echo "::endgroup::"
+            fi
+          done
+
+      - name: Package binaries
+        id: package
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $platform = "${{ matrix.platform }}"
+          if ($platform -eq "macos" -or $platform -eq "linux") {
+            $arch = (uname -m).Trim()
+            $platform = "$platform-$arch"
+          }
+          $packageName = "KBEngine-Nex-$version-$platform"
+          $stageRoot = Join-Path $PWD "dist"
+          $stageDir = Join-Path $stageRoot $packageName
+          $kbeDir = Join-Path $stageDir "kbe"
+          New-Item -ItemType Directory -Force -Path $kbeDir | Out-Null
+          foreach ($dir in @("docs")) {
+            if (Test-Path $dir) { Copy-Item -Path $dir -Destination $stageDir -Recurse -Force }
+          }
+          foreach ($dir in @("bin", "res", "tools")) {
+            $source = Join-Path "kbe" $dir
+            if (Test-Path $source) { Copy-Item -Path $source -Destination $kbeDir -Recurse -Force }
+          }
+          foreach ($file in @("new_assets.bat", "new_assets.sh", "UPDATE.md", "README.md")) {
+            if (Test-Path $file) { Copy-Item -Path $file -Destination $stageDir -Force }
+          }
+          $archivePath = Join-Path $stageRoot "$packageName.${{ matrix.archive_ext }}"
+          if ("${{ matrix.archive_ext }}" -eq "zip") {
+            Compress-Archive -Path $stageDir -DestinationPath $archivePath -Force
+          } else {
+            tar -czf $archivePath -C $stageRoot $packageName
+          }
+          "archive=$archivePath" >> $env:GITHUB_OUTPUT
+          "archive_name=$(Split-Path $archivePath -Leaf)" >> $env:GITHUB_OUTPUT
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -61,7 +184,7 @@ jobs:
           name: ${{ steps.package.outputs.archive_name }}
           path: ${{ steps.package.outputs.archive }}
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 14
 
   publish:
     name: Publish GitHub Release
@@ -157,17 +280,6 @@ jobs:
           git push gitcode --all --force
           git push gitcode --tags --force
 
-      - name: Download packaged binaries
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
-
-      - name: Generate checksums
-        run: |
-          cd dist
-          sha256sum * > SHA256SUMS.txt
-
       - name: Create release on GitCode
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -191,52 +303,4 @@ jobs:
             exit 1
           fi
 
-      - name: Upload assets to GitCode
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          set -e
-          for f in dist/*; do
-            fname=$(basename "$f")
-            echo "::group::Uploading $fname"
 
-            UPLOAD_INFO=$(curl -sS \
-              "https://api.gitcode.com/api/v5/repos/${GITCODE_OWNER}/${GITCODE_REPO}/releases/${VERSION}/upload_url?access_token=${GITCODE_TOKEN}&file_name=${fname}")
-
-            UPLOAD_URL=$(echo "$UPLOAD_INFO" | jq -r '.url')
-            if [ -z "$UPLOAD_URL" ] || [ "$UPLOAD_URL" = "null" ]; then
-              echo "Failed to get upload URL: $UPLOAD_INFO"
-              exit 1
-            fi
-
-            # Build curl -H args
-            HDR_ARGS=""
-            while IFS= read -r line; do
-              [ -z "$line" ] && continue
-              HDR_ARGS="$HDR_ARGS -H \"$line\""
-            done < <(echo "$UPLOAD_INFO" | jq -r '.headers | to_entries[] | "\(.key): \(.value)"')
-
-            upload_with_retry() {
-              local retry=0 max=3
-              while [ $retry -lt $max ]; do
-                echo "Upload $fname (attempt $((retry+1))), size=$(stat -c%s "$f") bytes..."
-                echo "URL: $(echo "$UPLOAD_URL" | cut -d'?' -f1)..."
-                local http_code
-                # -v stderr shows connection progress, -w stdout gives HTTP code
-                http_code=$(eval "curl --connect-timeout 30 --max-time 600 -v -w '%{http_code}' -o /dev/null -X PUT \"$UPLOAD_URL\" $HDR_ARGS --data-binary @\"$f\"")
-                echo "HTTP $http_code"
-                if [ "$http_code" = "200" ] || [ "$http_code" = "201" ] || [ "$http_code" = "204" ]; then
-                  return 0
-                fi
-                # Show error response (body was discarded, -v already showed headers)
-                case "$http_code" in
-                  5*) sleep 5; retry=$((retry+1)) ;;
-                  *) return 1 ;;
-                esac
-              done
-              return 1
-            }
-
-            upload_with_retry || exit 1
-            echo "::endgroup::"
-          done
