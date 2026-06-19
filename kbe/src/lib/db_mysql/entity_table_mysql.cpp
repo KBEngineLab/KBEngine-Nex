@@ -376,41 +376,50 @@ bool EntityTableMysql::syncIndexToDB(DBInterface* pdbi)
 //-------------------------------------------------------------------------------------
 bool EntityTableMysql::syncToDB(DBInterface* pdbi)
 {
-	if(hasSync())
+	if (hasSync())
 		return true;
-
-	// DEBUG_MSG(fmt::format("EntityTableMysql::syncToDB(): {}.\n", tableName()));
 
 	char sql_str[SQL_BUF];
 	std::string exItems = "";
 
-	if(this->isChild())
+	if (this->isChild())
 		exItems = ", " TABLE_PARENTID_CONST_STR " bigint(20) unsigned NOT NULL, INDEX(" TABLE_PARENTID_CONST_STR ")";
 
 	char autoIncrement_str[MAX_BUF];
 	memset(autoIncrement_str, 0, sizeof(autoIncrement_str));
-	const char* autoIncrementInit = pdbi->getAutoIncrementInit();
-	if (autoIncrementInit != NULL && strlen(autoIncrementInit) > 0)
-	{
-		kbe_snprintf(autoIncrement_str, MAX_BUF, " AUTO_INCREMENT=%s", autoIncrementInit);
-	}
 
-	kbe_snprintf(sql_str, SQL_BUF, "CREATE TABLE IF NOT EXISTS " ENTITY_TABLE_PERFIX "_%s "
+	DBInterfaceMysql* mysqlDB = static_cast<DBInterfaceMysql*>(pdbi);
+
+	if (mysqlDB->isAutoIncrementDBID())
+	{
+		const char* autoIncrementInit = mysqlDB->getAutoIncrementInit();
+		if (autoIncrementInit != NULL && strlen(autoIncrementInit) > 0)
+			kbe_snprintf(autoIncrement_str, MAX_BUF, " AUTO_INCREMENT=%s", autoIncrementInit);
+
+		kbe_snprintf(sql_str, SQL_BUF,
+			"CREATE TABLE IF NOT EXISTS " ENTITY_TABLE_PERFIX "_%s "
 			"(id bigint(20) unsigned AUTO_INCREMENT, PRIMARY KEY idKey (id)%s)"
-		"ENGINE=" MYSQL_ENGINE_TYPE "%s", 
-		tableName(), exItems.c_str(), autoIncrement_str);
+			"ENGINE=" MYSQL_ENGINE_TYPE "%s",
+			tableName(), exItems.c_str(), autoIncrement_str);
+	}
+	else
+	{
+		kbe_snprintf(sql_str, SQL_BUF,
+			"CREATE TABLE IF NOT EXISTS " ENTITY_TABLE_PERFIX "_%s "
+			"(id bigint(20) unsigned NOT NULL, PRIMARY KEY idKey (id)%s)"
+			"ENGINE=" MYSQL_ENGINE_TYPE "%s",
+			tableName(), exItems.c_str(), autoIncrement_str);
+	}
 
 	try
 	{
 		bool ret = pdbi->query(sql_str, strlen(sql_str), false);
-		if(!ret)
-		{
+		if (!ret)
 			return false;
-		}
 	}
-	catch(...)
+	catch (...)
 	{
-		ERROR_MSG(fmt::format("EntityTableMysql::syncToDB(): error({}: {})\n lastQuery: {}.\n", 
+		ERROR_MSG(fmt::format("EntityTableMysql::syncToDB(): error({}: {})\n lastQuery: {}.\n",
 			pdbi->getlasterror(), pdbi->getstrerror(), static_cast<DBInterfaceMysql*>(pdbi)->lastquery()));
 
 		return false;
@@ -420,13 +429,14 @@ bool EntityTableMysql::syncToDB(DBInterface* pdbi)
 	static_cast<DBInterfaceMysql*>(pdbi)->getFields(outs, this->tableName());
 
 	ALL_MYSQL_SET_FLAGS |= NOT_NULL_FLAG;
-	sync_item_to_db(pdbi, "tinyint not null DEFAULT 0", this->tableName(), TABLE_ITEM_PERFIX"_" TABLE_AUTOLOAD_CONST_STR, 0, 
-			FIELD_TYPE_TINY, NOT_NULL_FLAG, (void*)&outs, &sync_autoload_item_index);
+	sync_item_to_db(pdbi, "tinyint not null DEFAULT 0", this->tableName(),
+		TABLE_ITEM_PERFIX"_" TABLE_AUTOLOAD_CONST_STR, 0,
+		FIELD_TYPE_TINY, NOT_NULL_FLAG, (void*)&outs, &sync_autoload_item_index);
 
 	EntityTable::TABLEITEM_MAP::iterator iter = tableItems_.begin();
-	for(; iter != tableItems_.end(); ++iter)
+	for (; iter != tableItems_.end(); ++iter)
 	{
-		if(!iter->second->syncToDB(pdbi, (void*)&outs))
+		if (!iter->second->syncToDB(pdbi, (void*)&outs))
 			return false;
 	}
 
@@ -437,14 +447,13 @@ bool EntityTableMysql::syncToDB(DBInterface* pdbi)
 
 	pdbi->getTableItemNames(ttablename.c_str(), dbTableItemNames);
 
-	// 检查是否有需要删除的表字段
 	std::vector<std::string>::iterator iter0 = dbTableItemNames.begin();
-	for(; iter0 != dbTableItemNames.end(); ++iter0)
+	for (; iter0 != dbTableItemNames.end(); ++iter0)
 	{
 		std::string tname = (*iter0);
-		
-		if(tname == TABLE_ID_CONST_STR || 
-			tname == TABLE_ITEM_PERFIX"_" TABLE_AUTOLOAD_CONST_STR || 
+
+		if (tname == TABLE_ID_CONST_STR ||
+			tname == TABLE_ITEM_PERFIX"_" TABLE_AUTOLOAD_CONST_STR ||
 			tname == TABLE_PARENTID_CONST_STR)
 		{
 			continue;
@@ -453,24 +462,23 @@ bool EntityTableMysql::syncToDB(DBInterface* pdbi)
 		EntityTable::TABLEITEM_MAP::iterator iter = tableItems_.begin();
 		bool found = false;
 
-		for(; iter != tableItems_.end(); ++iter)
+		for (; iter != tableItems_.end(); ++iter)
 		{
-			if(iter->second->isSameKey(tname))
+			if (iter->second->isSameKey(tname))
 			{
 				found = true;
 				break;
 			}
 		}
 
-		if(!found)
+		if (!found)
 		{
-			if(!pdbi->dropEntityTableItemFromDB(ttablename.c_str(), tname.c_str()))
+			if (!pdbi->dropEntityTableItemFromDB(ttablename.c_str(), tname.c_str()))
 				return false;
 		}
 	}
 
-	// 同步表索引
-	if(!syncIndexToDB(pdbi))
+	if (!syncIndexToDB(pdbi))
 		return false;
 
 	sync_ = true;

@@ -96,22 +96,30 @@ SqlStatementInsert::SqlStatementInsert(DBInterface* pdbi, std::string tableName,
 {
 	sqlstr_ = fmt::format("INSERT INTO {} ", sqlTableName_);
 
-	if (!values.empty())
-	{
-		std::string columns;
-		std::string sqlValues;
-		for (size_t i = 0; i < values.size(); ++i)
-		{
-			if (i > 0)
-			{
-				columns += ",";
-				sqlValues += ",";
-			}
+	std::string columns;
+	std::string sqlValues;
 
-			columns += columnSqlName(pdbi, values[i].first.c_str());
-			sqlValues += values[i].second;
+	// 非自增模式下显式写入主键id，由引擎生成UUID
+	if (!pg(pdbi)->isAutoIncrementDBID())
+	{
+		columns = columnSqlName(pdbi, TABLE_ID_CONST_STR);
+		sqlValues = fmt::format("{}", (uint64)KBEngine::genUUID64());
+	}
+
+	for (size_t i = 0; i < values.size(); ++i)
+	{
+		if (!columns.empty())
+		{
+			columns += ",";
+			sqlValues += ",";
 		}
 
+		columns += columnSqlName(pdbi, values[i].first.c_str());
+		sqlValues += values[i].second;
+	}
+
+	if (!columns.empty())
+	{
 		sqlstr_ += fmt::format("({}) VALUES ({}) ", columns, sqlValues);
 	}
 	else

@@ -1142,8 +1142,10 @@ bool EntityTablePostgresql::syncToDB(DBInterface* pdbi)
 	if (isChild())
 		exItems = fmt::format(", {} BIGINT NOT NULL", columnSqlName(pdbi, TABLE_PARENTID_CONST_STR).c_str());
 
-	std::string sql = fmt::format("CREATE TABLE IF NOT EXISTS {} (id BIGSERIAL PRIMARY KEY, {} SMALLINT DEFAULT 0{})",
+	std::string idColumnType = pg(pdbi)->isAutoIncrementDBID() ? "BIGSERIAL PRIMARY KEY" : "BIGINT NOT NULL PRIMARY KEY";
+	std::string sql = fmt::format("CREATE TABLE IF NOT EXISTS {} (id {}, {} SMALLINT DEFAULT 0{})",
 		tableSqlName(pdbi, tableName()).c_str(),
+		idColumnType.c_str(),
 		columnSqlName(pdbi, TABLE_ITEM_PERFIX "_" TABLE_AUTOLOAD_CONST_STR).c_str(),
 		exItems.c_str());
 

@@ -37,11 +37,12 @@ bool checkSystemTableTuples(PGresult* result, const std::string& sql, const char
 bool ensureServerLogTableForEntityLog(DBInterface* pdbi)
 {
 	return pdbi->query(
+		"DO $$ BEGIN "
 		"CREATE TABLE IF NOT EXISTS kbe_serverlog ("
 		"heartbeatTime BIGINT NOT NULL DEFAULT 0, "
 		"isShareDB SMALLINT NOT NULL DEFAULT 0, "
 		"serverGroupID BIGINT PRIMARY KEY"
-		")")
+		"); EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
 		&& pdbi->query("ALTER TABLE kbe_serverlog DROP COLUMN IF EXISTS componentID")
 		&& pdbi->query("ALTER TABLE kbe_serverlog ADD COLUMN IF NOT EXISTS heartbeatTime BIGINT NOT NULL DEFAULT 0")
 		&& pdbi->query("ALTER TABLE kbe_serverlog ADD COLUMN IF NOT EXISTS isShareDB SMALLINT NOT NULL DEFAULT 0")
@@ -128,6 +129,7 @@ bool KBEEntityLogTablePostgresql::syncToDB(DBInterface* pdbi)
 		return false;
 
 	if (!pdbi->query(
+		"DO $$ BEGIN "
 		"CREATE TABLE IF NOT EXISTS kbe_entitylog ("
 		"dbid BIGINT NOT NULL, "
 		"entityType INTEGER NOT NULL, "
@@ -137,7 +139,7 @@ bool KBEEntityLogTablePostgresql::syncToDB(DBInterface* pdbi)
 		"componentID BIGINT NOT NULL, "
 		"serverGroupID BIGINT NOT NULL, "
 		"PRIMARY KEY(dbid, entityType)"
-		")"))
+		"); EXCEPTION WHEN duplicate_object THEN NULL; END $$;"))
 		return false;
 
 	std::vector<COMPONENT_ID> cids = serverLogTable.queryTimeOutServers(pdbi);
@@ -242,11 +244,12 @@ bool KBEServerLogTablePostgresql::syncToDB(DBInterface* pdbi)
 	// 这里存的是当前 dbmgr 进程组的心跳。KBE 的清理逻辑按 serverGroupID 归属实体在线记录，
 	// PostgreSQL 这边也保持同一套口径。
 	if (!pdbi->query(
+		"DO $$ BEGIN "
 		"CREATE TABLE IF NOT EXISTS kbe_serverlog ("
 		"heartbeatTime BIGINT NOT NULL, "
 		"isShareDB SMALLINT NOT NULL DEFAULT 0, "
 		"serverGroupID BIGINT PRIMARY KEY"
-		")"))
+		"); EXCEPTION WHEN duplicate_object THEN NULL; END $$;"))
 		return false;
 
 	// 早期 PostgreSQL 实现用过 componentID 做主键，本表真正参与清理的是 serverGroupID。
@@ -461,6 +464,7 @@ bool KBEAccountTablePostgresql::syncToDB(DBInterface* pdbi)
 		dbid=0 是“还没有绑定实体”的占位值，不能建普通唯一索引，否则多个未完成账号会互相冲突。
 	*/
 	if (!pdbi->query(
+		"DO $$ BEGIN "
 		"CREATE TABLE IF NOT EXISTS kbe_accountinfos ("
 		"name VARCHAR(255) PRIMARY KEY, "
 		"password VARCHAR(255) NOT NULL, "
@@ -472,7 +476,7 @@ bool KBEAccountTablePostgresql::syncToDB(DBInterface* pdbi)
 		"regtime BIGINT NOT NULL DEFAULT 0, "
 		"lasttime BIGINT NOT NULL DEFAULT 0, "
 		"numlogin BIGINT NOT NULL DEFAULT 0"
-		")"))
+		"); EXCEPTION WHEN duplicate_object THEN NULL; END $$;"))
 		return false;
 
 	return pdbi->query("ALTER TABLE kbe_accountinfos ADD COLUMN IF NOT EXISTS regtime BIGINT NOT NULL DEFAULT 0")
@@ -577,13 +581,14 @@ bool KBEEmailVerificationTablePostgresql::syncToDB(DBInterface* pdbi)
 {
 	// 邮件验证码表按 code 查询和清理。
 	if (!pdbi->query(
+		"DO $$ BEGIN "
 		"CREATE TABLE IF NOT EXISTS kbe_email_verification ("
 		"code VARCHAR(255) PRIMARY KEY, "
 		"type SMALLINT NOT NULL, "
 		"name VARCHAR(255) NOT NULL, "
 		"datas TEXT NOT NULL DEFAULT '', "
 		"logtime BIGINT NOT NULL DEFAULT 0"
-		")"))
+		"); EXCEPTION WHEN duplicate_object THEN NULL; END $$;"))
 		return false;
 
 	if (!pdbi->query("ALTER TABLE kbe_email_verification ADD COLUMN IF NOT EXISTS logtime BIGINT NOT NULL DEFAULT 0"))

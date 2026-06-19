@@ -847,7 +847,7 @@ bool DBInterfaceMysql::processException(std::exception & e)
 }
 
 //-------------------------------------------------------------------------------------
-const char* DBInterfaceMysql::getAutoIncrementInit()
+const char* DBInterfaceMysql::getAutoIncrementInit() const
 {
 	DBInterfaceInfo* pDBInfo = g_kbeSrvConfig.dbInterface(name());
 	if (!pDBInfo)
@@ -859,6 +859,17 @@ const char* DBInterfaceMysql::getAutoIncrementInit()
 	}
 
 	return pDBInfo->db_autoIncrementInit;
+}
+
+//-------------------------------------------------------------------------------------
+bool DBInterfaceMysql::isAutoIncrementDBID() const
+{
+	DBInterfaceInfo* pDBInfo = g_kbeSrvConfig.dbInterface(name());
+	if (!pDBInfo)
+		return true;
+
+	// idType 设置为 UUID64 时使用UUID，否则自增
+	return strcmp(pDBInfo->db_idType, "UUID64") != 0;
 }
 
 //-------------------------------------------------------------------------------------
