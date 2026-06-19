@@ -96,6 +96,7 @@ struct DBInterfaceInfo
 		memset(db_password, 0, sizeof(db_password));
 		memset(db_name, 0, sizeof(db_name));
 		memset(db_autoIncrementInit, 0, sizeof(db_autoIncrementInit));
+		memset(db_idType, 0, sizeof(db_idType));
 	}
 
 	int index;
@@ -110,6 +111,7 @@ struct DBInterfaceInfo
 	char db_name[MAX_NAME];									// 数据库名
 	uint16 db_numConnections;								// 数据库最大连接
 	char db_autoIncrementInit[MAX_BUF];							// 自增索引起始
+	char db_idType[MAX_BUF];									// 数据库ID类型: Default(自增) / UUID64
 	std::string db_unicodeString_characterSet;				// 设置数据库字符集
 	std::string db_unicodeString_collation;
 	bool db_mysql_ssl;									// 是否使用mysql ssl连接

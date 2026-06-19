@@ -373,11 +373,12 @@
 				<!-- 数据库地址 
 					（Database address)
 				-->
-				<host> localhost </host>										<!-- Type: String -->
+				<host> 127.0.0.1 </host>										<!-- Type: String -->
 				<port> 0 </port>												<!-- Type: Integer -->
 
-
-				<!-- 数据库自增列初始值 -->
+				<!-- 数据库ID类型，Default （mysql、postgresql为自增ID，mongodb为uuid64），UUID64 （统一使用UUID64） -->
+				<idType> Default </idType>
+				<!-- 数据库自增列初始值，仅对mysql、postgresql有效 -->
 				<autoIncrementInit> 1 </autoIncrementInit>
 
 				<!-- 数据库账号验证 

@@ -53,7 +53,12 @@ public:
 	virtual bool lock();
 	virtual bool unlock();
 	virtual bool processException(std::exception& e);
-	virtual const char* getAutoIncrementInit();
+	virtual const char* getAutoIncrementInit() const;
+
+	/**
+		是否为自动增长id
+	*/
+	bool isAutoIncrementDBID() const;
 
 	PGconn* pgconn() { return pConn_; }
 	const std::string& lastSqlState() const { return lastSqlState_; }

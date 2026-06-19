@@ -864,10 +864,12 @@ const char* DBInterfaceMysql::getAutoIncrementInit() const
 //-------------------------------------------------------------------------------------
 bool DBInterfaceMysql::isAutoIncrementDBID() const
 {
-	const char* autoIncrementInit = getAutoIncrementInit();
-	return (autoIncrementInit != NULL &&
-			strlen(autoIncrementInit) > 0 &&
-			strcmp(autoIncrementInit, "0") != 0);
+	DBInterfaceInfo* pDBInfo = g_kbeSrvConfig.dbInterface(name());
+	if (!pDBInfo)
+		return true;
+
+	// idType 设置为 UUID64 时使用UUID，否则自增
+	return strcmp(pDBInfo->db_idType, "UUID64") != 0;
 }
 
 //-------------------------------------------------------------------------------------

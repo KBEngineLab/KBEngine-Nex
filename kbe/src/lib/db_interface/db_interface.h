@@ -163,7 +163,7 @@ public:
 	/**
 		获得自增起始id
 	*/
-	virtual  const char* getAutoIncrementInit() { return NULL; }
+	virtual  const char* getAutoIncrementInit() const { return NULL; }
 
 protected:
 	char name_[MAX_BUF];									// 数据库接口的名称
