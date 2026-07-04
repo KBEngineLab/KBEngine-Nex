@@ -27,3 +27,4 @@ start "" "%KBE_BIN_PATH%/kbcmd.exe" --clientsdk=ue5 --outpath="%~dp0/kbengine_ue
 start "" "%KBE_BIN_PATH%/kbcmd.exe" --clientsdk=cxx --outpath="%~dp0/kbengine_cxx_plugins"
 start "" "%KBE_BIN_PATH%/kbcmd.exe" --clientsdk=csharp --outpath="%~dp0/kbengine_csharp_plugins"
 start "" "%KBE_BIN_PATH%/kbcmd.exe" --clientsdk=typescript --outpath="%~dp0/kbengine_typescript_plugins"
+start "" "%KBE_BIN_PATH%/kbcmd.exe" --clientsdk=gdscript --outpath="%~dp0/kbengine_gdscript_plugins"

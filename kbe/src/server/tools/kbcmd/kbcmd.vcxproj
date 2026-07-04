@@ -131,6 +131,7 @@
   <ItemGroup><ClCompile Include="client_sdk.cpp" />
     <ClCompile Include="client_sdk_csharp.cpp" />
     <ClCompile Include="client_sdk_cxx.cpp" />
+    <ClCompile Include="client_sdk_gdscript.cpp" />
     <ClCompile Include="client_sdk_plugin.cpp" />
     <ClCompile Include="client_sdk_typescript.cpp" />
     <ClCompile Include="client_sdk_ue4.cpp" />
@@ -147,6 +148,7 @@
     <ClInclude Include="client_sdk.h" />
     <ClInclude Include="client_sdk_csharp.h" />
     <ClInclude Include="client_sdk_cxx.h" />
+    <ClInclude Include="client_sdk_gdscript.h" />
     <ClInclude Include="client_sdk_plugin.h" />
     <ClInclude Include="client_sdk_typescript.h" />
     <ClInclude Include="client_sdk_ue4.h" />
