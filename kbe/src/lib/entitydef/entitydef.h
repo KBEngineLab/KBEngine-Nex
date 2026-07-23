@@ -98,6 +98,12 @@ public:
 		TiXmlNode* defNode, 
 		ScriptDefModule* pScriptModule);
 
+	static bool loadComponents(const std::string& defFilePath,
+		const std::string& moduleName,
+		XML* defxml,
+		TiXmlNode* defNode,
+		ScriptDefModule* pScriptModule);
+
 	static bool loadParentClass(const std::string& defFilePath, 
 		const std::string& moduleName, 
 		XML* defxml, 

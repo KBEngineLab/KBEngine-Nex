@@ -190,6 +190,7 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 		EntityDef::__scriptModules.push_back(pScriptModule);
 
 		std::string deffile = defFilePath + moduleName + ".def";
+		pScriptModule->setDefSourceFile(deffile);
 		SmartPointer<XML> defxml(new XML());
 
 		if(!defxml->openSection(deffile.c_str()))
@@ -255,7 +256,15 @@ bool EntityDef::loadDefInfo(const std::string& defFilePath,
 
 		return false;
 	}
-	
+
+	if(!loadComponents(defFilePath, moduleName, defxml, defNode, pScriptModule))
+	{
+		ERROR_MSG(fmt::format("EntityDef::loadDefInfo: failed to load entity:{} component.\n",
+			moduleName.c_str()));
+
+		return false;
+	}
+
 	// 加载父类所有的内容
 	if(!loadParentClass(defFilePath, moduleName, defxml, defNode, pScriptModule))
 	{
@@ -436,7 +445,7 @@ bool EntityDef::loadVolatileInfo(const std::string& defFilePath,
 }
 
 //-------------------------------------------------------------------------------------
-bool EntityDef::loadInterfaces(const std::string& defFilePath, 
+bool EntityDef::loadInterfaces(const std::string& defFilePath,
 							   const std::string& moduleName, 
 							   XML* defxml, 
 							   TiXmlNode* defNode, 
@@ -515,8 +524,97 @@ bool EntityDef::loadInterfaces(const std::string& defFilePath,
 	return true;
 }
 
+// 读取实体定义中的组件声明，并把组件定义展开为宿主实体的组件描述索引。
+// Load component declarations and index each component definition on its host entity.
+bool EntityDef::loadComponents(const std::string& defFilePath,
+	const std::string& moduleName,
+	XML* defxml,
+	TiXmlNode* defNode,
+	ScriptDefModule* pScriptModule)
+{
+	TiXmlNode* componentsNode = defxml->enterNode(defNode, "Components");
+	if (componentsNode == NULL)
+		return true;
+
+	XML_FOR_BEGIN(componentsNode)
+	{
+		std::string componentName = defxml->getKey(componentsNode);
+		if (componentName.empty() || !validDefPropertyName(componentName))
+		{
+			ERROR_MSG(fmt::format("EntityDef::loadComponents: invalid component name '{}' in module {}.\n",
+				componentName, moduleName));
+			return false;
+		}
+
+		TiXmlNode* componentNode = defxml->enterNode(componentsNode, componentName.c_str());
+		if (componentNode == NULL)
+			continue;
+
+		TiXmlNode* typeNode = defxml->enterNode(componentNode, "Type");
+		if (typeNode == NULL)
+			typeNode = defxml->enterNode(componentNode, "type");
+
+		std::string componentTypeName = typeNode ? defxml->getKey(typeNode) : std::string();
+		if (componentTypeName.empty())
+		{
+			ERROR_MSG(fmt::format("EntityDef::loadComponents: component '{}' has no Type in module {}.\n",
+				componentName, moduleName));
+			return false;
+		}
+
+		ScriptDefModule* componentModule = NULL;
+		SCRIPT_MODULE_UID_MAP::iterator moduleIter = __scriptTypeMappingUType.find(componentTypeName);
+		if (moduleIter != __scriptTypeMappingUType.end())
+			componentModule = findScriptModule(moduleIter->second);
+
+		if (componentModule == NULL)
+		{
+			ENTITY_SCRIPT_UID componentUType = static_cast<ENTITY_SCRIPT_UID>(__scriptModules.size() + 1);
+			componentModule = new ScriptDefModule(componentTypeName, componentUType);
+			componentModule->isComponentModule(true);
+			__scriptTypeMappingUType[componentTypeName] = componentUType;
+			__scriptModules.push_back(componentModule);
+
+			std::string componentFile = defFilePath + "components/" + componentTypeName + ".def";
+			componentModule->setDefSourceFile(componentFile);
+			SmartPointer<XML> componentXml(new XML());
+			if (!componentXml->openSection(componentFile.c_str()))
+			{
+				ERROR_MSG(fmt::format("EntityDef::loadComponents: cannot open component definition {}.\n",
+					componentFile));
+				return false;
+			}
+
+			TiXmlNode* componentRootNode = componentXml->getRootNode();
+			if (componentRootNode != NULL &&
+				(!loadAllDefDescriptions(componentTypeName, componentXml.get(), componentRootNode, componentModule) ||
+				 !loadInterfaces(defFilePath + "components/", componentTypeName, componentXml.get(), componentRootNode, componentModule) ||
+				 !loadParentClass(defFilePath + "components/", componentTypeName, componentXml.get(), componentRootNode, componentModule) ||
+				 !loadDetailLevelInfo(defFilePath + "components/", componentTypeName, componentXml.get(), componentRootNode, componentModule)))
+			{
+				ERROR_MSG(fmt::format("EntityDef::loadComponents: failed to load component definition {}.\n",
+					componentTypeName));
+				return false;
+			}
+
+			componentModule->autoMatchCompOwn();
+			componentModule->onLoaded();
+		}
+
+		if (!pScriptModule->addComponentDescription(componentName.c_str(), componentModule))
+		{
+			ERROR_MSG(fmt::format("EntityDef::loadComponents: failed to register {}.{} component.\n",
+				moduleName, componentName));
+			return false;
+		}
+	}
+	XML_FOR_END(componentsNode);
+
+	return true;
+}
+
 //-------------------------------------------------------------------------------------
-bool EntityDef::loadParentClass(const std::string& defFilePath, 
+bool EntityDef::loadParentClass(const std::string& defFilePath,
 								const std::string& moduleName, 
 								XML* defxml, 
 								TiXmlNode* defNode, 
