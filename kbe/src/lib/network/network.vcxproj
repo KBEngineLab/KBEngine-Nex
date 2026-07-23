@@ -121,6 +121,8 @@
     <ClCompile Include="poller_epoll.cpp" />
     <ClCompile Include="poller_completion.cpp" />
     <ClCompile Include="poller_iocp.cpp" />
+    <ClCompile Include="poller_io_uring.cpp" />
+    <ClCompile Include="poller_kqueue.cpp" />
     <ClCompile Include="tcp_packet.cpp" />
     <ClCompile Include="tcp_packet_receiver.cpp" />
     <ClCompile Include="tcp_packet_sender.cpp" />
@@ -144,6 +146,8 @@
     <ClInclude Include="event_poller.h" />
     <ClInclude Include="poller_completion.h" />
     <ClInclude Include="poller_iocp.h" />
+    <ClInclude Include="poller_io_uring.h" />
+    <ClInclude Include="poller_kqueue.h" />
     <ClInclude Include="fixed_messages.h" />
     <ClInclude Include="http_utility.h" />
     <ClInclude Include="interface_defs.h" />

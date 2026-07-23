@@ -22,7 +22,10 @@ SRCS =					\
 	packet_reader		\
 	packet_sender		\
 	packet_receiver		\
+	poller_completion	\
 	poller_epoll		\
+	poller_io_uring		\
+	poller_kqueue		\
 	endpoint			\
 	tcp_packet			\
 	tcp_packet_receiver	\

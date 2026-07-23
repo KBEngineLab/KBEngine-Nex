@@ -22,6 +22,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "event_poller.h"
 #include "poller_epoll.h"
 #include "poller_iocp.h"
+#include "poller_kqueue.h"
+#include "poller_io_uring.h"
 #include "helper/profile.h"
 
 namespace KBEngine { 
@@ -235,12 +237,14 @@ const char* EventPoller::defaultIOModelName()
 {
 #if KBE_PLATFORM == PLATFORM_WIN32
 	return "iocp completion";
-#else
-#ifdef HAS_EPOLL
+#elif defined(__linux__)
+	return "io_uring completion";
+#elif defined(HAS_KQUEUE)
+	return "kqueue completion adapter";
+#elif defined(HAS_EPOLL)
 	return "epoll readiness";
 #else
 	return "unsupported IO backend";
-#endif // HAS_EPOLL
 #endif // KBE_PLATFORM == PLATFORM_WIN32
 }
 
@@ -281,6 +285,10 @@ EventPoller * EventPoller::create()
 {
 #if KBE_PLATFORM == PLATFORM_WIN32
 	return new IocpPoller();
+#elif defined(__linux__)
+	return new IoUringPoller();
+#elif defined(HAS_KQUEUE)
+	return new KqueuePoller();
 #elif defined(HAS_EPOLL)
 	return new EpollPoller();
 #else

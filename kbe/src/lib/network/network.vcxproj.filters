@@ -108,6 +108,12 @@
     <ClCompile Include="poller_iocp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="poller_io_uring.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="poller_kqueue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="websocket_packet_filter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -219,6 +225,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="poller_iocp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="poller_io_uring.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="poller_kqueue.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="websocket_packet_filter.h">
