@@ -28,6 +28,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/bundle.h"
 #include "network/endpoint.h"
 #include "network/event_dispatcher.h"
+#include "network/event_poller.h"
 #include "network/network_interface.h"
 #include "network/packet_receiver.h"
 #include "network/error_reporter.h"
@@ -54,10 +55,43 @@ ListenerReceiver::~ListenerReceiver()
 int ListenerReceiver::handleInputNotification(int fd)
 {
 	int tickcount = 0;
+	EventPoller* pPoller = this->dispatcher().pPoller();
+	const bool completion = pPoller != NULL && pPoller->supportsCompletion();
 
 	while(tickcount ++ < 256)
 	{
-		EndPoint* pNewEndPoint = endpoint_.accept();
+		EndPoint* pNewEndPoint = NULL;
+		if (completion)
+		{
+			// Completion backends already created the socket asynchronously; consume it without calling accept again.
+			// 完成模型已经异步创建 socket，这里直接消费结果，不能再次调用 accept。
+			KBESOCKET acceptedSocket = (KBESOCKET)-1;
+			if (!pPoller->takeAcceptedSocket(fd, acceptedSocket))
+				break;
+
+			pNewEndPoint = EndPoint::createPoolObject(OBJECTPOOL_POINT);
+			pNewEndPoint->setFileDescriptor(acceptedSocket);
+
+			u_int16_t networkPort = 0;
+			u_int32_t networkAddr = 0;
+			if (pNewEndPoint->getremoteaddress(&networkPort, &networkAddr) != 0)
+			{
+				// Reclaim failed completion results so an invalid peer never leaks its native socket.
+				// 回收失败的完成结果，避免无效对端导致原生 socket 泄漏。
+				pNewEndPoint->close();
+				EndPoint::reclaimPoolObject(pNewEndPoint);
+				continue;
+			}
+
+			pNewEndPoint->addr(networkPort, networkAddr);
+			pNewEndPoint->setnonblocking(true);
+			pNewEndPoint->setnodelay(true);
+		}
+		else
+		{
+			pNewEndPoint = endpoint_.accept();
+		}
+
 		if(pNewEndPoint == NULL){
 
 			if(tickcount == 1)

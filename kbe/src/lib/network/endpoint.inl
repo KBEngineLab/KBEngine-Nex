@@ -97,6 +97,15 @@ INLINE void EndPoint::setFileDescriptor(int fd)
 {
 	socket_ = fd;
 }
+#if KBE_PLATFORM == PLATFORM_WIN32
+INLINE void EndPoint::setFileDescriptor(KBESOCKET fd)
+{
+	// Preserve the complete native socket value when accepting IOCP results.
+	// 接收 IOCP 结果时保留完整的原生 socket 值。
+	socket_ = fd;
+}
+#endif
+
 
 INLINE void EndPoint::socket(int type)
 {

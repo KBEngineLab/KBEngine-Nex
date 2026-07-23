@@ -65,6 +65,11 @@ public:
 	INLINE KBESOCKET socket() const;
 	
 	INLINE void setFileDescriptor(int fd);
+#if KBE_PLATFORM == PLATFORM_WIN32
+	// Windows SOCKET uses a pointer-sized integer and must not be narrowed to int.
+	// Windows SOCKET 使用指针宽度整数，不能缩窄为 int。
+	INLINE void setFileDescriptor(KBESOCKET fd);
+#endif
 
 	INLINE int joinMulticastGroup(u_int32_t networkAddr);
 	INLINE int quitMulticastGroup(u_int32_t networkAddr);
