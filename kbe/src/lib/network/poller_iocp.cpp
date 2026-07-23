@@ -121,7 +121,10 @@ bool IocpPoller::queueTcpSend(int fd, const void* data, int len)
 	}
 
 	SocketState& state = socketStateForFd(fd);
-	return armTcpSend(fd, state);
+	// Once the shared queue accepts bytes, ownership has moved to the poller even if the first WSASend attempt fails.
+	// 共享队列接受字节后，数据所有权已经转移给 poller，即使首次 WSASend 投递失败也由后端继续重试。
+	armTcpSend(fd, state);
+	return true;
 }
 
 //-------------------------------------------------------------------------------------
@@ -134,7 +137,10 @@ bool IocpPoller::queueUdpSend(int fd, const void* data, int len, const Address& 
 	}
 
 	SocketState& state = socketStateForFd(fd);
-	return armUdpSend(fd, state);
+	// Once the shared queue accepts a datagram, later completion rounds own its retry lifecycle.
+	// 共享队列接受数据报后，后续 completion 轮次负责其重试生命周期。
+	armUdpSend(fd, state);
+	return true;
 }
 
 //-------------------------------------------------------------------------------------
@@ -281,6 +287,9 @@ bool IocpPoller::armTcpSend(int fd, SocketState& state)
 		return true;
 	}
 
+	// WSASend did not take ownership of the buffer; restore the batch before retrying later.
+	// WSASend 未接管缓冲区所有权，失败时先恢复 batch，等待后续轮次重试。
+	pushTcpSendFront(state, pContext->data);
 	delete pContext;
 	return false;
 }
@@ -325,6 +334,11 @@ bool IocpPoller::armUdpSend(int fd, SocketState& state)
 		return true;
 	}
 
+	// WSASendTo did not take ownership of the datagram; put it back at the queue front.
+	// WSASendTo 未接管数据报所有权，将其放回队首等待后续重试。
+	pending.data.swap(pContext->data);
+	state.pendingUdpSendBytes += pending.data.size();
+	state.pendingUdpSends.push_front(std::move(pending));
 	delete pContext;
 	return false;
 }
