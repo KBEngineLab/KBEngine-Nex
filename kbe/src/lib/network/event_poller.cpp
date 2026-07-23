@@ -20,7 +20,6 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include "event_poller.h"
-#include "poller_select.h"
 #include "poller_epoll.h"
 #include "poller_iocp.h"
 #include "helper/profile.h"
@@ -29,10 +28,6 @@ namespace KBEngine {
 namespace Network
 {
 	
-#if KBE_PLATFORM != PLATFORM_WIN32
-#define HAS_EPOLL
-#endif
-
 //-------------------------------------------------------------------------------------
 EventPoller::EventPoller() : 
 	fdReadHandlers_(), 
@@ -244,7 +239,7 @@ const char* EventPoller::defaultIOModelName()
 #ifdef HAS_EPOLL
 	return "epoll readiness";
 #else
-	return "select readiness";
+	return "unsupported IO backend";
 #endif // HAS_EPOLL
 #endif // KBE_PLATFORM == PLATFORM_WIN32
 }
@@ -289,7 +284,9 @@ EventPoller * EventPoller::create()
 #elif defined(HAS_EPOLL)
 	return new EpollPoller();
 #else
-	return new SelectPoller();
+	// 没有完成模型后端时明确失败，避免悄悄回退到已移除的 select。
+	// Fail explicitly when no completion backend exists instead of silently falling back to the removed select path.
+	return NULL;
 #endif // KBE_PLATFORM == PLATFORM_WIN32
 }
 

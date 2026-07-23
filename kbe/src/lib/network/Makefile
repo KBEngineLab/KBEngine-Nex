@@ -23,7 +23,6 @@ SRCS =					\
 	packet_sender		\
 	packet_receiver		\
 	poller_epoll		\
-	poller_select		\
 	endpoint			\
 	tcp_packet			\
 	tcp_packet_receiver	\

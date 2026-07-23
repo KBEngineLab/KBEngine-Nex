@@ -23,7 +23,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "event_poller.h"
 
-#if KBE_PLATFORM != PLATFORM_WIN32
+#if defined(__linux__)
 #define HAS_EPOLL
 #endif
 
