@@ -147,6 +147,8 @@ public:
 	INLINE METHODDESCRIPTION_MAP& getCellExposedMethodDescriptions(void);
 
 	INLINE const char* getName();
+	INLINE const std::string& getDefSourceFile() const;
+	INLINE void setDefSourceFile(const std::string& file);
 
 	bool addComponentDescription(const char* compName, ScriptDefModule* compDescription);
 	ScriptDefModule* findComponentDescription(const char* compName);
@@ -222,6 +224,7 @@ protected:
 
 	// 这个模块的名称
 	std::string							name_;
+	std::string							defSourceFile_;
 
 	// 组件描述使用独立索引，避免改变普通属性和方法的查找语义。
 	// Component descriptors use separate indexes so ordinary property and method lookup is unchanged.

@@ -166,6 +166,20 @@ INLINE const char* ScriptDefModule::getName()
 	return name_.c_str(); 
 }
 
+// 返回定义模块的来源文件，供多语言 SDK 生成器保留真实路径。
+// Return the definition source file so multilingual SDK generators preserve the real path.
+INLINE const std::string& ScriptDefModule::getDefSourceFile() const
+{
+	return defSourceFile_;
+}
+
+// 由 EntityDef 加载器写入来源文件，生成器只读该元数据。
+// The EntityDef loader writes the source file and generators consume this metadata read-only.
+INLINE void ScriptDefModule::setDefSourceFile(const std::string& file)
+{
+	defSourceFile_ = file;
+}
+
 // 返回当前模块声明的组件描述索引。
 // Return the component descriptor index declared by this module.
 INLINE ScriptDefModule::COMPONENTDESCRIPTION_MAP& ScriptDefModule::getComponentDescrs()
