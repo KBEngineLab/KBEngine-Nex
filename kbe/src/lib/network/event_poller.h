@@ -52,10 +52,22 @@ public:
 	virtual int processPendingEvents(double maxWait) = 0;
 	virtual int getFileDescriptor() const;
 
+	// 返回当前事件后端的稳定名称，供启动日志、诊断和测试识别实际 IO 模型。
+	// Return a stable name for the active event backend so startup logs, diagnostics, and tests can identify the actual IO model.
+	virtual const char* ioModelName() const;
+
+	// readiness 后端返回 false；完成模型接入后由具体后端返回 true。
+	// Readiness backends return false; a completion backend returns true after it is integrated.
+	virtual bool supportsCompletion() const;
+
 	void clearSpareTime()		{spareTime_ = 0;}
 	uint64 spareTime() const	{return spareTime_;}
 
 	static EventPoller * create();
+
+	// 根据当前编译平台返回 1.x 基线默认后端名称，不改变后端选择逻辑。
+	// Return the 1.x baseline backend name for the build platform without changing backend selection logic.
+	static const char* defaultIOModelName();
 
 	InputNotificationHandler* findForRead(int fd);
 	OutputNotificationHandler* findForWrite(int fd);

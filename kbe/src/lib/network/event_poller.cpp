@@ -166,6 +166,28 @@ int EventPoller::getFileDescriptor() const
 }
 
 //-------------------------------------------------------------------------------------
+const char* EventPoller::ioModelName() const
+{
+	return EventPoller::defaultIOModelName();
+}
+
+//-------------------------------------------------------------------------------------
+bool EventPoller::supportsCompletion() const
+{
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
+const char* EventPoller::defaultIOModelName()
+{
+#ifdef HAS_EPOLL
+	return "epoll readiness";
+#else
+	return "select readiness";
+#endif // HAS_EPOLL
+}
+
+//-------------------------------------------------------------------------------------
 int EventPoller::maxFD() const
 {
 	int readMaxFD = -1;

@@ -47,6 +47,14 @@ EventDispatcher::EventDispatcher() :
 {
 	pPoller_ = EventPoller::create();
 	pErrorReporter_ = new ErrorReporter(*this);
+
+	// 记录每个 dispatcher 实际使用的后端，避免平台迁移时只看编译选项而误判运行模型。
+	// Record the backend actually used by each dispatcher so platform migrations do not rely on build flags alone.
+	if (pPoller_ != NULL)
+	{
+		INFO_MSG(fmt::format("EventDispatcher: using IO model {} (completion={}).\n",
+			pPoller_->ioModelName(), pPoller_->supportsCompletion() ? "true" : "false"));
+	}
 }
 
 //-------------------------------------------------------------------------------------
