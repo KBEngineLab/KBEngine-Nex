@@ -456,6 +456,7 @@ int process_help(int argc, char* argv[])
 	printf("\tkbcmd.exe --clientsdk=csharp --zip=c:/csharp_kbesdk.zip\n");
 	printf("\tkbcmd.exe --clientsdk=csharp --tar=c:/csharp_kbesdk.tgz\n");
 	printf("\tkbcmd.exe --clientsdk=csharp --outpath=c:/csharp_kbesdk --KBE_ROOT=\"*\"  --KBE_RES_PATH=\"*\"  --KBE_BIN_PATH=\"*\"\n");
+	printf("\tkbcmd.exe --clientsdk=gdscript --outpath=c:/gdscript_kbesdk\n");
 
 	printf("\tkbcmd.exe --clientsdk=cxx --zip=c:/cxx_kbesdk.zip\n");
 	printf("\tkbcmd.exe --clientsdk=cxx --tar=c:/cxx_kbesdk.tgz\n");

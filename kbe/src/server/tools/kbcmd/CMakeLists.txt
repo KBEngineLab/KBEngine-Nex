@@ -7,6 +7,7 @@ set(SRCS
 	client_sdk_ue5.cpp
 	client_sdk_cxx.cpp
 	client_sdk_typescript.cpp
+	client_sdk_gdscript.cpp
 	client_sdk_plugin.cpp
 	client_sdk_csharp.cpp
 	server_assets.cpp

@@ -8,6 +8,7 @@
 #include "client_sdk_cxx.h"
 #include "client_sdk_typescript.h"
 #include "client_sdk_csharp.h"
+#include "client_sdk_gdscript.h"
 #include "client_sdk_plugin.h"
 #include "entitydef/entitydef.h"
 #include "entitydef/scriptdef_module.h"
@@ -77,6 +78,10 @@ ClientSDK* ClientSDK::createClientSDK(const std::string& type)
 	else if (lowerType == "csharp")
 	{
 		return new ClientSDKCSharp();
+	}
+	else if (lowerType == "gdscript" || lowerType == "godot")
+	{
+		return new ClientSDKGDScript();
 	}
 	else if (lowerType == "cxx")
 	{
