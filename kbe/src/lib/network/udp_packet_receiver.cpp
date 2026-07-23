@@ -88,7 +88,45 @@ bool UDPPacketReceiver::processRecv(bool expectingPacket)
 {	
 	Address	srcAddr;
 	UDPPacket* pChannelReceiveWindow = UDPPacket::createPoolObject(OBJECTPOOL_POINT);
+	EventPoller* pPoller = this->dispatcher().pPoller();
+	if (pPoller != NULL && pPoller->supportsCompletion())
+	{
+		// completion 后端已经保留来源地址和报文边界，不能退回 recvfrom 读取同一个数据报。
+		// A completion backend preserves the source address and datagram boundary, so recvfrom must not read the same datagram again.
+		std::vector<char> data;
+		int errorCode = 0;
+		if (!pPoller->takeUdpReceivedData(static_cast<int>(*pEndpoint_), data, srcAddr, errorCode))
+		{
+			UDPPacket::reclaimPoolObject(pChannelReceiveWindow);
+			return false;
+		}
+
+		if (errorCode != 0)
+		{
+#if KBE_PLATFORM == PLATFORM_WIN32
+			WSASetLastError(errorCode);
+#else
+			errno = errorCode;
+#endif
+			UDPPacket::reclaimPoolObject(pChannelReceiveWindow);
+			PacketReceiver::RecvState rstate = this->checkSocketErrors(-1, expectingPacket);
+			return rstate == PacketReceiver::RECV_STATE_CONTINUE;
+		}
+
+		if (data.empty())
+		{
+			UDPPacket::reclaimPoolObject(pChannelReceiveWindow);
+			return false;
+		}
+
+		// append 保持 UDP 报文的完整边界，并复用原有的 Channel 查找和协议解析流程。
+		// append preserves the complete UDP datagram boundary while reusing the existing channel lookup and protocol parsing flow.
+		pChannelReceiveWindow->append(data.data(), data.size());
+	}
+	else
+	{
 	int len = pChannelReceiveWindow->recvFromEndPoint(*pEndpoint_, &srcAddr);
+
 
 	if (len <= 0)
 	{
@@ -97,6 +135,9 @@ bool UDPPacketReceiver::processRecv(bool expectingPacket)
 		return rstate == PacketReceiver::RECV_STATE_CONTINUE;
 	}
 	
+
+	}
+
 	Channel* pSrcChannel = pNetworkInterface_->findChannel(srcAddr);
 
 	if(pSrcChannel == NULL) 

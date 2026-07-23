@@ -97,6 +97,63 @@ bool TCPPacketReceiver::processRecv(bool expectingPacket)
 	}
 
 	TCPPacket* pReceiveWindow = TCPPacket::createPoolObject(OBJECTPOOL_POINT);
+	EventPoller* pPoller = this->dispatcher().pPoller();
+	if (pPoller != NULL && pPoller->supportsCompletion())
+	{
+		// 完成模型已经把字节复制到自己的生命周期队列，上层不能再次调用 recv。
+		// A completion backend has already copied bytes into its lifetime-managed queue, so the upper layer must not call recv again.
+		std::vector<char> data;
+		bool disconnected = false;
+		int errorCode = 0;
+		if (!pPoller->takeTcpReceivedData(static_cast<int>(*pEndpoint_), data, disconnected, errorCode))
+		{
+			TCPPacket::reclaimPoolObject(pReceiveWindow);
+			return false;
+		}
+
+		// 统一复用旧错误路径，让异步错误仍然经过原有 channel 关闭和日志逻辑。
+		// Reuse the legacy error path so asynchronous failures keep the original channel shutdown and logging behavior.
+		if (errorCode != 0)
+		{
+#if KBE_PLATFORM == PLATFORM_WIN32
+			WSASetLastError(errorCode);
+#else
+			errno = errorCode;
+#endif
+			TCPPacket::reclaimPoolObject(pReceiveWindow);
+			PacketReceiver::RecvState rstate = this->checkSocketErrors(-1, expectingPacket);
+			if (rstate == PacketReceiver::RECV_STATE_INTERRUPT)
+			{
+				onGetError(pChannel, fmt::format("TCPPacketReceiver::processRecv(): error={}\n", kbe_lasterror()));
+				return false;
+			}
+
+			return rstate == PacketReceiver::RECV_STATE_CONTINUE;
+		}
+
+		if (disconnected)
+		{
+			TCPPacket::reclaimPoolObject(pReceiveWindow);
+			onGetError(pChannel, "disconnected");
+			return false;
+		}
+
+		if (data.empty())
+		{
+			TCPPacket::reclaimPoolObject(pReceiveWindow);
+			return false;
+		}
+
+		// append 会按 MemoryStream 规则检查容量，避免 completion 缓冲区直接覆盖 Packet 内存。
+		// append applies MemoryStream capacity checks and prevents completion buffers from overwriting Packet memory.
+		pReceiveWindow->append(data.data(), data.size());
+		Reason ret = this->processPacket(pChannel, pReceiveWindow);
+		if (ret != REASON_SUCCESS)
+			this->dispatcher().errorReporter().reportException(ret, pEndpoint_->addr());
+
+		return true;
+	}
+
 	int len = pReceiveWindow->recvFromEndPoint(*pEndpoint_);
 
 	if (len < 0)
