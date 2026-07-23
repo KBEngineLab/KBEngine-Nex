@@ -23,5 +23,22 @@
     <VcpkgUseStatic>true</VcpkgUseStatic>
     <VcpkgTriplet>x64-windows-static</VcpkgTriplet>
     <VcpkgConfiguration Condition="'$(Configuration)' == 'Debug'">Debug</VcpkgConfiguration>
+    <KbeVcpkgInstalledDir>$(MSBuildThisFileDirectory)vcpkg_installed\$(VcpkgTriplet)</KbeVcpkgInstalledDir>
+    <KbeVcpkgIncludeDir>$(KbeVcpkgInstalledDir)\include</KbeVcpkgIncludeDir>
+    <KbeVcpkgLibraryDir Condition="'$(Configuration)' == 'Debug'">$(KbeVcpkgInstalledDir)\debug\lib</KbeVcpkgLibraryDir>
+    <KbeVcpkgLibraryDir Condition="'$(Configuration)' != 'Debug'">$(KbeVcpkgInstalledDir)\lib</KbeVcpkgLibraryDir>
   </PropertyGroup>
+
+  <!--
+    旧工程使用手写 vcxproj，不能依赖 CMake targets 自动传播 vcpkg 的目录。
+    The legacy projects define their own vcxproj items, so vcpkg include and library paths must be propagated here.
+  -->
+  <ItemDefinitionGroup Condition="('$(Platform)' == 'x64' Or '$(Platform)' == 'Win64') And Exists('$(KbeVcpkgIncludeDir)')">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(KbeVcpkgIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(KbeVcpkgLibraryDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
 </Project>
