@@ -775,6 +775,13 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 //-------------------------------------------------------------------------------------
 int IocpPoller::processPendingEvents(double maxWait)
 {
+	// 初始化失败时不能把空 HANDLE 传给 GetQueuedCompletionStatus；
+	// When initialization failed, never pass a null HANDLE to GetQueuedCompletionStatus.
+	if (completionPort_ == NULL)
+	{
+		return 0;
+	}
+
 	for (auto& item : socketStates_)
 	{
 		if (item.second->registeredRead && item.second->pPendingReadContext == NULL)
