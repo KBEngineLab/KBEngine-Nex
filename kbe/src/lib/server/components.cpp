@@ -808,7 +808,7 @@ bool Components::updateComponentInfos(const Components::ComponentInfos* info)
 				break;
 			}
 
-			WARNING_MSG(fmt::format("Components::updateComponentInfos: couldn't connect to:{}\n", 
+			WARNING_MSG(fmt::format("Components::updateComponentInfos: couldn't connect to:{}\n",
 				info->pIntAddr->c_str()));
 
 			return false;

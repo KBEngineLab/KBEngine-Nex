@@ -432,10 +432,10 @@ int process_help(int argc, char* argv[])
 	printf("Usage:\n");
 	printf("--clientsdk:\n");
 	printf("\tAutomatically generate client code based on entity_defs file. Environment variables based on KBE.\n");
-	printf("\tkbcmd.exe --clientsdk=unity --outpath=c:/unity_kbesdk\n");
-	printf("\tkbcmd.exe --clientsdk=ue4 --zip=c:/unity_kbesdk.zip\n");
-	printf("\tkbcmd.exe --clientsdk=ue4 --tar=c:/unity_kbesdk.tgz\n");
-	printf("\tkbcmd.exe --clientsdk=ue4 --outpath=c:/unity_kbesdk --KBE_ROOT=\"*\"  --KBE_RES_PATH=\"*\"  --KBE_BIN_PATH=\"*\"\n");
+	printf("\tkbcmd.exe --clientsdk=csharp --outpath=c:/csharp_kbesdk\n");
+	printf("\tkbcmd.exe --clientsdk=cxx --outpath=c:/cxx_kbesdk\n");
+	printf("\tkbcmd.exe --clientsdk=typescript --outpath=c:/typescript_kbesdk\n");
+	printf("\tkbcmd.exe --clientsdk=gdscript --outpath=c:/gdscript_kbesdk\n");
 
 	printf("\n--getuid\n");
 	printf("\tReturns the ID of the server group.\n");
