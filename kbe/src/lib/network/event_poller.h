@@ -27,12 +27,14 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "thread/concurrency.h"
 #include "network/common.h"
 #include <map>
+#include <vector>
 
 namespace KBEngine { 
 namespace Network
 {
 	
 class InputNotificationHandler;
+class Address;
 typedef std::map<int, InputNotificationHandler *> FDReadHandlers;
 typedef std::map<int, OutputNotificationHandler *> FDWriteHandlers;
 
@@ -59,6 +61,30 @@ public:
 	// readiness 后端返回 false；完成模型接入后由具体后端返回 true。
 	// Readiness backends return false; a completion backend returns true after it is integrated.
 	virtual bool supportsCompletion() const;
+
+	// 从完成队列取出一个已经完成的 accept；readiness 后端保持 false，避免改变旧调用链。
+	// Take one completed accept from the completion queue; readiness backends return false to preserve the old call path.
+	virtual bool takeAcceptedSocket(int fd, KBESOCKET& acceptedSocket);
+
+	// 从完成队列取出一段 TCP 数据或终止状态；数据所有权在调用方接收后转移。
+	// Take TCP data or a terminal state from the completion queue; ownership transfers to the caller on success.
+	virtual bool takeTcpReceivedData(int fd, std::vector<char>& data, bool& disconnected, int& errorCode);
+
+	// 从完成队列取出一个 UDP 数据报及其来源地址。
+	// Take one UDP datagram and its source address from the completion queue.
+	virtual bool takeUdpReceivedData(int fd, std::vector<char>& data, Address& srcAddr, int& errorCode);
+
+	// 将 TCP 数据交给完成后端排队；旧后端返回 false，继续使用原有 PacketSender 发送路径。
+	// Queue TCP data in a completion backend; legacy backends return false and keep the original PacketSender path.
+	virtual bool queueTcpSend(int fd, const void* data, int len);
+
+	// 将 UDP 数据报交给完成后端排队；旧后端返回 false，保持原有 UDP 发送语义。
+	// Queue a UDP datagram in a completion backend; legacy backends return false and preserve existing UDP send semantics.
+	virtual bool queueUdpSend(int fd, const void* data, int len, const Address& dstAddr);
+
+	// 查询指定 socket 是否仍有完成后端待发送数据，用于避免重复注册写事件。
+	// Report whether a socket still has pending completion-backend sends to avoid duplicate write registration.
+	virtual bool hasPendingSend(int fd) const;
 
 	void clearSpareTime()		{spareTime_ = 0;}
 	uint64 spareTime() const	{return spareTime_;}

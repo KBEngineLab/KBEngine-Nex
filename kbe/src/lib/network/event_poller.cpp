@@ -177,6 +177,63 @@ bool EventPoller::supportsCompletion() const
 	return false;
 }
 
+// 这些默认实现刻意保持无操作，确保旧 select/epoll 后端在完成模型接入期间可以继续编译和运行。
+// These default implementations are intentionally no-ops so legacy select/epoll backends keep compiling and running while completion support is introduced.
+
+//-------------------------------------------------------------------------------------
+bool EventPoller::takeAcceptedSocket(int fd, KBESOCKET& acceptedSocket)
+{
+	(void)fd;
+	(void)acceptedSocket;
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
+bool EventPoller::takeTcpReceivedData(int fd, std::vector<char>& data, bool& disconnected, int& errorCode)
+{
+	(void)fd;
+	(void)data;
+	disconnected = false;
+	errorCode = 0;
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
+bool EventPoller::takeUdpReceivedData(int fd, std::vector<char>& data, Address& srcAddr, int& errorCode)
+{
+	(void)fd;
+	(void)data;
+	(void)srcAddr;
+	errorCode = 0;
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
+bool EventPoller::queueTcpSend(int fd, const void* data, int len)
+{
+	(void)fd;
+	(void)data;
+	(void)len;
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
+bool EventPoller::queueUdpSend(int fd, const void* data, int len, const Address& dstAddr)
+{
+	(void)fd;
+	(void)data;
+	(void)len;
+	(void)dstAddr;
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
+bool EventPoller::hasPendingSend(int fd) const
+{
+	(void)fd;
+	return false;
+}
+
 //-------------------------------------------------------------------------------------
 const char* EventPoller::defaultIOModelName()
 {
