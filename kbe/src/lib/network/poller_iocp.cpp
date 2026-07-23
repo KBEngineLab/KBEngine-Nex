@@ -457,8 +457,16 @@ bool IocpPoller::doRegisterForRead(int fd)
 		state.acceptExFn = NULL;
 	}
 
-	ensureReadArmed(fd, *iter->second);
-	return true;
+	const bool armed = ensureReadArmed(fd, *iter->second);
+	if (!armed)
+	{
+		// Do not leave a handler registered when the first overlapped operation could not be armed.
+		// 首次异步操作投递失败时不能继续保留 handler，避免上层永久等待一个不会到来的事件。
+		iter->second->registeredRead = false;
+		cleanupStateIfUnused(fd);
+	}
+
+	return armed;
 }
 
 //-------------------------------------------------------------------------------------
