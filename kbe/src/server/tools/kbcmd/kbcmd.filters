@@ -36,6 +36,21 @@
     <ClCompile Include="..\..\..\lib\dependencies\vsopenssl\include\openssl\applink.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="client_sdk.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="client_sdk_csharp.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="client_sdk_cxx.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="client_sdk_gdscript.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="client_sdk_typescript.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="kbcmd.h">
@@ -48,6 +63,21 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="profile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="client_sdk.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="client_sdk_csharp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="client_sdk_cxx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="client_sdk_gdscript.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="client_sdk_typescript.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

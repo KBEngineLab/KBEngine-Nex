@@ -22,6 +22,10 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "client_sdk.h"
 #include "client_sdk_unity.h"	
 #include "client_sdk_ue4.h"
+#include "client_sdk_csharp.h"
+#include "client_sdk_cxx.h"
+#include "client_sdk_typescript.h"
+#include "client_sdk_gdscript.h"
 #include "entitydef/entitydef.h"
 #include "entitydef/scriptdef_module.h"
 #include "entitydef/property.h"
@@ -74,6 +78,22 @@ ClientSDK* ClientSDK::createClientSDK(const std::string& type)
 	else if(lowerType == "ue4")
 	{
 		return new ClientSDKUE4();
+	}
+	else if (lowerType == "csharp")
+	{
+		return new ClientSDKCSharp();
+	}
+	else if (lowerType == "cxx")
+	{
+		return new ClientSDKCXX();
+	}
+	else if (lowerType == "typescript")
+	{
+		return new ClientSDKTypeScript();
+	}
+	else if (lowerType == "gdscript" || lowerType == "godot")
+	{
+		return new ClientSDKGDScript();
 	}
 
 	return NULL;

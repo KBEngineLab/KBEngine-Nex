@@ -1,6 +1,10 @@
 BIN  = kbcmd
 SRCS =					\
 	client_sdk			\
+	client_sdk_csharp	\
+	client_sdk_cxx		\
+	client_sdk_gdscript	\
+	client_sdk_typescript	\
 	client_sdk_unity	\
 	client_sdk_ue4		\
 	server_assets		\

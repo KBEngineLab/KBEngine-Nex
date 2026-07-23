@@ -57,11 +57,22 @@
     <OutDir>../../../../bin/server/</OutDir>
     <IntDir>..\..\..\_objs\$(ProjectName)\$(Configuration)\</IntDir>
   </PropertyGroup>
+  <PropertyGroup Label="Vcpkg">
+    <VcpkgEnableManifest>true</VcpkgEnableManifest>
+    <VcpkgManifestInstall>false</VcpkgManifestInstall>
+  </PropertyGroup>
+  <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <VcpkgConfiguration>Debug</VcpkgConfiguration>
+    <VcpkgUseStatic>true</VcpkgUseStatic>
+  </PropertyGroup>
+  <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <VcpkgUseStatic>true</VcpkgUseStatic>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>../../../lib/python/PC;../../../lib/python/Include;../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies/log4cxx/src/main/include;../../../lib/dependencies/mysql;../../../lib/dependencies;../../../lib/dependencies/fmt/include;../../../lib/dependencies/vsopenssl/include;../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>USE_OPENSSL;ENABLE_WATCHERS;WIN32;_DEBUG;_CONSOLE;CODE_INLINE;KBE_USE_ASSERTS;USE_PYTHON;USE_KBE_MYSQL;LOG4CXX_STATIC;KBE_SERVER;KBE_CMD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>../../../lib/python/PC;../../../lib/python/Include;../../../lib/python/Include/internal;../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies;../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>USE_OPENSSL;ENABLE_WATCHERS;_DEBUG;_CONSOLE;CODE_INLINE;KBE_USE_ASSERTS;USE_PYTHON;USE_KBE_MYSQL;LOG4CXX_STATIC;KBE_SERVER;KBE_CMD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
@@ -71,13 +82,14 @@
       <XMLDocumentationFileName>$(IntDir)</XMLDocumentationFileName>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <AdditionalOptions>/ignore:4049
 /ignore:4217 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>apr-1_d.lib;aprutil-1_d.lib;log4cxx_d.lib;expat_d.lib;jwsmtp_d.lib;openssl_uptable.obj;crypt32.lib;Version.lib;wldap32.lib;netapi32.lib;zlib_d.lib;resmgr_d.lib;entitydef_d.lib;python37_d.lib;server_d.lib;pyscript_d.lib;xml_d.lib;common_d.lib;fmt_d.lib;helper_d.lib;math_d.lib;network_d.lib;libcurl_d.lib;thread_d.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>secur32.lib;jwsmtp_d.lib;crypt32.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr_d.lib;entitydef_d.lib;python37_d.lib;server_d.lib;pyscript_d.lib;xml_d.lib;common_d.lib;helper_d.lib;math_d.lib;network_d.lib;thread_d.lib;ws2_32.lib;Rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
-      <AdditionalLibraryDirectories>../../../libs;../../../lib/dependencies/vld;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>../../../src/vcpkg_installed/x64-windows-static/lib;../../../libs;../../../lib/dependencies/vld;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
@@ -87,8 +99,8 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>../../../lib/python/PC;../../../lib/python/Include;../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies/log4cxx/src/main/include;../../../lib/dependencies/mysql;../../../lib/dependencies;../../../lib/dependencies/fmt/include;../../../lib/dependencies/vsopenssl/include;../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>USE_OPENSSL;ENABLE_WATCHERS;WIN32;NDEBUG;_CONSOLE;CODE_INLINE;KBE_USE_ASSERTS;USE_PYTHON;USE_KBE_MYSQL;LOG4CXX_STATIC;KBE_SERVER;KBE_CMD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>../../../lib/python/PC;../../../lib/python/Include;../../../lib/python/Include/internal;../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies;../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>USE_OPENSSL;ENABLE_WATCHERS;NDEBUG;_CONSOLE;CODE_INLINE;KBE_USE_ASSERTS;USE_PYTHON;USE_KBE_MYSQL;LOG4CXX_STATIC;KBE_SERVER;KBE_CMD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
@@ -98,13 +110,14 @@
       <XMLDocumentationFileName>$(IntDir)</XMLDocumentationFileName>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <AdditionalOptions>/ignore:4049
 /ignore:4217 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>apr-1.lib;aprutil-1.lib;log4cxx.lib;expat.lib;jwsmtp.lib;openssl_uptable.obj;crypt32.lib;Version.lib;wldap32.lib;netapi32.lib;zlib.lib;resmgr.lib;entitydef.lib;python37.lib;server.lib;pyscript.lib;xml.lib;common.lib;fmt.lib;helper.lib;math.lib;network.lib;libcurl.lib;thread.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>secur32.lib;Rpcrt4.lib;jwsmtp.lib;crypt32.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr.lib;entitydef.lib;python37.lib;server.lib;pyscript.lib;xml.lib;common.lib;helper.lib;math.lib;network.lib;thread.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
-      <AdditionalLibraryDirectories>../../../libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>../../../src/vcpkg_installed/x64-windows-static/lib;../../../libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
@@ -112,9 +125,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\lib\dependencies\vsopenssl\include\openssl\applink.c" />
-    <ClCompile Include="..\..\..\lib\python\Modules\getbuildinfo.c" />
     <ClCompile Include="client_sdk.cpp" />
+    <ClCompile Include="client_sdk_csharp.cpp" />
+    <ClCompile Include="client_sdk_cxx.cpp" />
+    <ClCompile Include="client_sdk_gdscript.cpp" />
+    <ClCompile Include="client_sdk_typescript.cpp" />
     <ClCompile Include="client_sdk_ue4.cpp" />
     <ClCompile Include="client_sdk_unity.cpp" />
     <ClCompile Include="kbcmd.cpp" />
@@ -125,6 +140,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="client_sdk.h" />
+    <ClInclude Include="client_sdk_csharp.h" />
+    <ClInclude Include="client_sdk_cxx.h" />
+    <ClInclude Include="client_sdk_gdscript.h" />
+    <ClInclude Include="client_sdk_typescript.h" />
     <ClInclude Include="client_sdk_ue4.h" />
     <ClInclude Include="client_sdk_unity.h" />
     <ClInclude Include="kbcmd.h" />
