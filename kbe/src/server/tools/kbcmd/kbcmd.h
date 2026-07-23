@@ -52,7 +52,7 @@ public:
 	void handleTimeout(TimerHandle handle, void * arg);
 	void handleMainTick();
 
-	/* ��ʼ����ؽӿ� */
+	/* 初始化相关接口 */
 	bool initializeBegin();
 	bool inInitialize();
 	bool initializeEnd();

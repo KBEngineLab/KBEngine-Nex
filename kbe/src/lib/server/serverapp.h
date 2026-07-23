@@ -123,8 +123,8 @@ public:
 	virtual void onShutdown(bool first);
 	virtual void onShutdownEnd();
 
-	/** ����ӿ�
-		����鿴watcher
+	/** 网络接口
+		请求查看watcher
 	*/
 	void queryWatcher(Network::Channel* pChannel, MemoryStream& s);
 
@@ -133,9 +133,9 @@ public:
 	COMPONENT_ORDER globalOrder() const { return startGlobalOrder_; }
 	COMPONENT_ORDER groupOrder() const { return startGroupOrder_; }
 
-	/** ����ӿ�
-		ע��һ���¼����baseapp����cellapp����dbmgr
-		ͨ����һ���µ�app�������ˣ� ����Ҫ��ĳЩ���ע���Լ���
+	/** 网络接口
+		注册一个新激活的baseapp或者cellapp或者dbmgr
+		通常是一个新的app被启动了， 它需要向某些组件注册自己。
 	*/
 	virtual void onRegisterNewApp(Network::Channel* pChannel, 
 							int32 uid, 
@@ -143,39 +143,39 @@ public:
 							COMPONENT_TYPE componentType, COMPONENT_ID componentID, COMPONENT_ORDER globalorderID, COMPONENT_ORDER grouporderID,
 							uint32 intaddr, uint16 intport, uint32 extaddr, uint16 extport, std::string& extaddrEx);
 
-	/** ����ӿ�
-		ĳ��app��app��֪���ڻ״̬��
+	/** 网络接口
+		某个app向本app告知处于活动状态。
 	*/
 	void onAppActiveTick(Network::Channel* pChannel, COMPONENT_TYPE componentType, COMPONENT_ID componentID);
 	
-	/** ����ӿ�
-		����Ͽ�������������
+	/** 网络接口
+		请求断开服务器的连接
 	*/
 	virtual void reqClose(Network::Channel* pChannel);
 
-	/** ����ӿ�
-		ĳ��app����鿴��app
+	/** 网络接口
+		某个app请求查看该app
 	*/
 	virtual void lookApp(Network::Channel* pChannel);
 
-	/** ����ӿ�
-		����رշ�����
+	/** 网络接口
+		请求关闭服务器
 	*/
 	virtual void reqCloseServer(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ����ӿ�
-		ĳ��app����鿴��app����״̬�� ͨ����console����鿴
+	/** 网络接口
+		某个app请求查看该app负载状态， 通常是console请求查看
 	*/
 	virtual void queryLoad(Network::Channel* pChannel);
 
-	/** ����ӿ�
-		����رշ�����
+	/** 网络接口
+		请求关闭服务器
 	*/
 	void reqKillServer(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ����ӿ�
-		�ͻ��������˵�һ�ν�������, �ͻ��˷����Լ��İ汾����ͨѶ��Կ����Ϣ
-		������ˣ� ����˷����Ƿ����ֳɹ�
+	/** 网络接口
+		客户端与服务端第一次建立交互, 客户端发送自己的版本号与通讯密钥等信息
+		给服务端， 服务端返回是否握手成功
 	*/
 	virtual void hello(Network::Channel* pChannel, MemoryStream& s);
 	virtual void onHello(Network::Channel* pChannel, 
@@ -183,36 +183,36 @@ public:
 		const std::string& scriptVerInfo, 
 		const std::string& encryptedKey);
 
-	// ����汾��ƥ��
+	// 引擎版本不匹配
 	virtual void onVersionNotMatch(Network::Channel* pChannel);
 
-	// ����ű���汾��ƥ��
+	// 引擎脚本层版本不匹配
 	virtual void onScriptVersionNotMatch(Network::Channel* pChannel);
 
-	/** ����ӿ�
-		console����ʼprofile
+	/** 网络接口
+		console请求开始profile
 	*/
 	void startProfile(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 	virtual void startProfile_(Network::Channel* pChannel, std::string profileName, int8 profileType, uint32 timelen);
 		
 protected:
 	COMPONENT_TYPE											componentType_;
-	COMPONENT_ID											componentID_;									// �������ID
+	COMPONENT_ID											componentID_;									// 本组件的ID
 
 	Network::EventDispatcher& 								dispatcher_;	
 	Network::NetworkInterface&								networkInterface_;
 	
 	Timers													timers_;
 
-	// app����˳�� globalΪȫ��(��dbmgr��cellapp��˳��)����˳�� 
-	// groupΪ������˳��(��:����baseappΪһ��)
+	// app启动顺序， global为全局(如dbmgr，cellapp的顺序)启动顺序， 
+	// group为组启动顺序(如:所有baseapp为一组)
 	COMPONENT_ORDER											startGlobalOrder_;
 	COMPONENT_ORDER											startGroupOrder_;
 
 	Shutdowner*												pShutdowner_;
 	ComponentActiveReportHandler*							pActiveTimerHandle_;
 
-	// �̳߳�
+	// 线程池
 	thread::ThreadPool										threadPool_;	
 };
 

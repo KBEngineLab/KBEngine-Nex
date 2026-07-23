@@ -32,7 +32,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine
 {
 
-// ���ĳ��entity�ĺ�����ַ
+// 获得某个entity的函数地址
 EntityCall::GetEntityFunc EntityCall::__getEntityFunc;
 EntityCall::FindChannelFunc EntityCall::__findChannelFunc;
 EntityCall::EntityCallCallHookFunc*	EntityCall::__hookCallFuncPtr = NULL;
@@ -78,7 +78,7 @@ EntityCall::~EntityCall()
 	KBE_ASSERT(atIdx_ < EntityCall::entityCalls.size());
 	KBE_ASSERT(EntityCall::entityCalls[ atIdx_ ] == this);
 
-	// �����2�������ϵ�EntityCall�����һ��EntityCall����ɾ�������EntityCall����λ��
+	// 如果有2个或以上的EntityCall则将最后一个EntityCall移至删除的这个EntityCall所在位置
 	EntityCall* pBack = EntityCall::entityCalls.back();
 	pBack->_setATIdx(atIdx_);
 	EntityCall::entityCalls[atIdx_] = pBack;
@@ -144,7 +144,7 @@ PyObject* EntityCall::onScriptGetAttribute(PyObject* attr)
 		return createRemoteMethod(pMethodDescription);
 	}
 
-	// ����Ҫ�����Ʋ���Ϊ�Լ�  ���磺������һ��cell�� ����ʹ��cell.cell
+	// 首先要求名称不能为自己  比如：自身是一个cell， 不能使用cell.cell
 	if(strcmp(ccattr, ENTITYCALL_TYPE_TO_NAME_TABLE[type_]) != 0)
 	{
 		int8 mbtype = -1;

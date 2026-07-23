@@ -38,10 +38,10 @@ namespace KBEngine{
 #define OBJECT_POOL_INIT_SIZE			16
 #define OBJECT_POOL_INIT_MAX_SIZE		OBJECT_POOL_INIT_SIZE * 1024
 
-// ÿ5���Ӽ��һ������
+// 每5分钟检查一次瘦身
 #define OBJECT_POOL_REDUCING_TIME_OUT	300 * stampsPerSecondD()
 
-// ׷�ٶ�����䴦
+// 追踪对象分配处
 #define OBJECTPOOL_POINT fmt::format("{}#{}", __FUNCTION__, __LINE__).c_str() 
 
 template< typename T >
@@ -60,9 +60,9 @@ public:
 };
 
 /*
-	һЩ�����ǳ�Ƶ���ı������� ���磺MemoryStream, Bundle, TCPPacket�ȵ�
-	�������ض�ͨ������˷�ֵ��Ч��Ԥ����ǰ������һЩ���󻺴����������õ���ʱ��ֱ�ӴӶ������
-	��ȡһ��δ��ʹ�õĶ��󼴿ɡ�
+	一些对象会非常频繁的被创建， 例如：MemoryStream, Bundle, TCPPacket等等
+	这个对象池对通过服务端峰值有效的预估提前创建出一些对象缓存起来，在用到的时候直接从对象池中
+	获取一个未被使用的对象即可。
 */
 template< typename T, typename THREADMUTEX = KBEngine::thread::ThreadMutexNull >
 class ObjectPool
@@ -152,8 +152,8 @@ public:
 	}
 
 	/** 
-		����һ������ ����������Ѿ������򷵻����еģ�����
-		����һ���µġ�
+		创建一个对象。 如果缓冲里已经创建则返回现有的，否则
+		创建一个新的。
 	*/
 	T* createObject(const std::string& logPoint)
 	{
@@ -183,7 +183,7 @@ public:
 	}
 
 	/**
-		����һ������
+		回收一个对象
 	*/
 	void reclaimObject(T* obj)
 	{
@@ -193,7 +193,7 @@ public:
 	}
 
 	/**
-		����һ����������
+		回收一个对象容器
 	*/
 	void reclaimObject(std::list<T*>& objs)
 	{
@@ -211,7 +211,7 @@ public:
 	}
 
 	/**
-		����һ����������
+		回收一个对象容器
 	*/
 	void reclaimObject(std::vector< T* >& objs)
 	{
@@ -229,7 +229,7 @@ public:
 	}
 
 	/**
-		����һ����������
+		回收一个对象容器
 	*/
 	void reclaimObject(std::queue<T*>& objs)
 	{
@@ -282,7 +282,7 @@ public:
 
 protected:
 	/**
-		����һ������
+		回收一个对象
 	*/
 	void reclaimObject_(T* obj)
 	{
@@ -290,7 +290,7 @@ protected:
 		{
 			decLogPoint(obj->poolObjectCreatePoint());
 
-			// ������״̬
+			// 先重置状态
 			obj->onReclaimObject();
 			obj->isEnabledPoolObject(false);
 			obj->poolObjectCreatePoint("");
@@ -311,12 +311,12 @@ protected:
 
 		if (obj_count_ <= OBJECT_POOL_INIT_SIZE)
 		{
-			// С�ڵ�����ˢ�¼��ʱ��
+			// 小于等于则刷新检查时间
 			lastReducingCheckTime_ = now_timestamp;
 		}
 		else if (now_timestamp - lastReducingCheckTime_ > OBJECT_POOL_REDUCING_TIME_OUT)
 		{
-			// ��ʱ�����OBJECT_POOL_INIT_SIZEδʹ�õĶ�����ʼ����������
+			// 长时间大于OBJECT_POOL_INIT_SIZE未使用的对象则开始做清理工作
 			size_t reducing = std::min(objects_.size(), std::min((size_t)OBJECT_POOL_INIT_SIZE, (size_t)(obj_count_ - OBJECT_POOL_INIT_SIZE)));
 			
 			//printf("ObjectPool::reclaimObject_(): start reducing..., name=%s, currsize=%d, OBJECT_POOL_INIT_SIZE=%d\n", 
@@ -345,28 +345,28 @@ protected:
 
 	bool isDestroyed_;
 
-	// һЩԭ�����������б�Ҫ��
-	// ���磺dbmgr�����߳������log��cellapp�м���navmesh����̻߳ص����µ�log���
+	// 一些原因导致锁还是有必要的
+	// 例如：dbmgr任务线程中输出log，cellapp中加载navmesh后的线程回调导致的log输出
 	THREADMUTEX* pMutex_;
 
 	std::string name_;
 
 	size_t total_allocs_;
 
-	// Linux�����У�list.size()ʹ�õ���std::distance(begin(), end())��ʽ�����
-	// ���������Ӱ�죬���������Լ���size��һ����¼
+	// Linux环境中，list.size()使用的是std::distance(begin(), end())方式来获得
+	// 会对性能有影响，这里我们自己对size做一个记录
 	size_t obj_count_;
 
-	// ���һ���������ʱ��
-	// �������OBJECT_POOL_REDUCING_TIME_OUT����OBJECT_POOL_INIT_SIZE�����������OBJECT_POOL_INIT_SIZE��
+	// 最后一次瘦身检查时间
+	// 如果长达OBJECT_POOL_REDUCING_TIME_OUT大于OBJECT_POOL_INIT_SIZE，则最多瘦身OBJECT_POOL_INIT_SIZE个
 	uint64 lastReducingCheckTime_;
 
-	// ��¼�Ĵ���λ����Ϣ������׷��й¶��
+	// 记录的创建位置信息，用于追踪泄露点
 	std::map<std::string, ObjectPoolLogPoint> logPoints_;
 };
 
 /*
-	�ض��� ����ʹ�óصĶ������ʵ�ֻ��չ��ܡ�
+	池对象， 所有使用池的对象必须实现回收功能。
 */
 class PoolObject
 {
@@ -388,8 +388,8 @@ public:
 	}
 
 	/**
-		�ض�������ǰ��֪ͨ
-		ĳЩ��������ڴ���һЩ����
+		池对象被析构前的通知
+		某些对象可以在此做一些工作
 	*/
 	virtual bool destructorPoolObject()
 	{
@@ -418,10 +418,10 @@ public:
 
 protected:
 
-	// �ض����Ƿ��ڼ���ӳ����Ѿ�ȡ����״̬
+	// 池对象是否处于激活（从池中已经取出）状态
 	bool isEnabledPoolObject_;
 
-	// ��¼���󴴽���λ��
+	// 记录对象创建的位置
 	std::string poolObjectCreatePoint_;
 };
 

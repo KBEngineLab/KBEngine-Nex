@@ -101,7 +101,7 @@ INLINE void EndPoint::setFileDescriptor(int fd)
 INLINE void EndPoint::setFileDescriptor(KBESOCKET fd)
 {
 	// Preserve the complete native socket value when accepting IOCP results.
-	// ���� IOCP ���ʱ����������ԭ�� socket ֵ��
+	// 接收 IOCP 结果时保留完整的原生 socket 值。
 	socket_ = fd;
 }
 #endif

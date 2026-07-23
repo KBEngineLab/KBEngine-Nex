@@ -19,10 +19,10 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 /*
-	�ֽ��򽻻�����ģ�飺
-		 ��������ͨ��һ�����BIG�ֽ���\Ҳ���������ֽ���.
- 		 ����ʹ�õ�PC������Ƕ��ʽϵͳ����ʹ��BIG�ֽ���Ҳ����ʹ��LITTEN(С�ֽ���)
- 		 �������Ǳ����ڴ�֮����һ���ֽ����ת����
+	字节序交换处理模块：
+		 由于网络通信一般采用BIG字节序\也叫做网络字节序.
+ 		 我们使用的PC机或者嵌入式系统可能使用BIG字节序也可能使用LITTEN(小字节序)
+ 		 所以我们必须在此之间做一个字节序的转换。
 */
 #ifndef KBE_MEMORYSTREAMCONVERTER_H
 #define KBE_MEMORYSTREAMCONVERTER_H
@@ -58,7 +58,7 @@ namespace MemoryStreamConverter
 	}
 }
 
-#if KBENGINE_ENDIAN == KBENGINE_BIG_ENDIAN			// ����ʹ��sys.isPlatformLittleEndian() ���в���
+#if KBENGINE_ENDIAN == KBENGINE_BIG_ENDIAN			// 可以使用sys.isPlatformLittleEndian() 进行测试
 template<typename T> inline void EndianConvert(T& val) { MemoryStreamConverter::apply<T>(&val); }
 template<typename T> inline void EndianConvertReverse(T&) { }
 #else

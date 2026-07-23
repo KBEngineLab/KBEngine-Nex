@@ -41,7 +41,7 @@ class MethodDescription;
 
 class RemoteEntityMethod : public script::ScriptObject
 {
-	/** ���໯ ��һЩpy�������������� */
+	/** 子类化 将一些py操作填充进派生类 */
 	INSTANCE_SCRIPT_HREADER(RemoteEntityMethod, script::ScriptObject)	
 		
 public:	
@@ -66,8 +66,8 @@ public:
 	}
 	
 protected:	
-	MethodDescription*		methodDescription_;					// �������������
-	EntityCallAbstract*		pEntityCall_;						// �������������entitycall
+	MethodDescription*		methodDescription_;					// 这个方法的描述
+	EntityCallAbstract*		pEntityCall_;						// 这个方法所属的entitycall
 };
 }
 

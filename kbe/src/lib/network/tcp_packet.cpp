@@ -102,7 +102,7 @@ int TCPPacket::recvFromEndPoint(EndPoint & ep, Address* pAddr)
 	{
 		wpos((int)(wpos() + len));
 
-		// ע��:�����ڴ���0��ʱ�����DEBUG_MSG���ᵼ��WSAGetLastError����0�Ӷ�������ѭ��
+		// 注意:必须在大于0的时候否则DEBUG_MSG将会导致WSAGetLastError返回0从而陷入死循环
 		// DEBUG_MSG(fmt::format("TCPPacket::recvFromEndPoint: datasize={}, wpos={}.\n", len, wpos()));
 	}
 

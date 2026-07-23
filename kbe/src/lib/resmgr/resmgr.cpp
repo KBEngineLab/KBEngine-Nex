@@ -117,7 +117,7 @@ void Resmgr::updatePaths()
 	char splitFlag = ';';
 	strutil::kbe_split<char>(tbuf, splitFlag, respaths_);
 
-	// windows�û����ָܷ�ð�ţ� ���ܻ���̷����ָ���
+	// windows用户不能分割冒号， 可能会把盘符给分割了
 #if KBE_PLATFORM != PLATFORM_WIN32
 	if(respaths_.size() < 2)
 	{
@@ -154,7 +154,7 @@ bool Resmgr::initialize()
 	//if(isInit())
 	//	return true;
 
-	// ��ȡ���滷������
+	// 获取引擎环境配置
 	kb_env_.root_path		= getenv("KBE_ROOT") == NULL ? "" : getenv("KBE_ROOT");
 	kb_env_.res_path		= getenv("KBE_RES_PATH") == NULL ? "" : getenv("KBE_RES_PATH"); 
 	kb_env_.bin_path		= getenv("KBE_BIN_PATH") == NULL ? "" : getenv("KBE_BIN_PATH"); 

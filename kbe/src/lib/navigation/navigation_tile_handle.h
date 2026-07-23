@@ -41,13 +41,13 @@ public:
 
 	enum TILE_STATE
 	{
-		TILE_STATE_OPENED_COST0 = 0,	// ��״̬, ����ͨ��
-		TILE_STATE_OPENED_COST1 = 1,	// ��״̬, ����ͨ��
-		TILE_STATE_OPENED_COST2 = 2,	// ��״̬, ����ͨ��
-		TILE_STATE_OPENED_COST3 = 3,	// ��״̬, ����ͨ��
-		TILE_STATE_OPENED_COST4 = 4,	// ��״̬, ����ͨ��
-		TILE_STATE_OPENED_COST5 = 5,	// ��״̬, ����ͨ��
-		TILE_STATE_CLOSED = 9			// �ر�״̬
+		TILE_STATE_OPENED_COST0 = 0,	// 打开状态, 允许通过
+		TILE_STATE_OPENED_COST1 = 1,	// 打开状态, 允许通过
+		TILE_STATE_OPENED_COST2 = 2,	// 打开状态, 允许通过
+		TILE_STATE_OPENED_COST3 = 3,	// 打开状态, 允许通过
+		TILE_STATE_OPENED_COST4 = 4,	// 打开状态, 允许通过
+		TILE_STATE_OPENED_COST5 = 5,	// 打开状态, 允许通过
+		TILE_STATE_CLOSED = 9			// 关闭状态
 	};
 
 	class MapSearchNode

@@ -45,7 +45,7 @@ bool WebSocketProtocol::isWebSocketProtocol(MemoryStream* s)
 {
 	KBE_ASSERT(s != NULL);
 
-	// �ַ������Ͻ��������ٳ�����Ҫ����2�����򷵻�����MemoryStream�����쳣
+	// 字符串加上结束符至少长度需要大于2，否则返回以免MemoryStream产生异常
 	if(s->length() < 2)
 		return false;
 
@@ -86,7 +86,7 @@ bool WebSocketProtocol::handshake(Network::Channel* pChannel, MemoryStream* s)
 {
 	KBE_ASSERT(s != NULL);
 	
-	// �ַ������Ͻ��������ٳ�����Ҫ����2�����򷵻�����MemoryStream�����쳣
+	// 字符串加上结束符至少长度需要大于2，否则返回以免MemoryStream产生异常
 	if(s->length() < 2)
 		return false;
 	
@@ -134,7 +134,7 @@ bool WebSocketProtocol::handshake(Network::Channel* pChannel, MemoryStream* s)
 		findIter = headers.find("Origin");
 		if(findIter == headers.end())
 		{
-			//��Щapp���ͻ��˿���û������ֶ�
+			//有些app级客户端可能没有这个字段
 			//s->rpos(rpos);
 			//s->wpos(wpos);
 			//return false;
@@ -203,7 +203,7 @@ int WebSocketProtocol::makeFrame(WebSocketProtocol::FrameType frame_type,
 {
 	uint64 size = pInPacket->length(); 
 
-	// д��frame����
+	// 写入frame类型
 	(*pOutPacket) << ((uint8)frame_type); 
 
 	if(size <= 125)
@@ -255,7 +255,7 @@ int WebSocketProtocol::getFrame(Packet * pPacket, uint8& msg_opcode, uint8& msg_
 		+---------------------------------------------------------------+
 	*/
 
-	// ����3�ֽڣ���Ҫ�����ȴ�
+	// 不足3字节，需要继续等待
 	int remainSize = 3 - pPacket->length();
 	if(remainSize > 0) 
 	{
@@ -263,31 +263,31 @@ int WebSocketProtocol::getFrame(Packet * pPacket, uint8& msg_opcode, uint8& msg_
 		return remainSize;
 	}
 	
-	// ��һ���ֽ�, ���λ����������Ϣ�Ƿ����, ���4λ����������Ϣ����
+	// 第一个字节, 最高位用于描述消息是否结束, 最低4位用于描述消息类型
 	uint8 bytedata;
 	(*pPacket) >> bytedata;
 
 	msg_opcode = bytedata & 0x0F;
 	msg_fin = (bytedata >> 7) & 0x01;
 
-	// �ڶ����ֽ�, ��Ϣ�ĵڶ����ֽ���Ҫ���������������Ϣ����, ���λ��0��1�������Ƿ������봦��
+	// 第二个字节, 消息的第二个字节主要用于描述掩码和消息长度, 最高位用0或1来描述是否有掩码处理
 	(*pPacket) >> bytedata;
 	msg_masked = (bytedata >> 7) & 0x01;
 
-	// ��Ϣ����
+	// 消息解码
 	msg_length_field = bytedata & (~0x80);
 
-	// ʣ�µĺ���7λ����������Ϣ����, ����7λ���ֻ������127�������ֵ������������
-	// һ������Ϣ��������126�洢��Ϣ����, �����Ϣ��������UINT16�������ֵΪ126
-	// ����Ϣ���ȴ���UINT16������´�ֵΪ127;
-	// �������������Ϣ���ȴ洢����������byte[], �ֱ���UINT16(2λbyte)��UINT64(4λbyte)
+	// 剩下的后面7位用来描述消息长度, 由于7位最多只能描述127所以这个值会代表三种情况
+	// 一种是消息内容少于126存储消息长度, 如果消息长度少于UINT16的情况此值为126
+	// 当消息长度大于UINT16的情况下此值为127;
+	// 这两种情况的消息长度存储到紧随后面的byte[], 分别是UINT16(2位byte)和UINT64(4位byte)
 	if(msg_length_field <= 125) 
 	{
 		msg_payload_length = msg_length_field;
 	}
 	else if(msg_length_field == 126) 
 	{ 
-		// ����2�ֽڣ���Ҫ�����ȴ�
+		// 不足2字节，需要继续等待
 		remainSize = 2 - pPacket->length();
 		if(remainSize > 0) 
 		{
@@ -301,7 +301,7 @@ int WebSocketProtocol::getFrame(Packet * pPacket, uint8& msg_opcode, uint8& msg_
 	}
 	else if(msg_length_field == 127) 
 	{
-		// ����8�ֽڣ���Ҫ�����ȴ�
+		// 不足8字节，需要继续等待
 		remainSize = 8 - pPacket->length();
 		if(remainSize > 0) 
 		{
@@ -324,18 +324,18 @@ int WebSocketProtocol::getFrame(Packet * pPacket, uint8& msg_opcode, uint8& msg_
 		pPacket->read_skip(8);
 	}
 
-	// ����ɶ����Ȳ���
-	/* ���ﲻ����飬ֻ����Э��ͷ
+	// 缓冲可读长度不够
+	/* 这里不做检查，只解析协议头
 	if(pPacket->length() < (size_t)msg_payload_length) {
 		frameType = INCOMPLETE_FRAME;
 		return (size_t)msg_payload_length - pPacket->length();
 	}
 	*/
 
-	// ����������������»�ȡ4�ֽ�����ֵ
+	// 如果存在掩码的情况下获取4字节掩码值
 	if(msg_masked) 
 	{
-		// ����4�ֽڣ���Ҫ�����ȴ�
+		// 不足4字节，需要继续等待
 		remainSize = 4 - pPacket->length();
 		if(remainSize > 0) 
 		{
@@ -369,7 +369,7 @@ int WebSocketProtocol::getFrame(Packet * pPacket, uint8& msg_opcode, uint8& msg_
 //-------------------------------------------------------------------------------------
 bool WebSocketProtocol::decodingDatas(Packet* pPacket, uint8 msg_masked, uint32 msg_mask)
 {
-	// ��������
+	// 解码内容
 	if(msg_masked) 
 	{
 		uint8* c = pPacket->data() + pPacket->rpos();

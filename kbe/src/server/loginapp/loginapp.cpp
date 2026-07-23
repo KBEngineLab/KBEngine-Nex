@@ -75,7 +75,7 @@ void Loginapp::onShutdownBegin()
 {
 	PythonApp::onShutdownBegin();
 	
-	// ֪ͨ�ű�
+	// 通知脚本
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	SCRIPT_OBJECT_CALL_ARGS0(getEntryScript().get(), const_cast<char*>("onLoginAppShutDown"), false);
 }
@@ -119,12 +119,12 @@ void Loginapp::handleMainTick()
 //-------------------------------------------------------------------------------------
 void Loginapp::onChannelDeregister(Network::Channel * pChannel)
 {
-	// ������ⲿͨ������
+	// 如果是外部通道则处理
 	if(!pChannel->isInternal())
 	{
 		const std::string& extra = pChannel->extra();
 
-		// ֪ͨdbmgr�Ӷ���������������� ����ӵ��
+		// 通知dbmgr从队列中清除他的请求， 避免拥塞
 		if(extra.size() > 0)
 		{
 			Components::COMPONENTS& cts = Components::getSingleton().getComponents(DBMGR_TYPE);
@@ -143,7 +143,7 @@ void Loginapp::onChannelDeregister(Network::Channel * pChannel)
 				(*pBundle) << extra;
 				dbmgrinfos->pChannel->send(pBundle);
 
-                // �������ɽű�����
+                // 把请求交由脚本处理
                 SCOPED_PROFILE(SCRIPTCALL_PROFILE);
                 PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
                                                     const_cast<char*>("onLoseLogin"), 
@@ -182,13 +182,13 @@ bool Loginapp::initializeEnd()
 {
 	PythonApp::initializeEnd();
 
-	// ����һ��timer�� ÿ����һЩ״̬
+	// 添加一个timer， 每秒检查一些状态
 	mainProcessTimer_ = this->dispatcher().addTimer(1000000 / 50, this,
 							reinterpret_cast<void *>(TIMEOUT_TICK));
 
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-	// ���нű����������
+	// 所有脚本都加载完毕
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
 										const_cast<char*>("onLoginAppReady"), 
 										const_cast<char*>(""));
@@ -279,7 +279,7 @@ void Loginapp::onDbmgrInitCompleted(Network::Channel* pChannel, COMPONENT_ORDER 
 	g_componentGroupOrder = startGroupOrder;
 	digest_ = digest;
 
-	// �ٴ�ͬ���Լ�������Ϣ(startGlobalOrder, startGroupOrder��)��machine
+	// 再次同步自己的新信息(startGlobalOrder, startGroupOrder等)到machine
 	Components::getSingleton().broadcastSelf();
 
 	if(startGroupOrder_ == 1)
@@ -379,7 +379,7 @@ bool Loginapp::_createAccount(Network::Channel* pChannel, std::string& accountNa
 	}
 	
 	{
-		// �������ɽű�����
+		// 把请求交由脚本处理
 		SERVER_ERROR_CODE retcode = SERVER_SUCCESS;
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
@@ -603,7 +603,7 @@ void Loginapp::onReqCreateAccountResult(Network::Channel* pChannel, MemoryStream
 	s >> failedcode >> accountName >> password;
 	s.readBlob(retdatas);
 
-	// �������ɽű�����
+	// 把请求交由脚本处理
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
 										const_cast<char*>("onCreateAccountCallbackFromDB"), 
@@ -903,17 +903,17 @@ void Loginapp::login(Network::Channel* pChannel, MemoryStream& s)
 	std::string datas;
 	bool forceInternalLogin = false;
 
-	// ǰ�����
+	// 前端类别
 	s >> tctype;
 	ctype = static_cast<COMPONENT_CLIENT_TYPE>(tctype);
 	
-	// ��������
+	// 附带数据
 	s.readBlob(datas);
 
-	// �ʺŵ�¼��
+	// 帐号登录名
 	s >> loginName;
 
-	// ����
+	// 密码
 	s >> password;
 
 	loginName = KBEngine::strutil::kbe_trim(loginName);
@@ -955,7 +955,7 @@ void Loginapp::login(Network::Channel* pChannel, MemoryStream& s)
 		return;
 	}
 
-	// ���ȱ���baseappmgr��dbmgr���Ѿ�׼������ˡ�
+	// 首先必须baseappmgr和dbmgr都已经准备完毕了。
 	Components::ComponentInfos* baseappmgrinfos = Components::getSingleton().getBaseappmgr();
 	if(baseappmgrinfos == NULL || baseappmgrinfos->pChannel == NULL || baseappmgrinfos->cid == 0)
 	{
@@ -1000,8 +1000,8 @@ void Loginapp::login(Network::Channel* pChannel, MemoryStream& s)
 		}
 	}
 
-	// ����ǻ����˵�½�����������ǿ��ʹ���ڲ���ַ��½����Ҫ��ȡ�����־
-	// ��ϸ�������ļ��е�forceInternalLogin
+	// 如果是机器人登陆，如果设置了强制使用内部地址登陆则需要读取这个标志
+	// 详细看配置文件中的forceInternalLogin
 	if (ctype == CLIENT_TYPE_BOTS)
 	{
 		if (s.length() > 0)
@@ -1026,7 +1026,7 @@ void Loginapp::login(Network::Channel* pChannel, MemoryStream& s)
 		return;
 	}
 	
-	// �������ɽű�����
+	// 把请求交由脚本处理
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
 										const_cast<char*>("onRequestLogin"), 
@@ -1126,7 +1126,7 @@ void Loginapp::login(Network::Channel* pChannel, MemoryStream& s)
 
 	pChannel->extra(loginName);
 
-	// ��dbmgr��ѯ�û��Ϸ���
+	// 向dbmgr查询用户合法性
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(DbmgrInterface::onAccountLogin);
 	(*pBundle) << loginName << password;
@@ -1197,11 +1197,11 @@ void Loginapp::onLoginAccountQueryResultFromDbmgr(Network::Channel* pChannel, Me
 
 	s >> retcode;
 
-	// ��¼���ȵ�¼ʱ�ͻ�����������ƣ� �˺�������dbmgr��ѯ�õ�������
-	// �����������һ���˺Ŷ�����ϵͳ���߶���������˺�ϵͳ���������
-	// accountNameΪ����Ϸ�������˺����󶨵���������
-	// �ͻ��˵õ�baseapp��ַ��ͬʱҲ�᷵������˺�����
-	// �ͻ��˵�½baseappӦ��ʹ������˺����Ƶ�½
+	// 登录名既登录时客户端输入的名称， 账号名则是dbmgr查询得到的名称
+	// 这个机制用于一个账号多名称系统或者多个第三方账号系统登入服务器
+	// accountName为本游戏服务器账号所绑定的终身名称
+	// 客户端得到baseapp地址的同时也会返回这个账号名称
+	// 客户端登陆baseapp应该使用这个账号名称登陆
 	s >> loginName;
 	s >> accountName;
 
@@ -1244,7 +1244,7 @@ void Loginapp::onLoginAccountQueryResultFromDbmgr(Network::Channel* pChannel, Me
 		return;
 	}
 
-	// �������ɽű�����
+	// 把请求交由脚本处理
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
 										const_cast<char*>("onLoginCallbackFromDB"), 
@@ -1275,7 +1275,7 @@ void Loginapp::onLoginAccountQueryResultFromDbmgr(Network::Channel* pChannel, Me
 		return;
 	}
 
-	// ���baseappmgr��ַ��
+	// 获得baseappmgr地址。
 	Components::COMPONENTS& cts = Components::getSingleton().getComponents(BASEAPPMGR_TYPE);
 	Components::ComponentInfos* baseappmgrinfos = NULL;
 	if(cts.size() > 0)
@@ -1287,7 +1287,7 @@ void Loginapp::onLoginAccountQueryResultFromDbmgr(Network::Channel* pChannel, Me
 		return;
 	}
 
-	// �������0��˵����ǰ�˺���Ȼ�����ĳ��baseapp��
+	// 如果大于0则说明当前账号仍然存活于某个baseapp上
 	if(componentID > 0)
 	{
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
@@ -1299,7 +1299,7 @@ void Loginapp::onLoginAccountQueryResultFromDbmgr(Network::Channel* pChannel, Me
 	}
 	else
 	{
-		// ע�ᵽbaseapp���һ�ȡbaseapp�ĵ�ַ
+		// 注册到baseapp并且获取baseapp的地址
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(BaseappmgrInterface::registerPendingAccountToBaseapp);
 
@@ -1338,7 +1338,7 @@ void Loginapp::onLoginAccountQueryBaseappAddrFromBaseappmgr(Network::Channel* pC
 	DEBUG_MSG(fmt::format("Loginapp::onLoginAccountQueryBaseappAddrFromBaseappmgr:accountName={0}, addr={1}.\n", 
 		loginName, address.c_str()));
 
-	// ������Բ���ɾ���� ��Ȼʹ�䱣��һ��ʱ�����ͬһʱ��ͬʱ��¼�������Ӱ��
+	// 这里可以不做删除， 仍然使其保留一段时间避免同一时刻同时登录造成意外影响
 	PendingLoginMgr::PLInfos* infos = pendingLoginMgr_.remove(loginName);
 	if(infos == NULL)
 		return;
@@ -1384,8 +1384,8 @@ void Loginapp::onHello(Network::Channel* pChannel,
 	(*pBundle) << digest_;
 	(*pBundle) << g_componentType;
 
-	// ����Ϣ���������ܣ������趨�Ѽ��ܺ����ٴμ��ܣ�����һ��send��Ϣ���������������ǽ���epoll֪ͨʱ��������������һ�����ڲ��ԣ����滷��������֣�
-	// webЭ�����Ҫ���ܣ����Բ�������Ϊtrue
+	// 此消息不允许加密，所以设定已加密忽略再次加密，当第一次send消息不是立即发生而是交由epoll通知时会出现这种情况（一般用于测试，正规环境不会出现）
+	// web协议必须要加密，所以不能设置为true
 	if (pChannel->type() != KBEngine::Network::Channel::CHANNEL_WEB)
 		pBundle->pCurrPacket()->encrypted(true);
 
@@ -1395,7 +1395,7 @@ void Loginapp::onHello(Network::Channel* pChannel,
 	{
 		if(encryptedKey.size() > 3)
 		{
-			// �滻Ϊһ�����ܵĹ�����
+			// 替换为一个加密的过滤器
 			pChannel->pFilter(Network::createEncryptionFilter(Network::g_channelExternalEncryptType, encryptedKey));
 		}
 		else
@@ -1541,7 +1541,7 @@ void Loginapp::importServerErrorsDescr(Network::Channel* pChannel)
 			rootNode = xml->getRootNode();
 			if (rootNode == NULL)
 			{
-				// root�ڵ���û���ӽڵ���
+				// root节点下没有子节点了
 				return;
 			}
 
@@ -1602,7 +1602,7 @@ void Loginapp::importServerErrorsDescr(Network::Channel* pChannel)
 //-------------------------------------------------------------------------------------
 void Loginapp::importClientSDK(Network::Channel* pChannel, MemoryStream& s)
 {
-	// ��ֹ���ϱ��������
+	// 防止线上被恶意调用
 	static uint8 getcount = 0;
 	if(++getcount == 0)
 	{
@@ -1616,7 +1616,7 @@ void Loginapp::importClientSDK(Network::Channel* pChannel, MemoryStream& s)
 	int clientWindowSize = 0;
 	s >> clientWindowSize;
 
-	// ���ip�����ڿգ� ��ô�½�һ��tcp���ӷ������ݣ�����ԭ·����
+	// 如果ip不等于空， 那么新建一个tcp连接返回数据，否则原路返回
 	std::string callbackIP = "";
 	s >> callbackIP;
 

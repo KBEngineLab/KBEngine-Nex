@@ -62,7 +62,7 @@ bool Controllers::add(KBEShared_ptr<Controller> pController)
 	}
 	else
 	{
-		// ˢ��id������
+		// 刷新id计数器
 		if(lastid_ < id)
 			lastid_ = id;
 	}
@@ -92,7 +92,7 @@ bool Controllers::remove(uint32 id)
 	if (iter == objects_.end())
 		return true;
 
-	// �������ã���ֹ��Controller�����е���ĳЩ�������eraseδ������������ֽ�������ִ��erase����������
+	// 做个引用，防止在Controller析构中导致某些情况下在erase未结束的情况下又进入这里执行erase而产生问题
 	KBEShared_ptr< Controller > pController = iter->second;
 	objects_.erase(iter);
 	return pController != NULL;

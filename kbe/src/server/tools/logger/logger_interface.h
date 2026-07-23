@@ -43,10 +43,10 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	Logger������Ϣ�ӿ��ڴ˶���
+	Logger所有消息接口在此定义
 */
 NETWORK_INTERFACE_DECLARE_BEGIN(LoggerInterface)
-	// ĳappע���Լ��Ľӿڵ�ַ����app
+	// 某app注册自己的接口地址到本app
 	LOGGER_MESSAGE_DECLARE_ARGS11(onRegisterNewApp,							NETWORK_VARIABLE_MESSAGE,
 									int32,									uid, 
 									std::string,							username,
@@ -60,39 +60,39 @@ NETWORK_INTERFACE_DECLARE_BEGIN(LoggerInterface)
 									uint16,									extport,
 									std::string,							extAddrEx)
 
-	// ĳapp��������look��
+	// 某app主动请求look。
 	LOGGER_MESSAGE_DECLARE_ARGS0(lookApp,									NETWORK_FIXED_MESSAGE)
 
-	// ĳ��app����鿴��app����״̬��
+	// 某个app请求查看该app负载状态。
 	LOGGER_MESSAGE_DECLARE_ARGS0(queryLoad,									NETWORK_FIXED_MESSAGE)
 
-	// ĳ��app��app��֪���ڻ״̬��
+	// 某个app向本app告知处于活动状态。
 	LOGGER_MESSAGE_DECLARE_ARGS2(onAppActiveTick,							NETWORK_FIXED_MESSAGE,
 									COMPONENT_TYPE,							componentType, 
 									COMPONENT_ID,							componentID)
 
-	// Զ��д��־
+	// 远程写日志
 	LOGGER_MESSAGE_DECLARE_STREAM(writeLog,									NETWORK_VARIABLE_MESSAGE)
 
-	// ע��log������
+	// 注册log监听者
 	LOGGER_MESSAGE_DECLARE_STREAM(registerLogWatcher,						NETWORK_VARIABLE_MESSAGE)
 
-	// ע��log������
+	// 注销log监听者
 	LOGGER_MESSAGE_DECLARE_STREAM(deregisterLogWatcher,						NETWORK_VARIABLE_MESSAGE)
 
-	// log�����߸����Լ�������
+	// log监听者更新自己的设置
 	LOGGER_MESSAGE_DECLARE_STREAM(updateLogWatcherSetting,					NETWORK_VARIABLE_MESSAGE)
 
-	// ����رշ�����
+	// 请求关闭服务器
 	LOGGER_MESSAGE_DECLARE_STREAM(reqCloseServer,							NETWORK_VARIABLE_MESSAGE)
 
-	// �����ѯwatcher����
+	// 请求查询watcher数据
 	LOGGER_MESSAGE_DECLARE_STREAM(queryWatcher,								NETWORK_VARIABLE_MESSAGE)
 
-	// ��ʼprofile
+	// 开始profile
 	LOGGER_MESSAGE_DECLARE_STREAM(startProfile,								NETWORK_VARIABLE_MESSAGE)
 
-	// ����ǿ��ɱ����ǰapp
+	// 请求强制杀死当前app
 	LOGGER_MESSAGE_DECLARE_STREAM(reqKillServer,							NETWORK_VARIABLE_MESSAGE)
 
 NETWORK_INTERFACE_DECLARE_END()

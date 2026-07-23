@@ -70,7 +70,7 @@ bool KBEEntityLogTableMysql::syncToDB(DBInterface* pdbi)
 	if (!pdbi->query(sqlstr.c_str(), sqlstr.size(), true))
 		return false;
 
-	// ������ڵ���־
+	// 清除过期的日志
 	std::vector<COMPONENT_ID> cids;
 
 	{
@@ -102,10 +102,10 @@ bool KBEEntityLogTableMysql::syncToDB(DBInterface* pdbi)
 			return false;
 	}
 
-	// ������з�����
+	// 获得所有服务器
 	cids = serverLogTable.queryServers(pdbi);
 
-	// ��ѯ����entitylogɸѡ����serverlog���Ҳ�����¼��log��������Щ��Ч��¼
+	// 查询所有entitylog筛选出在serverlog中找不到记录的log并清理这些无效记录
 	{
 		sqlstr = fmt::format("select distinct(serverGroupID) from " KBE_TABLE_PERFIX "_entitylog");
 
@@ -123,7 +123,7 @@ bool KBEEntityLogTableMysql::syncToDB(DBInterface* pdbi)
 				COMPONENT_ID serverGroupID = 0;
 				KBEngine::StringConv::str2value(serverGroupID, arow[0]);
 
-				// ����Ҳ���������log�����ӵ�ɾ���б�
+				// 如果找不到服务器log就添加到删除列表
 				if (std::find(cids.begin(), cids.end(), serverGroupID) == cids.end())
 					erases_ids.push_back(serverGroupID);
 			}
@@ -636,7 +636,7 @@ bool KBEAccountTableMysql::setFlagsDeadline(DBInterface * pdbi, const std::strin
 
 	SAFE_RELEASE_ARRAY(tbuf);
 
-	// �����ѯʧ���򷵻ش��ڣ� ������ܲ����Ĵ���
+	// 如果查询失败则返回存在， 避免可能产生的错误
 	if(pdbi->query(sqlstr.c_str(), sqlstr.size(), false))
 		return true;
 
@@ -659,7 +659,7 @@ bool KBEAccountTableMysql::queryAccount(DBInterface * pdbi, const std::string& n
 	sqlstr += "\" LIMIT 1";
 	SAFE_RELEASE_ARRAY(tbuf);
 
-	// �����ѯʧ���򷵻ش��ڣ� ������ܲ����Ĵ���
+	// 如果查询失败则返回存在， 避免可能产生的错误
 	if(!pdbi->query(sqlstr.c_str(), sqlstr.size(), false))
 		return true;
 
@@ -704,7 +704,7 @@ bool KBEAccountTableMysql::queryAccountAllInfos(DBInterface * pdbi, const std::s
 	sqlstr += "\" LIMIT 1";
 	SAFE_RELEASE_ARRAY(tbuf);
 
-	// �����ѯʧ���򷵻ش��ڣ� ������ܲ����Ĵ���
+	// 如果查询失败则返回存在， 避免可能产生的错误
 	if(!pdbi->query(sqlstr.c_str(), sqlstr.size(), false))
 		return true;
 
@@ -732,7 +732,7 @@ bool KBEAccountTableMysql::queryAccountAllInfos(DBInterface * pdbi, const std::s
 //-------------------------------------------------------------------------------------
 bool KBEAccountTableMysql::updateCount(DBInterface * pdbi, const std::string& name, DBID dbid)
 {
-	// �����ѯʧ���򷵻ش��ڣ� ������ܲ����Ĵ���
+	// 如果查询失败则返回存在， 避免可能产生的错误
 	if(!pdbi->query(fmt::format("update " KBE_TABLE_PERFIX "_accountinfos set lasttime={}, numlogin=numlogin+1 where entityDBID={}",
 		time(NULL), dbid), false))
 		return false;
@@ -752,7 +752,7 @@ bool KBEAccountTableMysql::updatePassword(DBInterface * pdbi, const std::string&
 	mysql_real_escape_string(static_cast<DBInterfaceMysql*>(pdbi)->mysql(), 
 		tbuf1, name.c_str(), name.size());
 
-	// �����ѯʧ���򷵻ش��ڣ� ������ܲ����Ĵ���
+	// 如果查询失败则返回存在， 避免可能产生的错误
 	if(!pdbi->query(fmt::format("update " KBE_TABLE_PERFIX "_accountinfos set password=\"{}\" where accountName like \"{}\"", 
 		password, tbuf1), false))
 	{
@@ -823,7 +823,7 @@ bool KBEAccountTableMysql::logAccount(DBInterface * pdbi, ACCOUNT_INFOS& info)
 
 	SAFE_RELEASE_ARRAY(tbuf);
 
-	// �����ѯʧ���򷵻ش��ڣ� ������ܲ����Ĵ���
+	// 如果查询失败则返回存在， 避免可能产生的错误
 	if(!pdbi->query(sqlstr.c_str(), sqlstr.size(), false))
 	{
 		ERROR_MSG(fmt::format("KBEAccountTableMysql::logAccount({}): sql({}) is failed({})!\n", 
@@ -1002,7 +1002,7 @@ bool KBEEmailVerificationTableMysql::activateAccount(DBInterface * pdbi, const s
 	
 	std::string password = info.password;
 
-	// Ѱ��dblog�Ƿ��д��˺�
+	// 寻找dblog是否有此账号
 	KBEAccountTable* pTable = static_cast<KBEAccountTable*>(EntityTables::findByInterfaceName(pdbi->name()).findKBETable(KBE_TABLE_PERFIX "_accountinfos"));
 	KBE_ASSERT(pTable);
 	
@@ -1041,7 +1041,7 @@ bool KBEEmailVerificationTableMysql::activateAccount(DBInterface * pdbi, const s
 
 	ScriptDefModule* pModule = EntityDef::findScriptModule(DBUtil::accountScriptName());
 
-	// ��ֹ���߳����⣬ ������һ��������
+	// 防止多线程问题， 这里做一个拷贝。
 	MemoryStream copyAccountDefMemoryStream(pTable->accountDefMemoryStream());
 
 	info.dbid = EntityTables::findByInterfaceName(pdbi->name()).writeEntity(pdbi, 0, -1,
@@ -1049,7 +1049,7 @@ bool KBEEmailVerificationTableMysql::activateAccount(DBInterface * pdbi, const s
 
 	KBE_ASSERT(info.dbid > 0);
 
-	// �����ѯʧ���򷵻ش��ڣ� ������ܲ����Ĵ���
+	// 如果查询失败则返回存在， 避免可能产生的错误
 	tbuf = new char[MAX_BUF * 3];
 
 	mysql_real_escape_string(static_cast<DBInterfaceMysql*>(pdbi)->mysql(), 
@@ -1252,7 +1252,7 @@ bool KBEEmailVerificationTableMysql::resetpassword(DBInterface * pdbi, const std
 		return false;
 	}
 
-	// Ѱ��dblog�Ƿ��д��˺�
+	// 寻找dblog是否有此账号
 	KBEAccountTable* pTable = static_cast<KBEAccountTable*>(EntityTables::findByInterfaceName(pdbi->name()).findKBETable(KBE_TABLE_PERFIX "_accountinfos"));
 	KBE_ASSERT(pTable);
 
@@ -1322,7 +1322,7 @@ bool KBEEmailVerificationTableMysql::syncToDB(DBInterface* pdbi)
 	ret = pdbi->query(sqlstr.c_str(), sqlstr.size(), true);
 	KBE_ASSERT(ret);
 
-	// ɾ��xxСʱ֮ǰ�ļ�¼
+	// 删除xx小时之前的记录
 	sqlstr = fmt::format("delete from " KBE_TABLE_PERFIX "_email_verification where logtime<{} and type={}", 
 		KBEngine::StringConv::val2str(time(NULL) - g_kbeSrvConfig.emailAtivationInfo_.deadline), 
 		((int)KBEEmailVerificationTable::V_TYPE_CREATEACCOUNT));

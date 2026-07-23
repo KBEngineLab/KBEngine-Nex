@@ -94,7 +94,7 @@ ShutdownHandler::CAN_SHUTDOWN_STATE Dbmgr::canShutdown()
 {
 	if (getEntryScript().get() && PyObject_HasAttrString(getEntryScript().get(), "onReadyForShutDown") > 0)
 	{
-		// ���нű����������
+		// 所有脚本都加载完毕
 		PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(),
 			const_cast<char*>("onReadyForShutDown"),
 			const_cast<char*>(""));
@@ -168,7 +168,7 @@ void Dbmgr::onShutdownBegin()
 {
 	PythonApp::onShutdownBegin();
 
-	// ֪ͨ�ű�
+	// 通知脚本
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	SCRIPT_OBJECT_CALL_ARGS0(getEntryScript().get(), const_cast<char*>("onDBMgrShutDown"), false);
 }
@@ -241,7 +241,7 @@ void Dbmgr::handleMainTick()
 //-------------------------------------------------------------------------------------
 void Dbmgr::handleCheckStatusTick()
 {
-	// ��鶪ʧ��������̣������һ��ʱ��֮����Ȼ�޷����֣���Ҫ�������ݿ���entitylog
+	// 检查丢失的组件进程，如果在一段时间之内仍然无法发现，需要清理数据库中entitylog
 	if (loseBaseappts_.size() > 0)
 	{
 		std::map<COMPONENT_ID, uint64>::iterator iter = loseBaseappts_.begin();
@@ -283,7 +283,7 @@ bool Dbmgr::initializeBegin()
 //-------------------------------------------------------------------------------------
 bool Dbmgr::inInitialize()
 {
-	// ��ʼ��������չģ��
+	// 初始化所有扩展模块
 	// assets/scripts/
 	if (!PythonApp::inInitialize())
 		return false;
@@ -301,14 +301,14 @@ bool Dbmgr::initializeEnd()
 {
 	PythonApp::initializeEnd();
 
-	// ����һ��timer�� ÿ����һЩ״̬
+	// 添加一个timer， 每秒检查一些状态
 	loopCheckTimerHandle_ = this->dispatcher().addTimer(1000000, this,
 							reinterpret_cast<void *>(TIMEOUT_CHECK_STATUS));
 
 	mainProcessTimer_ = this->dispatcher().addTimer(1000000 / 50, this,
 							reinterpret_cast<void *>(TIMEOUT_TICK));
 
-	// ����globalData, baseAppData, cellAppData֧��
+	// 添加globalData, baseAppData, cellAppData支持
 	pGlobalData_ = new GlobalDataServer(GlobalDataServer::GLOBAL_DATA);
 	pBaseAppData_ = new GlobalDataServer(GlobalDataServer::BASEAPP_DATA);
 	pCellAppData_ = new GlobalDataServer(GlobalDataServer::CELLAPP_DATA);
@@ -322,7 +322,7 @@ bool Dbmgr::initializeEnd()
 	
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-	// ���нű����������
+	// 所有脚本都加载完毕
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
 										const_cast<char*>("onDBMgrReady"), 
 										const_cast<char*>(""));
@@ -521,7 +521,7 @@ void Dbmgr::onReqAllocEntityID(Network::Channel* pChannel, COMPONENT_ORDER compo
 {
 	KBEngine::COMPONENT_TYPE ct = static_cast<KBEngine::COMPONENT_TYPE>(componentType);
 
-	// ��ȡһ��id�� �������IDClient
+	// 获取一个id段 并传输给IDClient
 	std::pair<ENTITY_ID, ENTITY_ID> idRange = idServer_.allocRange();
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 
@@ -560,9 +560,9 @@ void Dbmgr::onRegisterNewApp(Network::Channel* pChannel, int32 uid, std::string&
 	if(pSyncAppDatasHandler_ == NULL)
 		pSyncAppDatasHandler_ = new SyncAppDatasHandler(this->networkInterface());
 
-	// ��һ��:
-	// ��������ӵ�dbmgr����Ҫ�ȴ�����app��ʼ��Ϣ
-	// ���磺��ʼ�����entityID���Լ����app������˳����Ϣ���Ƿ��һ��baseapp������
+	// 下一步:
+	// 如果是连接到dbmgr则需要等待接收app初始信息
+	// 例如：初始会分配entityID段以及这个app启动的顺序信息（是否第一个baseapp启动）
 	if(tcomponentType == BASEAPP_TYPE || 
 		tcomponentType == CELLAPP_TYPE || 
 		tcomponentType == LOGINAPP_TYPE)
@@ -593,7 +593,7 @@ void Dbmgr::onRegisterNewApp(Network::Channel* pChannel, int32 uid, std::string&
 
 	pSyncAppDatasHandler_->pushApp(componentID, startGroupOrder, startGlobalOrder);
 
-	// �����baseapp����cellapp���Լ�ע�ᵽ��������baseapp��cellapp
+	// 如果是baseapp或者cellapp则将自己注册到所有其他baseapp和cellapp
 	if(tcomponentType == BASEAPP_TYPE || 
 		tcomponentType == CELLAPP_TYPE)
 	{
@@ -1254,7 +1254,7 @@ std::string Dbmgr::selectAccountDBInterfaceName(const std::string& name)
 {
 	std::string dbInterfaceName = "default";
 
-	// �������ɽű�����
+	// 把请求交由脚本处理
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(),
 		const_cast<char*>("onSelectAccountDBInterface"),
@@ -1283,7 +1283,7 @@ std::string Dbmgr::selectAccountDBInterfaceName(const std::string& name)
 //-------------------------------------------------------------------------------------
 void Dbmgr::onChannelDeregister(Network::Channel * pChannel)
 {
-	// �����app������
+	// 如果是app死亡了
 	if (pChannel->isInternal())
 	{
 		Components::ComponentInfos* cinfo = Components::getSingleton().findComponent(pChannel);

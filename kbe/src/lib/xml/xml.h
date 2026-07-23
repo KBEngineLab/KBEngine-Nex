@@ -19,8 +19,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 /*
-	xml ��д��
-		����:	
+	xml 读写：
+		例子:	
 				<root>
 					<server>
 						<ip>172.16.0.12</ip>
@@ -38,12 +38,12 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 				XML_FOR_END(node);
 				
 				delete xml;
-		���:
+		输出:
 				---ip---172.16.0.12
 				---port---6000
 				
 
-		����2:
+		例子2:
 				XML* xml = new XML("KBEngine.xml");
 				TiXmlNode* serverNode = xml->getRootNode("server");
 				
@@ -54,7 +54,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 				node = xml->enterNode(serverNode, "port");		
 				printf("%s\n", xml->getValStr(node).c_str() );	
 			
-		���:
+		输出:
 			172.16.0.12
 			6000
 */
@@ -134,10 +134,10 @@ public:
 		return true;
 	}
 
-	/**��ȡ��Ԫ��*/
+	/**获取根元素*/
 	TiXmlElement* getRootElement(void){return rootElement_;}
 
-	/**��ȡ���ڵ㣬 ������keyΪ��Χ���ڵ��µ�ĳ���ӽڵ��*/
+	/**获取根节点， 带参数key为范围根节点下的某个子节点根*/
 	TiXmlNode* getRootNode(const char* key = "")
 	{
 		if(rootElement_ == NULL)
@@ -152,7 +152,7 @@ public:
 		return rootElement_->FirstChild();
 	}
 
-	/**ֱ�ӷ���Ҫ�����key�ڵ�ָ��*/
+	/**直接返回要进入的key节点指针*/
 	TiXmlNode* enterNode(TiXmlNode* node, const char* key)
 	{
 		do
@@ -179,7 +179,7 @@ public:
 		return NULL;
 	}
 
-	/**�Ƿ��������һ��key*/
+	/**是否存在这样一个key*/
 	bool hasNode(TiXmlNode* node, const char* key)
 	{
 		do{

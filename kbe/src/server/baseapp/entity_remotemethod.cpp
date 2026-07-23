@@ -59,7 +59,7 @@ PyObject* EntityRemoteMethod::tp_call(PyObject* self, PyObject* args,
 	MethodDescription* methodDescription = rmethod->getDescription();
 	EntityCallAbstract* entityCall = rmethod->getEntityCall();
 
-	if (!entityCall->isClient() || entityCall->type() == ENTITYCALL_TYPE_CLIENT_VIA_CELL /* ��Ҫ�Ⱦ���cell */ )
+	if (!entityCall->isClient() || entityCall->type() == ENTITYCALL_TYPE_CLIENT_VIA_CELL /* 需要先经过cell */ )
 	{
 		return RemoteEntityMethod::tp_call(self, args, kwds);
 	}
@@ -73,7 +73,7 @@ PyObject* EntityRemoteMethod::tp_call(PyObject* self, PyObject* args,
 		return RemoteEntityMethod::tp_call(self, args, kwds);
 	}
 
-	// ����ǵ��ÿͻ��˷����� ���Ǽ�¼�¼����Ҽ�¼����
+	// 如果是调用客户端方法， 我们记录事件并且记录带宽
 	if(methodDescription->checkArgs(args))
 	{
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
@@ -97,7 +97,7 @@ PyObject* EntityRemoteMethod::tp_call(PyObject* self, PyObject* args,
 		if(mstream->wpos() > 0)
 			(*pBundle).append(mstream->data(), (int)mstream->wpos());
 
-		// ��¼����¼���������������С
+		// 记录这个事件产生的数据量大小
 		g_privateClientEventHistoryStats.trackEvent(pEntity->scriptName(), 
 			methodDescription->getName(), 
 			pBundle->currMsgLength(), 

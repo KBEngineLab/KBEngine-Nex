@@ -28,7 +28,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{ 
 
-// ��¼KBE�����ù�������mysql��ǣ��ṩsync_item_to_dbʱ���������
+// 记录KBE所设置过的所有mysql标记，提供sync_item_to_db时检查设置项
 extern uint32 ALL_MYSQL_SET_FLAGS;
 
 }

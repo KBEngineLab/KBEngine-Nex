@@ -35,7 +35,7 @@ inline Quat Quat::operator+(const Quat& other) const {
 }
 
 /*
-* ��׼����
+* 标准定义
 */
 inline Quat Quat::operator*(const Quat& other) const{
 

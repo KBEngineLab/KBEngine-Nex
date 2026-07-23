@@ -332,9 +332,9 @@ void CMultiLineListBox::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBa
 	bool done = false;
 	switch(nSBCode)
 	{
-	case SB_THUMBPOSITION:	//�϶�����
-	case SB_LINELEFT:		//�����ߵļ�ͷ
-	case SB_LINERIGHT:		//����ұߵļ�ͷ
+	case SB_THUMBPOSITION:	//拖动滑块
+	case SB_LINELEFT:		//点击左边的箭头
+	case SB_LINERIGHT:		//点击右边的箭头
 		done = true;
 		break;
 	} 

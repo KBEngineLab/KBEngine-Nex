@@ -30,7 +30,7 @@ namespace KBEngine{
 
 class FixedArray : public script::Sequence
 {		
-	/** ���໯ ��һЩpy�������������� */
+	/** 子类化 将一些py操作填充进派生类 */
 	INSTANCE_SCRIPT_HREADER(FixedArray, Sequence)
 
 public:	
@@ -40,28 +40,28 @@ public:
 	const DataType* getDataType(void){ return _dataType; }
 	
 	/** 
-		��ʼ���̶�����
+		初始化固定数组
 	*/
 	void initialize(std::string strInitData);
 	void initialize(PyObject* pyObjInitData);
 
 	/** 
-		֧��pickler ���� 
+		支持pickler 方法 
 	*/
 	static PyObject* __py_reduce_ex__(PyObject* self, PyObject* protocol);
 
 	/** 
-		unpickle���� 
+		unpickle方法 
 	*/
 	static PyObject* __unpickle__(PyObject* self, PyObject* args);
 	
 	/** 
-		�ű�����װʱ������ 
+		脚本被安装时被调用 
 	*/
 	static void onInstallScript(PyObject* mod);
 	
 	/** 
-		һ��Ϊһ��list����Ĳ����ӿ� 
+		一下为一个list所需的操作接口 
 	*/
 	static PyObject* __py_append(PyObject* self, PyObject* args, PyObject* kwargs);	
 	static PyObject* __py_count(PyObject* self, PyObject* args, PyObject* kwargs);
@@ -78,7 +78,7 @@ public:
 	virtual PyObject* createNewItemFromObj(PyObject* pyItem);
 
 	/** 
-		��ö�������� 
+		获得对象的描述 
 	*/
 	PyObject* tp_repr();
 	PyObject* tp_str();

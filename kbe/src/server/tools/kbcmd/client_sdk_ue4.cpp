@@ -171,7 +171,7 @@ bool ClientSDKUE4::getArrayType(DataType* pDataType, std::string& outstr)
 	{
 		FixedArrayType* pFixedArrayType = static_cast<FixedArrayType*>(pDataType);
 
-		// ���Ԫ����������
+		// 如果元素又是数组
 		if (pFixedArrayType->getDataType()->type() == DATA_TYPE_FIXEDARRAY)
 		{
 			if (outstr.size() > 0)
@@ -1011,8 +1011,8 @@ bool ClientSDKUE4::createArrayChildClass(DataType* pRootDataType, DataType* pDat
 		fileBody() += fmt::format("{}\tDATATYPE_{} itemType;\n\n",
 			tabs, pDataType->aliasName(), pDataType->aliasName());
 
-		// ����Ƿ����������飬���һ�����Ӧ��ֱ������Ϊ�����ֵ����
-		// ��������ΪϵͳList���
+		// 如果是非匿名的数组，则第一层解析应该直接设置为有名字的类别
+		// 否则设置为系统List类别
 		if (numLayer == 1)
 		{
 			if (strlen(pRootDataType->aliasName()) == 0 || pRootDataType->aliasName()[0] == '_')
@@ -1067,8 +1067,8 @@ bool ClientSDKUE4::createArrayChildClass(DataType* pRootDataType, DataType* pDat
 
 		std::string classNameStr = typeName;
 
-		// ����Ƿ����������飬���һ�����Ӧ��ֱ������Ϊ�����ֵ����
-		// ��������ΪϵͳList���
+		// 如果是非匿名的数组，则第一层解析应该直接设置为有名字的类别
+		// 否则设置为系统List类别
 		if (numLayer == 1)
 		{
 			if (strlen(pRootDataType->aliasName()) == 0 || pRootDataType->aliasName()[0] == '_')
@@ -1195,7 +1195,7 @@ bool ClientSDKUE4::writeCustomDataType(const DataType* pDataType)
 
 		FixedDictType* dictdatatype = const_cast<FixedDictType*>(static_cast<const FixedDictType*>(pDataType));
 
-		// �ȴ�������
+		// 先创建属性
 		{
 			FixedDictType::FIXEDDICT_KEYTYPE_MAP& keys = dictdatatype->getKeyTypes();
 			FixedDictType::FIXEDDICT_KEYTYPE_MAP::const_iterator keyiter = keys.begin();
@@ -1238,7 +1238,7 @@ bool ClientSDKUE4::writeCustomDataType(const DataType* pDataType)
 			}
 		}
 
-		// ����createFromStreamEx����
+		// 创建createFromStreamEx方法
 		{
 			changeContextToHeader();
 			fileBody() += fmt::format("\tvoid createFromStreamEx(MemoryStream& stream, {}& datas);\n", typeName);
@@ -1273,7 +1273,7 @@ bool ClientSDKUE4::writeCustomDataType(const DataType* pDataType)
 			fileBody() += fmt::format("}}\n\n");
 		}
 
-		// ����addToStreamEx����
+		// 创建addToStreamEx方法
 		{
 			changeContextToHeader();
 			fileBody() += fmt::format("\tvoid addToStreamEx(Bundle& stream, const {}& v);\n", typeName);
@@ -1489,7 +1489,7 @@ bool ClientSDKUE4::writeEntityDefsModuleInitScript_ScriptModule(ScriptDefModule*
 //-------------------------------------------------------------------------------------
 bool ClientSDKUE4::writeEntityDefsModuleInitScript_MethodDescr(ScriptDefModule* pScriptDefModule, MethodDescription* pDescr, COMPONENT_TYPE componentType)
 {
-	// ���pDescrΪNone�������ǿͻ��˷�������ô��Ҫǿ���趨useMethodDescrAliasΪtrue������Ĭ��Ϊfalse�����������
+	// 如果pDescr为None，并且是客户端方法，那么需要强制设定useMethodDescrAlias为true，否则默认为false将会出现问题
 	if (!pDescr && componentType == CLIENT_TYPE)
 	{
 		fileBody() += fmt::format("\tp{}Module->useMethodDescrAlias = true;\n", pScriptDefModule->getName());
@@ -2011,7 +2011,7 @@ bool ClientSDKUE4::writeEntityModuleBegin(ScriptDefModule* pEntityScriptDefModul
 
 	fileBody() += fmt::format("class KBENGINEPLUGINS_API {} : public Entity\n{{\npublic:\n", newModuleName);
 
-	// дentityCall����
+	// 写entityCall属性
 	fileBody() += fmt::format("\tEntityBaseEntityCall_{}* pBaseEntityCall;\n", newModuleName);
 	fileBody() += fmt::format("\tEntityCellEntityCall_{}* pCellEntityCall;\n\n", newModuleName);
 
@@ -2028,7 +2028,7 @@ bool ClientSDKUE4::writeEntityModuleBegin(ScriptDefModule* pEntityScriptDefModul
 	fileBody() += namespaceNameBegin;
 
 	changeContextToHeader();
-	// �������غ󣬺�������Ϊдʵ������..
+	// 函数返回后，后续流程为写实体属性..
 	return true;
 }
 
@@ -2123,7 +2123,7 @@ bool ClientSDKUE4::writeEntityProcessMessagesMethod(ScriptDefModule* pEntityScri
 	fileBody() += fmt::format("\treturn pCellEntityCall;\n");
 	fileBody() += "}\n";
 
-	// ��������
+	// 处理方法
 	changeContextToHeader();
 	fileBody() += fmt::format("\tvoid onRemoteMethodCall(Method* pMethod, MemoryStream& stream) override;\n");
 
@@ -2218,7 +2218,7 @@ bool ClientSDKUE4::writeEntityProcessMessagesMethod(ScriptDefModule* pEntityScri
 
 	fileBody() += "}\n";
 
-	// ��������
+	// 处理属性
 	ENTITY_PROPERTY_UID posuid = 0;
 	if (posuid == 0)
 	{
@@ -2373,7 +2373,7 @@ bool ClientSDKUE4::writeEntityProcessMessagesMethod(ScriptDefModule* pEntityScri
 
 	fileBody() += "}\n";
 
-	// ��������callPropertysSetMethods
+	// 处理属性callPropertysSetMethods
 	changeContextToHeader();
 	fileBody() += fmt::format("\tvoid callPropertysSetMethods() override;\n");
 
@@ -2754,7 +2754,7 @@ bool ClientSDKUE4::writeEntityMethod(ScriptDefModule* pEntityScriptDefModule,
 //-------------------------------------------------------------------------------------
 bool ClientSDKUE4::writeEntityMethodArgs_ARRAY(FixedArrayType* pFixedArrayType, std::string& stackArgsTypeBody, const std::string& childItemName)
 {
-	// ��������������Ҫ����������ֱ������������
+	// 对于匿名数组需要解析，否则直接填类型名称
 	if (childItemName.size() == 0 || childItemName[0] == '_')
 	{
 		std::string typeStr;

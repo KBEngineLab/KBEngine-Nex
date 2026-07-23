@@ -154,7 +154,7 @@ PyObject* Sequence::seq_repeat(PyObject* self, Py_ssize_t n)
 	int seqSize1 = (int)values.size();
 
 	PyObject* pyList = PyList_New(seqSize1 * n);
-	// ����û�ڴ���
+	// 可能没内存了
 	if (pyList == NULL) 
 		return NULL;
 
@@ -281,7 +281,7 @@ int Sequence::seq_ass_item(PyObject* self, Py_ssize_t index, PyObject* value)
 
 	if(value)
 	{
-		// �������Ƿ���ȷ
+		// 检查类别是否正确
 		if(seq->isSameItemType(value))
 		{
 			values[index] = seq->createNewItemFromObj(value);
@@ -315,7 +315,7 @@ int Sequence::seq_ass_slice(PyObject* self, Py_ssize_t index1, Py_ssize_t index2
 	Sequence* seq = static_cast<Sequence*>(self);
 	std::vector<PyObject*>& values = seq->getValues();
 		
-	// �Ƿ���ɾ��Ԫ��
+	// 是否是删除元素
 	if (!oterSeq)
 	{
 		if (index1 < index2)
@@ -331,7 +331,7 @@ int Sequence::seq_ass_slice(PyObject* self, Py_ssize_t index1, Py_ssize_t index2
 		return 0;
 	}
 
-	// oterSeq������һ�� sequence
+	// oterSeq必须是一个 sequence
 	if (!PySequence_Check(oterSeq))
 	{
 		PyErr_Format(PyExc_TypeError, "Sequence slices can only be assigned to a sequence");
@@ -349,13 +349,13 @@ int Sequence::seq_ass_slice(PyObject* self, Py_ssize_t index1, Py_ssize_t index2
 	int sz = (int)values.size();
 	int osz = (int)PySequence_Size(oterSeq);
 
-	// ��֤index����Խ��
+	// 保证index不会越界
 	if (index1 > sz) index1 = sz;
 	if (index1 < 0) index1 = 0;
 	if (index2 > sz) index2 = sz;
 	if (index2 < 0) index2 = 0;
 
-	// ���һ�� �������޴������
+	// 检查一下 看看有无错误类别
 	for (int i = 0; i < osz; ++i)
 	{
 		PyObject* pyVal = PySequence_GetItem(oterSeq, i);
@@ -380,7 +380,7 @@ int Sequence::seq_ass_slice(PyObject* self, Py_ssize_t index1, Py_ssize_t index2
 		values.erase(values.begin() + index1, values.begin() + index2);
 	}
 
-	// ����vector������ڴ�
+	// 先让vector分配好内存
 	values.insert(values.begin() + index1, osz, (PyObject*)NULL);
 	for(int i = 0; i < osz; ++i)
 	{
@@ -429,7 +429,7 @@ PyObject* Sequence::seq_inplace_concat(PyObject* self, PyObject* oterSeq)
 		return seq;
 	}
 
-	// ��������Ƿ���ȷ
+	// 检查类型是否正确
 	for (int i = 0; i < szB; ++i)
 	{
 		PyObject * pyVal = PySequence_GetItem(oterSeq, i);
@@ -444,7 +444,7 @@ PyObject* Sequence::seq_inplace_concat(PyObject* self, PyObject* oterSeq)
 		}
 	}
 	
-	// ����vector������ڴ�
+	// 先让vector分配好内存
 	values.insert(values.end(), szB, (PyObject*)NULL);
 
 	for (int i = 0; i < szB; ++i)

@@ -45,7 +45,7 @@ public:
 	void loadSpaceGeometry(const std::map< int, std::string >& params);
 
 	/** 
-		����space�е����� 
+		更新space中的内容 
 	*/
 	bool update();
 
@@ -56,7 +56,7 @@ public:
 	void removeEntity(Entity* pEntity);
 
 	/**
-		һ��entity��������Ϸ����
+		一个entity进入了游戏世界
 	*/
 	void onEnterWorld(Entity* pEntity);
 	void _onEnterWorld(Entity* pEntity);
@@ -70,18 +70,18 @@ public:
 	Entity* findEntity(ENTITY_ID entityID);
 
 	/**
-		����
+		销毁
 	*/
 	bool destroy(ENTITY_ID entityID, bool ignoreGhost = true);
 
 	/**
-		���space��cell
+		这个space的cell
 	*/
 	Cell * pCell() const	{ return pCell_; }
 	void pCell( Cell * pCell );
 
 	/**
-		����space�ļ���ӳ��
+		添加space的几何映射
 	*/
 	static PyObject* __py_AddSpaceGeometryMapping(PyObject* self, PyObject* args);
 	bool addSpaceGeometryMapping(std::string respath, bool shouldLoadOnServer, const std::map< int, std::string >& params);
@@ -94,7 +94,7 @@ public:
 	NavigationHandlePtr pNavHandle() const{ return pNavHandle_; }
 
 	/**
-		spaceData��ز����ӿ�
+		spaceData相关操作接口
 	*/
 	void setSpaceData(const std::string& key, const std::string& value);
 	void delSpaceData(const std::string& key);
@@ -123,27 +123,27 @@ protected:
 	};
 
 protected:
-	// ���space��ID
+	// 这个space的ID
 	SPACE_ID					id_;														
 
-	// �������spaceʱ�õ�ʵ��ű�ģ������
+	// 创建这个space时用的实体脚本模块名称
 	std::string					scriptModuleName_;
 
-	// ���space�ϵ�entity
+	// 这个space上的entity
 	SPACE_ENTITIES				entities_;							
 
-	// �Ƿ���ع���������
+	// 是否加载过地形数据
 	bool						hasGeometry_;
 
-	// ÿ��space���ֻ��һ��cell
+	// 每个space最多只有一个cell
 	Cell*						pCell_;
 
 	CoordinateSystem			coordinateSystem_;
 
 	NavigationHandlePtr			pNavHandle_;
 
-	// spaceData, ֻ�ܴ洢�ַ�����Դ�� �����ܱȽϺõļ��ݿͻ��ˡ�
-	// �����߿��Խ���������ת�����ַ������д���
+	// spaceData, 只能存储字符串资源， 这样能比较好的兼容客户端。
+	// 开发者可以将其他类型转换成字符串进行传输
 	SPACE_DATA					datas_;
 
 	int8						state_;

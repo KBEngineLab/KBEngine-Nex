@@ -32,12 +32,12 @@ public:
 	static bool zipCompressDirectory(const std::string& sourceDir, const std::string& outfile);
 	static bool tarCompressDirectory(const std::string& sourceDir, const std::string& outfile);
 
-	/** ��ʼ�� */
+	/** 初始化 */
 	static bool initialize(void);
 	static void finalise(void);
 
 private:
-	static bool	isInit;										// �Ƿ��Ѿ�����ʼ��
+	static bool	isInit;										// 是否已经被初始化
 } ;
 
 }

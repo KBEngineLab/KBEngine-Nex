@@ -54,7 +54,7 @@ class ScriptDefModule;
 
 class AllClients : public script::ScriptObject
 {
-	/** ���໯ ��һЩpy�������������� */
+	/** 子类化 将一些py操作填充进派生类 */
 	INSTANCE_SCRIPT_HREADER(AllClients, ScriptObject)
 public:
 	AllClients(const ScriptDefModule* pScriptModule, 
@@ -64,12 +64,12 @@ public:
 	~AllClients();
 	
 	/** 
-		�ű������ȡ���Ի��߷��� 
+		脚本请求获取属性或者方法 
 	*/
 	PyObject* onScriptGetAttribute(PyObject* attr);						
 			
 	/** 
-		��ö�������� 
+		获得对象的描述 
 	*/
 	PyObject* tp_repr();
 	PyObject* tp_str();
@@ -77,7 +77,7 @@ public:
 	void c_str(char* s, size_t size);
 	
 	/** 
-		��ȡentityID 
+		获取entityID 
 	*/
 	ENTITY_ID id() const{ return id_; }
 	void setID(int id){ id_ = id; }
@@ -88,11 +88,11 @@ public:
 	}
 
 protected:
-	const ScriptDefModule*					pScriptModule_;			// ��entity��ʹ�õĽű�ģ�����
+	const ScriptDefModule*					pScriptModule_;			// 该entity所使用的脚本模块对象
 
 	ENTITY_ID								id_;					// entityID
 
-	bool									otherClients_;			// �Ƿ�ֻ�������ͻ��ˣ� �������Լ�
+	bool									otherClients_;			// 是否只是其他客户端， 不包括自己
 };
 
 }

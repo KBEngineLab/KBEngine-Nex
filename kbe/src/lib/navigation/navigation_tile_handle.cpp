@@ -295,9 +295,9 @@ int NavTileHandle::findRandomPointAroundCircle(int layer, const Position3D& cent
 	for (uint32 i = 0; i < max_points; i++)
 	{
 		float rnd = frand();
-		float a = maxRadius * rnd;						// �뾶��maxRadius����
-		float b = 360.0f * rnd;							// ���һ���Ƕ�
-		currpos.x = centerPos.x + (a * cos(b)); 		// �뾶 * ������
+		float a = maxRadius * rnd;						// 半径在maxRadius米内
+		float b = 360.0f * rnd;							// 随机一个角度
+		currpos.x = centerPos.x + (a * cos(b)); 		// 半径 * 正余玄
 		currpos.z = centerPos.z + (a * sin(b));
 		points.push_back(currpos);
 	}
@@ -531,7 +531,7 @@ bool NavTileHandle::MapSearchNode::GetSuccessors(AStarSearch<MapSearchNode> *ast
 		astarsearch->AddSuccessor( NewNode );
 	}	
 
-	// �����8�����ƶ�
+	// 如果是8方向移动
 	if(NavTileHandle::pCurrNavTileHandle->direction8())
 	{
 		if( (NavTileHandle::pCurrNavTileHandle->getMap( x + 1, y + 1 ) < TILE_STATE_CLOSED) 
@@ -577,20 +577,20 @@ bool NavTileHandle::MapSearchNode::GetSuccessors(AStarSearch<MapSearchNode> *ast
 float NavTileHandle::MapSearchNode::GetCost( MapSearchNode &successor )
 {
 	/*
-		һ��tileѰ·���Լ۱�
-		ÿ��tile�����Զ����0~5���Լ۱�ֵ�� ֵԽ���Լ۱�Խ��
-		���磺 ǰ����Ȼ�ܹ�ͨ������ǰ�������·�� ���������ǳ������� 
-		������ǰ��Ϊ���ٹ�·�� ���߷ǳ��졣
+		一个tile寻路的性价比
+		每个tile都可以定义从0~5的性价比值， 值越大性价比越低
+		比如： 前方虽然能够通过但是前方是泥巴路， 行走起来非常费力， 
+		或者是前方为高速公路， 行走非常快。
 	*/
 	
 	/*
-		������ۣ�
-		ͨ���ù�ʽ��ʾΪ��f = g + h.
-		g���Ǵ���㵽��ǰ��Ĵ���.
-		h�ǵ�ǰ�㵽�յ�Ĺ��ƴ��ۣ���ͨ�����ۺ������������.
+		计算代价：
+		通常用公式表示为：f = g + h.
+		g就是从起点到当前点的代价.
+		h是当前点到终点的估计代价，是通过估价函数计算出来的.
 
-		����һ�����ٱ��ϵĽڵ㣬����Χ����8���ڵ㣬���Կ���������Χ8����Ĵ��۶���1��
-		��ȷ�㣬����������4����Ĵ�����1�������������������µ�1.414���ǡ�����2�������ֵ����ǰ��˵��g.
+		对于一个不再边上的节点，他周围会有8个节点，可以看成他到周围8个点的代价都是1。
+		精确点，到上下左右4个点的代价是1，到左上左下右上右下的1.414就是“根号2”，这个值就是前面说的g.
 		2.8  2.4  2  2.4  2.8
 		2.4  1.4  1  1.4  2.4
 		2    1    0    1    2
@@ -600,7 +600,7 @@ float NavTileHandle::MapSearchNode::GetCost( MapSearchNode &successor )
 	if(NavTileHandle::pCurrNavTileHandle->direction8())
 	{
 		if (x != successor.x && y != successor.y) {
-			return (float) (NavTileHandle::pCurrNavTileHandle->getMap( x, y ) + 0.41421356/* ����������1��ֵ */); //sqrt(2)
+			return (float) (NavTileHandle::pCurrNavTileHandle->getMap( x, y ) + 0.41421356/* 本身有至少1的值 */); //sqrt(2)
 		}
 	}
 

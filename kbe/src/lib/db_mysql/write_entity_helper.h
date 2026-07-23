@@ -73,7 +73,7 @@ public:
 	}
 
 	/**
-		�����ݸ��µ�����
+		将数据更新到表中
 	*/
 	static bool writeDB(DB_TABLE_OP optype, DBInterface* pdbi, mysql::DBContext& context)
 	{
@@ -92,24 +92,24 @@ public:
 
 		if(optype == TABLE_OP_INSERT)
 		{
-			// ��ʼ�������е��ӱ�
+			// 开始更新所有的子表
 			mysql::DBContext::DB_RW_CONTEXTS::iterator iter1 = context.optable.begin();
 			for(; iter1 != context.optable.end(); ++iter1)
 			{
 				mysql::DBContext& wbox = *iter1->second.get();
 				
-				// �󶨱���ϵ
+				// 绑定表关系
 				wbox.parentTableDBID = context.dbid;
 
-				// �����ӱ�
+				// 更新子表
 				writeDB(optype, pdbi, wbox);
 			}
 		}
 		else
 		{
-			// ����и�ID���ȵõ����������ݿ���ͬ��id�������ж�����Ŀ�� ��ȡ��ÿ�����ݵ�id
-			// Ȼ���ڴ��е�����˳����������ݿ⣬ ������ݿ����д��ڵ���Ŀ��˳�򸲸Ǹ������е���Ŀ�� �����������
-			// �������ݿ������е���Ŀ�����ʣ������ݣ� ��������������ݿ��е���Ŀ��ɾ�����ݿ��е���Ŀ
+			// 如果有父ID首先得到该属性数据库中同父id的数据有多少条目， 并取出每条数据的id
+			// 然后将内存中的数据顺序更新至数据库， 如果数据库中有存在的条目则顺序覆盖更新已有的条目， 如果数据数量
+			// 大于数据库中已有的条目则插入剩余的数据， 如果数据少于数据库中的条目则删除数据库中的条目
 			// select id from tbl_SpawnPoint_xxx_values where parentID = 7;
 			KBEUnordered_map< std::string, std::vector<DBID> > childTableDBIDs;
 
@@ -210,10 +210,10 @@ public:
 				}
 			}
 
-			// �����Ҫ��մ˱��� ��ѭ��N���Ѿ��ҵ���dbid�� ʹ���ӱ��е��ӱ�Ҳ����Чɾ��
+			// 如果是要清空此表， 则循环N次已经找到的dbid， 使其子表中的子表也能有效删除
 			if(!context.isEmpty)
 			{
-				// ��ʼ�������е��ӱ�
+				// 开始更新所有的子表
 				mysql::DBContext::DB_RW_CONTEXTS::iterator iter1 = context.optable.begin();
 				for(; iter1 != context.optable.end(); ++iter1)
 				{
@@ -222,7 +222,7 @@ public:
 					if(wbox.isEmpty)
 						continue;
 
-					// �󶨱���ϵ
+					// 绑定表关系
 					wbox.parentTableDBID = context.dbid;
 
 					KBEUnordered_map<std::string, std::vector<DBID> >::iterator iter = 
@@ -242,19 +242,19 @@ public:
 						}
 					}
 
-					// �����ӱ�
+					// 更新子表
 					writeDB(optype, pdbi, wbox);
 				}
 			}
 			
-			// ɾ��������������
+			// 删除废弃的数据项
 			KBEUnordered_map< std::string, std::vector<DBID> >::iterator tabiter = childTableDBIDs.begin();
 			for(; tabiter != childTableDBIDs.end(); ++tabiter)
 			{
 				if(tabiter->second.size() == 0)
 					continue;
 
-				// ��ɾ�����ݿ��еļ�¼
+				// 先删除数据库中的记录
 				std::string sqlstr = "delete from " ENTITY_TABLE_PERFIX "_";
 				sqlstr += tabiter->first;
 				sqlstr += " where " TABLE_ID_CONST_STR " in (";
@@ -290,7 +290,7 @@ public:
 							wbox.dbid = dbid;
 							wbox.isEmpty = true;
 
-							// �����ӱ�
+							// 更新子表
 							writeDB(optype, pdbi, wbox);
 						}
 					}

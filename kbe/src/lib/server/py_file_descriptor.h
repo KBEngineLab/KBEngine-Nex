@@ -35,7 +35,7 @@ public:
 	virtual ~PyFileDescriptor();
 	
 	/** 
-		�ű�����(ע��/ע��)�ļ�������(����д)
+		脚本请求(注册/注销)文件描述符(读和写)
 	*/
 	static PyObject* __py_registerReadFileDescriptor(PyObject* self, PyObject* args);
 	static PyObject* __py_registerWriteFileDescriptor(PyObject* self, PyObject* args);

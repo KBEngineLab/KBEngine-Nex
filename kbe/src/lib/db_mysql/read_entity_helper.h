@@ -48,11 +48,11 @@ public:
 	}
 
 	/**
-		�ӱ��в�ѯ����
+		从表中查询数据
 	*/
 	static bool queryDB(DBInterface* pdbi, mysql::DBContext& context)
 	{
-		// ����ĳ��dbid���һ�ű��ϵ��������
+		// 根据某个dbid获得一张表上的相关数据
 		SqlStatement* pSqlcmd = new SqlStatementQuery(pdbi, context.tableName, 
 			context.dbids[context.dbid], 
 			context.dbid, context.items);
@@ -64,7 +64,7 @@ public:
 		if(!ret)
 			return ret;
 
-		// ����ѯ���Ľ��д��������
+		// 将查询到的结果写入上下文
 		MYSQL_RES * pResult = mysql_store_result(static_cast<DBInterfaceMysql*>(pdbi)->mysql());
 
 		if(pResult)
@@ -79,18 +79,18 @@ public:
 
 				unsigned long *lengths = mysql_fetch_lengths(pResult);
 
-				// ��ѯ���֤�˲�ѯ����ÿ����¼������dbid
+				// 查询命令保证了查询到的每条记录都会有dbid
 				std::stringstream sval;
 				sval << arow[0];
 
 				DBID item_dbid;
 				sval >> item_dbid;
 
-				// ��dbid��¼���б��У������ǰ���������ӱ��������ȥ�ӱ���ÿһ�����dbid��صļ�¼
+				// 将dbid记录到列表中，如果当前表还存在子表引用则会去子表查每一条与此dbid相关的记录
 				std::vector<DBID>& itemDBIDs = context.dbids[context.dbid];
 				int fidx = -100;
 
-				// �����ǰ���item��dbidС�ڸñ������һ����¼��dbid��С����ô��Ҫ��itemDBIDs��ָ����λ�ò������dbid���Ա�֤��С�����˳��
+				// 如果当前这个item的dbid小于该表下最后一个记录的dbid大小，那么需要在itemDBIDs中指定的位置插入这个dbid，以保证从小到大的顺序
 				if (itemDBIDs.size() > 0 && itemDBIDs[itemDBIDs.size() - 1] > item_dbid)
 				{
 					for (fidx = itemDBIDs.size() - 1; fidx > 0; --fidx)
@@ -106,7 +106,7 @@ public:
 					itemDBIDs.push_back(item_dbid);
 				}
 
-				// ���������¼����dbid���⻹�����������ݣ���������䵽�������
+				// 如果这条记录除了dbid以外还存在其他数据，则将数据填充到结果集中
 				if(nfields > 1)
 				{
 					std::vector<std::string>& itemResults = context.results[item_dbid].second;
@@ -120,7 +120,7 @@ public:
 						std::string data;
 						data.assign(arow[i], lengths[i]);
 
-						// �������������dbidʱ�ǲ��뷽ʽ����ô�������Ҳ��Ҫ���뵽��Ӧ��λ��
+						// 如果上面计算加入dbid时是插入方式，那么结果集中也需要插入到对应的位置
 						if (fidx != -100)
 							itemResults.insert(itemResults.begin() + fidx++, data);
 						else
@@ -134,13 +134,13 @@ public:
 		
 		std::vector<DBID>& dbids = context.dbids[context.dbid];
 
-		// ���û���������ѯ�����
+		// 如果没有数据则查询完毕了
 		if(dbids.size() == 0)
 			return true;
 
-		// �����ǰ�������ӱ���������Ҫ������ѯ�ӱ�
-		// ÿһ��dbid����Ҫ����ӱ��ϵ�����
-		// �������������ӱ�һ�β�ѯ�����е�dbids����Ȼ����䵽�����
+		// 如果当前表存在子表引用则需要继续查询子表
+		// 每一个dbid都需要获得子表上的数据
+		// 在这里我们让子表一次查询出所有的dbids数据然后填充到结果集
 
 		mysql::DBContext::DB_RW_CONTEXTS::iterator iter1 = context.optable.begin();
 		for(; iter1 != context.optable.end(); ++iter1)
@@ -155,11 +155,11 @@ public:
 
 
 	/**
-		���ӱ��в�ѯ����
+		从子表中查询数据
 	*/
 	static bool queryChildDB(DBInterface* pdbi, mysql::DBContext& context, std::vector<DBID>& parentTableDBIDs)
 	{
-		// ����ĳ��dbid���һ�ű��ϵ��������
+		// 根据某个dbid获得一张表上的相关数据
 		SqlStatement* pSqlcmd = new SqlStatementQuery(pdbi, context.tableName, 
 			parentTableDBIDs, 
 			context.dbid, context.items);
@@ -173,7 +173,7 @@ public:
 
 		std::vector<DBID> t_parentTableDBIDs;
 
-		// ����ѯ���Ľ��д��������
+		// 将查询到的结果写入上下文
 		MYSQL_RES * pResult = mysql_store_result(static_cast<DBInterfaceMysql*>(pdbi)->mysql());
 
 		if(pResult)
@@ -188,7 +188,7 @@ public:
 
 				unsigned long *lengths = mysql_fetch_lengths(pResult);
 
-				// ��ѯ���֤�˲�ѯ����ÿ����¼������dbid
+				// 查询命令保证了查询到的每条记录都会有dbid
 				std::stringstream sval;
 				sval << arow[0];
 
@@ -201,11 +201,11 @@ public:
 				DBID parentID;
 				sval >> parentID;
 
-				// ��dbid��¼���б��У������ǰ���������ӱ��������ȥ�ӱ���ÿһ�����dbid��صļ�¼
+				// 将dbid记录到列表中，如果当前表还存在子表引用则会去子表查每一条与此dbid相关的记录
 				std::vector<DBID>& itemDBIDs = context.dbids[parentID];
 				int fidx = -100;
 
-				// �����ǰ���item��dbidС�ڸñ������һ����¼��dbid��С����ô��Ҫ��itemDBIDs��ָ����λ�ò������dbid���Ա�֤��С�����˳��
+				// 如果当前这个item的dbid小于该表下最后一个记录的dbid大小，那么需要在itemDBIDs中指定的位置插入这个dbid，以保证从小到大的顺序
 				if (itemDBIDs.size() > 0 && itemDBIDs[itemDBIDs.size() - 1] > item_dbid)
 				{
 					for (fidx = itemDBIDs.size() - 1; fidx > 0; --fidx)
@@ -223,7 +223,7 @@ public:
 					t_parentTableDBIDs.push_back(item_dbid);
 				}
 
-				// ���������¼����dbid���⻹�����������ݣ���������䵽�������
+				// 如果这条记录除了dbid以外还存在其他数据，则将数据填充到结果集中
 				const uint32 const_fields = 2; // id, parentID
 				if(nfields > const_fields)
 				{
@@ -238,7 +238,7 @@ public:
 						std::string data;
 						data.assign(arow[i], lengths[i]);
 
-						// �����ǰ���item��dbid���ڸñ������м�¼����dbid��С����ô��Ҫ��itemDBIDs��ָ����λ�ò������dbid���Ա�֤��С�����˳��
+						// 如果当前这个item的dbid大于该表下所有记录集的dbid大小，那么需要在itemDBIDs中指定的位置插入这个dbid，以保证从小到大的顺序
 						if (fidx != -100)
 							itemResults.insert(itemResults.begin() + fidx++, data);
 						else
@@ -250,13 +250,13 @@ public:
 			mysql_free_result(pResult);
 		}
 
-		// ���û���������ѯ�����
+		// 如果没有数据则查询完毕了
 		if(t_parentTableDBIDs.size() == 0)
 			return true;
 
-		// �����ǰ�������ӱ���������Ҫ������ѯ�ӱ�
-		// ÿһ��dbid����Ҫ����ӱ��ϵ�����
-		// �������������ӱ�һ�β�ѯ�����е�dbids����Ȼ����䵽�����
+		// 如果当前表存在子表引用则需要继续查询子表
+		// 每一个dbid都需要获得子表上的数据
+		// 在这里我们让子表一次查询出所有的dbids数据然后填充到结果集
 		mysql::DBContext::DB_RW_CONTEXTS::iterator iter1 = context.optable.begin();
 		for(; iter1 != context.optable.end(); ++iter1)
 		{

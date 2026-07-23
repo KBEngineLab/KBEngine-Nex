@@ -64,7 +64,7 @@ public:
 	const std::string& lastShutdownFailReason(){ return lastShutdownFailReason_; }
 
 protected:
-	std::string lastShutdownFailReason_; // ���һ�ιػ�ʧ�ܵ�ԭ��
+	std::string lastShutdownFailReason_; // 最后一次关机失败的原因
 	SHUTDOWN_STATE shuttingdown_;
 };
 

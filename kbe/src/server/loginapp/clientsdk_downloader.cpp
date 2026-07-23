@@ -78,16 +78,16 @@ DWORD ClientSDKDownloader::startWindowsProcessGenSDK(const std::string& file)
 	std::string str = binPath_;
 	str += "/kbcmd.exe";
 
-	// ��˫���Ű����������������Ա���·���д��ڿո񣬴Ӷ�ִ�д���
+	// 用双引号把命令行括起来，以避免路径中存在空格，从而执行错误
 	str = "\"" + str + "\"";
 
-	// ���Ӳ���
+	// 増加参数
 	str += fmt::format(" --clientsdk={} --outpath={}", options_, file);
 
 	wchar_t* szCmdline = KBEngine::strutil::char2wchar(str.c_str());
 
-	// ʹ��machine��ǰ�Ĺ���Ŀ¼��Ϊ�½��̵Ĺ���Ŀ¼��
-	// ΪһЩ�����Ŀ¼���ļ���������һ�µĹ���Ŀ¼������־��
+	// 使用machine当前的工作目录作为新进程的工作目录，
+	// 为一些与相对目录的文件操作操作一致的工作目录（如日志）
 	wchar_t currdir[1024];
 	GetCurrentDirectory(sizeof(currdir), currdir);
 
@@ -128,7 +128,7 @@ uint16 ClientSDKDownloader::starLinuxProcessGenSDK(const std::string& file)
 	{
 		std::string cmdLine = binPath_ + "kbcmd";
 
-		// �ı䵱ǰĿ¼�����ó������ʱ��core���ڴ˴�����
+		// 改变当前目录，以让出问题的时候core能在此处生成
 		//chdir(bin_path.c_str());
 
 		const char *argv[6];
@@ -191,7 +191,7 @@ bool ClientSDKDownloader::loadSDKDatas()
 		if (pid_ <= 0)
 			return false;
 
-		// ����kbcmd�����Ѿ�����
+		// 必须kbcmd进程已经结束
 		SystemInfo::PROCESS_INFOS sysinfos = SystemInfo::getSingleton().getProcessInfo(pid_);
 		if (!sysinfos.error)
 			return false;

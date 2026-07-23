@@ -35,8 +35,8 @@ public:
 	static void finalise();
 
 	/**
-		�Ƿ�ΪHttps/WssЭ��
-		���ؾ���Э��汾
+		是否为Https/Wss协议
+		返回具体协议版本
 	*/
 	static int isSSLProtocal(MemoryStream* s);
 

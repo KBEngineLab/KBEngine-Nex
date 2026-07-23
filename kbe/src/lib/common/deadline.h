@@ -27,7 +27,7 @@ namespace KBEngine
 {
 
 /**
- *	����
+ *	期限
  */
 class Deadline
 {

@@ -13,14 +13,14 @@
 IMPLEMENT_DYNAMIC(CLogWindow, CDialog)
 
 CString  state_flags[8] = {
-	L"�I",
-	L"��",
-	L"�J",
-	L"��",
-	L"�K ",
-	L"��",
-	L"�L",
-	L"��",
+	L"↖",
+	L"↑",
+	L"↗",
+	L"→",
+	L"↘ ",
+	L"↓",
+	L"↙",
+	L"←",
 };
 
 int state_flags_idx = 0;
@@ -350,7 +350,7 @@ void CLogWindow::onConnectionState(bool success, KBEngine::Network::Address addr
 void CLogWindow::OnBnClickedButton1()
 {
 	// TODO: Add your control notification handler code here
-	// �����������ȡ��־
+	// 请求服务器拉取日志
 	CguiconsoleDlg* dlg = static_cast<CguiconsoleDlg*>(theApp.m_pMainWnd);
 	
 	HTREEITEM item = dlg->hasCheckApp(LOGGER_TYPE);

@@ -61,7 +61,7 @@ class MemoryStream;
 #define TABLE_AUTOLOAD_CONST_STR				"autoLoad"
 
 /**
-	db������
+	db表操作
 */
 enum DB_TABLE_OP
 {
@@ -90,7 +90,7 @@ struct ACCOUNT_INFOS
 };
 
 /**
-	ά��entity�����ݿ��еı��е�һ���ֶ�
+	维护entity在数据库中的表中的一个字段
 */
 class EntityTableItem
 {
@@ -143,7 +143,7 @@ public:
 	const PropertyDescription* pPropertyDescription() const { return pPropertyDescription_; }
 
 	/**
-		��ʼ��
+		初始化
 	*/
 	virtual bool initialize(const PropertyDescription* pPropertyDescription, 
 		const DataType* pDataType, std::string itemName) = 0;
@@ -152,22 +152,22 @@ public:
 	const char* tableName() { return tableName_.c_str(); }
 
 	/**
-		ͬ��entity�������ݿ���
+		同步entity表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL) = 0;
 
 	/**
-		��������
+		更新数据
 	*/
 	virtual bool writeItem(DBInterface* pdbi, DBID dbid, MemoryStream* s, ScriptDefModule* pModule) = 0;
 
 	/**
-		��ȡ���е����ݷŵ�����
+		获取所有的数据放到流中
 	*/
 	virtual bool queryTable(DBInterface* pdbi, DBID dbid, MemoryStream* s, ScriptDefModule* pModule) = 0;
 
 protected:
-	// �ֶ�����
+	// 字段名称
 	std::string itemName_;
 	std::string tableName_;
 	int32/*ENTITY_PROPERTY_UID*/ utype_;
@@ -186,7 +186,7 @@ protected:
 };
 
 /*
-	ά��entity�����ݿ��еı�
+	维护entity在数据库中的表
 */
 class EntityTable
 {
@@ -209,27 +209,27 @@ public:
 	const char* tableName(){ return tableName_.c_str(); }
 
 	/**
-		��ʼ��
+		初始化
 	*/
 	virtual bool initialize(ScriptDefModule* sm, std::string name) = 0;
 
 	/**
-		ͬ��entity�������ݿ���
+		同步entity表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi) = 0;
 
 	/**
-		ͬ��entity�����������ݿ���
+		同步entity表索引到数据库中
 	*/
 	virtual bool syncIndexToDB(DBInterface* pdbi) = 0;
 
 	/** 
-		����һ����item
+		创建一个表item
 	*/
 	virtual EntityTableItem* createItem(std::string type, std::string defaultVal) = 0;
 
 	/** 
-		������б��ֶ�
+		获得所有表字段
 	*/
 	const EntityTable::TABLEITEM_MAP& tableItems() const { return tableItems_; }
 	const std::vector<EntityTableItem*>& tableFixedOrderItems() const{ return tableFixedOrderItems_; }
@@ -242,29 +242,29 @@ public:
 	EntityTableItem* findItem(int32/*ENTITY_PROPERTY_UID*/ utype);
 
 	/**
-		���±�
+		更新表
 	*/
 	virtual DBID writeTable(DBInterface* pdbi, DBID dbid, int8 shouldAutoLoad, MemoryStream* s, ScriptDefModule* pModule);
 
 	/**
-		�����ݿ�ɾ��entity
+		从数据库删除entity
 	*/
 	virtual bool removeEntity(DBInterface* pdbi, DBID dbid, ScriptDefModule* pModule);
 
 	/**
-		��ȡ���е����ݷŵ�����
+		获取所有的数据放到流中
 	*/
 	virtual bool queryTable(DBInterface* pdbi, DBID dbid, MemoryStream* s, ScriptDefModule* pModule);
 
 	/**
-		�����Ƿ��Զ�����
+		设置是否自动加载
 	*/
 	virtual void entityShouldAutoLoad(DBInterface* pdbi, DBID dbid, bool shouldAutoLoad){};
 
 	bool hasSync() const { return sync_; }
 
 	/**
-		��ѯ�Զ����ص�ʵ��
+		查询自动加载的实体
 	*/
 	virtual void queryAutoLoadEntities(DBInterface* pdbi, ScriptDefModule* pModule, 
 		ENTITY_ID start, ENTITY_ID end, std::vector<DBID>& outs){}
@@ -274,16 +274,16 @@ public:
 
 protected:
 
-	// ������
+	// 表名称
 	std::string tableName_;
 
-	// ���е��ֶ�
+	// 所有的字段
 	TABLEITEM_MAP tableItems_;
 
-	// ��ScriptDefModule�б���һ�������item����
+	// 和ScriptDefModule中保持一致秩序的item引用
 	std::vector<EntityTableItem*> tableFixedOrderItems_; 
 
-	// �Ƿ�Ϊ�ӱ�
+	// 是否为子表
 	bool isChild_; 
 
 	bool sync_;
@@ -329,7 +329,7 @@ public:
 	}
 
 	/** 
-		������б�
+		获得所有表
 	*/
 	const EntityTables::TABLES_MAP& tables() const { return tables_; }
 
@@ -342,30 +342,30 @@ public:
 	EntityTable* findKBETable(std::string name);
 
 	/**
-		дentity�����ݿ�
+		写entity到数据库
 	*/
 	DBID writeEntity(DBInterface* pdbi, DBID dbid, int8 shouldAutoLoad, MemoryStream* s, ScriptDefModule* pModule);
 
 	/**
-		�����ݿ�ɾ��entity
+		从数据库删除entity
 	*/
 	bool removeEntity(DBInterface* pdbi, DBID dbid, ScriptDefModule* pModule);
 
 	/**
-		��ȡĳ�������е����ݷŵ�����
+		获取某个表所有的数据放到流中
 	*/
 	bool queryEntity(DBInterface* pdbi, DBID dbid, MemoryStream* s, ScriptDefModule* pModule);
 
 	void onTableSyncSuccessfully(KBEShared_ptr<EntityTable> pEntityTable, bool error);
 
 	/**
-		��ѯ�Զ����ص�ʵ��
+		查询自动加载的实体
 	*/
 	void queryAutoLoadEntities(DBInterface* pdbi, ScriptDefModule* pModule, 
 		ENTITY_ID start, ENTITY_ID end, std::vector<DBID>& outs);
 
 protected:
-	// ���еı�
+	// 所有的表
 	TABLES_MAP tables_;
 	TABLES_MAP kbe_tables_;
 

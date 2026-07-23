@@ -43,7 +43,7 @@ class AppForwardItem : public ForwardItem
 public:
 	virtual bool isOK()
 	{
-		// �������һ��׼���õĽ���
+		// 必须存在一个准备好的进程
 		Components::COMPONENTS& cts = Components::getSingleton().getComponents(CELLAPP_TYPE);
 		Components::COMPONENTS::iterator ctiter = cts.begin();
 		for (; ctiter != cts.end(); ++ctiter)
@@ -140,7 +140,7 @@ Cellapp& Cellappmgr::getCellapp(COMPONENT_ID cid)
 		return iter->second;
 	}
 
-	// ������һ���µ�cellapp
+	// 添加了一个新的cellapp
 	Cellapp& cellapp = cellapps_[cid];
 
 	INFO_MSG(fmt::format("Cellappmgr::getCellapp: added new cellapp({0}).\n",
@@ -167,7 +167,7 @@ void Cellappmgr::handleTimeout(TimerHandle handle, void * arg)
 //-------------------------------------------------------------------------------------
 void Cellappmgr::onChannelDeregister(Network::Channel * pChannel)
 {
-	// �����app������
+	// 如果是app死亡了
 	if(pChannel->isInternal())
 	{
 		Components::ComponentInfos* cinfo = Components::getSingleton().findComponent(pChannel);
@@ -258,14 +258,14 @@ COMPONENT_ID Cellappmgr::findFreeCellapp(void)
 		if ((iter->second.flags() & APP_FLAGS_NOT_PARTCIPATING_LOAD_BALANCING) > 0)
 			continue;
 		
-		// ���Ƚ��̱�������ҳ�ʼ�����
+		// 首先进程必须活着且初始化完毕
 		if(!iter->second.isDestroyed() && iter->second.initProgress() > 1.f)
 		{
-			// ���û���κ�ʵ��������������
+			// 如果没有任何实体则无条件分配
 			if(iter->second.numEntities() == 0)
 				return iter->first;
 
-			// �Ƚϲ���¼������С�Ľ������ձ�����
+			// 比较并记录负载最小的进程最终被分配
 			if(minload > iter->second.load() || 
 				(minload == iter->second.load() && numEntities > iter->second.numEntities()))
 			{
@@ -332,9 +332,9 @@ void Cellappmgr::reqCreateCellEntityInNewSpace(Network::Channel* pChannel, Memor
 	COMPONENT_ID componentID;
 	bool hasClient;
 
-	// ���cellappIndexΪ0���������ǿ��ָ��cellapp
-	// ��0������£�ѡ���cellapp������1,2,3,4������
-	// ����Ԥ����4��cellapp�� ���粻��4���� ֻ��3���� ��ô4����1
+	// 如果cellappIndex为0，则代表不强制指定cellapp
+	// 非0的情况下，选择的cellapp可以用1,2,3,4来代替
+	// 假如预期有4个cellapp， 假如不够4个， 只有3个， 那么4代表1
 	uint32 cellappIndex = 0;
 
 	s >> entityType;
@@ -362,7 +362,7 @@ void Cellappmgr::reqCreateCellEntityInNewSpace(Network::Channel* pChannel, Memor
 	{
 		updateBestCellapp();
 
-		// ѡ���ض���cellapp����space
+		// 选择特定的cellapp创建space
 		if (cellappIndex > 0)
 		{
 			uint32 index = (cellappIndex - 1) % cellappSize;
@@ -401,7 +401,7 @@ void Cellappmgr::reqCreateCellEntityInNewSpace(Network::Channel* pChannel, Memor
 
 	std::map< COMPONENT_ID, Cellapp >::iterator cellapp_iter = cellapps_.find(bestCellappID_);
 
-	// Ԥ�Ƚ�ʵ����������
+	// 预先将实体数量增加
 	if (cellapp_iter != cellapps_.end())
 	{
 		DEBUG_MSG(fmt::format("Cellappmgr::reqCreateCellEntityInNewSpace: entityType={}, entityID={}, componentID={}, cellapp(cid={}, load={}, numEntities={}).\n",
@@ -460,7 +460,7 @@ void Cellappmgr::reqRestoreSpaceInCell(Network::Channel* pChannel, MemoryStream&
 		cinfos->pChannel->send(pBundle);
 	}
 
-	// Ԥ�Ƚ�ʵ����������
+	// 预先将实体数量增加
 	std::map< COMPONENT_ID, Cellapp >::iterator cellapp_iter = cellapps_.find(bestCellappID_);
 	if (cellapp_iter != cellapps_.end())
 	{
@@ -532,7 +532,7 @@ void Cellappmgr::addCellappComponentID(COMPONENT_ID cid)
 	if (!isInserted)
 		cellapp_cids_.push_back(cid);
 
-	// �����־�����ҪУ��cellapp�����˳���Ƿ���ȷ�����Դ������ע�ͽ��в���
+	// 输出日志，如果要校验cellapp插入的顺序是否正确，可以打开下面的注释进行测试
 	/*
 	{
 		std::string sCID = "";
@@ -591,7 +591,7 @@ void Cellappmgr::querySpaces(Network::Channel* pChannel, MemoryStream& s)
 
 		(*pBundle) << iter1->first;
 		
-		// �����ǿ�ƣ�����win64�£�����8�ֽڣ���win32����4�ֽ�
+		// 如果不强制，则在win64下，它是8字节，而win32下是4字节
 		(*pBundle) << (uint32)spaces.size(); 
 
 		std::map<SPACE_ID, Space>& allSpaces = spaces.spaces();
@@ -612,8 +612,8 @@ void Cellappmgr::querySpaces(Network::Channel* pChannel, MemoryStream& s)
 			{
 				(*pBundle) << iter3->first;
 
-				// ������Ϣ���ָ��ʵ�ֺ����
-				// ����cell��С��״����Ϣ
+				// 其他信息待分割功能实现后完成
+				// 例如cell大小形状等信息
 			}
 		}
 	}

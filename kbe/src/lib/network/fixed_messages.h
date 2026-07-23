@@ -30,14 +30,14 @@ namespace KBEngine {
 namespace Network
 {
 /*
-	�������м�Э��(ǰ������֮��)����ǿ��Լ����
-	û��ʹ�õ�kbe����Э���Զ��󶨻��Ƶ�ǰ�˿���ʹ�ô˴���ǿ��Լ��Э�顣
+	用来对中间协议(前端与后端之间)进行强制约定。
+	没有使用到kbe整套协议自动绑定机制的前端可以使用此处来强制约定协议。
 */
 class FixedMessages : public Singleton<FixedMessages>
 {
 public:
 
-	// �̶���Э�����ݽṹ
+	// 固定的协议数据结构
 	struct MSGInfo
 	{
 		MessageID msgid;

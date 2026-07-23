@@ -221,7 +221,7 @@ END:
 
 void CConnectRemoteMachineWindow::saveHistory()
 {
-    //����һ��XML���ĵ�����
+    //创建一个XML的文档对象。
     TiXmlDocument *pDocument = new TiXmlDocument();
 
 	int i = 0;
@@ -275,7 +275,7 @@ void CConnectRemoteMachineWindow::saveIpMapping()
 	{
 		for (std::multimap<CString, CString>::iterator iter = m_ipMapping.begin(); iter != m_ipMapping.end();)
 		{
-			// ����Ѿ��������host�ļ�¼�����
+			// 如果已经存在这个host的记录则清空
 			if (iter->first == host)
 				iter = m_ipMapping.erase(iter);
 			else

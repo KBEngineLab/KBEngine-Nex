@@ -46,7 +46,7 @@ namespace KBEngine{
 class PyBots  : public script::ScriptObject
 {
 	/** 
-		���໯ ��һЩpy�������������� 
+		子类化 将一些py操作填充进派生类 
 	*/
 	INSTANCE_SCRIPT_HREADER(PyBots, ScriptObject)	
 public:
@@ -54,7 +54,7 @@ public:
 	~PyBots();
 
 	/** 
-		��¶һЩ�ֵ䷽����python 
+		暴露一些字典方法给python 
 	*/
 	DECLARE_PY_MOTHOD_ARG1(pyHas_key, ENTITY_ID);
 	DECLARE_PY_MOTHOD_ARG0(pyKeys);
@@ -65,7 +65,7 @@ public:
 		PyObject * args, PyObject* kwds);
 
 	/** 
-		map����������� 
+		map操作函数相关 
 	*/
 	static PyObject* mp_subscript(PyObject * self, PyObject * key);
 

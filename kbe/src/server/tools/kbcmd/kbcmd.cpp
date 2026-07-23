@@ -133,7 +133,7 @@ bool KBCMD::initializeBegin()
 bool KBCMD::inInitialize()
 {
 	PythonApp::inInitialize();
-	// �㲥�Լ��ĵ�ַ�������ϵ�����kbemachine
+	// 广播自己的地址给网上上的所有kbemachine
 	Components::getSingleton().pHandler(this);
 	return true;
 }
@@ -190,7 +190,7 @@ int KBCMD::creatDir(const char *pDir)
 	pszDir = strdup(pDir);
 	iLen = strlen(pszDir);
 
-	// �����м�Ŀ¼  
+	// 创建中间目录  
 	for (i = 0; i < iLen; i++)
 	{
 		if (pszDir[i] == '\\' || pszDir[i] == '/')
@@ -200,7 +200,7 @@ int KBCMD::creatDir(const char *pDir)
 
 			pszDir[i] = '\0';
 
-			//���������,����  
+			//如果不存在,创建  
 			iRet = KBE_ACCESS(pszDir, 0);
 			if (iRet != 0)
 			{
@@ -215,7 +215,7 @@ int KBCMD::creatDir(const char *pDir)
 				}
 			}
 
-			//֧��linux,������\����/  
+			//支持linux,将所有\换成/  
 			pszDir[i] = '/';
 		}
 	}

@@ -58,40 +58,40 @@ public:
 	void handleTimeout(TimerHandle handle, void * arg);
 	void handleGameTick();
 
-	/* ��ʼ����ؽӿ� */
+	/* 初始化相关接口 */
 	bool initializeBegin();
 	bool inInitialize();
 	bool initializeEnd();
 	void finalise();
 
-	/** �ҳ�һ������е�cellapp */
+	/** 找出一个最空闲的cellapp */
 	COMPONENT_ID findFreeCellapp(void);
 	void updateBestCellapp();
 
-	/** ����ӿ�
-		baseEntity���󴴽���һ���µ�space��
+	/** 网络接口
+		baseEntity请求创建在一个新的space中
 	*/
 	void reqCreateCellEntityInNewSpace(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ����ӿ�
-		baseEntity���󴴽���һ���µ�space��
+	/** 网络接口
+		baseEntity请求创建在一个新的space中
 	*/
 	void reqRestoreSpaceInCell(Network::Channel* pChannel, MemoryStream& s);
 	
-	/** ����ӿ�
-		��Ϣת���� ��ĳ��app��ͨ����app����Ϣת����ĳ��app��
+	/** 网络接口
+		消息转发， 由某个app想通过本app将消息转发给某个app。
 	*/
 	void forwardMessage(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ����ӿ�
-		����cellapp�����
+	/** 网络接口
+		更新cellapp情况。
 	*/
 	void updateCellapp(Network::Channel* pChannel, COMPONENT_ID componentID, ENTITY_ID numEntities, float load, uint32 flags);
 
-	/** ����ӿ�
-		cellappͬ���Լ��ĳ�ʼ����Ϣ
-		startGlobalOrder: ȫ������˳�� �������ֲ�ͬ���
-		startGroupOrder: ��������˳�� ����������baseapp�еڼ���������
+	/** 网络接口
+		cellapp同步自己的初始化信息
+		startGlobalOrder: 全局启动顺序 包括各种不同组件
+		startGroupOrder: 组内启动顺序， 比如在所有baseapp中第几个启动。
 	*/
 	void onCellappInitProgress(Network::Channel* pChannel, COMPONENT_ID cid, float progress, 
 		COMPONENT_ORDER componentGlobalOrder, COMPONENT_ORDER componentGroupOrder);
@@ -105,30 +105,30 @@ public:
 
 	uint32 numLoadBalancingApp();
 
-	/* ��groupOrderIDΪ�����׼��
-	   ����һ��cellapp component id��cellapp_cids_�б���
+	/* 以groupOrderID为排序基准，
+	   増加一个cellapp component id到cellapp_cids_列表中
 	*/
 	void addCellappComponentID(COMPONENT_ID cid);
 
-	/** ����ӿ�
-	��ѯ������ؽ��̸�����Ϣ
+	/** 网络接口
+	查询所有相关进程负载信息
 	*/
 	void queryAppsLoads(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ����ӿ�
-	��ѯ������ؽ���space��Ϣ
+	/** 网络接口
+	查询所有相关进程space信息
 	*/
 	void querySpaces(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ����ӿ�
-	������ؽ���space��Ϣ��ע�⣺��spaceData����API�ĵ���������spaceData
-	��ָspace��һЩ��Ϣ
+	/** 网络接口
+	更新相关进程space信息，注意：此spaceData并非API文档中描述的spaceData
+	是指space的一些信息
 	*/
 	void updateSpaceData(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ����ӿ�
-	��������ı�space�鿴���������Ӻ�ɾ�����ܣ�
-	�����������²��ҷ������ϲ����ڸõ�ַ�Ĳ鿴�����Զ������������ɾ������ȷ����ɾ��Ҫ��
+	/** 网络接口
+	工具请求改变space查看器（含添加和删除功能）
+	如果是请求更新并且服务器上不存在该地址的查看器则自动创建，如果是删除则明确给出删除要求
 	*/
 	void setSpaceViewer(Network::Channel* pChannel, MemoryStream& s);
 
@@ -142,7 +142,7 @@ protected:
 	std::map< COMPONENT_ID, Cellapp >	cellapps_;
 	std::vector<COMPONENT_ID>			cellapp_cids_;
 
-	// ͨ�����߲鿴space
+	// 通过工具查看space
 	SpaceViewers						spaceViewers_;
 };
 

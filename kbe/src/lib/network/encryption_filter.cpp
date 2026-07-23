@@ -153,7 +153,7 @@ Reason BlowfishFilter::recv(Channel * pChannel, PacketReceiver & receiver, Packe
 
 		if(packetLen_ <= 0)
 		{
-			// �������һ����С�����Խ��, ���򻺴������������һ�����ϲ�Ȼ����
+			// 如果满足一个最小包则尝试解包, 否则缓存这个包待与下一个包合并然后解包
 			if(pPacket->length() >= (PACKET_LENGTH_SIZE + 1 + BLOCK_SIZE))
 			{
 				(*pPacket) >> packetLen_;
@@ -161,7 +161,7 @@ Reason BlowfishFilter::recv(Channel * pChannel, PacketReceiver & receiver, Packe
 				
 				packetLen_ -= 1;
 
-				// ��������������������̻���ܣ� ����ж����������Ҫ������ó���������һ�����ϲ�
+				// 如果包是完整的下面流程会解密， 如果有多余的内容需要将其剪裁出来待与下一个包合并
 				if(pPacket->length() > packetLen_)
 				{
 					MALLOC_PACKET(pPacket_, pPacket->isTCPPacket());
@@ -192,8 +192,8 @@ Reason BlowfishFilter::recv(Channel * pChannel, PacketReceiver & receiver, Packe
 		}
 		else
 		{
-			// �����һ�������������Ϊ������û���������������
-			// ��������������������̻���ܣ� ����ж����������Ҫ������ó���������һ�����ϲ�
+			// 如果上一次有做过解包行为但包还没有完整则继续处理
+			// 如果包是完整的下面流程会解密， 如果有多余的内容需要将其剪裁出来待与下一个包合并
 			if(pPacket->length() > packetLen_)
 			{
 				MALLOC_PACKET(pPacket_, pPacket->isTCPPacket());
@@ -242,8 +242,8 @@ Reason BlowfishFilter::recv(Channel * pChannel, PacketReceiver & receiver, Packe
 		
 		decrypt(pPacket, pPacket);
 
-		// ����������ܱ�֤wpos֮�󲻻��ж���İ�
-		// ����ж���İ����ݻ����pPacket_
+		// 上面的流程能保证wpos之后不会有多余的包
+		// 如果有多余的包数据会放在pPacket_
 		pPacket->wpos((int)(pPacket->wpos() - padSize_));
 
 		packetLen_ = 0;
@@ -270,19 +270,19 @@ Reason BlowfishFilter::recv(Channel * pChannel, PacketReceiver & receiver, Packe
 //-------------------------------------------------------------------------------------
 void BlowfishFilter::encrypt(Packet * pInPacket, Packet * pOutPacket)
 {
-	// BlowFish ÿ��ֻ�ܼ��ܺͽ���8�ֽ�����
-	// ����8�ֽ������0
+	// BlowFish 每次只能加密和解密8字节数据
+	// 不足8字节则填充0
 	uint8 padSize = 0;
 
 	if (pInPacket->length() % BLOCK_SIZE != 0)
 	{
-		// �õ������С
+		// 得到不足大小
 		padSize = BLOCK_SIZE - (pInPacket->length() % BLOCK_SIZE);
 
-		// ��pPacket�������ô��
+		// 向pPacket中填充这么多
 		pInPacket->data_resize(pInPacket->size() + padSize);
 
-		// ���0
+		// 填充0
 		memset(pInPacket->data() + pInPacket->wpos(), 0, padSize);
 
 		pInPacket->wpos((int)(pInPacket->wpos() + padSize));

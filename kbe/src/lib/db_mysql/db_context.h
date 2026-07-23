@@ -29,34 +29,34 @@ namespace KBEngine {
 namespace mysql {
 
 /**
-	��дɾ����ʱ���õ�������ȡ�����д��ĸ�����Ϣ��
+	读写删操作时会用到，包含取到或待写入的各种信息。
 
-	dbid���������������ʵ���dbid���ӱ����ǵ�ǰ��ѯ��dbid
+	dbid：如果是主表就是实体的dbid，子表就是当前查询的dbid
 
-	dbids��������dbids��ֻ��һ��dbid������ʵ���id�����ʵ�����ݴ���������������ӱ����֣���������ݽṹ��������һ���ӱ���ʱ��
-		dbids�����������ӱ�����, ÿ��dbid����ʾ����ӱ��϶�Ӧ��ֵ���Ұ�������˳��ͬʱҲ��ʾ�������ж�Ӧλ�õ�ֵ��
+	dbids：主表上dbids中只有一个dbid，就是实体的id，如果实体数据存在数组类则会有子表出现，当这个数据结构描述的是一个子表的时候
+		dbids是这个数组的子表索引, 每个dbid都表示这个子表上对应的值并且按照排列顺序同时也表示在数组中对应位置的值。
 		dbids = {
-			123 : [xxx, xxx, ...], // 123Ϊ�����ϵ�ĳ��dbid������Ϊ���ӱ����븸��������ĵ�dbids��
+			123 : [xxx, xxx, ...], // 123为父表上的某个dbid，数组为在子表上与父表相关联的的dbids。
 			...
 		}
 
-	items��������������ֶ���Ϣ�������д�����ֶ���Ҳ�ж�Ӧ��Ҫдֵ��
+	items：中有这个表的字段信息，如果是写库则字段中也有对应的要写值。
 
-	optable���ӱ��ṹ
+	optable：子表结构
 
-	results��������ʱ��ѯ��������, ���ݵ����ж�Ӧitems�е�strkey����������dbids��������
-	readresultIdx����Ϊresults�е�������dbids * items�����Ե���ĳЩ�ݹ����ʱ��������ݻ�������readresultIdx��������λ�á�
+	results：读操作时查询到的数据, 数据的排列对应items中的strkey的数量乘以dbids的数量。
+	readresultIdx：因为results中的数量是dbids * items，所以当在某些递归读的时候填充数据会根据这个readresultIdx计算填充的位置。
 
-	parentTableDBID��������dbid
-	parentTableName������������
+	parentTableDBID：父表的dbid
+	parentTableName：父表的名称
 
-	tableName����ǰ��������
+	tableName：当前表的名称
  */
 class DBContext
 {
 public:
 	/**
-		�洢����Ҫ�����ı�item�ṹ
+		存储所有要操作的表item结构
 	*/
 	struct DB_ITEM_DATA
 	{

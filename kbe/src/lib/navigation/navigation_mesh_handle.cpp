@@ -635,7 +635,7 @@ bool NavMeshHandle::_create(int layer, const std::string& resPath, const std::st
 
 	dtNavMesh* mesh = tryReadNavmesh<NavMeshSetHeader>(data, readsize, res, false);
 	
-	// �������ʧ�����Լ�����չ��ʽ
+	// 如果加载失败则尝试加载扩展格式
 	if(!mesh)
 		mesh = tryReadNavmesh<NavMeshSetHeaderEx>(data, readsize, res, true);
 

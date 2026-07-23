@@ -198,7 +198,7 @@ static PyObject* delWatcher(PyObject* self, PyObject* args)
 //-------------------------------------------------------------------------------------
 bool initializePyWatcher(Script* pScript)
 {
-	// ע�����uuid������py
+	// 注册产生uuid方法到py
 	APPEND_SCRIPT_MODULE_METHOD(pScript->getModule(),		addWatcher,			addWatcher,					METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(pScript->getModule(),		delWatcher,			delWatcher,					METH_VARARGS,			0);
 	return true;

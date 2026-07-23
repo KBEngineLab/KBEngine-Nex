@@ -37,14 +37,14 @@ class EventDispatcher;
 }
 
 /*
-	�����app��û���ҵ��κ�cellapp����baseapp���ģ�齫һЩ��Ϣ���������� 
-	�ȴ����µ�cellapp����baseapp������ʼ��ָ��ת����
+	如果在app上没有找到任何cellapp或者baseapp这个模块将一些消息缓存起来， 
+	等待有新的cellapp或者baseapp加入则开始将指令转发。
 */
 
 
 /*
-	��һ����Ϣ���ɹ�ת����������handler����ʣ�������
-	��Ҫ��дprocess
+	当一个消息被成功转寄则调用这个handler处理剩余的事情
+	需要重写process
 */
 class ForwardMessageOverHandler
 {
@@ -75,7 +75,7 @@ public:
 };
 
 /*
-	ת��������Ϣ��ָ�������
+	转发缓存消息到指定组件上
 */
 class ForwardComponent_MessageBuffer : public Task, 
 						public Singleton<ForwardComponent_MessageBuffer>
@@ -103,7 +103,7 @@ private:
 };
 
 /*
-	ת��������Ϣ��ͬ�������������
+	转发缓存消息到同类型任意组件上
 */
 class ForwardAnywhere_MessageBuffer : public Task, 
 						public Singleton<ForwardAnywhere_MessageBuffer>

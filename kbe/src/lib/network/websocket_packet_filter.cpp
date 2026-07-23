@@ -141,7 +141,7 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 
 				reset();
 
-				// ���û�д��������棬�ȳ���ֱ�ӽ�����ͷ�������Ϣ�㹻�ɹ��������������һ��
+				// 如果没有创建过缓存，先尝试直接解析包头，如果信息足够成功解析则继续到下一步
 				pFragmentDatasRemain_ = websocket::WebSocketProtocol::getFrame(pPacket, msg_opcode_, msg_fin_, msg_masked_, 
 					msg_mask_, msg_length_field_, msg_payload_length_, msg_frameType_);
 
@@ -162,8 +162,8 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 			{
 				KBE_ASSERT(pTCPPacket_ != NULL);
 
-				// �����������ʣ���ȡ���ȣ���ô���Կ�ʼ������
-				// ���򽫰��ڴ��������
+				// 长度如果大于剩余读取长度，那么可以开始解析了
+				// 否则将包内存继续缓存
 				if((int32)pPacket->length() >= pFragmentDatasRemain_)
 				{
 					size_t wpos = pPacket->wpos();
@@ -171,36 +171,36 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 
 					pPacket->wpos(rpos + pFragmentDatasRemain_);
 
-					// ���Ƚ���Ҫ���������ӵ�pTCPPacket_
+					// 首先将需要的数据添加到pTCPPacket_
 					pTCPPacket_->append(*(static_cast<MemoryStream*>(pPacket)));
 					
-					// ��дλ�û�ԭ��ȥ
+					// 将写位置还原回去
 					pPacket->wpos(wpos);
 					
-					// �����Ѿ���ȡ������
+					// 丢弃已经读取的数据
 					pPacket->read_skip(pFragmentDatasRemain_);
 					
 					size_t buffer_rpos = pTCPPacket_->rpos();
 					pFragmentDatasRemain_ = websocket::WebSocketProtocol::getFrame(pTCPPacket_, msg_opcode_, msg_fin_, msg_masked_, 
 						msg_mask_, msg_length_field_, msg_payload_length_, msg_frameType_);
 
-					// �����Ȼ����0�� ˵����Ҫ�����հ�
+					// 如果仍然大于0， 说明需要继续收包
 					if(pFragmentDatasRemain_ > 0)
 					{
-						// ����һ��û�н����꣬ ���ǻس�������һ���ٳ��Խ���
+						// 由于一次没有解析完， 我们回撤数据下一次再尝试解析
 						pTCPPacket_->rpos(buffer_rpos);
 
-						// ��ǰ������������ݲ��Ҵ��ڵ���������Ҫ�����ݣ��������һѭ����������
+						// 当前包如果还有数据并且大于等于我们需要的数据，则继续下一循环立即解析
 						if ((int32)pPacket->length() >= pFragmentDatasRemain_)
 							continue;
 					}
 					else
 					{
-						// frame������ϣ����������
+						// frame解析完毕，将对象回收
 						TCPPacket::reclaimPoolObject(pTCPPacket_);
 						pTCPPacket_ = NULL;
 
-						// �Ƿ�������Я�������û���򲻽���data����
+						// 是否有数据携带？如果没有则不进入data解析
 						if(msg_payload_length_ > 0)
 						{
 							fragmentDatasFlag_ = FRAGMENT_MESSAGE_DATAS;
@@ -251,7 +251,7 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 			}
 			else if(msg_frameType_ == websocket::WebSocketProtocol::INCOMPLETE_FRAME)
 			{
-				// �����ȴ��������ݵ���
+				// 继续等待后续内容到达
 			}
 			else if (msg_frameType_ == websocket::WebSocketProtocol::PING_FRAME)
 			{
@@ -304,7 +304,7 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 
 			if (msg_frameType_ == websocket::WebSocketProtocol::PING_FRAME)
 			{
-				// ������ʣ������ݵ���Ϊֹ
+				// 继续等剩余的内容到来为止
 				if (pFragmentDatasRemain_ > 0)
 					continue;
 
@@ -339,7 +339,7 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 				reason = PacketFilter::recv(pChannel, receiver, pTCPPacket_);
 				KBE_ASSERT(reason == REASON_SUCCESS);
 
-				// pTCPPacket_����Ҫ�����������
+				// pTCPPacket_不需要在这里回收了
 				pTCPPacket_ = NULL;
 			}
 

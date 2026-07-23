@@ -268,7 +268,7 @@ void Entity::onUpdatePropertys(MemoryStream& s)
 			s >> uid;
 		}
 
-		// �����λ�û��߳�����Ϣ��
+		// 如果是位置或者朝向信息则
 		if(uid == posuid)
 		{
 			Position3D pos;
@@ -533,7 +533,7 @@ void Entity::onBecomePlayer()
 
 		if(pyClass == NULL)
 		{
-			// ����ǿ����Ҫʵ��Player**��
+			// 不在强制需要实现Player**类
 			PyErr_Clear();
 		}
 		else
@@ -623,7 +623,7 @@ PyObject* Entity::pyMoveToPoint(PyObject_ptr pyDestination, float velocity, floa
 		return 0;
 	}
 
-	// ��������Ϣ��ȡ����
+	// 将坐标信息提取出来
 	script::ScriptVector3::convertPyObjectToVector3(destination, pyDestination);
 	Py_INCREF(userData);
 
@@ -676,7 +676,7 @@ void Entity::cancelController(uint32 id)
 		return;
 	}
 
-	// ��ʱֻ�лص�, ��Ҫ����Ϊ�������ƶ��У���ǰ���ܲ��Ƿǳ�����
+	// 暂时只有回调, 主要是因为用在了移动中，当前可能不是非常合适
 	if(id == (uint32)pMoveHandlerID_)
 		this->stopMove();
 }

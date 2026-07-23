@@ -60,7 +60,7 @@ public:
 	virtual void handleTimeout(TimerHandle handle, void * arg);
 	void handleMainTick();
 
-	/* ��ʼ����ؽӿ� */
+	/* 初始化相关接口 */
 	bool initializeBegin();
 	bool inInitialize();
 	bool initializeEnd();
@@ -70,7 +70,7 @@ public:
 	virtual void onShutdownBegin();
 	virtual void onShutdownEnd();
 
-	/** �źŴ���
+	/** 信号处理
 	*/
 	virtual bool installSignals();
 	virtual void onSignalled(int sigNum);
@@ -80,130 +80,130 @@ public:
 		const std::string& scriptVerInfo, 
 		const std::string& encryptedKey);
 
-	/** ����ӿ�
-		ĳ��client��app��֪���ڻ״̬��
+	/** 网络接口
+		某个client向本app告知处于活动状态。
 	*/
 	void onClientActiveTick(Network::Channel* pChannel);
 
-	/** ����ӿ�
-		�����˺�
+	/** 网络接口
+		创建账号
 	*/
 	bool _createAccount(Network::Channel* pChannel, std::string& accountName, 
 		std::string& password, std::string& datas, ACCOUNT_TYPE type = ACCOUNT_TYPE_NORMAL);
 	void reqCreateAccount(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ����ӿ�
-		����email�˺�
+	/** 网络接口
+		创建email账号
 	*/
 	void reqCreateMailAccount(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ����ӿ�
-		�����˺�
+	/** 网络接口
+		创建账号
 	*/
 	void onReqCreateAccountResult(Network::Channel* pChannel, MemoryStream& s);
 	void onReqCreateMailAccountResult(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ����ӿ�
-		�����˺��������루��������?��
+	/** 网络接口
+		重置账号密码申请（忘记密码?）
 	*/
 	void reqAccountResetPassword(Network::Channel* pChannel, std::string& accountName);
 	void onReqAccountResetPasswordCB(Network::Channel* pChannel, std::string& accountName, std::string& email,
 		SERVER_ERROR_CODE failedcode, std::string& code);
 
-	/** ����ӿ�
-		dbmgr�˺ż����
+	/** 网络接口
+		dbmgr账号激活返回
 	*/
 	void onAccountActivated(Network::Channel* pChannel, std::string& code, bool success);
 
-	/** ����ӿ�
-		dbmgr�˺Ű�email����
+	/** 网络接口
+		dbmgr账号绑定email返回
 	*/
 	void onAccountBindedEmail(Network::Channel* pChannel, std::string& code, bool success);
 
-	/** ����ӿ�
-		dbmgr�˺��������뷵��
+	/** 网络接口
+		dbmgr账号重设密码返回
 	*/
 	void onAccountResetPassword(Network::Channel* pChannel, std::string& code, bool success);
 
-	/** ����ӿ�
-	baseapp�����email������ʱ��Ҫ�ҵ�loginapp�ĵ�ַ��
+	/** 网络接口
+	baseapp请求绑定email（返回时需要找到loginapp的地址）
 	*/
 	void onReqAccountBindEmailAllocCallbackLoginapp(Network::Channel* pChannel, COMPONENT_ID reqBaseappID, ENTITY_ID entityID, std::string& accountName, std::string& email,
 		SERVER_ERROR_CODE failedcode, std::string& code);
 
-	/** ����ӿ�
-		�û���¼������
-		clientType[COMPONENT_CLIENT_TYPE]: ǰ�����(�ֻ��� web�� pcexe��)
-		clientData[str]: ǰ�˸�������(����������ģ� ���總���ֻ��ͺţ� ��������͵�)
-		accountName[str]: �ʺ���
-		password[str]: ����
+	/** 网络接口
+		用户登录服务器
+		clientType[COMPONENT_CLIENT_TYPE]: 前端类别(手机， web， pcexe端)
+		clientData[str]: 前端附带数据(可以是任意的， 比如附带手机型号， 浏览器类型等)
+		accountName[str]: 帐号名
+		password[str]: 密码
 	*/
 	void login(Network::Channel* pChannel, MemoryStream& s);
 
 	/*
-		��¼ʧ��
-		failedcode: ʧ�ܷ����� NETWORK_ERR_SRV_NO_READY:������û��׼����, 
-									NETWORK_ERR_SRV_OVERLOAD:���������ع���, 
-									NETWORK_ERR_NAME_PASSWORD:�û����������벻��ȷ
+		登录失败
+		failedcode: 失败返回码 NETWORK_ERR_SRV_NO_READY:服务器没有准备好, 
+									NETWORK_ERR_SRV_OVERLOAD:服务器负载过重, 
+									NETWORK_ERR_NAME_PASSWORD:用户名或者密码不正确
 	*/
 	void _loginFailed(Network::Channel* pChannel, std::string& loginName, 
 		SERVER_ERROR_CODE failedcode, std::string& datas, bool force = false);
 	
-	/** ����ӿ�
-		dbmgr���صĵ�¼�˺ż����
+	/** 网络接口
+		dbmgr返回的登录账号检测结果
 	*/
 	void onLoginAccountQueryResultFromDbmgr(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ����ӿ�
-		baseappmgr���صĵ�¼���ص�ַ
+	/** 网络接口
+		baseappmgr返回的登录网关地址
 	*/
 	void onLoginAccountQueryBaseappAddrFromBaseappmgr(Network::Channel* pChannel, std::string& loginName, 
 		std::string& accountName, std::string& addr, uint16 port);
 
 
-	/** ����ӿ�
-		dbmgr���ͳ�ʼ��Ϣ
-		startGlobalOrder: ȫ������˳�� �������ֲ�ͬ���
-		startGroupOrder: ��������˳�� ����������baseapp�еڼ���������
+	/** 网络接口
+		dbmgr发送初始信息
+		startGlobalOrder: 全局启动顺序 包括各种不同组件
+		startGroupOrder: 组内启动顺序， 比如在所有baseapp中第几个启动。
 	*/
 	void onDbmgrInitCompleted(Network::Channel* pChannel, COMPONENT_ORDER startGlobalOrder, 
 		COMPONENT_ORDER startGroupOrder, const std::string& digest);
 
-	/** ����ӿ�
-		�ͻ���Э�鵼��
+	/** 网络接口
+		客户端协议导出
 	*/
 	void importClientMessages(Network::Channel* pChannel);
 
-	/** ����ӿ�
-		��������������
+	/** 网络接口
+		错误码描述导出
 	*/
 	void importServerErrorsDescr(Network::Channel* pChannel);
 
-	/** ����ӿ�
-	�ͻ���SDK����
+	/** 网络接口
+	客户端SDK导出
 	*/
 	void importClientSDK(Network::Channel* pChannel, MemoryStream& s);
 
-	// ����汾��ƥ��
+	// 引擎版本不匹配
 	virtual void onVersionNotMatch(Network::Channel* pChannel);
 
-	// ����ű���汾��ƥ��
+	// 引擎脚本层版本不匹配
 	virtual void onScriptVersionNotMatch(Network::Channel* pChannel);
 
-	/** ����ӿ�
-		baseappͬ���Լ��ĳ�ʼ����Ϣ
-		startGlobalOrder: ȫ������˳�� �������ֲ�ͬ���
-		startGroupOrder: ��������˳�� ����������baseapp�еڼ���������
+	/** 网络接口
+		baseapp同步自己的初始化信息
+		startGlobalOrder: 全局启动顺序 包括各种不同组件
+		startGroupOrder: 组内启动顺序， 比如在所有baseapp中第几个启动。
 	*/
 	void onBaseappInitProgress(Network::Channel* pChannel, float progress);
 
 protected:
 	TimerHandle							mainProcessTimer_;
 
-	// ��¼ע���˺Ż�δ��½������
+	// 记录注册账号还未登陆的请求
 	PendingLoginMgr						pendingCreateMgr_;
 
-	// ��¼��¼������������δ������ϵ��˺�
+	// 记录登录到服务器但还未处理完毕的账号
 	PendingLoginMgr						pendingLoginMgr_;
 
 	std::string							digest_;

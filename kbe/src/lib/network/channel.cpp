@@ -216,10 +216,10 @@ bool Channel::initialize(NetworkInterface & networkInterface,
 
 		KBE_ASSERT(pPacketReceiver_->type() == PacketReceiver::TCP_PACKET_RECEIVER);
 
-		// UDP����Ҫע��������
+		// UDP不需要注册描述符
 		pNetworkInterface_->dispatcher().registerReadFileDescriptor(*pEndPoint_, pPacketReceiver_);
 
-		// ��Ҫ��������ʱ��ע��
+		// 需要发送数据时再注册
 		// pPacketSender_ = new TCPPacketSender(*pEndPoint_, *pNetworkInterface_);
 		// pNetworkInterface_->dispatcher().registerWriteFileDescriptor(*pEndPoint_, pPacketSender_);
 	}
@@ -296,7 +296,7 @@ void Channel::startInactivityDetection( float period, float checkPeriod )
 {
 	stopInactivityDetection();
 
-	// �������Ϊ�����򲻼��
+	// 如果周期为负数则不检查
 	if (period > 0.1f)
 	{
 		checkPeriod = std::max(1.f, checkPeriod);
@@ -378,7 +378,7 @@ void Channel::clearState( bool warnOnDiscard /*=false*/ )
 		}
 	}
 
-	// ����ֻ���״̬�����ͷ�
+	// 这里只清空状态，不释放
 	//SAFE_RELEASE(pPacketReader_);
 	//SAFE_RELEASE(pPacketSender_);
 
@@ -390,7 +390,7 @@ void Channel::clearState( bool warnOnDiscard /*=false*/ )
 
 	stopInactivityDetection();
 
-	// ����pEndPointͨ�����ⲿ���룬�����ͷţ�Ƶ�����¼���ʱ�����¸�ֵ
+	// 由于pEndPoint通常由外部给入，必须释放，频道重新激活时会重新赋值
 	if(pEndPoint_)
 	{
 		pEndPoint_->destroySSL();
@@ -523,7 +523,7 @@ void Channel::send(Bundle * pBundle)
 
 		pPacketSender_->processSend(this);
 
-		// ��������������͵�ϵͳ����������ô����poller����
+		// 如果不能立即发送到系统缓冲区，那么交给poller处理
 		if(bundles_.size() > 0 && condemn() == 0 && !isDestroyed())
 		{
 			flags_ |= FLAG_SENDING;
@@ -746,7 +746,7 @@ bool Channel::handshake(Packet* pPacket)
 		int sslVersion = KB_SSL::isSSLProtocal(pPacket);
 		if (sslVersion != -1)
 		{
-			// ���۳ɹ���ʧ�ܶ�����true�����ⲿ�������ݰ��������ȴ�����
+			// 无论成功和失败都返回true，让外部回收数据包并继续等待握手
 			pEndPoint_->setupSSL(sslVersion, pPacket);
 
 			if (pPacket->length() == 0)
@@ -755,14 +755,14 @@ bool Channel::handshake(Packet* pPacket)
 	}
 	else
 	{
-		// ���������sslͨѶ����Ŀǰֻ֧��wss�����Ա���ȴ�websocket���ֳɹ�����ͨ��
+		// 如果开启了ssl通讯，因目前只支持wss，所以必须等待websocket握手成功才算通过
 		if (!websocket::WebSocketProtocol::isWebSocketProtocol(pPacket))
 			return true;
 	}
 
 	flags_ |= FLAG_HANDSHAKE;
 
-	// �˴��ж��Ƿ�Ϊwebsocket��������Э�������
+	// 此处判定是否为websocket或者其他协议的握手
 	if(websocket::WebSocketProtocol::isWebSocketProtocol(pPacket))
 	{
 		channelType_ = CHANNEL_WEB;
@@ -777,7 +777,7 @@ bool Channel::handshake(Packet* pPacket)
 			pFilter_ = new WebSocketPacketFilter(this);
 			DEBUG_MSG(fmt::format("Channel::handshake: websocket({}) successfully!\n", this->c_str()));
 
-			// ������ζ�����true��ֱ�����ֳɹ�
+			// 无论如何都返回true，直到握手成功
 			return true;
 		}
 		else
@@ -879,12 +879,12 @@ Bundle* Channel::createSendBundle()
 		Bundle* pBundle = bundles_.back();
 		Bundle::Packets& packets = pBundle->packets();
 
-		// pBundle��packets[0]��������û�б�����ػ��յĶ���
-		// ������δ�������ܵİ�������Ѿ������˾Ͳ�Ҫ���ظ��ó������ˣ������ⲿ��������������δ�������� 
+		// pBundle和packets[0]都必须是没有被对象池回收的对象
+		// 必须是未经过加密的包，如果已经加密了就不要再重复拿出来用了，否则外部容易向其中添加未加密数据 
 		if (pBundle->packetHaveSpace() &&
 			!packets[0]->encrypted())
 		{
-			// �ȴӶ���ɾ��
+			// 先从队列删除
 			bundles_.pop_back();
 			pBundle->pChannel(this);
 			pBundle->pCurrMsgHandler(NULL);

@@ -54,7 +54,7 @@ public:
 	{
 		TIMEOUT_GAME_TICK = TIMEOUT_SERVERAPP_MAX + 1,
 
-		// ��������������棬��ʾ��ǰ����ö��ֵ�Ƕ���
+		// 这个必须放在最后面，表示当前最大的枚举值是多少
 		TIMEOUT_PYTHONAPP_MAX = TIMEOUT_GAME_TICK
 	};
 
@@ -85,58 +85,58 @@ public:
 
 	virtual void handleTimeout(TimerHandle, void * arg);
 
-	/** ����ӿ�
-		����ִ��һ��pythonָ��
+	/** 网络接口
+		请求执行一段python指令
 	*/
 	void onExecScriptCommand(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
 	/** 
-		console����ʼprofile
+		console请求开始profile
 	*/
 	virtual void startProfile_(Network::Channel* pChannel, std::string profileName, int8 profileType, uint32 timelen);
 
 	/**
-		��ȡapps����״̬, ���ڽű��л�ȡ��ֵ
+		获取apps发布状态, 可在脚本中获取该值
 	*/
 	static PyObject* __py_getAppPublish(PyObject* self, PyObject* args);
 
 	/**
-		���ýű��������ǰ׺
+		设置脚本输出类型前缀
 	*/
 	static PyObject* __py_setScriptLogType(PyObject* self, PyObject* args);
 
 	/**
-		���µ������еĽű�
+		重新导入所有的脚本
 	*/
 	virtual void reloadScript(bool fullReload);
 	virtual void onReloadScript(bool fullReload);
 
 	/**
-		ͨ�����·����ȡ��Դ��ȫ·��
+		通过相对路径获取资源的全路径
 	*/
 	static PyObject* __py_getResFullPath(PyObject* self, PyObject* args);
 
 	/**
-		ͨ�����·���ж���Դ�Ƿ����
+		通过相对路径判断资源是否存在
 	*/
 	static PyObject* __py_hasRes(PyObject* self, PyObject* args);
 
 	/**
-		open�ļ�
+		open文件
 	*/
 	static PyObject* __py_kbeOpen(PyObject* self, PyObject* args);
 
 	/**
-		�г�Ŀ¼�������ļ�
+		列出目录下所有文件
 	*/
 	static PyObject* __py_listPathRes(PyObject* self, PyObject* args);
 
 	/**
-		ƥ�����·�����ȫ·�� 
+		匹配相对路径获得全路径 
 	*/
 	static PyObject* __py_matchPath(PyObject* self, PyObject* args);
 
-	/** Timer����
+	/** Timer操作
 	*/
 	static PyObject* __py_addTimer(PyObject* self, PyObject* args);
 	static PyObject* __py_delTimer(PyObject* self, PyObject* args);

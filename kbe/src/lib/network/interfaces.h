@@ -27,7 +27,7 @@ namespace Network
 class Channel;
 class MessageHandler;
 
-/** ����ӿ����ڽ�����ͨ��Network������Ϣ
+/** 此类接口用于接收普通的Network输入消息
 */
 class InputNotificationHandler
 {
@@ -36,7 +36,7 @@ public:
 	virtual int handleInputNotification(int fd) = 0;
 };
 
-/** ����ӿ����ڽ�����ͨ��Network�����Ϣ
+/** 此类接口用于接收普通的Network输出消息
 */
 class OutputNotificationHandler
 {
@@ -45,7 +45,7 @@ public:
 	virtual int handleOutputNotification(int fd) = 0;
 };
 
-/** ����ӿ����ڽ���һ������ͨ����ʱ��Ϣ
+/** 此类接口用于接收一个网络通道超时消息
 */
 class ChannelTimeOutHandler
 {
@@ -53,7 +53,7 @@ public:
 	virtual void onChannelTimeOut(Channel * pChannel) = 0;
 };
 
-/** ����ӿ����ڽ���һ���ڲ�����ͨ��ȡ��ע��
+/** 此类接口用于接收一个内部网络通道取消注册
 */
 class ChannelDeregisterHandler
 {
@@ -61,7 +61,7 @@ public:
 	virtual void onChannelDeregister(Channel * pChannel) = 0;
 };
 
-/** ����ӿ����ڼ���NetworkStats�¼�
+/** 此类接口用于监听NetworkStats事件
 */
 class NetworkStatsHandler
 {

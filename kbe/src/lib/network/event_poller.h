@@ -46,7 +46,7 @@ struct TcpCompletionData
 	int errorCode;
 
 	// Store one TCP receive completion so upper layers consume data without probing socket readiness again.
-	// ����һ�� TCP ������ɽ�������ϲ���������ʱ�����ظ�̽�� socket readiness��
+	// 保存一次 TCP 接收完成结果，让上层消费数据时不再重复探测 socket readiness。
 };
 
 struct UdpCompletionData
@@ -56,7 +56,7 @@ struct UdpCompletionData
 	int errorCode;
 
 	// Store one UDP datagram completion together with its source address.
-	// ����һ�� UDP ���ݱ���ɽ��������Դ��ַ��
+	// 保存一次 UDP 数据报完成结果及其来源地址。
 };
 
 class EventPoller
@@ -75,35 +75,35 @@ public:
 	virtual int processPendingEvents(double maxWait) = 0;
 	virtual int getFileDescriptor() const;
 
-	// ���ص�ǰ�¼���˵��ȶ����ƣ���������־����ϺͲ���ʶ��ʵ�� IO ģ�͡�
+	// 返回当前事件后端的稳定名称，供启动日志、诊断和测试识别实际 IO 模型。
 	// Return a stable name for the active event backend so startup logs, diagnostics, and tests can identify the actual IO model.
 	virtual const char* ioModelName() const;
 
-	// readiness ��˷��� false�����ģ�ͽ�����ɾ����˷��� true��
+	// readiness 后端返回 false；完成模型接入后由具体后端返回 true。
 	// Readiness backends return false; a completion backend returns true after it is integrated.
 	virtual bool supportsCompletion() const;
 
-	// ����ɶ���ȡ��һ���Ѿ���ɵ� accept��readiness ��˱��� false������ı�ɵ�������
+	// 从完成队列取出一个已经完成的 accept；readiness 后端保持 false，避免改变旧调用链。
 	// Take one completed accept from the completion queue; readiness backends return false to preserve the old call path.
 	virtual bool takeAcceptedSocket(int fd, KBESOCKET& acceptedSocket);
 
-	// ����ɶ���ȡ��һ�� TCP ���ݻ���ֹ״̬����������Ȩ�ڵ��÷����պ�ת�ơ�
+	// 从完成队列取出一段 TCP 数据或终止状态；数据所有权在调用方接收后转移。
 	// Take TCP data or a terminal state from the completion queue; ownership transfers to the caller on success.
 	virtual bool takeTcpReceivedData(int fd, std::vector<char>& data, bool& disconnected, int& errorCode);
 
-	// ����ɶ���ȡ��һ�� UDP ���ݱ�������Դ��ַ��
+	// 从完成队列取出一个 UDP 数据报及其来源地址。
 	// Take one UDP datagram and its source address from the completion queue.
 	virtual bool takeUdpReceivedData(int fd, std::vector<char>& data, Address& srcAddr, int& errorCode);
 
-	// �� TCP ���ݽ�����ɺ���Ŷӣ��ɺ�˷��� false������ʹ��ԭ�� PacketSender ����·����
+	// 将 TCP 数据交给完成后端排队；旧后端返回 false，继续使用原有 PacketSender 发送路径。
 	// Queue TCP data in a completion backend; legacy backends return false and keep the original PacketSender path.
 	virtual bool queueTcpSend(int fd, const void* data, int len);
 
-	// �� UDP ���ݱ�������ɺ���Ŷӣ��ɺ�˷��� false������ԭ�� UDP �������塣
+	// 将 UDP 数据报交给完成后端排队；旧后端返回 false，保持原有 UDP 发送语义。
 	// Queue a UDP datagram in a completion backend; legacy backends return false and preserve existing UDP send semantics.
 	virtual bool queueUdpSend(int fd, const void* data, int len, const Address& dstAddr);
 
-	// ��ѯָ�� socket �Ƿ�������ɺ�˴��������ݣ����ڱ����ظ�ע��д�¼���
+	// 查询指定 socket 是否仍有完成后端待发送数据，用于避免重复注册写事件。
 	// Report whether a socket still has pending completion-backend sends to avoid duplicate write registration.
 	virtual bool hasPendingSend(int fd) const;
 
@@ -112,7 +112,7 @@ public:
 
 	static EventPoller * create();
 
-	// ���ݵ�ǰ����ƽ̨���� 1.x ����Ĭ�Ϻ�����ƣ����ı���ѡ���߼���
+	// 根据当前编译平台返回 1.x 基线默认后端名称，不改变后端选择逻辑。
 	// Return the 1.x baseline backend name for the build platform without changing backend selection logic.
 	static const char* defaultIOModelName();
 

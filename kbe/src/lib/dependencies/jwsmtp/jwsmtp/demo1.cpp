@@ -50,7 +50,7 @@ int main(int argc, char* argv[])
    // display the html if the client is set to show html messages.
    //    m.setmessageHTMLfile("/home/myname/thefile.html");
    
-	//�������ԣ�163֧�ֵ�auth��֤��PLAINģʽ  
+	//经过测试，163支持的auth认证是PLAIN模式  
    m.authtype(jwsmtp::mailer::PLAIN);  
 
    // Build our html from a string. You can also send html as a vector.

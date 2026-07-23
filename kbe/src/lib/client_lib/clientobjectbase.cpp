@@ -198,7 +198,7 @@ void ClientObjectBase::tickSend()
 		return;
 	}
 
-	// �����������tick
+	// 向服务器发送tick
 	uint64 check = uint64( Network::g_channelExternalTimeout * stampsPerSecond() ) / 2;
 	if (timestamp() - lastSentActiveTickTime_ > check)
 	{
@@ -346,10 +346,10 @@ client::Entity* ClientObjectBase::createEntity(const char* entityType, PyObject*
 	if(initProperty)
 		entity->initProperty();
 
-	// ��entity����entities
+	// 将entity加入entities
 	pEntities_->add(eid, entity); 
 
-	// ��ʼ���ű�
+	// 初始化脚本
 	if(isInitializeScript)
 		entity->initializeEntity(params);
 
@@ -415,9 +415,9 @@ ENTITY_ID ClientObjectBase::getViewEntityIDFromStream(MemoryStream& s)
 		uint8 aliasID = 0;
 		s >> aliasID;
 
-		// ���Ϊ0�ҿͻ�����һ�����ص�½���������������ҷ����entity�ڶ����ڼ�һֱ��������״̬
-		// ����Ժ����������, ��Ϊcellapp����һֱ����baseapp����ͬ����Ϣ�� ���ͻ���������ʱδ��
-		// ����˳�ʼ�����迪ʼ���յ�ͬ����Ϣ, ��ʱ����ͻ������
+		// 如果为0且客户端上一步是重登陆或者重连操作并且服务端entity在断线期间一直处于在线状态
+		// 则可以忽略这个错误, 因为cellapp可能一直在向baseapp发送同步消息， 当客户端重连上时未等
+		// 服务端初始化步骤开始则收到同步信息, 此时这里就会出错。
 		if (pEntityIDAliasIDList_.size() <= aliasID)
 			return 0;
 
@@ -448,7 +448,7 @@ bool ClientObjectBase::deregisterEventHandle(EventHandle* pEventHandle)
 //-------------------------------------------------------------------------------------
 bool ClientObjectBase::createAccount()
 {
-	// �����˺�
+	// 创建账号
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(LoginappInterface::reqCreateAccount);
 	(*pBundle) << name_;
@@ -605,7 +605,7 @@ bool ClientObjectBase::login()
 {
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 
-	// �ύ�˺����������¼
+	// 提交账号密码请求登录
 	(*pBundle).newMessage(LoginappInterface::login);
 	(*pBundle) << typeClient_;
 	(*pBundle).appendBlob(clientDatas_);
@@ -640,7 +640,7 @@ void ClientObjectBase::onLogin(Network::Bundle* pBundle)
 //-------------------------------------------------------------------------------------
 bool ClientObjectBase::loginBaseapp()
 {
-	// �����¼����, ���ߵ�������һ��������������
+	// 请求登录网关, 能走到这里来一定是连接了网关
 	connectedBaseapp_ = true;
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
@@ -654,7 +654,7 @@ bool ClientObjectBase::loginBaseapp()
 //-------------------------------------------------------------------------------------
 bool ClientObjectBase::reloginBaseapp()
 {
-	// �����ص�½����, ͨ���ǵ�����֮��ִ��
+	// 请求重登陆网关, 通常是掉线了之后执行
 	connectedBaseapp_ = true;
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
@@ -726,7 +726,7 @@ void ClientObjectBase::onLoginBaseappFailed(Network::Channel * pChannel, SERVER_
 {
 	INFO_MSG(fmt::format("ClientObjectBase::onLoginBaseappFailed: {} failedcode={}!\n", name_, failedcode));
 
-	// ���ߵ�������һ��������������
+	// 能走到这里来一定是连接了网关
 	connectedBaseapp_ = true;
 
 	EventData_LoginBaseappFailed eventdata;
@@ -740,7 +740,7 @@ void ClientObjectBase::onReloginBaseappFailed(Network::Channel * pChannel, SERVE
 {
 	INFO_MSG(fmt::format("ClientObjectBase::onReloginBaseappFailed: {} failedcode={}!\n", name_, failedcode));
 
-	// ���ߵ�������һ��������������
+	// 能走到这里来一定是连接了网关
 	connectedBaseapp_ = true;
 
 	EventData_LoginBaseappFailed eventdata;
@@ -768,7 +768,7 @@ void ClientObjectBase::onCreatedProxies(Network::Channel * pChannel, uint64 rndU
 	entityID_ = eid;
 	rndUUID_ = rndUUID;
 	
-	// ���ߵ�������һ��������������
+	// 能走到这里来一定是连接了网关
 	connectedBaseapp_ = true;
 		
 	BUFFEREDMESSAGE::iterator iter = bufferedCreateEntityMessage_.find(eid);
@@ -781,7 +781,7 @@ void ClientObjectBase::onCreatedProxies(Network::Channel * pChannel, uint64 rndU
 		INFO_MSG(fmt::format("ClientObject::onCreatedProxies({}): rndUUID={} eid={} entityType={}!\n",
 			name_, rndUUID, eid, entityType));
 
-		// ����entity��baseEntityCall
+		// 设置entity的baseEntityCall
 		EntityCall* entitycall = new EntityCall(EntityDef::findScriptModule(entityType.c_str()), 
 			NULL, appID(), eid, ENTITYCALL_TYPE_BASE);
 
@@ -790,7 +790,7 @@ void ClientObjectBase::onCreatedProxies(Network::Channel * pChannel, uint64 rndU
 
 		if(hasBufferedMessage)
 		{
-			// �ȸ��������ٳ�ʼ���ű�
+			// 先更新属性再初始化脚本
 			this->onUpdatePropertys(pChannel, *iter->second.get());
 			bufferedCreateEntityMessage_.erase(iter);
 			pEntity->initializeEntity(NULL);
@@ -810,7 +810,7 @@ void ClientObjectBase::onCreatedProxies(Network::Channel * pChannel, uint64 rndU
 	{
 		if(hasBufferedMessage)
 		{
-			// �ȸ��������ٳ�ʼ���ű�
+			// 先更新属性再初始化脚本
 			this->onUpdatePropertys(pChannel, *iter->second.get());
 			bufferedCreateEntityMessage_.erase(iter);
 			entity->initializeEntity(NULL);
@@ -854,14 +854,14 @@ void ClientObjectBase::onEntityEnterWorld(Network::Channel * pChannel, MemoryStr
 			ScriptDefModule* sm = EntityDef::findScriptModule(scriptType);
 			KBE_ASSERT(sm);
 			
-			// ����entity��cellEntityCall
+			// 设置entity的cellEntityCall
 			EntityCall* entitycall = new EntityCall(EntityDef::findScriptModule(sm->getName()), 
 				NULL, appID(), eid, ENTITYCALL_TYPE_CELL);
 
 			entity = createEntity(sm->getName(), NULL, false, eid, true, NULL, entitycall);
 			KBE_ASSERT(entity != NULL);
 
-			// �ȸ��������ٳ�ʼ���ű�
+			// 先更新属性再初始化脚本
 			this->onUpdatePropertys(pChannel, *iter->second.get());
 			bufferedCreateEntityMessage_.erase(iter);
 			entity->isOnGround(isOnGround > 0);
@@ -889,7 +889,7 @@ void ClientObjectBase::onEntityEnterWorld(Network::Channel * pChannel, MemoryStr
 			entity->clientPos(entity->position());
 			entity->clientDir(entity->direction());
 
-			// ��ʼ��һ�·���˵�ǰ��λ��
+			// 初始化一下服务端当前的位置
 			entity->serverPosition(entity->position());
 
 			DEBUG_MSG(fmt::format("ClientObjectBase::onPlayerEnterWorld: {}({}), isOnGround({}), appID({}).\n",
@@ -897,15 +897,15 @@ void ClientObjectBase::onEntityEnterWorld(Network::Channel * pChannel, MemoryStr
 
 			KBE_ASSERT(entity->cellEntityCall() == NULL);
 
-			// ����entity��cellEntityCall
+			// 设置entity的cellEntityCall
 			EntityCall* entitycall = new EntityCall(entity->pScriptModule(), 
 				NULL, appID(), eid, ENTITYCALL_TYPE_CELL);
 
 			entity->cellEntityCall(entitycall);
 
-			// ��ȫ����� �������һ��
-			// ����������ʹ��giveClientTo�л�����Ȩ
-			// ֮ǰ��ʵ���Ѿ��������磬 �л����ʵ��Ҳ�������磬 ������ܻ����֮ǰ�Ǹ�ʵ������������Ϣ
+			// 安全起见， 这里清空一下
+			// 如果服务端上使用giveClientTo切换控制权
+			// 之前的实体已经进入世界， 切换后的实体也进入世界， 这里可能会残留之前那个实体进入世界的信息
 			pEntityIDAliasIDList_.clear();
 			std::vector<ENTITY_ID> excludes;
 			excludes.push_back(entityID_);
@@ -972,7 +972,7 @@ void ClientObjectBase::onEntityLeaveWorld(Network::Channel * pChannel, ENTITY_ID
 
 	eventHandler_.fire(&eventdata);
 
-	// ����������
+	// 如果不是玩家
 	if(entityID_ != eid)
 	{
 		destroyEntity(eid, false);
@@ -1014,7 +1014,7 @@ void ClientObjectBase::onEntityEnterSpace(Network::Channel * pChannel, MemoryStr
 	entity->clientPos(entity->position());
 	entity->clientDir(entity->direction());
 
-	// ��ʼ��һ�·���˵�ǰ��λ��
+	// 初始化一下服务端当前的位置
 	entity->serverPosition(entity->position());
 
 	EventData_EnterSpace eventdata;
@@ -1236,7 +1236,7 @@ void ClientObjectBase::updatePlayerToServer()
         pServerChannel_->send(pBundle);
     }
 
-    // ͬ������controlled entity��λ���볯��
+    // 同步所有controlled entity的位置与朝向
     std::list<client::Entity *>::iterator itr = controlledEntities_.begin();
     for (; itr != controlledEntities_.end(); itr++)
     {
@@ -2145,9 +2145,9 @@ void ClientObjectBase::_updateVolatileData(ENTITY_ID entityID, float x, float y,
 	client::Entity* entity = pEntities_->find(entityID);
 	if(entity == NULL)
 	{
-		// ���Ϊ0�ҿͻ�����һ�����ص�½���������������ҷ����entity�ڶ����ڼ�һֱ��������״̬
-		// ����Ժ����������, ��Ϊcellapp����һֱ����baseapp����ͬ����Ϣ�� ���ͻ���������ʱδ��
-		// ����˳�ʼ�����迪ʼ���յ�ͬ����Ϣ, ��ʱ����ͻ������
+		// 如果为0且客户端上一步是重登陆或者重连操作并且服务端entity在断线期间一直处于在线状态
+		// 则可以忽略这个错误, 因为cellapp可能一直在向baseapp发送同步消息， 当客户端重连上时未等
+		// 服务端初始化步骤开始则收到同步信息, 此时这里就会出错。
 		ERROR_MSG(fmt::format("ClientObjectBase::onUpdateData_xz_yp: not found entity({}).\n", entityID));
 		return;
 	}
@@ -2159,7 +2159,7 @@ void ClientObjectBase::_updateVolatileData(ENTITY_ID entityID, float x, float y,
 		return;
 	}
 
-	// С��0������
+	// 小于0不设置
 	if(isOnGround >= 0)
 		entity->isOnGround(isOnGround > 0);
 

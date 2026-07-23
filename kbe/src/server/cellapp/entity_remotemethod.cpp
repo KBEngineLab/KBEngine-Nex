@@ -82,7 +82,7 @@ PyObject* EntityRemoteMethod::tp_call(PyObject* self, PyObject* args,
 		return RemoteEntityMethod::tp_call(self, args, kwds);
 	}
 	
-	// ����ǵ��ÿͻ��˷����� ���Ǽ�¼�¼����Ҽ�¼����
+	// 如果是调用客户端方法， 我们记录事件并且记录带宽
 	if(methodDescription->checkArgs(args))
 	{
 		Network::Bundle* pBundle = pChannel->createSendBundle();
@@ -131,7 +131,7 @@ PyObject* EntityRemoteMethod::tp_call(PyObject* self, PyObject* args,
 				DebugHelper::getSingleton().changeLogger(COMPONENT_NAME_EX(g_componentType));																				
 		}
 
-		// ��¼����¼���������������С
+		// 记录这个事件产生的数据量大小
 		g_privateClientEventHistoryStats.trackEvent(pEntity->scriptName(), 
 			methodDescription->getName(), 
 			pBundle->currMsgLength(), 

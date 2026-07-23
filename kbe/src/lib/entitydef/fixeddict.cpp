@@ -24,7 +24,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{ 
 
-/** python map��������Ҫ�ķ����� */
+/** python map操作所需要的方法表 */
 PyMappingMethods FixedDict::mappingMethods =
 {
 	(lenfunc)FixedDict::mp_length,					// mp_length
@@ -32,7 +32,7 @@ PyMappingMethods FixedDict::mappingMethods =
 	(objobjargproc)FixedDict::mp_ass_subscript		// mp_ass_subscript
 };
 
-// �ο� objects/dictobject.c
+// 参考 objects/dictobject.c
 // Hack to implement "key in dict"
 PySequenceMethods FixedDict::mappingSequenceMethods = 
 {
@@ -181,7 +181,7 @@ void FixedDict::initialize(MemoryStream* streamInitData, bool isPersistentsStrea
 			PyObject* val1 = iter->second->dataType->parseDefaultStr("");
 			PyDict_SetItemString(pyDict_, iter->first.c_str(), val1);
 			
-			// ����PyDict_SetItem���������������Ҫ��
+			// 由于PyDict_SetItem会增加引用因此需要减
 			Py_DECREF(val1);
 		}
 		else
@@ -203,7 +203,7 @@ void FixedDict::initialize(MemoryStream* streamInitData, bool isPersistentsStrea
 
 			PyDict_SetItemString(pyDict_, iter->first.c_str(), val1);
 			
-			// ����PyDict_SetItem���������������Ҫ��
+			// 由于PyDict_SetItem会增加引用因此需要减
 			Py_DECREF(val1);
 		}
 	}
@@ -320,7 +320,7 @@ int FixedDict::mp_ass_subscript(PyObject* self, PyObject* key, PyObject* value)
 
 	int ret = PyDict_SetItem(fixedDict->pyDict_, key, val1);
 	
-	// ����PyDict_SetItem���������������Ҫ��
+	// 由于PyDict_SetItem会增加引用因此需要减
 	Py_DECREF(val1);
 
 	return ret;
@@ -393,7 +393,7 @@ PyObject* FixedDict::update(PyObject* args)
 
 			PyDict_SetItemString(pyDict_, iter->first.c_str(), val1);
 			
-			// ����PyDict_SetItem���������������Ҫ��
+			// 由于PyDict_SetItem会增加引用因此需要减
 			Py_DECREF(val1);
 		}
 	}

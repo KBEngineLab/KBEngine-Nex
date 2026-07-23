@@ -34,7 +34,7 @@ class PyUrl
 {						
 public:	
 	/** 
-		��ʼ��
+		初始化
 	*/
 	static bool initialize(Script* pScript);
 	static void finalise(void);
@@ -44,7 +44,7 @@ public:
 	static void onHttpCallback(bool success, const Network::Http::Request& pRequest, const std::string& data);
 
 private:
-	static bool	isInit; // �Ƿ��Ѿ�����ʼ��
+	static bool	isInit; // 是否已经被初始化
 	static std::map<PyObject*, PyObjectPtr> pyCallbacks;
 
 };

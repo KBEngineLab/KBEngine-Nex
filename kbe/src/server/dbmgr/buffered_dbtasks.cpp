@@ -121,7 +121,7 @@ EntityDBTask* Buffered_DBTasks::tryGetNextTask(EntityDBTask* pTask)
 		std::pair<ENTITYID_TASKS_MAP::iterator, ENTITYID_TASKS_MAP::iterator> range = 
 			entityid_tasks_.equal_range(pTask->EntityDBTask_entityID());  
 
-		// ���û���������˳�
+		// 如果没有任务则退出
 		if (range.first == range.second)
 		{
 			mutex_.unlockMutex();
@@ -143,7 +143,7 @@ EntityDBTask* Buffered_DBTasks::tryGetNextTask(EntityDBTask* pTask)
 		std::pair<DBID_TASKS_MAP::iterator, DBID_TASKS_MAP::iterator> range = 
 			dbid_tasks_.equal_range(pTask->EntityDBTask_entityDBID());  
 
-		// ���û���������˳�
+		// 如果没有任务则退出
 		if (range.first == range.second)
 		{
 			mutex_.unlockMutex();

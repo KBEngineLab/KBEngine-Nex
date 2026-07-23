@@ -33,7 +33,7 @@ class EntityTable;
 class EntityTables;
 
 /*
-	���ݿ��߳����������
+	数据库线程任务基础类
 */
 
 class DBTaskBase : public thread::TPTask
@@ -61,7 +61,7 @@ protected:
 };
 
 /**
-	ִ��һ��sql���
+	执行一条sql语句
 */
 class DBTaskSyncTable : public DBTaskBase
 {

@@ -30,7 +30,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{ namespace script{
 
-/** �ű�ϵͳ·�� */
+/** 脚本系统路径 */
 #ifdef _LP64
 #define SCRIPT_PATH													\
 					L"../../res/scripts;"							\
@@ -109,7 +109,7 @@ public:
 	virtual ~Script();
 	
 	/** 
-		��װ��ж�ؽű�ģ�� 
+		安装和卸载脚本模块 
 	*/
 	virtual bool install(const wchar_t* pythonHomeDir, std::wstring pyPaths, 
 		const char* moduleName, COMPONENT_TYPE componentType);
@@ -119,27 +119,27 @@ public:
 	bool installExtraModule(const char* moduleName);
 
 	/** 
-		����һ����չ�ӿڵ�������չģ�� 
+		添加一个扩展接口到引擎扩展模块 
 	*/
 	bool registerExtraMethod(const char* attrName, PyMethodDef* pyFunc);
 
 	/** 
-		����һ����չ���Ե�������չģ�� 
+		添加一个扩展属性到引擎扩展模块 
 	*/
 	bool registerExtraObject(const char* attrName, PyObject* pyObj);
 
 	/** 
-		��ȡ�ű�����ģ�� 
+		获取脚本基础模块 
 	*/
 	INLINE PyObject* getModule(void) const;
 
 	/** 
-		��ȡ�ű���չģ�� 
+		获取脚本扩展模块 
 	*/
 	INLINE PyObject* getExtraModule(void) const;
 
 	/**
-		��ȡ�ű���ʼ��ʱ����ģ��
+		获取脚本初始化时导入模块
 	*/
 	INLINE PyObject* getSysInitModules(void) const;
 
@@ -157,8 +157,8 @@ public:
 
 protected:
 	PyObject* 					module_;
-	PyObject*					extraModule_;		// ��չ�ű�ģ��
-	PyObject*					sysInitModules_;	// ��ʼʱsys���ص�ģ��
+	PyObject*					extraModule_;		// 扩展脚本模块
+	PyObject*					sysInitModules_;	// 初始时sys加载的模块
 
 	ScriptStdOutErr*			pyStdouterr_;
 } ;

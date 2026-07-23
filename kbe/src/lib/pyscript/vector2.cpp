@@ -53,7 +53,7 @@ PyNumberMethods ScriptVector2::numberMethods =
 	ScriptVector2::py_negative,			//unaryfunc nb_negative;
 	ScriptVector2::py_positive,			//unaryfunc nb_positive;
 	0,									//unaryfunc nb_absolute;
-	ScriptVector2::py_nonzero,			//inquiry nb_nonzero  nb_nonzero������Ϊnb_bool,__nonzero__()������Ϊ__bool__();
+	ScriptVector2::py_nonzero,			//inquiry nb_nonzero  nb_nonzero重命名为nb_bool,__nonzero__()重命名为__bool__();
 	0,									//unaryfunc nb_invert;
 	0,									//binaryfunc nb_lshift;
 	0,									//binaryfunc nb_rshift;
@@ -528,7 +528,7 @@ PyObject* ScriptVector2::py_positive(PyObject *self)
 int ScriptVector2::py_nonzero(PyObject *self)
 {
 	ScriptVector2* sv = static_cast<ScriptVector2*>(self);
-	// ���
+	// 点乘
 	Vector2 v = sv->getVector();
 	float val = v.x * v.x + v.y * v.y;
 	return val > 0.f;
@@ -617,7 +617,7 @@ PyObject* ScriptVector2::__py_pyDistTo(PyObject* self, PyObject* args)
 	convertPyObjectToVector2(v1, pyVal);
 	
 	Vector2 rv = (v - v1);
-	return PyFloat_FromDouble(KBEVec2Length(&rv)); //���㳤�Ȳ�����
+	return PyFloat_FromDouble(KBEVec2Length(&rv)); //计算长度并返回
 }
 
 //-------------------------------------------------------------------------------------
@@ -643,7 +643,7 @@ PyObject* ScriptVector2::__py_pyDistSqrTo(PyObject* self, PyObject* args)
 	convertPyObjectToVector2(v1, pyVal);
 	
 	Vector2 rv = (v - v1);
-	return PyFloat_FromDouble(KBEVec2LengthSq(&rv)); //�����˲�����
+	return PyFloat_FromDouble(KBEVec2LengthSq(&rv)); //计算点乘并返回
 }
 
 //-------------------------------------------------------------------------------------
@@ -757,7 +757,7 @@ PyObject* ScriptVector2::__py_pySet(PyObject* self, PyObject* args)
 	bool good = false;
 	Vector2 v;
 
-	// �������ֻ��1��Ԫ��
+	// 如果参数只有1个元素
 	int tupleSize = (int)PyTuple_Size(args);
 	if(tupleSize == 1)
 	{

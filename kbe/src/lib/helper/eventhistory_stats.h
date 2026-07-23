@@ -26,7 +26,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine { 
 
 /*
-	��¼event_history����
+	记录event_history流量
 */
 class EventHistoryStats
 {

@@ -35,7 +35,7 @@ class EntityTableMysql;
 #define MYSQL_ENGINE_TYPE "InnoDB"
 
 /*
-	ά��entity�����ݿ���е�һ���ֶ�
+	维护entity在数据库表中的一个字段
 */
 class EntityTableItemMysqlBase : public EntityTableItem
 {
@@ -44,7 +44,7 @@ public:
 	  EntityTableItem(itemDBType, datalength, flags),
 	  mysqlItemtype_(mysqlItemtype)
 	{
-		// ��¼�����������õ����б��
+		// 记录下我们所设置的所有标记
 		ALL_MYSQL_SET_FLAGS |= flags;
 
 		memset(db_item_name_, 0, MAX_BUF);
@@ -57,33 +57,33 @@ public:
 	uint8 type() const{ return TABLE_ITEM_TYPE_UNKONWN; }
 
 	/**
-		��ʼ��
+		初始化
 	*/
 	virtual bool initialize(const PropertyDescription* pPropertyDescription, 
 		const DataType* pDataType, std::string name);
 
 	/**
-		ͬ��entity�������ݿ���
+		同步entity表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL) = 0;
 
 	/**
-		��������
+		更新数据
 	*/
 	virtual bool writeItem(DBInterface* pdbi, DBID dbid, MemoryStream* s, ScriptDefModule* pModule){ return true; }
 
 	/**
-		��ѯ��
+		查询表
 	*/
 	virtual bool queryTable(DBInterface* pdbi, DBID dbid, MemoryStream* s, ScriptDefModule* pModule){ return true; }
 
 	/**
-		��ȡĳ�������е����ݷŵ�����
+		获取某个表所有的数据放到流中
 	*/
 	virtual void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID){};
 
 	/**
-		��ȡ��Ҫ�洢�ı����� �ֶ�����ת��Ϊsql�洢ʱ���ַ���ֵ
+		获取需要存储的表名， 字段名和转换为sql存储时的字符串值
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context) = 0;
 	virtual void getReadSqlItem(mysql::DBContext& context) = 0;
@@ -113,17 +113,17 @@ public:
 	uint8 type() const{ return TABLE_ITEM_TYPE_DIGIT; }
 
 	/**
-		ͬ��entity�������ݿ���
+		同步entity表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		��ȡĳ�������е����ݷŵ�����
+		获取某个表所有的数据放到流中
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		��ȡ��Ҫ�洢�ı����� �ֶ�����ת��Ϊsql�洢ʱ���ַ���ֵ
+		获取需要存储的表名， 字段名和转换为sql存储时的字符串值
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -146,17 +146,17 @@ public:
 	uint8 type() const{ return TABLE_ITEM_TYPE_STRING; }
 
 	/**
-		ͬ��entity�������ݿ���
+		同步entity表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		��ȡĳ�������е����ݷŵ�����
+		获取某个表所有的数据放到流中
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		��ȡ��Ҫ�洢�ı����� �ֶ�����ת��Ϊsql�洢ʱ���ַ���ֵ
+		获取需要存储的表名， 字段名和转换为sql存储时的字符串值
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -176,17 +176,17 @@ public:
 	uint8 type() const{ return TABLE_ITEM_TYPE_UNICODE; }
 
 	/**
-		ͬ��entity�������ݿ���
+		同步entity表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		��ȡĳ�������е����ݷŵ�����
+		获取某个表所有的数据放到流中
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		��ȡ��Ҫ�洢�ı����� �ֶ�����ת��Ϊsql�洢ʱ���ַ���ֵ
+		获取需要存储的表名， 字段名和转换为sql存储时的字符串值
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -206,17 +206,17 @@ public:
 	uint8 type() const{ return TABLE_ITEM_TYPE_PYTHON; }
 
 	/**
-		ͬ��entity�������ݿ���
+		同步entity表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		��ȡĳ�������е����ݷŵ�����
+		获取某个表所有的数据放到流中
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		��ȡ��Ҫ�洢�ı����� �ֶ�����ת��Ϊsql�洢ʱ���ַ���ֵ
+		获取需要存储的表名， 字段名和转换为sql存储时的字符串值
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -236,17 +236,17 @@ public:
 	uint8 type() const{ return TABLE_ITEM_TYPE_BLOB; }
 
 	/**
-		ͬ��entity�������ݿ���
+		同步entity表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		��ȡĳ�������е����ݷŵ�����
+		获取某个表所有的数据放到流中
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		��ȡ��Ҫ�洢�ı����� �ֶ�����ת��Ϊsql�洢ʱ���ַ���ֵ
+		获取需要存储的表名， 字段名和转换为sql存储时的字符串值
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -268,17 +268,17 @@ public:
 	virtual bool isSameKey(std::string key);
 
 	/**
-		ͬ��entity�������ݿ���
+		同步entity表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		��ȡĳ�������е����ݷŵ�����
+		获取某个表所有的数据放到流中
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		��ȡ��Ҫ�洢�ı����� �ֶ�����ת��Ϊsql�洢ʱ���ַ���ֵ
+		获取需要存储的表名， 字段名和转换为sql存储时的字符串值
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -309,17 +309,17 @@ public:
 	virtual bool isSameKey(std::string key);
 
 	/**
-		ͬ��entity�������ݿ���
+		同步entity表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		��ȡĳ�������е����ݷŵ�����
+		获取某个表所有的数据放到流中
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		��ȡ��Ҫ�洢�ı����� �ֶ�����ת��Ϊsql�洢ʱ���ַ���ֵ
+		获取需要存储的表名， 字段名和转换为sql存储时的字符串值
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -350,17 +350,17 @@ public:
 	virtual bool isSameKey(std::string key);
 
 	/**
-		ͬ��entity�������ݿ���
+		同步entity表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		��ȡĳ�������е����ݷŵ�����
+		获取某个表所有的数据放到流中
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		��ȡ��Ҫ�洢�ı����� �ֶ�����ת��Ϊsql�洢ʱ���ַ���ֵ
+		获取需要存储的表名， 字段名和转换为sql存储时的字符串值
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -389,17 +389,17 @@ public:
 	uint8 type() const{ return TABLE_ITEM_TYPE_ENTITYCALL; }
 
 	/**
-		ͬ��entity�������ݿ���
+		同步entity表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		��ȡĳ�������е����ݷŵ�����
+		获取某个表所有的数据放到流中
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		��ȡ��Ҫ�洢�ı����� �ֶ�����ת��Ϊsql�洢ʱ���ַ���ֵ
+		获取需要存储的表名， 字段名和转换为sql存储时的字符串值
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -420,7 +420,7 @@ public:
 	virtual bool isSameKey(std::string key);
 
 	/**
-		��ʼ��
+		初始化
 	*/
 	virtual bool initialize(const PropertyDescription* pPropertyDescription, 
 		const DataType* pDataType, std::string name);
@@ -428,17 +428,17 @@ public:
 	uint8 type() const{ return TABLE_ITEM_TYPE_FIXEDARRAY; }
 
 	/**
-		ͬ��entity�������ݿ���
+		同步entity表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		��ȡĳ�������е����ݷŵ�����
+		获取某个表所有的数据放到流中
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		��ȡ��Ҫ�洢�ı����� �ֶ�����ת��Ϊsql�洢ʱ���ַ���ֵ
+		获取需要存储的表名， 字段名和转换为sql存储时的字符串值
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -467,23 +467,23 @@ public:
 	virtual bool isSameKey(std::string key);
 
 	/**
-		��ʼ��
+		初始化
 	*/
 	virtual bool initialize(const PropertyDescription* pPropertyDescription, 
 		const DataType* pDataType, std::string name);
 
 	/**
-		ͬ��entity�������ݿ���
+		同步entity表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		��ȡĳ�������е����ݷŵ�����
+		获取某个表所有的数据放到流中
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		��ȡ��Ҫ�洢�ı����� �ֶ�����ת��Ϊsql�洢ʱ���ַ���ֵ
+		获取需要存储的表名， 字段名和转换为sql存储时的字符串值
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -493,12 +493,12 @@ public:
 	uint32 getItemDatabaseLength(const std::string& name);
 
 protected:
-	EntityTableItemMysql_FIXED_DICT::FIXEDDICT_KEYTYPES			keyTypes_;		// ����̶��ֵ���ĸ���key������
+	EntityTableItemMysql_FIXED_DICT::FIXEDDICT_KEYTYPES			keyTypes_;		// 这个固定字典里的各个key的类型
 };
 
 
 /*
-	ά��entity�����ݿ��еı�
+	维护entity在数据库中的表
 */
 class EntityTableMysql : public EntityTable
 {
@@ -507,55 +507,55 @@ public:
 	virtual ~EntityTableMysql();
 	
 	/**
-		��ʼ��
+		初始化
 	*/
 	virtual bool initialize(ScriptDefModule* sm, std::string name);
 
 	/**
-		ͬ��entity�������ݿ���
+		同步entity表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi);
 
 	/**
-		ͬ��������
+		同步表索引
 	*/
 	virtual bool syncIndexToDB(DBInterface* pdbi);
 
 	/** 
-		����һ����item
+		创建一个表item
 	*/
 	virtual EntityTableItem* createItem(std::string type, std::string defaultVal);
 
 	DBID writeTable(DBInterface* pdbi, DBID dbid, int8 shouldAutoLoad, MemoryStream* s, ScriptDefModule* pModule);
 
 	/**
-		�����ݿ�ɾ��entity
+		从数据库删除entity
 	*/
 	bool removeEntity(DBInterface* pdbi, DBID dbid, ScriptDefModule* pModule);
 
 	/**
-		��ȡ���е����ݷŵ�����
+		获取所有的数据放到流中
 	*/
 	virtual bool queryTable(DBInterface* pdbi, DBID dbid, MemoryStream* s, ScriptDefModule* pModule);
 
 	/**
-		�����Ƿ��Զ�����
+		设置是否自动加载
 	*/
 	virtual void entityShouldAutoLoad(DBInterface* pdbi, DBID dbid, bool shouldAutoLoad);
 
 	/**
-		��ѯ�Զ����ص�ʵ��
+		查询自动加载的实体
 	*/
 	virtual void queryAutoLoadEntities(DBInterface* pdbi, ScriptDefModule* pModule, 
 		ENTITY_ID start, ENTITY_ID end, std::vector<DBID>& outs);
 
 	/**
-		��ȡĳ�������е����ݷŵ�����
+		获取某个表所有的数据放到流中
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		��ȡ��Ҫ�洢�ı����� �ֶ�����ת��Ϊsql�洢ʱ���ַ���ֵ
+		获取需要存储的表名， 字段名和转换为sql存储时的字符串值
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);

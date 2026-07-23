@@ -153,7 +153,7 @@ bool Script::install(const wchar_t* pythonHomeDir, std::wstring pyPaths,
 {
 	APPEND_PYSYSPATH(pyPaths);
 
-	// ������python�Ļ�������
+	// 先设置python的环境变量
 	Py_SetPythonHome(const_cast<wchar_t*>(pythonHomeDir));								
 
 #if KBE_PLATFORM != PLATFORM_WIN32
@@ -175,7 +175,7 @@ bool Script::install(const wchar_t* pythonHomeDir, std::wstring pyPaths,
 
 	Py_SetPath(pyPaths.c_str());
 
-	// python�������ĳ�ʼ��  
+	// python解释器的初始化  
 	Py_Initialize();
     if (!Py_IsInitialized())
     {
@@ -188,7 +188,7 @@ bool Script::install(const wchar_t* pythonHomeDir, std::wstring pyPaths,
 	PySys_SetArgvEx(0, NULL, 0);
 	PyObject *m = PyImport_AddModule("__main__");
 
-	// ����һ���ű�����ģ��
+	// 添加一个脚本基础模块
 	module_ = PyImport_AddModule(moduleName);
 	if (module_ == NULL)
 		return false;
@@ -203,23 +203,23 @@ bool Script::install(const wchar_t* pythonHomeDir, std::wstring pyPaths,
 	
 	PyEval_InitThreads();
 
-	// ע�����uuid������py
+	// 注册产生uuid方法到py
 	APPEND_SCRIPT_MODULE_METHOD(module_,		genUUID64,			__py_genUUID64,					METH_VARARGS,			0);
 
-	// ��װpy�ض���ģ��
+	// 安装py重定向模块
 	ScriptStdOut::installScript(NULL);
 	ScriptStdErr::installScript(NULL);
 
-	// ��ģ��������main
+	// 将模块对象加入main
 	PyObject_SetAttrString(m, moduleName, module_);	
 	PyObject* pyDoc = PyUnicode_FromString("This module is created by KBEngine!");
 	PyObject_SetAttrString(module_, "__doc__", pyDoc);
 	Py_DECREF(pyDoc);
 
-	// �ض���python���
+	// 重定向python输出
 	pyStdouterr_ = new ScriptStdOutErr();
 	
-	// ��װpy�ض���ű�ģ��
+	// 安装py重定向脚本模块
 	if(!pyStdouterr_->install()){
 		ERROR_MSG("Script::install::pyStdouterr_->install() is failed!\n");
 		delete pyStdouterr_;
@@ -275,7 +275,7 @@ bool Script::uninstall()
 		sysInitModules_ = NULL;
 	}
 
-	// ж��python������
+	// 卸载python解释器
 	Py_Finalize();
 
 	INFO_MSG("Script::uninstall(): is successfully!\n");
@@ -287,12 +287,12 @@ bool Script::installExtraModule(const char* moduleName)
 {
 	PyObject *m = PyImport_AddModule("__main__");
 
-	// ����һ���ű���չģ��
+	// 添加一个脚本扩展模块
 	extraModule_ = PyImport_AddModule(moduleName);
 	if (extraModule_ == NULL)
 		return false;
 
-	// ����չģ��������main
+	// 将扩展模块对象加入main
 	PyObject_SetAttrString(m, moduleName, extraModule_);
 
 	INFO_MSG(fmt::format("Script::install(): {} is successfully!\n", moduleName));

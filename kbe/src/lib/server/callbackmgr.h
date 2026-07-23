@@ -20,15 +20,15 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 	
 /*
-	CallbackMgr( �ص������� )
-		����һЩ�ص����������첽�ģ� ����ͨ��һ������������Щ�ص����������� �����ⷵ��һ��
-		��ʶ�ûص���Ψһid�� �ⲿ����ͨ����id����������ص���
+	CallbackMgr( 回调管理器 )
+		由于一些回调操作都是异步的， 我们通过一个管理器将这些回调管理起来， 并对外返回一个
+		标识该回调的唯一id， 外部可以通过该id来触发这个回调。
 		
-	�÷�:
+	用法:
 	typedef CallbackMgr<std::tr1::function<void(Entity*, int64, bool)>> CALLBACK_MGR;
 	CALLBACK_MGR callbackMgr;
 	void xxx(Entity*, int64, bool){}
-	CALLBACK_ID callbackID = callbackMgr.save(&xxx); // ����ʹ��bind����һ�����Ա����
+	CALLBACK_ID callbackID = callbackMgr.save(&xxx); // 可以使用bind来绑定一个类成员函数
 */
 
 #ifndef KBE_CALLBACKMGR_H
@@ -75,7 +75,7 @@ public:
 	void createFromStream(KBEngine::MemoryStream& s);
 
 	/** 
-		�����������һ���ص� 
+		向管理器添加一个回调 
 	*/
 	CALLBACK_ID save(T callback, uint64 timeout = 0/*secs*/)
 	{
@@ -91,7 +91,7 @@ public:
 	}
 	
 	/** 
-		ͨ��callbackIDȡ�߻ص� 
+		通过callbackID取走回调 
 	*/
 	T take(CALLBACK_ID cbID)
 	{
@@ -134,7 +134,7 @@ public:
 	}
 
 	/**
-		��ʱ��callback
+		超时的callback
 	*/
 	bool processTimeout(CALLBACK_ID cbID, T callback)
 	{
@@ -143,8 +143,8 @@ public:
 	}
 
 protected:
-	CALLBACKS cbMap_;									// ���еĻص����洢�����map��
-	IDAllocate<CALLBACK_ID> idAlloc_;					// �ص���id������
+	CALLBACKS cbMap_;									// 所有的回调都存储在这个map中
+	IDAllocate<CALLBACK_ID> idAlloc_;					// 回调的id分配器
 	uint64 lastTimestamp_;
 };
 

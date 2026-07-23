@@ -49,7 +49,7 @@ class MemoryStream;
 class ViewTrigger;
 class Space;
 
-/** �۲�����Ϣ�ṹ */
+/** 观察者信息结构 */
 struct WitnessInfo
 {
 	WitnessInfo(const int8& lv, Entity* e, const float& r):
@@ -64,17 +64,17 @@ struct WitnessInfo
 				detailLevelLog[i] = false;
 	}
 	
-	int8 detailLevel;							// ��ǰ�������鼶��
-	Entity* entity;								// �������entity
-	float range;								// ��ǰ�����entity�ľ���
-	bool detailLevelLog[3];						// ��ʾ���entity���������entity����Щ���鼶�� �ṩ���Թ㲥�Ż��õ�
-												// ��û�н����ĳ����ʱ�� �Ὣ���������������Ը��¸����� ����ֻ���½���ʱ�������ı��������
-	std::vector<uint32> changeDefDataLogs[3];	// entity�뿪��ĳ�����鼶��(û������witness)�� ���ڼ���ĳ�����鼶������Ըı����¼������
+	int8 detailLevel;							// 当前所在详情级别
+	Entity* entity;								// 所表达的entity
+	float range;								// 当前与这个entity的距离
+	bool detailLevelLog[3];						// 表示这个entity都进入过该entity的哪些详情级别， 提供属性广播优化用的
+												// 当没有进入过某级别时， 会将所有这个级别的属性更新给他， 否则只更新近段时间曾经改变过的属性
+	std::vector<uint32> changeDefDataLogs[3];	// entity离开了某个详情级别(没有脱离witness)后， 这期间有某个详情级别的属性改变均记录在这里
 };
 
 /**
-	���ģ�������������Ǹ���Ȥ��entity���ݣ� �磺view�� ���Ը��£� ����entity�ķ���
-	�����䴫��������ߡ�
+	这个模块用来监视我们感兴趣的entity数据， 如：view， 属性更新， 调用entity的方法
+	并将其传输给监视者。
 */
 class Witness : public PoolObject, public Updatable
 {
@@ -128,12 +128,12 @@ public:
 	bool pushBundle(Network::Bundle* pBundle);
 
 	/**
-		����λ�ã� ������������λ�ÿ����������
+		基础位置， 如果有坐骑基础位置可能是坐骑等
 	*/
 	INLINE const Position3D& basePos();
 
 	/**
-	�������� ��������������������������
+	基础朝向， 如果有坐骑基础朝向可能是坐骑等
 	*/
 	INLINE const Direction3D& baseDir();
 
@@ -147,7 +147,7 @@ public:
 	void _onLeaveView(EntityRef* pEntityRef);
 
 	/**
-		���ʵ�屾��ͬ��Volatile���ݵı��
+		获得实体本次同步Volatile数据的标记
 	*/
 	uint32 getEntityVolatileDataUpdateFlags(Entity* otherEntity);
 	
@@ -158,17 +158,17 @@ public:
 	bool entityID2AliasID(ENTITY_ID id, uint8& aliasID);
 
 	/**
-		ʹ�ú���Э�������¿ͻ���
+		使用何种协议来更新客户端
 	*/
 	void addUpdateToStream(Network::Bundle* pForwardBundle, uint32 flags, EntityRef* pEntityRef);
 
 	/**
-		���ӻ���λ�õ����°�
+		添加基础位置到更新包
 	*/
 	void addBaseDataToStream(Network::Bundle* pSendBundle);
 
 	/**
-		��witness�ͻ�������һ����Ϣ
+		向witness客户端推送一条消息
 	*/
 	bool sendToClient(const Network::MessageHandler& msgHandler, Network::Bundle* pBundle);
 	Network::Channel* pChannel();
@@ -176,10 +176,10 @@ public:
 	INLINE VIEW_ENTITIES_MAP& viewEntitiesMap();
 	INLINE VIEW_ENTITIES& viewEntities();
 
-	/** ���viewentity������ */
+	/** 获得viewentity的引用 */
 	INLINE EntityRef* getViewEntityRef(ENTITY_ID entityID);
 
-	/** entityID�Ƿ���view�� */
+	/** entityID是否在view内 */
 	INLINE bool entityInView(ENTITY_ID entityID);
 
 	INLINE ViewTrigger* pViewTrigger();
@@ -189,27 +189,27 @@ public:
 	void uninstallViewTrigger();
 
 	/**
-		����View��Χ�ڵ�entities�� ʹ��ͬ��״̬�ָ������δͬ����״̬
+		重置View范围内的entities， 使其同步状态恢复到最初未同步的状态
 	*/
 	void resetViewEntities();
 
 private:
 	/**
-		���view��entity����С��256��ֻ��������λ��
+		如果view中entity数量小于256则只发送索引位置
 	*/
 	INLINE void _addViewEntityIDToBundle(Network::Bundle* pBundle, EntityRef* pEntityRef);
 	
 	/**
-		��updateִ��ʱview�б��иı��ʱ����Ҫ����entityRef��aliasID
+		当update执行时view列表有改变的时候需要更新entityRef的aliasID
 	*/
 	void updateEntitiesAliasID();
 		
 private:
 	Entity*									pEntity_;
 
-	// ��ǰentity��view�뾶
+	// 当前entity的view半径
 	float									viewRadius_;
-	// ��ǰentityview��һ���ͺ�Χ
+	// 当前entityview的一个滞后范围
 	float									viewHysteresisArea_;
 
 	ViewTrigger*							pViewTrigger_;

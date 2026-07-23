@@ -46,7 +46,7 @@ class AppForwardItem : public ForwardItem
 public:
 	virtual bool isOK()
 	{
-		// �������һ��׼���õĽ���
+		// 必须存在一个准备好的进程
 		Components::COMPONENTS& cts = Components::getSingleton().getComponents(BASEAPP_TYPE);
 		Components::COMPONENTS::iterator ctiter = cts.begin();
 		for (; ctiter != cts.end(); ++ctiter)
@@ -139,7 +139,7 @@ void Baseappmgr::handleGameTick()
 //-------------------------------------------------------------------------------------
 void Baseappmgr::onChannelDeregister(Network::Channel * pChannel)
 {
-	// �����app������
+	// 如果是app死亡了
 	if(pChannel->isInternal())
 	{
 		Components::ComponentInfos* cinfo = Components::getSingleton().findComponent(pChannel);
@@ -307,14 +307,14 @@ COMPONENT_ID Baseappmgr::findFreeBaseapp()
 		if ((iter->second.flags() & APP_FLAGS_NOT_PARTCIPATING_LOAD_BALANCING) > 0)
 			continue;
 		
-		// ���Ƚ��̱�������ҳ�ʼ�����
+		// 首先进程必须活着且初始化完毕
 		if(!iter->second.isDestroyed() && iter->second.initProgress() > 1.f)
 		{
-			// ���û���κ�ʵ��������������
+			// 如果没有任何实体则无条件分配
 			if(iter->second.numEntities() == 0)
 				return iter->first;
 
-			// �Ƚϲ���¼������С�Ľ������ձ�����
+			// 比较并记录负载最小的进程最终被分配
 			if(minload > iter->second.load() || 
 				(minload == iter->second.load() && numEntities > iter->second.numEntities()))
 			{
@@ -341,9 +341,9 @@ void Baseappmgr::reqCreateEntityAnywhere(Network::Channel* pChannel, MemoryStrea
 	Components::ComponentInfos* cinfos = 
 		Components::getSingleton().findComponent(pChannel);
 
-	// ��ʱ�϶���������״̬�У����п����ڵȴ�����space
-	// ���Գ�ʼ������û�����, ��ֻ��һ��baseapp������������
-	// �ﲻ�������ý���һ���໥�ȴ���״̬
+	// 此时肯定是在运行状态中，但有可能在等待创建space
+	// 所以初始化进度没有完成, 在只有一个baseapp的情况下如果这
+	// 里不进行设置将是一个相互等待的状态
 	if(cinfos)
 		cinfos->state = COMPONENT_STATE_RUN;
 
@@ -387,7 +387,7 @@ void Baseappmgr::reqCreateEntityAnywhere(Network::Channel* pChannel, MemoryStrea
 	cinfos->pChannel->send(pBundle);
 	s.done();
 
-	// Ԥ�Ƚ�ʵ����������
+	// 预先将实体数量增加
 	std::map< COMPONENT_ID, Baseapp >::iterator baseapps_iter = baseapps_.find(bestBaseappID_);
 	if (baseapps_iter != baseapps_.end())
 	{
@@ -401,9 +401,9 @@ void Baseappmgr::reqCreateEntityRemotely(Network::Channel* pChannel, MemoryStrea
 	Components::ComponentInfos* cinfos =
 		Components::getSingleton().findComponent(pChannel);
 
-	// ��ʱ�϶���������״̬�У����п����ڵȴ�����space
-	// ���Գ�ʼ������û�����, ��ֻ��һ��baseapp������������
-	// �ﲻ�������ý���һ���໥�ȴ���״̬
+	// 此时肯定是在运行状态中，但有可能在等待创建space
+	// 所以初始化进度没有完成, 在只有一个baseapp的情况下如果这
+	// 里不进行设置将是一个相互等待的状态
 	if (cinfos)
 		cinfos->state = COMPONENT_STATE_RUN;
 
@@ -442,7 +442,7 @@ void Baseappmgr::reqCreateEntityRemotely(Network::Channel* pChannel, MemoryStrea
 	cinfos->pChannel->send(pBundle);
 	s.done();
 
-	// Ԥ�Ƚ�ʵ����������
+	// 预先将实体数量增加
 	std::map< COMPONENT_ID, Baseapp >::iterator baseapps_iter = baseapps_.find(createToComponentID);
 	if (baseapps_iter != baseapps_.end())
 	{
@@ -456,9 +456,9 @@ void Baseappmgr::reqCreateEntityAnywhereFromDBIDQueryBestBaseappID(Network::Chan
 	Components::ComponentInfos* cinfos =
 		Components::getSingleton().findComponent(pChannel);
 
-	// ��ʱ�϶���������״̬�У����п����ڵȴ�����space
-	// ���Գ�ʼ������û�����, ��ֻ��һ��baseapp������������
-	// �ﲻ�������ý���һ���໥�ȴ���״̬
+	// 此时肯定是在运行状态中，但有可能在等待创建space
+	// 所以初始化进度没有完成, 在只有一个baseapp的情况下如果这
+	// 里不进行设置将是一个相互等待的状态
 	if (cinfos)
 		cinfos->state = COMPONENT_STATE_RUN;
 
@@ -489,9 +489,9 @@ void Baseappmgr::reqCreateEntityAnywhereFromDBID(Network::Channel* pChannel, Mem
 	Components::ComponentInfos* cinfos = 
 		Components::getSingleton().findComponent(pChannel);
 
-	// ��ʱ�϶���������״̬�У����п����ڵȴ�����space
-	// ���Գ�ʼ������û�����, ��ֻ��һ��baseapp������������
-	// �ﲻ�������ý���һ���໥�ȴ���״̬
+	// 此时肯定是在运行状态中，但有可能在等待创建space
+	// 所以初始化进度没有完成, 在只有一个baseapp的情况下如果这
+	// 里不进行设置将是一个相互等待的状态
 	if(cinfos)
 		cinfos->state = COMPONENT_STATE_RUN;
 
@@ -530,7 +530,7 @@ void Baseappmgr::reqCreateEntityAnywhereFromDBID(Network::Channel* pChannel, Mem
 	cinfos->pChannel->send(pBundle);
 	s.done();
 
-	// Ԥ�Ƚ�ʵ����������
+	// 预先将实体数量增加
 	std::map< COMPONENT_ID, Baseapp >::iterator baseapps_iter = baseapps_.find(targetComponentID);
 	if (baseapps_iter != baseapps_.end())
 	{
@@ -544,9 +544,9 @@ void Baseappmgr::reqCreateEntityRemotelyFromDBID(Network::Channel* pChannel, Mem
 	Components::ComponentInfos* cinfos =
 		Components::getSingleton().findComponent(pChannel);
 
-	// ��ʱ�϶���������״̬�У����п����ڵȴ�����space
-	// ���Գ�ʼ������û�����, ��ֻ��һ��baseapp������������
-	// �ﲻ�������ý���һ���໥�ȴ���״̬
+	// 此时肯定是在运行状态中，但有可能在等待创建space
+	// 所以初始化进度没有完成, 在只有一个baseapp的情况下如果这
+	// 里不进行设置将是一个相互等待的状态
 	if (cinfos)
 		cinfos->state = COMPONENT_STATE_RUN;
 
@@ -585,7 +585,7 @@ void Baseappmgr::reqCreateEntityRemotelyFromDBID(Network::Channel* pChannel, Mem
 	cinfos->pChannel->send(pBundle);
 	s.done();
 
-	// Ԥ�Ƚ�ʵ����������
+	// 预先将实体数量增加
 	std::map< COMPONENT_ID, Baseapp >::iterator baseapps_iter = baseapps_.find(targetComponentID);
 	if (baseapps_iter != baseapps_.end())
 	{
@@ -671,7 +671,7 @@ void Baseappmgr::registerPendingAccountToBaseapp(Network::Channel* pChannel, Mem
 	pBundle->appendBlob(datas);
 	cinfos->pChannel->send(pBundle);
 
-	// Ԥ�Ƚ�ʵ����������
+	// 预先将实体数量增加
 	if (baseapps_iter != baseapps_.end())
 	{
 		baseapps_iter->second.incNumProxices();

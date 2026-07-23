@@ -95,7 +95,7 @@ Space::~Space()
 //-------------------------------------------------------------------------------------
 void Space::_clearGhosts()
 {
-	// ��Ϊspace��destroyʱ����һ���������������������ʣ�µ���ghostsʵ��
+	// 因为space在destroy时做过一次清理，因此这里理论上剩下的是ghosts实体
 	if(entities_.size() == 0)
 		return;
 	
@@ -320,7 +320,7 @@ void Space::onLoadedSpaceGeometryMapping(NavigationHandlePtr pNavHandle)
 	INFO_MSG(fmt::format("KBEngine::onLoadedSpaceGeometryMapping: spaceID={}, respath={}!\n",
 			id(), getGeometryPath()));
 
-	// ֪ͨ�ű�
+	// 通知脚本
 	{
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 		SCRIPT_OBJECT_CALL_ARGS2(Cellapp::getSingleton().getEntryScript().get(), const_cast<char*>("onSpaceGeometryLoaded"), 
@@ -350,7 +350,7 @@ void Space::onAllSpaceGeometryLoaded()
 {
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-	// ֪ͨ�ű�
+	// 通知脚本
 	SCRIPT_OBJECT_CALL_ARGS3(Cellapp::getSingleton().getEntryScript().get(), const_cast<char*>("onAllSpaceGeometryLoaded"), 
 		const_cast<char*>("Iis"), this->id(), true, getGeometryPath().c_str(), false);
 }
@@ -406,13 +406,13 @@ void Space::removeEntity(Entity* pEntity)
 
 	pEntity->spaceID(0);
 	
-	// �Ȼ�ȡ������λ��
+	// 先获取到所在位置
 	SPACE_ENTITIES::size_type idx = pEntity->spaceEntityIdx();
 
 	KBE_ASSERT(idx < entities_.size());
 	KBE_ASSERT(entities_[ idx ] == pEntity);
 
-	// �����2�������ϵ�entity�����һ��entity����ɾ�������entity����λ��
+	// 如果有2个或以上的entity则将最后一个entity移至删除的这个entity所在位置
 	Entity* pBack = entities_.back().get();
 	pBack->spaceEntityIdx(idx);
 	entities_[idx] = pBack;
@@ -421,11 +421,11 @@ void Space::removeEntity(Entity* pEntity)
 
 	onLeaveWorld(pEntity);
 
-	// ��������onLeaveWorld֮�� ��Ϊ����rangeTrigger��Ҫ�ο�pEntityCoordinateNode
+	// 这句必须在onLeaveWorld之后， 因为可能rangeTrigger需要参考pEntityCoordinateNode
 	pEntity->uninstallCoordinateNodes(&coordinateSystem_);
 	pEntity->onLeaveSpace(this);
 
-	// ���û��entity������Ҫ����space, ��Ϊspace���ٴ���һ��entity
+	// 如果没有entity了则需要销毁space, 因为space最少存在一个entity
 	if(entities_.empty() && state_ == STATE_NORMAL)
 	{
 		Spaces::destroySpace(this->id(), 0);
@@ -450,8 +450,8 @@ void Space::onEnterWorld(Entity* pEntity)
 {
 	KBE_ASSERT(pEntity != NULL);
 	
-	// �����һ����Witness(ͨ�������)����Ҫ����ǰ�����Ѿ���������client���ֵ�entity�㲥����
-	// ������һ����ͨ��entity�������磬 ��ô��Ҫ�����entity�㲥�����п���������Witness��entity��
+	// 如果是一个有Witness(通常是玩家)则需要将当前场景已经创建的有client部分的entity广播给他
+	// 否则是一个普通的entity进入世界， 那么需要将这个entity广播给所有看见他的有Witness的entity。
 	if(pEntity->hasWitness())
 	{
 		_onEnterWorld(pEntity);
@@ -471,8 +471,8 @@ void Space::onLeaveWorld(Entity* pEntity)
 	if(!pEntity->isReal() || !pEntity->pScriptModule()->hasClient())
 		return;
 	
-	// �������˿ͻ��˹㲥�Լ����뿪
-	// ��ͻ��˷���onLeaveWorld��Ϣ
+	// 向其他人客户端广播自己的离开
+	// 向客户端发送onLeaveWorld消息
 	if(pEntity->hasWitness())
 	{
 		pEntity->pWitness()->onLeaveSpace(this);
@@ -620,7 +620,7 @@ void Space::delSpaceData(const std::string& key)
 //-------------------------------------------------------------------------------------
 void Space::onSpaceDataChanged(const std::string& key, const std::string& value, bool isdel)
 {
-	// ֪ͨ�ű�
+	// 通知脚本
 	if(!isdel)
 	{
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);

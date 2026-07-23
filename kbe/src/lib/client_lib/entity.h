@@ -49,7 +49,7 @@ namespace client
 
 class Entity : public script::ScriptObject
 {
-	/** ���໯ ��һЩpy�������������� */
+	/** 子类化 将一些py操作填充进派生类 */
 	BASE_SCRIPT_HREADER(Entity, ScriptObject)	
 	ENTITY_HEADER(Entity)
 		
@@ -58,7 +58,7 @@ public:
 	~Entity();
 	
 	/** 
-		�����������ݱ��ı��� 
+		定义属性数据被改变了 
 	*/
 	void onDefDataChanged(const PropertyDescription* propertyDescription, 
 			PyObject* pyData);
@@ -75,7 +75,7 @@ public:
 	INLINE void cellEntityCall(EntityCall* entitycall);
 
 	/** 
-		�ű���ȡ������entity��position 
+		脚本获取和设置entity的position 
 	*/
 	INLINE Position3D& position();
 	INLINE Position3D& serverPosition();
@@ -85,7 +85,7 @@ public:
 	DECLARE_PY_GETSET_MOTHOD(pyGetPosition, pySetPosition);
 
 	/** 
-		�ű���ȡ������entity�ķ��� 
+		脚本获取和设置entity的方向 
 	*/
 	INLINE Direction3D& direction();
 	INLINE void direction(const Direction3D& dir);
@@ -93,7 +93,7 @@ public:
 	DECLARE_PY_GETSET_MOTHOD(pyGetDirection, pySetDirection);
 	
 	/**
-		ʵ��ͻ��˵�λ�úͳ���
+		实体客户端的位置和朝向
 	*/
 	INLINE Position3D& clientPos();
 	INLINE void clientPos(const Position3D& pos);
@@ -104,7 +104,7 @@ public:
 	INLINE void clientDir(float roll, float pitch, float yaw);
 
 	/**
-		�ƶ��ٶ�
+		移动速度
 	*/
 	INLINE void moveSpeed(float speed);
 	INLINE float moveSpeed() const;
@@ -121,7 +121,7 @@ public:
 	const EntityAspect* getAspect() const{ return &aspect_; }
 
 	/** 
-		entity�ƶ���ĳ���� 
+		entity移动到某个点 
 	*/
 	uint32 moveToPoint(const Position3D& destination, float velocity, float distance,
 			PyObject* userData, bool faceMovement, bool moveVertically);
@@ -129,33 +129,33 @@ public:
 	DECLARE_PY_MOTHOD_ARG6(pyMoveToPoint, PyObject_ptr, float, float, PyObject_ptr, int32, int32);
 
 	/** 
-		ֹͣ�κ��ƶ���Ϊ
+		停止任何移动行为
 	*/
 	bool stopMove();
 
 	/** 
-		entity��һ���ƶ���� 
+		entity的一次移动完成 
 	*/
 	void onMove(uint32 controllerId, int layer, const Position3D& oldPos, PyObject* userarg);
 
 	/** 
-		entity���ƶ���� 
+		entity的移动完成 
 	*/
 	void onMoveOver(uint32 controllerId, int layer, const Position3D& oldPos, PyObject* userarg);
 
 	/** 
-		entity�ƶ�ʧ��
+		entity移动失败
 	*/
 	void onMoveFailure(uint32 controllerId, PyObject* userarg);
 
 	/** 
-		ɾ��һ��������  
+		删除一个控制器  
 	*/
 	void cancelController(uint32 id);
 	static PyObject* __py_pyCancelController(PyObject* self, PyObject* args);
 
 	/** 
-		�������entity 
+		销毁这个entity 
 	*/
 	void onDestroy(bool callScript){};
 
@@ -166,17 +166,17 @@ public:
 	void onLeaveSpace();
 
 	/**
-		Զ�̺��б�entity�ķ��� 
+		远程呼叫本entity的方法 
 	*/
 	void onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s);
 
 	/**
-		����������entity����
+		服务器更新entity属性
 	*/
 	void onUpdatePropertys(MemoryStream& s);
 	
 	/**
-	    ����Entity�����ݵ�һ������ʱ�������Ƿ�Ҫ�ص��ű����set_*����
+	    用于Entity的数据第一次设置时，决定是否要回调脚本层的set_*方法
 	*/
 	void callPropertysSetMethods();
 
@@ -198,14 +198,14 @@ public:
 	DECLARE_PY_MOTHOD_ARG0(pyIsPlayer);
 
 protected:
-	EntityCall*								cellEntityCall_;					// ���entity��cell-entitycall
-	EntityCall*								baseEntityCall_;					// ���entity��base-entitycall
+	EntityCall*								cellEntityCall_;					// 这个entity的cell-entitycall
+	EntityCall*								baseEntityCall_;					// 这个entity的base-entitycall
 
-	Position3D								position_, serverPosition_;			// entity�ĵ�ǰλ��
-	Direction3D								direction_;							// entity�ĵ�ǰ����
+	Position3D								position_, serverPosition_;			// entity的当前位置
+	Direction3D								direction_;							// entity的当前方向
 
-	Position3D								clientPos_;							// �ͻ���λ�ã����ʵ�屻�ͻ��˿��������������ͬ��λ��
-	Direction3D								clientDir_;							// �ͻ��˳������ʵ�屻�ͻ��˿��������������ͬ������
+	Position3D								clientPos_;							// 客户端位置，如果实体被客户端控制用于向服务器同步位置
+	Direction3D								clientDir_;							// 客户端朝向，如果实体被客户端控制用于向服务器同步朝向
 
 	ClientObjectBase*						pClientApp_;
 
@@ -213,15 +213,15 @@ protected:
 
 	float									velocity_;
 
-	bool									enterworld_;						// �Ƿ��Ѿ�enterworld�ˣ� restoreʱ����
+	bool									enterworld_;						// 是否已经enterworld了， restore时有用
 	
 	bool									isOnGround_;
 
 	ScriptID								pMoveHandlerID_;
 	
-	bool									inited_;							// __init__����֮������Ϊtrue
+	bool									inited_;							// __init__调用之后设置为true
 
-    bool                                    isControlled_;                      // �Ƿ񱻿���
+    bool                                    isControlled_;                      // 是否被控制
 };																										
 
 }

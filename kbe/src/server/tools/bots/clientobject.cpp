@@ -172,7 +172,7 @@ bool ClientObject::initCreate()
 	pTCPPacketReceiverEx_ = new Network::TCPPacketReceiverEx(*pEndpoint, this->networkInterface_, this);
 	Bots::getSingleton().networkInterface().dispatcher().registerReadFileDescriptor((*pEndpoint), pTCPPacketReceiverEx_);
 	
-	//��������ע��
+	//不在这里注册
 	//Bots::getSingleton().networkInterface().dispatcher().registerWriteFileDescriptor((*pEndpoint), pTCPPacketSenderEx_);
 	pServerChannel_->pPacketSender(pTCPPacketSenderEx_);
 
@@ -236,7 +236,7 @@ bool ClientObject::initLoginBaseapp()
 	pTCPPacketReceiverEx_ = new Network::TCPPacketReceiverEx(*pEndpoint, this->networkInterface_, this);
 	Bots::getSingleton().networkInterface().dispatcher().registerReadFileDescriptor((*pEndpoint), pTCPPacketReceiverEx_);
 
-	//��������ע��
+	//不在这里注册
 	//Bots::getSingleton().networkInterface().dispatcher().registerWriteFileDescriptor((*pEndpoint), pTCPPacketSenderEx_);
 	pServerChannel_->pPacketSender(pTCPPacketSenderEx_);
 
@@ -383,7 +383,7 @@ void ClientObject::onCreateAccountResult(Network::Channel * pChannel, MemoryStre
 	{
 		//error_ = C_ERROR_CREATE_FAILED;
 
-		// �������Ե�¼
+		// 继续尝试登录
 		state_ = C_STATE_LOGIN;
 		
 		INFO_MSG(fmt::format("ClientObject::onCreateAccountResult: {} create is failed! code={}.\n", 
@@ -425,7 +425,7 @@ void ClientObject::onLoginFailed(Network::Channel * pChannel, MemoryStream& s)
 
 	// error_ = C_ERROR_LOGIN_FAILED;
 
-	// �������Ե�¼
+	// 继续尝试登录
 	state_ = C_STATE_LOGIN;
 }
 

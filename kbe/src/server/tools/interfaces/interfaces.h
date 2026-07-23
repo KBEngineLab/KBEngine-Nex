@@ -60,7 +60,7 @@ public:
 	void handleTimeout(TimerHandle handle, void * arg);
 	void handleMainTick();
 
-	/* ��ʼ����ؽӿ� */
+	/* 初始化相关接口 */
 	bool initializeBegin();
 	bool inInitialize();
 	bool initializeEnd();
@@ -73,9 +73,9 @@ public:
 	virtual void onShutdownEnd();
 
 
-	/** ����ӿ�
-	ע��һ���¼����baseapp����cellapp����dbmgr
-	ͨ����һ���µ�app�������ˣ� ����Ҫ��ĳЩ���ע���Լ���
+	/** 网络接口
+	注册一个新激活的baseapp或者cellapp或者dbmgr
+	通常是一个新的app被启动了， 它需要向某些组件注册自己。
 	*/
 	virtual void onRegisterNewApp(Network::Channel* pChannel,
 		int32 uid,
@@ -83,41 +83,41 @@ public:
 		COMPONENT_TYPE componentType, COMPONENT_ID componentID, COMPONENT_ORDER globalorderID, COMPONENT_ORDER grouporderID,
 		uint32 intaddr, uint16 intport, uint32 extaddr, uint16 extport, std::string& extaddrEx);
 
-	/** ����ӿ�
-		���󴴽��˺�
+	/** 网络接口
+		请求创建账号
 	*/
 	void reqCreateAccount(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ����ӿ�
-		һ�����û���¼�� ��Ҫ���Ϸ���
+	/** 网络接口
+		一个新用户登录， 需要检查合法性
 	*/
 	void onAccountLogin(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ����ӿ�
-		��������ͻ�����������
+	/** 网络接口
+		请求擦除客户端请求任务
 	*/
 	void eraseClientReq(Network::Channel* pChannel, std::string& logkey);
 
-	/** ����ӿ�
-		�����ֵ
+	/** 网络接口
+		请求充值
 	*/
 	void charge(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** Python�ص��ӿ�
-	    ��ֵ��Ӧ
+	/** Python回调接口
+	    充值响应
 	*/
 	void chargeResponse(std::string orderID, std::string extraDatas, KBEngine::SERVER_ERROR_CODE errorCode);
 	static PyObject* __py_chargeResponse(PyObject* self, PyObject* args);
 
-	/** Python�ص��ӿ�
-	    �����¼�˺ŵ���Ӧ
+	/** Python回调接口
+	    请求登录账号的响应
 	*/
 	void accountLoginResponse(std::string commitName, std::string realAccountName, 
 		std::string extraDatas, KBEngine::SERVER_ERROR_CODE errorCode);
 	static PyObject* __py_accountLoginResponse(PyObject* self, PyObject* args);
 
-	/** Python�ص��ӿ�
-	    ���󴴽��˺ŵ���Ӧ
+	/** Python回调接口
+	    请求创建账号的响应
 	*/
 	void createAccountResponse(std::string commitName, std::string realAccountName, 
 		std::string extraDatas, KBEngine::SERVER_ERROR_CODE errorCode);
@@ -135,7 +135,7 @@ public:
 	bool hasOrders(std::string ordersid);
 	
 	/**
-		��dbmgr����ִ��һ�����ݿ�����
+		向dbmgr请求执行一个数据库命令
 	*/
 	static PyObject* __py_executeRawDatabaseCommand(PyObject* self, PyObject* args);
 	void executeRawDatabaseCommand(const char* datas, uint32 size, PyObject* pycallback, ENTITY_ID eid, const std::string& dbInterfaceName);
@@ -146,10 +146,10 @@ public:
 protected:
 	TimerHandle																mainProcessTimer_;
 
-	// ����
+	// 订单
 	ORDERS																	orders_;
 
-	// ���е������¼�� ����ĳ���ظ�������
+	// 所有的请求记录， 避免某类重复性请求。
 	REQCREATE_MAP															reqCreateAccount_requests_;
 	REQLOGIN_MAP															reqAccountLogin_requests_;
 

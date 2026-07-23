@@ -31,7 +31,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{ namespace script{
 
-// python��Ĭ�Ͽշ���ֵ
+// python的默认空返回值
 #define S_Return { Py_INCREF(Py_None); return Py_None; }			
 #define S_RETURN S_Return	
 #define PY_RETURN S_Return	
@@ -46,14 +46,14 @@ namespace KBEngine{ namespace script{
 		Py_DECREF(pyObj);																	\
 	}																						\
 
-// python�Ķ����ͷ�
+// python的对象释放
 #define S_RELEASE(pyObj)																	\
 	if(pyObj){																				\
 		Py_DECREF(pyObj);																	\
 		pyObj = NULL;																		\
 	}																						\
 
-/// �����ǰ�ű������Ĵ�����Ϣ	
+/// 输出当前脚本产生的错误信息	
 #define SCRIPT_ERROR_CHECK()																\
 {																							\
  	if (PyErr_Occurred())																	\
@@ -62,20 +62,20 @@ namespace KBEngine{ namespace script{
 	}																						\
 }
 
-// �ű�����ͷ ��ͨ����pythonĬ�Ϸ������ʽ�����Ķ��� ��
+// 脚本对象头 （通常是python默认分配对象方式产生的对象 ）
 #define SCRIPT_OBJECT_HREADER(CLASS, SUPERCLASS)											\
 	SCRIPT_HREADER_BASE(CLASS, SUPERCLASS);													\
-	/** python�����Ķ���������python���ͷ�
+	/** python创建的对象则对象从python中释放
 	*/																						\
 	static void _tp_dealloc(PyObject* self)													\
 	{																						\
 		CLASS::_scriptType.tp_free(self);													\
 	}																						\
 
-// �����ű�����ͷ �����ģ��ͨ�����ṩ��python�ű��н��м̳е�һ�������� ��
+// 基础脚本对象头 （这个模块通常是提供给python脚本中进行继承的一个基础类 ）
 #define BASE_SCRIPT_HREADER(CLASS, SUPERCLASS)												\
 	SCRIPT_HREADER_BASE(CLASS, SUPERCLASS);													\
-	/** python�����Ķ���������python���ͷ�
+	/** python创建的对象则对象从python中释放
 	*/																						\
 	static void _tp_dealloc(PyObject* self)													\
 	{																						\
@@ -83,10 +83,10 @@ namespace KBEngine{ namespace script{
 		CLASS::_scriptType.tp_free(self);													\
 	}																						\
 
-// ʵ���ű�����ͷ ������ű���������c++�н���new������ ��
+// 实例脚本对象头 （这个脚本对象是由c++中进行new产生的 ）
 #define INSTANCE_SCRIPT_HREADER(CLASS, SUPERCLASS)											\
 	SCRIPT_HREADER_BASE(CLASS, SUPERCLASS);													\
-	/** c++new�����Ķ��������delete����
+	/** c++new创建的对象则进行delete操作
 	*/																						\
 	static void _tp_dealloc(PyObject* self)													\
 	{																						\
@@ -95,7 +95,7 @@ namespace KBEngine{ namespace script{
 
 																							
 #define SCRIPT_HREADER_BASE(CLASS, SUPERCLASS)												\
-	/* ��ǰ�ű�ģ������ */																	\
+	/* 当前脚本模块的类别 */																	\
 	static PyTypeObject _scriptType;														\
 	typedef CLASS ThisClass;																\
 																							\
@@ -109,21 +109,21 @@ namespace KBEngine{ namespace script{
 		return static_cast<CLASS*>(self)->tp_str();											\
 	}																						\
 																							\
-	/** �ű�ģ������python�д���
+	/** 脚本模块对象从python中创建
 	*/																						\
 	static PyObject* _tp_new(PyTypeObject* type, PyObject* args, PyObject* kwds)			\
 	{																						\
 		return CLASS::tp_new(type, args, kwds);												\
 	}																						\
 																							\
-	/** python �����ȡ��ģ������Ի��߷���
+	/** python 请求获取本模块的属性或者方法
 	*/																						\
 	static PyObject* _tp_getattro(PyObject* self, PyObject* name)							\
 	{																						\
 		return static_cast<CLASS*>(self)->onScriptGetAttribute(name);						\
 	}																						\
 																							\
-	/** python �������ñ�ģ������Ի��߷���
+	/** python 请求设置本模块的属性或者方法
 	*/																						\
 	static int _tp_setattro(PyObject* self, PyObject* name, PyObject* value)				\
 	{																						\
@@ -132,7 +132,7 @@ namespace KBEngine{ namespace script{
 				static_cast<CLASS*>(self)->onScriptDelAttribute(name);						\
 	}																						\
 																							\
-	/** python �����ʼ����ģ�����
+	/** python 请求初始化本模块对象
 	*/																						\
 	static int _tp_init(PyObject* self, PyObject *args, PyObject* kwds)						\
 	{																						\
@@ -140,18 +140,18 @@ namespace KBEngine{ namespace script{
 	}																						\
 																							\
 public:																						\
-	/* ���ս�Ҫ����װ���ű�ģ���еķ����ͳ�Ա����б�*/											\
+	/* 最终将要被安装到脚本模块中的方法和成员存放列表*/											\
 	static PyMethodDef* _##CLASS##_lpScriptmethods;											\
 	static PyMemberDef* _##CLASS##_lpScriptmembers;											\
 	static PyGetSetDef* _##CLASS##_lpgetseters;												\
-	/* ��ģ����Ҫ��©���ű��ķ����ͳ�Ա�� ���ջᱻ���뵽�����2��ָ���б��� */					\
+	/* 本模块所要暴漏给脚本的方法和成员， 最终会被导入到上面的2个指针列表中 */					\
 	static PyMethodDef _##CLASS##_scriptMethods[];											\
 	static PyMemberDef _##CLASS##_scriptMembers[];											\
 	static PyGetSetDef _##CLASS##_scriptGetSeters[];										\
 																							\
 	static bool _##CLASS##_py_installed;													\
 																							\
-	/** getset��ֻ������
+	/** getset的只读属性
 	*/																						\
 	static int __py_readonly_descr(PyObject* self, PyObject* value, void* closure)			\
 	{																						\
@@ -162,7 +162,7 @@ public:																						\
 		return 0;																			\
 	}																						\
 																							\
-	/** getset��ֻд����
+	/** getset的只写属性
 	*/																						\
 	static int __py_writeonly_descr(PyObject* self, PyObject* value, void* closure)			\
 	{																						\
@@ -173,7 +173,7 @@ public:																						\
 		return 0;																			\
 	}																						\
 																							\
-	/** ����ӿڿ��Ի�õ�ǰģ��Ľű���� 
+	/** 这个接口可以获得当前模块的脚本类别 
 	*/																						\
 	static PyTypeObject* getScriptType(void)												\
 	{																						\
@@ -193,7 +193,7 @@ public:																						\
 		return 0;																			\
 	}																						\
 																							\
-	/** �������м̳�ģ��ı�¶�������� 
+	/** 计算所有继承模块的暴露方法个数 
 	*/																						\
 	static int calcTotalMethodCount(void)													\
 	{																						\
@@ -211,7 +211,7 @@ public:																						\
 		return SUPERCLASS::calcTotalMethodCount() + nlen;									\
 	}																						\
 																							\
-	/** �������м̳�ģ��ı�¶��Ա���� 
+	/** 计算所有继承模块的暴露成员个数 
 	*/																						\
 	static int calcTotalMemberCount(void)													\
 	{																						\
@@ -229,7 +229,7 @@ public:																						\
 		return SUPERCLASS::calcTotalMemberCount() + nlen;									\
 	}																						\
 																							\
-	/** �������м̳�ģ��ı�¶getset���� 
+	/** 计算所有继承模块的暴露getset个数 
 	*/																						\
 	static int calcTotalGetSetCount(void)													\
 	{																						\
@@ -247,7 +247,7 @@ public:																						\
 		return SUPERCLASS::calcTotalGetSetCount() + nlen;									\
 	}																						\
 																							\
-	/** �����и����Լ���ǰģ��ı�¶��Ա�ͷ�����װ������Ҫ����ű����б��� 
+	/** 将所有父类以及当前模块的暴露成员和方法安装到最终要导入脚本的列表中 
 	*/																						\
 	static void setupScriptMethodAndAttribute(PyMethodDef* lppmf, PyMemberDef* lppmd,		\
 	PyGetSetDef* lppgs)																		\
@@ -293,8 +293,8 @@ public:																						\
 		SUPERCLASS::setupScriptMethodAndAttribute(lppmf, lppmd, lppgs);						\
 	}																						\
 																							\
-	/** ע��ű�ģ��
-		@param mod: ��Ҫ�������ģ��
+	/** 注册脚本模块
+		@param mod: 所要导入的主模块
 	*/																						\
 	static void registerScript(PyObject* mod, const char* name = #CLASS)					\
 	{																						\
@@ -333,8 +333,8 @@ public:																						\
 		_##CLASS##_py_installed = true;														\
 	}																						\
 																							\
-	/** ��װ��ǰ�ű�ģ�� 
-		@param mod: ��Ҫ�������ģ��
+	/** 安装当前脚本模块 
+		@param mod: 所要导入的主模块
 	*/																						\
 	static void installScript(PyObject* mod, const char* name = #CLASS)						\
 	{																						\
@@ -344,7 +344,7 @@ public:																						\
 		ScriptObject::scriptObjectTypes[name] = &_scriptType;								\
 	}																						\
 																							\
-	/** ע���ű�ģ��
+	/** 注销脚本模块
 	*/																						\
 	static void unregisterScript(void)														\
 	{																						\
@@ -356,7 +356,7 @@ public:																						\
 			Py_DECREF(&_scriptType);														\
 	}																						\
 																							\
-	/** ж�ص�ǰ�ű�ģ�� 
+	/** 卸载当前脚本模块 
 	*/																						\
 	static void uninstallScript(void)														\
 	{																						\
@@ -367,7 +367,7 @@ public:																						\
 
 
 
-/** �������ʽ�ĳ�ʼ��һ���ű�ģ�飬 ��һЩ��Ҫ����Ϣ��䵽python��type������
+/** 这个宏正式的初始化一个脚本模块， 将一些必要的信息填充到python的type对象中
 */
 #define SCRIPT_INIT(CLASS, CALL, SEQ, MAP, ITER, ITERNEXT)									\
 		TEMPLATE_SCRIPT_INIT(;,CLASS, CLASS, CALL, SEQ, MAP, ITER, ITERNEXT)				\
@@ -423,7 +423,7 @@ public:																						\
 		PyObject_GC_Del,										/* tp_free            */	\
 	};																						\
 
-// BASE_SCRIPT_HREADER������ű���ʼ��, �����ɽű��̳�
+// BASE_SCRIPT_HREADER基础类脚本初始化, 该类由脚本继承
 #define BASE_SCRIPT_INIT(CLASS, CALL, SEQ, MAP, ITER, ITERNEXT)								\
 	PyMethodDef* CLASS::_##CLASS##_lpScriptmethods = NULL;									\
 	PyMemberDef* CLASS::_##CLASS##_lpScriptmembers = NULL;									\
@@ -483,20 +483,20 @@ public:																						\
 class ScriptObject: public PyObject
 {
 	/** 
-		���໯ ��һЩpy�������������� 
+		子类化 将一些py操作填充进派生类 
 	*/
 	SCRIPT_OBJECT_HREADER(ScriptObject, ScriptObject)							
 public:	
 	ScriptObject(PyTypeObject* pyType, bool isInitialised = false);
 	~ScriptObject();
 
-	// ���е�kbe�ű����
+	// 所有的kbe脚本类别
 	typedef KBEUnordered_map<std::string, PyTypeObject*> SCRIPTOBJECT_TYPES;
 	static SCRIPTOBJECT_TYPES scriptObjectTypes;
 	static PyTypeObject* getScriptObjectType(const std::string& name);
 
 	/** 
-		�ű��������ü��� 
+		脚本对象引用计数 
 	*/
 	void incRef() const				{ Py_INCREF((PyObject*)this); }
 	void decRef() const				{ Py_DECREF((PyObject*)this); }
@@ -504,7 +504,7 @@ public:
 	int refCount() const			{ return int(((PyObject*)this)->ob_refcnt); }
 	
 	/** 
-		��ö�������� 
+		获得对象的描述 
 	*/
 	PyObject* tp_repr();
 	PyObject* tp_str();
@@ -514,44 +514,44 @@ public:
 	DECLARE_PY_GET_MOTHOD(py__name__);
 
 	/** 
-		�ű����󴴽�һ���ö��� 
+		脚本请求创建一个该对象 
 	*/
 	static PyObject* tp_new(PyTypeObject* type, PyObject* args, 
 		PyObject* kwds);
 
 	/** 
-		�ű������ȡ���Ի��߷��� 
+		脚本请求获取属性或者方法 
 	*/
 	PyObject* onScriptGetAttribute(PyObject* attr);						
 
 	/** 
-		�ű������������Ի��߷��� 
+		脚本请求设置属性或者方法 
 	*/
 	int onScriptSetAttribute(PyObject* attr, PyObject* value);			
 
 	/** 
-		�ű�����ɾ��һ������ 
+		脚本请求删除一个属性 
 	*/
 	int onScriptDelAttribute(PyObject* attr);
 
 	/** 
-		�ű������ʼ�� 
+		脚本请求初始化 
 	*/
 	int onScriptInit(PyObject* self, PyObject *args, 
 		PyObject* kwds);
 
 	/** 
-		��ȡ�����������
+		获取对象类别名称
 	*/
 	const char* scriptName() const { return ob_type->tp_name; }
 
 	/** 
-		�ű�����װʱ������ 
+		脚本被安装时被调用 
 	*/
 	static void onInstallScript(PyObject* mod) {}
 
 	/** 
-		�ű���ж��ʱ������ 
+		脚本被卸载时被调用 
 	*/
 	static void onUninstallScript() {}
 } ;

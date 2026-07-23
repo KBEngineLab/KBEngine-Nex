@@ -44,11 +44,11 @@ public:
 	InterfacesTask();
 	virtual ~InterfacesTask();
 	
-	std::string commitName;			// �ύʱ�õ�����
-	std::string accountName;		// ����Ϸ���������ݿ�����account�󶨵�����
-	std::string password;			// ����
-	std::string postDatas;			// �ύ�ĸ�������
-	std::string getDatas;			// ���ظ��ͻ��˵ĸ�������
+	std::string commitName;			// 提交时用的名称
+	std::string accountName;		// 在游戏服务器数据库中与account绑定的名称
+	std::string password;			// 密码
+	std::string postDatas;			// 提交的附带数据
+	std::string getDatas;			// 返回给客户端的附带数据
 	COMPONENT_ID baseappID;
 	COMPONENT_ID dbmgrID;
 	SERVER_ERROR_CODE retcode;

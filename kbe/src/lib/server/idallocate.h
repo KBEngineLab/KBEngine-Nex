@@ -19,40 +19,40 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 /*
-	IDAllocate(������)
-		��������һ������������������Ψһid�� ʹ����������������Լ���֤�� һ��Ӧ��ֻ��ʹ��
-		ͬһ��id����������ȡid����Ψһ�ġ�
+	IDAllocate(分配器)
+		用来分配一个本分配器所管理的唯一id。 使用这个分配器必须自己保证， 一个应用只能使用
+		同一个id分配器来获取id才是唯一的。
 		
-		�����һ�� unsigned int���ͣ� �����������һֱ���Ϸ��䣬 ���ﵽ���͵����ֵ֮���
-		��תͷ�ִ�0��ʼ�����ۼӷ��䣬 �����list��Ѱ�ң� �����ǰҪ�����IDû����list���ҵ�
-		��ô���id�������䡣
+		如果是一个 unsigned int类型， 这个分配器会一直向上分配， 当达到类型的最大值之后会
+		从转头又从0开始向上累加分配， 它会从list中寻找， 如果当前要分配的ID没有在list中找到
+		那么这个id将被分配。
 
-		�÷�:
+		用法:
 		IDAllocate<ENTITY_ID>* m_IDAllocPtr = new IDAllocate<ENTITY_ID>;
-		// ����һ��id 
+		// 分配一个id 
 		m_IDAllocPtr->alloc()
-		// ����һ��id
+		// 回收一个id
 		m_IDAllocPtr->reclaim()
 		
-	IDServer(������)
-		�����Ҫ���ṩ������������֮���entityID�ķ��䣬 ����Ҫ��baseappmgrʹ�ã� ÿ��IDserver
-		�����ȡID��ʱ�� ����������ͻ����һ��Ψһid�θ��ͻ��ˣ� ��ô�ͻ��˾Ϳ��Ը��������
-		�������е�Ψһid���������ɵķ��ɡ�
+	IDServer(服务器)
+		这个主要是提供整个服务器组之间的entityID的分配， 他主要被baseappmgr使用， 每个IDserver
+		请求获取ID的时候， 这个服务器就会分配一个唯一id段给客户端， 那么客户端就可以根据这个段
+		产生所有的唯一id并进行自由的分派。
 		
-		�÷�:
+		用法:
 		IDServer<ENTITY_ID>* m_idServer = new IDServer<ENTITY_ID>(1, 400);
-		// ��ȡһ��id�� �������IDClient
+		// 获取一个id段 并传输给IDClient
 		std::pair< unsigned int, unsigned int > idRange = m_idServer->allocRange();
 		g_socketStreamIDClient->send(idRange.first, idRange.second);
 		
-	IDClient(�ͻ���)
-		���ģ�������IDServer����id����ͽ��յģ� ��
+	IDClient(客户端)
+		这个模块是配合IDServer进行id申请和接收的， 。
 		
-		�÷�:
+		用法:
 		IDClient<ENTITY_ID>* m_idClient = new IDClient<ENTITY_ID>;
-		// ����IDServer���͹�����id��
+		// 添加IDServer发送过来的id段
 		m_idClient->onAddRange(id_begin, id_end);
-		// ����һ��id 
+		// 分配一个id 
 		m_idClient->alloc()
 */
 #ifndef KBE_IDALLOCATE_H
@@ -72,8 +72,8 @@ namespace KBEngine{
 
 class ServerApp;
 
-// ֱ��ʹ��һ���������� �������������ʹ�С�͹���������Ҫʹ���޷�������
-// ��������ʱ����id�� ���Һܿ�黹�� �����Ų���ID��ͻ
+// 直接使用一个迭代数， 如果数溢出了类型大小就归零所以需要使用无符号类型
+// 适用于临时分配id， 并且很快归还， 这样才不会ID冲突
 template<typename T>
 class IDAllocate
 {
@@ -87,7 +87,7 @@ public:
 	}	
 	
 	/** 
-		����һ��id 
+		分配一个id 
 	*/
 	T alloc(void)
 	{
@@ -99,7 +99,7 @@ public:
 	}
 	
 	/** 
-		����һ��id 
+		回收一个id 
 	*/
 	virtual void reclaim(T id)
 	{
@@ -109,11 +109,11 @@ public:
 	void lastID(T v){ last_id_ = v; }
 
 protected:
-	// ���һ�����뵽��ID
+	// 最后一次申请到的ID
 	T last_id_;
 };
 
-// �����id�����洢���б��У� �´�ʹ�û���л�ȡ
+// 分配的id用完会存储在列表中， 下次使用会从中获取
 template< typename T >
 class IDAllocateFromList : public IDAllocate<T>
 {
@@ -127,7 +127,7 @@ public:
 	}	
 	
 	/** 
-		����һ��id 
+		分配一个id 
 	*/
 	T alloc(void)
 	{
@@ -146,7 +146,7 @@ public:
 	}
 	
 	/** 
-		����һ��id 
+		回收一个id 
 	*/
 	void reclaim(T id)
 	{
@@ -154,7 +154,7 @@ public:
 	}
 
 protected:
-	// id�б��� ����ID����������б���
+	// id列表， 所有ID都存在这个列表里
 	typename std::queue< T > id_list_;
 };
 
@@ -174,7 +174,7 @@ public:
 	}
 	
 	/** 
-		����һ��id�� 
+		分配一个id段 
 	*/
 	std::pair< T, T > allocRange(void)
 	{
@@ -191,10 +191,10 @@ public:
 	}
 
 protected:
-	// ���һ�����뵽��ID�ε���ʼλ��
+	// 最后一次申请到的ID段的起始位置
 	T last_id_range_begin_;
 	
-	// id�ε�һ���γ���
+	// id段的一个段长度
 	T range_step_;	
 };
 
@@ -210,7 +210,7 @@ public:
 	}
 	
 	/** 
-		����ʱ����֪ͨIDServer���л��գ� ��ʹ�����Լ������ⷽ���ά�� 
+		析构时不会通知IDServer进行回收， 请使用者自己进行这方面的维护 
 	*/
 	virtual ~IDClient()
 	{
@@ -229,7 +229,7 @@ public:
 		size_t nCount = last_id_range_end_ - last_id_range_begin_; 
 		if(nCount <= 0)
 		{
-			// �����Ƿ��л����ID�Σ�����id���þ�ʱ����������뻺�浽���
+			// 看看是否有缓存的ID段（会在id快用尽时向服务器申请缓存到这里）
 			if(id_list_.size() > 0)
 			{
 				std::pair< T, T > n = id_list_.front();
@@ -244,14 +244,14 @@ public:
 	}
 	
 	/**
-		���entityID�Ƿ��� 
-		ע�⣺һ��tick��ʹ��ID������Ҫ����ID_ENOUGH_LIMIT
+		检查entityID是否够用 
+		注意：一个tick内使用ID数量不要超过ID_ENOUGH_LIMIT
 	*/
 	virtual void onAlloc(void) {
 	};
 	
 	/** 
-		idserver ���������һ��id�� 
+		idserver 分配过来的一个id段 
 	*/
 	void onAddRange(T id_begin, T id_end)
 	{
@@ -268,7 +268,7 @@ public:
 	}
 	
 	/** 
-		����һ��id 
+		分配一个id 
 	*/
 	T alloc(void)
 	{
@@ -278,7 +278,7 @@ public:
 
 		if(last_id_range_begin_ > last_id_range_end_)
 		{
-			// �����Ƿ��л����ID�Σ�����id���þ�ʱ����������뻺�浽���
+			// 看看是否有缓存的ID段（会在id快用尽时向服务器申请缓存到这里）
 			if(id_list_.size() > 0)
 			{
 				std::pair< T, T > n = id_list_.front();
@@ -297,21 +297,21 @@ public:
 	}
 	
 	/** 
-		����һ��id
+		回收一个id
 	*/
 	void onReclaim(T id)
 	{
 	}
 	
 protected:
-	// id�б��� ����ID�ζ���������б���
+	// id列表， 所有ID段都存在这个列表里
 	typename std::queue< std::pair< T, T > > id_list_;
 
-	// ���һ�����뵽��ID�ε���ʼλ��
+	// 最后一次申请到的ID段的起始位置
 	T last_id_range_begin_;
 	T last_id_range_end_;
 
-	// �Ƿ��Ѿ�����ID����˷���ID
+	// 是否已经请求ID服务端分配ID
 	bool requested_idserver_alloc_;	
 };
 

@@ -32,7 +32,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine { 
 
 /*
-	���ݿ��߳�����buffer
+	数据库线程任务buffer
 */
 
 class Buffered_DBTasks
@@ -107,7 +107,7 @@ public:
 	const std::string& dbInterfaceName() { return dbInterfaceName_; }
 
 	/**
-		�ṩ��watcherʹ��
+		提供给watcher使用
 	*/
 	uint32 dbid_tasksSize()
 	{ 
@@ -118,7 +118,7 @@ public:
 	}
 
 	/**
-		�ṩ��watcherʹ��
+		提供给watcher使用
 	*/
 	uint32 entityid_tasksSize()
 	{ 
@@ -129,7 +129,7 @@ public:
 	}
 
 	/**
-		�ṩ��watcherʹ��
+		提供给watcher使用
 	*/
 	std::string printBuffered_dbid();
 	std::string printBuffered_entityID();

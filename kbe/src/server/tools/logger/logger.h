@@ -90,7 +90,7 @@ public:
 	void handleTimeout(TimerHandle handle, void * arg);
 	void handleTick();
 
-	/* ��ʼ����ؽӿ� */
+	/* 初始化相关接口 */
 	bool initializeBegin();
 	bool inInitialize();
 	bool initializeEnd();
@@ -104,23 +104,23 @@ public:
 		return (uint32)buffered_logs_.size();
 	}
 
-	/** ����ӿ�
-		д��־
+	/** 网络接口
+		写日志
 	*/
 	void writeLog(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ����ӿ�
-		ע��log������
+	/** 网络接口
+		注册log监听者
 	*/
 	void registerLogWatcher(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ����ӿ�
-		ע��log������
+	/** 网络接口
+		注销log监听者
 	*/
 	void deregisterLogWatcher(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ����ӿ�
-		log�����߸����Լ�������
+	/** 网络接口
+		log监听者更新自己的设置
 	*/
 	void updateLogWatcherSetting(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 

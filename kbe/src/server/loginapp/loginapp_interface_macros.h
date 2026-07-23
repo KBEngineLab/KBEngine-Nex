@@ -38,7 +38,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	Loginapp��Ϣ�꣬  ����Ϊ���� ��Ҫ�Լ��⿪
+	Loginapp消息宏，  参数为流， 需要自己解开
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef LOGINAPP_MESSAGE_HANDLER_STREAM
@@ -85,7 +85,7 @@ namespace KBEngine{
 																				\
 
 /**
-	Loginapp��Ϣ�꣬  ֻ�������������Ϣ
+	Loginapp消息宏，  只有零个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef LOGINAPP_MESSAGE_HANDLER_ARGS0
@@ -126,7 +126,7 @@ namespace KBEngine{
 																				\
 
 /**
-	Loginapp��Ϣ�꣬  ֻ��һ����������Ϣ
+	Loginapp消息宏，  只有一个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef LOGINAPP_MESSAGE_HANDLER_ARGS1
@@ -169,7 +169,7 @@ namespace KBEngine{
 																				\
 
 /**
-	Loginapp��Ϣ�꣬  ֻ�ж�����������Ϣ
+	Loginapp消息宏，  只有二个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef LOGINAPP_MESSAGE_HANDLER_ARGS2
@@ -220,7 +220,7 @@ namespace KBEngine{
 											ARG_TYPE2, ARG_NAME2)				\
 
 /**
-	Loginapp��Ϣ�꣬  ֻ��������������Ϣ
+	Loginapp消息宏，  只有三个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef LOGINAPP_MESSAGE_HANDLER_ARGS3
@@ -281,7 +281,7 @@ namespace KBEngine{
 
 
 /**
-	Loginapp��Ϣ�꣬  ֻ���ĸ���������Ϣ
+	Loginapp消息宏，  只有四个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef LOGINAPP_MESSAGE_HANDLER_ARGS4
@@ -349,7 +349,7 @@ namespace KBEngine{
 											ARG_TYPE4, ARG_NAME4)				\
 
 /**
-	Loginapp��Ϣ�꣬  ֻ�������������Ϣ
+	Loginapp消息宏，  只有五个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef LOGINAPP_MESSAGE_HANDLER_ARGS5
@@ -426,7 +426,7 @@ namespace KBEngine{
 
 
 /**
-	Loginapp��Ϣ�꣬  ֻ��������������Ϣ
+	Loginapp消息宏，  只有六个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef LOGINAPP_MESSAGE_HANDLER_ARGS6
@@ -510,7 +510,7 @@ namespace KBEngine{
 											ARG_TYPE6, ARG_NAME6)				\
 
 /**
-	Loginapp��Ϣ�꣬  ֻ�а˸���������Ϣ
+	Loginapp消息宏，  只有八个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef LOGINAPP_MESSAGE_HANDLER_ARGS8

@@ -136,8 +136,8 @@ public:
 
 //-------------------------------------------------------------------------------------
 /**
- ���������ĵ�����Ľڵ�
- ģ����� NODEWRAP ȡֵΪ��������֮һ��
+ 查找离中心点最近的节点
+ 模版参数 NODEWRAP 取值为以下三者之一：
    - CoordinateNodeWrapX
    - CoordinateNodeWrapZ
    - CoordinateNodeWrapY
@@ -148,9 +148,9 @@ CoordinateNode* findNearestNode(CoordinateNode* rootNode, const Position3D& orig
 	CoordinateNode* pRN = NULL;
 	CoordinateNode* pCoordinateNode = rootNode;
 
-	// ���ҵ�һ��EntityNode��֧��
+	// 先找到一个EntityNode做支点
 	{
-		// ���ҵ�ǰ�ڵ㣬�Ҳ���������߱���Ѱ��
+		// 先找当前节点，找不到则往左边遍历寻找
 		NODEWRAP wrap(rootNode, originPos);
 		do
 		{
@@ -161,7 +161,7 @@ CoordinateNode* findNearestNode(CoordinateNode* rootNode, const Position3D& orig
 			}
 		} while (wrap.prev());
 
-		// ����Ҳ����������ұ߱���Ѱ��
+		// 如果找不到，则往右边编历寻找
 		if (!pRN)
 		{
 			wrap.reset();
@@ -174,29 +174,29 @@ CoordinateNode* findNearestNode(CoordinateNode* rootNode, const Position3D& orig
 				}
 			}
 
-			// �����ϲ������Ҳ���
+			// 理论上不可能找不到
 			if (!pRN)
 				return NULL;
 		}
 	}
 
-	// �����������ʾһ�����ҵ��ˣ���ʼ����Ŀ��λ�������Node
+	// 能来到这里，表示一定是找到了，开始找离目标位置最近的Node
 	NODEWRAP wrap(pRN, originPos);
 	int v = wrap.compare();
 	
-	if (v == 0)  // ���
+	if (v == 0)  // 相等
 	{
 		return wrap.currentNode();
 	}
-	else if (v > 0)  // Entity Node�����ĵ���ұ�
+	else if (v > 0)  // Entity Node在中心点的右边
 	{
 		pCoordinateNode = wrap.currentNode();
 		while (wrap.prev())
 		{
 			if (wrap.isEntityNode() && wrap.valid())
 			{
-				// �����Ǵ����ĵ���ұ�����߱�����
-				// ��˵�һ��positionС�����ĵ��entity��һ���������ĵ������
+				// 由于是从中心点的右边往左边遍历，
+				// 因此第一个position小于中心点的entity就一定是离中心点最近的
 				if (wrap.compare() <= 0)
 				{
 					return wrap.currentNode();
@@ -207,15 +207,15 @@ CoordinateNode* findNearestNode(CoordinateNode* rootNode, const Position3D& orig
 		}
 		return pCoordinateNode;
 	}
-	else   // Entity Node�����ĵ�����
+	else   // Entity Node在中心点的左边
 	{
 		pCoordinateNode = wrap.currentNode();
 		while (wrap.next())
 		{
 			if (wrap.isEntityNode() && wrap.valid())
 			{
-				// �����Ǵ����ĵ��������ұ߱�����
-				// ��˵�һ��position�������ĵ��entity��һ���������ĵ������
+				// 由于是从中心点的左边往右边遍历，
+				// 因此第一个position大于中心点的entity就一定是离中心点最近的
 				if (wrap.compare() >= 0)
 				{
 					return wrap.currentNode();
@@ -231,8 +231,8 @@ CoordinateNode* findNearestNode(CoordinateNode* rootNode, const Position3D& orig
 
 //-------------------------------------------------------------------------------------
 /**
- ����һ�����Ϸ��Ϸ�Χ��entity
- ģ����� NODEWRAP ȡֵΪ��������֮һ��
+ 查找一个轴上符合范围的entity
+ 模版参数 NODEWRAP 取值为以下三者之一：
    - CoordinateNodeWrapX
    - CoordinateNodeWrapZ
    - CoordinateNodeWrapY
@@ -247,7 +247,7 @@ void entitiesInAxisRange(std::set<Entity*>& foundEntities, CoordinateNode* rootN
 
 	NODEWRAP wrap(pCoordinateNode, originPos);
 
-	// ����ڵ��Լ�Ҳ��������������Լ��ӽ�ȥ
+	// 如果节点自己也符合条件，则把自己加进去
 	if (wrap.isEntityNode() && wrap.valid())
 	{
 		Entity* pEntity = wrap.currentNodeEntity();
@@ -362,9 +362,9 @@ float EntityCoordinateNode::zz() const
 //-------------------------------------------------------------------------------------
 void EntityCoordinateNode::update()
 {
-	// ��������һ�¸��µ�ԭ���ǣ��ܿ�����CoordinateNode::update()�Ĺ����е���ʵ��λ�ñ��ƶ�
-	// �����´���update�����ã���ĳ������»��������
-	// ���磺// A->B, B-A����ʱold_*��B��, A->B����ʱold_*��B����xx��Ŀ�ĵؾ���B��,��ʱupdate�л�����Ϊû���ƶ���
+	// 在这里做一下更新的原因是，很可能在CoordinateNode::update()的过程中导致实体位置被移动
+	// 而导致次数update被调用，在某种情况下会出现问题
+	// 例如：// A->B, B-A（此时old_*是B）, A->B（此时old_*是B，而xx等目的地就是B）,此时update中会误判为没有移动。
 	// https://github.com/kbengine/kbengine/issues/407
 	old_xx(x());
 	old_yy(y());
@@ -375,7 +375,7 @@ void EntityCoordinateNode::update()
 	addFlags(COORDINATE_NODE_FLAG_ENTITY_NODE_UPDATING);
 	++entityNodeUpdating_;
 
-	// �˴�����ʹ��watcherNodes_.size()������ʹ�õ�������������ֹ��update�е���������watcherNodes_�������ƻ�������
+	// 此处必须使用watcherNodes_.size()而不能使用迭代器遍历，防止在update中导致增加了watcherNodes_数量而破坏迭代器
 	for (WATCHER_NODES::size_type i = 0; i < watcherNodes_.size(); ++i)
 	{
 		CoordinateNode* pCoordinateNode = watcherNodes_[i];
@@ -429,9 +429,9 @@ void EntityCoordinateNode::onRemove()
 		if (!pCoordinateNode)
 			continue;
 
-		// ������ΪNULL�� �ں���updateʱ����ɾ��
-		// �˴����ܶ�watcherNodes_����С���޸ģ���Ϊ������EntityCoordinateNode::update()�е��¸ô�����
-		// ��ô���ܵ���EntityCoordinateNode::update()��ѭ��watcherNodes_�б��޸Ķ�������
+		// 先设置为NULL， 在后面update时进行删除
+		// 此处不能对watcherNodes_做大小做修改，因为可能由EntityCoordinateNode::update()中导致该处调用
+		// 那么可能导致EntityCoordinateNode::update()在循环watcherNodes_中被修改而出错。
 		watcherNodes_[i] = NULL;
 		++delWatcherNodeNum_;
 
@@ -491,7 +491,7 @@ void EntityCoordinateNode::entitiesInRange(std::vector<Entity*>& foundEntities, 
 	entitiesInAxisRange<CoordinateNodeWrapX>(entities_X, rootNode, originPos, radius, entityUType);
 	entitiesInAxisRange<CoordinateNodeWrapZ>(entities_Z, rootNode, originPos, radius, entityUType);
 
-	// ����Y
+	// 查找Y
 	if (CoordinateSystem::hasY)
 	{
 		std::set<Entity*> entities_Y;

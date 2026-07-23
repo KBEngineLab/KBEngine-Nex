@@ -35,7 +35,7 @@ template<typename T>
 class Entities : public script::ScriptObject
 {
 	/** 
-		���໯ ��һЩpy�������������� 
+		子类化 将一些py操作填充进派生类 
 	*/
 	INSTANCE_SCRIPT_HREADER(Entities, ScriptObject)	
 public:
@@ -59,7 +59,7 @@ public:
 	}
 
 	/** 
-		��¶һЩ�ֵ䷽����python 
+		暴露一些字典方法给python 
 	*/
 	DECLARE_PY_MOTHOD_ARG1(pyHas_key, ENTITY_ID);
 	DECLARE_PY_MOTHOD_ARG0(pyKeys);
@@ -70,7 +70,7 @@ public:
 		PyObject * args, PyObject* kwds);
 
 	/** 
-		map����������� 
+		map操作函数相关 
 	*/
 	static PyObject* mp_subscript(PyObject * self, PyObject * key);
 
@@ -96,13 +96,13 @@ public:
 private:
 	ENTITYS_MAP _entities;
 
-	// �Ѿ����ù�destroy��δ������entity�����洢����� ��ʱ��δ������˵��
-	// �ű����п��ܴ���ѭ�����õ���������ڴ�й¶��
+	// 已经调用过destroy但未析构的entity都将存储在这里， 长时间未被析构说明
+	// 脚本层有可能存在循环引用的问题造成内存泄露。
 	EntityGarbages<T>* _pGarbages;
 };
 
 /** 
-	Python Entities��������Ҫ�ķ����� 
+	Python Entities操作所需要的方法表 
 */
 template<typename T>
 PyMappingMethods Entities<T>::mappingMethods =
@@ -112,7 +112,7 @@ PyMappingMethods Entities<T>::mappingMethods =
 	NULL											// mp_ass_subscript
 };
 
-// �ο� objects/dictobject.c
+// 参考 objects/dictobject.c
 // Hack to implement "key in dict"
 template<typename T>
 PySequenceMethods Entities<T>::mappingSequenceMethods = 
@@ -327,7 +327,7 @@ void Entities<T>::clear(bool callScript, std::vector<ENTITY_ID> excludes)
 		_entities.erase(iter++);
 	}
 	
-	// ���ڴ���excludes�������
+	// 由于存在excludes不能清空
 	// _entities.clear();
 }
 

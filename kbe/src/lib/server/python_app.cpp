@@ -28,7 +28,7 @@ namespace KBEngine{
 KBEngine::ScriptTimers KBEngine::PythonApp::scriptTimers_;
 
 /**
-�ڲ���ʱ��������
+内部定时器处理类
 */
 class ScriptTimerHandler : public TimerHandler
 {
@@ -247,7 +247,7 @@ bool PythonApp::uninstallPyScript()
 //-------------------------------------------------------------------------------------
 bool PythonApp::installPyModules()
 {
-	// ��װ���ģ��
+	// 安装入口模块
 	PyObject *entryScriptFileName = NULL;
 	if(componentType() == BASEAPP_TYPE)
 	{
@@ -288,29 +288,29 @@ bool PythonApp::installPyModules()
 
 	APPEND_SCRIPT_MODULE_METHOD(module, MemoryStream, script::PyMemoryStream::py_new, METH_VARARGS, 0);
 
-	// ע�ᴴ��entity�ķ�����py
-	// ��ű�ע��app����״̬
+	// 注册创建entity的方法到py
+	// 向脚本注册app发布状态
 	APPEND_SCRIPT_MODULE_METHOD(module, publish, __py_getAppPublish, METH_VARARGS, 0);
 
-	// ע�����ýű��������
+	// 注册设置脚本输出类型
 	APPEND_SCRIPT_MODULE_METHOD(module, scriptLogType, __py_setScriptLogType, METH_VARARGS, 0);
 	
-	// �����Դȫ·��
+	// 获得资源全路径
 	APPEND_SCRIPT_MODULE_METHOD(module, getResFullPath, __py_getResFullPath, METH_VARARGS, 0);
 
-	// �Ƿ����ĳ����Դ
+	// 是否存在某个资源
 	APPEND_SCRIPT_MODULE_METHOD(module, hasRes, __py_hasRes, METH_VARARGS, 0);
 
-	// ��һ���ļ�
+	// 打开一个文件
 	APPEND_SCRIPT_MODULE_METHOD(module, open, __py_kbeOpen, METH_VARARGS, 0);
 
-	// �г�Ŀ¼�������ļ�
+	// 列出目录下所有文件
 	APPEND_SCRIPT_MODULE_METHOD(module, listPathRes, __py_listPathRes, METH_VARARGS, 0);
 
-	// ƥ�����·�����ȫ·��
+	// 匹配相对路径获得全路径
 	APPEND_SCRIPT_MODULE_METHOD(module, matchPath, __py_matchPath, METH_VARARGS, 0);
 
-	// debug׷��kbe��װ��py�������
+	// debug追踪kbe封装的py对象计数
 	APPEND_SCRIPT_MODULE_METHOD(module, debugTracing, script::PyGC::__py_debugTracing, METH_VARARGS, 0);
 
 	if (PyModule_AddIntConstant(module, "LOG_TYPE_NORMAL", log4cxx::ScriptLevel::SCRIPT_INT))
@@ -343,7 +343,7 @@ bool PythonApp::installPyModules()
 		ERROR_MSG( "PythonApp::installPyModules: Unable to set KBEngine.NEXT_ONLY.\n");
 	}
 	
-	// ע������pythonApp��Ҫ�õ���ͨ�ýӿ�
+	// 注册所有pythonApp都要用到的通用接口
 	APPEND_SCRIPT_MODULE_METHOD(module,		addTimer,						__py_addTimer,											METH_VARARGS,	0);
 	APPEND_SCRIPT_MODULE_METHOD(module,		delTimer,						__py_delTimer,											METH_VARARGS,	0);
 	APPEND_SCRIPT_MODULE_METHOD(module,		registerReadFileDescriptor,		PyFileDescriptor::__py_registerReadFileDescriptor,		METH_VARARGS,	0);
@@ -700,7 +700,7 @@ void PythonApp::onExecScriptCommand(Network::Channel* pChannel, KBEngine::Memory
 		retbuf = "\r\n";
 	}
 
-	// ��������ظ��ͻ���
+	// 将结果返回给客户端
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	ConsoleInterface::ConsoleExecCommandCBMessageHandler msgHandler;
 	(*pBundle).newMessage(msgHandler);
@@ -723,7 +723,7 @@ void PythonApp::reloadScript(bool fullReload)
 
 	// SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-	// ���нű����������
+	// 所有脚本都加载完毕
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(),
 										const_cast<char*>("onInit"),
 										const_cast<char*>("i"), 

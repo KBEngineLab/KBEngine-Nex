@@ -25,7 +25,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{
 
-// vector<string>֮�������ʹ�� std::find_if �������Ƿ����ĳ���ַ���
+// vector<string>之类的容易使用 std::find_if 来查找是否存在某个字符串
 template<typename T>
 class find_vec_string_exist_handle
 {
@@ -48,7 +48,7 @@ private:
 };
 
 
-// vector<obj*>֮�������ʹ�� std::find_if �������Ƿ����ĳ������
+// vector<obj*>之类的容易使用 std::find_if 来查找是否存在某个对象
 template<typename T>
 class findif_vector_obj_exist_handler
 {

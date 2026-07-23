@@ -117,7 +117,7 @@ bool MethodDescription::checkArgs(PyObject* args)
 	}	
 	
 	
-	// ����Ƿ���һ��exposed����
+	// 检查是否是一个exposed方法
 	if(offset > 0)
 	{
 		PyObject* pyExposed = PyTuple_GetItem(args, 0);
@@ -167,8 +167,8 @@ void MethodDescription::addToStream(MemoryStream* mstream, PyObject* args)
 	uint8 argsSize = argTypes_.size();
 	int offset = 0;
 
-	// ��utype�Ž�ȥ������Զ�ʶ���������
-	// �������aliasID_����0�����һ���Ż��İ취�� ʹ��1�ֽڴ���
+	// 将utype放进去，方便对端识别这个方法
+	// 这里如果aliasID_大于0则采用一个优化的办法， 使用1字节传输
 	if(aliasID_ < 0)
 	{
 		(*mstream) << utype_;
@@ -179,13 +179,13 @@ void MethodDescription::addToStream(MemoryStream* mstream, PyObject* args)
 		(*mstream) << utype;
 	}
 
-	// �����exposed�������Ƚ�entityID�����ȥ
+	// 如果是exposed方法则先将entityID打包进去
 	if(isExposed() == EXPOSED_AND_CALLER_CHECK && g_componentType == CELLAPP_TYPE && isCell())
 	{
 		offset = 1;
 	}
 
-	// ��ÿһ���������ӵ�����
+	// 将每一个参数添加到流中
 	for(uint8 i=0; i <argsSize; ++i)
 	{
 		PyObject* pyArg = PyTuple_GetItem(args, i + offset);
@@ -205,7 +205,7 @@ PyObject* MethodDescription::createFromStream(MemoryStream* mstream)
 		offset = 1;
 		pyArgsTuple = PyTuple_New(argSize + offset);
 
-		// ����һ��������ID�ṩ���ű��ж���Դ�Ƿ���ȷ
+		// 设置一个调用者ID提供给脚本判断来源是否正确
 		KBE_ASSERT(currCallerID_ > 0);
 		PyTuple_SET_ITEM(pyArgsTuple, 0, PyLong_FromLong(currCallerID_));
 	}

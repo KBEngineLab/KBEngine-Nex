@@ -521,10 +521,10 @@ void DebugHelper::sync()
 		return;
 	}
 
-	// �����߳���־����bufferedLogPackets_
+	// 将子线程日志放入bufferedLogPackets_
 	while (childThreadBufferedLogPackets_.size() > 0)
 	{
-		// ���������ȡ��һ�����󣬽����߳��ж���vector�ڴ潻����ȥ
+		// 从主对象池取出一个对象，将子线程中对象vector内存交换进去
 		MemoryStream* pMemoryStream = childThreadBufferedLogPackets_.front();
 		childThreadBufferedLogPackets_.pop();
 
@@ -535,17 +535,17 @@ void DebugHelper::sync()
 		pBundle->finiCurrPacket();
 		pBundle->newPacket();
 
-		// �����ǵ��ڴ潻����ȥ
+		// 将他们的内存交换进去
 		pBundle->pCurrPacket()->swap(*pMemoryStream);
 		pBundle->currMsgLength(pBundle->currMsgLength() + pBundle->pCurrPacket()->length());
 
-		// �����ж��󽻻��������
+		// 将所有对象交还给对象池
 		memoryStreamPool_.reclaimObject(pMemoryStream);
 	}
 
 	if (Network::Address::NONE == loggerAddr_)
 	{
-		// �������300��û���ҵ�logger����ôǿ�������ڴ�
+		// 如果超过300秒没有找到logger，那么强制清理内存
 		if (timestamp() - loseLoggerTime_ > uint64(300 * stampsPerSecond()))
 		{
 			clearBufferedLog();
@@ -623,7 +623,7 @@ void DebugHelper::sync()
 		--hasBufferedLogPackets_;
 	}
 
-	// ������Ҫ��ʱ���ͣ������ڷ��͹����в������󣬵�����־������������
+	// 这里需要延时发送，否则在发送过程中产生错误，导致日志输出会出现死锁
 	if(bundles.size() > 0 && !pLoggerChannel->sending())
 		pLoggerChannel->delayedSend();
 
@@ -796,10 +796,10 @@ void DebugHelper::printBufferedLogs()
 	KBE_LOG4CXX_PRINT(g_logger, std::string("The following logs sent to logger failed:\n"));
 #endif
 
-	// �����߳���־����bufferedLogPackets_
+	// 将子线程日志放入bufferedLogPackets_
 	while (childThreadBufferedLogPackets_.size() > 0)
 	{
-		// ���������ȡ��һ�����󣬽����߳��ж���vector�ڴ潻����ȥ
+		// 从主对象池取出一个对象，将子线程中对象vector内存交换进去
 		MemoryStream* pMemoryStream = childThreadBufferedLogPackets_.front();
 		childThreadBufferedLogPackets_.pop();
 
@@ -810,11 +810,11 @@ void DebugHelper::printBufferedLogs()
 		pBundle->finiCurrPacket();
 		pBundle->newPacket();
 
-		// �����ǵ��ڴ潻����ȥ
+		// 将他们的内存交换进去
 		pBundle->pCurrPacket()->swap(*pMemoryStream);
 		pBundle->currMsgLength(pBundle->currMsgLength() + pBundle->pCurrPacket()->length());
 
-		// �����ж��󽻻��������
+		// 将所有对象交还给对象池
 		memoryStreamPool_.reclaimObject(pMemoryStream);
 	}
 
@@ -1014,7 +1014,7 @@ void DebugHelper::script_info_msg(const std::string& s)
 
 	onMessage(KBELOG_TYPE_MAPPING(scriptMsgType_), s.c_str(), (uint32)s.size());
 
-	// ������û��ֶ����õ�Ҳ���Ϊ������Ϣ
+	// 如果是用户手动设置的也输出为错误信息
 	if(log4cxx::ScriptLevel::SCRIPT_ERR == scriptMsgType_)
 	{
 		set_errorcolor();

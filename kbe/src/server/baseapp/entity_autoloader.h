@@ -37,8 +37,8 @@ public:
 	void pInitProgressHandler(InitProgressHandler* p)
 		{ pInitProgressHandler_ = p; }
 
-	/** ����ӿ�
-		���ݿ��в�ѯ���Զ�entity������Ϣ����
+	/** 网络接口
+		数据库中查询的自动entity加载信息返回
 	*/
 	void onEntityAutoLoadCBFromDBMgr(Network::Channel* pChannel, MemoryStream& s);
 
@@ -48,7 +48,7 @@ private:
 
 	std::vector< std::vector<ENTITY_SCRIPT_UID> > entityTypes_;
 
-	// ÿ��ȡ��ѯ�����������
+	// 每次取查询结果集的区段
 	ENTITY_ID start_;
 	ENTITY_ID end_;
 

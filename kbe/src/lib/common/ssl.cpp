@@ -85,13 +85,13 @@ int KB_SSL::isSSLProtocal(MemoryStream* s)
 		&& (recvData[4] == 0x00 || recvData[4] == 0x01 || recvData[4] == 0x02 || recvData[4] == 0x03)
 		&& (s->length() - recvData[1]) == 2)
 	{
-		// SSLv2 Э��
+		// SSLv2 协议
 		return SSL2_VERSION;
 	}
 	else if (s->length() >= 47 && recvData[0] == 0x16 && recvData[1] == 0x03
 		&& (recvData[2] == 0x00 || recvData[2] == 0x01 || recvData[2] == 0x02 || recvData[2] == 0x03))
 	{
-		// SSLv3 Э��
+		// SSLv3 协议
 		if (recvData[2] == 0x00)
 		{
 			return SSL3_VERSION;

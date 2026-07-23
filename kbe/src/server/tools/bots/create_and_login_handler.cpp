@@ -62,7 +62,7 @@ void CreateAndLoginHandler::handleTimeout(TimerHandle handle, void * arg)
 
 	if(lasttick > 0.f)
 	{
-		// ÿ��tick��ȥ0.1�룬 Ϊ0����Դ���һ��������;
+		// 每个tick减去0.1秒， 为0则可以创建一次且重置;
 		lasttick -= 0.1f;
 		return;
 	}

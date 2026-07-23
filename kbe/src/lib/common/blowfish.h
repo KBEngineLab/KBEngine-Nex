@@ -31,14 +31,14 @@ namespace KBEngine {
 class KBEBlowfish
 {
 public:
-	// ÿ���С
+	// 每块大小
 	static const int BLOCK_SIZE = 64 / 8;
 
-	// key����С������С
+	// key的最小和最大大小
 	static const int MIN_KEY_SIZE = 32 / 8;
 	static const int MAX_KEY_SIZE = 448 / 8;
 
-	// Ĭ��key�Ĵ�С
+	// 默认key的大小
 	static const int DEFAULT_KEY_SIZE = 128 / 8;
 
 	typedef std::string Key;

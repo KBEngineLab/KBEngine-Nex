@@ -56,7 +56,7 @@ class ScriptDefModule;
 
 class ClientEntity : public script::ScriptObject
 {
-	/** ���໯ ��һЩpy�������������� */
+	/** 子类化 将一些py操作填充进派生类 */
 	INSTANCE_SCRIPT_HREADER(ClientEntity, ScriptObject)
 public:
 	ClientEntity(ENTITY_ID srcEntityID, ENTITY_ID clientEntityID);
@@ -64,12 +64,12 @@ public:
 	~ClientEntity();
 	
 	/** 
-		�ű������ȡ���Ի��߷��� 
+		脚本请求获取属性或者方法 
 	*/
 	PyObject* onScriptGetAttribute(PyObject* attr);						
 			
 	/** 
-		��ö�������� 
+		获得对象的描述 
 	*/
 	PyObject* tp_repr();
 	PyObject* tp_str();

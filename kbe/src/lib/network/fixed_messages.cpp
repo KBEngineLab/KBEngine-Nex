@@ -75,7 +75,7 @@ bool FixedMessages::loadConfig(std::string fileName, bool notFoundError)
 	rootNode = xml->getRootNode();
 	if(rootNode == NULL)
 	{
-		// root�ڵ���û���ӽڵ���
+		// root节点下没有子节点了
 		return true;
 	}
 

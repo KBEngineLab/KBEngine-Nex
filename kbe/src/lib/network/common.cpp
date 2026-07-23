@@ -63,7 +63,7 @@ uint32						g_extSendWindowBytesOverflow = 65535;
 uint32						g_intSentWindowBytesOverflow = 0;
 uint32						g_extSentWindowBytesOverflow = 0;
 
-// ͨ�����ͳ�ʱ����
+// 通道发送超时重试
 uint32						g_intReSendInterval = 10;
 uint32						g_intReSendRetries = 0;
 uint32						g_extReSendInterval = 10;

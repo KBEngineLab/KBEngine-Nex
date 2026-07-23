@@ -99,7 +99,7 @@ public:
 				{
 					KBE_ASSERT(pRedisReply->element[0]->type == REDIS_REPLY_STRING);
 					
-					// ��һ�������index��ʼ
+					// 下一次由这个index开始
 					StringConv::str2value(index, pRedisReply->element[0]->str);
 					
 					redisReply* r0 = pRedisReply->element[1];
@@ -145,7 +145,7 @@ public:
 				{
 					KBE_ASSERT(pRedisReply->element[0]->type == REDIS_REPLY_STRING);
 					
-					// ��һ�������index��ʼ
+					// 下一次由这个index开始
 					StringConv::str2value(index, pRedisReply->element[0]->str);
 					
 					redisReply* r0 = pRedisReply->element[1];

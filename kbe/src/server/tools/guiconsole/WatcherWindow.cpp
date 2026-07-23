@@ -37,10 +37,10 @@ BOOL CWatcherWindow::OnInitDialog()
 
 	{
 		DWORD dwStyle = m_status.GetExtendedStyle();
-		dwStyle |= LVS_EX_FULLROWSELECT;					//ѡ��ĳ��ʹ���и�����ֻ������report����listctrl��
-		dwStyle |= LVS_EX_GRIDLINES;						//�����ߣ�ֻ������report����listctrl��
+		dwStyle |= LVS_EX_FULLROWSELECT;					//选中某行使整行高亮（只适用与report风格的listctrl）
+		dwStyle |= LVS_EX_GRIDLINES;						//网格线（只适用与report风格的listctrl）
 		//dwStyle |= LVS_EX_ONECLICKACTIVATE;
-		m_status.SetExtendedStyle(dwStyle);					//������չ���
+		m_status.SetExtendedStyle(dwStyle);					//设置扩展风格
 	}
 
 	DWORD styles = ::GetWindowLong(m_tree.m_hWnd, GWL_STYLE);
@@ -49,10 +49,10 @@ BOOL CWatcherWindow::OnInitDialog()
 
 	{
 		DWORD dwStyle = m_statusShow.GetExtendedStyle();
-		dwStyle |= LVS_EX_FULLROWSELECT;					//ѡ��ĳ��ʹ���и�����ֻ������report����listctrl��
-		dwStyle |= LVS_EX_GRIDLINES;						//�����ߣ�ֻ������report����listctrl��
+		dwStyle |= LVS_EX_FULLROWSELECT;					//选中某行使整行高亮（只适用与report风格的listctrl）
+		dwStyle |= LVS_EX_GRIDLINES;						//网格线（只适用与report风格的listctrl）
 		//dwStyle |= LVS_EX_ONECLICKACTIVATE;
-		m_statusShow.SetExtendedStyle(dwStyle);				//������չ���
+		m_statusShow.SetExtendedStyle(dwStyle);				//设置扩展风格
 	}
 	
 	return TRUE;  // return TRUE  unless you set the focus to a control

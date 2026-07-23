@@ -74,7 +74,7 @@ state_(C_STATE_INIT)
 	networkInterface_.pChannelTimeOutHandler(this);
 	networkInterface_.pChannelDeregisterHandler(this);
 
-	// ��ʼ��entitycallģ���ȡchannel������ַ
+	// 初始化entitycall模块获取channel函数地址
 	EntityCall::setFindChannelFunc(std::tr1::bind(&ClientApp::findChannelByEntityCall, this, 
 		std::tr1::placeholders::_1));
 
@@ -144,7 +144,7 @@ bool ClientApp::initializeBegin()
 //-------------------------------------------------------------------------------------	
 bool ClientApp::initializeEnd()
 {
-	// ���нű����������
+	// 所有脚本都加载完毕
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
 										const_cast<char*>("onInit"), 
 										const_cast<char*>("i"), 
@@ -198,13 +198,13 @@ bool ClientApp::installEntityDef()
 	if(!EntityDef::installScript(getScript().getModule()))
 		return false;
 
-	// ��ʼ��������չģ��
+	// 初始化所有扩展模块
 	// assets/scripts/
 	if(!EntityDef::initialize(scriptBaseTypes_, g_componentType)){
 		return false;
 	}
 
-	// ע��һЩ�ӿڵ�kbengine
+	// 注册一些接口到kbengine
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	publish,			__py_getAppPublish,								METH_VARARGS,	0)
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	fireEvent,			__py_fireEvent,									METH_VARARGS,	0)
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	player,				__py_getPlayer,									METH_VARARGS,	0)
@@ -216,19 +216,19 @@ bool ClientApp::installEntityDef()
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	disconnect,			__py_disconnect,								METH_VARARGS,	0)
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	kbassert,			__py_assert,									METH_VARARGS,	0)
 
-	// �����Դȫ·��
+	// 获得资源全路径
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	getResFullPath,		__py_getResFullPath,							METH_VARARGS,	0)
 
-	// �Ƿ����ĳ����Դ
+	// 是否存在某个资源
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	hasRes,				__py_hasRes,									METH_VARARGS,	0)
 
-	// ��һ���ļ�
+	// 打开一个文件
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	open,				__py_kbeOpen,									METH_VARARGS,	0)
 
-	// �г�Ŀ¼�������ļ�
+	// 列出目录下所有文件
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	listPathRes,		__py_listPathRes,								METH_VARARGS,	0)
 
-	// ƥ�����·�����ȫ·��
+	// 匹配相对路径获得全路径
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	matchPath,			__py_matchPath,									METH_VARARGS,	0)
 	return true;
 }
@@ -252,7 +252,7 @@ bool ClientApp::installPyModules()
 	registerScript(client::Entity::getScriptType());
 	onInstallPyModules();
 
-	// ע�����ýű��������
+	// 注册设置脚本输出类型
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	scriptLogType,	__py_setScriptLogType,	METH_VARARGS,	0)
 	if(PyModule_AddIntConstant(this->getScript().getModule(), "LOG_TYPE_NORMAL", log4cxx::ScriptLevel::SCRIPT_INT))
 	{
@@ -281,7 +281,7 @@ bool ClientApp::installPyModules()
 
 	registerPyObjectToScript("entities", pEntities_);
 
-	// ��װ���ģ��
+	// 安装入口模块
 	PyObject *entryScriptFileName = PyUnicode_FromString(g_kbeConfig.entryScriptFile());
 	if(entryScriptFileName != NULL)
 	{
@@ -315,7 +315,7 @@ bool ClientApp::uninstallPyModules()
 //-------------------------------------------------------------------------------------		
 void ClientApp::finalise(void)
 {
-	// ����֪ͨ�ű�
+	// 结束通知脚本
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
 										const_cast<char*>("onFinish"),
 										const_cast<char*>(""));
@@ -411,7 +411,7 @@ void ClientApp::handleGameTick()
 				bool ret = updateChannel(false, "", "", "", 0);
 				if(ret)
 				{
-					// ������Ȼ���helloCB֮���ٽ��е�¼
+					// 先握手然后等helloCB之后再进行登录
 					Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 					(*pBundle).newMessage(BaseappInterface::hello);
 					(*pBundle) << KBEVersion::versionString();
@@ -470,7 +470,7 @@ int ClientApp::processOnce(bool shouldIdle)
 //-------------------------------------------------------------------------------------
 void ClientApp::onTargetChanged()
 { 
-	// ���нű����������
+	// 所有脚本都加载完毕
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
 										const_cast<char*>("onTargetChanged"), 
 										const_cast<char*>("i"), 
@@ -660,7 +660,7 @@ bool ClientApp::login(std::string accountName, std::string passwd, std::string d
 	bool ret = updateChannel(true, accountName, passwd, ip, port);
 	if(ret)
 	{
-		// ������Ȼ���helloCB֮���ٽ��е�¼
+		// 先握手然后等helloCB之后再进行登录
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(LoginappInterface::hello);
 		(*pBundle) << KBEVersion::versionString();

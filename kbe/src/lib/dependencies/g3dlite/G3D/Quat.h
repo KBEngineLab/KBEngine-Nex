@@ -327,7 +327,7 @@ public:
     static Quat unitRandom();
 
 	/*
-	* ��u = (x, y, z)����תq�Ƕ�
+	* 绕u = (x, y, z)轴旋转q角度
 	*/
 	static Quat rotateQuaternion(float x, float y, float z, float q){
 		float w_ = cos(q / 2);
@@ -338,7 +338,7 @@ public:
 	}
 
 	/*
-	* ��Ԫ��ת����ŷ���ǣ��˹�ʽ���붨����ת˳����ת˳����Z��X��Y
+	* 四元数转换成欧拉角，此公式必须定义旋转顺序，旋转顺序是Z、X、Y
 	*/
 	static Vector3 quatToEuler(Quat temp){
 		float z = float( aTan2(2 * (temp.w*temp.z + temp.x*temp.y), 1 - 2 * (temp.z*temp.z + temp.x*temp.x)) );
@@ -348,11 +348,11 @@ public:
 	}
 
 	/*
-	* ŷ����ת������Ԫ�����˹�ʽ���붨����ת˳����ת˳����Z��X��Y
-	* ��ͬ����ת˳����ͨ��q=qy*qx*qz���Ϳ������ݳ�����Ĺ�ʽ(w,x,y,z)����Ȼ
-	* qx = ['cos(X/2)','sin(X/2)','0','0']      ������(1,0,0)˳ʱ��X��
-	* qz = ['cos(Z/2)','0','0','sin(Z/2)']	  ������(0,0,1)˳ʱ��Z��
-	* qy = ['cos(Y/2)', '0','sin(Y/2)', '0']	  ������(0,1,0)˳ʱ��Y��
+	* 欧拉角转换成四元数，此公式必须定义旋转顺序，旋转顺序是Z、X、Y
+	* 不同的旋转顺序方向，通过q=qy*qx*qz，就可以推演出下面的公式(w,x,y,z)，当然
+	* qx = ['cos(X/2)','sin(X/2)','0','0']      绕坐标(1,0,0)顺时针X度
+	* qz = ['cos(Z/2)','0','0','sin(Z/2)']	  绕坐标(0,0,1)顺时针Z度
+	* qy = ['cos(Y/2)', '0','sin(Y/2)', '0']	  绕坐标(0,1,0)顺时针Y度
 	*/
 	static Quat eulerToQuat(Vector3 euler){
 		float w = cos(euler.y / 2)*cos(euler.x / 2)*cos(euler.z / 2) + sin(euler.y / 2)*sin(euler.x / 2)*sin(euler.z / 2);

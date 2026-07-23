@@ -62,8 +62,8 @@ public:
 	
 	bool findBroadcastInterface();
 
-	/** ����ӿ�
-		ĳ��app�㲥���Լ��ĵ�ַ
+	/** 网络接口
+		某个app广播了自己的地址
 	*/
 	void onBroadcastInterface(Network::Channel* pChannel, int32 uid, std::string& username, 
 							COMPONENT_TYPE componentType, COMPONENT_ID componentID, COMPONENT_ID componentIDEx, 
@@ -72,20 +72,20 @@ public:
 							float cpu, float mem, uint32 usedmem, int8 state, uint32 machineID, uint64 extradata,
 							uint64 extradata1, uint64 extradata2, uint64 extradata3, uint32 backRecvAddr, uint16 backRecvPort);
 	
-	/** ����ӿ�
-		ĳ��appѰ����һ��app�ĵ�ַ
+	/** 网络接口
+		某个app寻找另一个app的地址
 	*/
 	void onFindInterfaceAddr(Network::Channel* pChannel, int32 uid, std::string& username, 
 		COMPONENT_TYPE componentType, COMPONENT_ID componentID, COMPONENT_TYPE findComponentType, uint32 finderAddr, uint16 finderRecvPort);
 
-	/** ����ӿ�
-		��ѯ���нӿ���Ϣ
+	/** 网络接口
+		查询所有接口信息
 	*/
 	void onQueryAllInterfaceInfos(Network::Channel* pChannel, int32 uid, std::string& username, 
 		uint16 finderRecvPort);
 
-	/** ����ӿ�
-	��ѯ����machine����
+	/** 网络接口
+	查询所有machine进程
 	*/
 	void onQueryMachines(Network::Channel* pChannel, int32 uid, std::string& username,
 		uint16 finderRecvPort);
@@ -97,58 +97,58 @@ public:
 
 	void handleTimeout(TimerHandle handle, void * arg);
 
-	/* ��ʼ����ؽӿ� */
+	/* 初始化相关接口 */
 	bool initializeBegin();
 	bool inInitialize();
 	bool initializeEnd();
 	void finalise();
 	bool initNetwork();
 
-	/** ����ӿ�
-		����������
-		@uid: �ṩ������uid����
-		@components: ������Щ���(���ܲ�ȡ�ֲ�ʽ��������)
+	/** 网络接口
+		启动服务器
+		@uid: 提供启动的uid参数
+		@components: 启动哪些组件(可能采取分布式启动方案)
 	*/
 	void startserver(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** �źŴ���
+	/** 信号处理
 	*/
 	virtual bool installSignals();
 	virtual void onSignalled(int sigNum);
 
 #if KBE_PLATFORM != PLATFORM_WIN32
 	/**
-	* ��linux������һ���½���
+	* 在linux下启动一个新进程
 	*/
 	uint16 startLinuxProcess(int32 uid, COMPONENT_TYPE componentType, uint64 cid, uint16 gus, 
 		std::string& KBE_ROOT, std::string& KBE_RES_PATH, std::string& KBE_BIN_PATH);
 #else
 	/**
-	* ��windows������һ���½���
+	* 在windows下启动一个新进程
 	*/
 	DWORD startWindowsProcess(int32 uid, COMPONENT_TYPE componentType, uint64 cid, uint16 gus, 
 		std::string& KBE_ROOT, std::string& KBE_RES_PATH, std::string& KBE_BIN_PATH);
 #endif
 
-	/** ����ӿ�
-		�رշ�����
-		@uid: �ṩ������uid����
+	/** 网络接口
+		关闭服务器
+		@uid: 提供启动的uid参数
 	*/
 	void stopserver(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ����ӿ�
-	ɱ��������
-	@uid: �ṩ������uid����
+	/** 网络接口
+	杀死服务器
+	@uid: 提供启动的uid参数
 	*/
 	void killserver(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
 	/**
-		�Ա������е�������м���Ƿ����
+		对本机运行的组件进行检查是否可用
 	*/
 	bool checkComponentUsable(const Components::ComponentInfos* info, bool getdatas, bool autoerase);
 
 protected:
-	// udp�㲥��ַ
+	// udp广播地址
 	u_int32_t					broadcastAddr_;
 	Network::EndPoint			ep_;
 	Network::EndPoint			epBroadcast_;
@@ -159,7 +159,7 @@ protected:
 	Network::UDPPacketReceiver* pEBPacketReceiver_;
 	Network::UDPPacketReceiver* pEPLocalPacketReceiver_;
 
-	// ����ʹ�õ�uid
+	// 本机使用的uid
 	std::vector<int32>			localuids_;
 
 	typedef std::vector<COMPONENT_ID> ID_LOGS;

@@ -63,9 +63,9 @@ public:
 	static bool finalise();
 
 	/**	
-		����������pyobj�����ǵ�ǰ����ʱ���յ�ǰ���ʹ�����һ��obj
-		ǰ���Ǽ�ʹ���PyObject���ǵ�ǰ���ͣ� ������ӵ��ת���Ĺ���
-		��һ��python�ֵ�ת��Ϊһ���̶��ֵ䣬 �ֵ��е�key��ƥ��
+		当传入的这个pyobj并不是当前类型时则按照当前类型创建出一个obj
+		前提是即使这个PyObject不是当前类型， 但必须拥有转换的共性
+		既一个python字典转换为一个固定字典， 字典中的key都匹配
 	*/
 	virtual PyObject* createNewItemFromObj(PyObject* pyobj)
 	{
@@ -670,9 +670,9 @@ public:
 	const char* getName(void) const{ return "ARRAY";}
 
 	/**	
-		����������pyobj�����ǵ�ǰ����ʱ���յ�ǰ���ʹ�����һ��obj
-		ǰ���Ǽ�ʹ���PyObject���ǵ�ǰ���ͣ� ������ӵ��ת���Ĺ���
-		��һ��python�ֵ�ת��Ϊһ���̶��ֵ䣬 �ֵ��е�key��ƥ��
+		当传入的这个pyobj并不是当前类型时则按照当前类型创建出一个obj
+		前提是即使这个PyObject不是当前类型， 但必须拥有转换的共性
+		既一个python字典转换为一个固定字典， 字典中的key都匹配
 	*/
 	virtual PyObject* createNewItemFromObj(PyObject* pyobj);
 	virtual PyObject* createNewFromObj(PyObject* pyobj);
@@ -680,7 +680,7 @@ public:
 	virtual DATATYPE type() const{ return DATA_TYPE_FIXEDARRAY; }
 
 protected:
-	DataType*			dataType_;		// ������������������
+	DataType*			dataType_;		// 这个数组所处理的类别
 };
 
 class FixedDictType : public DataType
@@ -690,10 +690,10 @@ public:
 	{
 		DataType* dataType;
 
-		// ��Ϊһ�����������alias�пɶ�dict�е�ĳ����ָ���Ƿ�־û�
+		// 作为一个数据类别在alias中可对dict中的某个项指定是否持久化
 		bool persistent;
 
-		// ������������ݿ��еĳ���
+		// 这个属性在数据库中的长度
 		uint32 databaseLength;
 	};
 
@@ -705,7 +705,7 @@ public:
 	virtual ~FixedDictType();
 	
 	/** 
-		�������̶��ֵ��key��� 
+		获得这个固定字典的key类别 
 	*/	
 	FIXEDDICT_KEYTYPE_MAP& getKeyTypes(void){ return keyTypes_; }
 
@@ -724,31 +724,31 @@ public:
 	bool initialize(XML* xml, TiXmlNode* node, std::string& parentName);
 	
 	/**	
-		����������pyobj�����ǵ�ǰ����ʱ���յ�ǰ���ʹ�����һ��obj
-		ǰ���Ǽ�ʹ���PyObject���ǵ�ǰ���ͣ� ������ӵ��ת���Ĺ���
-		��һ��python�ֵ�ת��Ϊһ���̶��ֵ䣬 �ֵ��е�key��ƥ��
+		当传入的这个pyobj并不是当前类型时则按照当前类型创建出一个obj
+		前提是即使这个PyObject不是当前类型， 但必须拥有转换的共性
+		既一个python字典转换为一个固定字典， 字典中的key都匹配
 	*/
 	virtual PyObject* createNewItemFromObj(const char* keyName, PyObject* pyobj);
 	virtual PyObject* createNewFromObj(PyObject* pyobj);
 
 	/** 
-		��ù̶��ֵ����е�key���� 
+		获得固定字典所有的key名称 
 	*/
 	std::string getKeyNames(void);
 
 	/** 
-		���debug��Ϣ�����ع̶��ֵ����е�key���ƺ�����
+		获得debug信息，返回固定字典所有的key名称和类型
 	*/
 	std::string debugInfos(void);
 
 	/** 
-		����implģ��
+		加载impl模块
 	*/
 	bool loadImplModule(std::string moduleName);
 	bool setImplModule(PyObject* pyobj);
 
 	/** 
-		impl���ʵ��
+		impl相关实现
 	*/
 	PyObject* impl_createObjFromDict(PyObject* dictData);
 	PyObject* impl_getDictFromObj(PyObject* pyobj);
@@ -763,10 +763,10 @@ public:
 	std::string getNotFoundKeys(PyObject* dict);
 
 protected:
-	// ����̶��ֵ���ĸ���key������
+	// 这个固定字典里的各个key的类型
 	FIXEDDICT_KEYTYPE_MAP			keyTypes_;				
 
-	// ʵ�ֽű�ģ��
+	// 实现脚本模块
 	PyObject*						implObj_;				
 
 	PyObject*						pycreateObjFromDict_;

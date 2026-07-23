@@ -46,16 +46,16 @@ BOOL CStartServerWindow::OnInitDialog()
 	CDialog::OnInitDialog();
 	
 	DWORD dwStyle = m_list.GetExtendedStyle();
-	dwStyle |= LVS_EX_FULLROWSELECT;					//ѡ��ĳ��ʹ���и�����ֻ������report����listctrl��
-	dwStyle |= LVS_EX_GRIDLINES;						//�����ߣ�ֻ������report����listctrl��
+	dwStyle |= LVS_EX_FULLROWSELECT;					//选中某行使整行高亮（只适用与report风格的listctrl）
+	dwStyle |= LVS_EX_GRIDLINES;						//网格线（只适用与report风格的listctrl）
 	//dwStyle |= LVS_EX_ONECLICKACTIVATE;
-	m_list.SetExtendedStyle(dwStyle);					//������չ���
+	m_list.SetExtendedStyle(dwStyle);					//设置扩展风格
 
 	dwStyle = m_list1.GetExtendedStyle();
-	dwStyle |= LVS_EX_FULLROWSELECT;					//ѡ��ĳ��ʹ���и�����ֻ������report����listctrl��
-	dwStyle |= LVS_EX_GRIDLINES;						//�����ߣ�ֻ������report����listctrl��
+	dwStyle |= LVS_EX_FULLROWSELECT;					//选中某行使整行高亮（只适用与report风格的listctrl）
+	dwStyle |= LVS_EX_GRIDLINES;						//网格线（只适用与report风格的listctrl）
 	//dwStyle |= LVS_EX_ONECLICKACTIVATE;
-	m_list1.SetExtendedStyle(dwStyle);					//������չ���
+	m_list1.SetExtendedStyle(dwStyle);					//设置扩展风格
 
 	int idx = 0;
 	m_list.InsertColumn(idx++, _T("componentType"),				LVCFMT_CENTER,	150);
@@ -169,7 +169,7 @@ void CStartServerWindow::OnBnClickedButton2()
 		if(selgot == 0)
 		{
 			KBEngine::Network::EndPoint::reclaimPoolObject(endpoint);
-			continue;	// ��ʱ���ܶԷ���æ
+			continue;	// 超时可能对方繁忙
 		}
 		else if(selgot == -1)
 		{
@@ -303,7 +303,7 @@ void CStartServerWindow::OnBnClickedButton3()
 		if(selgot == 0)
 		{
 			KBEngine::Network::EndPoint::reclaimPoolObject(endpoint);
-			continue;	// ��ʱ���ܶԷ���æ
+			continue;	// 超时可能对方繁忙
 		}
 		else if(selgot == -1)
 		{
@@ -395,7 +395,7 @@ void CStartServerWindow::loadLayouts()
 
 void CStartServerWindow::saveLayouts()
 {
-    //����һ��XML���ĵ�����
+    //创建一个XML的文档对象。
     TiXmlDocument *pDocument = new TiXmlDocument();
 
 	int i = 0;

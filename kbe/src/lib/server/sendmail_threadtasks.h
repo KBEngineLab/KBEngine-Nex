@@ -52,7 +52,7 @@ protected:
 };
 
 /*
-	�˺ż����ʼ������߳�����
+	账号激活邮件发送线程任务
 */
 
 class SendActivateEMailTask : public SendEMailTask
@@ -74,7 +74,7 @@ protected:
 };
 
 /*
-	���������ʼ������߳�����
+	忘记密码邮件发送线程任务
 */
 
 class SendResetPasswordEMailTask : public SendEMailTask
@@ -96,7 +96,7 @@ protected:
 };
 
 /*
-	�˺Ű������ʼ������߳�����
+	账号绑定邮箱邮件发送线程任务
 */
 
 class SendBindEMailTask : public SendEMailTask

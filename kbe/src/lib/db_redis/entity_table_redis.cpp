@@ -47,10 +47,10 @@ EntityTableRedis::~EntityTableRedis()
 //-------------------------------------------------------------------------------------
 bool EntityTableRedis::initialize(ScriptDefModule* sm, std::string name)
 {
-	// ��ȡ����
+	// 获取表名
 	tableName(name);
 
-	// �ҵ����д洢���Բ��Ҵ��������е��ֶ�
+	// 找到所有存储属性并且创建出所有的字段
 	ScriptDefModule::PROPERTYDESCRIPTION_MAP& pdescrsMap = sm->getPersistentPropertyDescriptions();
 	ScriptDefModule::PROPERTYDESCRIPTION_MAP::const_iterator iter = pdescrsMap.begin();
 
@@ -75,7 +75,7 @@ bool EntityTableRedis::initialize(ScriptDefModule* sm, std::string name)
 		addItem(pETItem);
 	}
 
-	// ���⴦���� ���ݿⱣ�淽���λ��
+	// 特殊处理， 数据库保存方向和位置
 	if(sm->hasCell())
 	{
 		ENTITY_PROPERTY_UID posuid = ENTITY_BASE_PROPERTY_UTYPE_POSITION_XYZ;
@@ -122,7 +122,7 @@ void EntityTableRedis::init_db_item_name()
 	EntityTable::TABLEITEM_MAP::iterator iter = tableItems_.begin();
 	for(; iter != tableItems_.end(); ++iter)
 	{
-		// ����fixedDict�ֶ����Ƶ��������
+		// 处理fixedDict字段名称的特例情况
 		std::string exstrFlag = "";
 		if(iter->second->type() == TABLE_ITEM_TYPE_FIXEDDICT)
 		{
@@ -149,8 +149,8 @@ bool EntityTableRedis::syncToDB(DBInterface* pdbi)
 
 	// DEBUG_MSG(fmt::format("EntityTableRedis::syncToDB(): {}.\n", tableName()));
 
-	// ����redis����Ҫһ��ʼ������������������дʱ�Ų������ݣ�������ﲻ��Ҫ������
-	// ��ȡ��ǰ����items�����ÿ��item�Ƿ��뵱ǰƥ�䣬����ͬ��Ϊ��ǰ������
+	// 对于redis不需要一开始将表创建出来，数据写时才产生数据，因此这里不需要创建表
+	// 获取当前表的items，检查每个item是否与当前匹配，将其同步为当前表描述
 
 	//DBInterfaceRedis::TABLE_FIELDS outs;
 	//static_cast<DBInterfaceRedis*>(pdbi)->getFields(outs, this->tableName());
@@ -172,7 +172,7 @@ bool EntityTableRedis::syncToDB(DBInterface* pdbi)
 
 	pdbi->getTableItemNames(ttablename.c_str(), dbTableItemNames);
 
-	// ����Ƿ�����Ҫɾ���ı��ֶ�
+	// 检查是否有需要删除的表字段
 	std::vector<std::string>::iterator iter0 = dbTableItemNames.begin();
 	for (; iter0 != dbTableItemNames.end(); ++iter0)
 	{
@@ -204,7 +204,7 @@ bool EntityTableRedis::syncToDB(DBInterface* pdbi)
 		}
 	}
 
-	// ͬ��������
+	// 同步表索引
 	if (!syncIndexToDB(pdbi))
 		return false;
 
