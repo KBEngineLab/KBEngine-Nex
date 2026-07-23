@@ -217,6 +217,22 @@ Reason TCPPacketSender::processFilterPacket(Channel* pChannel, Packet * pPacket)
 	}
 
 	EndPoint* pEndpoint = pChannel->pEndPoint();
+	EventPoller* pPoller = this->dispatcher().pPoller();
+	if (pPoller != NULL && pPoller->supportsCompletion())
+	{
+		// Completion backends own a copy of the packet until WSASend completes, so the packet can leave the Channel queue now.
+		// 完成模型会在 WSASend 完成前持有 packet 副本，因此此处可以立即移出 Channel 队列。
+		const int remaining = pPacket->length() - pPacket->sentSize;
+		if (!pPoller->queueTcpSend(static_cast<int>(*pEndpoint), pPacket->data() + pPacket->sentSize, remaining))
+		{
+			return REASON_RESOURCE_UNAVAILABLE;
+		}
+
+		pPacket->sentSize += remaining;
+		pChannel->onPacketSent(remaining, true);
+		return REASON_SUCCESS;
+	}
+
 	int len = pEndpoint->send(pPacket->data() + pPacket->sentSize, pPacket->length() - pPacket->sentSize);
 
 	if(len > 0)
