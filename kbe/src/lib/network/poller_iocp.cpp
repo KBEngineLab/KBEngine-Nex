@@ -660,9 +660,19 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 				pState->registeredRead = false;
 			}
 
-			if (pushTcpReceivedData(fd, data, success && bytesTransferred == 0, success ? 0 : static_cast<int>(errorCode)))
+			const bool queued = pushTcpReceivedData(fd, data, success && bytesTransferred == 0, success ? 0 : static_cast<int>(errorCode));
+			if (queued)
 			{
 				this->triggerRead(fd);
+			}
+			else if (!terminal)
+			{
+				// Never discard TCP bytes silently; turn a full handoff queue into a deterministic channel error.
+				// TCP 字节不能静默丢弃；交接队列满时转成确定性的 channel 错误。
+				if (pushTcpReceivedData(fd, data, false, WSAENOBUFS))
+				{
+					this->triggerRead(fd);
+				}
 			}
 		}
 	else if (pContext->operation == OP_UDP_RECV)
