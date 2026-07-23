@@ -35,8 +35,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /*
-	ÓÃÀ´ÃèÊöÒ»¸ö×ÜÊÇ»á±»¸üĞÂµÄ¶ÔÏó£¬ appÃ¿¸ötick¶¼»áµ÷ÓÃËùÓĞµÄ
-	UpdatableÀ´¸üĞÂ×´Ì¬£¬ ĞèÒªÊµÏÖ²»Í¬µÄUpdatableÀ´Íê³É²»Í¬µÄ¸üĞÂÌØĞÔ¡£
+	ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ç»á±»ï¿½ï¿½ï¿½ÂµÄ¶ï¿½ï¿½ï¿½ appÃ¿ï¿½ï¿½tickï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğµï¿½
+	Updatableï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½ ï¿½ï¿½ÒªÊµï¿½Ö²ï¿½Í¬ï¿½ï¿½Updatableï¿½ï¿½ï¿½ï¿½É²ï¿½Í¬ï¿½Ä¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¡ï¿½
 */
 class Updatable
 {
@@ -52,7 +52,7 @@ public:
 
 	std::string c_str() { return updatableName; }
 
-	// ×ÔÉíÔÚUpdatablesÈİÆ÷ÖĞµÄÎ»ÖÃ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Updatablesï¿½ï¿½ï¿½ï¿½ï¿½Ğµï¿½Î»ï¿½ï¿½
 	int removeIdx;
 
 	std::string updatableName;

@@ -32,7 +32,7 @@ namespace Network
 class MessageHandler;
 
 /*
-	¼ÇÂ¼networkÁ÷Á¿µÈÐÅÏ¢
+	ï¿½ï¿½Â¼networkï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 class NetworkStats : public Singleton<NetworkStats>
 {

@@ -50,10 +50,10 @@ BOOL CStartServerLayoutWindow::OnInitDialog()
 	loadHistory();
 
 	DWORD dwStyle = m_list.GetExtendedStyle();
-	dwStyle |= LVS_EX_FULLROWSELECT;					//Ñ¡ÖÐÄ³ÐÐÊ¹ÕûÐÐ¸ßÁÁ£¨Ö»ÊÊÓÃÓëreport·ç¸ñµÄlistctrl£©
-	dwStyle |= LVS_EX_GRIDLINES;						//Íø¸ñÏß£¨Ö»ÊÊÓÃÓëreport·ç¸ñµÄlistctrl£©
+	dwStyle |= LVS_EX_FULLROWSELECT;					//Ñ¡ï¿½ï¿½Ä³ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½Ð¸ï¿½ï¿½ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½reportï¿½ï¿½ï¿½ï¿½listctrlï¿½ï¿½
+	dwStyle |= LVS_EX_GRIDLINES;						//ï¿½ï¿½ï¿½ï¿½ï¿½ß£ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½reportï¿½ï¿½ï¿½ï¿½listctrlï¿½ï¿½
 	//dwStyle |= LVS_EX_ONECLICKACTIVATE;
-	m_list.SetExtendedStyle(dwStyle);				//ÉèÖÃÀ©Õ¹·ç¸ñ
+	m_list.SetExtendedStyle(dwStyle);				//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ¹ï¿½ï¿½ï¿½
 
 	int idx = 0;
 	m_list.InsertColumn(idx++, _T("componentType"),				LVCFMT_CENTER,	200);
@@ -103,7 +103,7 @@ BOOL CStartServerLayoutWindow::OnInitDialog()
 
 void CStartServerLayoutWindow::saveHistory()
 {
-    //´´½¨Ò»¸öXMLµÄÎÄµµ¶ÔÏó¡£
+    //ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½XMLï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½ï¿½ï¿½
     TiXmlDocument *pDocument = new TiXmlDocument();
 
 	int i = 0;

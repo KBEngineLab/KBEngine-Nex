@@ -123,8 +123,8 @@ public:
 	virtual void onShutdown(bool first);
 	virtual void onShutdownEnd();
 
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇó²é¿´watcher
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½é¿´watcher
 	*/
 	void queryWatcher(Network::Channel* pChannel, MemoryStream& s);
 
@@ -133,9 +133,9 @@ public:
 	COMPONENT_ORDER globalOrder() const { return startGlobalOrder_; }
 	COMPONENT_ORDER groupOrder() const { return startGroupOrder_; }
 
-	/** ÍøÂç½Ó¿Ú
-		×¢²áÒ»¸öÐÂ¼¤»îµÄbaseapp»òÕßcellapp»òÕßdbmgr
-		Í¨³£ÊÇÒ»¸öÐÂµÄapp±»Æô¶¯ÁË£¬ ËüÐèÒªÏòÄ³Ð©×é¼þ×¢²á×Ô¼º¡£
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		×¢ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½baseappï¿½ï¿½ï¿½ï¿½cellappï¿½ï¿½ï¿½ï¿½dbmgr
+		Í¨ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½appï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë£ï¿½ ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½Ä³Ð©ï¿½ï¿½ï¿½×¢ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½
 	*/
 	virtual void onRegisterNewApp(Network::Channel* pChannel, 
 							int32 uid, 
@@ -143,39 +143,39 @@ public:
 							COMPONENT_TYPE componentType, COMPONENT_ID componentID, COMPONENT_ORDER globalorderID, COMPONENT_ORDER grouporderID,
 							uint32 intaddr, uint16 intport, uint32 extaddr, uint16 extport, std::string& extaddrEx);
 
-	/** ÍøÂç½Ó¿Ú
-		Ä³¸öappÏò±¾app¸æÖª´¦ÓÚ»î¶¯×´Ì¬¡£
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Ä³ï¿½ï¿½appï¿½ï¿½appï¿½ï¿½Öªï¿½ï¿½ï¿½Ú»î¶¯×´Ì¬ï¿½ï¿½
 	*/
 	void onAppActiveTick(Network::Channel* pChannel, COMPONENT_TYPE componentType, COMPONENT_ID componentID);
 	
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇó¶Ï¿ª·þÎñÆ÷µÄÁ¬½Ó
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½Ï¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual void reqClose(Network::Channel* pChannel);
 
-	/** ÍøÂç½Ó¿Ú
-		Ä³¸öappÇëÇó²é¿´¸Ãapp
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Ä³ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½é¿´ï¿½ï¿½app
 	*/
 	virtual void lookApp(Network::Channel* pChannel);
 
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇó¹Ø±Õ·þÎñÆ÷
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½Ø±Õ·ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual void reqCloseServer(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		Ä³¸öappÇëÇó²é¿´¸Ãapp¸ºÔØ×´Ì¬£¬ Í¨³£ÊÇconsoleÇëÇó²é¿´
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Ä³ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½é¿´ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½ Í¨ï¿½ï¿½ï¿½ï¿½consoleï¿½ï¿½ï¿½ï¿½é¿´
 	*/
 	virtual void queryLoad(Network::Channel* pChannel);
 
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇó¹Ø±Õ·þÎñÆ÷
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½Ø±Õ·ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void reqKillServer(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		¿Í»§¶ËÓë·þÎñ¶ËµÚÒ»´Î½¨Á¢½»»¥, ¿Í»§¶Ë·¢ËÍ×Ô¼ºµÄ°æ±¾ºÅÓëÍ¨Ñ¶ÃÜÔ¿µÈÐÅÏ¢
-		¸ø·þÎñ¶Ë£¬ ·þÎñ¶Ë·µ»ØÊÇ·ñÎÕÊÖ³É¹¦
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ëµï¿½Ò»ï¿½Î½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½, ï¿½Í»ï¿½ï¿½Ë·ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ä°æ±¾ï¿½ï¿½ï¿½ï¿½Í¨Ñ¶ï¿½ï¿½Ô¿ï¿½ï¿½ï¿½ï¿½Ï¢
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë£ï¿½ ï¿½ï¿½ï¿½ï¿½Ë·ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½Ö³É¹ï¿½
 	*/
 	virtual void hello(Network::Channel* pChannel, MemoryStream& s);
 	virtual void onHello(Network::Channel* pChannel, 
@@ -183,36 +183,36 @@ public:
 		const std::string& scriptVerInfo, 
 		const std::string& encryptedKey);
 
-	// ÒýÇæ°æ±¾²»Æ¥Åä
+	// ï¿½ï¿½ï¿½ï¿½æ±¾ï¿½ï¿½Æ¥ï¿½ï¿½
 	virtual void onVersionNotMatch(Network::Channel* pChannel);
 
-	// ÒýÇæ½Å±¾²ã°æ±¾²»Æ¥Åä
+	// ï¿½ï¿½ï¿½ï¿½Å±ï¿½ï¿½ï¿½æ±¾ï¿½ï¿½Æ¥ï¿½ï¿½
 	virtual void onScriptVersionNotMatch(Network::Channel* pChannel);
 
-	/** ÍøÂç½Ó¿Ú
-		consoleÇëÇó¿ªÊ¼profile
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		consoleï¿½ï¿½ï¿½ï¿½Ê¼profile
 	*/
 	void startProfile(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 	virtual void startProfile_(Network::Channel* pChannel, std::string profileName, int8 profileType, uint32 timelen);
 		
 protected:
 	COMPONENT_TYPE											componentType_;
-	COMPONENT_ID											componentID_;									// ±¾×é¼þµÄID
+	COMPONENT_ID											componentID_;									// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ID
 
 	Network::EventDispatcher& 								dispatcher_;	
 	Network::NetworkInterface&								networkInterface_;
 	
 	Timers													timers_;
 
-	// appÆô¶¯Ë³Ðò£¬ globalÎªÈ«¾Ö(Èçdbmgr£¬cellappµÄË³Ðò)Æô¶¯Ë³Ðò£¬ 
-	// groupÎª×éÆô¶¯Ë³Ðò(Èç:ËùÓÐbaseappÎªÒ»×é)
+	// appï¿½ï¿½ï¿½ï¿½Ë³ï¿½ï¿½ globalÎªÈ«ï¿½ï¿½(ï¿½ï¿½dbmgrï¿½ï¿½cellappï¿½ï¿½Ë³ï¿½ï¿½)ï¿½ï¿½ï¿½ï¿½Ë³ï¿½ï¿½ 
+	// groupÎªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë³ï¿½ï¿½(ï¿½ï¿½:ï¿½ï¿½ï¿½ï¿½baseappÎªÒ»ï¿½ï¿½)
 	COMPONENT_ORDER											startGlobalOrder_;
 	COMPONENT_ORDER											startGroupOrder_;
 
 	Shutdowner*												pShutdowner_;
 	ComponentActiveReportHandler*							pActiveTimerHandle_;
 
-	// Ïß³Ì³Ø
+	// ï¿½ß³Ì³ï¿½
 	thread::ThreadPool										threadPool_;	
 };
 

@@ -70,7 +70,7 @@ public:
 	void handleMainTick();
 	void handleCheckStatusTick();
 
-	/* ³õÊ¼»¯Ïà¹Ø½Ó¿Ú */
+	/* ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ø½Ó¿ï¿½ */
 	bool initializeBegin();
 	bool inInitialize();
 	bool initializeEnd();
@@ -89,17 +89,17 @@ public:
 	virtual void onShutdownBegin();
 	virtual void onShutdownEnd();
 
-	/** »ñÈ¡ID·þÎñÆ÷Ö¸Õë */
+	/** ï¿½ï¿½È¡IDï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ */
 	IDServer<ENTITY_ID>& idServer(void){ return idServer_; }
 
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇó·ÖÅäÒ»¸öENTITY_ID¶Î
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ENTITY_IDï¿½ï¿½
 	*/
 	void onReqAllocEntityID(Network::Channel* pChannel, COMPONENT_ORDER componentType, COMPONENT_ID componentID);
 
-	/* ÍøÂç½Ó¿Ú
-		×¢²áÒ»¸öÐÂ¼¤»îµÄbaseapp»òÕßcellapp»òÕßdbmgr
-		Í¨³£ÊÇÒ»¸öÐÂµÄapp±»Æô¶¯ÁË£¬ ËüÐèÒªÏòÄ³Ð©×é¼þ×¢²á×Ô¼º¡£
+	/* ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		×¢ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½baseappï¿½ï¿½ï¿½ï¿½cellappï¿½ï¿½ï¿½ï¿½dbmgr
+		Í¨ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½appï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë£ï¿½ ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½Ä³Ð©ï¿½ï¿½ï¿½×¢ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½
 	*/
 	virtual void onRegisterNewApp(Network::Channel* pChannel, 
 							int32 uid, 
@@ -108,121 +108,121 @@ public:
 							uint32 intaddr, uint16 intport, uint32 extaddr, uint16 extport, std::string& extaddrEx);
 
 
-	/** ÍøÂç½Ó¿Ú
-		dbmgr¹ã²¥globalÊý¾ÝµÄ¸Ä±ä
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		dbmgrï¿½ã²¥globalï¿½ï¿½ï¿½ÝµÄ¸Ä±ï¿½
 	*/
 	void onGlobalDataClientLogon(Network::Channel* pChannel, COMPONENT_TYPE componentType);
 	void onBroadcastGlobalDataChanged(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 	
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇó´´½¨ÕËºÅ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ó´´½ï¿½ï¿½Ëºï¿½
 	*/
 	void reqCreateAccount(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 	void onCreateAccountCBFromInterfaces(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇó²Á³ý¿Í»§¶ËÇëÇóÈÎÎñ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void eraseClientReq(Network::Channel* pChannel, std::string& logkey);
 
-	/** ÍøÂç½Ó¿Ú
-		Ò»¸öÐÂÓÃ»§µÇÂ¼£¬ ÐèÒª¼ì²éºÏ·¨ÐÔ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ ï¿½ï¿½Òªï¿½ï¿½ï¿½Ï·ï¿½ï¿½ï¿½
 	*/
 	void onAccountLogin(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 	void onLoginAccountCBBFromInterfaces(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		baseappÇëÇó²éÑ¯accountÐÅÏ¢
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		baseappï¿½ï¿½ï¿½ï¿½ï¿½Ñ¯accountï¿½ï¿½Ï¢
 	*/
 	void queryAccount(Network::Channel* pChannel, std::string& accountName, std::string& password, bool needCheckPassword,
 		COMPONENT_ID componentID, ENTITY_ID entityID, DBID entityDBID, uint32 ip, uint16 port);
 
-	/** ÍøÂç½Ó¿Ú
-		ÊµÌå×Ô¶¯¼ÓÔØ¹¦ÄÜ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Êµï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½Ø¹ï¿½ï¿½ï¿½
 	*/
 	void entityAutoLoad(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		ÕËºÅ´ÓbaseappÉÏÏßÁË
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ËºÅ´ï¿½baseappï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void onAccountOnline(Network::Channel* pChannel, std::string& accountName, 
 		COMPONENT_ID componentID, ENTITY_ID entityID);
 
-	/** ÍøÂç½Ó¿Ú
-		entity-baseappÏÂÏßÁË
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		entity-baseappï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void onEntityOffline(Network::Channel* pChannel, DBID dbid, ENTITY_SCRIPT_UID sid, uint16 dbInterfaceIndex);
 
-	/** ÍøÂç½Ó¿Ú
-		Ö´ÐÐÊý¾Ý¿â²éÑ¯
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Ö´ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½Ñ¯
 	*/
 	void executeRawDatabaseCommand(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		Ä³¸öentity´æµµ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Ä³ï¿½ï¿½entityï¿½æµµ
 	*/
 	void writeEntity(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		É¾³ýÄ³¸öentityµÄ´æµµÊý¾Ý
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		É¾ï¿½ï¿½Ä³ï¿½ï¿½entityï¿½Ä´æµµï¿½ï¿½ï¿½ï¿½
 	*/
 	void removeEntity(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		Í¨¹ýdbid´ÓÊý¾Ý¿âÖÐÉ¾³ýÒ»¸öÊµÌåµÄ»Øµ÷
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Í¨ï¿½ï¿½dbidï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½É¾ï¿½ï¿½Ò»ï¿½ï¿½Êµï¿½ï¿½Ä»Øµï¿½
 	*/
 	void deleteEntityByDBID(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		Í¨¹ýdbid²éÑ¯Ò»¸öÊµÌåÊÇ·ñ´ÓÊý¾Ý¿â¼ì³ö
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Í¨ï¿½ï¿½dbidï¿½ï¿½Ñ¯Ò»ï¿½ï¿½Êµï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 	*/
 	void lookUpEntityByDBID(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇó´Ódb»ñÈ¡entityµÄËùÓÐÊý¾Ý
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½dbï¿½ï¿½È¡entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void queryEntity(Network::Channel* pChannel, uint16 dbInterfaceIndex, COMPONENT_ID componentID, int8	queryMode, DBID dbid, 
 		std::string& entityType, CALLBACK_ID callbackID, ENTITY_ID entityID);
 
-	/** ÍøÂç½Ó¿Ú
-		Í¬²½entityÁ÷Ä£°å
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Í¬ï¿½ï¿½entityï¿½ï¿½Ä£ï¿½ï¿½
 	*/
 	void syncEntityStreamTemplate(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
 	virtual bool initializeWatcher();
 
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇó³äÖµ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½Öµ
 	*/
 	void charge(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		³äÖµ»Øµ÷
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½Öµï¿½Øµï¿½
 	*/
 	void onChargeCB(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
 
-	/** ÍøÂç½Ó¿Ú
-		¼¤»î»Øµ÷
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½Øµï¿½
 	*/
 	void accountActivate(Network::Channel* pChannel, std::string& scode);
 
-	/** ÍøÂç½Ó¿Ú
-		ÕËºÅÖØÖÃÃÜÂë
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½Ëºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void accountReqResetPassword(Network::Channel* pChannel, std::string& accountName);
 	void accountResetPassword(Network::Channel* pChannel, std::string& accountName, 
 		std::string& newpassword, std::string& code);
 
-	/** ÍøÂç½Ó¿Ú
-		ÕËºÅ°ó¶¨ÓÊÏä
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ËºÅ°ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void accountReqBindMail(Network::Channel* pChannel, ENTITY_ID entityID, std::string& accountName, 
 		std::string& password, std::string& email);
 	void accountBindMail(Network::Channel* pChannel, std::string& username, std::string& scode);
 
-	/** ÍøÂç½Ó¿Ú
-		ÕËºÅÐÞ¸ÄÃÜÂë
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½Ëºï¿½ï¿½Þ¸ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void accountNewPassword(Network::Channel* pChannel, ENTITY_ID entityID, std::string& accountName, 
 		std::string& password, std::string& newpassword);
@@ -246,7 +246,7 @@ public:
 	InterfacesHandler* findBestInterfacesHandler();
 
 	/**
-		ÏòdbmgrÇëÇóÖ´ÐÐÒ»¸öÊý¾Ý¿âÃüÁî
+		ï¿½ï¿½dbmgrï¿½ï¿½ï¿½ï¿½Ö´ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	static PyObject* __py_executeRawDatabaseCommand(PyObject* self, PyObject* args);
 	void executeRawDatabaseCommand(const char* datas, uint32 size, PyObject* pycallback, ENTITY_ID eid, const std::string& dbInterfaceName);
@@ -258,7 +258,7 @@ protected:
 	TimerHandle											loopCheckTimerHandle_;
 	TimerHandle											mainProcessTimer_;
 
-	// entityID·ÖÅä·þÎñ¶Ë
+	// entityIDï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	IDServer<ENTITY_ID>									idServer_;
 
 	// globalData

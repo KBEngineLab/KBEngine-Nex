@@ -74,7 +74,7 @@ state_(C_STATE_INIT)
 	networkInterface_.pChannelTimeOutHandler(this);
 	networkInterface_.pChannelDeregisterHandler(this);
 
-	// ³õÊ¼»¯entitycallÄ£¿é»ñÈ¡channelº¯ÊýµØÖ·
+	// ï¿½ï¿½Ê¼ï¿½ï¿½entitycallÄ£ï¿½ï¿½ï¿½È¡channelï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö·
 	EntityCall::setFindChannelFunc(std::tr1::bind(&ClientApp::findChannelByEntityCall, this, 
 		std::tr1::placeholders::_1));
 
@@ -144,7 +144,7 @@ bool ClientApp::initializeBegin()
 //-------------------------------------------------------------------------------------	
 bool ClientApp::initializeEnd()
 {
-	// ËùÓÐ½Å±¾¶¼¼ÓÔØÍê±Ï
+	// ï¿½ï¿½ï¿½Ð½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
 										const_cast<char*>("onInit"), 
 										const_cast<char*>("i"), 
@@ -198,13 +198,13 @@ bool ClientApp::installEntityDef()
 	if(!EntityDef::installScript(getScript().getModule()))
 		return false;
 
-	// ³õÊ¼»¯ËùÓÐÀ©Õ¹Ä£¿é
+	// ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ¹Ä£ï¿½ï¿½
 	// assets/scripts/
 	if(!EntityDef::initialize(scriptBaseTypes_, g_componentType)){
 		return false;
 	}
 
-	// ×¢²áÒ»Ð©½Ó¿Úµ½kbengine
+	// ×¢ï¿½ï¿½Ò»Ð©ï¿½Ó¿Úµï¿½kbengine
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	publish,			__py_getAppPublish,								METH_VARARGS,	0)
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	fireEvent,			__py_fireEvent,									METH_VARARGS,	0)
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	player,				__py_getPlayer,									METH_VARARGS,	0)
@@ -216,19 +216,19 @@ bool ClientApp::installEntityDef()
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	disconnect,			__py_disconnect,								METH_VARARGS,	0)
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	kbassert,			__py_assert,									METH_VARARGS,	0)
 
-	// »ñµÃ×ÊÔ´È«Â·¾¶
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ô´È«Â·ï¿½ï¿½
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	getResFullPath,		__py_getResFullPath,							METH_VARARGS,	0)
 
-	// ÊÇ·ñ´æÔÚÄ³¸ö×ÊÔ´
+	// ï¿½Ç·ï¿½ï¿½ï¿½ï¿½Ä³ï¿½ï¿½ï¿½ï¿½Ô´
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	hasRes,				__py_hasRes,									METH_VARARGS,	0)
 
-	// ´ò¿ªÒ»¸öÎÄ¼þ
+	// ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ä¼ï¿½
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	open,				__py_kbeOpen,									METH_VARARGS,	0)
 
-	// ÁÐ³öÄ¿Â¼ÏÂËùÓÐÎÄ¼þ
+	// ï¿½Ð³ï¿½Ä¿Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	listPathRes,		__py_listPathRes,								METH_VARARGS,	0)
 
-	// Æ¥ÅäÏà¶ÔÂ·¾¶»ñµÃÈ«Â·¾¶
+	// Æ¥ï¿½ï¿½ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½ï¿½ï¿½È«Â·ï¿½ï¿½
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	matchPath,			__py_matchPath,									METH_VARARGS,	0)
 	return true;
 }
@@ -252,7 +252,7 @@ bool ClientApp::installPyModules()
 	registerScript(client::Entity::getScriptType());
 	onInstallPyModules();
 
-	// ×¢²áÉèÖÃ½Å±¾Êä³öÀàÐÍ
+	// ×¢ï¿½ï¿½ï¿½ï¿½ï¿½Ã½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	scriptLogType,	__py_setScriptLogType,	METH_VARARGS,	0)
 	if(PyModule_AddIntConstant(this->getScript().getModule(), "LOG_TYPE_NORMAL", log4cxx::ScriptLevel::SCRIPT_INT))
 	{
@@ -281,7 +281,7 @@ bool ClientApp::installPyModules()
 
 	registerPyObjectToScript("entities", pEntities_);
 
-	// °²×°Èë¿ÚÄ£¿é
+	// ï¿½ï¿½×°ï¿½ï¿½ï¿½Ä£ï¿½ï¿½
 	PyObject *entryScriptFileName = PyUnicode_FromString(g_kbeConfig.entryScriptFile());
 	if(entryScriptFileName != NULL)
 	{
@@ -315,7 +315,7 @@ bool ClientApp::uninstallPyModules()
 //-------------------------------------------------------------------------------------		
 void ClientApp::finalise(void)
 {
-	// ½áÊøÍ¨Öª½Å±¾
+	// ï¿½ï¿½ï¿½ï¿½Í¨Öªï¿½Å±ï¿½
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
 										const_cast<char*>("onFinish"),
 										const_cast<char*>(""));
@@ -411,7 +411,7 @@ void ClientApp::handleGameTick()
 				bool ret = updateChannel(false, "", "", "", 0);
 				if(ret)
 				{
-					// ÏÈÎÕÊÖÈ»ºóµÈhelloCBÖ®ºóÔÙ½øÐÐµÇÂ¼
+					// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È»ï¿½ï¿½ï¿½helloCBÖ®ï¿½ï¿½ï¿½Ù½ï¿½ï¿½Ðµï¿½Â¼
 					Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 					(*pBundle).newMessage(BaseappInterface::hello);
 					(*pBundle) << KBEVersion::versionString();
@@ -470,7 +470,7 @@ int ClientApp::processOnce(bool shouldIdle)
 //-------------------------------------------------------------------------------------
 void ClientApp::onTargetChanged()
 { 
-	// ËùÓÐ½Å±¾¶¼¼ÓÔØÍê±Ï
+	// ï¿½ï¿½ï¿½Ð½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
 										const_cast<char*>("onTargetChanged"), 
 										const_cast<char*>("i"), 
@@ -660,7 +660,7 @@ bool ClientApp::login(std::string accountName, std::string passwd, std::string d
 	bool ret = updateChannel(true, accountName, passwd, ip, port);
 	if(ret)
 	{
-		// ÏÈÎÕÊÖÈ»ºóµÈhelloCBÖ®ºóÔÙ½øÐÐµÇÂ¼
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È»ï¿½ï¿½ï¿½helloCBÖ®ï¿½ï¿½ï¿½Ù½ï¿½ï¿½Ðµï¿½Â¼
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(LoginappInterface::hello);
 		(*pBundle) << KBEVersion::versionString();

@@ -19,8 +19,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 /*
-	xml ¶ÁÐ´£º
-		Àý×Ó:	
+	xml ï¿½ï¿½Ð´ï¿½ï¿½
+		ï¿½ï¿½ï¿½ï¿½:	
 				<root>
 					<server>
 						<ip>172.16.0.12</ip>
@@ -38,12 +38,12 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 				XML_FOR_END(node);
 				
 				delete xml;
-		Êä³ö:
+		ï¿½ï¿½ï¿½:
 				---ip---172.16.0.12
 				---port---6000
 				
 
-		Àý×Ó2:
+		ï¿½ï¿½ï¿½ï¿½2:
 				XML* xml = new XML("KBEngine.xml");
 				TiXmlNode* serverNode = xml->getRootNode("server");
 				
@@ -54,7 +54,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 				node = xml->enterNode(serverNode, "port");		
 				printf("%s\n", xml->getValStr(node).c_str() );	
 			
-		Êä³ö:
+		ï¿½ï¿½ï¿½:
 			172.16.0.12
 			6000
 */
@@ -134,10 +134,10 @@ public:
 		return true;
 	}
 
-	/**»ñÈ¡¸ùÔªËØ*/
+	/**ï¿½ï¿½È¡ï¿½ï¿½Ôªï¿½ï¿½*/
 	TiXmlElement* getRootElement(void){return rootElement_;}
 
-	/**»ñÈ¡¸ù½Úµã£¬ ´ø²ÎÊýkeyÎª·¶Î§¸ù½ÚµãÏÂµÄÄ³¸ö×Ó½Úµã¸ù*/
+	/**ï¿½ï¿½È¡ï¿½ï¿½ï¿½Úµã£¬ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½keyÎªï¿½ï¿½Î§ï¿½ï¿½ï¿½Úµï¿½ï¿½Âµï¿½Ä³ï¿½ï¿½ï¿½Ó½Úµï¿½ï¿½*/
 	TiXmlNode* getRootNode(const char* key = "")
 	{
 		if(rootElement_ == NULL)
@@ -152,7 +152,7 @@ public:
 		return rootElement_->FirstChild();
 	}
 
-	/**Ö±½Ó·µ»ØÒª½øÈëµÄkey½ÚµãÖ¸Õë*/
+	/**Ö±ï¿½Ó·ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½keyï¿½Úµï¿½Ö¸ï¿½ï¿½*/
 	TiXmlNode* enterNode(TiXmlNode* node, const char* key)
 	{
 		do
@@ -179,7 +179,7 @@ public:
 		return NULL;
 	}
 
-	/**ÊÇ·ñ´æÔÚÕâÑùÒ»¸ökey*/
+	/**ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½key*/
 	bool hasNode(TiXmlNode* node, const char* key)
 	{
 		do{

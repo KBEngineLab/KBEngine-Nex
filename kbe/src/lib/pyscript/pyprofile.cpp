@@ -213,7 +213,7 @@ void PyProfile::addToStream(std::string profile, MemoryStream* s)
 //-------------------------------------------------------------------------------------
 bool PyProfile::dump(std::string profile, std::string fileName)
 {
-	/* ╪сть╫А╧Ш
+	/* О©╫О©╫О©╫ь╫О©╫О©╫
 		import pstats
 		p = pstats.Stats("*.prof")
 		p.sort_stats("time").print_stats()

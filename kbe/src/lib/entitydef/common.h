@@ -31,18 +31,18 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{
 
-/** entityµÄÊý¾Ý´«ÊäÌØÐÔ±ê¼Ç */
+/** entityï¿½ï¿½ï¿½ï¿½ï¿½Ý´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô±ï¿½ï¿½ */
 enum EntityDataFlags
 {
-	ED_FLAG_UNKOWN													= 0x00000000, // Î´¶¨Òå
-	ED_FLAG_CELL_PUBLIC												= 0x00000001, // Ïà¹ØËùÓÐcell¹ã²¥
-	ED_FLAG_CELL_PRIVATE											= 0x00000002, // µ±Ç°cell
-	ED_FLAG_ALL_CLIENTS												= 0x00000004, // cell¹ã²¥ÓëËùÓÐ¿Í»§¶Ë
-	ED_FLAG_CELL_PUBLIC_AND_OWN										= 0x00000008, // cell¹ã²¥Óë×Ô¼ºµÄ¿Í»§¶Ë
-	ED_FLAG_OWN_CLIENT												= 0x00000010, // µ±Ç°cellºÍ¿Í»§¶Ë
-	ED_FLAG_BASE_AND_CLIENT											= 0x00000020, // baseºÍ¿Í»§¶Ë
-	ED_FLAG_BASE													= 0x00000040, // µ±Ç°base
-	ED_FLAG_OTHER_CLIENTS											= 0x00000080, // cell¹ã²¥ºÍÆäËû¿Í»§¶Ë
+	ED_FLAG_UNKOWN													= 0x00000000, // Î´ï¿½ï¿½ï¿½ï¿½
+	ED_FLAG_CELL_PUBLIC												= 0x00000001, // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½cellï¿½ã²¥
+	ED_FLAG_CELL_PRIVATE											= 0x00000002, // ï¿½ï¿½Ç°cell
+	ED_FLAG_ALL_CLIENTS												= 0x00000004, // cellï¿½ã²¥ï¿½ï¿½ï¿½ï¿½ï¿½Ð¿Í»ï¿½ï¿½ï¿½
+	ED_FLAG_CELL_PUBLIC_AND_OWN										= 0x00000008, // cellï¿½ã²¥ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ä¿Í»ï¿½ï¿½ï¿½
+	ED_FLAG_OWN_CLIENT												= 0x00000010, // ï¿½ï¿½Ç°cellï¿½Í¿Í»ï¿½ï¿½ï¿½
+	ED_FLAG_BASE_AND_CLIENT											= 0x00000020, // baseï¿½Í¿Í»ï¿½ï¿½ï¿½
+	ED_FLAG_BASE													= 0x00000040, // ï¿½ï¿½Ç°base
+	ED_FLAG_OTHER_CLIENTS											= 0x00000080, // cellï¿½ã²¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½
 };
 
 std::string entityDataFlagsToString(uint32 flags);
@@ -52,28 +52,28 @@ EntityDataFlags stringToEntityDataFlags(const std::string& strFlags);
 	| ED_FLAG_CELL_PUBLIC_AND_OWN | ED_FLAG_OWN_CLIENT |	\
 	ED_FLAG_BASE_AND_CLIENT | ED_FLAG_BASE | ED_FLAG_OTHER_CLIENTS
 
-/** Ïàµ±ÓÚ¶ÔentityÊý¾Ý´«ÊäÀà±ðµÄÒ»¸ö×ÜÌåµÄ¶¨Òå */
+/** ï¿½àµ±ï¿½Ú¶ï¿½entityï¿½ï¿½ï¿½Ý´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¶ï¿½ï¿½ï¿½ */
 enum EntityDataFlagRelation
 {
-	// ËùÓÐÓëbaseappÓÐ¹ØÏµµÄ±êÖ¾
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½baseappï¿½Ð¹ï¿½Ïµï¿½Ä±ï¿½Ö¾
 	ENTITY_BASE_DATA_FLAGS											= ED_FLAG_BASE | ED_FLAG_BASE_AND_CLIENT,
-	// ËùÓÐÓëcellappÓÐ¹ØÏµµÄ±êÖ¾
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½cellappï¿½Ð¹ï¿½Ïµï¿½Ä±ï¿½Ö¾
 	ENTITY_CELL_DATA_FLAGS											= ED_FLAG_CELL_PUBLIC | ED_FLAG_CELL_PRIVATE | ED_FLAG_ALL_CLIENTS | ED_FLAG_CELL_PUBLIC_AND_OWN | ED_FLAG_OTHER_CLIENTS | ED_FLAG_OWN_CLIENT,
-	// ËùÓÐÓëclientÓÐ¹ØÏµµÄ±êÖ¾
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½clientï¿½Ð¹ï¿½Ïµï¿½Ä±ï¿½Ö¾
 	ENTITY_CLIENT_DATA_FLAGS										= ED_FLAG_BASE_AND_CLIENT | ED_FLAG_ALL_CLIENTS | ED_FLAG_CELL_PUBLIC_AND_OWN | ED_FLAG_OTHER_CLIENTS | ED_FLAG_OWN_CLIENT,
-	// ËùÓÐÐèÒª¹ã²¥¸øÆäËûcellappµÄ±êÖ¾
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ã²¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½cellappï¿½Ä±ï¿½Ö¾
 	ENTITY_BROADCAST_CELL_FLAGS										= ED_FLAG_CELL_PUBLIC | ED_FLAG_ALL_CLIENTS | ED_FLAG_CELL_PUBLIC_AND_OWN | ED_FLAG_OTHER_CLIENTS,
-	// ËùÓÐÐèÒª¹ã²¥¸øÆäËû¿Í»§¶Ë(²»°üÀ¨×Ô¼ºµÄ)µÄ±êÖ¾
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ã²¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½)ï¿½Ä±ï¿½Ö¾
 	ENTITY_BROADCAST_OTHER_CLIENT_FLAGS								= ED_FLAG_OTHER_CLIENTS | ED_FLAG_ALL_CLIENTS,
-	// ËùÓÐÐèÒª¹ã²¥¸ø×Ô¼ºµÄ¿Í»§¶ËµÄ±êÖ¾
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ã²¥ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ä¿Í»ï¿½ï¿½ËµÄ±ï¿½Ö¾
 	ENTITY_BROADCAST_OWN_CLIENT_FLAGS								= ED_FLAG_ALL_CLIENTS | ED_FLAG_CELL_PUBLIC_AND_OWN | ED_FLAG_OWN_CLIENT | ED_FLAG_BASE_AND_CLIENT,
-	// ËùÓÐbaseappÓë¿Í»§¶ËÓÐ¹ØµÄ±êÖ¾
+	// ï¿½ï¿½ï¿½ï¿½baseappï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½Ð¹ØµÄ±ï¿½Ö¾
 	ENTITY_BASEAPP_ANDA_CLIENT_DATA_FLAGS							= ED_FLAG_BASE_AND_CLIENT,
-	// ËùÓÐcellappÓë¿Í»§¶ËÓÐ¹ØµÄ±êÖ¾
+	// ï¿½ï¿½ï¿½ï¿½cellappï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½Ð¹ØµÄ±ï¿½Ö¾
 	ENTITY_CELLAPP_ANDA_CLIENT_DATA_FLAGS							= ED_FLAG_ALL_CLIENTS | ED_FLAG_CELL_PUBLIC_AND_OWN | ED_FLAG_OTHER_CLIENTS | ED_FLAG_OWN_CLIENT,
 };
 
-/** entityCallÀà±ðËù¶ÔÓ¦µÄ×é¼þÀà±ðÓ³Éä£¬  Õâ¸ö±íµÄË÷Òý¸öÑÏ¸ñÆ¥ÅäENTITYCALL_TYPEµÄÖµ */
+/** entityCallï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¦ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó³ï¿½ä£¬  ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¸ï¿½Æ¥ï¿½ï¿½ENTITYCALL_TYPEï¿½ï¿½Öµ */
 const COMPONENT_TYPE ENTITYCALL_COMPONENT_TYPE_MAPPING[] = 
 {
 	CELLAPP_TYPE,
@@ -85,16 +85,16 @@ const COMPONENT_TYPE ENTITYCALL_COMPONENT_TYPE_MAPPING[] =
 	BASEAPP_TYPE,
 };
 
-/** ÊôÐÔµÄlod¹ã²¥¼¶±ð·¶Î§µÄ¶¨Òå */
+/** ï¿½ï¿½ï¿½Ôµï¿½lodï¿½ã²¥ï¿½ï¿½ï¿½ï¿½Î§ï¿½Ä¶ï¿½ï¿½ï¿½ */
 typedef uint8 DETAIL_TYPE;
-#define DETAIL_LEVEL_NEAR													0	// lod¼¶±ð£º½ü						
-#define DETAIL_LEVEL_MEDIUM													1	// lod¼¶±ð£ºÖÐ
-#define DETAIL_LEVEL_FAR													2	// lod¼¶±ð£ºÔ¶	
+#define DETAIL_LEVEL_NEAR													0	// lodï¿½ï¿½ï¿½ð£º½ï¿½						
+#define DETAIL_LEVEL_MEDIUM													1	// lodï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+#define DETAIL_LEVEL_FAR													2	// lodï¿½ï¿½ï¿½ï¿½Ô¶	
 
 typedef std::map<std::string, EntityDataFlags> ENTITYFLAGMAP;
-extern ENTITYFLAGMAP g_entityFlagMapping;										// entity µÄflag×Ö·û´®Ó³Éä±í
+extern ENTITYFLAGMAP g_entityFlagMapping;										// entity ï¿½ï¿½flagï¿½Ö·ï¿½ï¿½ï¿½Ó³ï¿½ï¿½ï¿½
 
-// ÊôÐÔºÍ·½·¨µÄUIDÀà±ð
+// ï¿½ï¿½ï¿½ÔºÍ·ï¿½ï¿½ï¿½ï¿½ï¿½UIDï¿½ï¿½ï¿½
 typedef uint16 ENTITY_PROPERTY_UID;
 typedef uint16 ENTITY_METHOD_UID;
 typedef uint16 ENTITY_SCRIPT_UID;
@@ -118,7 +118,7 @@ typedef uint8  ENTITY_DEF_ALIASID;
 #define DATA_TYPE_PYTUPLE		13
 #define DATA_TYPE_PYLIST		14
 
-// ¶ÔentityµÄÒ»Ð©ÏµÍ³¼¶±ðµÄ¿É±äÊôÐÔ½øÐÐ±àºÅÒÔ±ãÍøÂç´«ÊäÊ±½øÐÐ±æ±ð
+// ï¿½ï¿½entityï¿½ï¿½Ò»Ð©ÏµÍ³ï¿½ï¿½ï¿½ï¿½Ä¿É±ï¿½ï¿½ï¿½ï¿½Ô½ï¿½ï¿½Ð±ï¿½ï¿½ï¿½Ô±ï¿½ï¿½ï¿½ï¿½ç´«ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Ð±ï¿½ï¿½
 enum ENTITY_BASE_PROPERTY_UTYPE
 {
 	ENTITY_BASE_PROPERTY_UTYPE_POSITION_XYZ					= 1,
@@ -126,7 +126,7 @@ enum ENTITY_BASE_PROPERTY_UTYPE
 	ENTITY_BASE_PROPERTY_UTYPE_SPACEID						= 3,
 };
 
-// ¶ÔentityµÄÒ»Ð©ÏµÍ³¼¶±ðµÄ¿É±äÊôÐÔ½øÐÐ±àºÅÒÔ±ãÍøÂç´«ÊäÊ±½øÐÐ±æ±ð
+// ï¿½ï¿½entityï¿½ï¿½Ò»Ð©ÏµÍ³ï¿½ï¿½ï¿½ï¿½Ä¿É±ï¿½ï¿½ï¿½ï¿½Ô½ï¿½ï¿½Ð±ï¿½ï¿½ï¿½Ô±ï¿½ï¿½ï¿½ï¿½ç´«ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Ð±ï¿½ï¿½
 enum ENTITY_BASE_PROPERTY_ALIASID
 {
 	ENTITY_BASE_PROPERTY_ALIASID_POSITION_XYZ				= 0,
@@ -135,7 +135,7 @@ enum ENTITY_BASE_PROPERTY_ALIASID
 	ENTITY_BASE_PROPERTY_ALIASID_MAX						= 3,
 };
 
-// ±»ÏÞÖÆµÄÏµÍ³ÊôÐÔ£¬defÖÐ²»ÔÊÐí¶¨Òå
+// ï¿½ï¿½ï¿½ï¿½ï¿½Æµï¿½ÏµÍ³ï¿½ï¿½ï¿½Ô£ï¿½defï¿½Ð²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 const char ENTITY_LIMITED_PROPERTYS[][34] =
 {
 	"id",
@@ -170,7 +170,7 @@ const char ENTITY_LIMITED_PROPERTYS[][34] =
 	"",
 };
 
-// »ñµÃ½ø³ÌµÄpython»·¾³Ä¿Â¼
+// ï¿½ï¿½Ã½ï¿½ï¿½Ìµï¿½pythonï¿½ï¿½ï¿½ï¿½Ä¿Â¼
 std::pair<std::wstring, std::wstring> getComponentPythonPaths(COMPONENT_TYPE componentType);
 
 }

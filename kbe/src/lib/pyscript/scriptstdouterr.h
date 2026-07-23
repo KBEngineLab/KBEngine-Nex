@@ -36,7 +36,7 @@ public:
 	virtual ~ScriptStdOutErr();
 
 	/** 
-		°²×°ºÍÐ¶ÔØÕâ¸öÄ£¿é 
+		ï¿½ï¿½×°ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½ 
 	*/
 	bool install(void);
 	bool uninstall(void);

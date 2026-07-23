@@ -60,7 +60,7 @@ public:
 	void handleTimeout(TimerHandle handle, void * arg);
 	void handleMainTick();
 
-	/* ³õÊ¼»¯Ïà¹Ø½Ó¿Ú */
+	/* ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ø½Ó¿ï¿½ */
 	bool initializeBegin();
 	bool inInitialize();
 	bool initializeEnd();
@@ -73,9 +73,9 @@ public:
 	virtual void onShutdownEnd();
 
 
-	/** ÍøÂç½Ó¿Ú
-	×¢²áÒ»¸öÐÂ¼¤»îµÄbaseapp»òÕßcellapp»òÕßdbmgr
-	Í¨³£ÊÇÒ»¸öÐÂµÄapp±»Æô¶¯ÁË£¬ ËüÐèÒªÏòÄ³Ð©×é¼þ×¢²á×Ô¼º¡£
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	×¢ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½baseappï¿½ï¿½ï¿½ï¿½cellappï¿½ï¿½ï¿½ï¿½dbmgr
+	Í¨ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½appï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë£ï¿½ ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½Ä³Ð©ï¿½ï¿½ï¿½×¢ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½
 	*/
 	virtual void onRegisterNewApp(Network::Channel* pChannel,
 		int32 uid,
@@ -83,41 +83,41 @@ public:
 		COMPONENT_TYPE componentType, COMPONENT_ID componentID, COMPONENT_ORDER globalorderID, COMPONENT_ORDER grouporderID,
 		uint32 intaddr, uint16 intport, uint32 extaddr, uint16 extport, std::string& extaddrEx);
 
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇó´´½¨ÕËºÅ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ó´´½ï¿½ï¿½Ëºï¿½
 	*/
 	void reqCreateAccount(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		Ò»¸öÐÂÓÃ»§µÇÂ¼£¬ ÐèÒª¼ì²éºÏ·¨ÐÔ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ ï¿½ï¿½Òªï¿½ï¿½ï¿½Ï·ï¿½ï¿½ï¿½
 	*/
 	void onAccountLogin(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇó²Á³ý¿Í»§¶ËÇëÇóÈÎÎñ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void eraseClientReq(Network::Channel* pChannel, std::string& logkey);
 
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇó³äÖµ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½Öµ
 	*/
 	void charge(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** Python»Øµ÷½Ó¿Ú
-	    ³äÖµÏìÓ¦
+	/** Pythonï¿½Øµï¿½ï¿½Ó¿ï¿½
+	    ï¿½ï¿½Öµï¿½ï¿½Ó¦
 	*/
 	void chargeResponse(std::string orderID, std::string extraDatas, KBEngine::SERVER_ERROR_CODE errorCode);
 	static PyObject* __py_chargeResponse(PyObject* self, PyObject* args);
 
-	/** Python»Øµ÷½Ó¿Ú
-	    ÇëÇóµÇÂ¼ÕËºÅµÄÏìÓ¦
+	/** Pythonï¿½Øµï¿½ï¿½Ó¿ï¿½
+	    ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ËºÅµï¿½ï¿½ï¿½Ó¦
 	*/
 	void accountLoginResponse(std::string commitName, std::string realAccountName, 
 		std::string extraDatas, KBEngine::SERVER_ERROR_CODE errorCode);
 	static PyObject* __py_accountLoginResponse(PyObject* self, PyObject* args);
 
-	/** Python»Øµ÷½Ó¿Ú
-	    ÇëÇó´´½¨ÕËºÅµÄÏìÓ¦
+	/** Pythonï¿½Øµï¿½ï¿½Ó¿ï¿½
+	    ï¿½ï¿½ï¿½ó´´½ï¿½ï¿½ËºÅµï¿½ï¿½ï¿½Ó¦
 	*/
 	void createAccountResponse(std::string commitName, std::string realAccountName, 
 		std::string extraDatas, KBEngine::SERVER_ERROR_CODE errorCode);
@@ -135,7 +135,7 @@ public:
 	bool hasOrders(std::string ordersid);
 	
 	/**
-		ÏòdbmgrÇëÇóÖ´ÐÐÒ»¸öÊý¾Ý¿âÃüÁî
+		ï¿½ï¿½dbmgrï¿½ï¿½ï¿½ï¿½Ö´ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	static PyObject* __py_executeRawDatabaseCommand(PyObject* self, PyObject* args);
 	void executeRawDatabaseCommand(const char* datas, uint32 size, PyObject* pycallback, ENTITY_ID eid, const std::string& dbInterfaceName);
@@ -146,10 +146,10 @@ public:
 protected:
 	TimerHandle																mainProcessTimer_;
 
-	// ¶©µ¥
+	// ï¿½ï¿½ï¿½ï¿½
 	ORDERS																	orders_;
 
-	// ËùÓÐµÄÇëÇó¼ÇÂ¼£¬ ±ÜÃâÄ³ÀàÖØ¸´ÐÔÇëÇó¡£
+	// ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ä³ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	REQCREATE_MAP															reqCreateAccount_requests_;
 	REQLOGIN_MAP															reqAccountLogin_requests_;
 

@@ -37,10 +37,10 @@ BOOL CWatcherWindow::OnInitDialog()
 
 	{
 		DWORD dwStyle = m_status.GetExtendedStyle();
-		dwStyle |= LVS_EX_FULLROWSELECT;					//Ñ¡ÖÐÄ³ÐÐÊ¹ÕûÐÐ¸ßÁÁ£¨Ö»ÊÊÓÃÓëreport·ç¸ñµÄlistctrl£©
-		dwStyle |= LVS_EX_GRIDLINES;						//Íø¸ñÏß£¨Ö»ÊÊÓÃÓëreport·ç¸ñµÄlistctrl£©
+		dwStyle |= LVS_EX_FULLROWSELECT;					//Ñ¡ï¿½ï¿½Ä³ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½Ð¸ï¿½ï¿½ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½reportï¿½ï¿½ï¿½ï¿½listctrlï¿½ï¿½
+		dwStyle |= LVS_EX_GRIDLINES;						//ï¿½ï¿½ï¿½ï¿½ï¿½ß£ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½reportï¿½ï¿½ï¿½ï¿½listctrlï¿½ï¿½
 		//dwStyle |= LVS_EX_ONECLICKACTIVATE;
-		m_status.SetExtendedStyle(dwStyle);					//ÉèÖÃÀ©Õ¹·ç¸ñ
+		m_status.SetExtendedStyle(dwStyle);					//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ¹ï¿½ï¿½ï¿½
 	}
 
 	DWORD styles = ::GetWindowLong(m_tree.m_hWnd, GWL_STYLE);
@@ -49,10 +49,10 @@ BOOL CWatcherWindow::OnInitDialog()
 
 	{
 		DWORD dwStyle = m_statusShow.GetExtendedStyle();
-		dwStyle |= LVS_EX_FULLROWSELECT;					//Ñ¡ÖÐÄ³ÐÐÊ¹ÕûÐÐ¸ßÁÁ£¨Ö»ÊÊÓÃÓëreport·ç¸ñµÄlistctrl£©
-		dwStyle |= LVS_EX_GRIDLINES;						//Íø¸ñÏß£¨Ö»ÊÊÓÃÓëreport·ç¸ñµÄlistctrl£©
+		dwStyle |= LVS_EX_FULLROWSELECT;					//Ñ¡ï¿½ï¿½Ä³ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½Ð¸ï¿½ï¿½ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½reportï¿½ï¿½ï¿½ï¿½listctrlï¿½ï¿½
+		dwStyle |= LVS_EX_GRIDLINES;						//ï¿½ï¿½ï¿½ï¿½ï¿½ß£ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½reportï¿½ï¿½ï¿½ï¿½listctrlï¿½ï¿½
 		//dwStyle |= LVS_EX_ONECLICKACTIVATE;
-		m_statusShow.SetExtendedStyle(dwStyle);				//ÉèÖÃÀ©Õ¹·ç¸ñ
+		m_statusShow.SetExtendedStyle(dwStyle);				//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ¹ï¿½ï¿½ï¿½
 	}
 	
 	return TRUE;  // return TRUE  unless you set the focus to a control

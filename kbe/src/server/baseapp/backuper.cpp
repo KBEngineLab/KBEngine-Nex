@@ -45,17 +45,17 @@ void Backuper::tick()
 	if (periodInTicks == 0)
 		return;
 
-	// ÕâÀï¶Ô±¸·ÝµÄentity×öÒ»ÏÂ·ÖÅú²Ù×÷
-	// ´ó¸ÅËã·¨ÊÇÅäÖÃÉÏÌîÐ´µÄ±¸·ÝÖÜÆÚ»»Ëã³ÉtickÊýÁ¿£¬ Ã¿¸ötick±¸·ÝÒ»²¿·Öentity
+	// ï¿½ï¿½ï¿½ï¿½Ô±ï¿½ï¿½Ýµï¿½entityï¿½ï¿½Ò»ï¿½Â·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	// ï¿½ï¿½ï¿½ï¿½ã·¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð´ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú»ï¿½ï¿½ï¿½ï¿½tickï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Ã¿ï¿½ï¿½tickï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½entity
 	float numToBackUpFloat = float(Baseapp::getSingleton().pEntities()->size()) / periodInTicks + backupRemainder_;
 
-	// ±¾´Î±¸·ÝµÄÊýÁ¿
+	// ï¿½ï¿½ï¿½Î±ï¿½ï¿½Ýµï¿½ï¿½ï¿½ï¿½ï¿½
 	int numToBackUp = int(numToBackUpFloat);
 
-	// ¼ÆËã³ö¾«¶Èµ¼ÖÂµÄËðÊ§ÊýÁ¿
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Èµï¿½ï¿½Âµï¿½ï¿½ï¿½Ê§ï¿½ï¿½ï¿½ï¿½
 	backupRemainder_ = numToBackUpFloat - numToBackUp;
 
-	// Èç¹û±¸·Ý±íÖÐÃ»ÓÐÄÚÈÝÁËÔòÖØÐÂ²úÉúÒ»·ÝÐÂµÄ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý±ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â²ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½
 	if (backupEntityIDs_.empty())
 	{
 		this->createBackupTable();
@@ -82,7 +82,7 @@ void Backuper::tick()
 //-------------------------------------------------------------------------------------
 bool Backuper::backup(Entity& entity, MemoryStream& s)
 {
-	// ÕâÀï¿ªÊ¼½«ÐèÒª±¸·ÝµÄÊý¾ÝÐ´ÈëÁ÷
+	// ï¿½ï¿½ï¿½ï¿ªÊ¼ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½Ýµï¿½ï¿½ï¿½ï¿½ï¿½Ð´ï¿½ï¿½ï¿½ï¿½
 	entity.writeBackupData(&s);
 
 	if(entity.shouldAutoBackup() == KBE_NEXT_ONLY)
@@ -106,7 +106,7 @@ void Backuper::createBackupTable()
 			backupEntityIDs_.push_back(iter->first);
 	}
 
-	// Ëæ»úÒ»ÏÂÐòÁÐ
+	// ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	std::random_shuffle(backupEntityIDs_.begin(), backupEntityIDs_.end());
 }
 

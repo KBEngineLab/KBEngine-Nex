@@ -28,7 +28,7 @@ namespace KBEngine
 {
 
 /**
- *	openssl md5�ķ�װ
+ *	openssl md5�ķ�װ
  */
 class KBE_MD5
 {

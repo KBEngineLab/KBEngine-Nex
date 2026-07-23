@@ -33,7 +33,7 @@ namespace Network{
 typedef uint32 HistoryEventID;
 
 /**
-	描述一个历史事件
+	锟斤拷锟斤拷一锟斤拷锟斤拷史锟铰硷拷
 */
 class HistoryEvent
 {
@@ -53,7 +53,7 @@ protected:
 };
 
 /**
-	管理所有的历史事件
+	锟斤拷锟斤拷锟斤拷锟叫碉拷锟斤拷史锟铰硷拷
 */
 class EventHistory
 {

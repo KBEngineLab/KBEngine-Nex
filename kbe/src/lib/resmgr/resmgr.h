@@ -19,7 +19,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 /*
-	×ÊÔ´¹ÜÀíÆ÷¡£
+	ï¿½ï¿½Ô´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 */
 #ifndef KBE_RESMGR_H
 #define KBE_RESMGR_H
@@ -42,7 +42,7 @@ namespace KBEngine{
 class Resmgr : public Singleton<Resmgr>, public TimerHandler
 {
 public:
-	// ÒýÇæ»·¾³±äÁ¿
+	// ï¿½ï¿½ï¿½æ»·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	struct KBEEnv
 	{
 		std::string root_path;
@@ -66,7 +66,7 @@ public:
 	const Resmgr::KBEEnv& getEnv() { return kb_env_; }
 
 	/*
-		´Ó×ÊÔ´Â·¾¶ÖÐ(»·¾³±äÁ¿ÖÐÖ¸¶¨µÄ)Æ¥Åäµ½ÍêÕûµÄ×ÊÔ´µØÖ·
+		ï¿½ï¿½ï¿½ï¿½Ô´Â·ï¿½ï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½)Æ¥ï¿½äµ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô´ï¿½ï¿½Ö·
 	*/
 	std::string matchRes(const std::string& res);
 	std::string matchRes(const char* res);
@@ -76,12 +76,12 @@ public:
 	FILE* openRes(std::string res, const char* mode = "r");
 
 	/*
-		ÁÐ³öÄ¿Â¼ÏÂËùÓÐµÄ×ÊÔ´ÎÄ¼þ
+		ï¿½Ð³ï¿½Ä¿Â¼ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½Ô´ï¿½Ä¼ï¿½
 	*/
 	bool listPathRes(std::wstring path, const std::wstring& extendName, std::vector<std::wstring>& results);
 
 	/*
-		´Ó×ÊÔ´Â·¾¶ÖÐ(»·¾³±äÁ¿ÖÐÖ¸¶¨µÄ)Æ¥Åäµ½Ä¿Â¼
+		ï¿½ï¿½ï¿½ï¿½Ô´Â·ï¿½ï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½)Æ¥ï¿½äµ½Ä¿Â¼
 	*/
 	std::string matchPath(const std::string& path);
 	std::string matchPath(const char* path);
@@ -97,31 +97,31 @@ public:
 	}
 
 	/**
-		»ñµÃÒýÇæÏµÍ³¼¶×ÊÔ´Ä¿Â¼
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÏµÍ³ï¿½ï¿½ï¿½ï¿½Ô´Ä¿Â¼
 		kbe\\res\\*
 	*/
 	std::string getPySysResPath();
 
 	/**
-		»ñµÃÓÃ»§¼¶×ÊÔ´Ä¿Â¼
+		ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½Ô´Ä¿Â¼
 		assets\\res\\*
 	*/
 	std::string getPyUserResPath();
 
 	/**
-		»ñµÃÓÃ»§¼¶½Å±¾Ä¿Â¼
+		ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½Å±ï¿½Ä¿Â¼
 		assets\\scripts\\*
 	*/
 	std::string getPyUserScriptsPath();
 
 	/**
-		»ñµÃÓÃ»§¼¶½ø³Ì½Å±¾Ä¿Â¼
-		assets\\scripts\\cell¡¢base¡¢client
+		ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì½Å±ï¿½Ä¿Â¼
+		assets\\scripts\\cellï¿½ï¿½baseï¿½ï¿½client
 	*/
 	std::string getPyUserComponentScriptsPath(COMPONENT_TYPE componentType = UNKNOWN_COMPONENT_TYPE);
 
 	/**
-		»ñµÃÓÃ»§¼¶¿âÄ¿Â¼
+		ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿Â¼
 		assets\\*
 	*/
 	std::string getPyUserAssetsPath();

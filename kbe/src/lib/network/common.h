@@ -31,38 +31,38 @@ namespace Network
 const uint32 BROADCAST = 0xFFFFFFFF;
 const uint32 LOCALHOST = 0x0100007F;
 
-// ÏûÏ¢µÄID
+// ï¿½ï¿½Ï¢ï¿½ï¿½ID
 typedef uint16	MessageID;
 
-// ÏûÏ¢³¤¶È£¬Ä¿Ç°³¤¶ÈÓÐ2ÖÖ£¬Ä¬ÈÏÏûÏ¢³¤¶È×î´óMessageLength
-// µ±³¬¹ýÕâ¸öÊýÊ±ÐèÒªÀ©Õ¹³¤¶È£¬µ×²ãÊ¹ÓÃMessageLength1
-typedef uint16	MessageLength;		// ×î´ó65535
-typedef uint32	MessageLength1;		// ×î´ó4294967295
+// ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½È£ï¿½Ä¿Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½2ï¿½Ö£ï¿½Ä¬ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½MessageLength
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½Òªï¿½ï¿½Õ¹ï¿½ï¿½ï¿½È£ï¿½ï¿½×²ï¿½Ê¹ï¿½ï¿½MessageLength1
+typedef uint16	MessageLength;		// ï¿½ï¿½ï¿½65535
+typedef uint32	MessageLength1;		// ï¿½ï¿½ï¿½4294967295
 
 typedef int32	ChannelID;
 const ChannelID CHANNEL_ID_NULL = 0;
 
-// Í¨µÀ³¬Ê±Ê±¼ä
+// Í¨ï¿½ï¿½ï¿½ï¿½Ê±Ê±ï¿½ï¿½
 extern float g_channelInternalTimeout;
 extern float g_channelExternalTimeout;
 
-// Í¨µÀ·¢ËÍ³¬Ê±ÖØÊÔ
+// Í¨ï¿½ï¿½ï¿½ï¿½ï¿½Í³ï¿½Ê±ï¿½ï¿½ï¿½ï¿½
 extern uint32 g_intReSendInterval;
 extern uint32 g_intReSendRetries;
 extern uint32 g_extReSendInterval;
 extern uint32 g_extReSendRetries;
 
-// Íâ²¿Í¨µÀ¼ÓÃÜÀà±ð
+// ï¿½â²¿Í¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 extern int8 g_channelExternalEncryptType;
 
-// listen¼àÌý¶ÓÁÐ×î´óÖµ
+// listenï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµ
 extern uint32 g_SOMAXCONN;
 
 // Certificate file required for HTTPS/WSS/SSL communication
 extern std::string g_sslCertificate;
 extern std::string g_sslPrivateKey;
 
-// ²»×öÍ¨µÀ³¬Ê±¼ì²é
+// ï¿½ï¿½ï¿½ï¿½Í¨ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½
 #define CLOSE_CHANNEL_INACTIVITIY_DETECTION()										\
 {																					\
 	Network::g_channelExternalTimeout = Network::g_channelInternalTimeout = -1.0f;	\
@@ -75,7 +75,7 @@ namespace udp{
 namespace tcp{
 }
 
-// ¼ÓÃÜ¶îÍâ´æ´¢µÄÐÅÏ¢Õ¼ÓÃ×Ö½Ú(³¤¶È+Ìî³ä)
+// ï¿½ï¿½ï¿½Ü¶ï¿½ï¿½ï¿½æ´¢ï¿½ï¿½ï¿½ï¿½Ï¢Õ¼ï¿½ï¿½ï¿½Ö½ï¿½(ï¿½ï¿½ï¿½ï¿½+ï¿½ï¿½ï¿½)
 #define ENCRYPTTION_WASTAGE_SIZE			(1 + 7)
 
 #define PACKET_MAX_SIZE						1500
@@ -84,7 +84,7 @@ namespace tcp{
 #endif
 #define PACKET_MAX_SIZE_UDP					1472
 
-typedef uint16								PacketLength;				// ×î´ó65535
+typedef uint16								PacketLength;				// ï¿½ï¿½ï¿½65535
 #define PACKET_LENGTH_SIZE					sizeof(PacketLength)
 
 #define NETWORK_MESSAGE_ID_SIZE				sizeof(Network::MessageID)
@@ -93,21 +93,21 @@ typedef uint16								PacketLength;				// ×î´ó65535
 #define NETWORK_MESSAGE_MAX_SIZE			65535
 #define NETWORK_MESSAGE_MAX_SIZE1			4294967295
 
-// ÓÎÏ·ÄÚÈÝ¿ÉÓÃ°ü´óÐ¡
+// ï¿½ï¿½Ï·ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½Ã°ï¿½ï¿½ï¿½Ð¡
 #define GAME_PACKET_MAX_SIZE_TCP			PACKET_MAX_SIZE_TCP - NETWORK_MESSAGE_ID_SIZE - \
 											NETWORK_MESSAGE_LENGTH_SIZE - ENCRYPTTION_WASTAGE_SIZE
 
-/** kbe machine¶Ë¿Ú */
+/** kbe machineï¿½Ë¿ï¿½ */
 #define KBE_PORT_START						20000
-#define KBE_MACHINE_BROADCAST_SEND_PORT		KBE_PORT_START + 86			// machine½ÓÊÕ¹ã²¥µÄ¶Ë¿Ú
+#define KBE_MACHINE_BROADCAST_SEND_PORT		KBE_PORT_START + 86			// machineï¿½ï¿½ï¿½Õ¹ã²¥ï¿½Ä¶Ë¿ï¿½
 #define KBE_PORT_BROADCAST_DISCOVERY		KBE_PORT_START + 87
 #define KBE_MACHINE_TCP_PORT				KBE_PORT_START + 88
 
 #define KBE_INTERFACES_TCP_PORT				30099
 
 /*
-	ÍøÂçÏûÏ¢ÀàÐÍ£¬ ¶¨³¤»òÕß±ä³¤¡£
-	Èç¹ûÐèÒª×Ô¶¨Òå³¤¶ÈÔòÔÚNETWORK_INTERFACE_DECLARE_BEGINÖÐÉùÃ÷Ê±ÌîÈë³¤¶È¼´¿É¡£
+	ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½Í£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß±ä³¤ï¿½ï¿½
+	ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½Ô¶ï¿½ï¿½å³¤ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½NETWORK_INTERFACE_DECLARE_BEGINï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ë³¤ï¿½È¼ï¿½ï¿½É¡ï¿½
 */
 #ifndef NETWORK_FIXED_MESSAGE
 #define NETWORK_FIXED_MESSAGE 0
@@ -117,11 +117,11 @@ typedef uint16								PacketLength;				// ×î´ó65535
 #define NETWORK_VARIABLE_MESSAGE -1
 #endif
 
-// ÍøÂçÏûÏ¢Àà±ð
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½
 enum NETWORK_MESSAGE_TYPE
 {
-	NETWORK_MESSAGE_TYPE_COMPONENT = 0,	// ×é¼þÏûÏ¢
-	NETWORK_MESSAGE_TYPE_ENTITY = 1,	// entityÏûÏ¢
+	NETWORK_MESSAGE_TYPE_COMPONENT = 0,	// ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
+	NETWORK_MESSAGE_TYPE_ENTITY = 1,	// entityï¿½ï¿½Ï¢
 };
 
 enum ProtocolType
@@ -195,13 +195,13 @@ const char * reasonToString(Reason reason)
 		if(slen != (int)pPacket->totalSize())																\
 		{																									\
 			reason = Network::PacketSender::checkSocketErrors(ep, slen, pPacket->totalSize());				\
-			/* Èç¹û·¢ËÍ³öÏÖ´íÎóÄÇÃ´ÎÒÃÇ¿ÉÒÔ¼ÌÐø³¢ÊÔÒ»´Î£¬ ³¬¹ý3´ÎÍË³ö	*/										\
+			/* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í³ï¿½ï¿½Ö´ï¿½ï¿½ï¿½ï¿½ï¿½Ã´ï¿½ï¿½ï¿½Ç¿ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½Î£ï¿½ ï¿½ï¿½ï¿½ï¿½3ï¿½ï¿½ï¿½Ë³ï¿½	*/										\
 			if (reason == Network::REASON_NO_SUCH_PORT && retries <= 3)										\
 			{																								\
 				continue;																					\
 			}																								\
 																											\
-			/* Èç¹ûÏµÍ³·¢ËÍ»º³åÒÑ¾­ÂúÁË£¬ÔòÎÒÃÇµÈ´ý10ms	*/													\
+			/* ï¿½ï¿½ï¿½ÏµÍ³ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½Ë£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÇµÈ´ï¿½10ms	*/													\
 			if ((reason == REASON_RESOURCE_UNAVAILABLE || reason == REASON_GENERAL_NETWORK)					\
 															&& retries <= 3)								\
 			{																								\
@@ -251,13 +251,13 @@ const char * reasonToString(Reason reason)
 			if(pPacket->sentSize != pPacket->length())														\
 			{																								\
 				reason = PacketSender::checkSocketErrors(&ep);												\
-				/* Èç¹û·¢ËÍ³öÏÖ´íÎóÄÇÃ´ÎÒÃÇ¿ÉÒÔ¼ÌÐø³¢ÊÔÒ»´Î£¬ ³¬¹ý60´ÎÍË³ö	*/									\
+				/* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í³ï¿½ï¿½Ö´ï¿½ï¿½ï¿½ï¿½ï¿½Ã´ï¿½ï¿½ï¿½Ç¿ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½Î£ï¿½ ï¿½ï¿½ï¿½ï¿½60ï¿½ï¿½ï¿½Ë³ï¿½	*/									\
 				if (reason == REASON_NO_SUCH_PORT && retries <= 3)											\
 				{																							\
 					continue;																				\
 				}																							\
 																											\
-				/* Èç¹ûÏµÍ³·¢ËÍ»º³åÒÑ¾­ÂúÁË£¬ÔòÎÒÃÇµÈ´ý10ms	*/												\
+				/* ï¿½ï¿½ï¿½ÏµÍ³ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½Ë£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÇµÈ´ï¿½10ms	*/												\
 				if ((reason == REASON_RESOURCE_UNAVAILABLE || reason == REASON_GENERAL_NETWORK)				\
 																					&& retries <= 60)		\
 				{																							\
@@ -321,7 +321,7 @@ const char * reasonToString(Reason reason)
 }																											\
 
 
-// ÅäºÏ·þÎñ¶ËÅäÖÃÑ¡Ïîtrace_packetÊ¹ÓÃ£¬ÓÃÀ´¸ú×ÙÒ»Ìõ¼´½«Êä³öµÄÏûÏ¢°ü
+// ï¿½ï¿½Ï·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¡ï¿½ï¿½trace_packetÊ¹ï¿½Ã£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½
 #define TRACE_MESSAGE_PACKET(isrecv, pPacket, pCurrMsgHandler, length, addr, readPacketHead)				\
 	if(Network::g_trace_packet > 0)																			\
 	{																										\
@@ -400,7 +400,7 @@ extern uint64						g_numPacketsReceived;
 extern uint64						g_numBytesSent;
 extern uint64						g_numBytesReceived;
 
-// °ü½ÓÊÕ´°¿ÚÒç³ö
+// ï¿½ï¿½ï¿½ï¿½ï¿½Õ´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 extern uint32						g_receiveWindowMessagesOverflowCritical;
 extern uint32						g_intReceiveWindowMessagesOverflow;
 extern uint32						g_extReceiveWindowMessagesOverflow;

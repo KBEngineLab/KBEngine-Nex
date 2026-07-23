@@ -28,7 +28,7 @@ namespace KBEngine{
 KBEngine::ScriptTimers KBEngine::PythonApp::scriptTimers_;
 
 /**
-ÄÚ²¿¶¨Ê±Æ÷´¦ÀíÀà
+ï¿½Ú²ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 */
 class ScriptTimerHandler : public TimerHandler
 {
@@ -247,7 +247,7 @@ bool PythonApp::uninstallPyScript()
 //-------------------------------------------------------------------------------------
 bool PythonApp::installPyModules()
 {
-	// °²×°Èë¿ÚÄ£¿é
+	// ï¿½ï¿½×°ï¿½ï¿½ï¿½Ä£ï¿½ï¿½
 	PyObject *entryScriptFileName = NULL;
 	if(componentType() == BASEAPP_TYPE)
 	{
@@ -288,29 +288,29 @@ bool PythonApp::installPyModules()
 
 	APPEND_SCRIPT_MODULE_METHOD(module, MemoryStream, script::PyMemoryStream::py_new, METH_VARARGS, 0);
 
-	// ×¢²á´´½¨entityµÄ·½·¨µ½py
-	// Ïò½Å±¾×¢²áapp·¢²¼×´Ì¬
+	// ×¢ï¿½á´´ï¿½ï¿½entityï¿½Ä·ï¿½ï¿½ï¿½ï¿½ï¿½py
+	// ï¿½ï¿½Å±ï¿½×¢ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½×´Ì¬
 	APPEND_SCRIPT_MODULE_METHOD(module, publish, __py_getAppPublish, METH_VARARGS, 0);
 
-	// ×¢²áÉèÖÃ½Å±¾Êä³öÀàÐÍ
+	// ×¢ï¿½ï¿½ï¿½ï¿½ï¿½Ã½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	APPEND_SCRIPT_MODULE_METHOD(module, scriptLogType, __py_setScriptLogType, METH_VARARGS, 0);
 	
-	// »ñµÃ×ÊÔ´È«Â·¾¶
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ô´È«Â·ï¿½ï¿½
 	APPEND_SCRIPT_MODULE_METHOD(module, getResFullPath, __py_getResFullPath, METH_VARARGS, 0);
 
-	// ÊÇ·ñ´æÔÚÄ³¸ö×ÊÔ´
+	// ï¿½Ç·ï¿½ï¿½ï¿½ï¿½Ä³ï¿½ï¿½ï¿½ï¿½Ô´
 	APPEND_SCRIPT_MODULE_METHOD(module, hasRes, __py_hasRes, METH_VARARGS, 0);
 
-	// ´ò¿ªÒ»¸öÎÄ¼þ
+	// ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ä¼ï¿½
 	APPEND_SCRIPT_MODULE_METHOD(module, open, __py_kbeOpen, METH_VARARGS, 0);
 
-	// ÁÐ³öÄ¿Â¼ÏÂËùÓÐÎÄ¼þ
+	// ï¿½Ð³ï¿½Ä¿Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½
 	APPEND_SCRIPT_MODULE_METHOD(module, listPathRes, __py_listPathRes, METH_VARARGS, 0);
 
-	// Æ¥ÅäÏà¶ÔÂ·¾¶»ñµÃÈ«Â·¾¶
+	// Æ¥ï¿½ï¿½ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½ï¿½ï¿½È«Â·ï¿½ï¿½
 	APPEND_SCRIPT_MODULE_METHOD(module, matchPath, __py_matchPath, METH_VARARGS, 0);
 
-	// debug×·×Ùkbe·â×°µÄpy¶ÔÏó¼ÆÊý
+	// debug×·ï¿½ï¿½kbeï¿½ï¿½×°ï¿½ï¿½pyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	APPEND_SCRIPT_MODULE_METHOD(module, debugTracing, script::PyGC::__py_debugTracing, METH_VARARGS, 0);
 
 	if (PyModule_AddIntConstant(module, "LOG_TYPE_NORMAL", log4cxx::ScriptLevel::SCRIPT_INT))
@@ -343,7 +343,7 @@ bool PythonApp::installPyModules()
 		ERROR_MSG( "PythonApp::installPyModules: Unable to set KBEngine.NEXT_ONLY.\n");
 	}
 	
-	// ×¢²áËùÓÐpythonApp¶¼ÒªÓÃµ½µÄÍ¨ÓÃ½Ó¿Ú
+	// ×¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½pythonAppï¿½ï¿½Òªï¿½Ãµï¿½ï¿½ï¿½Í¨ï¿½Ã½Ó¿ï¿½
 	APPEND_SCRIPT_MODULE_METHOD(module,		addTimer,						__py_addTimer,											METH_VARARGS,	0);
 	APPEND_SCRIPT_MODULE_METHOD(module,		delTimer,						__py_delTimer,											METH_VARARGS,	0);
 	APPEND_SCRIPT_MODULE_METHOD(module,		registerReadFileDescriptor,		PyFileDescriptor::__py_registerReadFileDescriptor,		METH_VARARGS,	0);
@@ -700,7 +700,7 @@ void PythonApp::onExecScriptCommand(Network::Channel* pChannel, KBEngine::Memory
 		retbuf = "\r\n";
 	}
 
-	// ½«½á¹û·µ»Ø¸ø¿Í»§¶Ë
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½Í»ï¿½ï¿½ï¿½
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	ConsoleInterface::ConsoleExecCommandCBMessageHandler msgHandler;
 	(*pBundle).newMessage(msgHandler);
@@ -723,7 +723,7 @@ void PythonApp::reloadScript(bool fullReload)
 
 	// SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-	// ËùÓÐ½Å±¾¶¼¼ÓÔØÍê±Ï
+	// ï¿½ï¿½ï¿½Ð½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(),
 										const_cast<char*>("onInit"),
 										const_cast<char*>("i"), 

@@ -98,8 +98,8 @@ void TCPPacketSender::onGetError(Channel* pChannel, const std::string& err)
 {
 	pChannel->condemn(err);
 	
-	// ´Ë´¦²»±ØÁ¢¼´Ïú»Ù£¬¿ÉÄÜµ¼ÖÂbufferedReceives_ÄÚ²¿±éÀúµü´úÆ÷ÆÆ»µ
-	// ½»¸øTCPPacketReceiver´¦Àí¼´¿É
+	// ï¿½Ë´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ù£ï¿½ï¿½ï¿½ï¿½Üµï¿½ï¿½ï¿½bufferedReceives_ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ»ï¿½
+	// ï¿½ï¿½ï¿½ï¿½TCPPacketReceiverï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	//pChannel->networkInterface().deregisterChannel(pChannel);
 	//pChannel->destroy();
 }
@@ -109,7 +109,7 @@ bool TCPPacketSender::processSend(Channel* pChannel)
 {
 	bool noticed = pChannel == NULL;
 
-	// Èç¹ûÊÇÓÉpollerÍ¨ÖªµÄ£¬ÎÒÃÇÐèÒªÍ¨¹ýµØÖ·ÕÒµ½channel
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½pollerÍ¨Öªï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÒªÍ¨ï¿½ï¿½ï¿½ï¿½Ö·ï¿½Òµï¿½channel
 	if(noticed)
 		pChannel = getChannel();
 
@@ -150,13 +150,13 @@ bool TCPPacketSender::processSend(Channel* pChannel)
 
 			if (reason == REASON_RESOURCE_UNAVAILABLE)
 			{
-				/* ´Ë´¦Êä³ö¿ÉÄÜ»áÔì³ÉdebugHelper´¦ËÀËø
+				/* ï¿½Ë´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü»ï¿½ï¿½ï¿½ï¿½debugHelperï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 					WARNING_MSG(fmt::format("TCPPacketSender::processSend: "
 						"Transmit queue full, waiting for space(kbengine.xml->channelCommon->writeBufferSize->{})...\n",
 						(pChannel->isInternal() ? "internal" : "external")));
 				*/
 
-				// Á¬Ðø³¬¹ý10´ÎÔòÍ¨Öª³ö´í
+				// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½10ï¿½ï¿½ï¿½ï¿½Í¨Öªï¿½ï¿½ï¿½ï¿½
 				if (++sendfailCount_ >= 10 && pChannel->isExternal())
 				{
 					onGetError(pChannel, "TCPPacketSender::processSend: sendfailCount >= 10");
@@ -221,7 +221,7 @@ Reason TCPPacketSender::processFilterPacket(Channel* pChannel, Packet * pPacket)
 	if (pPoller != NULL && pPoller->supportsCompletion())
 	{
 		// Completion backends own a copy of the packet until WSASend completes, so the packet can leave the Channel queue now.
-		// Íê³ÉÄ£ÐÍ»áÔÚ WSASend Íê³ÉÇ°³ÖÓÐ packet ¸±±¾£¬Òò´Ë´Ë´¦¿ÉÒÔÁ¢¼´ÒÆ³ö Channel ¶ÓÁÐ¡£
+		// ï¿½ï¿½ï¿½Ä£ï¿½Í»ï¿½ï¿½ï¿½ WSASend ï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ packet ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë´Ë´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ³ï¿½ Channel ï¿½ï¿½ï¿½Ð¡ï¿½
 		const int remaining = pPacket->length() - pPacket->sentSize;
 		if (!pPoller->queueTcpSend(static_cast<int>(*pEndpoint), pPacket->data() + pPacket->sentSize, remaining))
 		{
@@ -250,7 +250,7 @@ Reason TCPPacketSender::processFilterPacket(Channel* pChannel, Packet * pPacket)
 	}
 	else
 	{
-		// Èç¹ûÖ»·¢ËÍÁËÒ»²¿·ÖÊý¾Ý£¬ÔòÈÏÎªÊÇREASON_RESOURCE_UNAVAILABLE
+		// ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý£ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½REASON_RESOURCE_UNAVAILABLE
 		if (len > 0)
 			return REASON_RESOURCE_UNAVAILABLE;
 	}

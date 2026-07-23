@@ -52,7 +52,7 @@ public:
 	~EntityDef();
 	
 	/** 
-		³õÊ¼»¯
+		ï¿½ï¿½Ê¼ï¿½ï¿½
 	*/
 	static bool initialize(std::vector<PyTypeObject*>& scriptBaseTypes, 
 		COMPONENT_TYPE loadComponentType);
@@ -62,7 +62,7 @@ public:
 	static void reload(bool fullReload);
 
 	/** 
-		¼ÓÔØÏà¹ØÃèÊö
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	static bool loadAllScriptModules(std::string entitiesPath, 
 		std::vector<PyTypeObject*>& scriptBaseTypes);
@@ -123,28 +123,28 @@ public:
 		ScriptDefModule* pScriptModule);
 
 	/** 
-		ÊÇ·ñ¼ÓÔØÕâ¸ö½Å±¾Ä£¿é 
+		ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Å±ï¿½Ä£ï¿½ï¿½ 
 	*/
 	static bool isLoadScriptModule(ScriptDefModule* pScriptModule);
 
 	/** 
-		¸ù¾Ýµ±Ç°×é¼þÀà±ðÉèÖÃÊÇ·ñÓÐcell»òÕßbase 
+		ï¿½ï¿½ï¿½Ýµï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½cellï¿½ï¿½ï¿½ï¿½base 
 	*/
 	static void setScriptModuleHasComponentEntity(ScriptDefModule* pScriptModule, bool has);
 
 	/** 
-		¼ì²é½Å±¾Ä£¿éÖÐ±»¶¨ÒåµÄ·½·¨ÊÇ·ñ´æÔÚ 
+		ï¿½ï¿½ï¿½Å±ï¿½Ä£ï¿½ï¿½ï¿½Ð±ï¿½ï¿½ï¿½ï¿½ï¿½Ä·ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static bool checkDefMethod(ScriptDefModule* pScriptModule, PyObject* moduleObj, 
 		const std::string& moduleName);
 	
 	/** 
-		¼ì²é½Å±¾Ä£¿éÖÐ±»¶¨ÒåµÄÊôÐÔÊÇ·ñºÏ·¨ 
+		ï¿½ï¿½ï¿½Å±ï¿½Ä£ï¿½ï¿½ï¿½Ð±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½Ï·ï¿½ 
 	*/
 	static bool validDefPropertyName(const std::string& name);
 
 	/** 
-		Í¨¹ý±ê¼ÇÀ´Ñ°ÕÒµ½¶ÔÓ¦µÄ½Å±¾Ä£¿é¶ÔÏó 
+		Í¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ°ï¿½Òµï¿½ï¿½ï¿½Ó¦ï¿½Ä½Å±ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static ScriptDefModule* findScriptModule(ENTITY_SCRIPT_UID utype);
 	static ScriptDefModule* findScriptModule(const char* scriptName);
@@ -189,13 +189,13 @@ public:
 	static bool isReload();
 
 private:
-	static SCRIPT_MODULES __scriptModules;										// ËùÓÐµÄÀ©Õ¹½Å±¾Ä£¿é¶¼´æ´¢ÔÚÕâÀï
-	static SCRIPT_MODULES __oldScriptModules;									// reloadÊ±¾ÉµÄÄ£¿é»á·Åµ½ÕâÀïÓÃÓÚÅÐ¶Ï
+	static SCRIPT_MODULES __scriptModules;										// ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½Õ¹ï¿½Å±ï¿½Ä£ï¿½é¶¼ï¿½æ´¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	static SCRIPT_MODULES __oldScriptModules;									// reloadÊ±ï¿½Éµï¿½Ä£ï¿½ï¿½ï¿½Åµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½
 
-	static SCRIPT_MODULE_UID_MAP __scriptTypeMappingUType;						// ½Å±¾Àà±ðÓ³Éäutype
-	static SCRIPT_MODULE_UID_MAP __oldScriptTypeMappingUType;					// reloadÊ±¾ÉµÄ½Å±¾Àà±ðÓ³Éäutype
+	static SCRIPT_MODULE_UID_MAP __scriptTypeMappingUType;						// ï¿½Å±ï¿½ï¿½ï¿½ï¿½Ó³ï¿½ï¿½utype
+	static SCRIPT_MODULE_UID_MAP __oldScriptTypeMappingUType;					// reloadÊ±ï¿½ÉµÄ½Å±ï¿½ï¿½ï¿½ï¿½Ó³ï¿½ï¿½utype
 
-	static COMPONENT_TYPE __loadComponentType;									// ËùÐè¹ØÏµµÄ×é¼þÀà±ðµÄÏà¹ØÊý¾Ý		
+	static COMPONENT_TYPE __loadComponentType;									// ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½		
 	static std::vector<PyTypeObject*> __scriptBaseTypes;
 	static std::string __entitiesPath;
 
@@ -203,8 +203,8 @@ private:
 
 	static bool _isInit;
 
-	static bool __entityAliasID;												// ÓÅ»¯EntityID£¬view·¶Î§ÄÚÐ¡ÓÚ255¸öEntityID, ´«Êäµ½clientÊ±Ê¹ÓÃ1×Ö½ÚÎ±ID 
-	static bool __entitydefAliasID;												// ÓÅ»¯entityÊôÐÔºÍ·½·¨¹ã²¥Ê±Õ¼ÓÃµÄ´ø¿í£¬entity¿Í»§¶ËÊôÐÔ»òÕß¿Í»§¶Ë²»³¬¹ý255¸öÊ±£¬ ·½·¨uidºÍÊôÐÔuid´«Êäµ½clientÊ±Ê¹ÓÃ1×Ö½Ú±ðÃûID
+	static bool __entityAliasID;												// ï¿½Å»ï¿½EntityIDï¿½ï¿½viewï¿½ï¿½Î§ï¿½ï¿½Ð¡ï¿½ï¿½255ï¿½ï¿½EntityID, ï¿½ï¿½ï¿½äµ½clientÊ±Ê¹ï¿½ï¿½1ï¿½Ö½ï¿½Î±ID 
+	static bool __entitydefAliasID;												// ï¿½Å»ï¿½entityï¿½ï¿½ï¿½ÔºÍ·ï¿½ï¿½ï¿½ï¿½ã²¥Ê±Õ¼ï¿½ÃµÄ´ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô»ï¿½ï¿½ß¿Í»ï¿½ï¿½Ë²ï¿½ï¿½ï¿½ï¿½ï¿½255ï¿½ï¿½Ê±ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½uidï¿½ï¿½ï¿½ï¿½ï¿½ï¿½uidï¿½ï¿½ï¿½äµ½clientÊ±Ê¹ï¿½ï¿½1ï¿½Ö½Ú±ï¿½ï¿½ï¿½ID
 };
 
 }

@@ -115,21 +115,21 @@ struct DBInterfaceInfo
 	}
 
 	int index;
-	bool isPure;											// ÊÇ·ñÎª´¿¾»¿â£¨Ã»ÓĞÒıÇæ´´½¨µÄÊµÌå±í£©
-	char name[MAX_BUF];										// Êı¾İ¿âµÄ½Ó¿ÚÃû³Æ
-	char db_type[MAX_BUF];									// Êı¾İ¿âµÄÀà±ğ
-	uint32 db_port;											// Êı¾İ¿âµÄ¶Ë¿Ú
-	char db_ip[MAX_BUF];									// Êı¾İ¿âµÄipµØÖ·
-	char db_username[MAX_NAME];								// Êı¾İ¿âµÄÓÃ»§Ãû
-	char db_password[MAX_BUF * 10];							// Êı¾İ¿âµÄÃÜÂë
-	bool db_passwordEncrypt;								// dbÃÜÂëÊÇ·ñÊÇ¼ÓÃÜµÄ
-	char db_name[MAX_NAME];									// Êı¾İ¿âÃû
-	uint16 db_numConnections;								// Êı¾İ¿â×î´óÁ¬½Ó
-	std::string db_unicodeString_characterSet;				// ÉèÖÃÊı¾İ¿â×Ö·û¼¯
+	bool isPure;											// ï¿½Ç·ï¿½Îªï¿½ï¿½ï¿½ï¿½ï¿½â£¨Ã»ï¿½ï¿½ï¿½ï¿½ï¿½æ´´ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½
+	char name[MAX_BUF];										// ï¿½ï¿½ï¿½İ¿ï¿½Ä½Ó¿ï¿½ï¿½ï¿½ï¿½ï¿½
+	char db_type[MAX_BUF];									// ï¿½ï¿½ï¿½İ¿ï¿½ï¿½ï¿½ï¿½ï¿½
+	uint32 db_port;											// ï¿½ï¿½ï¿½İ¿ï¿½Ä¶Ë¿ï¿½
+	char db_ip[MAX_BUF];									// ï¿½ï¿½ï¿½İ¿ï¿½ï¿½ipï¿½ï¿½Ö·
+	char db_username[MAX_NAME];								// ï¿½ï¿½ï¿½İ¿ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½
+	char db_password[MAX_BUF * 10];							// ï¿½ï¿½ï¿½İ¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	bool db_passwordEncrypt;								// dbï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½Ç¼ï¿½ï¿½Üµï¿½
+	char db_name[MAX_NAME];									// ï¿½ï¿½ï¿½İ¿ï¿½ï¿½ï¿½
+	uint16 db_numConnections;								// ï¿½ï¿½ï¿½İ¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	std::string db_unicodeString_characterSet;				// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½İ¿ï¿½ï¿½Ö·ï¿½ï¿½ï¿½
 	std::string db_unicodeString_collation;
 };
 
-// ÒıÇæ×é¼şĞÅÏ¢½á¹¹Ìå
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½á¹¹ï¿½ï¿½
 typedef struct EngineComponentInfo
 {
 	EngineComponentInfo()
@@ -152,99 +152,99 @@ typedef struct EngineComponentInfo
 	{
 	}
 
-	uint32 port;											// ×é¼şµÄÔËĞĞºó¼àÌıµÄ¶Ë¿Ú
-	char ip[MAX_BUF];										// ×é¼şµÄÔËĞĞÆÚipµØÖ·
+	uint32 port;											// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğºï¿½ï¿½ï¿½ï¿½ï¿½Ä¶Ë¿ï¿½
+	char ip[MAX_BUF];										// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ipï¿½ï¿½Ö·
 
-	std::vector< std::string > machine_addresses;			// ÅäÖÃÖĞ¸ø³öµÄËùÓĞµÄmachineµÄµØÖ·
+	std::vector< std::string > machine_addresses;			// ï¿½ï¿½ï¿½ï¿½ï¿½Ğ¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğµï¿½machineï¿½Äµï¿½Ö·
 	
-	char entryScriptFile[MAX_NAME];							// ×é¼şµÄÈë¿Ú½Å±¾ÎÄ¼ş
-	char dbAccountEntityScriptType[MAX_NAME];				// Êı¾İ¿âÕÊºÅ½Å±¾Àà±ğ
-	float defaultViewRadius;								// ÅäÖÃÔÚcellapp½ÚµãÖĞµÄplayerµÄview°ë¾¶´óĞ¡
-	float defaultViewHysteresisArea;						// ÅäÖÃÔÚcellapp½ÚµãÖĞµÄplayerµÄviewµÄÖÍºó·¶Î§
-	uint16 witness_timeout;									// ¹Û²ìÕßÄ¬ÈÏ³¬Ê±Ê±¼ä(Ãë)
-	const Network::Address* externalAddr;					// Íâ²¿µØÖ·
-	const Network::Address* internalAddr;					// ÄÚ²¿µØÖ·
+	char entryScriptFile[MAX_NAME];							// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú½Å±ï¿½ï¿½Ä¼ï¿½
+	char dbAccountEntityScriptType[MAX_NAME];				// ï¿½ï¿½ï¿½İ¿ï¿½ï¿½ÊºÅ½Å±ï¿½ï¿½ï¿½ï¿½
+	float defaultViewRadius;								// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½cellappï¿½Úµï¿½ï¿½Ğµï¿½playerï¿½ï¿½viewï¿½ë¾¶ï¿½ï¿½Ğ¡
+	float defaultViewHysteresisArea;						// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½cellappï¿½Úµï¿½ï¿½Ğµï¿½playerï¿½ï¿½viewï¿½ï¿½ï¿½Íºï¿½Î§
+	uint16 witness_timeout;									// ï¿½Û²ï¿½ï¿½ï¿½Ä¬ï¿½Ï³ï¿½Ê±Ê±ï¿½ï¿½(ï¿½ï¿½)
+	const Network::Address* externalAddr;					// ï¿½â²¿ï¿½ï¿½Ö·
+	const Network::Address* internalAddr;					// ï¿½Ú²ï¿½ï¿½ï¿½Ö·
 	COMPONENT_ID componentID;
 
-	float ghostDistance;									// ghostÇøÓò¾àÀë
-	uint16 ghostingMaxPerCheck;								// Ã¿Ãë¼ì²éghost´ÎÊı
-	uint16 ghostUpdateHertz;								// ghost¸üĞÂhz
+	float ghostDistance;									// ghostï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	uint16 ghostingMaxPerCheck;								// Ã¿ï¿½ï¿½ï¿½ï¿½ghostï¿½ï¿½ï¿½ï¿½
+	uint16 ghostUpdateHertz;								// ghostï¿½ï¿½ï¿½ï¿½hz
 	
-	bool use_coordinate_system;								// ÊÇ·ñÊ¹ÓÃ×ø±êÏµÍ³ Èç¹ûÎªfalse, view, trap, moveµÈ¹¦ÄÜ½«²»ÔÙÎ¬»¤
-	bool coordinateSystem_hasY;								// ·¶Î§¹ÜÀíÆ÷ÊÇ¹ÜÀíYÖá£¬ ×¢£ºÓĞyÖáÔòview¡¢trapµÈ¹¦ÄÜÓĞÁË¸ß¶È£¬ µ«yÖáµÄ¹ÜÀí»á´øÀ´Ò»¶¨µÄÏûºÄ
-	uint16 entity_posdir_additional_updates;				// ÊµÌåÎ»ÖÃÍ£Ö¹·¢Éú¸Ä±äºó£¬ÒıÇæ¼ÌĞøÏò¿Í»§¶Ë¸üĞÂtick´ÎµÄÎ»ÖÃĞÅÏ¢£¬Îª0Ôò×ÜÊÇ¸üĞÂ¡£
-	uint16 entity_posdir_updates_type;						// ÊµÌåÎ»ÖÃ¸üĞÂ·½Ê½£¬0£º·ÇÓÅ»¯¸ß¾«¶ÈÍ¬²½, 1:ÓÅ»¯Í¬²½, 2:ÖÇÄÜÑ¡ÔñÄ£Ê½
-	uint16 entity_posdir_updates_smart_threshold;			// ÊµÌåÎ»ÖÃ¸üĞÂÖÇÄÜÄ£Ê½ÏÂµÄÍ¬ÆÁÈËÊıãĞÖµ
+	bool use_coordinate_system;								// ï¿½Ç·ï¿½Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÏµÍ³ ï¿½ï¿½ï¿½Îªfalse, view, trap, moveï¿½È¹ï¿½ï¿½Ü½ï¿½ï¿½ï¿½ï¿½ï¿½Î¬ï¿½ï¿½
+	bool coordinateSystem_hasY;								// ï¿½ï¿½Î§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç¹ï¿½ï¿½ï¿½Yï¿½á£¬ ×¢ï¿½ï¿½ï¿½ï¿½yï¿½ï¿½ï¿½ï¿½viewï¿½ï¿½trapï¿½È¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë¸ß¶È£ï¿½ ï¿½ï¿½yï¿½ï¿½Ä¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	uint16 entity_posdir_additional_updates;				// Êµï¿½ï¿½Î»ï¿½ï¿½Í£Ö¹ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í»ï¿½ï¿½Ë¸ï¿½ï¿½ï¿½tickï¿½Îµï¿½Î»ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½Îª0ï¿½ï¿½ï¿½ï¿½ï¿½Ç¸ï¿½ï¿½Â¡ï¿½
+	uint16 entity_posdir_updates_type;						// Êµï¿½ï¿½Î»ï¿½Ã¸ï¿½ï¿½Â·ï¿½Ê½ï¿½ï¿½0ï¿½ï¿½ï¿½ï¿½ï¿½Å»ï¿½ï¿½ß¾ï¿½ï¿½ï¿½Í¬ï¿½ï¿½, 1:ï¿½Å»ï¿½Í¬ï¿½ï¿½, 2:ï¿½ï¿½ï¿½ï¿½Ñ¡ï¿½ï¿½Ä£Ê½
+	uint16 entity_posdir_updates_smart_threshold;			// Êµï¿½ï¿½Î»ï¿½Ã¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£Ê½ï¿½Âµï¿½Í¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµ
 
-	bool aliasEntityID;										// ÓÅ»¯EntityID£¬view·¶Î§ÄÚĞ¡ÓÚ255¸öEntityID, ´«Êäµ½clientÊ±Ê¹ÓÃ1×Ö½ÚÎ±ID 
-	bool entitydefAliasID;									// ÓÅ»¯entityÊôĞÔºÍ·½·¨¹ã²¥Ê±Õ¼ÓÃµÄ´ø¿í£¬entity¿Í»§¶ËÊôĞÔ»òÕß¿Í»§¶Ë²»³¬¹ı255¸öÊ±£¬ ·½·¨uidºÍÊôĞÔuid´«Êäµ½clientÊ±Ê¹ÓÃ1×Ö½Ú±ğÃûID
+	bool aliasEntityID;										// ï¿½Å»ï¿½EntityIDï¿½ï¿½viewï¿½ï¿½Î§ï¿½ï¿½Ğ¡ï¿½ï¿½255ï¿½ï¿½EntityID, ï¿½ï¿½ï¿½äµ½clientÊ±Ê¹ï¿½ï¿½1ï¿½Ö½ï¿½Î±ID 
+	bool entitydefAliasID;									// ï¿½Å»ï¿½entityï¿½ï¿½ï¿½ÔºÍ·ï¿½ï¿½ï¿½ï¿½ã²¥Ê±Õ¼ï¿½ÃµÄ´ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô»ï¿½ï¿½ß¿Í»ï¿½ï¿½Ë²ï¿½ï¿½ï¿½ï¿½ï¿½255ï¿½ï¿½Ê±ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½uidï¿½ï¿½ï¿½ï¿½ï¿½ï¿½uidï¿½ï¿½ï¿½äµ½clientÊ±Ê¹ï¿½ï¿½1ï¿½Ö½Ú±ï¿½ï¿½ï¿½ID
 
-	char internalInterface[MAX_NAME];						// ÄÚ²¿Íø¿¨½Ó¿ÚÃû³Æ
-	char externalInterface[MAX_NAME];						// Íâ²¿Íø¿¨½Ó¿ÚÃû³Æ
-	char externalAddress[MAX_NAME];							// Íâ²¿IPµØÖ·
-	int32 externalPorts_min;								// ¶ÔÍâsocket¶Ë¿ÚÊ¹ÓÃÖ¸¶¨·¶Î§
+	char internalInterface[MAX_NAME];						// ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½ï¿½ï¿½ï¿½ï¿½
+	char externalInterface[MAX_NAME];						// ï¿½â²¿ï¿½ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½ï¿½ï¿½ï¿½ï¿½
+	char externalAddress[MAX_NAME];							// ï¿½â²¿IPï¿½ï¿½Ö·
+	int32 externalPorts_min;								// ï¿½ï¿½ï¿½ï¿½socketï¿½Ë¿ï¿½Ê¹ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½Î§
 	int32 externalPorts_max;
 
-	std::vector<DBInterfaceInfo> dbInterfaceInfos;			// Êı¾İ¿â½Ó¿Ú
-	bool notFoundAccountAutoCreate;							// µÇÂ¼ºÏ·¨Ê±ÓÎÏ·Êı¾İ¿âÕÒ²»µ½ÓÎÏ·ÕËºÅÔò×Ô¶¯´´½¨
-	bool allowEmptyDigest;									// ÊÇ·ñ¼ì²édefs-MD5
-	bool account_registration_enable;						// ÊÇ·ñ¿ª·Å×¢²á
-	bool account_reset_password_enable;						// ÊÇ·ñ¿ª·ÅÖØÉèÃÜÂë¹¦ÄÜ
-	bool isShareDB;											// ÊÇ·ñ¹²ÏíÊı¾İ¿â
+	std::vector<DBInterfaceInfo> dbInterfaceInfos;			// ï¿½ï¿½ï¿½İ¿ï¿½Ó¿ï¿½
+	bool notFoundAccountAutoCreate;							// ï¿½ï¿½Â¼ï¿½Ï·ï¿½Ê±ï¿½ï¿½Ï·ï¿½ï¿½ï¿½İ¿ï¿½ï¿½Ò²ï¿½ï¿½ï¿½ï¿½ï¿½Ï·ï¿½Ëºï¿½ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½
+	bool allowEmptyDigest;									// ï¿½Ç·ï¿½ï¿½ï¿½defs-MD5
+	bool account_registration_enable;						// ï¿½Ç·ñ¿ª·ï¿½×¢ï¿½ï¿½
+	bool account_reset_password_enable;						// ï¿½Ç·ñ¿ª·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ë¹¦ï¿½ï¿½
+	bool isShareDB;											// ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½İ¿ï¿½
 
-	float archivePeriod;									// entity´æ´¢Êı¾İ¿âÖÜÆÚ
-	float backupPeriod;										// entity±¸·İÖÜÆÚ
-	bool backUpUndefinedProperties;							// entityÊÇ·ñ±¸·İÎ´¶¨ÒåÊôĞÔ
-	uint16 entityRestoreSize;								// entity restoreÃ¿tickÊıÁ¿ 
+	float archivePeriod;									// entityï¿½æ´¢ï¿½ï¿½ï¿½İ¿ï¿½ï¿½ï¿½ï¿½ï¿½
+	float backupPeriod;										// entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	bool backUpUndefinedProperties;							// entityï¿½Ç·ñ±¸·ï¿½Î´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	uint16 entityRestoreSize;								// entity restoreÃ¿tickï¿½ï¿½ï¿½ï¿½ 
 
-	float loadSmoothingBias;								// baseapp¸ºÔØÂËÆ½ºâµ÷ÕûÖµ£¬ 
-	uint32 login_port;										// ·şÎñÆ÷µÇÂ¼¶Ë¿Ú Ä¿Ç°botsÔÚÓÃ
-	uint32 login_port_min;									// ·şÎñÆ÷µÇÂ¼¶Ë¿ÚÊ¹ÓÃÖ¸¶¨·¶Î§ Ä¿Ç°botsÔÚÓÃ
+	float loadSmoothingBias;								// baseappï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ½ï¿½ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½ 
+	uint32 login_port;										// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ï¿½Ë¿ï¿½ Ä¿Ç°botsï¿½ï¿½ï¿½ï¿½
+	uint32 login_port_min;									// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ï¿½Ë¿ï¿½Ê¹ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½Î§ Ä¿Ç°botsï¿½ï¿½ï¿½ï¿½
 	uint32 login_port_max;
-	char login_ip[MAX_BUF];									// ·şÎñÆ÷µÇÂ¼ipµØÖ·
+	char login_ip[MAX_BUF];									// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ipï¿½ï¿½Ö·
 
-	ENTITY_ID ids_criticallyLowSize;						// idÊ£ÓàÕâÃ´¶à¸öÊ±ÏòdbmgrÉêÇëĞÂµÄid×ÊÔ´
-	ENTITY_ID ids_increasing_range;							// ÉêÇëIDÊ±idÃ¿´ÎµİÔö·¶Î§
+	ENTITY_ID ids_criticallyLowSize;						// idÊ£ï¿½ï¿½ï¿½ï¿½Ã´ï¿½ï¿½ï¿½Ê±ï¿½ï¿½dbmgrï¿½ï¿½ï¿½ï¿½ï¿½Âµï¿½idï¿½ï¿½Ô´
+	ENTITY_ID ids_increasing_range;							// ï¿½ï¿½ï¿½ï¿½IDÊ±idÃ¿ï¿½Îµï¿½ï¿½ï¿½ï¿½ï¿½Î§
 
-	uint32 downloadBitsPerSecondTotal;						// ËùÓĞ¿Í»§¶ËÃ¿ÃëÏÂÔØ´ø¿í×ÜÉÏÏŞ
-	uint32 downloadBitsPerSecondPerClient;					// Ã¿¸ö¿Í»§¶ËÃ¿ÃëµÄÏÂÔØ´ø¿í
+	uint32 downloadBitsPerSecondTotal;						// ï¿½ï¿½ï¿½Ğ¿Í»ï¿½ï¿½ï¿½Ã¿ï¿½ï¿½ï¿½ï¿½ï¿½Ø´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	uint32 downloadBitsPerSecondPerClient;					// Ã¿ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½Ã¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø´ï¿½ï¿½ï¿½
 
 	Profiles_Config profiles;
 
-	uint32 defaultAddBots_totalCount;						// Ä¬ÈÏÆô¶¯½ø³Ìºó×Ô¶¯Ìí¼ÓÕâÃ´¶à¸öbots Ìí¼Ó×ÜÊıÁ¿
-	float defaultAddBots_tickTime;							// Ä¬ÈÏÆô¶¯½ø³Ìºó×Ô¶¯Ìí¼ÓÕâÃ´¶à¸öbots Ã¿´ÎÌí¼ÓËùÓÃÊ±¼ä(s)
-	uint32 defaultAddBots_tickCount;						// Ä¬ÈÏÆô¶¯½ø³Ìºó×Ô¶¯Ìí¼ÓÕâÃ´¶à¸öbots Ã¿´ÎÌí¼ÓÊıÁ¿
+	uint32 defaultAddBots_totalCount;						// Ä¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ìºï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã´ï¿½ï¿½ï¿½bots ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	float defaultAddBots_tickTime;							// Ä¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ìºï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã´ï¿½ï¿½ï¿½bots Ã¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½(s)
+	uint32 defaultAddBots_tickCount;						// Ä¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ìºï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã´ï¿½ï¿½ï¿½bots Ã¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-	bool forceInternalLogin;								// ¶ÔÓ¦baseappµÄexternalAddressµÄ½â¾ö·½°¸£¬µ±externalAddressÇ¿ÖÆÏÂ·¢¹«ÍøIPÌá¹©µÇÂ½Ê±£¬
-															// Èç¹û¾ÖÓòÍøÄÚ²¿Ê¹ÓÃ»úÆ÷ÈË²âÊÔÒ²×ß¹«ÍøIPºÍÁ÷Á¿¿ÉÄÜ»á²»ºÏÊÊ£¬´ËÊ±¿ÉÒÔÉèÖÃÎªtrue£¬µÇÂ½Ê±Ç¿ÖÆÖ±½ÓÊ¹ÓÃÄÚÍø»·¾³
+	bool forceInternalLogin;								// ï¿½ï¿½Ó¦baseappï¿½ï¿½externalAddressï¿½Ä½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½externalAddressÇ¿ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½ï¿½ï¿½IPï¿½á¹©ï¿½ï¿½Â½Ê±ï¿½ï¿½
+															// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú²ï¿½Ê¹ï¿½Ã»ï¿½ï¿½ï¿½ï¿½Ë²ï¿½ï¿½ï¿½Ò²ï¿½ß¹ï¿½ï¿½ï¿½IPï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü»á²»ï¿½ï¿½ï¿½Ê£ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªtrueï¿½ï¿½ï¿½ï¿½Â½Ê±Ç¿ï¿½ï¿½Ö±ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-	std::string bots_account_name_prefix;					// »úÆ÷ÈËÕËºÅÃû³ÆµÄÇ°×º
-	uint32 bots_account_name_suffix_inc;					// »úÆ÷ÈËÕËºÅÃû³ÆµÄºó×ºµİÔö, 0Ê¹ÓÃËæ»úÊıµİÔö£¬ ·ñÔò°´ÕÕbaseNumÌîĞ´µÄÊıµİÔö
-	std::string bots_account_passwd;						// »úÆ÷ÈËÕËºÅµÄÃÜÂë
+	std::string bots_account_name_prefix;					// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ëºï¿½ï¿½ï¿½ï¿½Æµï¿½Ç°×º
+	uint32 bots_account_name_suffix_inc;					// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ëºï¿½ï¿½ï¿½ï¿½ÆµÄºï¿½×ºï¿½ï¿½ï¿½ï¿½, 0Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½baseNumï¿½ï¿½Ğ´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	std::string bots_account_passwd;						// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ËºÅµï¿½ï¿½ï¿½ï¿½ï¿½
 
-	uint32 tcp_SOMAXCONN;									// listen¼àÌı¶ÓÁĞ×î´óÖµ
+	uint32 tcp_SOMAXCONN;									// listenï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµ
 
-	int8 encrypt_login;										// ¼ÓÃÜµÇÂ¼ĞÅÏ¢
+	int8 encrypt_login;										// ï¿½ï¿½ï¿½Üµï¿½Â¼ï¿½ï¿½Ï¢
 
 	uint32 telnet_port;
 	std::string telnet_passwd;
 	std::string telnet_deflayer;
 
-	uint32 perSecsDestroyEntitySize;						// Ã¿ÃëÏú»ÙentityÊıÁ¿
+	uint32 perSecsDestroyEntitySize;						// Ã¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½
 
 	uint64 respool_timeout;
 	uint32 respool_buffersize;
 
-	uint8 account_type;										// 1: ÆÕÍ¨ÕËºÅ, 2: emailÕËºÅ(ĞèÒª¼¤»î), 3: ÖÇÄÜÕËºÅ(×Ô¶¯Ê¶±ğemail£¬ ÆÕÍ¨ºÅÂëµÈ) 
-	uint32 accountDefaultFlags;								// ĞÂÕËºÅÄ¬ÈÏ±ê¼Ç(ACCOUNT_FLAGS¿Éµş¼Ó£¬ ÌîĞ´Ê±°´Ê®½øÖÆ¸ñÊ½) 
-	uint64 accountDefaultDeadline;							// ĞÂÕËºÅÄ¬ÈÏ¹ıÆÚÊ±¼ä(Ãë, ÒıÇæ»á¼ÓÉÏµ±Ç°Ê±¼ä)
+	uint8 account_type;										// 1: ï¿½ï¿½Í¨ï¿½Ëºï¿½, 2: emailï¿½Ëºï¿½(ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½), 3: ï¿½ï¿½ï¿½ï¿½ï¿½Ëºï¿½(ï¿½Ô¶ï¿½Ê¶ï¿½ï¿½emailï¿½ï¿½ ï¿½ï¿½Í¨ï¿½ï¿½ï¿½ï¿½ï¿½) 
+	uint32 accountDefaultFlags;								// ï¿½ï¿½ï¿½Ëºï¿½Ä¬ï¿½Ï±ï¿½ï¿½(ACCOUNT_FLAGSï¿½Éµï¿½ï¿½Ó£ï¿½ ï¿½ï¿½Ğ´Ê±ï¿½ï¿½Ê®ï¿½ï¿½ï¿½Æ¸ï¿½Ê½) 
+	uint64 accountDefaultDeadline;							// ï¿½ï¿½ï¿½Ëºï¿½Ä¬ï¿½Ï¹ï¿½ï¿½ï¿½Ê±ï¿½ï¿½(ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½Ç°Ê±ï¿½ï¿½)
 	
 	std::string http_cbhost;
-	uint16 http_cbport;										// ÓÃ»§http»Øµ÷½Ó¿Ú£¬´¦ÀíÈÏÖ¤¡¢ÃÜÂëÖØÖÃµÈ
+	uint16 http_cbport;										// ï¿½Ã»ï¿½httpï¿½Øµï¿½ï¿½Ó¿Ú£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¤ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ãµï¿½
 
-	bool debugDBMgr;										// debugÄ£Ê½ÏÂ¿ÉÊä³ö¶ÁĞ´²Ù×÷ĞÅÏ¢
+	bool debugDBMgr;										// debugÄ£Ê½ï¿½Â¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğ´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 
-	bool isOnInitCallPropertysSetMethods;					// »úÆ÷ÈË(bots)×¨ÓÃ£ºÔÚEntity³õÊ¼»¯Ê±ÊÇ·ñ´¥·¢ÊôĞÔµÄset_*ÊÂ¼ş
+	bool isOnInitCallPropertysSetMethods;					// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½(bots)×¨ï¿½Ã£ï¿½ï¿½ï¿½Entityï¿½ï¿½Ê¼ï¿½ï¿½Ê±ï¿½Ç·ñ´¥·ï¿½ï¿½ï¿½ï¿½Ôµï¿½set_*ï¿½Â¼ï¿½
 } ENGINE_COMPONENT_INFO;
 
 class ServerConfig : public Singleton<ServerConfig>
@@ -320,7 +320,7 @@ public:
 
 	ChannelCommon channelCommon_;
 
-	// Ã¿¸ö¿Í»§¶ËÃ¿ÃëÕ¼ÓÃµÄ×î´ó´ø¿í
+	// Ã¿ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½Ã¿ï¿½ï¿½Õ¼ï¿½Ãµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	uint32 bitsPerSecondToClient_;		
 
 	std::string interfacesAddress_;
@@ -332,8 +332,8 @@ public:
 	float shutdown_time_;
 	float shutdown_waitTickTime_;
 
-	float callback_timeout_;										// callbackÄ¬ÈÏ³¬Ê±Ê±¼ä(Ãë)
-	float thread_timeout_;											// Ä¬ÈÏ³¬Ê±Ê±¼ä(Ãë)
+	float callback_timeout_;										// callbackÄ¬ï¿½Ï³ï¿½Ê±Ê±ï¿½ï¿½(ï¿½ï¿½)
+	float thread_timeout_;											// Ä¬ï¿½Ï³ï¿½Ê±Ê±ï¿½ï¿½(ï¿½ï¿½)
 
 	uint32 thread_init_create_, thread_pre_create_, thread_max_create_;
 	

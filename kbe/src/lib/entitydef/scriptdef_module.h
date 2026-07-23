@@ -41,7 +41,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	ÃèÊöÒ»¸ö½Å±¾defÄ£¿é
+	ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Å±ï¿½defÄ£ï¿½ï¿½
 */
 class ScriptDefModule : public RefCountable
 {
@@ -152,37 +152,37 @@ public:
 	INLINE bool useMethodDescrAlias() const;
 	
 protected:
-	// ½Å±¾Àà±ð
+	// ï¿½Å±ï¿½ï¿½ï¿½ï¿½
 	PyTypeObject*						scriptType_;
 
-	// Êý×ÖÀà±ð  Ö÷ÒªÓÃÓÚ·½±ã²éÕÒºÍÍøÂç¼ä´«ÊäÊ¶±ðÕâ¸ö½Å±¾Ä£¿é
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½  ï¿½ï¿½Òªï¿½ï¿½ï¿½Ú·ï¿½ï¿½ï¿½ï¿½ï¿½Òºï¿½ï¿½ï¿½ï¿½ï¿½ä´«ï¿½ï¿½Ê¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Å±ï¿½Ä£ï¿½ï¿½
 	ENTITY_SCRIPT_UID					uType_;
 	
-	// Õâ¸ö½Å±¾ËùÓÐµÄ´æ´¢µ½dbµÄÊôÐÔ
+	// ï¿½ï¿½ï¿½ï¿½Å±ï¿½ï¿½ï¿½ï¿½ÐµÄ´æ´¢ï¿½ï¿½dbï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	PROPERTYDESCRIPTION_MAP				persistentPropertyDescr_;
 
-	// Õâ¸ö½Å±¾cell²¿·ÖËùÓµÓÐµÄËùÓÐÊôÐÔÃèÊö
+	// ï¿½ï¿½ï¿½ï¿½Å±ï¿½cellï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Óµï¿½Ðµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	PROPERTYDESCRIPTION_MAP				cellPropertyDescr_;
 
-	// cell½üÖÐÔ¶¼¶±ðÊôÐÔÃèÊö
+	// cellï¿½ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	PROPERTYDESCRIPTION_MAP				cellDetailLevelPropertyDescrs_[3];
 
-	// Õâ¸ö½Å±¾base²¿·ÖËùÓµÓÐµÄÊôÐÔÃèÊö
+	// ï¿½ï¿½ï¿½ï¿½Å±ï¿½baseï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Óµï¿½Ðµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	PROPERTYDESCRIPTION_MAP				basePropertyDescr_;
 
-	// Õâ¸ö½Å±¾client²¿·ÖËùÓµÓÐµÄÊôÐÔÃèÊö
+	// ï¿½ï¿½ï¿½ï¿½Å±ï¿½clientï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Óµï¿½Ðµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	PROPERTYDESCRIPTION_MAP				clientPropertyDescr_;
 	
-	// Õâ¸ö½Å±¾ËùÓµÓÐµÄÊôÐÔÃèÊöuidÓ³Éä
+	// ï¿½ï¿½ï¿½ï¿½Å±ï¿½ï¿½ï¿½Óµï¿½Ðµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½uidÓ³ï¿½ï¿½
 	PROPERTYDESCRIPTION_UIDMAP			persistentPropertyDescr_uidmap_;
 	PROPERTYDESCRIPTION_UIDMAP			cellPropertyDescr_uidmap_;
 	PROPERTYDESCRIPTION_UIDMAP			basePropertyDescr_uidmap_;
 	PROPERTYDESCRIPTION_UIDMAP			clientPropertyDescr_uidmap_;
 	
-	// Õâ¸ö½Å±¾ËùÓµÓÐµÄÊôÐÔÃèÊöaliasIDÓ³Éä
+	// ï¿½ï¿½ï¿½ï¿½Å±ï¿½ï¿½ï¿½Óµï¿½Ðµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½aliasIDÓ³ï¿½ï¿½
 	PROPERTYDESCRIPTION_ALIASMAP		propertyDescr_aliasmap_;
 
-	// Õâ¸ö½Å±¾ËùÓµÓÐµÄ·½·¨ÃèÊö
+	// ï¿½ï¿½ï¿½ï¿½Å±ï¿½ï¿½ï¿½Óµï¿½ÐµÄ·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	METHODDESCRIPTION_MAP				methodCellDescr_;
 	METHODDESCRIPTION_MAP				methodBaseDescr_;
 	METHODDESCRIPTION_MAP				methodClientDescr_;
@@ -190,23 +190,23 @@ protected:
 	METHODDESCRIPTION_MAP				methodBaseExposedDescr_;
 	METHODDESCRIPTION_MAP				methodCellExposedDescr_;
 
-	// Õâ¸ö½Å±¾ËùÓµÓÐµÄ·½·¨ÃèÊöuidÓ³Éä
+	// ï¿½ï¿½ï¿½ï¿½Å±ï¿½ï¿½ï¿½Óµï¿½ÐµÄ·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½uidÓ³ï¿½ï¿½
 	METHODDESCRIPTION_UIDMAP			methodCellDescr_uidmap_;
 	METHODDESCRIPTION_UIDMAP			methodBaseDescr_uidmap_;
 	METHODDESCRIPTION_UIDMAP			methodClientDescr_uidmap_;
 			
 	METHODDESCRIPTION_ALIASMAP			methodDescr_aliasmap_;
 
-	// ÊÇ·ñÓÐcell²¿·ÖµÈ
+	// ï¿½Ç·ï¿½ï¿½ï¿½cellï¿½ï¿½ï¿½Öµï¿½
 	bool								hasCell_;
 	bool								hasBase_;
 	bool								hasClient_;
 	
-	// entityµÄÏêÇé¼¶±ðÊý¾Ý
+	// entityï¿½ï¿½ï¿½ï¿½ï¿½é¼¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	DetailLevel							detailLevel_;
 	VolatileInfo*						pVolatileinfo_;
 
-	// Õâ¸öÄ£¿éµÄÃû³Æ
+	// ï¿½ï¿½ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	std::string							name_;
 
 	bool								usePropertyDescrAlias_;

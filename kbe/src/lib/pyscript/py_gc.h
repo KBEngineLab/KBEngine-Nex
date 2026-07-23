@@ -36,48 +36,48 @@ public:
 	static uint32 DEBUG_LEAK;
 	
 	/** 
-		³õÊ¼»¯pickler 
+		ï¿½ï¿½Ê¼ï¿½ï¿½pickler 
 	*/
 	static bool initialize(void);
 	static void finalise(void);
 	
 	/** 
-		Ç¿ÖÆ»ØÊÕÀ¬»ø
+		Ç¿ï¿½Æ»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	static void collect(int8 generations = -1);
 
 	/** 
-		ÉèÖÃµ÷ÊÔ±êÖ¾
+		ï¿½ï¿½ï¿½Ãµï¿½ï¿½Ô±ï¿½Ö¾
 	*/
 	static void set_debug(uint32 flags);
 	
 	/**
-		Ôö¼Ó¼ÆÊý
+		ï¿½ï¿½ï¿½Ó¼ï¿½ï¿½ï¿½
 	*/
 	static void incTracing(std::string name);
 
 	/**
-		¼õÉÙ¼ÆÊý
+		ï¿½ï¿½ï¿½Ù¼ï¿½ï¿½ï¿½
 	*/
 	static void decTracing(std::string name);
 
 	/**
-		debug×·×Ùkbe·â×°µÄpy¶ÔÏó¼ÆÊý
+		debug×·ï¿½ï¿½kbeï¿½ï¿½×°ï¿½ï¿½pyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	static void debugTracing(bool shuttingdown = true);
 
 	/**
-		½Å±¾µ÷ÓÃ
+		ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	static PyObject* __py_debugTracing(PyObject* self, PyObject* args);
 
 private:
-	static PyObject* collectMethod_;							// cPicket.dumps·½·¨Ö¸Õë
-	static PyObject* set_debugMethod_;							// cPicket.loads·½·¨Ö¸Õë
+	static PyObject* collectMethod_;							// cPicket.dumpsï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½
+	static PyObject* set_debugMethod_;							// cPicket.loadsï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½
 
-	static bool	isInit;											// ÊÇ·ñÒÑ¾­±»³õÊ¼»¯
+	static bool	isInit;											// ï¿½Ç·ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½
 
-	static KBEUnordered_map<std::string, int> tracingCountMap_;	// ×·×ÙÌØ¶¨µÄ¶ÔÏó¼ÆÊýÆ÷
+	static KBEUnordered_map<std::string, int> tracingCountMap_;	// ×·ï¿½ï¿½ï¿½Ø¶ï¿½ï¿½Ä¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 } ;
 
 }

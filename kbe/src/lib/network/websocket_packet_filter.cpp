@@ -141,7 +141,7 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 
 				reset();
 
-				// Èç¹ûÃ»ÓĞ´´½¨¹ı»º´æ£¬ÏÈ³¢ÊÔÖ±½Ó½âÎö°üÍ·£¬Èç¹ûĞÅÏ¢×ã¹»³É¹¦½âÎöÔò¼ÌĞøµ½ÏÂÒ»²½
+				// ï¿½ï¿½ï¿½Ã»ï¿½Ğ´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½æ£¬ï¿½È³ï¿½ï¿½ï¿½Ö±ï¿½Ó½ï¿½ï¿½ï¿½ï¿½ï¿½Í·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ã¹»ï¿½É¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½
 				pFragmentDatasRemain_ = websocket::WebSocketProtocol::getFrame(pPacket, msg_opcode_, msg_fin_, msg_masked_, 
 					msg_mask_, msg_length_field_, msg_payload_length_, msg_frameType_);
 
@@ -162,8 +162,8 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 			{
 				KBE_ASSERT(pTCPPacket_ != NULL);
 
-				// ³¤¶ÈÈç¹û´óÓÚÊ£Óà¶ÁÈ¡³¤¶È£¬ÄÇÃ´¿ÉÒÔ¿ªÊ¼½âÎöÁË
-				// ·ñÔò½«°üÄÚ´æ¼ÌĞø»º´æ
+				// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê£ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½È£ï¿½ï¿½ï¿½Ã´ï¿½ï¿½ï¿½Ô¿ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+				// ï¿½ï¿½ï¿½ò½«°ï¿½ï¿½Ú´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 				if((int32)pPacket->length() >= pFragmentDatasRemain_)
 				{
 					size_t wpos = pPacket->wpos();
@@ -171,36 +171,36 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 
 					pPacket->wpos(rpos + pFragmentDatasRemain_);
 
-					// Ê×ÏÈ½«ĞèÒªµÄÊı¾İÌí¼Óµ½pTCPPacket_
+					// ï¿½ï¿½ï¿½È½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Óµï¿½pTCPPacket_
 					pTCPPacket_->append(*(static_cast<MemoryStream*>(pPacket)));
 					
-					// ½«Ğ´Î»ÖÃ»¹Ô­»ØÈ¥
+					// ï¿½ï¿½Ğ´Î»ï¿½Ã»ï¿½Ô­ï¿½ï¿½È¥
 					pPacket->wpos(wpos);
 					
-					// ¶ªÆúÒÑ¾­¶ÁÈ¡µÄÊı¾İ
+					// ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 					pPacket->read_skip(pFragmentDatasRemain_);
 					
 					size_t buffer_rpos = pTCPPacket_->rpos();
 					pFragmentDatasRemain_ = websocket::WebSocketProtocol::getFrame(pTCPPacket_, msg_opcode_, msg_fin_, msg_masked_, 
 						msg_mask_, msg_length_field_, msg_payload_length_, msg_frameType_);
 
-					// Èç¹ûÈÔÈ»´óÓÚ0£¬ ËµÃ÷ĞèÒª¼ÌĞøÊÕ°ü
+					// ï¿½ï¿½ï¿½ï¿½ï¿½È»ï¿½ï¿½ï¿½ï¿½0ï¿½ï¿½ Ëµï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½Õ°ï¿½
 					if(pFragmentDatasRemain_ > 0)
 					{
-						// ÓÉÓÚÒ»´ÎÃ»ÓĞ½âÎöÍê£¬ ÎÒÃÇ»Ø³·Êı¾İÏÂÒ»´ÎÔÙ³¢ÊÔ½âÎö
+						// ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½Ã»ï¿½Ğ½ï¿½ï¿½ï¿½ï¿½ê£¬ ï¿½ï¿½ï¿½Ç»Ø³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ù³ï¿½ï¿½Ô½ï¿½ï¿½ï¿½
 						pTCPPacket_->rpos(buffer_rpos);
 
-						// µ±Ç°°üÈç¹û»¹ÓĞÊı¾İ²¢ÇÒ´óÓÚµÈÓÚÎÒÃÇĞèÒªµÄÊı¾İ£¬Ôò¼ÌĞøÏÂÒ»Ñ­»·Á¢¼´½âÎö
+						// ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½İ²ï¿½ï¿½Ò´ï¿½ï¿½Úµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½İ£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»Ñ­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 						if ((int32)pPacket->length() >= pFragmentDatasRemain_)
 							continue;
 					}
 					else
 					{
-						// frame½âÎöÍê±Ï£¬½«¶ÔÏó»ØÊÕ
+						// frameï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 						TCPPacket::reclaimPoolObject(pTCPPacket_);
 						pTCPPacket_ = NULL;
 
-						// ÊÇ·ñÓĞÊı¾İĞ¯´ø£¿Èç¹ûÃ»ÓĞÔò²»½øÈëdata½âÎö
+						// ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğ¯ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ò²»½ï¿½ï¿½ï¿½dataï¿½ï¿½ï¿½ï¿½
 						if(msg_payload_length_ > 0)
 						{
 							fragmentDatasFlag_ = FRAGMENT_MESSAGE_DATAS;
@@ -251,7 +251,7 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 			}
 			else if(msg_frameType_ == websocket::WebSocketProtocol::INCOMPLETE_FRAME)
 			{
-				// ¼ÌĞøµÈ´ıºóĞøÄÚÈİµ½´ï
+				// ï¿½ï¿½ï¿½ï¿½ï¿½È´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½İµï¿½ï¿½ï¿½
 			}
 			else if (msg_frameType_ == websocket::WebSocketProtocol::PING_FRAME)
 			{
@@ -304,7 +304,7 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 
 			if (msg_frameType_ == websocket::WebSocketProtocol::PING_FRAME)
 			{
-				// ¼ÌĞøµÈÊ£ÓàµÄÄÚÈİµ½À´ÎªÖ¹
+				// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½İµï¿½ï¿½ï¿½ÎªÖ¹
 				if (pFragmentDatasRemain_ > 0)
 					continue;
 
@@ -339,7 +339,7 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 				reason = PacketFilter::recv(pChannel, receiver, pTCPPacket_);
 				KBE_ASSERT(reason == REASON_SUCCESS);
 
-				// pTCPPacket_²»ĞèÒªÔÚÕâÀï»ØÊÕÁË
+				// pTCPPacket_ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 				pTCPPacket_ = NULL;
 			}
 

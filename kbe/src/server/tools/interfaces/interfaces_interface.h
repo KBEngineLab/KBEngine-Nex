@@ -43,14 +43,14 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	InterfacesÏûÏ¢ºê£¬  ²ÎÊýÎªÁ÷£¬ ÐèÒª×Ô¼º½â¿ª
+	Interfacesï¿½ï¿½Ï¢ï¿½ê£¬  ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Òªï¿½Ô¼ï¿½ï¿½â¿ª
 */
 
 /**
-	InterfacesËùÓÐÏûÏ¢½Ó¿ÚÔÚ´Ë¶¨Òå
+	Interfacesï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½Ó¿ï¿½ï¿½Ú´Ë¶ï¿½ï¿½ï¿½
 */
 NETWORK_INTERFACE_DECLARE_BEGIN(InterfacesInterface)
-	// Ä³app×¢²á×Ô¼ºµÄ½Ó¿ÚµØÖ·µ½±¾app
+	// Ä³app×¢ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ä½Ó¿Úµï¿½Ö·ï¿½ï¿½ï¿½ï¿½app
 	INTERFACES_MESSAGE_DECLARE_ARGS11(onRegisterNewApp,						NETWORK_VARIABLE_MESSAGE,
 									int32,									uid, 
 									std::string,							username,
@@ -64,40 +64,40 @@ NETWORK_INTERFACE_DECLARE_BEGIN(InterfacesInterface)
 									uint16,									extport,
 									std::string,							extaddrEx)
 
-	// ÇëÇó´´½¨ÕËºÅ¡£
+	// ï¿½ï¿½ï¿½ó´´½ï¿½ï¿½ËºÅ¡ï¿½
 	INTERFACES_MESSAGE_DECLARE_STREAM(reqCreateAccount,						NETWORK_VARIABLE_MESSAGE)
 
-	// µÇÂ½ÕËºÅ¡£
+	// ï¿½ï¿½Â½ï¿½ËºÅ¡ï¿½
 	INTERFACES_MESSAGE_DECLARE_STREAM(onAccountLogin,						NETWORK_VARIABLE_MESSAGE)
 
-	// ³äÖµÇëÇó
+	// ï¿½ï¿½Öµï¿½ï¿½ï¿½ï¿½
 	INTERFACES_MESSAGE_DECLARE_STREAM(charge,								NETWORK_VARIABLE_MESSAGE)
 
-	// Ä³appÖ÷¶¯ÇëÇólook¡£
+	// Ä³appï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½lookï¿½ï¿½
 	INTERFACES_MESSAGE_DECLARE_ARGS0(lookApp,								NETWORK_FIXED_MESSAGE)
 
-	// Ä³¸öappÏò±¾app¸æÖª´¦ÓÚ»î¶¯×´Ì¬¡£
+	// Ä³ï¿½ï¿½appï¿½ï¿½appï¿½ï¿½Öªï¿½ï¿½ï¿½Ú»î¶¯×´Ì¬ï¿½ï¿½
 	INTERFACES_MESSAGE_DECLARE_ARGS2(onAppActiveTick,						NETWORK_FIXED_MESSAGE,
 										COMPONENT_TYPE,						componentType, 
 										COMPONENT_ID,						componentID)
 
-	// ÇëÇó¹Ø±Õ·þÎñÆ÷
+	// ï¿½ï¿½ï¿½ï¿½Ø±Õ·ï¿½ï¿½ï¿½ï¿½ï¿½
 	INTERFACES_MESSAGE_DECLARE_STREAM(reqCloseServer,						NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇó²éÑ¯watcherÊý¾Ý
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¯watcherï¿½ï¿½ï¿½ï¿½
 	INTERFACES_MESSAGE_DECLARE_STREAM(queryWatcher,							NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇó²Á³ý¿Í»§¶ËÇëÇóÈÎÎñ¡£
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	INTERFACES_MESSAGE_DECLARE_ARGS1(eraseClientReq,						NETWORK_VARIABLE_MESSAGE,
 										std::string,						logkey)
 
-	// ¿ªÊ¼profile
+	// ï¿½ï¿½Ê¼profile
 	INTERFACES_MESSAGE_DECLARE_STREAM(startProfile,							NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇóÇ¿ÖÆÉ±ËÀµ±Ç°app
+	// ï¿½ï¿½ï¿½ï¿½Ç¿ï¿½ï¿½É±ï¿½ï¿½ï¿½ï¿½Ç°app
 	INTERFACES_MESSAGE_DECLARE_STREAM(reqKillServer,						NETWORK_VARIABLE_MESSAGE)
 
-	// executeRawDatabaseCommand´ÓdbmgrµÄ»Øµ÷
+	// executeRawDatabaseCommandï¿½ï¿½dbmgrï¿½Ä»Øµï¿½
 	INTERFACES_MESSAGE_DECLARE_STREAM(onExecuteRawDatabaseCommandCB,		NETWORK_VARIABLE_MESSAGE)
 
 NETWORK_INTERFACE_DECLARE_END()

@@ -62,7 +62,7 @@ bool Controllers::add(KBEShared_ptr<Controller> pController)
 	}
 	else
 	{
-		// Ë¢ÐÂid¼ÆÊýÆ÷
+		// Ë¢ï¿½ï¿½idï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		if(lastid_ < id)
 			lastid_ = id;
 	}
@@ -92,7 +92,7 @@ bool Controllers::remove(uint32 id)
 	if (iter == objects_.end())
 		return true;
 
-	// ×ö¸öÒýÓÃ£¬·ÀÖ¹ÔÚControllerÎö¹¹ÖÐµ¼ÖÂÄ³Ð©Çé¿öÏÂÔÚeraseÎ´½áÊøµÄÇé¿öÏÂÓÖ½øÈëÕâÀïÖ´ÐÐerase¶ø²úÉúÎÊÌâ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½ï¿½ï¿½Ö¹ï¿½ï¿½Controllerï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½Ä³Ð©ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½eraseÎ´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö´ï¿½ï¿½eraseï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	KBEShared_ptr< Controller > pController = iter->second;
 	objects_.erase(iter);
 	return pController != NULL;

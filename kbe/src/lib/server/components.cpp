@@ -163,7 +163,7 @@ bool Components::checkComponents(int32 uid, COMPONENT_ID componentID, uint32 pid
 		ComponentInfos* cinfos = findComponent(ct, uid, componentID);
 		if(cinfos != NULL)
 		{
-			if(cinfos->componentType != MACHINE_TYPE && cinfos->pid != 0 /* µÈÓÚ0Í¨³£ÊÇÔ¤Éè£¬ ÕâÖÖÇé¿öÎÒÃÇÏÈ²»×÷±È½Ï */ && pid != cinfos->pid)
+			if(cinfos->componentType != MACHINE_TYPE && cinfos->pid != 0 /* ï¿½ï¿½ï¿½ï¿½0Í¨ï¿½ï¿½ï¿½ï¿½Ô¤ï¿½è£¬ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È²ï¿½ï¿½ï¿½ï¿½È½ï¿½ */ && pid != cinfos->pid)
 			{
 				ERROR_MSG(fmt::format("Components::checkComponents: uid:{}, componentType={}, componentID:{} exist.\n",
 					uid, COMPONENT_NAME_EX(ct), componentID));
@@ -198,7 +198,7 @@ void Components::addComponent(int32 uid, const char* username,
 		return;
 	}
 	
-	// Èç¹û¸ÃuidÏÂÃ»ÓÐÒÑ¾­ÔËÐÐµÄÈÎºÎÏà¹Ø×é¼þ£¬ÄÇÃ´ÖØÖÃ¼ÆÊýÆ÷
+	// ï¿½ï¿½ï¿½ï¿½ï¿½uidï¿½ï¿½Ã»ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½Îºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã´ï¿½ï¿½ï¿½Ã¼ï¿½ï¿½ï¿½ï¿½ï¿½
 	if (getGameSrvComponentsSize(uid) == 0)
 	{
 		_globalOrderLog[uid] = 0;
@@ -478,7 +478,7 @@ int Components::connectComponent(COMPONENT_TYPE componentType, int32 uid, COMPON
 			pComponentInfos->pChannel->destroy();
 			Network::Channel::reclaimPoolObject(pComponentInfos->pChannel);
 
-			// ´ËÊ±²»¿ÉÇ¿ÖÆÊÍ·ÅÄÚ´æ£¬destroyÖÐÒÑ¾­¶ÔÆä¼õÒýÓÃ
+			// ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½Ç¿ï¿½ï¿½ï¿½Í·ï¿½ï¿½Ú´æ£¬destroyï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 			// SAFE_RELEASE(pComponentInfos->pChannel);
 			pComponentInfos->pChannel = NULL;
 			return -1;
@@ -771,7 +771,7 @@ const Components::ComponentInfos* Components::lookupLocalComponentRunning(uint32
 //-------------------------------------------------------------------------------------		
 bool Components::updateComponentInfos(const Components::ComponentInfos* info)
 {
-	// ²»¶ÔÆäËûmachine×ö´¦Àí
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½machineï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if(info->componentType == MACHINE_TYPE)
 	{
 		return true;
@@ -823,7 +823,7 @@ bool Components::updateComponentInfos(const Components::ComponentInfos* info)
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 
-	// ÓÉÓÚCOMMON_NETWORK_MESSAGE²»°üº¬client£¬ Èç¹ûÊÇbots£¬ ÎÒÃÇÐèÒªµ¥¶À´¦Àí
+	// ï¿½ï¿½ï¿½ï¿½COMMON_NETWORK_MESSAGEï¿½ï¿½ï¿½ï¿½ï¿½ï¿½clientï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½botsï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if(info->componentType != BOTS_TYPE)
 	{
 		COMMON_NETWORK_MESSAGE(info->componentType, (*pBundle), lookApp);
@@ -845,7 +845,7 @@ bool Components::updateComponentInfos(const Components::ComponentInfos* info)
 	int selgot = select(epListen+1, &fds, NULL, NULL, &tv);
 	if(selgot == 0)
 	{
-		// ³¬Ê±, ¿ÉÄÜ¶Ô·½·±Ã¦
+		// ï¿½ï¿½Ê±, ï¿½ï¿½ï¿½Ü¶Ô·ï¿½ï¿½ï¿½Ã¦
 		return true;	
 	}
 	else if(selgot == -1)
@@ -1085,8 +1085,8 @@ bool Components::findLogger()
 	
 	int i = 0;
 	
-	while(i++ < 1/*Èç¹ûLoggerÓëÆäËûÓÎÏ·½ø³ÌÍ¬Ê±Æô¶¯£¬ÕâÀïÉè¶¨µÄ²éÕÒ´ÎÊýÔ½¶à£¬
-		ÕÒµ½LoggerµÄ¸ÅÂÊÔ½´ó£¬µ±Ç°Ö»Éè¶¨²éÕÒÒ»´Î£¬¼Ù¶¨ÓÃ»§ÒÑ¾­ÌáÇ°ºÃÆô¶¯Logger·þÎñ*/)
+	while(i++ < 1/*ï¿½ï¿½ï¿½Loggerï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï·ï¿½ï¿½ï¿½ï¿½Í¬Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½è¶¨ï¿½Ä²ï¿½ï¿½Ò´ï¿½ï¿½ï¿½Ô½ï¿½à£¬
+		ï¿½Òµï¿½Loggerï¿½Ä¸ï¿½ï¿½ï¿½Ô½ï¿½ó£¬µï¿½Ç°Ö»ï¿½è¶¨ï¿½ï¿½ï¿½ï¿½Ò»ï¿½Î£ï¿½ï¿½Ù¶ï¿½ï¿½Ã»ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Loggerï¿½ï¿½ï¿½ï¿½*/)
 	{
 		srand(KBEngine::getSystemTime());
 		uint16 nport = KBE_PORT_START + (rand() % 1000);
@@ -1151,7 +1151,7 @@ RESTART_RECV:
 					goto RESTART_RECV;
 				}
 
-				// Èç¹ûÕÒ²»µ½
+				// ï¿½ï¿½ï¿½ï¿½Ò²ï¿½ï¿½ï¿½
 				if(args.componentType == UNKNOWN_COMPONENT_TYPE)
 				{
 					isContinue = true;
@@ -1171,7 +1171,7 @@ RESTART_RECV:
 				isContinue = true;
 			}while(bhandler.pCurrPacket()->length() > 0);
 
-			// ·ÀÖ¹½ÓÊÕµ½µÄÊý¾Ý²»ÊÇÏëÒªµÄÊý¾Ý
+			// ï¿½ï¿½Ö¹ï¿½ï¿½ï¿½Õµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý²ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 			if(findComponentType == args.componentType)
 			{
 				for(int iconn=0; iconn<5; iconn++)
@@ -1198,7 +1198,7 @@ RESTART_RECV:
 		}
 		else
 		{
-			// ½ÓÊÜÊý¾Ý³¬Ê±ÁË
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý³ï¿½Ê±ï¿½ï¿½
 		}
 	}
 
@@ -1306,7 +1306,7 @@ RESTART_RECV:
 						goto RESTART_RECV;
 					}
 
-					// Èç¹ûÕÒ²»µ½
+					// ï¿½ï¿½ï¿½ï¿½Ò²ï¿½ï¿½ï¿½
 					if(args.componentType == UNKNOWN_COMPONENT_TYPE)
 					{
 						isContinue = true;
@@ -1326,10 +1326,10 @@ RESTART_RECV:
 					isContinue = true;
 				}while(bhandler.pCurrPacket()->length() > 0);
 
-				// ·ÀÖ¹½ÓÊÕµ½µÄÊý¾Ý²»ÊÇÏëÒªµÄÊý¾Ý
+				// ï¿½ï¿½Ö¹ï¿½ï¿½ï¿½Õµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý²ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 				if(findComponentType == args.componentType)
 				{
-					// ÕâÀï×ö¸öÌØÀý£¬ ÊÇloggerÔòÓÅÏÈÁ¬½ÓÉÏÈ¥£¬ ÕâÑù¿ÉÒÔ¾¡ÔçÍ¬²½ÈÕÖ¾
+					// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½loggerï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¥ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¾ï¿½ï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½Ö¾
 					if(findComponentType == (int8)LOGGER_TYPE)
 					{
 						findComponentTypes_[findIdx_] = -1;
@@ -1365,7 +1365,7 @@ RESTART_RECV:
 						ERROR_MSG("Components::findComponents: receive error!\n");
 					}
 
-					// Èç¹ûÊÇÕâÐ©¸¨Öú×é¼þÃ»ÕÒµ½ÔòÌø¹ý
+					// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð©ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½Òµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 					int helperComponentIdx = 0;
 
 					while(1)
@@ -1380,7 +1380,7 @@ RESTART_RECV:
 							WARNING_MSG(fmt::format("Components::findComponents: not found {}!\n",
 								COMPONENT_NAME_EX((COMPONENT_TYPE)findComponentType)));
 
-							findComponentTypes_[findIdx_] = -1; // Ìø¹ý±êÖ¾
+							findComponentTypes_[findIdx_] = -1; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾
 							count = 0;
 							findIdx_++;
 							return false;
@@ -1399,7 +1399,7 @@ RESTART_RECV:
 
 	if(state_ == 2)
 	{
-		// ¿ªÊ¼×¢²áµ½ËùÓÐµÄ×é¼þ
+		// ï¿½ï¿½Ê¼×¢ï¿½áµ½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½
 		while(findComponentTypes_[findIdx_] != UNKNOWN_COMPONENT_TYPE)
 		{
 			if(dispatcher().hasBreakProcessing())
@@ -1458,7 +1458,7 @@ void Components::broadcastSelf()
 		srand(KBEngine::getSystemTime());
 		uint16 nport = KBE_PORT_START + (rand() % 1000);
 
-		// Ïò¾ÖÓòÍøÄÚ¹ã²¥UDP°ü£¬Ìá½»×Ô¼ºµÄÉí·Ý
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú¹ã²¥UDPï¿½ï¿½ï¿½ï¿½ï¿½á½»ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		Network::BundleBroadcast bhandler(*pNetworkInterface(), nport);
 
 		if (!bhandler.good())
@@ -1470,7 +1470,7 @@ void Components::broadcastSelf()
 				return;
 			}
 
-			// Èç¹ûÊ§°ÜÔò¼ÌÐø¹ã²¥
+			// ï¿½ï¿½ï¿½Ê§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ã²¥
 			--cidex;
 			KBEngine::sleep(10);
 			continue;
@@ -1526,7 +1526,7 @@ bool Components::process()
 			srand(KBEngine::getSystemTime());
 			uint16 nport = KBE_PORT_START + (rand() % 1000);
 
-			// Ïò¾ÖÓòÍøÄÚ¹ã²¥UDP°ü£¬Ìá½»×Ô¼ºµÄÉí·Ý
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú¹ã²¥UDPï¿½ï¿½ï¿½ï¿½ï¿½á½»ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 			Network::BundleBroadcast bhandler(*pNetworkInterface(), nport);
 
 			if (!bhandler.good())
@@ -1538,7 +1538,7 @@ bool Components::process()
 					return false;
 				}
 
-				// Èç¹ûÊ§°ÜÔò¼ÌÐø¹ã²¥
+				// ï¿½ï¿½ï¿½Ê§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ã²¥
 				--cidex;
 				KBEngine::sleep(10);
 				continue;
@@ -1559,8 +1559,8 @@ bool Components::process()
 			
 			bhandler.broadcast();
 
-			// µÈ´ý·µ»ØÐÅÏ¢£¬Èç¹û´æÔÚ·µ»ØËµÃ÷Éí·ÝÒÑ¾­±»Ê¹ÓÃ£¬¸Ã½ø³Ì²»ºÏ·¨£¬³ÌÐò½ÓÏÂÀ´»áÍË³ö
-			// Èç¹ûÃ»ÓÐ·µ»ØËµÃ÷Ã»ÓÐmachine¶Ô´Ë½ø³ÌÓÐÒâ¼û£¬¿ÉÒÔ³É¹¦Æô¶¯
+			// ï¿½È´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú·ï¿½ï¿½ï¿½Ëµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½Ê¹ï¿½Ã£ï¿½ï¿½Ã½ï¿½ï¿½Ì²ï¿½ï¿½Ï·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë³ï¿½
+			// ï¿½ï¿½ï¿½Ã»ï¿½Ð·ï¿½ï¿½ï¿½Ëµï¿½ï¿½Ã»ï¿½ï¿½machineï¿½Ô´Ë½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô³É¹ï¿½ï¿½ï¿½ï¿½ï¿½
 			int32 timeout = 500000;
 			MachineInterface::onBroadcastInterfaceArgs25 args;
 
@@ -1583,7 +1583,7 @@ bool Components::process()
 
 					hasContinue = true;
 
-					// Èç¹ûÊÇÎ´ÖªÀàÐÍÔò¼ÌÐøÒ»´Î
+					// ï¿½ï¿½ï¿½ï¿½ï¿½Î´Öªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½
 					if(args.componentType == UNKNOWN_COMPONENT_TYPE)
 						continue;
 
@@ -1595,7 +1595,7 @@ bool Components::process()
 						inet_ntoa((struct in_addr&)args.intaddr),
 						ntohs(args.intport)));
 
-					// ´æÔÚÏàÍ¬Éí·Ý£¬ ³ÌÐò¸ÃÍË³öÁË
+					// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½ï¿½Ý£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë³ï¿½ï¿½ï¿½
 					if(_pHandler)
 						_pHandler->onIdentityillegal((COMPONENT_TYPE)args.componentType, args.componentID, args.pid, inet_ntoa((struct in_addr&)args.intaddr));
 

@@ -35,9 +35,9 @@ class MoveToPointHandler : public ScriptCallbackHandler
 public:
 	enum MoveType
 	{
-		MOVE_TYPE_POINT = 0,		// ³£¹æÀàÐÍ
-		MOVE_TYPE_ENTITY = 1,		// ·¶Î§´¥·¢Æ÷ÀàÐÍ
-		MOVE_TYPE_NAV = 2,			// ÒÆ¶¯¿ØÖÆÆ÷ÀàÐÍ
+		MOVE_TYPE_POINT = 0,		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+		MOVE_TYPE_ENTITY = 1,		// ï¿½ï¿½Î§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+		MOVE_TYPE_NAV = 2,			// ï¿½Æ¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	};
 
 	MoveToPointHandler(ScriptCallbacks& scriptCallbacks, client::Entity* pEntity, int layer, 
@@ -62,9 +62,9 @@ protected:
 
 protected:
 	Position3D destPos_;
-	float velocity_;			// ËÙ¶È
-	bool faceMovement_;			// ÊÇ·ñ²»¸Ä±äÃæÏòÒÆ¶¯
-	bool moveVertically_;		// trueÔò¿ÉÒÔ·ÉÆðÀ´ÒÆ¶¯·ñÔòÌùµØ
+	float velocity_;			// ï¿½Ù¶ï¿½
+	bool faceMovement_;			// ï¿½Ç·ñ²»¸Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¶ï¿½
+	bool moveVertically_;		// trueï¿½ï¿½ï¿½ï¿½Ô·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	PyObject* pyuserarg_;
 	float distance_;
 	int layer_;

@@ -85,7 +85,7 @@ bool RotatorHandler::requestTurnOver()
 		if (pController_->pEntity())
 			pController_->pEntity()->onTurn(pController_->id(), pyuserarg_);
 
-		// Èç¹ûÔÚonTurnÖÐµ÷ÓÃcancelController£¨id£©»áµ¼ÖÂControllerÎö¹¹µ¼ÖÂpController_ÎªNULL
+		// ï¿½ï¿½ï¿½ï¿½ï¿½onTurnï¿½Ðµï¿½ï¿½ï¿½cancelControllerï¿½ï¿½idï¿½ï¿½ï¿½áµ¼ï¿½ï¿½Controllerï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½pController_ÎªNULL
 		if (pController_)
 			pController_->destroy();
 	}
@@ -114,11 +114,11 @@ bool RotatorHandler::update()
 	const Direction3D& dstDir = destDir();
 	Direction3D currDir = pEntity->direction();
 
-	// µÃµ½²îÖµ
+	// ï¿½Ãµï¿½ï¿½ï¿½Öµ
 	float deltaYaw = dstDir.yaw() - currDir.yaw();
 
 	if (deltaYaw > KBE_PI)
-		deltaYaw = (float)((double)deltaYaw - KBE_2PI/* ÓÉÓÚÎÒÃÇµÄ»¡¶È±íÊ¾·¶Î§ÔÚ-PI ~ PI£¬´Ë´¦·ÀÖ¹Òç³ö */);
+		deltaYaw = (float)((double)deltaYaw - KBE_2PI/* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÇµÄ»ï¿½ï¿½È±ï¿½Ê¾ï¿½ï¿½Î§ï¿½ï¿½-PI ~ PIï¿½ï¿½ï¿½Ë´ï¿½ï¿½ï¿½Ö¹ï¿½ï¿½ï¿½ */);
 	else if (deltaYaw < -KBE_PI)
 		deltaYaw = (float)((double)deltaYaw + KBE_2PI);
 
@@ -138,11 +138,11 @@ bool RotatorHandler::update()
 	else if (currDir.yaw() < -KBE_PI)
 		currDir.yaw((float((double)currDir.yaw() + KBE_2PI)));
 
-	// ÉèÖÃentityµÄÐÂÎ»ÖÃºÍÃæÏò
+	// ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½Î»ï¿½Ãºï¿½ï¿½ï¿½ï¿½ï¿½
 	if (pController_)
 		pEntity->setPositionAndDirection(pEntity->position(), currDir);
 
-	// Èç¹û´ïµ½Ä¿µÄµØÔò·µ»Øtrue
+	// ï¿½ï¿½ï¿½ï¿½ïµ½Ä¿ï¿½Äµï¿½ï¿½ò·µ»ï¿½true
 	if (fabs(deltaYaw) < 0.0001f && requestTurnOver())
 	{
 		Py_DECREF(pEntity);

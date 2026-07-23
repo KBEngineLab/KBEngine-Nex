@@ -64,7 +64,7 @@ void TurnController::destroy()
 {
 	Controller::destroy();
 
-	// ¼ÈÈ»×Ô¼ºÒªÏú»ÙÁË£¬ÄÇÃ´Óë×Ô¼ºÏàÁªµÄupdatableÒ²Ó¦¸ÃÍ£Ö¹ÁË
+	// ï¿½ï¿½È»ï¿½Ô¼ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½Ë£ï¿½ï¿½ï¿½Ã´ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½updatableÒ²Ó¦ï¿½ï¿½Í£Ö¹ï¿½ï¿½
 	if (pRotatorHandler_)
 	{
 		pRotatorHandler_->pController(KBEShared_ptr<Controller>());

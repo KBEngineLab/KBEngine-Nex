@@ -25,7 +25,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{
 
-// vector<string>╓о└р╡─╚▌╥╫╩╣╙├ std::find_if └┤▓щ╒╥╩╟╖ё┤ц╘┌─│╕Ў╫╓╖√┤о
+// vector<string>╓оя┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜╩╣я┐╜я┐╜ std::find_if я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜╟╖я┐╜я┐╜я┐╜я┐╜─│я┐╜я┐╜я┐╜╓╖я┐╜я┐╜я┐╜
 template<typename T>
 class find_vec_string_exist_handle
 {
@@ -48,7 +48,7 @@ private:
 };
 
 
-// vector<obj*>╓о└р╡─╚▌╥╫╩╣╙├ std::find_if └┤▓щ╒╥╩╟╖ё┤ц╘┌─│╕Ў╢╘╧є
+// vector<obj*>╓оя┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜╩╣я┐╜я┐╜ std::find_if я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜╟╖я┐╜я┐╜я┐╜я┐╜─│я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜
 template<typename T>
 class findif_vector_obj_exist_handler
 {

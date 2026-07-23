@@ -75,10 +75,10 @@ EntityCallAbstract::~EntityCallAbstract()
 //-------------------------------------------------------------------------------------
 void EntityCallAbstract::newCall(Network::Bundle& bundle)
 {
-	// Èç¹ûÊÇserver¶ËµÄentitycall
+	// ï¿½ï¿½ï¿½ï¿½ï¿½serverï¿½Ëµï¿½entitycall
 	if(g_componentType != CLIENT_TYPE && g_componentType != BOTS_TYPE)
 	{
-		// Èç¹ûIDÎª0£¬ÔòÕâÊÇÒ»¸ö¿Í»§¶Ë×é¼þ£¬·ñÔòÎª·þÎñ¶Ë¡£
+		// ï¿½ï¿½ï¿½IDÎª0ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½Ë¡ï¿½
 		if(componentID_ == 0)
 		{
 			bundle.newMessage(ClientInterface::onRemoteMethodCall);
@@ -89,7 +89,7 @@ void EntityCallAbstract::newCall(Network::Bundle& bundle)
 
 			if(cinfos != NULL)
 			{
-				// ÕÒµ½¶ÔÓ¦µÄ×é¼þÍ¶µÝ¹ýÈ¥£¬ Èç¹ûÕâ¸öentitycall»¹ÐèÒªÖÐ×ª±ÈÈç e.base.cell £¬ ÔòÓÉbaseapp×ªÍùcellapp
+				// ï¿½Òµï¿½ï¿½ï¿½Ó¦ï¿½ï¿½ï¿½ï¿½ï¿½Í¶ï¿½Ý¹ï¿½È¥ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entitycallï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½ e.base.cell ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½baseapp×ªï¿½ï¿½cellapp
 				if(cinfos->componentType == BASEAPP_TYPE)
 				{
 					bundle.newMessage(BaseappInterface::onEntityCall);
@@ -108,13 +108,13 @@ void EntityCallAbstract::newCall(Network::Bundle& bundle)
 
 		bundle << id_;
 		
-		// Èç¹ûÊÇ·¢Íù¿Í»§¶ËµÄ°üÔòÎÞÐè¸½¼ÓÕâÑùÒ»¸öÀàÐÍ
+		// ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½Í»ï¿½ï¿½ËµÄ°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½è¸½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		if(componentID_ > 0)
 			bundle << type_;
 	}
 	else
 	{
-		// Èç¹ûÊÇ¿Í»§¶ËÉÏµÄentitycallµ÷ÓÃ·þÎñ¶Ë·½·¨Ö»´æÔÚµ÷ÓÃcell»òÕßbase
+		// ï¿½ï¿½ï¿½ï¿½Ç¿Í»ï¿½ï¿½ï¿½ï¿½Ïµï¿½entitycallï¿½ï¿½ï¿½Ã·ï¿½ï¿½ï¿½Ë·ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½Úµï¿½ï¿½ï¿½cellï¿½ï¿½ï¿½ï¿½base
 		switch(type_)
 		{
 		case ENTITYCALL_TYPE_BASE:

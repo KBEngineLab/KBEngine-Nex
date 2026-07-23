@@ -76,7 +76,7 @@ namespace KBEngine{
 																				\
 
 /**
-	CellappÏûÏ¢ºê£¬  Ö»ÓÐÁã¸ö²ÎÊýµÄÏûÏ¢
+	Cellappï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CELLAPP_MESSAGE_HANDLER_ARGS0
@@ -117,7 +117,7 @@ namespace KBEngine{
 																				\
 
 /**
-	CellappÏûÏ¢ºê£¬  Ö»ÓÐÒ»¸ö²ÎÊýµÄÏûÏ¢
+	Cellappï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CELLAPP_MESSAGE_HANDLER_ARGS1
@@ -160,7 +160,7 @@ namespace KBEngine{
 																				\
 
 /**
-	CellappÏûÏ¢ºê£¬  Ö»ÓÐ¶þ¸ö²ÎÊýµÄÏûÏ¢
+	Cellappï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CELLAPP_MESSAGE_HANDLER_ARGS2
@@ -212,7 +212,7 @@ namespace KBEngine{
 
 
 /**
-	CellappÏûÏ¢ºê£¬  Ö»ÓÐÈý¸ö²ÎÊýµÄÏûÏ¢
+	Cellappï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CELLAPP_MESSAGE_HANDLER_ARGS3
@@ -272,7 +272,7 @@ namespace KBEngine{
 											ARG_TYPE3, ARG_NAME3)				\
 
 /**
-	CellappÏûÏ¢ºê£¬  Ö»ÓÐËÄ¸ö²ÎÊýµÄÏûÏ¢
+	Cellappï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½Ä¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CELLAPP_MESSAGE_HANDLER_ARGS4
@@ -340,7 +340,7 @@ namespace KBEngine{
 											ARG_TYPE4, ARG_NAME4)				\
 
 /**
-	CellappÏûÏ¢ºê£¬  Ö»ÓÐÎå¸ö²ÎÊýµÄÏûÏ¢
+	Cellappï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CELLAPP_MESSAGE_HANDLER_ARGS5
@@ -417,7 +417,7 @@ namespace KBEngine{
 
 
 /**
-	CellappÏûÏ¢ºê£¬  Ö»ÓÐÁù¸ö²ÎÊýµÄÏûÏ¢
+	Cellappï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CELLAPP_MESSAGE_HANDLER_ARGS6
@@ -502,7 +502,7 @@ namespace KBEngine{
 
 
 /**
-	CellappÏûÏ¢ºê£¬Ö»ÓÐÆß¸ö²ÎÊýµÄÏûÏ¢
+	Cellappï¿½ï¿½Ï¢ï¿½ê£¬Ö»ï¿½ï¿½ï¿½ß¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CELLAPP_MESSAGE_HANDLER_ARGS7
@@ -597,7 +597,7 @@ namespace KBEngine{
 
 
 /**
-	CellappÏûÏ¢ºê£¬  Ö»ÓÐ°Ë¸ö²ÎÊýµÄÏûÏ¢
+	Cellappï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½Ð°Ë¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CELLAPP_MESSAGE_HANDLER_ARGS8
@@ -699,7 +699,7 @@ namespace KBEngine{
 
 
 /**
-	CellappÏûÏ¢ºê£¬  Ö»ÓÐ¾Å¸ö²ÎÊýµÄÏûÏ¢
+	Cellappï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½Ð¾Å¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CELLAPP_MESSAGE_HANDLER_ARGS9
@@ -809,7 +809,7 @@ namespace KBEngine{
 
 
 /**
-	CellappÏûÏ¢ºê£¬  Ö»ÓÐÊ®¸ö²ÎÊýµÄÏûÏ¢
+	Cellappï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½Ê®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CELLAPP_MESSAGE_HANDLER_ARGS10
@@ -928,7 +928,7 @@ namespace KBEngine{
 
 
 /**
-	CellappÏûÏ¢ºê£¬  Ö»ÓÐÊ®Ò»¸ö²ÎÊýµÄÏûÏ¢
+	Cellappï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½Ê®Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CELLAPP_MESSAGE_HANDLER_ARGS11

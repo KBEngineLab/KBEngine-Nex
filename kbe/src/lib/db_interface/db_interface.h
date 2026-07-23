@@ -37,7 +37,7 @@ class ThreadPool;
 class DBUtil;
 
 /*
-	Êý¾Ý¿â½Ó¿Ú
+	ï¿½ï¿½ï¿½Ý¿ï¿½Ó¿ï¿½
 */
 class DBInterface
 {
@@ -66,34 +66,34 @@ public:
 	};
 
 	/**
-		¼ì²é»·¾³
+		ï¿½ï¿½é»·ï¿½ï¿½
 	*/
 	virtual bool checkEnvironment() = 0;
 	
 	/**
-		¼ì²é´íÎó£¬ ¶Ô´íÎóµÄÄÚÈÝ½øÐÐ¾ÀÕý
-		Èç¹û¾ÀÕý²»³É¹¦·µ»ØÊ§°Ü
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ô´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý½ï¿½ï¿½Ð¾ï¿½ï¿½ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É¹ï¿½ï¿½ï¿½ï¿½ï¿½Ê§ï¿½ï¿½
 	*/
 	virtual bool checkErrors() = 0;
 
 	/**
-		ÓëÄ³¸öÊý¾Ý¿â¹ØÁª
+		ï¿½ï¿½Ä³ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual bool attach(const char* databaseName = NULL) = 0;
 	virtual bool detach() = 0;
 
 	/**
-		»ñÈ¡Êý¾Ý¿âËùÓÐµÄ±íÃû
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½ï¿½ÐµÄ±ï¿½ï¿½ï¿½
 	*/
 	virtual bool getTableNames( std::vector<std::string>& tableNames, const char * pattern) = 0;
 
 	/**
-		»ñÈ¡Êý¾Ý¿âÄ³¸ö±íËùÓÐµÄ×Ö¶ÎÃû³Æ
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½Ý¿ï¿½Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual bool getTableItemNames(const char* tableName, std::vector<std::string>& itemNames) = 0;
 
 	/**
-		²éÑ¯±í
+		ï¿½ï¿½Ñ¯ï¿½ï¿½
 	*/
 	virtual bool query(const char* cmd, uint32 size, bool printlog = true, MemoryStream * result = NULL) = 0;
 	virtual bool query(const std::string& cmd, bool printlog = true, MemoryStream * result = NULL)
@@ -102,76 +102,76 @@ public:
 	}
 
 	/**
-		·µ»ØÕâ¸ö½Ó¿ÚµÄÃû³Æ
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¿Úµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	const char* name() const { return name_; }
 
 	/**
-		·µ»ØÕâ¸ö½Ó¿ÚµÄË÷Òý
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¿Úµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	uint16 dbIndex() const { return dbIndex_; }
 
 	/**
-		·µ»ØÕâ¸ö½Ó¿ÚµÄÃèÊö
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¿Úµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual const char* c_str() = 0;
 
 	/** 
-		»ñÈ¡´íÎó
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual const char* getstrerror() = 0;
 
 	/** 
-		»ñÈ¡´íÎó±àºÅ
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual int getlasterror() = 0;
 
 	/**
-		´´½¨Ò»¸öentity´æ´¢±í
+		ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½entityï¿½æ´¢ï¿½ï¿½
 	*/
 	virtual EntityTable* createEntityTable(EntityTables* pEntityTables) = 0;
 
 	/** 
-		´ÓÊý¾Ý¿âÉ¾³ýentity±í
+		ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½É¾ï¿½ï¿½entityï¿½ï¿½
 	*/
 	virtual bool dropEntityTableFromDB(const char* tableName) = 0;
 
 	/** 
-		´ÓÊý¾Ý¿âÉ¾³ýentity±í×Ö¶Î
+		ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½É¾ï¿½ï¿½entityï¿½ï¿½ï¿½Ö¶ï¿½
 	*/
 	virtual bool dropEntityTableItemFromDB(const char* tableName, const char* tableItemName) = 0;
 
 	/**
-		Ëø×¡½Ó¿Ú²Ù×÷
+		ï¿½ï¿½×¡ï¿½Ó¿Ú²ï¿½ï¿½ï¿½
 	*/
 	virtual bool lock() = 0;
 	virtual bool unlock() = 0;
 
 	/**
-		´¦ÀíÒì³£
+		ï¿½ï¿½ï¿½ï¿½ï¿½ì³£
 	*/
 	virtual bool processException(std::exception & e) = 0;
 
 	/**
-		»ñÈ¡×îºóÒ»´Î²éÑ¯µÄsqlÓï¾ä
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½Ò»ï¿½Î²ï¿½Ñ¯ï¿½ï¿½sqlï¿½ï¿½ï¿½
 	*/
 	virtual const std::string& lastquery() const{ return lastquery_; }
 
 protected:
-	char name_[MAX_BUF];									// Êý¾Ý¿â½Ó¿ÚµÄÃû³Æ
-	char db_type_[MAX_BUF];									// Êý¾Ý¿âµÄÀà±ð
-	uint32 db_port_;										// Êý¾Ý¿âµÄ¶Ë¿Ú
-	char db_ip_[MAX_IP];									// Êý¾Ý¿âµÄipµØÖ·
-	char db_username_[MAX_BUF];								// Êý¾Ý¿âµÄÓÃ»§Ãû
-	char db_password_[MAX_BUF * 10];						// Êý¾Ý¿âµÄÃÜÂë
-	char db_name_[MAX_BUF];									// Êý¾Ý¿âÃû
-	uint16 db_numConnections_;								// Êý¾Ý¿â×î´óÁ¬½Ó
-	std::string lastquery_;									// ×îºóÒ»´Î²éÑ¯ÃèÊö
-	uint16 dbIndex_;										// ¶ÔÓ¦µÄÊý¾Ý¿â½Ó¿ÚË÷Òý
+	char name_[MAX_BUF];									// ï¿½ï¿½ï¿½Ý¿ï¿½Ó¿Úµï¿½ï¿½ï¿½ï¿½ï¿½
+	char db_type_[MAX_BUF];									// ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½ï¿½ï¿½
+	uint32 db_port_;										// ï¿½ï¿½ï¿½Ý¿ï¿½Ä¶Ë¿ï¿½
+	char db_ip_[MAX_IP];									// ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ipï¿½ï¿½Ö·
+	char db_username_[MAX_BUF];								// ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½
+	char db_password_[MAX_BUF * 10];						// ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	char db_name_[MAX_BUF];									// ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
+	uint16 db_numConnections_;								// ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	std::string lastquery_;									// ï¿½ï¿½ï¿½Ò»ï¿½Î²ï¿½Ñ¯ï¿½ï¿½ï¿½ï¿½
+	uint16 dbIndex_;										// ï¿½ï¿½Ó¦ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½Ó¿ï¿½ï¿½ï¿½ï¿½ï¿½
 };
 
 /*
-	Êý¾Ý¿â²Ù×÷µ¥Ôª
+	ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôª
 */
 class DBUtil : public Singleton<DBUtil>
 {

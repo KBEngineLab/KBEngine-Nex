@@ -27,16 +27,16 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 #define COORDINATE_NODE_FLAG_UNKNOWN				0x00000000
-#define COORDINATE_NODE_FLAG_ENTITY					0x00000001		// Ò»¸öEntity½Úµã
-#define COORDINATE_NODE_FLAG_TRIGGER				0x00000002		// Ò»¸ö´¥·¢Æ÷½Úµã
-#define COORDINATE_NODE_FLAG_HIDE					0x00000004		// Òþ²Ø½Úµã(ÆäËû½Úµã²»¿É¼û)
-#define COORDINATE_NODE_FLAG_REMOVING				0x00000008		// É¾³ýÖÐµÄ½Úµã
-#define COORDINATE_NODE_FLAG_REMOVED				0x00000010		// É¾³ý½Úµã
-#define COORDINATE_NODE_FLAG_PENDING				0x00000020		// ÕâÀà½Úµã´¦ÓÚupdate²Ù×÷ÖÐ¡£
-#define COORDINATE_NODE_FLAG_ENTITY_NODE_UPDATING	0x00000040		// entity½ÚµãÕýÔÚÖ´ÐÐupdate²Ù×÷
-#define COORDINATE_NODE_FLAG_INSTALLING				0x00000080		// ½ÚµãÕýÔÚ°²×°²Ù×÷
-#define COORDINATE_NODE_FLAG_POSITIVE_BOUNDARY		0x00000100		// ½ÚµãÊÇ´¥·¢Æ÷µÄÕý±ß½ç
-#define COORDINATE_NODE_FLAG_NEGATIVE_BOUNDARY		0x00000200		// ½ÚµãÊÇ´¥·¢Æ÷µÄ¸º±ß½ç
+#define COORDINATE_NODE_FLAG_ENTITY					0x00000001		// Ò»ï¿½ï¿½Entityï¿½Úµï¿½
+#define COORDINATE_NODE_FLAG_TRIGGER				0x00000002		// Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Úµï¿½
+#define COORDINATE_NODE_FLAG_HIDE					0x00000004		// ï¿½ï¿½ï¿½Ø½Úµï¿½(ï¿½ï¿½ï¿½ï¿½ï¿½Úµã²»ï¿½É¼ï¿½)
+#define COORDINATE_NODE_FLAG_REMOVING				0x00000008		// É¾ï¿½ï¿½ï¿½ÐµÄ½Úµï¿½
+#define COORDINATE_NODE_FLAG_REMOVED				0x00000010		// É¾ï¿½ï¿½ï¿½Úµï¿½
+#define COORDINATE_NODE_FLAG_PENDING				0x00000020		// ï¿½ï¿½ï¿½ï¿½Úµã´¦ï¿½ï¿½updateï¿½ï¿½ï¿½ï¿½ï¿½Ð¡ï¿½
+#define COORDINATE_NODE_FLAG_ENTITY_NODE_UPDATING	0x00000040		// entityï¿½Úµï¿½ï¿½ï¿½ï¿½ï¿½Ö´ï¿½ï¿½updateï¿½ï¿½ï¿½ï¿½
+#define COORDINATE_NODE_FLAG_INSTALLING				0x00000080		// ï¿½Úµï¿½ï¿½ï¿½ï¿½Ú°ï¿½×°ï¿½ï¿½ï¿½ï¿½
+#define COORDINATE_NODE_FLAG_POSITIVE_BOUNDARY		0x00000100		// ï¿½Úµï¿½ï¿½Ç´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß½ï¿½
+#define COORDINATE_NODE_FLAG_NEGATIVE_BOUNDARY		0x00000200		// ï¿½Úµï¿½ï¿½Ç´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¸ï¿½ï¿½ß½ï¿½
 
 #define COORDINATE_NODE_FLAG_HIDE_OR_REMOVED		(COORDINATE_NODE_FLAG_REMOVED | COORDINATE_NODE_FLAG_HIDE)
 
@@ -54,8 +54,8 @@ public:
 	INLINE bool hasFlags(uint32 v) const;
 
 	/**
-		(½Úµã±¾ÉíµÄ×ø±ê)
-		x && zÓÉ²»Í¬µÄÓ¦ÓÃÊµÏÖ(´Ó²»Í¬´¦»ñÈ¡)
+		(ï¿½Úµã±¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
+		x && zï¿½É²ï¿½Í¬ï¿½ï¿½Ó¦ï¿½ï¿½Êµï¿½ï¿½(ï¿½Ó²ï¿½Í¬ï¿½ï¿½ï¿½ï¿½È¡)
 	*/
 	virtual float x() const { return x_; }
 	virtual float y() const { return y_; }
@@ -66,8 +66,8 @@ public:
 	virtual void z(float v) { z_ = v; }
 
 	/**
-		(À©Õ¹×ø±ê)
-		x && zÓÉ²»Í¬µÄÓ¦ÓÃÊµÏÖ(´Ó²»Í¬´¦»ñÈ¡)
+		(ï¿½ï¿½Õ¹ï¿½ï¿½ï¿½ï¿½)
+		x && zï¿½É²ï¿½Í¬ï¿½ï¿½Ó¦ï¿½ï¿½Êµï¿½ï¿½(ï¿½Ó²ï¿½Í¬ï¿½ï¿½ï¿½ï¿½È¡)
 	*/
 	virtual float xx() const { return 0.f; }
 	virtual float yy() const { return 0.f; }
@@ -107,7 +107,7 @@ public:
 	}
 
 	/**
-		»ñÈ¡Á´±íµÄÇ°ºó¶ËÖ¸Õë
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½
 	*/
 	INLINE CoordinateNode* pPrevX() const;
 	INLINE CoordinateNode* pNextX() const;
@@ -117,7 +117,7 @@ public:
 	INLINE CoordinateNode* pNextZ() const;
 
 	/**
-		ÉèÖÃÁ´±íµÄÇ°ºó¶ËÖ¸Õë
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½
 	*/
 	INLINE void pPrevX(CoordinateNode* pNode);
 	INLINE void pNextX(CoordinateNode* pNode);
@@ -127,8 +127,8 @@ public:
 	INLINE void pNextZ(CoordinateNode* pNode);
 
 	/**
-		Ä³¸ö½Úµã±ä¶¯¾­¹ýÁË±¾½Úµã
-		@isfront: ÏòÇ°ÒÆ¶¯»¹ÊÇÏòºóÒÆ¶¯
+		Ä³ï¿½ï¿½ï¿½Úµï¿½ä¶¯ï¿½ï¿½ï¿½ï¿½ï¿½Ë±ï¿½ï¿½Úµï¿½
+		@isfront: ï¿½ï¿½Ç°ï¿½Æ¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¶ï¿½
 	*/
 	virtual void onNodePassX(CoordinateNode* pNode, bool isfront);
 	virtual void onNodePassY(CoordinateNode* pNode, bool isfront);
@@ -137,14 +137,14 @@ public:
 	virtual void onRemove();
 
 	/**
-		¸¸½ÚµãÉ¾³ý
+		ï¿½ï¿½ï¿½Úµï¿½É¾ï¿½ï¿½
 	*/
 	virtual void onParentRemove(CoordinateNode* pParentNode) {
 	}
 
 	/**
-		µ±½ÚµãÓÐ±ä¶¯Ê±£¬ÐèÒª¸üÐÂËüÔÚlistÖÐµÄ
-		Ïà¹ØÎ»ÖÃµÈÐÅÏ¢
+		ï¿½ï¿½ï¿½Úµï¿½ï¿½Ð±ä¶¯Ê±ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½listï¿½Ðµï¿½
+		ï¿½ï¿½ï¿½Î»ï¿½Ãµï¿½ï¿½ï¿½Ï¢
 	*/
 	virtual void update();
 
@@ -157,7 +157,7 @@ public:
 #endif
 
 protected:
-	// Á´±íµÄÇ°¶ËºÍºó¶Ë
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ËºÍºï¿½ï¿½
 	CoordinateNode* pPrevX_;
 	CoordinateNode* pNextX_;
 	CoordinateNode* pPrevY_;

@@ -43,18 +43,18 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	KBCMD消息宏，  参数为流， 需要自己解开
+	KBCMD锟斤拷息锟疥，  锟斤拷锟斤拷为锟斤拷锟斤拷 锟斤拷要锟皆硷拷锟解开
 */
 
 /**
-	KBCMD所有消息接口在此定义
+	KBCMD锟斤拷锟斤拷锟斤拷息锟接匡拷锟节此讹拷锟斤拷
 */
 NETWORK_INTERFACE_DECLARE_BEGIN(KBCMDInterface)
 
-	// 某app主动请求look。
+	// 某app锟斤拷锟斤拷锟斤拷锟斤拷look锟斤拷
 	KBCMD_MESSAGE_DECLARE_ARGS0(lookApp, NETWORK_FIXED_MESSAGE)
 
-	// 某个app向本app告知处于活动状态。
+	// 某锟斤拷app锟斤拷app锟斤拷知锟斤拷锟节活动状态锟斤拷
 	KBCMD_MESSAGE_DECLARE_ARGS2(onAppActiveTick, NETWORK_FIXED_MESSAGE,
 		COMPONENT_TYPE, componentType,
 		COMPONENT_ID, componentID)

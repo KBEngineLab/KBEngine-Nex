@@ -158,7 +158,7 @@ typedef G3D::Vector4							Vector4;
 #define KBEClamp								G3D::clamp
 #endif
 
-// ´Ó2¸ö3dÏòÁ¿ºöÂÔy¼ÆËã³ö2d³¤¶È
+// ï¿½ï¿½2ï¿½ï¿½3dï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½yï¿½ï¿½ï¿½ï¿½ï¿½2dï¿½ï¿½ï¿½ï¿½
 inline float KBEVec3CalcVec2Length(const Vector3& v1, const Vector3& v2)
 {
 	float x = v1.x - v2.x;
@@ -186,10 +186,10 @@ inline KBEngine::int8 angle2int8(float v, bool half = false)
 	return angle;
 }
 
-typedef Vector3													Position3D;												// ±íÊ¾3DÎ»ÖÃ±äÁ¿ÀàĞÍ	
-typedef KBEShared_ptr< std::vector<Position3D> >				VECTOR_POS3D_PTR;										// Ö¸ÏòPosition3DÊı×éµÄÖÇÄÜÖ¸ÕëÀàĞÍÉùÃ÷
+typedef Vector3													Position3D;												// ï¿½ï¿½Ê¾3DÎ»ï¿½Ã±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½	
+typedef KBEShared_ptr< std::vector<Position3D> >				VECTOR_POS3D_PTR;										// Ö¸ï¿½ï¿½Position3Dï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-struct Direction3D																										// ±íÊ¾·½ÏòÎ»ÖÃ±äÁ¿ÀàĞÍ
+struct Direction3D																										// ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½Î»ï¿½Ã±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 {
 	Direction3D():dir(0.f, 0.f, 0.f) {};
 	Direction3D(const Vector3 & v):dir(v){}
@@ -214,7 +214,7 @@ struct Direction3D																										// ±íÊ¾·½ÏòÎ»ÖÃ±äÁ¿ÀàĞÍ
 	Vector3 dir;
 };
 
-/** ¸¡µãÊı±È½Ï */
+/** ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È½ï¿½ */
 #define floatEqual(v1, v3) (abs(v1 - v2) < std::numeric_limits<float>::epsilon())
 inline bool almostEqual(const float f1, const float f2, const float epsilon = 0.0004f)
 {

@@ -64,7 +64,7 @@ int ListenerReceiver::handleInputNotification(int fd)
 		if (completion)
 		{
 			// Completion backends already created the socket asynchronously; consume it without calling accept again.
-			// Íê³ÉÄ£ÐÍÒÑ¾­Òì²½´´½¨ socket£¬ÕâÀïÖ±½ÓÏû·Ñ½á¹û£¬²»ÄÜÔÙ´Îµ÷ÓÃ accept¡£
+			// ï¿½ï¿½ï¿½Ä£ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ì²½ï¿½ï¿½ï¿½ï¿½ socketï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö±ï¿½ï¿½ï¿½ï¿½ï¿½Ñ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ù´Îµï¿½ï¿½ï¿½ acceptï¿½ï¿½
 			KBESOCKET acceptedSocket = (KBESOCKET)-1;
 			if (!pPoller->takeAcceptedSocket(fd, acceptedSocket))
 				break;
@@ -77,7 +77,7 @@ int ListenerReceiver::handleInputNotification(int fd)
 			if (pNewEndPoint->getremoteaddress(&networkPort, &networkAddr) != 0)
 			{
 				// Reclaim failed completion results so an invalid peer never leaks its native socket.
-				// »ØÊÕÊ§°ÜµÄÍê³É½á¹û£¬±ÜÃâÎÞÐ§¶Ô¶Ëµ¼ÖÂÔ­Éú socket Ð¹Â©¡£
+				// ï¿½ï¿½ï¿½ï¿½Ê§ï¿½Üµï¿½ï¿½ï¿½É½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð§ï¿½Ô¶Ëµï¿½ï¿½ï¿½Ô­ï¿½ï¿½ socket Ð¹Â©ï¿½ï¿½
 				pNewEndPoint->close();
 				EndPoint::reclaimPoolObject(pNewEndPoint);
 				continue;

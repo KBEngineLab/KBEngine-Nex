@@ -44,34 +44,34 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	BotsËùÓÐÏûÏ¢½Ó¿ÚÔÚ´Ë¶¨Òå
+	Botsï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½Ó¿ï¿½ï¿½Ú´Ë¶ï¿½ï¿½ï¿½
 */
 NETWORK_INTERFACE_DECLARE_BEGIN(BotsInterface)
 
-	// Ä³appÖ÷¶¯ÇëÇólook¡£
+	// Ä³appï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½lookï¿½ï¿½
 	BOTS_MESSAGE_DECLARE_ARGS0(lookApp,									NETWORK_FIXED_MESSAGE)
 
-	// ÇëÇó¹Ø±Õ·þÎñÆ÷
+	// ï¿½ï¿½ï¿½ï¿½Ø±Õ·ï¿½ï¿½ï¿½ï¿½ï¿½
 	BOTS_MESSAGE_DECLARE_STREAM(reqCloseServer,							NETWORK_VARIABLE_MESSAGE)
 
-	// consoleÔ¶³ÌÖ´ÐÐpythonÓï¾ä¡£
+	// consoleÔ¶ï¿½ï¿½Ö´ï¿½ï¿½pythonï¿½ï¿½ä¡£
 	BOTS_MESSAGE_DECLARE_STREAM(onExecScriptCommand,					NETWORK_VARIABLE_MESSAGE)
 
-	// Ä³¸öappÏò±¾app¸æÖª´¦ÓÚ»î¶¯×´Ì¬¡£
+	// Ä³ï¿½ï¿½appï¿½ï¿½appï¿½ï¿½Öªï¿½ï¿½ï¿½Ú»î¶¯×´Ì¬ï¿½ï¿½
 	BOTS_MESSAGE_DECLARE_ARGS2(onAppActiveTick,							NETWORK_FIXED_MESSAGE,
 								COMPONENT_TYPE,							componentType, 
 								COMPONENT_ID,							componentID)
 
-	// Ìí¼Óbots¡£
+	// ï¿½ï¿½ï¿½ï¿½botsï¿½ï¿½
 	BOTS_MESSAGE_DECLARE_STREAM(addBots,								NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇó²éÑ¯watcherÊý¾Ý
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¯watcherï¿½ï¿½ï¿½ï¿½
 	BOTS_MESSAGE_DECLARE_STREAM(queryWatcher,							NETWORK_VARIABLE_MESSAGE)
 
-	// ¿ªÊ¼profile
+	// ï¿½ï¿½Ê¼profile
 	BOTS_MESSAGE_DECLARE_STREAM(startProfile,							NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇóÇ¿ÖÆÉ±ËÀµ±Ç°app
+	// ï¿½ï¿½ï¿½ï¿½Ç¿ï¿½ï¿½É±ï¿½ï¿½ï¿½ï¿½Ç°app
 	BOTS_MESSAGE_DECLARE_STREAM(reqKillServer,							NETWORK_VARIABLE_MESSAGE)
 
 NETWORK_INTERFACE_DECLARE_END()

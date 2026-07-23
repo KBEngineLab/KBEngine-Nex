@@ -184,7 +184,7 @@ int process_make_client_sdk(int argc, char* argv[], const std::string clientType
 
 		app.finalise();
 
-		// Èç¹û»¹ÓÐÈÕÖ¾Î´Í¬²½Íê³É£¬ ÕâÀï»á¼ÌÐøÍ¬²½Íê³É²Å½áÊø
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾Î´Í¬ï¿½ï¿½ï¿½ï¿½É£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½É²Å½ï¿½ï¿½ï¿½
 		DebugHelper::getSingleton().finalise();
 		return -1;
 	}
@@ -196,7 +196,7 @@ int process_make_client_sdk(int argc, char* argv[], const std::string clientType
 
 		app.finalise();
 
-		// Èç¹û»¹ÓÐÈÕÖ¾Î´Í¬²½Íê³É£¬ ÕâÀï»á¼ÌÐøÍ¬²½Íê³É²Å½áÊø
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾Î´Í¬ï¿½ï¿½ï¿½ï¿½É£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½É²Å½ï¿½ï¿½ï¿½
 		DebugHelper::getSingleton().finalise();
 		return -1;
 	}
@@ -226,7 +226,7 @@ int process_make_client_sdk(int argc, char* argv[], const std::string clientType
 		compressionType = 1;
 	}
 
-	// Èç¹û¼ì²âµ½ÉèÖÃÁËzipÎÄ¼þ£¬ÄÇÃ´´ÓzipÎÄ¼þµÃµ½path
+	// ï¿½ï¿½ï¿½ï¿½ï¿½âµ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½zipï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½Ã´ï¿½ï¿½zipï¿½Ä¼ï¿½ï¿½Ãµï¿½path
 	if (compressionfile.size() > 0)
 	{
 		std::vector<std::string> tmpvec;
@@ -263,7 +263,7 @@ int process_make_client_sdk(int argc, char* argv[], const std::string clientType
 		ret = -1;
 	}
 
-	// ¿ªÊ¼´ò°ü
+	// ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½
 	if (compressionfile.size() > 0)
 	{
 		if (compressionType == 1)
@@ -293,7 +293,7 @@ int process_make_client_sdk(int argc, char* argv[], const std::string clientType
 	app.finalise();
 	INFO_MSG(fmt::format("{}({}) has shut down. ClientSDK={}\n", COMPONENT_NAME_EX(g_componentType), g_componentID, (pClientSDK ? pClientSDK->good() : false)));
 
-	// Èç¹û»¹ÓÐÈÕÖ¾Î´Í¬²½Íê³É£¬ ÕâÀï»á¼ÌÐøÍ¬²½Íê³É²Å½áÊø
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾Î´Í¬ï¿½ï¿½ï¿½ï¿½É£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½É²Å½ï¿½ï¿½ï¿½
 	DebugHelper::getSingleton().finalise();
 
 	if(pClientSDK)
@@ -304,7 +304,7 @@ int process_make_client_sdk(int argc, char* argv[], const std::string clientType
 
 int process_newassets(int argc, char* argv[], const std::string assetsType)
 {
-	// ¸ù¾ÝassetsTypeÉèÖÃKBE_RES_PATHµÄÏîÄ¿»·¾³±äÁ¿
+	// ï¿½ï¿½ï¿½ï¿½assetsTypeï¿½ï¿½ï¿½ï¿½KBE_RES_PATHï¿½ï¿½ï¿½ï¿½Ä¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	std::string res_path = getenv("KBE_RES_PATH") == NULL ? "" : getenv("KBE_RES_PATH");
 	std::string root_path = getenv("KBE_ROOT") == NULL ? "" : getenv("KBE_ROOT");
 
@@ -356,7 +356,7 @@ int process_newassets(int argc, char* argv[], const std::string assetsType)
 
 		app.finalise();
 
-		// Èç¹û»¹ÓÐÈÕÖ¾Î´Í¬²½Íê³É£¬ ÕâÀï»á¼ÌÐøÍ¬²½Íê³É²Å½áÊø
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾Î´Í¬ï¿½ï¿½ï¿½ï¿½É£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½É²Å½ï¿½ï¿½ï¿½
 		DebugHelper::getSingleton().finalise();
 		return -1;
 	}
@@ -368,7 +368,7 @@ int process_newassets(int argc, char* argv[], const std::string assetsType)
 
 		app.finalise();
 
-		// Èç¹û»¹ÓÐÈÕÖ¾Î´Í¬²½Íê³É£¬ ÕâÀï»á¼ÌÐøÍ¬²½Íê³É²Å½áÊø
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾Î´Í¬ï¿½ï¿½ï¿½ï¿½É£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½É²Å½ï¿½ï¿½ï¿½
 		DebugHelper::getSingleton().finalise();
 		return -1;
 	}
@@ -406,7 +406,7 @@ int process_newassets(int argc, char* argv[], const std::string assetsType)
 	app.finalise();
 	INFO_MSG(fmt::format("{}({}) has shut down. ServerAssets={}\n", COMPONENT_NAME_EX(g_componentType), g_componentID, (pServerAssets ? pServerAssets->good() : false)));
 
-	// Èç¹û»¹ÓÐÈÕÖ¾Î´Í¬²½Íê³É£¬ ÕâÀï»á¼ÌÐøÍ¬²½Íê³É²Å½áÊø
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾Î´Í¬ï¿½ï¿½ï¿½ï¿½É£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½É²Å½ï¿½ï¿½ï¿½
 	DebugHelper::getSingleton().finalise();
 
 	if (pServerAssets)

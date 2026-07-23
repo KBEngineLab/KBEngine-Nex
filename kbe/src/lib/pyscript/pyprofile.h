@@ -37,7 +37,7 @@ class PyProfile
 {						
 public:	
 	/** 
-		¼¤»îÓëÍ£Ö¹Ä³¸öprofile
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í£Ö¹Ä³ï¿½ï¿½profile
 	*/
 	static bool start(std::string profile);
 	static bool stop(std::string profile);
@@ -48,7 +48,7 @@ public:
 	static void print_stats(const std::string& sort = "time", const std::string& profileName = "kbengine");
 
 	/** 
-		³õÊ¼»¯pickler 
+		ï¿½ï¿½Ê¼ï¿½ï¿½pickler 
 	*/
 	static bool initialize(Script* pScript);
 	static void finalise(void);
@@ -59,7 +59,7 @@ private:
 
 	static PyObject* profileMethod_;
 
-	static bool	isInit;										// ÊÇ·ñÒÑ¾­±»³õÊ¼»¯
+	static bool	isInit;										// ï¿½Ç·ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½
 
 	static Script* pScript_;
 } ;

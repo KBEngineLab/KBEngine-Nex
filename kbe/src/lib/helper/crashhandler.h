@@ -39,13 +39,13 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 	
 namespace KBEngine{ namespace exception {
-/** °²×° */
+/** ï¿½ï¿½×° */
 void installCrashHandler(int svnVer, const char* dumpType);
 
-/** ´´½¨dumpÎÄ¼þº¯Êý */
+/** ï¿½ï¿½ï¿½ï¿½dumpï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½ */
 void createMiniDump(EXCEPTION_POINTERS* pep ); 
 
-/**  ×Ô¶¨ÒåµÄ minidump callback */
+/**  ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ minidump callback */
 BOOL CALLBACK dumpCallback(
 	PVOID                            pParam, 
 	const PMINIDUMP_CALLBACK_INPUT   pInput, 
@@ -53,11 +53,11 @@ BOOL CALLBACK dumpCallback(
 ); 
 
 #ifndef _DEBUG
-	/** ÔÚÒª½Ø»ñcrashµÄ´úÂë×î¿ªÊ¼µÄµØ·½Ð´ÉÏÕâ¸öºê */
+	/** ï¿½ï¿½Òªï¿½Ø»ï¿½crashï¿½Ä´ï¿½ï¿½ï¿½ï¿½î¿ªÊ¼ï¿½ÄµØ·ï¿½Ð´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 	#define THREAD_TRY_EXECUTION int exceptionCode = 0;																												\
 								__try{
 		
-	/** ÔÚÒª½Ø»ñcrashµÄ´úÂë×îÄ©Î²µÄµØ·½Ð´ÉÏÕâ¸öºê */
+	/** ï¿½ï¿½Òªï¿½Ø»ï¿½crashï¿½Ä´ï¿½ï¿½ï¿½ï¿½ï¿½Ä©Î²ï¿½ÄµØ·ï¿½Ð´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 	#define THREAD_HANDLE_CRASH  }__except(exceptionCode = GetExceptionCode(), KBEngine::exception::createMiniDump(GetExceptionInformation()),						\
 															EXCEPTION_EXECUTE_HANDLER) {																			\
 									printf("%x\n", exceptionCode);																									\

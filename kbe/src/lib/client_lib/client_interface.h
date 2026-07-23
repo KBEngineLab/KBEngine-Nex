@@ -39,78 +39,78 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	CLIENTËùÓÐÏûÏ¢½Ó¿ÚÔÚ´Ë¶¨Òå
+	CLIENTï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½Ó¿ï¿½ï¿½Ú´Ë¶ï¿½ï¿½ï¿½
 */
 NETWORK_INTERFACE_DECLARE_BEGIN(ClientInterface)
-	// ·þÎñ¶Ëhello·µ»Ø¡£
+	// ï¿½ï¿½ï¿½ï¿½ï¿½helloï¿½ï¿½ï¿½Ø¡ï¿½
 	CLIENT_MESSAGE_DECLARE_STREAM(onHelloCB,								NETWORK_VARIABLE_MESSAGE)
 
-	// ºÍ·þÎñ¶ËµÄ°æ±¾²»Æ¥Åä
+	// ï¿½Í·ï¿½ï¿½ï¿½ËµÄ°æ±¾ï¿½ï¿½Æ¥ï¿½ï¿½
 	CLIENT_MESSAGE_DECLARE_STREAM(onVersionNotMatch,						NETWORK_VARIABLE_MESSAGE)
 
-	// ºÍ·þÎñ¶ËµÄ½Å±¾²ã°æ±¾²»Æ¥Åä
+	// ï¿½Í·ï¿½ï¿½ï¿½ËµÄ½Å±ï¿½ï¿½ï¿½æ±¾ï¿½ï¿½Æ¥ï¿½ï¿½
 	CLIENT_MESSAGE_DECLARE_STREAM(onScriptVersionNotMatch,					NETWORK_VARIABLE_MESSAGE)
 
-	// ´´½¨ÕËºÅÊ§°Ü¡£
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ëºï¿½Ê§ï¿½Ü¡ï¿½
 	CLIENT_MESSAGE_DECLARE_STREAM(onCreateAccountResult,					NETWORK_VARIABLE_MESSAGE)
 
-	// µÇÂ¼³É¹¦¡£
+	// ï¿½ï¿½Â¼ï¿½É¹ï¿½ï¿½ï¿½
 	CLIENT_MESSAGE_DECLARE_STREAM(onLoginSuccessfully,						NETWORK_VARIABLE_MESSAGE)
 
-	// µÇÂ¼Ê§°Ü¡£
+	// ï¿½ï¿½Â¼Ê§ï¿½Ü¡ï¿½
 	CLIENT_MESSAGE_DECLARE_STREAM(onLoginFailed,							NETWORK_VARIABLE_MESSAGE)
 
-	// ·þÎñÆ÷¶ËÒÑ¾­´´½¨ÁËÒ»¸öÓë¿Í»§¶Ë¹ØÁªµÄ´úÀíEntity || µÇÂ¼Íø¹Ø³É¹¦¡£
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Í»ï¿½ï¿½Ë¹ï¿½ï¿½ï¿½ï¿½Ä´ï¿½ï¿½ï¿½Entity || ï¿½ï¿½Â¼ï¿½ï¿½ï¿½Ø³É¹ï¿½ï¿½ï¿½
 	CLIENT_MESSAGE_DECLARE_ARGS3(onCreatedProxies,							NETWORK_VARIABLE_MESSAGE,
 								uint64,										rndUUID,
 								ENTITY_ID,									eid,
 								std::string,								entityType)
 
-	// µÇÂ¼Íø¹ØÊ§°Ü¡£
+	// ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½Ê§ï¿½Ü¡ï¿½
 	CLIENT_MESSAGE_DECLARE_ARGS1(onLoginBaseappFailed,						NETWORK_FIXED_MESSAGE,
 								SERVER_ERROR_CODE,							failedcode)
 
-	// µÇÂ¼Íø¹ØÊ§°Ü¡£
+	// ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½Ê§ï¿½Ü¡ï¿½
 	CLIENT_MESSAGE_DECLARE_ARGS1(onReloginBaseappFailed,					NETWORK_FIXED_MESSAGE,
 								SERVER_ERROR_CODE,							failedcode)
 
-	// ·þÎñÆ÷ÉÏµÄentityÒÑ¾­½øÈëÓÎÏ·ÊÀ½çÁË¡£
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½entityï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï·ï¿½ï¿½ï¿½ï¿½ï¿½Ë¡ï¿½
 	CLIENT_MESSAGE_DECLARE_STREAM(onEntityEnterWorld,						NETWORK_VARIABLE_MESSAGE)
 
-	// ·þÎñÆ÷ÉÏµÄentityÒÑ¾­Àë¿ªÓÎÏ·ÊÀ½çÁË¡£
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½entityï¿½Ñ¾ï¿½ï¿½ë¿ªï¿½ï¿½Ï·ï¿½ï¿½ï¿½ï¿½ï¿½Ë¡ï¿½
 	CLIENT_MESSAGE_DECLARE_ARGS1(onEntityLeaveWorld,						NETWORK_FIXED_MESSAGE,
 								ENTITY_ID,									eid)
 
-	// ·þÎñÆ÷ÉÏµÄentityÒÑ¾­Àë¿ªÓÎÏ·ÊÀ½çÁË¡£
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½entityï¿½Ñ¾ï¿½ï¿½ë¿ªï¿½ï¿½Ï·ï¿½ï¿½ï¿½ï¿½ï¿½Ë¡ï¿½
 	CLIENT_MESSAGE_DECLARE_STREAM(onEntityLeaveWorldOptimized,				NETWORK_VARIABLE_MESSAGE)
 
-	// ¸æËß¿Í»§¶ËÄ³¸öentityÏú»ÙÁË£¬ ´ËÀàentityÍ¨³£ÊÇ»¹Î´onEntityEnterWorld¡£
+	// ï¿½ï¿½ï¿½ß¿Í»ï¿½ï¿½ï¿½Ä³ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½Ë£ï¿½ ï¿½ï¿½ï¿½ï¿½entityÍ¨ï¿½ï¿½ï¿½Ç»ï¿½Î´onEntityEnterWorldï¿½ï¿½
 	CLIENT_MESSAGE_DECLARE_ARGS1(onEntityDestroyed,							NETWORK_FIXED_MESSAGE,
 								ENTITY_ID,									eid)
 
-	// ·þÎñÆ÷ÉÏµÄentityÒÑ¾­½øÈëspaceÁË¡£
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½entityï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½spaceï¿½Ë¡ï¿½
 	CLIENT_MESSAGE_DECLARE_STREAM(onEntityEnterSpace,						NETWORK_VARIABLE_MESSAGE)
 
-	// ·þÎñÆ÷ÉÏµÄentityÒÑ¾­Àë¿ªspaceÁË¡£
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½entityï¿½Ñ¾ï¿½ï¿½ë¿ªspaceï¿½Ë¡ï¿½
 	CLIENT_MESSAGE_DECLARE_ARGS1(onEntityLeaveSpace,						NETWORK_FIXED_MESSAGE,
 								ENTITY_ID,									eid)
 
-	// Ô¶³Ìºô½Ðentity·½·¨
+	// Ô¶ï¿½Ìºï¿½ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½
 	CLIENT_MESSAGE_DECLARE_STREAM(onRemoteMethodCall,						NETWORK_VARIABLE_MESSAGE)
 	CLIENT_MESSAGE_DECLARE_STREAM(onRemoteMethodCallOptimized,				NETWORK_VARIABLE_MESSAGE)
 
-	// ±»Ìß³ö·þÎñÆ÷
+	// ï¿½ï¿½ï¿½ß³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	CLIENT_MESSAGE_DECLARE_ARGS1(onKicked,									NETWORK_FIXED_MESSAGE,
 								SERVER_ERROR_CODE,							failedcode)
 
-	// ·þÎñÆ÷¸üÐÂentityÊôÐÔ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½
 	CLIENT_MESSAGE_DECLARE_STREAM(onUpdatePropertys,						NETWORK_VARIABLE_MESSAGE)
 	CLIENT_MESSAGE_DECLARE_STREAM(onUpdatePropertysOptimized,				NETWORK_VARIABLE_MESSAGE)
 
-	// ·þÎñÆ÷Ç¿ÖÆÉèÖÃentityµÄÎ»ÖÃÓë³¯Ïò
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½Î»ï¿½ï¿½ï¿½ë³¯ï¿½ï¿½
 	CLIENT_MESSAGE_DECLARE_STREAM(onSetEntityPosAndDir,						NETWORK_VARIABLE_MESSAGE)
 
-	// ·þÎñÆ÷¸üÐÂ°ü
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â°ï¿½
 	CLIENT_MESSAGE_DECLARE_ARGS3(onUpdateBasePos,							NETWORK_FIXED_MESSAGE,
 								float,										x,
 								float,										y,
@@ -175,66 +175,66 @@ NETWORK_INTERFACE_DECLARE_BEGIN(ClientInterface)
 	CLIENT_MESSAGE_DECLARE_STREAM(onUpdateData_xyz_p_optimized,				NETWORK_VARIABLE_MESSAGE)
 	CLIENT_MESSAGE_DECLARE_STREAM(onUpdateData_xyz_r_optimized,				NETWORK_VARIABLE_MESSAGE)
 
-	// download stream¿ªÊ¼ÁË 
+	// download streamï¿½ï¿½Ê¼ï¿½ï¿½ 
 	CLIENT_MESSAGE_DECLARE_ARGS3(onStreamDataStarted,						NETWORK_VARIABLE_MESSAGE,
 								int16,										id,
 								uint32,										datasize,
 								std::string,								descr)
 
-	// ½ÓÊÕµ½streamData
+	// ï¿½ï¿½ï¿½Õµï¿½streamData
 	CLIENT_MESSAGE_DECLARE_STREAM(onStreamDataRecv,							NETWORK_VARIABLE_MESSAGE)
 
-	// download streamÍê³ÉÁË 
+	// download streamï¿½ï¿½ï¿½ï¿½ï¿½ 
 	CLIENT_MESSAGE_DECLARE_ARGS1(onStreamDataCompleted,						NETWORK_FIXED_MESSAGE,
 								int16,										id)
 
-	// µ¼ÈëÐ­Òé
+	// ï¿½ï¿½ï¿½ï¿½Ð­ï¿½ï¿½
 	CLIENT_MESSAGE_DECLARE_STREAM(onImportClientMessages,					NETWORK_VARIABLE_MESSAGE)
 	
-	// µ¼Èëentitydef
+	// ï¿½ï¿½ï¿½ï¿½entitydef
 	CLIENT_MESSAGE_DECLARE_STREAM(onImportClientEntityDef,					NETWORK_VARIABLE_MESSAGE)
 
-	// ´íÎóÂëÃèÊöµ¼³ö
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	CLIENT_MESSAGE_DECLARE_STREAM(onImportServerErrorsDescr,				NETWORK_VARIABLE_MESSAGE)
 
-	// ½ÓÊÕµ¼ÈësdkÏûÏ¢
+	// ï¿½ï¿½ï¿½Õµï¿½ï¿½ï¿½sdkï¿½ï¿½Ï¢
 	CLIENT_MESSAGE_DECLARE_STREAM(onImportClientSDK,						NETWORK_VARIABLE_MESSAGE)
 
-	// ·þÎñ¶Ë³õÊ¼»¯spacedata
+	// ï¿½ï¿½ï¿½ï¿½Ë³ï¿½Ê¼ï¿½ï¿½spacedata
 	CLIENT_MESSAGE_DECLARE_STREAM(initSpaceData,							NETWORK_VARIABLE_MESSAGE)
 
-	// ·þÎñ¶ËÉèÖÃÁËspacedata
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½spacedata
 	CLIENT_MESSAGE_DECLARE_ARGS3(setSpaceData,								NETWORK_VARIABLE_MESSAGE,
 								SPACE_ID,									spaceID,
 								std::string,								key,
 								std::string,								val)
 
-	// ·þÎñ¶ËÉ¾³ýÁËspacedata
+	// ï¿½ï¿½ï¿½ï¿½ï¿½É¾ï¿½ï¿½ï¿½ï¿½spacedata
 	CLIENT_MESSAGE_DECLARE_ARGS2(delSpaceData,								NETWORK_VARIABLE_MESSAGE,
 								SPACE_ID,									spaceID,
 								std::string,								key)
 
-	// ÖØÖÃÕËºÅÃÜÂëÇëÇó·µ»Ø
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ëºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ó·µ»ï¿½
 	CLIENT_MESSAGE_DECLARE_ARGS1(onReqAccountResetPasswordCB,				NETWORK_FIXED_MESSAGE,
 								SERVER_ERROR_CODE,							failedcode)
 
-	// ÖØÖÃÕËºÅÃÜÂëÇëÇó·µ»Ø
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ëºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ó·µ»ï¿½
 	CLIENT_MESSAGE_DECLARE_ARGS1(onReqAccountBindEmailCB,					NETWORK_FIXED_MESSAGE,
 								SERVER_ERROR_CODE,							failedcode)
 
-	// ÖØÖÃÕËºÅÃÜÂëÇëÇó·µ»Ø
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ëºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ó·µ»ï¿½
 	CLIENT_MESSAGE_DECLARE_ARGS1(onReqAccountNewPasswordCB,					NETWORK_FIXED_MESSAGE,
 								SERVER_ERROR_CODE,							failedcode)
 
-	// ÖØµÇÂ½Íø¹Ø³É¹¦ 
+	// ï¿½Øµï¿½Â½ï¿½ï¿½ï¿½Ø³É¹ï¿½ 
 	CLIENT_MESSAGE_DECLARE_STREAM(onReloginBaseappSuccessfully,				NETWORK_VARIABLE_MESSAGE)
 									
-	// ¸æËß¿Í»§¶Ë£ºÄãµ±Ç°¸ºÔð£¨»òÈ¡Ïû£©¿ØÖÆË­µÄÎ»ÒÆÍ¬²½
+	// ï¿½ï¿½ï¿½ß¿Í»ï¿½ï¿½Ë£ï¿½ï¿½ãµ±Ç°ï¿½ï¿½ï¿½ð£¨»ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë­ï¿½ï¿½Î»ï¿½ï¿½Í¬ï¿½ï¿½
 	CLIENT_MESSAGE_DECLARE_ARGS2(onControlEntity,							NETWORK_FIXED_MESSAGE,
 									ENTITY_ID,								eid,
 									int8,									isControlled)
 
-	// ·þÎñÆ÷ÐÄÌø»Øµ÷
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Øµï¿½
 	CLIENT_MESSAGE_DECLARE_ARGS0(onAppActiveTickCB,							NETWORK_FIXED_MESSAGE)
 
 	NETWORK_INTERFACE_DECLARE_END()

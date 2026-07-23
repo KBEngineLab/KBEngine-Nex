@@ -46,7 +46,7 @@ struct TcpCompletionData
 	int errorCode;
 
 	// Store one TCP receive completion so upper layers consume data without probing socket readiness again.
-	// ±£´æÒ»´Î TCP ½ÓÊÕÍê³É½á¹û£¬ÈÃÉÏ²ãÏû·ÑÊý¾ÝÊ±²»ÔÙÖØ¸´Ì½²â socket readiness¡£
+	// ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ TCP ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½Ì½ï¿½ï¿½ socket readinessï¿½ï¿½
 };
 
 struct UdpCompletionData
@@ -56,7 +56,7 @@ struct UdpCompletionData
 	int errorCode;
 
 	// Store one UDP datagram completion together with its source address.
-	// ±£´æÒ»´Î UDP Êý¾Ý±¨Íê³É½á¹û¼°ÆäÀ´Ô´µØÖ·¡£
+	// ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ UDP ï¿½ï¿½ï¿½Ý±ï¿½ï¿½ï¿½É½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô´ï¿½ï¿½Ö·ï¿½ï¿½
 };
 
 class EventPoller
@@ -75,35 +75,35 @@ public:
 	virtual int processPendingEvents(double maxWait) = 0;
 	virtual int getFileDescriptor() const;
 
-	// ·µ»Øµ±Ç°ÊÂ¼þºó¶ËµÄÎÈ¶¨Ãû³Æ£¬¹©Æô¶¯ÈÕÖ¾¡¢Õï¶ÏºÍ²âÊÔÊ¶±ðÊµ¼Ê IO Ä£ÐÍ¡£
+	// ï¿½ï¿½ï¿½Øµï¿½Ç°ï¿½Â¼ï¿½ï¿½ï¿½Ëµï¿½ï¿½È¶ï¿½ï¿½ï¿½ï¿½Æ£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½ï¿½ï¿½ÏºÍ²ï¿½ï¿½ï¿½Ê¶ï¿½ï¿½Êµï¿½ï¿½ IO Ä£ï¿½Í¡ï¿½
 	// Return a stable name for the active event backend so startup logs, diagnostics, and tests can identify the actual IO model.
 	virtual const char* ioModelName() const;
 
-	// readiness ºó¶Ë·µ»Ø false£»Íê³ÉÄ£ÐÍ½ÓÈëºóÓÉ¾ßÌåºó¶Ë·µ»Ø true¡£
+	// readiness ï¿½ï¿½Ë·ï¿½ï¿½ï¿½ falseï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½Í½ï¿½ï¿½ï¿½ï¿½ï¿½É¾ï¿½ï¿½ï¿½ï¿½Ë·ï¿½ï¿½ï¿½ trueï¿½ï¿½
 	// Readiness backends return false; a completion backend returns true after it is integrated.
 	virtual bool supportsCompletion() const;
 
-	// ´ÓÍê³É¶ÓÁÐÈ¡³öÒ»¸öÒÑ¾­Íê³ÉµÄ accept£»readiness ºó¶Ë±£³Ö false£¬±ÜÃâ¸Ä±ä¾Éµ÷ÓÃÁ´¡£
+	// ï¿½ï¿½ï¿½ï¿½É¶ï¿½ï¿½ï¿½È¡ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½Éµï¿½ acceptï¿½ï¿½readiness ï¿½ï¿½Ë±ï¿½ï¿½ï¿½ falseï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½Éµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	// Take one completed accept from the completion queue; readiness backends return false to preserve the old call path.
 	virtual bool takeAcceptedSocket(int fd, KBESOCKET& acceptedSocket);
 
-	// ´ÓÍê³É¶ÓÁÐÈ¡³öÒ»¶Î TCP Êý¾Ý»òÖÕÖ¹×´Ì¬£»Êý¾ÝËùÓÐÈ¨ÔÚµ÷ÓÃ·½½ÓÊÕºó×ªÒÆ¡£
+	// ï¿½ï¿½ï¿½ï¿½É¶ï¿½ï¿½ï¿½È¡ï¿½ï¿½Ò»ï¿½ï¿½ TCP ï¿½ï¿½ï¿½Ý»ï¿½ï¿½ï¿½Ö¹×´Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¨ï¿½Úµï¿½ï¿½Ã·ï¿½ï¿½ï¿½ï¿½Õºï¿½×ªï¿½Æ¡ï¿½
 	// Take TCP data or a terminal state from the completion queue; ownership transfers to the caller on success.
 	virtual bool takeTcpReceivedData(int fd, std::vector<char>& data, bool& disconnected, int& errorCode);
 
-	// ´ÓÍê³É¶ÓÁÐÈ¡³öÒ»¸ö UDP Êý¾Ý±¨¼°ÆäÀ´Ô´µØÖ·¡£
+	// ï¿½ï¿½ï¿½ï¿½É¶ï¿½ï¿½ï¿½È¡ï¿½ï¿½Ò»ï¿½ï¿½ UDP ï¿½ï¿½ï¿½Ý±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô´ï¿½ï¿½Ö·ï¿½ï¿½
 	// Take one UDP datagram and its source address from the completion queue.
 	virtual bool takeUdpReceivedData(int fd, std::vector<char>& data, Address& srcAddr, int& errorCode);
 
-	// ½« TCP Êý¾Ý½»¸øÍê³Éºó¶ËÅÅ¶Ó£»¾Éºó¶Ë·µ»Ø false£¬¼ÌÐøÊ¹ÓÃÔ­ÓÐ PacketSender ·¢ËÍÂ·¾¶¡£
+	// ï¿½ï¿½ TCP ï¿½ï¿½ï¿½Ý½ï¿½ï¿½ï¿½ï¿½ï¿½Éºï¿½ï¿½ï¿½Å¶Ó£ï¿½ï¿½Éºï¿½Ë·ï¿½ï¿½ï¿½ falseï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½Ô­ï¿½ï¿½ PacketSender ï¿½ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½ï¿½
 	// Queue TCP data in a completion backend; legacy backends return false and keep the original PacketSender path.
 	virtual bool queueTcpSend(int fd, const void* data, int len);
 
-	// ½« UDP Êý¾Ý±¨½»¸øÍê³Éºó¶ËÅÅ¶Ó£»¾Éºó¶Ë·µ»Ø false£¬±£³ÖÔ­ÓÐ UDP ·¢ËÍÓïÒå¡£
+	// ï¿½ï¿½ UDP ï¿½ï¿½ï¿½Ý±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Éºï¿½ï¿½ï¿½Å¶Ó£ï¿½ï¿½Éºï¿½Ë·ï¿½ï¿½ï¿½ falseï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô­ï¿½ï¿½ UDP ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½å¡£
 	// Queue a UDP datagram in a completion backend; legacy backends return false and preserve existing UDP send semantics.
 	virtual bool queueUdpSend(int fd, const void* data, int len, const Address& dstAddr);
 
-	// ²éÑ¯Ö¸¶¨ socket ÊÇ·ñÈÔÓÐÍê³Éºó¶Ë´ý·¢ËÍÊý¾Ý£¬ÓÃÓÚ±ÜÃâÖØ¸´×¢²áÐ´ÊÂ¼þ¡£
+	// ï¿½ï¿½Ñ¯Ö¸ï¿½ï¿½ socket ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Éºï¿½Ë´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý£ï¿½ï¿½ï¿½ï¿½Ú±ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½×¢ï¿½ï¿½Ð´ï¿½Â¼ï¿½ï¿½ï¿½
 	// Report whether a socket still has pending completion-backend sends to avoid duplicate write registration.
 	virtual bool hasPendingSend(int fd) const;
 
@@ -112,7 +112,7 @@ public:
 
 	static EventPoller * create();
 
-	// ¸ù¾Ýµ±Ç°±àÒëÆ½Ì¨·µ»Ø 1.x »ùÏßÄ¬ÈÏºó¶ËÃû³Æ£¬²»¸Ä±äºó¶ËÑ¡ÔñÂß¼­¡£
+	// ï¿½ï¿½ï¿½Ýµï¿½Ç°ï¿½ï¿½ï¿½ï¿½Æ½Ì¨ï¿½ï¿½ï¿½ï¿½ 1.x ï¿½ï¿½ï¿½ï¿½Ä¬ï¿½Ïºï¿½ï¿½ï¿½ï¿½ï¿½Æ£ï¿½ï¿½ï¿½ï¿½Ä±ï¿½ï¿½ï¿½Ñ¡ï¿½ï¿½ï¿½ß¼ï¿½ï¿½ï¿½
 	// Return the 1.x baseline backend name for the build platform without changing backend selection logic.
 	static const char* defaultIOModelName();
 

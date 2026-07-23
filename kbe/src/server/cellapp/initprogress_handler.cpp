@@ -151,7 +151,7 @@ bool InitProgressHandler::process()
 
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-		// кЫсп╫е╠╬╤╪╪стьмЙ╠о
+		// О©╫О©╫О©╫п╫е╠О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
 		PyObject* pyResult = PyObject_CallMethod(Cellapp::getSingleton().getEntryScript().get(),
 			const_cast<char*>("onInit"),
 			const_cast<char*>("i"),
@@ -170,7 +170,7 @@ bool InitProgressHandler::process()
 
 	if(PyObject_HasAttrString(Cellapp::getSingleton().getEntryScript().get(), "onReadyForLogin") > 0)
 	{
-		// кЫсп╫е╠╬╤╪╪стьмЙ╠о
+		// О©╫О©╫О©╫п╫е╠О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
 		PyObject* pyResult = PyObject_CallMethod(Cellapp::getSingleton().getEntryScript().get(), 
 											const_cast<char*>("onReadyForLogin"), 
 											const_cast<char*>("i"), 

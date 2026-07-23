@@ -36,14 +36,14 @@ namespace Network
 class Channel;
 class MessageHandlers;
 
-/** Ò»¸öÏûÏ¢µÄ²ÎÊý³éÏóÀà */
+/** Ò»ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½Ä²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 class MessageArgs
 {
 public:
 	enum MESSAGE_ARGS_TYPE
 	{
-		MESSAGE_ARGS_TYPE_VARIABLE = -1,		// ¿É±ä²ÎÊý³¤¶È
-		MESSAGE_ARGS_TYPE_FIXED = 0				// ¹Ì¶¨²ÎÊý³¤¶È
+		MESSAGE_ARGS_TYPE_VARIABLE = -1,		// ï¿½É±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+		MESSAGE_ARGS_TYPE_FIXED = 0				// ï¿½Ì¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	};
 
 	MessageArgs():strArgsTypes(){};
@@ -60,7 +60,7 @@ struct ExposedMessageInfo
 {
 	std::string name;
 	Network::MessageID id;
-	int16 msgLen; // ¶ÔÍâÏûÏ¢²»»á³¬¹ý1500
+	int16 msgLen; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½á³¬ï¿½ï¿½1500
 	int8 argsType;
 	std::vector<uint8> argsTypes;
 };
@@ -74,7 +74,7 @@ public:
 	std::string name;
 	MessageID msgID;
 	MessageArgs* pArgs;
-	int32 msgLen;					// Èç¹û³¤¶ÈÎª-1ÔòÎª·Ç¹Ì¶¨³¤¶ÈÏûÏ¢
+	int32 msgLen;					// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îª-1ï¿½ï¿½Îªï¿½Ç¹Ì¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 	bool exposed;
 	MessageHandlers* pMessageHandlers;
 
@@ -93,7 +93,7 @@ public:
 	uint32 recvavgsize() const  { return (recv_count <= 0) ? 0 : recv_size / recv_count; }
 
 	/**
-		Ä¬ÈÏ·µ»ØÀà±ðÎª×é¼þÏûÏ¢
+		Ä¬ï¿½Ï·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 	*/
 	virtual NETWORK_MESSAGE_TYPE type() const
 	{ 
@@ -105,7 +105,7 @@ public:
 	const char* c_str();
 
 	/**
-		µ±Õâ¸öhandler±»ÕýÊÇ°²×°µ½MessageHandlersºó±»µ÷ÓÃ
+		ï¿½ï¿½ï¿½ï¿½ï¿½handlerï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½×°ï¿½ï¿½MessageHandlersï¿½ó±»µï¿½ï¿½ï¿½
 	*/
 	virtual void onInstall(){}
 
@@ -113,7 +113,7 @@ public:
 	{
 		pArgs->createFromStream(s);
 		
-		// ½«²ÎÊý´«¸ø×îÖÕµÄ½Ó¿Ú
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÕµÄ½Ó¿ï¿½
 	};
 };
 

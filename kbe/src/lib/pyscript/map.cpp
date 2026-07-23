@@ -27,7 +27,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{ namespace script{
 
-/** python map²Ù×÷ËùÐèÒªµÄ·½·¨±í */
+/** python mapï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½Ä·ï¿½ï¿½ï¿½ï¿½ï¿½ */
 PyMappingMethods Map::mappingMethods =
 {
 	(lenfunc)Map::mp_length,					// mp_length
@@ -35,7 +35,7 @@ PyMappingMethods Map::mappingMethods =
 	(objobjargproc)Map::mp_ass_subscript		// mp_ass_subscript
 };
 
-// ²Î¿¼ objects/dictobject.c
+// ï¿½Î¿ï¿½ objects/dictobject.c
 // Hack to implement "key in dict"
 PySequenceMethods Map::mappingSequenceMethods = 
 {

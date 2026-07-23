@@ -171,7 +171,7 @@ bool InitProgressHandler::process()
 	if(delayTicks_++ < 1)
 		return true;
 
-	// Ö»ÓÐµÚÒ»¸öbaseappÉÏ»á´´½¨EntityAutoLoaderÀ´×Ô¶¯¼ÓÔØÊý¾Ý¿âÊµÌå
+	// Ö»ï¿½Ðµï¿½Ò»ï¿½ï¿½baseappï¿½Ï»á´´ï¿½ï¿½EntityAutoLoaderï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½Êµï¿½ï¿½
 	if(g_componentGroupOrder == 1)
 	{
 		if(autoLoadState_ == -1)
@@ -182,8 +182,8 @@ bool InitProgressHandler::process()
 		}
 		else if(autoLoadState_ == 0)
 		{
-			// ±ØÐëµÈ´ýEntityAutoLoaderÖ´ÐÐÍê±Ï
-			// EntityAutoLoaderÖ´ÐÐÍê±Ï»áÉèÖÃautoLoadState_ = 1
+			// ï¿½ï¿½ï¿½ï¿½È´ï¿½EntityAutoLoaderÖ´ï¿½ï¿½ï¿½ï¿½ï¿½
+			// EntityAutoLoaderÖ´ï¿½ï¿½ï¿½ï¿½Ï»ï¿½ï¿½ï¿½ï¿½ï¿½autoLoadState_ = 1
 			if(!pEntityAutoLoader_->process())
 				setAutoLoadState(1);
 			
@@ -199,7 +199,7 @@ bool InitProgressHandler::process()
 
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-		// ËùÓÐ½Å±¾¶¼¼ÓÔØÍê±Ï
+		// ï¿½ï¿½ï¿½Ð½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		PyObject* pyResult = PyObject_CallMethod(Baseapp::getSingleton().getEntryScript().get(), 
 											const_cast<char*>("onBaseAppReady"), 
 											const_cast<char*>("O"), 
@@ -220,7 +220,7 @@ bool InitProgressHandler::process()
 	{
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-		// »Øµ÷»ñµÃÊÇ·ñÄÜ¹»µÇÂ¼
+		// ï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½Ü¹ï¿½ï¿½ï¿½Â¼
 		PyObject* pyResult = PyObject_CallMethod(Baseapp::getSingleton().getEntryScript().get(), 
 											const_cast<char*>("onReadyForLogin"), 
 											const_cast<char*>("O"), 

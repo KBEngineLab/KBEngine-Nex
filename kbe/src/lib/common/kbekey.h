@@ -29,7 +29,7 @@ namespace KBEngine
 
 
 /**
- *	ÒýÇæµÄkey¹ÜÀí
+ *	ï¿½ï¿½ï¿½ï¿½ï¿½keyï¿½ï¿½ï¿½ï¿½
  */
 class KBEKey : public KBE_RSA, public Singleton<KBEKey>
 {

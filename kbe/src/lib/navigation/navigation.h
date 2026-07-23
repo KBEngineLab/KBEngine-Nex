@@ -30,7 +30,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine
 {
 /*
-	µ¼º½Àà
+	ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 */
 class Navigation : public Singleton<Navigation>
 {

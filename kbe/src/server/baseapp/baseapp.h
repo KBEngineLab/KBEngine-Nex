@@ -76,7 +76,7 @@ public:
 	bool run();
 	
 	/** 
-		Ïà¹Ø´¦Àí½Ó¿Ú 
+		ï¿½ï¿½Ø´ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½ 
 	*/
 	virtual void handleTimeout(TimerHandle handle, void * arg);
 	virtual void handleGameTick();
@@ -85,7 +85,7 @@ public:
 	void handleArchive();
 
 	/** 
-		³õÊ¼»¯Ïà¹Ø½Ó¿Ú 
+		ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ø½Ó¿ï¿½ 
 	*/
 	bool initialize();
 	bool initializeBegin();
@@ -106,13 +106,13 @@ public:
 	virtual void onChannelDeregister(Network::Channel * pChannel);
 
 	/**
-		Ò»¸öcellappËÀÍö
+		Ò»ï¿½ï¿½cellappï¿½ï¿½ï¿½ï¿½
 	*/
 	void onCellAppDeath(Network::Channel * pChannel);
 
-	/** ÍøÂç½Ó¿Ú
-		dbmgr¸æÖªÒÑ¾­Æô¶¯µÄÆäËûbaseapp»òÕßcellappµÄµØÖ·
-		µ±Ç°appÐèÒªÖ÷¶¯µÄÈ¥ÓëËûÃÇ½¨Á¢Á¬½Ó
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		dbmgrï¿½ï¿½Öªï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½baseappï¿½ï¿½ï¿½ï¿½cellappï¿½Äµï¿½Ö·
+		ï¿½ï¿½Ç°appï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¥ï¿½ï¿½ï¿½ï¿½ï¿½Ç½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual void onGetEntityAppFromDbmgr(Network::Channel* pChannel, 
 							int32 uid, 
@@ -120,23 +120,23 @@ public:
 							COMPONENT_TYPE componentType, COMPONENT_ID componentID, COMPONENT_ORDER globalorderID, COMPONENT_ORDER grouporderID,
 							uint32 intaddr, uint16 intport, uint32 extaddr, uint16 extport, std::string& extaddrEx);
 	
-	/** ÍøÂç½Ó¿Ú
-		Ä³¸öclientÏò±¾app¸æÖª´¦ÓÚ»î¶¯×´Ì¬¡£
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Ä³ï¿½ï¿½clientï¿½ï¿½appï¿½ï¿½Öªï¿½ï¿½ï¿½Ú»î¶¯×´Ì¬ï¿½ï¿½
 	*/
 	void onClientActiveTick(Network::Channel* pChannel);
 
-	/** ÍøÂç½Ó¿Ú
-		Êý¾Ý¿âÖÐ²éÑ¯µÄ×Ô¶¯entity¼ÓÔØÐÅÏ¢·µ»Ø
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½Ð²ï¿½Ñ¯ï¿½ï¿½ï¿½Ô¶ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½
 	*/
 	void onEntityAutoLoadCBFromDBMgr(Network::Channel* pChannel, MemoryStream& s);
 
 	/** 
-		´´½¨ÁËÒ»¸öentity»Øµ÷
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½entityï¿½Øµï¿½
 	*/
 	virtual Entity* onCreateEntity(PyObject* pyEntity, ScriptDefModule* sm, ENTITY_ID eid);
 
 	/** 
-		´´½¨Ò»¸öentity 
+		ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½entity 
 	*/
 	static PyObject* __py_createEntity(PyObject* self, PyObject* args);
 	static PyObject* __py_createEntityAnywhere(PyObject* self, PyObject* args);
@@ -146,267 +146,267 @@ public:
 	static PyObject* __py_createEntityRemotelyFromDBID(PyObject* self, PyObject* args);
 	
 	/**
-		´´½¨Ò»¸öÐÂµÄspace 
+		ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½space 
 	*/
 	void createCellEntityInNewSpace(Entity* pEntity, PyObject* pyCellappIndex);
 
 	/**
-		»Ö¸´Ò»¸öspace 
+		ï¿½Ö¸ï¿½Ò»ï¿½ï¿½space 
 	*/
 	void restoreSpaceInCell(Entity* pEntity);
 
 	/** 
-		ÔÚÒ»¸ö¸ºÔØ½ÏµÍµÄbaseappÉÏ´´½¨Ò»¸öbaseEntity 
+		ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ø½ÏµÍµï¿½baseappï¿½Ï´ï¿½ï¿½ï¿½Ò»ï¿½ï¿½baseEntity 
 	*/
 	void createEntityAnywhere(const char* entityType, PyObject* params, PyObject* pyCallback);
 
-	/** ÊÕµ½baseappmgr¾ö¶¨½«Ä³¸öbaseappÒªÇócreateEntityAnywhereµÄÇëÇóÔÚ±¾baseappÉÏÖ´ÐÐ 
-		@param entityType	: entityµÄÀà±ð£¬ entities.xmlÖÐµÄ¶¨ÒåµÄ¡£
-		@param strInitData	: Õâ¸öentity±»´´½¨ºóÓ¦¸Ã¸øËû³õÊ¼»¯µÄÒ»Ð©Êý¾Ý£¬ ÐèÒªÊ¹ÓÃpickle.loads½â°ü.
-		@param componentID	: ÇëÇó´´½¨entityµÄbaseappµÄ×é¼þID
+	/** ï¿½Õµï¿½baseappmgrï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä³ï¿½ï¿½baseappÒªï¿½ï¿½createEntityAnywhereï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú±ï¿½baseappï¿½ï¿½Ö´ï¿½ï¿½ 
+		@param entityType	: entityï¿½ï¿½ï¿½ï¿½ï¿½ entities.xmlï¿½ÐµÄ¶ï¿½ï¿½ï¿½Ä¡ï¿½
+		@param strInitData	: ï¿½ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¦ï¿½Ã¸ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ò»Ð©ï¿½ï¿½ï¿½Ý£ï¿½ ï¿½ï¿½ÒªÊ¹ï¿½ï¿½pickle.loadsï¿½ï¿½ï¿½.
+		@param componentID	: ï¿½ï¿½ï¿½ó´´½ï¿½entityï¿½ï¿½baseappï¿½ï¿½ï¿½ï¿½ï¿½ID
 	*/
 	void onCreateEntityAnywhere(Network::Channel* pChannel, MemoryStream& s);
 
 	/**
-	baseapp µÄcreateEntityAnywhereµÄ»Øµ÷
+	baseapp ï¿½ï¿½createEntityAnywhereï¿½Ä»Øµï¿½
 	*/
 	void onCreateEntityAnywhereCallback(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 	void _onCreateEntityAnywhereCallback(Network::Channel* pChannel, CALLBACK_ID callbackID,
 		std::string& entityType, ENTITY_ID eid, COMPONENT_ID componentID);
 
 	/**
-	ÔÚÒ»¸ö¸ºÔØ½ÏµÍµÄbaseappÉÏ´´½¨Ò»¸öbaseEntity
+	ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ø½ÏµÍµï¿½baseappï¿½Ï´ï¿½ï¿½ï¿½Ò»ï¿½ï¿½baseEntity
 	*/
 	void createEntityRemotely(const char* entityType, COMPONENT_ID componentID, PyObject* params, PyObject* pyCallback);
 
-	/** ÊÕµ½baseappmgr¾ö¶¨½«Ä³¸öbaseappÒªÇócreateEntityAnywhereµÄÇëÇóÔÚ±¾baseappÉÏÖ´ÐÐ
-	@param entityType	: entityµÄÀà±ð£¬ entities.xmlÖÐµÄ¶¨ÒåµÄ¡£
-	@param strInitData	: Õâ¸öentity±»´´½¨ºóÓ¦¸Ã¸øËû³õÊ¼»¯µÄÒ»Ð©Êý¾Ý£¬ ÐèÒªÊ¹ÓÃpickle.loads½â°ü.
-	@param componentID	: ÇëÇó´´½¨entityµÄbaseappµÄ×é¼þID
+	/** ï¿½Õµï¿½baseappmgrï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä³ï¿½ï¿½baseappÒªï¿½ï¿½createEntityAnywhereï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú±ï¿½baseappï¿½ï¿½Ö´ï¿½ï¿½
+	@param entityType	: entityï¿½ï¿½ï¿½ï¿½ï¿½ entities.xmlï¿½ÐµÄ¶ï¿½ï¿½ï¿½Ä¡ï¿½
+	@param strInitData	: ï¿½ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¦ï¿½Ã¸ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ò»Ð©ï¿½ï¿½ï¿½Ý£ï¿½ ï¿½ï¿½ÒªÊ¹ï¿½ï¿½pickle.loadsï¿½ï¿½ï¿½.
+	@param componentID	: ï¿½ï¿½ï¿½ó´´½ï¿½entityï¿½ï¿½baseappï¿½ï¿½ï¿½ï¿½ï¿½ID
 	*/
 	void onCreateEntityRemotely(Network::Channel* pChannel, MemoryStream& s);
 
 	/**
-	baseapp µÄcreateEntityAnywhereµÄ»Øµ÷
+	baseapp ï¿½ï¿½createEntityAnywhereï¿½Ä»Øµï¿½
 	*/
 	void onCreateEntityRemotelyCallback(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 	void _onCreateEntityRemotelyCallback(Network::Channel* pChannel, CALLBACK_ID callbackID,
 		std::string& entityType, ENTITY_ID eid, COMPONENT_ID componentID);
 
 	/** 
-		´Ódb»ñÈ¡ÐÅÏ¢´´½¨Ò»¸öentity
+		ï¿½ï¿½dbï¿½ï¿½È¡ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½entity
 	*/
 	void createEntityFromDBID(const char* entityType, DBID dbid, PyObject* pyCallback, const std::string& dbInterfaceName);
 
-	/** ÍøÂç½Ó¿Ú
-		createEntityFromDBIDµÄ»Øµ÷¡£
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		createEntityFromDBIDï¿½Ä»Øµï¿½ï¿½ï¿½
 	*/
 	void onCreateEntityFromDBIDCallback(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
 	/** 
-		´Ódb»ñÈ¡ÐÅÏ¢´´½¨Ò»¸öentity
+		ï¿½ï¿½dbï¿½ï¿½È¡ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½entity
 	*/
 	void createEntityAnywhereFromDBID(const char* entityType, DBID dbid, PyObject* pyCallback, const std::string& dbInterfaceName);
 
-	/** ÍøÂç½Ó¿Ú
-		createEntityAnywhereFromDBIDµÄ»Øµ÷¡£
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		createEntityAnywhereFromDBIDï¿½Ä»Øµï¿½ï¿½ï¿½
 	*/
-	// ´Óbaseappmgr²éÑ¯ÓÃÓÚ´´½¨ÊµÌåµÄ×é¼þid»Øµ÷
+	// ï¿½ï¿½baseappmgrï¿½ï¿½Ñ¯ï¿½ï¿½ï¿½Ú´ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½idï¿½Øµï¿½
 	void onGetCreateEntityAnywhereFromDBIDBestBaseappID(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		createEntityAnywhereFromDBIDµÄ»Øµ÷¡£
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		createEntityAnywhereFromDBIDï¿½Ä»Øµï¿½ï¿½ï¿½
 	*/
-	// ´ÓÊý¾Ý¿âÀ´µÄ»Øµ÷
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½ï¿½Ä»Øµï¿½
 	void onCreateEntityAnywhereFromDBIDCallback(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	// ÇëÇóÔÚÕâ¸ö½ø³ÌÉÏ´´½¨Õâ¸öentity
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entity
 	void createEntityAnywhereFromDBIDOtherBaseapp(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	// ´´½¨Íê±ÏºóµÄ»Øµ÷
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïºï¿½Ä»Øµï¿½
 	void onCreateEntityAnywhereFromDBIDOtherBaseappCallback(Network::Channel* pChannel, COMPONENT_ID createByBaseappID, 
 							std::string entityType, ENTITY_ID createdEntityID, CALLBACK_ID callbackID, DBID dbid);
 	
 	/**
-	´Ódb»ñÈ¡ÐÅÏ¢´´½¨Ò»¸öentity
+	ï¿½ï¿½dbï¿½ï¿½È¡ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½entity
 	*/
 	void createEntityRemotelyFromDBID(const char* entityType, DBID dbid, COMPONENT_ID createToComponentID, 
 		PyObject* pyCallback, const std::string& dbInterfaceName);
 
-	/** ÍøÂç½Ó¿Ú
-	createEntityRemotelyFromDBIDµÄ»Øµ÷¡£
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	createEntityRemotelyFromDBIDï¿½Ä»Øµï¿½ï¿½ï¿½
 	*/
-	// ´ÓÊý¾Ý¿âÀ´µÄ»Øµ÷
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½ï¿½Ä»Øµï¿½
 	void onCreateEntityRemotelyFromDBIDCallback(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	// ÇëÇóÔÚÕâ¸ö½ø³ÌÉÏ´´½¨Õâ¸öentity
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entity
 	void createEntityRemotelyFromDBIDOtherBaseapp(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	// ´´½¨Íê±ÏºóµÄ»Øµ÷
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïºï¿½Ä»Øµï¿½
 	void onCreateEntityRemotelyFromDBIDOtherBaseappCallback(Network::Channel* pChannel, COMPONENT_ID createByBaseappID,
 		std::string entityType, ENTITY_ID createdEntityID, CALLBACK_ID callbackID, DBID dbid);
 
 	/** 
-		ÎªÒ»¸öbaseEntityÔÚÖ¸¶¨µÄcellÉÏ´´½¨Ò»¸öcellEntity 
+		ÎªÒ»ï¿½ï¿½baseEntityï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½cellï¿½Ï´ï¿½ï¿½ï¿½Ò»ï¿½ï¿½cellEntity 
 	*/
 	void createCellEntity(EntityCallAbstract* createToCellEntityCall, Entity* pEntity);
 	
-	/** ÍøÂç½Ó¿Ú
-		createCellEntityÊ§°ÜµÄ»Øµ÷¡£
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		createCellEntityÊ§ï¿½ÜµÄ»Øµï¿½ï¿½ï¿½
 	*/
 	void onCreateCellFailure(Network::Channel* pChannel, ENTITY_ID entityID);
 
-	/** ÍøÂç½Ó¿Ú
-		createCellEntityµÄcellÊµÌå´´½¨³É¹¦»Øµ÷¡£
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		createCellEntityï¿½ï¿½cellÊµï¿½å´´ï¿½ï¿½ï¿½É¹ï¿½ï¿½Øµï¿½ï¿½ï¿½
 	*/
 	void onEntityGetCell(Network::Channel* pChannel, ENTITY_ID id, COMPONENT_ID componentID, SPACE_ID spaceID);
 
 	/** 
-		Í¨Öª¿Í»§¶Ë´´½¨Ò»¸öproxy¶ÔÓ¦µÄÊµÌå 
+		Í¨Öªï¿½Í»ï¿½ï¿½Ë´ï¿½ï¿½ï¿½Ò»ï¿½ï¿½proxyï¿½ï¿½Ó¦ï¿½ï¿½Êµï¿½ï¿½ 
 	*/
 	bool createClientProxies(Proxy* pEntity, bool reload = false);
 
 	/** 
-		ÏòdbmgrÇëÇóÖ´ÐÐÒ»¸öÊý¾Ý¿âÃüÁî
+		ï¿½ï¿½dbmgrï¿½ï¿½ï¿½ï¿½Ö´ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	static PyObject* __py_executeRawDatabaseCommand(PyObject* self, PyObject* args);
 	void executeRawDatabaseCommand(const char* datas, uint32 size, PyObject* pycallback, ENTITY_ID eid, const std::string& dbInterfaceName);
 	void onExecuteRawDatabaseCommandCB(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		dbmgr·¢ËÍ³õÊ¼ÐÅÏ¢
-		startID: ³õÊ¼·ÖÅäENTITY_ID ¶ÎÆðÊ¼Î»ÖÃ
-		endID: ³õÊ¼·ÖÅäENTITY_ID ¶Î½áÊøÎ»ÖÃ
-		startGlobalOrder: È«¾ÖÆô¶¯Ë³Ðò °üÀ¨¸÷ÖÖ²»Í¬×é¼þ
-		startGroupOrder: ×éÄÚÆô¶¯Ë³Ðò£¬ ±ÈÈçÔÚËùÓÐbaseappÖÐµÚ¼¸¸öÆô¶¯¡£
-		machineGroupOrder: ÔÚmachineÖÐÕæÊµµÄ×éË³Ðò, Ìá¹©µ×²ãÔÚÄ³Ð©Ê±ºòÅÐ¶ÏÊÇ·ñÎªµÚÒ»¸öbaseappÊ±Ê¹ÓÃ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		dbmgrï¿½ï¿½ï¿½Í³ï¿½Ê¼ï¿½ï¿½Ï¢
+		startID: ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ENTITY_ID ï¿½ï¿½ï¿½ï¿½Ê¼Î»ï¿½ï¿½
+		endID: ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ENTITY_ID ï¿½Î½ï¿½ï¿½ï¿½Î»ï¿½ï¿½
+		startGlobalOrder: È«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë³ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö²ï¿½Í¬ï¿½ï¿½ï¿½
+		startGroupOrder: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë³ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½baseappï¿½ÐµÚ¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+		machineGroupOrder: ï¿½ï¿½machineï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½Ë³ï¿½ï¿½, ï¿½á¹©ï¿½×²ï¿½ï¿½ï¿½Ä³Ð©Ê±ï¿½ï¿½ï¿½Ð¶ï¿½ï¿½Ç·ï¿½Îªï¿½ï¿½Ò»ï¿½ï¿½baseappÊ±Ê¹ï¿½ï¿½
 	*/
 	void onDbmgrInitCompleted(Network::Channel* pChannel, 
 		GAME_TIME gametime, ENTITY_ID startID, ENTITY_ID endID, COMPONENT_ORDER startGlobalOrder, 
 		COMPONENT_ORDER startGroupOrder, const std::string& digest);
 
-	/** ÍøÂç½Ó¿Ú
-		dbmgr¹ã²¥globalÊý¾ÝµÄ¸Ä±ä
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		dbmgrï¿½ã²¥globalï¿½ï¿½ï¿½ÝµÄ¸Ä±ï¿½
 	*/
 	void onBroadcastBaseAppDataChanged(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		×¢²á½«ÒªµÇÂ¼µÄÕËºÅ, ×¢²áºóÔòÔÊÐíµÇÂ¼µ½´ËÍø¹Ø
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		×¢ï¿½á½«Òªï¿½ï¿½Â¼ï¿½ï¿½ï¿½Ëºï¿½, ×¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void registerPendingLogin(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		ÐÂÓÃ»§ÇëÇóµÇÂ¼µ½Íø¹ØÉÏ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void loginBaseapp(Network::Channel* pChannel, std::string& accountName, std::string& password);
 
-	/** ÍøÂç½Ó¿Ú
-		µ½Íø¹ØÉÏµÇ³ö£¬½ö½ö¶Ï¿ªÁ¬½Ó²¢´¥·¢ÊµÌåµÄonClientDead£¬ÊµÌåÏú»ÙÓÉÓÃ»§¾ö¶¨
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÏµÇ³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¿ï¿½ï¿½ï¿½ï¿½Ó²ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½onClientDeadï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void logoutBaseapp(Network::Channel* pChannel, uint64 key, ENTITY_ID entityID);
 
 	/**
-		Ìß³öÒ»¸öChannel
+		ï¿½ß³ï¿½Ò»ï¿½ï¿½Channel
 	*/
 	void kickChannel(Network::Channel* pChannel, SERVER_ERROR_CODE failedcode);
 
-	/** ÍøÂç½Ó¿Ú
-		ÖØÐÂµÇÂ¼ ¿ìËÙÓëÍø¹Ø½¨Á¢½»»¥¹ØÏµ(Ç°ÌáÊÇÖ®Ç°ÒÑ¾­µÇÂ¼ÁË£¬ 
-		Ö®ºó¶Ï¿ªÔÚ·þÎñÆ÷ÅÐ¶¨¸ÃÇ°¶ËµÄEntityÎ´³¬Ê±Ïú»ÙµÄÇ°ÌáÏÂ¿ÉÒÔ¿ìËÙÓë·þÎñÆ÷½¨Á¢Á¬½Ó²¢´ïµ½²Ù¿Ø¸ÃentityµÄÄ¿µÄ)
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½Âµï¿½Â¼ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµ(Ç°ï¿½ï¿½ï¿½ï¿½Ö®Ç°ï¿½Ñ¾ï¿½ï¿½ï¿½Â¼ï¿½Ë£ï¿½ 
+		Ö®ï¿½ï¿½Ï¿ï¿½ï¿½Ú·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½Ç°ï¿½Ëµï¿½EntityÎ´ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Ùµï¿½Ç°ï¿½ï¿½ï¿½Â¿ï¿½ï¿½Ô¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó²ï¿½ï¿½ïµ½ï¿½Ù¿Ø¸ï¿½entityï¿½ï¿½Ä¿ï¿½ï¿½)
 	*/
 	void reloginBaseapp(Network::Channel* pChannel, std::string& accountName, 
 		std::string& password, uint64 key, ENTITY_ID entityID);
 
 	/**
-	   µÇÂ¼Ê§°Ü
-	   @failedcode: Ê§°Ü·µ»ØÂë NETWORK_ERR_SRV_NO_READY:·þÎñÆ÷Ã»ÓÐ×¼±¸ºÃ, 
-									NETWORK_ERR_ILLEGAL_LOGIN:·Ç·¨µÇÂ¼, 
-									NETWORK_ERR_NAME_PASSWORD:ÓÃ»§Ãû»òÕßÃÜÂë²»ÕýÈ·
+	   ï¿½ï¿½Â¼Ê§ï¿½ï¿½
+	   @failedcode: Ê§ï¿½Ü·ï¿½ï¿½ï¿½ï¿½ï¿½ NETWORK_ERR_SRV_NO_READY:ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½×¼ï¿½ï¿½ï¿½ï¿½, 
+									NETWORK_ERR_ILLEGAL_LOGIN:ï¿½Ç·ï¿½ï¿½ï¿½Â¼, 
+									NETWORK_ERR_NAME_PASSWORD:ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ë²»ï¿½ï¿½È·
 	*/
 	void loginBaseappFailed(Network::Channel* pChannel, std::string& accountName, 
 		SERVER_ERROR_CODE failedcode, bool relogin = false);
 
-	/** ÍøÂç½Ó¿Ú
-		´Ódbmgr»ñÈ¡µ½ÕËºÅEntityÐÅÏ¢
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½dbmgrï¿½ï¿½È¡ï¿½ï¿½ï¿½Ëºï¿½Entityï¿½ï¿½Ï¢
 	*/
 	void onQueryAccountCBFromDbmgr(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 	
 	/**
-		¿Í»§¶Ë×ÔÉí½øÈëÊÀ½çÁË
+		ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void onClientEntityEnterWorld(Proxy* pEntity, COMPONENT_ID componentID);
 
-	/** ÍøÂç½Ó¿Ú
-		entityÊÕµ½Ô¶³ÌcallÇëÇó, ÓÉÄ³¸öappÉÏµÄentityCall·¢Æð(Ö»ÏÞÓë·þÎñÆ÷ÄÚ²¿Ê¹ÓÃ£¬ ¿Í»§¶ËµÄentitycallµ÷ÓÃ·½·¨×ß
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		entityï¿½Õµï¿½Ô¶ï¿½ï¿½callï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½Ä³ï¿½ï¿½appï¿½Ïµï¿½entityCallï¿½ï¿½ï¿½ï¿½(Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú²ï¿½Ê¹ï¿½Ã£ï¿½ ï¿½Í»ï¿½ï¿½Ëµï¿½entitycallï¿½ï¿½ï¿½Ã·ï¿½ï¿½ï¿½ï¿½ï¿½
 		onRemoteCellMethodCallFromClient)
 	*/
 	void onEntityCall(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 	
-	/** ÍøÂç½Ó¿Ú
-		client·ÃÎÊentityµÄcell·½·¨
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		clientï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½cellï¿½ï¿½ï¿½ï¿½
 	*/
 	void onRemoteCallCellMethodFromClient(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		client¸üÐÂÊý¾Ý
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		clientï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void onUpdateDataFromClient(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 	void onUpdateDataFromClientForControlledEntity(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
 
-	/** ÍøÂç½Ó¿Ú
-		cellapp±¸·ÝentityµÄcellÊý¾Ý
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		cellappï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½cellï¿½ï¿½ï¿½ï¿½
 	*/
 	void onBackupEntityCellData(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		cellapp writeToDBÍê³É
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		cellapp writeToDBï¿½ï¿½ï¿½
 	*/
 	void onCellWriteToDBCompleted(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		cellapp×ª·¢entityÏûÏ¢¸øclient
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		cellapp×ªï¿½ï¿½entityï¿½ï¿½Ï¢ï¿½ï¿½client
 	*/
 	void forwardMessageToClientFromCellapp(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		cellapp×ª·¢entityÏûÏ¢¸øÄ³¸öbaseEntityµÄcellEntity
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		cellapp×ªï¿½ï¿½entityï¿½ï¿½Ï¢ï¿½ï¿½Ä³ï¿½ï¿½baseEntityï¿½ï¿½cellEntity
 	*/
 	void forwardMessageToCellappFromCellapp(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 	
 	/**
-		»ñÈ¡ÓÎÏ·Ê±¼ä
+		ï¿½ï¿½È¡ï¿½ï¿½Ï·Ê±ï¿½ï¿½
 	*/
 	static PyObject* __py_gametime(PyObject* self, PyObject* args);
 
-	/** ÍøÂç½Ó¿Ú
-		Ð´entityµ½db»Øµ÷
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Ð´entityï¿½ï¿½dbï¿½Øµï¿½
 	*/
 	void onWriteToDBCallback(Network::Channel* pChannel, ENTITY_ID eid, DBID entityDBID, 
 		uint16 dbInterfaceIndex, CALLBACK_ID callbackID, bool success);
 
 	/**
-		Ôö¼Óproxices¼ÆÊý
+		ï¿½ï¿½ï¿½ï¿½proxicesï¿½ï¿½ï¿½ï¿½
 	*/
 	void incProxicesCount() { ++numProxices_; }
 
 	/**
-		¼õÉÙproxices¼ÆÊý
+		ï¿½ï¿½ï¿½ï¿½proxicesï¿½ï¿½ï¿½ï¿½
 	*/
 	void decProxicesCount() { --numProxices_; }
 
 	/**
-		»ñµÃproxices¼ÆÊý
+		ï¿½ï¿½ï¿½proxicesï¿½ï¿½ï¿½ï¿½
 	*/
 	int32 numProxices() const { return numProxices_; }
 
 	/**
-		»ñµÃnumClients¼ÆÊý
+		ï¿½ï¿½ï¿½numClientsï¿½ï¿½ï¿½ï¿½
 	*/
 	int32 numClients() { return this->networkInterface().numExtChannels(); }
 	
 	/** 
-		ÇëÇó³äÖµ
+		ï¿½ï¿½ï¿½ï¿½ï¿½Öµ
 	*/
 	static PyObject* __py_charge(PyObject* self, PyObject* args);
 	void charge(std::string chargeID, DBID dbid, const std::string& datas, PyObject* pycallback);
@@ -422,102 +422,102 @@ public:
 		const std::string& scriptVerInfo, 
 		const std::string& encryptedKey);
 
-	// ÒýÇæ°æ±¾²»Æ¥Åä
+	// ï¿½ï¿½ï¿½ï¿½æ±¾ï¿½ï¿½Æ¥ï¿½ï¿½
 	virtual void onVersionNotMatch(Network::Channel* pChannel);
 
-	// ÒýÇæ½Å±¾²ã°æ±¾²»Æ¥Åä
+	// ï¿½ï¿½ï¿½ï¿½Å±ï¿½ï¿½ï¿½æ±¾ï¿½ï¿½Æ¥ï¿½ï¿½
 	virtual void onScriptVersionNotMatch(Network::Channel* pChannel);
 
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇóÔÚÆäËûAPPÔÖÄÑ»Ö¸´·µ»Ø½á¹û
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½APPï¿½ï¿½ï¿½Ñ»Ö¸ï¿½ï¿½ï¿½ï¿½Ø½ï¿½ï¿½
 	*/
 	void onRequestRestoreCB(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
 	/**
-		Ò»¸öcellµÄentity¶¼»Ö¸´Íê±Ï
+		Ò»ï¿½ï¿½cellï¿½ï¿½entityï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½
 	*/
 	void onRestoreEntitiesOver(RestoreEntityHandler* pRestoreEntityHandler);
 
-	/** ÍøÂç½Ó¿Ú
-		Ä³¸öbaseappÉÏµÄspace»Ö¸´ÁËcell£¬ ÅÐ¶Ïµ±Ç°baseappÊÇ·ñÓÐÏà¹ØentityÐèÒª»Ö¸´cell
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Ä³ï¿½ï¿½baseappï¿½Ïµï¿½spaceï¿½Ö¸ï¿½ï¿½ï¿½cellï¿½ï¿½ ï¿½Ð¶Ïµï¿½Ç°baseappï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½Òªï¿½Ö¸ï¿½cell
 	*/
 	void onRestoreSpaceCellFromOtherBaseapp(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		Ä³¸öappÇëÇó²é¿´¸Ãapp
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Ä³ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½é¿´ï¿½ï¿½app
 	*/
 	virtual void lookApp(Network::Channel* pChannel);
 
-	/** ÍøÂç½Ó¿Ú
-		¿Í»§¶ËÐ­Òéµ¼³ö
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½Í»ï¿½ï¿½ï¿½Ð­ï¿½éµ¼ï¿½ï¿½
 	*/
 	void importClientMessages(Network::Channel* pChannel);
 
-	/** ÍøÂç½Ó¿Ú
-		¿Í»§¶Ëentitydefµ¼³ö
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½Í»ï¿½ï¿½ï¿½entitydefï¿½ï¿½ï¿½ï¿½
 	*/
 	void importClientEntityDef(Network::Channel* pChannel);
 
 	/**
-		ÖØÐÂµ¼ÈëËùÓÐµÄ½Å±¾
+		ï¿½ï¿½ï¿½Âµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÐµÄ½Å±ï¿½
 	*/
 	static PyObject* __py_reloadScript(PyObject* self, PyObject* args);
 	virtual void reloadScript(bool fullReload);
 	virtual void onReloadScript(bool fullReload);
 
 	/**
-		»ñÈ¡½ø³ÌÊÇ·ñÕýÔÚ¹Ø±ÕÖÐ
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½Ú¹Ø±ï¿½ï¿½ï¿½
 	*/
 	static PyObject* __py_isShuttingDown(PyObject* self, PyObject* args);
 
 	/**
-		»ñÈ¡½ø³ÌÄÚ²¿ÍøÂçµØÖ·
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö·
 	*/
 	static PyObject* __py_address(PyObject* self, PyObject* args);
 
 	/**
-		Í¨¹ýdbid´ÓÊý¾Ý¿âÖÐÉ¾³ýÒ»¸öÊµÌå
+		Í¨ï¿½ï¿½dbidï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½É¾ï¿½ï¿½Ò»ï¿½ï¿½Êµï¿½ï¿½
 
-		´ÓÊý¾Ý¿âÉ¾³ýÊµÌå£¬ Èç¹ûÊµÌå²»ÔÚÏßÔò¿ÉÒÔÖ±½ÓÉ¾³ý»Øµ÷·µ»Øtrue£¬ Èç¹ûÔÚÏßÔò»Øµ÷·µ»ØµÄÊÇentityµÄentitycall£¬ ÆäËûÈÎºÎÔ­Òò¶¼·µ»Øfalse.
+		ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½É¾ï¿½ï¿½Êµï¿½å£¬ ï¿½ï¿½ï¿½Êµï¿½å²»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö±ï¿½ï¿½É¾ï¿½ï¿½ï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½trueï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Øµï¿½ï¿½ï¿½ï¿½Øµï¿½ï¿½ï¿½entityï¿½ï¿½entitycallï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Îºï¿½Ô­ï¿½ò¶¼·ï¿½ï¿½ï¿½false.
 	*/
 	static PyObject* __py_deleteEntityByDBID(PyObject* self, PyObject* args);
 
-	/** ÍøÂç½Ó¿Ú
-		Í¨¹ýdbid´ÓÊý¾Ý¿âÖÐÉ¾³ýÒ»¸öÊµÌåµÄ»Øµ÷
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Í¨ï¿½ï¿½dbidï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½É¾ï¿½ï¿½Ò»ï¿½ï¿½Êµï¿½ï¿½Ä»Øµï¿½
 	*/
 	void deleteEntityByDBIDCB(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
 	/**
-		Í¨¹ýdbid²éÑ¯Ò»¸öÊµÌåÊÇ·ñ´ÓÊý¾Ý¿â¼ì³ö
+		Í¨ï¿½ï¿½dbidï¿½ï¿½Ñ¯Ò»ï¿½ï¿½Êµï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 
-		Èç¹ûÊµÌåÔÚÏß»Øµ÷·µ»Øbaseentitycall£¬Èç¹ûÊµÌå²»ÔÚÏßÔò»Øµ÷·µ»Øtrue£¬ÆäËûÈÎºÎÔ­Òò¶¼·µ»Øfalse.
+		ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ß»Øµï¿½ï¿½ï¿½ï¿½ï¿½baseentitycallï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½å²»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½trueï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îºï¿½Ô­ï¿½ò¶¼·ï¿½ï¿½ï¿½false.
 	*/
 	static PyObject* __py_lookUpEntityByDBID(PyObject* self, PyObject* args);
 
-	/** ÍøÂç½Ó¿Ú
-		Èç¹ûÊµÌåÔÚÏß»Øµ÷·µ»Øbaseentitycall£¬Èç¹ûÊµÌå²»ÔÚÏßÔò»Øµ÷·µ»Øtrue£¬ÆäËûÈÎºÎÔ­Òò¶¼·µ»Øfalse.
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ß»Øµï¿½ï¿½ï¿½ï¿½ï¿½baseentitycallï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½å²»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½trueï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îºï¿½Ô­ï¿½ò¶¼·ï¿½ï¿½ï¿½false.
 	*/
 	void lookUpEntityByDBIDCB(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇó°ó¶¨email
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½email
 	*/
 	void reqAccountBindEmail(Network::Channel* pChannel, ENTITY_ID entityID, std::string& password, std::string& email);
 
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇó°ó¶¨email, dbmgr·µ»Ø½á¹û
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½email, dbmgrï¿½ï¿½ï¿½Ø½ï¿½ï¿½
 	*/
 	void onReqAccountBindEmailCBFromDBMgr(Network::Channel* pChannel, ENTITY_ID entityID, std::string& accountName, std::string& email,
 		SERVER_ERROR_CODE failedcode, std::string& code);
 
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇó°ó¶¨email, baseappmgr·µ»ØÐèÒªÕÒµ½loginappµÄµØÖ·
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½email, baseappmgrï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½Òµï¿½loginappï¿½Äµï¿½Ö·
 	*/
 	void onReqAccountBindEmailCBFromBaseappmgr(Network::Channel* pChannel, ENTITY_ID entityID, std::string& accountName, std::string& email,
 		SERVER_ERROR_CODE failedcode, std::string& code, std::string& loginappCBHost, uint16 loginappCBPort);
 
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇó°ó¶¨email
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½email
 	*/
 	void reqAccountNewPassword(Network::Channel* pChannel, ENTITY_ID entityID, std::string& oldpassworld, std::string& newpassword);
 
@@ -535,12 +535,12 @@ protected:
 	// globalBases
 	GlobalDataClient*										pBaseAppData_;
 
-	// ¼ÇÂ¼µÇÂ¼µ½·þÎñÆ÷µ«»¹Î´´¦ÀíÍê±ÏµÄÕËºÅ
+	// ï¿½ï¿½Â¼ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½ï¿½Ëºï¿½
 	PendingLoginMgr											pendingLoginMgr_;
 
 	ForwardComponent_MessageBuffer							forward_messagebuffer_;
 
-	// ±¸·Ý´æµµÏà¹Ø
+	// ï¿½ï¿½ï¿½Ý´æµµï¿½ï¿½ï¿½
 	KBEShared_ptr< Backuper >								pBackuper_;	
 	KBEShared_ptr< Archiver >								pArchiver_;	
 
@@ -554,10 +554,10 @@ protected:
 
 	InitProgressHandler*									pInitProgressHandler_;
 	
-	// APPµÄ±êÖ¾
+	// APPï¿½Ä±ï¿½Ö¾
 	uint32													flags_;
 
-	// ÓÃÓÚ¿Í»§¶Ë¶¯Ì¬µ¼ÈëentitydefÐ­Òé
+	// ï¿½ï¿½ï¿½Ú¿Í»ï¿½ï¿½Ë¶ï¿½Ì¬ï¿½ï¿½ï¿½ï¿½entitydefÐ­ï¿½ï¿½
 	Network::Bundle*										pBundleImportEntityDefDatas_;
 };
 

@@ -29,7 +29,7 @@ namespace KBEngine{ namespace script{
 	
 class ScriptVector4 : public ScriptObject
 {		
-	/** ×ÓÀà»¯ ½«Ò»Ð©py²Ù×÷Ìî³ä½øÅÉÉúÀà */
+	/** ï¿½ï¿½ï¿½à»¯ ï¿½ï¿½Ò»Ð©pyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 	INSTANCE_SCRIPT_HREADER(ScriptVector4, ScriptObject)
 public:	
 	static PySequenceMethods seqMethods;
@@ -41,18 +41,18 @@ public:
 	virtual ~ScriptVector4();
 
 	/** 
-		»ñµÃ¶ÔÏóµÄÃèÊö 
+		ï¿½ï¿½Ã¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	PyObject* tp_repr();
 	PyObject* tp_str();
 
 	/** 
-		½Å±¾Ä£¿é¶ÔÏó´ÓpythonÖÐ´´½¨ 
+		ï¿½Å±ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½pythonï¿½Ð´ï¿½ï¿½ï¿½ 
 	*/
 	static PyObject* tp_new(PyTypeObject* type, PyObject* args, PyObject* kwds);
 
 	/** 
-		seqÏà¹Ø²Ù×÷ 
+		seqï¿½ï¿½Ø²ï¿½ï¿½ï¿½ 
 	*/
 	static Py_ssize_t seq_length(PyObject* self);
 	static PyObject* seq_item(PyObject* self, Py_ssize_t index);
@@ -60,7 +60,7 @@ public:
 	static int seq_ass_item(PyObject* self, Py_ssize_t index, PyObject* value);
 	
 	/** 
-		¼Ó¼õ³Ë³ýÏà¹Ø²Ù×÷ 
+		ï¿½Ó¼ï¿½ï¿½Ë³ï¿½ï¿½ï¿½Ø²ï¿½ï¿½ï¿½ 
 	*/
 	static PyObject* py_add(PyObject *a, PyObject *b);
 	static PyObject* py_subtract(PyObject *a, PyObject *b);
@@ -78,7 +78,7 @@ public:
 	static PyObject* py_inplace_divide(PyObject *self, PyObject *b);
 	
 	/** 
-		±©Â©Ò»Ð©·½·¨ 
+		ï¿½ï¿½Â©Ò»Ð©ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static PyObject* __py_pyDistTo(PyObject* self, PyObject* args);
 	static PyObject* __py_pyDistSqrTo(PyObject* self, PyObject* args);
@@ -98,17 +98,17 @@ public:
 	DECLARE_PY_GETSET_MOTHOD(pyGetW, pySetW);
 	
 	/** 
-		Ö§³Öpickler ·½·¨ 
+		Ö§ï¿½ï¿½pickler ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static PyObject* __reduce_ex__(PyObject* self, PyObject* protocol);
 
 	/** 
-		unpickle·½·¨ 
+		unpickleï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static PyObject* __unpickle__(PyObject* self, PyObject* args);
 
 	/** 
-		½Å±¾±»°²×°Ê±±»µ÷ÓÃ 
+		ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½×°Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static void onInstallScript(PyObject* mod);
 	
@@ -117,12 +117,12 @@ public:
 	void setVector(const Vector4& v){ *val_ = v; }
 	
 	/** 
-		¼ì²éÄ³¸öpython¶ÔÏóÊÇ·ñ¿ÉÒÔ×ª»»Îª±¾ÀàÐÍ 
+		ï¿½ï¿½ï¿½Ä³ï¿½ï¿½pythonï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static bool check(PyObject* value, bool isPrintErr = true);
 	
 	/** 
-		½«Ä³¸ö¾­¹ýcheck¼ì²é¹ýµÄpython¶ÔÏó×ª»»Îªvector4 
+		ï¿½ï¿½Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½checkï¿½ï¿½ï¿½ï¿½ï¿½ï¿½pythonï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Îªvector4 
 	*/
 	static bool convertPyObjectToVector4(Vector4& v, PyObject* obj);
 

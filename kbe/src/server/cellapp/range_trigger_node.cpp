@@ -77,7 +77,7 @@ void RangeTriggerNode::onRemove()
 {
 	CoordinateNode::onRemove();
 
-	// ¼ÈÈ»×Ô¼º¶¼ÒªÉ¾³ýÁË£¬Í¨ÖªpRangeTrigger_Ð¶ÔØ
+	// ï¿½ï¿½È»ï¿½Ô¼ï¿½ï¿½ï¿½ÒªÉ¾ï¿½ï¿½ï¿½Ë£ï¿½Í¨ÖªpRangeTrigger_Ð¶ï¿½ï¿½
 	if (pRangeTrigger_)
 		pRangeTrigger_->uninstall();
 }
@@ -85,7 +85,7 @@ void RangeTriggerNode::onRemove()
 //-------------------------------------------------------------------------------------
 void RangeTriggerNode::onParentRemove(CoordinateNode* pParentNode)
 {
-	// ¼ÈÈ»×Ô¼º¶¼ÒªÉ¾³ýÁË£¬Í¨ÖªpRangeTrigger_Ð¶ÔØ
+	// ï¿½ï¿½È»ï¿½Ô¼ï¿½ï¿½ï¿½ÒªÉ¾ï¿½ï¿½ï¿½Ë£ï¿½Í¨ÖªpRangeTrigger_Ð¶ï¿½ï¿½
 	if (pRangeTrigger_)
 		pRangeTrigger_->uninstall();
 }

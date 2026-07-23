@@ -32,7 +32,7 @@ namespace KBEngine{
 
 class FixedDict : public script::Map
 {		
-	/** ×ÓÀà»¯ ½«Ò»Ð©py²Ù×÷Ìî³ä½øÅÉÉúÀà */
+	/** ï¿½ï¿½ï¿½à»¯ ï¿½ï¿½Ò»Ð©pyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 	INSTANCE_SCRIPT_HREADER(FixedDict, Map)
 public:	
 	static PyMappingMethods mappingMethods;
@@ -46,22 +46,22 @@ public:
 	DataType* getDataType(void){ return _dataType; }
 
 	/** 
-		Ö§³Öpickler ·½·¨ 
+		Ö§ï¿½ï¿½pickler ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static PyObject* __py_reduce_ex__(PyObject* self, PyObject* protocol);
 
 	/** 
-		unpickle·½·¨ 
+		unpickleï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static PyObject* __unpickle__(PyObject* self, PyObject* args);
 	
 	/** 
-		½Å±¾±»°²×°Ê±±»µ÷ÓÃ 
+		ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½×°Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static void onInstallScript(PyObject* mod);
 	
 	/** 
-		map²Ù×÷º¯ÊýÏà¹Ø 
+		mapï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static PyObject* mp_subscript(PyObject* self, PyObject* key);
 
@@ -71,26 +71,26 @@ public:
 	static int mp_length(PyObject* self);
 
 	/** 
-		³õÊ¼»¯¹Ì¶¨×Öµä
+		ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½Ì¶ï¿½ï¿½Öµï¿½
 	*/
 	void initialize(std::string strDictInitData);
 	void initialize(PyObject* pyDictInitData);
 	void initialize(MemoryStream* streamInitData, bool isPersistentsStream);
 
 	/** 
-		¼ì²éÊý¾Ý¸Ä±ä 
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¸Ä±ï¿½ 
 	*/
 	bool checkDataChanged(const char* keyName, 
 		PyObject* value,
 		bool isDelete = false);
 	
 	/**
-		¸üÐÂ×ÖµäÊý¾Ýµ½×Ô¼ºµÄÊý¾ÝÖÐ 
+		ï¿½ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½ï¿½ï¿½Ýµï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	PyObject* update(PyObject* args);
 
 	/** 
-		»ñµÃ¶ÔÏóµÄÃèÊö 
+		ï¿½ï¿½Ã¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	PyObject* tp_repr();
 	PyObject* tp_str();

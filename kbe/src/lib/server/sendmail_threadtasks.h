@@ -52,7 +52,7 @@ protected:
 };
 
 /*
-	ÕËºÅ¼¤»îÓÊ¼ş·¢ËÍÏß³ÌÈÎÎñ
+	ï¿½ËºÅ¼ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß³ï¿½ï¿½ï¿½ï¿½ï¿½
 */
 
 class SendActivateEMailTask : public SendEMailTask
@@ -74,7 +74,7 @@ protected:
 };
 
 /*
-	Íü¼ÇÃÜÂëÓÊ¼ş·¢ËÍÏß³ÌÈÎÎñ
+	ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß³ï¿½ï¿½ï¿½ï¿½ï¿½
 */
 
 class SendResetPasswordEMailTask : public SendEMailTask
@@ -96,7 +96,7 @@ protected:
 };
 
 /*
-	ÕËºÅ°ó¶¨ÓÊÏäÓÊ¼ş·¢ËÍÏß³ÌÈÎÎñ
+	ï¿½ËºÅ°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß³ï¿½ï¿½ï¿½ï¿½ï¿½
 */
 
 class SendBindEMailTask : public SendEMailTask

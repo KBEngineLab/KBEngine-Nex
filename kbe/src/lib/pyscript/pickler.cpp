@@ -72,7 +72,7 @@ bool Pickler::initialize(void)
 
 	if (isInit)
 	{
-		// 初始化一个unpickle函数表模块， 所有自定义类的unpickle函数都需要在此注册
+		// 锟斤拷始锟斤拷一锟斤拷unpickle锟斤拷锟斤拷锟斤拷模锟介， 锟斤拷锟斤拷锟皆讹拷锟斤拷锟斤拷锟絬npickle锟斤拷锟斤拷锟斤拷锟斤拷要锟节达拷注锟斤拷
 		pyPickleFuncTableModule_ = PyImport_AddModule("_upf");
 
 		static struct PyModuleDef moduleDesc =

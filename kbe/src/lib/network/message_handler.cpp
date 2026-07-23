@@ -265,7 +265,7 @@ std::string MessageHandlers::getDigestStr()
 			rootNode = xml->getRootNode();
 			if (rootNode == NULL)
 			{
-				// root节点下没有子节点了
+				// root锟节碉拷锟斤拷没锟斤拷锟接节碉拷锟斤拷
 				return "";
 			}
 

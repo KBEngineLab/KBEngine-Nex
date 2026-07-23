@@ -853,7 +853,7 @@ bool ClientSDK::writeEntityCall(ScriptDefModule* pScriptDefModule)
 
 	std::string newModuleName;
 
-	// ÏÈÐ´BaseEntityCall
+	// ï¿½ï¿½Ð´BaseEntityCall
 	if(!writeBaseEntityCallBegin(pScriptDefModule))
 		return false;
 
@@ -952,7 +952,7 @@ bool ClientSDK::writeEntityCall(ScriptDefModule* pScriptDefModule)
 	headerfileBody_ += fmt::format("\n");
 	sourcefileBody_ += fmt::format("\n");
 
-	// ÔÙÐ´CellEntityCall
+	// ï¿½ï¿½Ð´CellEntityCall
 	if (!writeCellEntityCallBegin(pScriptDefModule))
 		return false;
 

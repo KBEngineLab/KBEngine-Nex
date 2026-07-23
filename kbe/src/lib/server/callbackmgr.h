@@ -20,15 +20,15 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 	
 /*
-	CallbackMgr( »Øµ÷¹ÜÀíÆ÷ )
-		ÓÉÓÚÒ»Ð©»Øµ÷²Ù×÷¶¼ÊÇÒì²½µÄ£¬ ÎÒÃÇÍ¨¹ýÒ»¸ö¹ÜÀíÆ÷½«ÕâÐ©»Øµ÷¹ÜÀíÆðÀ´£¬ ²¢¶ÔÍâ·µ»ØÒ»¸ö
-		±êÊ¶¸Ã»Øµ÷µÄÎ¨Ò»id£¬ Íâ²¿¿ÉÒÔÍ¨¹ý¸ÃidÀ´´¥·¢Õâ¸ö»Øµ÷¡£
+	CallbackMgr( ï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ )
+		ï¿½ï¿½ï¿½ï¿½Ò»Ð©ï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ì²½ï¿½Ä£ï¿½ ï¿½ï¿½ï¿½ï¿½Í¨ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð©ï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½â·µï¿½ï¿½Ò»ï¿½ï¿½
+		ï¿½ï¿½Ê¶ï¿½Ã»Øµï¿½ï¿½ï¿½Î¨Ò»idï¿½ï¿½ ï¿½â²¿ï¿½ï¿½ï¿½ï¿½Í¨ï¿½ï¿½ï¿½ï¿½idï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Øµï¿½ï¿½ï¿½
 		
-	ÓÃ·¨:
+	ï¿½Ã·ï¿½:
 	typedef CallbackMgr<std::tr1::function<void(Entity*, int64, bool)>> CALLBACK_MGR;
 	CALLBACK_MGR callbackMgr;
 	void xxx(Entity*, int64, bool){}
-	CALLBACK_ID callbackID = callbackMgr.save(&xxx); // ¿ÉÒÔÊ¹ÓÃbindÀ´°ó¶¨Ò»¸öÀà³ÉÔ±º¯Êý
+	CALLBACK_ID callbackID = callbackMgr.save(&xxx); // ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½bindï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ô±ï¿½ï¿½ï¿½ï¿½
 */
 
 #ifndef KBE_CALLBACKMGR_H
@@ -75,7 +75,7 @@ public:
 	void createFromStream(KBEngine::MemoryStream& s);
 
 	/** 
-		Ïò¹ÜÀíÆ÷Ìí¼ÓÒ»¸ö»Øµ÷ 
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Øµï¿½ 
 	*/
 	CALLBACK_ID save(T callback, uint64 timeout = 0/*secs*/)
 	{
@@ -91,7 +91,7 @@ public:
 	}
 	
 	/** 
-		Í¨¹ýcallbackIDÈ¡×ß»Øµ÷ 
+		Í¨ï¿½ï¿½callbackIDÈ¡ï¿½ß»Øµï¿½ 
 	*/
 	T take(CALLBACK_ID cbID)
 	{
@@ -134,7 +134,7 @@ public:
 	}
 
 	/**
-		³¬Ê±µÄcallback
+		ï¿½ï¿½Ê±ï¿½ï¿½callback
 	*/
 	bool processTimeout(CALLBACK_ID cbID, T callback)
 	{
@@ -143,8 +143,8 @@ public:
 	}
 
 protected:
-	CALLBACKS cbMap_;									// ËùÓÐµÄ»Øµ÷¶¼´æ´¢ÔÚÕâ¸ömapÖÐ
-	IDAllocate<CALLBACK_ID> idAlloc_;					// »Øµ÷µÄid·ÖÅäÆ÷
+	CALLBACKS cbMap_;									// ï¿½ï¿½ï¿½ÐµÄ»Øµï¿½ï¿½ï¿½ï¿½æ´¢ï¿½ï¿½ï¿½ï¿½ï¿½mapï¿½ï¿½
+	IDAllocate<CALLBACK_ID> idAlloc_;					// ï¿½Øµï¿½ï¿½ï¿½idï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	uint64 lastTimestamp_;
 };
 

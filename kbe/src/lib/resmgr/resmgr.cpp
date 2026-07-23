@@ -117,7 +117,7 @@ void Resmgr::updatePaths()
 	char splitFlag = ';';
 	strutil::kbe_split<char>(tbuf, splitFlag, respaths_);
 
-	// windowsÓÃ»§²»ÄÜ·Ö¸îÃ°ºÅ£¬ ¿ÉÄÜ»á°ÑÅÌ·û¸ø·Ö¸îÁË
+	// windowsï¿½Ã»ï¿½ï¿½ï¿½ï¿½Ü·Ö¸ï¿½Ã°ï¿½Å£ï¿½ ï¿½ï¿½ï¿½Ü»ï¿½ï¿½ï¿½Ì·ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½
 #if KBE_PLATFORM != PLATFORM_WIN32
 	if(respaths_.size() < 2)
 	{
@@ -154,7 +154,7 @@ bool Resmgr::initialize()
 	//if(isInit())
 	//	return true;
 
-	// »ñÈ¡ÒýÇæ»·¾³ÅäÖÃ
+	// ï¿½ï¿½È¡ï¿½ï¿½ï¿½æ»·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	kb_env_.root_path		= getenv("KBE_ROOT") == NULL ? "" : getenv("KBE_ROOT");
 	kb_env_.res_path		= getenv("KBE_RES_PATH") == NULL ? "" : getenv("KBE_RES_PATH"); 
 	kb_env_.bin_path		= getenv("KBE_BIN_PATH") == NULL ? "" : getenv("KBE_BIN_PATH"); 

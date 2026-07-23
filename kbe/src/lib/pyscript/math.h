@@ -29,7 +29,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{ namespace script{ namespace math {
 	
-/** 安装数学模块 */
+/** 锟斤拷装锟斤拷学模锟斤拷 */
 bool installModule(const char* moduleName);
 bool uninstallModule();
 

@@ -166,7 +166,7 @@ void CProfileHandler::sendStream(MemoryStream* s)
 //-------------------------------------------------------------------------------------
 bool CProfileHandler::process()
 {
-	// ÕâÀïÃ¿¸ötick¶¼¼ì²éÒ»±é£¬ ·ÀÖ¹ÖÐÍ¾ÓÐÐÂ¼ÓÈëµÄprofileValÃ»±»ÊÕ¼¯µ½
+	// ï¿½ï¿½ï¿½ï¿½Ã¿ï¿½ï¿½tickï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½é£¬ ï¿½ï¿½Ö¹ï¿½ï¿½Í¾ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½profileValÃ»ï¿½ï¿½ï¿½Õ¼ï¿½ï¿½ï¿½
 	ProfileGroup& defaultGroup = ProfileGroup::defaultGroup();
 	ProfileGroup::PROFILEVALS::const_iterator iter = defaultGroup.profiles().begin();
 
@@ -181,7 +181,7 @@ bool CProfileHandler::process()
 
 		CProfileHandler::PROFILEVALS::iterator iter1 = profileVals_.find(name);
 		
-		// Èç¹ûÒÑ¾­³õÊ¼»¯¹ýÔòºöÂÔ
+		// ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		if(iter1 != profileVals_.end())
 		{
 			CProfileHandler::ProfileVal& profileVal = iter1->second;

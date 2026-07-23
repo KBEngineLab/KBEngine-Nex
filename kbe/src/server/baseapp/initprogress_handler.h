@@ -38,8 +38,8 @@ public:
 
 	void setAutoLoadState(int8 state);
 
-	/** ÍøÂç½Ó¿Ú
-		Êý¾Ý¿âÖÐ²éÑ¯µÄ×Ô¶¯entity¼ÓÔØÐÅÏ¢·µ»Ø
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½Ð²ï¿½Ñ¯ï¿½ï¿½ï¿½Ô¶ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½
 	*/
 	void onEntityAutoLoadCBFromDBMgr(Network::Channel* pChannel, MemoryStream& s);
 

@@ -46,7 +46,7 @@ namespace KBEngine{
 class PyBots  : public script::ScriptObject
 {
 	/** 
-		×ÓÀà»¯ ½«Ò»Ð©py²Ù×÷Ìî³ä½øÅÉÉúÀà 
+		ï¿½ï¿½ï¿½à»¯ ï¿½ï¿½Ò»Ð©pyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	INSTANCE_SCRIPT_HREADER(PyBots, ScriptObject)	
 public:
@@ -54,7 +54,7 @@ public:
 	~PyBots();
 
 	/** 
-		±©Â¶Ò»Ð©×Öµä·½·¨¸øpython 
+		ï¿½ï¿½Â¶Ò»Ð©ï¿½Öµä·½ï¿½ï¿½ï¿½ï¿½python 
 	*/
 	DECLARE_PY_MOTHOD_ARG1(pyHas_key, ENTITY_ID);
 	DECLARE_PY_MOTHOD_ARG0(pyKeys);
@@ -65,7 +65,7 @@ public:
 		PyObject * args, PyObject* kwds);
 
 	/** 
-		map²Ù×÷º¯ÊýÏà¹Ø 
+		mapï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static PyObject* mp_subscript(PyObject * self, PyObject * key);
 

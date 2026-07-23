@@ -85,29 +85,29 @@ public:
 	}
 
 	/**
-		ÉèÖÃ½Å±¾Êä³öÀàÐÍÇ°×º
+		ï¿½ï¿½ï¿½Ã½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç°×º
 	*/
 	static PyObject* __py_setScriptLogType(PyObject* self, PyObject* args);
 
 	bool run(void);
 
 	/**
-		ÓÉentitycallÀ´³¢ÊÔ»ñÈ¡Ò»¸öchannelµÄÊµÀý
+		ï¿½ï¿½entitycallï¿½ï¿½ï¿½ï¿½ï¿½Ô»ï¿½È¡Ò»ï¿½ï¿½channelï¿½ï¿½Êµï¿½ï¿½
 	*/
 	virtual Network::Channel* findChannelByEntityCall(EntityCall& entitycall);
 
-	/** ÍøÂç½Ó¿Ú
-		Ä³¸öappÇëÇó²é¿´¸Ãapp
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Ä³ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½é¿´ï¿½ï¿½app
 	*/
 	virtual void lookApp(Network::Channel* pChannel);
 
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇó¹Ø±Õ·þÎñÆ÷
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½Ø±Õ·ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual void reqCloseServer(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇó¹Ø±Õ·þÎñÆ÷
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½Ø±Õ·ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void reqKillServer(Network::Channel* pChannel, MemoryStream& s);
 
@@ -134,16 +134,16 @@ public:
 
 	static PyObject* __py_addBots(PyObject* self, PyObject* args);
 
-	/** ÍøÂç½Ó¿Ú
-	   Ìí¼Óbots
-	   @total uint32: ×Ü¹²Ìí¼ÓµÄ¸öÊý
-	   @ticknum uint32: Ã¿¸ötickÌí¼Ó¶àÉÙ¸ö
-	   @ticktime float: Ò»¸ötickµÄÊ±¼ä
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	   ï¿½ï¿½ï¿½ï¿½bots
+	   @total uint32: ï¿½Ü¹ï¿½ï¿½ï¿½ï¿½ÓµÄ¸ï¿½ï¿½ï¿½
+	   @ticknum uint32: Ã¿ï¿½ï¿½tickï¿½ï¿½ï¿½Ó¶ï¿½ï¿½Ù¸ï¿½
+	   @ticktime float: Ò»ï¿½ï¿½tickï¿½ï¿½Ê±ï¿½ï¿½
 	*/
 	virtual void addBots(Network::Channel * pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		Ä³¸öappÏò±¾app¸æÖª´¦ÓÚ»î¶¯×´Ì¬¡£
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Ä³ï¿½ï¿½appï¿½ï¿½appï¿½ï¿½Öªï¿½ï¿½ï¿½Ú»î¶¯×´Ì¬ï¿½ï¿½
 	*/
 	void onAppActiveTick(Network::Channel* pChannel, COMPONENT_TYPE componentType, COMPONENT_ID componentID);
 
@@ -151,128 +151,128 @@ public:
 		const std::string& scriptVerInfo, const std::string& protocolMD5, 
 		const std::string& entityDefMD5, COMPONENT_TYPE componentType);
 
-	/** ÍøÂç½Ó¿Ú
-		ºÍ·þÎñ¶ËµÄ°æ±¾²»Æ¥Åä
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½Í·ï¿½ï¿½ï¿½ËµÄ°æ±¾ï¿½ï¿½Æ¥ï¿½ï¿½
 	*/
 	virtual void onVersionNotMatch(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		ºÍ·þÎñ¶ËµÄ½Å±¾²ã°æ±¾²»Æ¥Åä
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½Í·ï¿½ï¿½ï¿½ËµÄ½Å±ï¿½ï¿½ï¿½æ±¾ï¿½ï¿½Æ¥ï¿½ï¿½
 	*/
 	virtual void onScriptVersionNotMatch(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		´´½¨ÕËºÅ³É¹¦ºÍÊ§°Ü»Øµ÷
-	   @failedcode: Ê§°Ü·µ»ØÂë NETWORK_ERR_SRV_NO_READY:·þÎñÆ÷Ã»ÓÐ×¼±¸ºÃ, 
-									NETWORK_ERR_ACCOUNT_CREATE:´´½¨Ê§°Ü£¨ÒÑ¾­´æÔÚ£©, 
-									NETWORK_SUCCESS:ÕËºÅ´´½¨³É¹¦
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ËºÅ³É¹ï¿½ï¿½ï¿½Ê§ï¿½Ü»Øµï¿½
+	   @failedcode: Ê§ï¿½Ü·ï¿½ï¿½ï¿½ï¿½ï¿½ NETWORK_ERR_SRV_NO_READY:ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½×¼ï¿½ï¿½ï¿½ï¿½, 
+									NETWORK_ERR_ACCOUNT_CREATE:ï¿½ï¿½ï¿½ï¿½Ê§ï¿½Ü£ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½Ú£ï¿½, 
+									NETWORK_SUCCESS:ï¿½ËºÅ´ï¿½ï¿½ï¿½ï¿½É¹ï¿½
 
 									SERVER_ERROR_CODE failedcode;
-		@¶þ½øÖÆ¸½´øÊý¾Ý:¶þ½øÖÆ¶îÍâÊý¾Ý: uint32³¤¶È + bytearray
+		@ï¿½ï¿½ï¿½ï¿½ï¿½Æ¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½:ï¿½ï¿½ï¿½ï¿½ï¿½Æ¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½: uint32ï¿½ï¿½ï¿½ï¿½ + bytearray
 	*/
 	virtual void onCreateAccountResult(Network::Channel * pChannel, MemoryStream& s);
 
 	Network::EventPoller* pEventPoller(){ return pEventPoller_; }
 
-	/** ÍøÂç½Ó¿Ú
-	   µÇÂ¼Ê§°Ü»Øµ÷
-	   @failedcode: Ê§°Ü·µ»ØÂë NETWORK_ERR_SRV_NO_READY:·þÎñÆ÷Ã»ÓÐ×¼±¸ºÃ, 
-									NETWORK_ERR_SRV_OVERLOAD:·þÎñÆ÷¸ºÔØ¹ýÖØ, 
-									NETWORK_ERR_NAME_PASSWORD:ÓÃ»§Ãû»òÕßÃÜÂë²»ÕýÈ·
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	   ï¿½ï¿½Â¼Ê§ï¿½Ü»Øµï¿½
+	   @failedcode: Ê§ï¿½Ü·ï¿½ï¿½ï¿½ï¿½ï¿½ NETWORK_ERR_SRV_NO_READY:ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½×¼ï¿½ï¿½ï¿½ï¿½, 
+									NETWORK_ERR_SRV_OVERLOAD:ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø¹ï¿½ï¿½ï¿½, 
+									NETWORK_ERR_NAME_PASSWORD:ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ë²»ï¿½ï¿½È·
 	*/
 	virtual void onLoginFailed(Network::Channel * pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-	   µÇÂ¼³É¹¦
-	   @ip: ·þÎñÆ÷ipµØÖ·
-	   @port: ·þÎñÆ÷¶Ë¿Ú
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	   ï¿½ï¿½Â¼ï¿½É¹ï¿½
+	   @ip: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ipï¿½ï¿½Ö·
+	   @port: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë¿ï¿½
 	*/
 	virtual void onLoginSuccessfully(Network::Channel * pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-	   µÇÂ¼Ê§°Ü»Øµ÷
-	   @failedcode: Ê§°Ü·µ»ØÂë NETWORK_ERR_SRV_NO_READY:·þÎñÆ÷Ã»ÓÐ×¼±¸ºÃ, 
-									NETWORK_ERR_ILLEGAL_LOGIN:·Ç·¨µÇÂ¼, 
-									NETWORK_ERR_NAME_PASSWORD:ÓÃ»§Ãû»òÕßÃÜÂë²»ÕýÈ·
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	   ï¿½ï¿½Â¼Ê§ï¿½Ü»Øµï¿½
+	   @failedcode: Ê§ï¿½Ü·ï¿½ï¿½ï¿½ï¿½ï¿½ NETWORK_ERR_SRV_NO_READY:ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½×¼ï¿½ï¿½ï¿½ï¿½, 
+									NETWORK_ERR_ILLEGAL_LOGIN:ï¿½Ç·ï¿½ï¿½ï¿½Â¼, 
+									NETWORK_ERR_NAME_PASSWORD:ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ë²»ï¿½ï¿½È·
 	*/
 	virtual void onLoginBaseappFailed(Network::Channel * pChannel, SERVER_ERROR_CODE failedcode);
 
-	/** ÍøÂç½Ó¿Ú
-	   ÖØµÇÂ½baseapp³É¹¦
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	   ï¿½Øµï¿½Â½baseappï¿½É¹ï¿½
 	*/
 	virtual void onReloginBaseappSuccessfully(Network::Channel * pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		·þÎñÆ÷¶ËÒÑ¾­´´½¨ÁËÒ»¸öÓë¿Í»§¶Ë¹ØÁªµÄ´úÀíEntity
-	   ÔÚµÇÂ¼Ê±Ò²¿É±í´ï³É¹¦»Øµ÷
-	   @datas: ÕËºÅentityµÄÐÅÏ¢
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Í»ï¿½ï¿½Ë¹ï¿½ï¿½ï¿½ï¿½Ä´ï¿½ï¿½ï¿½Entity
+	   ï¿½Úµï¿½Â¼Ê±Ò²ï¿½É±ï¿½ï¿½ï¿½É¹ï¿½ï¿½Øµï¿½
+	   @datas: ï¿½Ëºï¿½entityï¿½ï¿½ï¿½ï¿½Ï¢
 	*/
 	virtual void onCreatedProxies(Network::Channel * pChannel, uint64 rndUUID, 
 		ENTITY_ID eid, std::string& entityType);
 
-	/** ÍøÂç½Ó¿Ú
-		·þÎñÆ÷ÉÏµÄentityÒÑ¾­½øÈëÓÎÏ·ÊÀ½çÁË
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½entityï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual void onEntityEnterWorld(Network::Channel * pChannel, MemoryStream& s);
 
 
-	/** ÍøÂç½Ó¿Ú
-		·þÎñÆ÷ÉÏµÄentityÒÑ¾­Àë¿ªÓÎÏ·ÊÀ½çÁË
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½entityï¿½Ñ¾ï¿½ï¿½ë¿ªï¿½ï¿½Ï·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual void onEntityLeaveWorld(Network::Channel * pChannel, ENTITY_ID eid);
 	virtual void onEntityLeaveWorldOptimized(Network::Channel * pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		¸æËß¿Í»§¶ËÄ³¸öentityÏú»ÙÁË£¬ ´ËÀàentityÍ¨³£ÊÇ»¹Î´onEntityEnterWorld
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ß¿Í»ï¿½ï¿½ï¿½Ä³ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½Ë£ï¿½ ï¿½ï¿½ï¿½ï¿½entityÍ¨ï¿½ï¿½ï¿½Ç»ï¿½Î´onEntityEnterWorld
 	*/
 	virtual void onEntityDestroyed(Network::Channel * pChannel, ENTITY_ID eid);
 
-	/** ÍøÂç½Ó¿Ú
-		·þÎñÆ÷ÉÏµÄentityÒÑ¾­½øÈëspaceÁË
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½entityï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½spaceï¿½ï¿½
 	*/
 	virtual void onEntityEnterSpace(Network::Channel * pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		·þÎñÆ÷ÉÏµÄentityÒÑ¾­Àë¿ªspaceÁË
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½entityï¿½Ñ¾ï¿½ï¿½ë¿ªspaceï¿½ï¿½
 	*/
 	virtual void onEntityLeaveSpace(Network::Channel * pChannel, ENTITY_ID eid);
 
-	/** ÍøÂç½Ó¿Ú
-		Ô¶³Ìµ÷ÓÃentityµÄ·½·¨ 
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Ô¶ï¿½Ìµï¿½ï¿½ï¿½entityï¿½Ä·ï¿½ï¿½ï¿½ 
 	*/
 	virtual void onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s);
 	virtual void onRemoteMethodCallOptimized(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-	   ±»Ìß³ö·þÎñÆ÷
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	   ï¿½ï¿½ï¿½ß³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual void onKicked(Network::Channel * pChannel, SERVER_ERROR_CODE failedcode);
 
-	/** ÍøÂç½Ó¿Ú
-		·þÎñÆ÷¸üÐÂentityÊôÐÔ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual void onUpdatePropertys(Network::Channel* pChannel, MemoryStream& s);
 	virtual void onUpdatePropertysOptimized(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		·þÎñÆ÷¸üÐÂavatar»ù´¡Î»ÖÃºÍ³¯Ïò
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½avatarï¿½ï¿½ï¿½ï¿½Î»ï¿½ÃºÍ³ï¿½ï¿½ï¿½
 	*/
 	virtual void onUpdateBasePos(Network::Channel* pChannel, float x, float y, float z);
 	virtual void onUpdateBasePosXZ(Network::Channel* pChannel, float x, float z);
 	virtual void onUpdateBaseDir(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		·þÎñÆ÷Ç¿ÖÆÉèÖÃentityµÄÎ»ÖÃÓë³¯Ïò
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½Î»ï¿½ï¿½ï¿½ë³¯ï¿½ï¿½
 	*/
 	virtual void onSetEntityPosAndDir(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		·þÎñÆ÷¸üÐÂVolatileData
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½VolatileData
 	*/
 	virtual void onUpdateData(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		·ÇÓÅ»¯¸ß¾«¶ÈÍ¬²½
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½Å»ï¿½ï¿½ß¾ï¿½ï¿½ï¿½Í¬ï¿½ï¿½
 	*/
 	virtual void onUpdateData_ypr(Network::Channel* pChannel, MemoryStream& s);
 	virtual void onUpdateData_yp(Network::Channel* pChannel, MemoryStream& s);
@@ -300,8 +300,8 @@ public:
 	virtual void onUpdateData_xyz_p(Network::Channel* pChannel, MemoryStream& s);
 	virtual void onUpdateData_xyz_r(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		ÓÅ»¯µÄÎ»ÖÃÍ¬²½
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½Å»ï¿½ï¿½ï¿½Î»ï¿½ï¿½Í¬ï¿½ï¿½
 	*/
 	virtual void onUpdateData_ypr_optimized(Network::Channel* pChannel, MemoryStream& s);
 	virtual void onUpdateData_yp_optimized(Network::Channel* pChannel, MemoryStream& s);
@@ -329,47 +329,47 @@ public:
 	virtual void onUpdateData_xyz_p_optimized(Network::Channel* pChannel, MemoryStream& s);
 	virtual void onUpdateData_xyz_r_optimized(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		download stream¿ªÊ¼ÁË 
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		download streamï¿½ï¿½Ê¼ï¿½ï¿½ 
 	*/
 	virtual void onStreamDataStarted(Network::Channel* pChannel, int16 id, uint32 datasize, std::string& descr);
 
-	/** ÍøÂç½Ó¿Ú
-		½ÓÊÕµ½streamData
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½Õµï¿½streamData
 	*/
 	virtual void onStreamDataRecv(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		download streamÍê³ÉÁË 
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		download streamï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	virtual void onStreamDataCompleted(Network::Channel* pChannel, int16 id);
 
-	/** ÍøÂç½Ó¿Ú
-		spaceÏà¹Ø²Ù×÷½Ó¿Ú
-		·þÎñ¶ËÌí¼ÓÁËÄ³¸öspaceµÄ¼¸ºÎÓ³Éä
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		spaceï¿½ï¿½Ø²ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä³ï¿½ï¿½spaceï¿½Ä¼ï¿½ï¿½ï¿½Ó³ï¿½ï¿½
 	*/
 	virtual void initSpaceData(Network::Channel* pChannel, MemoryStream& s);
 	virtual void setSpaceData(Network::Channel* pChannel, SPACE_ID spaceID, const std::string& key, const std::string& value);
 	virtual void delSpaceData(Network::Channel* pChannel, SPACE_ID spaceID, const std::string& key);
 
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇó²é¿´watcher
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½é¿´watcher
 	*/
 	void queryWatcher(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		consoleÇëÇó¿ªÊ¼profile
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		consoleï¿½ï¿½ï¿½ï¿½Ê¼profile
 	*/
 	void startProfile(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 	virtual void startProfile_(Network::Channel* pChannel, std::string profileName, int8 profileType, uint32 timelen);
 
-	/** ÍøÂç½Ó¿Ú
-	    ·þÎñÆ÷¸æËß¿Í»§¶Ë£ºÄãµ±Ç°£¨È¡Ïû£©¿ØÖÆË­µÄÎ»ÒÆÍ¬²½
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	    ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß¿Í»ï¿½ï¿½Ë£ï¿½ï¿½ãµ±Ç°ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë­ï¿½ï¿½Î»ï¿½ï¿½Í¬ï¿½ï¿½
 	*/
 	virtual void onControlEntity(Network::Channel* pChannel, int32 entityID, int8 isControlled);
 
-	/** ÍøÂç½Ó¿Ú
-		·þÎñÆ÷ÐÄÌø·µ»Ø
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void onAppActiveTickCB(Network::Channel* pChannel);
 
@@ -378,12 +378,12 @@ protected:
 
 	CLIENTS													clients_;
 
-	// consoleÇëÇó´´½¨µ½·þÎñ¶ËµÄbotsÊýÁ¿
+	// consoleï¿½ï¿½ï¿½ó´´½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ëµï¿½botsï¿½ï¿½ï¿½ï¿½
 	uint32													reqCreateAndLoginTotalCount_;
 	uint32													reqCreateAndLoginTickCount_;
 	float													reqCreateAndLoginTickTime_;
 
-	// ´¦Àí´´½¨ÓëµÇÂ¼µÄhandler
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½handler
 	CreateAndLoginHandler*									pCreateAndLoginHandler_;
 
 	Network::EventPoller*									pEventPoller_;

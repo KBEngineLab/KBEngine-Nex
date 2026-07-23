@@ -573,7 +573,7 @@ bool ThreadPool::addTask(TPTask* tptask)
 	{
 		bool threadStartsImmediately = i > 0;
 
-		// Éè¶¨5·ÖÖÓÎ´Ê¹ÓÃÔòÍË³öµÄÏß³Ì
+		// ï¿½è¶¨5ï¿½ï¿½ï¿½ï¿½Î´Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½Ë³ï¿½ï¿½ï¿½ï¿½ß³ï¿½
 		TPThread* tptd = createThread(ThreadPool::timeout, threadStartsImmediately);
 		if(!tptd)
 		{
@@ -585,12 +585,12 @@ bool ThreadPool::addTask(TPTask* tptask)
 #endif				
 		}
 		
-		// ËùÓÐµÄÏß³ÌÁÐ±í
+		// ï¿½ï¿½ï¿½Ðµï¿½ï¿½ß³ï¿½ï¿½Ð±ï¿½
 		allThreadList_.push_back(tptd);	
 		
 		if (threadStartsImmediately)
 		{
-			// ÏÐÖÃµÄÏß³ÌÁÐ±í
+			// ï¿½ï¿½ï¿½Ãµï¿½ï¿½ß³ï¿½ï¿½Ð±ï¿½
 			freeThreadList_.push_back(tptd);
 			++currentFreeThreadCount_;
 		}
@@ -692,7 +692,7 @@ void* TPThread::threadFunc(void* arg)
 			tptd->processTask(task);
 			tptd->onProcessTaskEnd(task);
 			
-			// ³¢ÊÔ¼ÌÐø´ÓÈÎÎñ¶ÓÁÐÀïÈ¡³öÒ»¸ö·±Ã¦µÄÎ´´¦ÀíµÄÈÎÎñ
+			// ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¡ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Ã¦ï¿½ï¿½Î´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 			TPTask * task1 = tptd->tryGetTask();
 
 			if(!task1)
@@ -751,8 +751,8 @@ bool TPThread::onWaitCondSignal(void)
 		DWORD ret = WaitForSingleObject(cond_, threadWaitSecond_ * 1000);
 		ResetEvent(cond_);
 
-		// Èç¹ûÊÇÒòÎª³¬Ê±ÁË£¬ ËµÃ÷Õâ¸öÏß³ÌºÜ¾ÃÃ»ÓÐ±»ÓÃµ½£¬ ÎÒÃÇÓ¦¸Ã×¢ÏúÕâ¸öÏß³Ì¡£
-		// Í¨ÖªThreadPool×¢Ïú×Ô¼º
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½Ê±ï¿½Ë£ï¿½ Ëµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß³ÌºÜ¾ï¿½Ã»ï¿½Ð±ï¿½ï¿½Ãµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ó¦ï¿½ï¿½×¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß³Ì¡ï¿½
+		// Í¨ÖªThreadPool×¢ï¿½ï¿½ï¿½Ô¼ï¿½
 		if (ret == WAIT_TIMEOUT)
 		{
 			threadPool_->removeHangThread(this);
@@ -785,10 +785,10 @@ bool TPThread::onWaitCondSignal(void)
 		int ret = pthread_cond_timedwait(&cond_, &mutex_, &timeout);
 		unlock();
 		
-		// Èç¹ûÊÇÒòÎª³¬Ê±ÁË£¬ ËµÃ÷Õâ¸öÏß³ÌºÜ¾ÃÃ»ÓÐ±»ÓÃµ½£¬ ÎÒÃÇÓ¦¸Ã×¢ÏúÕâ¸öÏß³Ì¡£
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½Ê±ï¿½Ë£ï¿½ Ëµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß³ÌºÜ¾ï¿½Ã»ï¿½Ð±ï¿½ï¿½Ãµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ó¦ï¿½ï¿½×¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß³Ì¡ï¿½
 		if (ret == ETIMEDOUT)
 		{
-			// Í¨ÖªThreadPool×¢Ïú×Ô¼º
+			// Í¨ÖªThreadPool×¢ï¿½ï¿½ï¿½Ô¼ï¿½
 			threadPool_->removeHangThread(this);
 			return false;
 		}

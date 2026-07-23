@@ -35,7 +35,7 @@ public:
 
 // Implementation
 public:
-	/** ·þÎñÆ÷Ö´ÐÐÖ¸ÁîÍê±Ï»ØÏÔ */
+	/** ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö´ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½Ï»ï¿½ï¿½ï¿½ */
 	void onExecScriptCommandCB(Network::Channel* pChannel, std::string& command);
 
 	BOOL PreTranslateMessage(MSG* pMsg);
@@ -134,7 +134,7 @@ private:
 	CToolBar m_ToolBar;
 	CImageList m_ImageList;
 
-	// Ïß³Ì³Ø
+	// ï¿½ß³Ì³ï¿½
 	thread::ThreadPool threadPool_;	
 
 public:

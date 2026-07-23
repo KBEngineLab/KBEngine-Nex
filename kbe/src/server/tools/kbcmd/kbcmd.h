@@ -52,7 +52,7 @@ public:
 	void handleTimeout(TimerHandle handle, void * arg);
 	void handleMainTick();
 
-	/* ³õÊ¼»¯Ïà¹Ø½Ó¿Ú */
+	/* ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ø½Ó¿ï¿½ */
 	bool initializeBegin();
 	bool inInitialize();
 	bool initializeEnd();

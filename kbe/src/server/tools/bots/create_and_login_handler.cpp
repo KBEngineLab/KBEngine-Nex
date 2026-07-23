@@ -62,7 +62,7 @@ void CreateAndLoginHandler::handleTimeout(TimerHandle handle, void * arg)
 
 	if(lasttick > 0.f)
 	{
-		// ц©╦Жtick╪Ух╔0.1цКё╛ н╙0тР©ирт╢╢╫╗р╩╢нгржьжц;
+		// ц©О©╫О©╫tickО©╫О©╫х╔0.1О©╫Кё╛ н╙0О©╫О©╫О©╫О©╫т╢О©╫О©╫О©╫р╩О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫;
 		lasttick -= 0.1f;
 		return;
 	}

@@ -47,19 +47,19 @@ public:
 	INLINE void origin(CoordinateNode* pCoordinateNode);
 
 	/**
-		¸üÐÂ·¶Î§Êý¾Ý
+		ï¿½ï¿½ï¿½Â·ï¿½Î§ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual void update(float xz, float y);
 
 	/**
-		Ä³¸ö½Úµã½øÈë»òÕßÀë¿ªÁËrangeTrigger
+		Ä³ï¿½ï¿½ï¿½Úµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ë¿ªï¿½ï¿½rangeTrigger
 	*/
 	virtual void onEnter(CoordinateNode * pNode) = 0;
 	virtual void onLeave(CoordinateNode * pNode) = 0;
 
 	/**
-		Ä³¸ö½Úµã±ä¶¯¾­¹ýÁË±¾½Úµã
-		@isfront: ÏòÇ°ÒÆ¶¯»¹ÊÇÏòºóÒÆ¶¯
+		Ä³ï¿½ï¿½ï¿½Úµï¿½ä¶¯ï¿½ï¿½ï¿½ï¿½ï¿½Ë±ï¿½ï¿½Úµï¿½
+		@isfront: ï¿½ï¿½Ç°ï¿½Æ¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¶ï¿½
 	*/
 	virtual void onNodePassX(RangeTriggerNode* pRangeTriggerNode, CoordinateNode* pNode, bool isfront);
 	virtual void onNodePassY(RangeTriggerNode* pRangeTriggerNode, CoordinateNode* pNode, bool isfront);

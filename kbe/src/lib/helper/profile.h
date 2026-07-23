@@ -83,25 +83,25 @@ public:
 
 		TimeStamp now = timestamp();
 
-		// ¼ÇÂ¼µÚ¼¸´Î´¦Àí
+		// ï¿½ï¿½Â¼ï¿½Ú¼ï¿½ï¿½Î´ï¿½ï¿½ï¿½
 		if (inProgress_++ == 0)
 			lastTime_ = now;
 
 		ProfileGroup::PROFILEVALS & stack = pProfileGroup_->stack();
 
-		// Èç¹ûÕ»ÖÐÓÐ¶ÔÏóÔò×Ô¼ºÊÇ´ÓÉÏÒ»¸öProfileValº¯Êý½øÈëµ÷ÓÃµÄ
-		// ÎÒÃÇ¿ÉÒÔÔÚ´ËµÃµ½ÉÏÒ»¸öº¯Êý½øÈëµ½±¾º¯ÊýÖ®Ç°µÄÒ»¶ÎÊ±¼äÆ¬
-		// È»ºó½«Æä¼ÓÈëµ½sumIntTime_
+		// ï¿½ï¿½ï¿½Õ»ï¿½ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ç´ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ProfileValï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ãµï¿½
+		// ï¿½ï¿½ï¿½Ç¿ï¿½ï¿½ï¿½ï¿½Ú´ËµÃµï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ëµ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö®Ç°ï¿½ï¿½Ò»ï¿½ï¿½Ê±ï¿½ï¿½Æ¬
+		// È»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ëµ½sumIntTime_
 		if (!stack.empty()){
 			ProfileVal & profile = *stack.back();
 			profile.lastIntTime_ = now - profile.lastIntTime_;
 			profile.sumIntTime_ += profile.lastIntTime_;
 		}
 
-		// ½«×Ô¼ºÑ¹Õ»
+		// ï¿½ï¿½ï¿½Ô¼ï¿½Ñ¹Õ»
 		stack.push_back(this);
 
-		// ¼ÇÂ¼¿ªÊ¼Ê±¼ä
+		// ï¿½ï¿½Â¼ï¿½ï¿½Ê¼Ê±ï¿½ï¿½
 		lastIntTime_ = now;
 	}
 
@@ -109,8 +109,8 @@ public:
 	{
 		TimeStamp now = timestamp();
 
-		// Èç¹ûÎª0Ôò±íÃ÷×Ô¼ºÊÇµ÷ÓÃÕ»µÄ²úÉú×Å
-		// ÔÚ´ËÎÒÃÇ¿ÉÒÔµÃµ½Õâ¸öº¯Êý×Ü¹²ºÄ·ÑµÄÊ±¼ä
+		// ï¿½ï¿½ï¿½Îª0ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Çµï¿½ï¿½ï¿½Õ»ï¿½Ä²ï¿½ï¿½ï¿½ï¿½ï¿½
+		// ï¿½Ú´ï¿½ï¿½ï¿½ï¿½Ç¿ï¿½ï¿½ÔµÃµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü¹ï¿½ï¿½Ä·Ñµï¿½Ê±ï¿½ï¿½
 		if (--inProgress_ == 0){
 			lastTime_ = now - lastTime_;
 			sumTime_ += lastTime_;
@@ -125,13 +125,13 @@ public:
 
 		stack.pop_back();
 
-		// µÃµ½±¾º¯ÊýËùºÄ·ÑµÄÊ±¼ä
+		// ï¿½Ãµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä·Ñµï¿½Ê±ï¿½ï¿½
 		lastIntTime_ = now - lastIntTime_;
 		sumIntTime_ += lastIntTime_;
 
-		// ÎÒÃÇÐèÒªÔÚ´ËÖØÉèÉÏÒ»¸öº¯ÊýÖÐµÄprofile¶ÔÏóµÄ×îºóÒ»´ÎÄÚ²¿Ê±¼ä
-		// Ê¹ÆäÄÜ¹»ÔÚstartÊ±ÕýÈ·µÃµ½×Ôµ÷ÓÃÍê±¾º¯ÊýÖ®ºó½øÈëÏÂÒ»¸öprofileº¯ÊýÖÐÊ±ËùÏûºÄ
-		// µÄÊ±¼äÆ¬¶Î
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½Ú´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½profileï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ú²ï¿½Ê±ï¿½ï¿½
+		// Ê¹ï¿½ï¿½ï¿½Ü¹ï¿½ï¿½ï¿½startÊ±ï¿½ï¿½È·ï¿½Ãµï¿½ï¿½Ôµï¿½ï¿½ï¿½ï¿½ê±¾ï¿½ï¿½ï¿½ï¿½Ö®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½profileï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+		// ï¿½ï¿½Ê±ï¿½ï¿½Æ¬ï¿½ï¿½
 		if (!stack.empty())
 			stack.back()->lastIntTime_ = now;
 	}
@@ -161,29 +161,29 @@ public:
 
 	static void setWarningPeriod(TimeStamp warningPeriod) { warningPeriod_ = warningPeriod; }
 
-	// Ãû³Æ
+	// ï¿½ï¿½ï¿½ï¿½
 	std::string		name_;
 
-	// ProfileGroupÖ¸Õë
+	// ProfileGroupÖ¸ï¿½ï¿½
 	ProfileGroup * pProfileGroup_;
 
-	// startdºóµÄÊ±¼ä.
+	// startdï¿½ï¿½ï¿½Ê±ï¿½ï¿½.
 	TimeStamp		lastTime_;
 
-	// count_´ÎµÄ×ÜÊ±¼ä
+	// count_ï¿½Îµï¿½ï¿½ï¿½Ê±ï¿½ï¿½
 	TimeStamp		sumTime_;
 
-	// ¼ÇÂ¼×îºóÒ»´ÎÄÚ²¿Ê±¼äÆ¬
+	// ï¿½ï¿½Â¼ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ú²ï¿½Ê±ï¿½ï¿½Æ¬
 	TimeStamp		lastIntTime_;
 
-	// count_´ÎÄÚ²¿×ÜÊ±¼ä
+	// count_ï¿½ï¿½ï¿½Ú²ï¿½ï¿½ï¿½Ê±ï¿½ï¿½
 	TimeStamp		sumIntTime_;
 
 	uint32			lastQuantity_;	///< The last value passed into stop.
 	uint32			sumQuantity_;	///< The total of all values passed into stop.
 	uint32			count_;			///< The number of times stop has been called.
 
-									// ¼ÇÂ¼µÚ¼¸´Î´¦Àí, ÈçµÝ¹éµÈ
+									// ï¿½ï¿½Â¼ï¿½Ú¼ï¿½ï¿½Î´ï¿½ï¿½ï¿½, ï¿½ï¿½Ý¹ï¿½ï¿½
 	int				inProgress_;
 
 	bool			initWatcher_;
@@ -233,7 +233,7 @@ private:
 #define STOP_PROFILE_WITH_DATA( PROFILE, DATA )									\
 	PROFILE.stop( __FILE__, __LINE__ , DATA );
 
-// ÓÉ´Ë¿ÉµÃµ½ÏµÍ³profileÊ±¼ä
+// ï¿½É´Ë¿ÉµÃµï¿½ÏµÍ³profileÊ±ï¿½ï¿½
 uint64 runningTime();
 
 #else

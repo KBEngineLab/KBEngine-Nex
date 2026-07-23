@@ -34,7 +34,7 @@ template<typename T>
 class EntityGarbages : public script::ScriptObject
 {
 	/** 
-		×ÓÀà»¯ ½«Ò»Ð©py²Ù×÷Ìî³ä½øÅÉÉúÀà 
+		ï¿½ï¿½ï¿½à»¯ ï¿½ï¿½Ò»Ð©pyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	INSTANCE_SCRIPT_HREADER(EntityGarbages, ScriptObject)	
 public:
@@ -76,7 +76,7 @@ public:
 	}
 
 	/** 
-		±©Â¶Ò»Ð©×Öµä·½·¨¸øpython 
+		ï¿½ï¿½Â¶Ò»Ð©ï¿½Öµä·½ï¿½ï¿½ï¿½ï¿½python 
 	*/
 	DECLARE_PY_MOTHOD_ARG1(pyHas_key, ENTITY_ID);
 	DECLARE_PY_MOTHOD_ARG0(pyKeys);
@@ -87,7 +87,7 @@ public:
 		PyObject * args, PyObject* kwds);
 
 	/** 
-		map²Ù×÷º¯ÊýÏà¹Ø 
+		mapï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static PyObject* mp_subscript(PyObject* self, PyObject* key);
 
@@ -112,7 +112,7 @@ private:
 };
 
 /** 
-	Python EntityGarbages²Ù×÷ËùÐèÒªµÄ·½·¨±í 
+	Python EntityGarbagesï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½Ä·ï¿½ï¿½ï¿½ï¿½ï¿½ 
 */
 template<typename T>
 PyMappingMethods EntityGarbages<T>::mappingMethods =
@@ -122,7 +122,7 @@ PyMappingMethods EntityGarbages<T>::mappingMethods =
 	NULL											// mp_ass_subscript
 };
 
-// ²Î¿¼ objects/dictobject.c
+// ï¿½Î¿ï¿½ objects/dictobject.c
 // Hack to implement "key in dict"
 template<typename T>
 PySequenceMethods EntityGarbages<T>::mappingSequenceMethods = 
@@ -303,10 +303,10 @@ void EntityGarbages<T>::add(ENTITY_ID id, T* entity)
 	}
 	else
 	{
-		// XÃëÄÚÃ»ÓÐÇå¿Õ¹ýgarbagesÔò´íÎó¾¯¸æ
+		// Xï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½Õ¹ï¿½garbagesï¿½ï¿½ï¿½ï¿½ó¾¯¸ï¿½
 		if(_lastTime > 0 && timestamp() - _lastTime > uint64(stampsPerSecond()) * 3600)
 		{
-			// ÔÙÎ´Çå¿ÕÇé¿öÏÂ£¬ÏÂ´Î²»ÌáÊ¾ÁË
+			// ï¿½ï¿½Î´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â£ï¿½ï¿½Â´Î²ï¿½ï¿½ï¿½Ê¾ï¿½ï¿½
 			_lastTime = 0;
 			
 			ERROR_MSG(fmt::format("For a long time(3600s) not to empty the garbages, there may be a leak of the entitys(size:{}), "

@@ -63,9 +63,9 @@ public:
 	static bool finalise();
 
 	/**	
-		µ±´«ÈëµÄÕâ¸öpyobj²¢²»ÊÇµ±Ç°ÀàÐÍÊ±Ôò°´ÕÕµ±Ç°ÀàÐÍ´´½¨³öÒ»¸öobj
-		Ç°ÌáÊÇ¼´Ê¹Õâ¸öPyObject²»ÊÇµ±Ç°ÀàÐÍ£¬ µ«±ØÐëÓµÓÐ×ª»»µÄ¹²ÐÔ
-		¼ÈÒ»¸öpython×Öµä×ª»»ÎªÒ»¸ö¹Ì¶¨×Öµä£¬ ×ÖµäÖÐµÄkey¶¼Æ¥Åä
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½pyobjï¿½ï¿½ï¿½ï¿½ï¿½Çµï¿½Ç°ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Õµï¿½Ç°ï¿½ï¿½ï¿½Í´ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½obj
+		Ç°ï¿½ï¿½ï¿½Ç¼ï¿½Ê¹ï¿½ï¿½ï¿½PyObjectï¿½ï¿½ï¿½Çµï¿½Ç°ï¿½ï¿½ï¿½Í£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Óµï¿½ï¿½×ªï¿½ï¿½ï¿½Ä¹ï¿½ï¿½ï¿½
+		ï¿½ï¿½Ò»ï¿½ï¿½pythonï¿½Öµï¿½×ªï¿½ï¿½ÎªÒ»ï¿½ï¿½ï¿½Ì¶ï¿½ï¿½Öµä£¬ ï¿½Öµï¿½ï¿½Ðµï¿½keyï¿½ï¿½Æ¥ï¿½ï¿½
 	*/
 	virtual PyObject* createNewItemFromObj(PyObject* pyobj)
 	{
@@ -670,9 +670,9 @@ public:
 	const char* getName(void) const{ return "ARRAY";}
 
 	/**	
-		µ±´«ÈëµÄÕâ¸öpyobj²¢²»ÊÇµ±Ç°ÀàÐÍÊ±Ôò°´ÕÕµ±Ç°ÀàÐÍ´´½¨³öÒ»¸öobj
-		Ç°ÌáÊÇ¼´Ê¹Õâ¸öPyObject²»ÊÇµ±Ç°ÀàÐÍ£¬ µ«±ØÐëÓµÓÐ×ª»»µÄ¹²ÐÔ
-		¼ÈÒ»¸öpython×Öµä×ª»»ÎªÒ»¸ö¹Ì¶¨×Öµä£¬ ×ÖµäÖÐµÄkey¶¼Æ¥Åä
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½pyobjï¿½ï¿½ï¿½ï¿½ï¿½Çµï¿½Ç°ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Õµï¿½Ç°ï¿½ï¿½ï¿½Í´ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½obj
+		Ç°ï¿½ï¿½ï¿½Ç¼ï¿½Ê¹ï¿½ï¿½ï¿½PyObjectï¿½ï¿½ï¿½Çµï¿½Ç°ï¿½ï¿½ï¿½Í£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Óµï¿½ï¿½×ªï¿½ï¿½ï¿½Ä¹ï¿½ï¿½ï¿½
+		ï¿½ï¿½Ò»ï¿½ï¿½pythonï¿½Öµï¿½×ªï¿½ï¿½ÎªÒ»ï¿½ï¿½ï¿½Ì¶ï¿½ï¿½Öµä£¬ ï¿½Öµï¿½ï¿½Ðµï¿½keyï¿½ï¿½Æ¥ï¿½ï¿½
 	*/
 	virtual PyObject* createNewItemFromObj(PyObject* pyobj);
 	virtual PyObject* createNewFromObj(PyObject* pyobj);
@@ -680,7 +680,7 @@ public:
 	virtual DATATYPE type() const{ return DATA_TYPE_FIXEDARRAY; }
 
 protected:
-	DataType*			dataType_;		// Õâ¸öÊý×éËù´¦ÀíµÄÀà±ð
+	DataType*			dataType_;		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 };
 
 class FixedDictType : public DataType
@@ -690,10 +690,10 @@ public:
 	{
 		DataType* dataType;
 
-		// ×÷ÎªÒ»¸öÊý¾ÝÀà±ðÔÚaliasÖÐ¿É¶ÔdictÖÐµÄÄ³¸öÏîÖ¸¶¨ÊÇ·ñ³Ö¾Ã»¯
+		// ï¿½ï¿½ÎªÒ»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½aliasï¿½Ð¿É¶ï¿½dictï¿½Ðµï¿½Ä³ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½Ç·ï¿½Ö¾Ã»ï¿½
 		bool persistent;
 
-		// Õâ¸öÊôÐÔÔÚÊý¾Ý¿âÖÐµÄ³¤¶È
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ÐµÄ³ï¿½ï¿½ï¿½
 		uint32 databaseLength;
 	};
 
@@ -705,7 +705,7 @@ public:
 	virtual ~FixedDictType();
 	
 	/** 
-		»ñµÃÕâ¸ö¹Ì¶¨×ÖµäµÄkeyÀà±ð 
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì¶ï¿½ï¿½Öµï¿½ï¿½keyï¿½ï¿½ï¿½ 
 	*/	
 	FIXEDDICT_KEYTYPE_MAP& getKeyTypes(void){ return keyTypes_; }
 
@@ -724,31 +724,31 @@ public:
 	bool initialize(XML* xml, TiXmlNode* node, std::string& parentName);
 	
 	/**	
-		µ±´«ÈëµÄÕâ¸öpyobj²¢²»ÊÇµ±Ç°ÀàÐÍÊ±Ôò°´ÕÕµ±Ç°ÀàÐÍ´´½¨³öÒ»¸öobj
-		Ç°ÌáÊÇ¼´Ê¹Õâ¸öPyObject²»ÊÇµ±Ç°ÀàÐÍ£¬ µ«±ØÐëÓµÓÐ×ª»»µÄ¹²ÐÔ
-		¼ÈÒ»¸öpython×Öµä×ª»»ÎªÒ»¸ö¹Ì¶¨×Öµä£¬ ×ÖµäÖÐµÄkey¶¼Æ¥Åä
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½pyobjï¿½ï¿½ï¿½ï¿½ï¿½Çµï¿½Ç°ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Õµï¿½Ç°ï¿½ï¿½ï¿½Í´ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½obj
+		Ç°ï¿½ï¿½ï¿½Ç¼ï¿½Ê¹ï¿½ï¿½ï¿½PyObjectï¿½ï¿½ï¿½Çµï¿½Ç°ï¿½ï¿½ï¿½Í£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Óµï¿½ï¿½×ªï¿½ï¿½ï¿½Ä¹ï¿½ï¿½ï¿½
+		ï¿½ï¿½Ò»ï¿½ï¿½pythonï¿½Öµï¿½×ªï¿½ï¿½ÎªÒ»ï¿½ï¿½ï¿½Ì¶ï¿½ï¿½Öµä£¬ ï¿½Öµï¿½ï¿½Ðµï¿½keyï¿½ï¿½Æ¥ï¿½ï¿½
 	*/
 	virtual PyObject* createNewItemFromObj(const char* keyName, PyObject* pyobj);
 	virtual PyObject* createNewFromObj(PyObject* pyobj);
 
 	/** 
-		»ñµÃ¹Ì¶¨×ÖµäËùÓÐµÄkeyÃû³Æ 
+		ï¿½ï¿½Ã¹Ì¶ï¿½ï¿½Öµï¿½ï¿½ï¿½ï¿½Ðµï¿½keyï¿½ï¿½ï¿½ï¿½ 
 	*/
 	std::string getKeyNames(void);
 
 	/** 
-		»ñµÃdebugÐÅÏ¢£¬·µ»Ø¹Ì¶¨×ÖµäËùÓÐµÄkeyÃû³ÆºÍÀàÐÍ
+		ï¿½ï¿½ï¿½debugï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½Ø¹Ì¶ï¿½ï¿½Öµï¿½ï¿½ï¿½ï¿½Ðµï¿½keyï¿½ï¿½ï¿½Æºï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	std::string debugInfos(void);
 
 	/** 
-		¼ÓÔØimplÄ£¿é
+		ï¿½ï¿½ï¿½ï¿½implÄ£ï¿½ï¿½
 	*/
 	bool loadImplModule(std::string moduleName);
 	bool setImplModule(PyObject* pyobj);
 
 	/** 
-		implÏà¹ØÊµÏÖ
+		implï¿½ï¿½ï¿½Êµï¿½ï¿½
 	*/
 	PyObject* impl_createObjFromDict(PyObject* dictData);
 	PyObject* impl_getDictFromObj(PyObject* pyobj);
@@ -763,10 +763,10 @@ public:
 	std::string getNotFoundKeys(PyObject* dict);
 
 protected:
-	// Õâ¸ö¹Ì¶¨×ÖµäÀïµÄ¸÷¸ökeyµÄÀàÐÍ
+	// ï¿½ï¿½ï¿½ï¿½Ì¶ï¿½ï¿½Öµï¿½ï¿½ï¿½Ä¸ï¿½ï¿½ï¿½keyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	FIXEDDICT_KEYTYPE_MAP			keyTypes_;				
 
-	// ÊµÏÖ½Å±¾Ä£¿é
+	// Êµï¿½Ö½Å±ï¿½Ä£ï¿½ï¿½
 	PyObject*						implObj_;				
 
 	PyObject*						pycreateObjFromDict_;

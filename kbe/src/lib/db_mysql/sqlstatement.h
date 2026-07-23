@@ -56,7 +56,7 @@ public:
 
 	virtual bool query(DBInterface* pdbi = NULL)
 	{
-		// Ã»ÓÐÊý¾Ý¸üÐÂ
+		// Ã»ï¿½ï¿½ï¿½ï¿½ï¿½Ý¸ï¿½ï¿½ï¿½
 		if(sqlstr_ == "")
 			return true;
 
@@ -145,7 +145,7 @@ public:
 
 	virtual bool query(DBInterface* pdbi = NULL)
 	{
-		// Ã»ÓÐÊý¾Ý¸üÐÂ
+		// Ã»ï¿½ï¿½ï¿½ï¿½ï¿½Ý¸ï¿½ï¿½ï¿½
 		if(sqlstr_ == "")
 			return true;
 
@@ -228,7 +228,7 @@ public:
 
 		// select id,xxx from tbl_SpawnPoint where id=123;
 		sqlstr_ = "select id,";
-		// ÎÞÂÛÄÄÖÖÇé¿ö¶¼²éÑ¯³öID×Ö¶Î
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¯ï¿½ï¿½IDï¿½Ö¶ï¿½
 		sqlstr1_ += " from " ENTITY_TABLE_PERFIX "_";
 		sqlstr1_ += tableName;
 		

@@ -117,7 +117,7 @@ bool MethodDescription::checkArgs(PyObject* args)
 	}	
 	
 	
-	// ¼ì²éÊÇ·ñÊÇÒ»¸öexposed·½·¨
+	// ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½Ò»ï¿½ï¿½exposedï¿½ï¿½ï¿½ï¿½
 	if(offset > 0)
 	{
 		PyObject* pyExposed = PyTuple_GetItem(args, 0);
@@ -167,8 +167,8 @@ void MethodDescription::addToStream(MemoryStream* mstream, PyObject* args)
 	uint8 argsSize = argTypes_.size();
 	int offset = 0;
 
-	// ½«utype·Å½øÈ¥£¬·½±ã¶Ô¶ËÊ¶±ðÕâ¸ö·½·¨
-	// ÕâÀïÈç¹ûaliasID_´óÓÚ0Ôò²ÉÓÃÒ»¸öÓÅ»¯µÄ°ì·¨£¬ Ê¹ÓÃ1×Ö½Ú´«Êä
+	// ï¿½ï¿½utypeï¿½Å½ï¿½È¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¶ï¿½Ê¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½aliasID_ï¿½ï¿½ï¿½ï¿½0ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Å»ï¿½ï¿½Ä°ì·¨ï¿½ï¿½ Ê¹ï¿½ï¿½1ï¿½Ö½Ú´ï¿½ï¿½ï¿½
 	if(aliasID_ < 0)
 	{
 		(*mstream) << utype_;
@@ -179,13 +179,13 @@ void MethodDescription::addToStream(MemoryStream* mstream, PyObject* args)
 		(*mstream) << utype;
 	}
 
-	// Èç¹ûÊÇexposed·½·¨ÔòÏÈ½«entityID´ò°ü½øÈ¥
+	// ï¿½ï¿½ï¿½ï¿½ï¿½exposedï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È½ï¿½entityIDï¿½ï¿½ï¿½ï¿½ï¿½È¥
 	if(isExposed() == EXPOSED_AND_CALLER_CHECK && g_componentType == CELLAPP_TYPE && isCell())
 	{
 		offset = 1;
 	}
 
-	// ½«Ã¿Ò»¸ö²ÎÊýÌí¼Óµ½Á÷ÖÐ
+	// ï¿½ï¿½Ã¿Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Óµï¿½ï¿½ï¿½ï¿½ï¿½
 	for(uint8 i=0; i <argsSize; ++i)
 	{
 		PyObject* pyArg = PyTuple_GetItem(args, i + offset);
@@ -205,7 +205,7 @@ PyObject* MethodDescription::createFromStream(MemoryStream* mstream)
 		offset = 1;
 		pyArgsTuple = PyTuple_New(argSize + offset);
 
-		// ÉèÖÃÒ»¸öµ÷ÓÃÕßIDÌá¹©¸ø½Å±¾ÅÐ¶ÏÀ´Ô´ÊÇ·ñÕýÈ·
+		// ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½IDï¿½á¹©ï¿½ï¿½ï¿½Å±ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½Ô´ï¿½Ç·ï¿½ï¿½ï¿½È·
 		KBE_ASSERT(currCallerID_ > 0);
 		PyTuple_SET_ITEM(pyArgsTuple, 0, PyLong_FromLong(currCallerID_));
 	}

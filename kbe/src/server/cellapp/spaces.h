@@ -40,22 +40,22 @@ public:
 	typedef std::map<SPACE_ID, KBEShared_ptr<Space> > SPACES;
 
 	/** 
-		创建一个新的space 
+		锟斤拷锟斤拷一锟斤拷锟铰碉拷space 
 	*/
 	static Space* createNewSpace(SPACE_ID spaceID, const std::string& scriptModuleName);
 	
 	/**
-		销毁一个space
+		锟斤拷锟斤拷一锟斤拷space
 	*/
 	static bool destroySpace(SPACE_ID spaceID, ENTITY_ID entityID);
 
 	/** 
-		寻找一个指定space 
+		寻锟斤拷一锟斤拷指锟斤拷space 
 	*/
 	static Space* findSpace(SPACE_ID spaceID);
 	
 	/** 
-		更新所有的space 
+		锟斤拷锟斤拷锟斤拷锟叫碉拷space 
 	*/
 	static void update();
 

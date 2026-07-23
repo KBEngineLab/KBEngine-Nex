@@ -53,8 +53,8 @@ inline bool operator==( TimerHandle h1, TimerHandle h2 )
 
 
 /**
- *	±ØÐë¼Ì³ÐÕâ¸ö½Ó¿Ú
- *	À´½ÓÊÕtimer->handleTimeoutÊÂ¼þ
+ *	ï¿½ï¿½ï¿½ï¿½Ì³ï¿½ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+ *	ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½timer->handleTimeoutï¿½Â¼ï¿½
  */
 class TimerHandler
 {

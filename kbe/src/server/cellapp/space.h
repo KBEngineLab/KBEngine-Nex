@@ -45,7 +45,7 @@ public:
 	void loadSpaceGeometry(const std::map< int, std::string >& params);
 
 	/** 
-		¸üÐÂspaceÖÐµÄÄÚÈÝ 
+		ï¿½ï¿½ï¿½ï¿½spaceï¿½Ðµï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	bool update();
 
@@ -56,7 +56,7 @@ public:
 	void removeEntity(Entity* pEntity);
 
 	/**
-		Ò»¸öentity½øÈëÁËÓÎÏ·ÊÀ½ç
+		Ò»ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï·ï¿½ï¿½ï¿½ï¿½
 	*/
 	void onEnterWorld(Entity* pEntity);
 	void _onEnterWorld(Entity* pEntity);
@@ -70,18 +70,18 @@ public:
 	Entity* findEntity(ENTITY_ID entityID);
 
 	/**
-		Ïú»Ù
+		ï¿½ï¿½ï¿½ï¿½
 	*/
 	bool destroy(ENTITY_ID entityID, bool ignoreGhost = true);
 
 	/**
-		Õâ¸öspaceµÄcell
+		ï¿½ï¿½ï¿½spaceï¿½ï¿½cell
 	*/
 	Cell * pCell() const	{ return pCell_; }
 	void pCell( Cell * pCell );
 
 	/**
-		Ìí¼ÓspaceµÄ¼¸ºÎÓ³Éä
+		ï¿½ï¿½ï¿½ï¿½spaceï¿½Ä¼ï¿½ï¿½ï¿½Ó³ï¿½ï¿½
 	*/
 	static PyObject* __py_AddSpaceGeometryMapping(PyObject* self, PyObject* args);
 	bool addSpaceGeometryMapping(std::string respath, bool shouldLoadOnServer, const std::map< int, std::string >& params);
@@ -94,7 +94,7 @@ public:
 	NavigationHandlePtr pNavHandle() const{ return pNavHandle_; }
 
 	/**
-		spaceDataÏà¹Ø²Ù×÷½Ó¿Ú
+		spaceDataï¿½ï¿½Ø²ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
 	*/
 	void setSpaceData(const std::string& key, const std::string& value);
 	void delSpaceData(const std::string& key);
@@ -123,27 +123,27 @@ protected:
 	};
 
 protected:
-	// Õâ¸öspaceµÄID
+	// ï¿½ï¿½ï¿½spaceï¿½ï¿½ID
 	SPACE_ID					id_;														
 
-	// ´´½¨Õâ¸öspaceÊ±ÓÃµÄÊµÌå½Å±¾Ä£¿éÃû³Æ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½spaceÊ±ï¿½Ãµï¿½Êµï¿½ï¿½Å±ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	std::string					scriptModuleName_;
 
-	// Õâ¸öspaceÉÏµÄentity
+	// ï¿½ï¿½ï¿½spaceï¿½Ïµï¿½entity
 	SPACE_ENTITIES				entities_;							
 
-	// ÊÇ·ñ¼ÓÔØ¹ýµØÐÎÊý¾Ý
+	// ï¿½Ç·ï¿½ï¿½ï¿½Ø¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	bool						hasGeometry_;
 
-	// Ã¿¸öspace×î¶àÖ»ÓÐÒ»¸öcell
+	// Ã¿ï¿½ï¿½spaceï¿½ï¿½ï¿½Ö»ï¿½ï¿½Ò»ï¿½ï¿½cell
 	Cell*						pCell_;
 
 	CoordinateSystem			coordinateSystem_;
 
 	NavigationHandlePtr			pNavHandle_;
 
-	// spaceData, Ö»ÄÜ´æ´¢×Ö·û´®×ÊÔ´£¬ ÕâÑùÄÜ±È½ÏºÃµÄ¼æÈÝ¿Í»§¶Ë¡£
-	// ¿ª·¢Õß¿ÉÒÔ½«ÆäËûÀàÐÍ×ª»»³É×Ö·û´®½øÐÐ´«Êä
+	// spaceData, Ö»ï¿½Ü´æ´¢ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½Ô´ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ü±È½ÏºÃµÄ¼ï¿½ï¿½Ý¿Í»ï¿½ï¿½Ë¡ï¿½
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ß¿ï¿½ï¿½Ô½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð´ï¿½ï¿½ï¿½
 	SPACE_DATA					datas_;
 
 	int8						state_;

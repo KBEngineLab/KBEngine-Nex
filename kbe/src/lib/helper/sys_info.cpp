@@ -76,7 +76,7 @@ SystemInfo::SystemInfo()
 {
 	totalmem_ = 0;
 
-	// 不要在初始化中做这件事情，因为全局静态变量这里可能在main之前被调用一次
+	// 锟斤拷要锟节筹拷始锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷椋拷锟轿拷志锟教拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷main之前锟斤拷锟斤拷锟斤拷一锟斤拷
 	//_autocreate();
 	//getCPUPer();
 	//getProcessInfo();

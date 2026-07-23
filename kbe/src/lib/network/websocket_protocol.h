@@ -44,7 +44,7 @@ class WebSocketProtocol
 public:
 	enum FrameType 
 	{
-		// ÏÂÒ»Ö¡Óë½áÊø
+		// ï¿½ï¿½Ò»Ö¡ï¿½ï¿½ï¿½ï¿½ï¿½
 		NEXT_FRAME = 0x0,
 		END_FRAME = 0x80,
 
@@ -54,11 +54,11 @@ public:
 		OPENING_FRAME = 0x3300,
 		CLOSING_FRAME = 0x3400,
 
-		// Î´Íê³ÉµÄÖ¡
+		// Î´ï¿½ï¿½Éµï¿½Ö¡
 		INCOMPLETE_TEXT_FRAME = 0x01,
 		INCOMPLETE_BINARY_FRAME = 0x02,
 
-		// ÎÄ±¾Ö¡Óë¶þ½øÖÆÖ¡ END_FRAME + *_FRAME
+		// ï¿½Ä±ï¿½Ö¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¡ END_FRAME + *_FRAME
 		TEXT_FRAME = 0x81,
 		BINARY_FRAME = 0x82,
 
@@ -66,22 +66,22 @@ public:
 		PING_FRAME = 0x89,
 		PONG_FRAME = 0x8A,
 
-		// ¹Ø±ÕÁ¬½Ó
+		// ï¿½Ø±ï¿½ï¿½ï¿½ï¿½ï¿½
 		CLOSE_FRAME = 0x08
 	};
 
 	/**
-		ÊÇ·ñÊÇwebsocketÐ­Òé
+		ï¿½Ç·ï¿½ï¿½ï¿½websocketÐ­ï¿½ï¿½
 	*/
 	static bool isWebSocketProtocol(MemoryStream* s);
 	
 	/**
-		websocketÐ­ÒéÎÕÊÖ
+		websocketÐ­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	static bool handshake(Network::Channel* pChannel, MemoryStream* s);
 
 	/**
-		Ö¡½âÎöÏà¹Ø
+		Ö¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	static int makeFrame(FrameType frame_type, Packet* pInPacket, Packet* pOutPacket);
 	static int getFrame(Packet* pPacket, uint8& msg_opcode, uint8& msg_fin, uint8& msg_masked, uint32& msg_mask, 

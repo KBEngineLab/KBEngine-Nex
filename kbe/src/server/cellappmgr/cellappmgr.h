@@ -58,40 +58,40 @@ public:
 	void handleTimeout(TimerHandle handle, void * arg);
 	void handleGameTick();
 
-	/* ³õÊ¼»¯Ïà¹Ø½Ó¿Ú */
+	/* ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ø½Ó¿ï¿½ */
 	bool initializeBegin();
 	bool inInitialize();
 	bool initializeEnd();
 	void finalise();
 
-	/** ÕÒ³öÒ»¸ö×î¿ÕÏÐµÄcellapp */
+	/** ï¿½Ò³ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½cellapp */
 	COMPONENT_ID findFreeCellapp(void);
 	void updateBestCellapp();
 
-	/** ÍøÂç½Ó¿Ú
-		baseEntityÇëÇó´´½¨ÔÚÒ»¸öÐÂµÄspaceÖÐ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		baseEntityï¿½ï¿½ï¿½ó´´½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½spaceï¿½ï¿½
 	*/
 	void reqCreateCellEntityInNewSpace(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		baseEntityÇëÇó´´½¨ÔÚÒ»¸öÐÂµÄspaceÖÐ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		baseEntityï¿½ï¿½ï¿½ó´´½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½spaceï¿½ï¿½
 	*/
 	void reqRestoreSpaceInCell(Network::Channel* pChannel, MemoryStream& s);
 	
-	/** ÍøÂç½Ó¿Ú
-		ÏûÏ¢×ª·¢£¬ ÓÉÄ³¸öappÏëÍ¨¹ý±¾app½«ÏûÏ¢×ª·¢¸øÄ³¸öapp¡£
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½Ï¢×ªï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä³ï¿½ï¿½appï¿½ï¿½Í¨ï¿½ï¿½ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½Ï¢×ªï¿½ï¿½ï¿½ï¿½Ä³ï¿½ï¿½appï¿½ï¿½
 	*/
 	void forwardMessage(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		¸üÐÂcellappÇé¿ö¡£
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½cellappï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void updateCellapp(Network::Channel* pChannel, COMPONENT_ID componentID, ENTITY_ID numEntities, float load, uint32 flags);
 
-	/** ÍøÂç½Ó¿Ú
-		cellappÍ¬²½×Ô¼ºµÄ³õÊ¼»¯ÐÅÏ¢
-		startGlobalOrder: È«¾ÖÆô¶¯Ë³Ðò °üÀ¨¸÷ÖÖ²»Í¬×é¼þ
-		startGroupOrder: ×éÄÚÆô¶¯Ë³Ðò£¬ ±ÈÈçÔÚËùÓÐbaseappÖÐµÚ¼¸¸öÆô¶¯¡£
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		cellappÍ¬ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ä³ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ï¢
+		startGlobalOrder: È«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë³ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö²ï¿½Í¬ï¿½ï¿½ï¿½
+		startGroupOrder: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë³ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½baseappï¿½ÐµÚ¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void onCellappInitProgress(Network::Channel* pChannel, COMPONENT_ID cid, float progress, 
 		COMPONENT_ORDER componentGlobalOrder, COMPONENT_ORDER componentGroupOrder);
@@ -105,30 +105,30 @@ public:
 
 	uint32 numLoadBalancingApp();
 
-	/* ÒÔgroupOrderIDÎªÅÅÐò»ù×¼£¬
-	   ‰ˆ¼ÓÒ»¸öcellapp component idµ½cellapp_cids_ÁÐ±íÖÐ
+	/* ï¿½ï¿½groupOrderIDÎªï¿½ï¿½ï¿½ï¿½ï¿½×¼ï¿½ï¿½
+	   ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½cellapp component idï¿½ï¿½cellapp_cids_ï¿½Ð±ï¿½ï¿½ï¿½
 	*/
 	void addCellappComponentID(COMPONENT_ID cid);
 
-	/** ÍøÂç½Ó¿Ú
-	²éÑ¯ËùÓÐÏà¹Ø½ø³Ì¸ºÔØÐÅÏ¢
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	ï¿½ï¿½Ñ¯ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø½ï¿½ï¿½Ì¸ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 	*/
 	void queryAppsLoads(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-	²éÑ¯ËùÓÐÏà¹Ø½ø³ÌspaceÐÅÏ¢
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	ï¿½ï¿½Ñ¯ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø½ï¿½ï¿½ï¿½spaceï¿½ï¿½Ï¢
 	*/
 	void querySpaces(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-	¸üÐÂÏà¹Ø½ø³ÌspaceÐÅÏ¢£¬×¢Òâ£º´ËspaceData²¢·ÇAPIÎÄµµÖÐÃèÊöµÄspaceData
-	ÊÇÖ¸spaceµÄÒ»Ð©ÐÅÏ¢
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø½ï¿½ï¿½ï¿½spaceï¿½ï¿½Ï¢ï¿½ï¿½×¢ï¿½â£ºï¿½ï¿½spaceDataï¿½ï¿½ï¿½ï¿½APIï¿½Äµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½spaceData
+	ï¿½ï¿½Ö¸spaceï¿½ï¿½Ò»Ð©ï¿½ï¿½Ï¢
 	*/
 	void updateSpaceData(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-	¹¤¾ßÇëÇó¸Ä±äspace²é¿´Æ÷£¨º¬Ìí¼ÓºÍÉ¾³ý¹¦ÄÜ£©
-	Èç¹ûÊÇÇëÇó¸üÐÂ²¢ÇÒ·þÎñÆ÷ÉÏ²»´æÔÚ¸ÃµØÖ·µÄ²é¿´Æ÷Ôò×Ô¶¯´´½¨£¬Èç¹ûÊÇÉ¾³ýÔòÃ÷È·¸ø³öÉ¾³ýÒªÇó
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½spaceï¿½é¿´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Óºï¿½É¾ï¿½ï¿½ï¿½ï¿½ï¿½Ü£ï¿½
+	ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â²ï¿½ï¿½Ò·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï²ï¿½ï¿½ï¿½ï¿½Ú¸Ãµï¿½Ö·ï¿½Ä²é¿´ï¿½ï¿½ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½É¾ï¿½ï¿½Òªï¿½ï¿½
 	*/
 	void setSpaceViewer(Network::Channel* pChannel, MemoryStream& s);
 
@@ -142,7 +142,7 @@ protected:
 	std::map< COMPONENT_ID, Cellapp >	cellapps_;
 	std::vector<COMPONENT_ID>			cellapp_cids_;
 
-	// Í¨¹ý¹¤¾ß²é¿´space
+	// Í¨ï¿½ï¿½ï¿½ï¿½ï¿½ß²é¿´space
 	SpaceViewers						spaceViewers_;
 };
 

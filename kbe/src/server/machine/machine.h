@@ -62,8 +62,8 @@ public:
 	
 	bool findBroadcastInterface();
 
-	/** ÍøÂç½Ó¿Ú
-		Ä³¸öapp¹ã²¥ÁË×Ô¼ºµÄµØÖ·
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Ä³ï¿½ï¿½appï¿½ã²¥ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Äµï¿½Ö·
 	*/
 	void onBroadcastInterface(Network::Channel* pChannel, int32 uid, std::string& username, 
 							COMPONENT_TYPE componentType, COMPONENT_ID componentID, COMPONENT_ID componentIDEx, 
@@ -72,20 +72,20 @@ public:
 							float cpu, float mem, uint32 usedmem, int8 state, uint32 machineID, uint64 extradata,
 							uint64 extradata1, uint64 extradata2, uint64 extradata3, uint32 backRecvAddr, uint16 backRecvPort);
 	
-	/** ÍøÂç½Ó¿Ú
-		Ä³¸öappÑ°ÕÒÁíÒ»¸öappµÄµØÖ·
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Ä³ï¿½ï¿½appÑ°ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½appï¿½Äµï¿½Ö·
 	*/
 	void onFindInterfaceAddr(Network::Channel* pChannel, int32 uid, std::string& username, 
 		COMPONENT_TYPE componentType, COMPONENT_ID componentID, COMPONENT_TYPE findComponentType, uint32 finderAddr, uint16 finderRecvPort);
 
-	/** ÍøÂç½Ó¿Ú
-		²éÑ¯ËùÓÐ½Ó¿ÚÐÅÏ¢
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½Ñ¯ï¿½ï¿½ï¿½Ð½Ó¿ï¿½ï¿½ï¿½Ï¢
 	*/
 	void onQueryAllInterfaceInfos(Network::Channel* pChannel, int32 uid, std::string& username, 
 		uint16 finderRecvPort);
 
-	/** ÍøÂç½Ó¿Ú
-	²éÑ¯ËùÓÐmachine½ø³Ì
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	ï¿½ï¿½Ñ¯ï¿½ï¿½ï¿½ï¿½machineï¿½ï¿½ï¿½ï¿½
 	*/
 	void onQueryMachines(Network::Channel* pChannel, int32 uid, std::string& username,
 		uint16 finderRecvPort);
@@ -97,58 +97,58 @@ public:
 
 	void handleTimeout(TimerHandle handle, void * arg);
 
-	/* ³õÊ¼»¯Ïà¹Ø½Ó¿Ú */
+	/* ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ø½Ó¿ï¿½ */
 	bool initializeBegin();
 	bool inInitialize();
 	bool initializeEnd();
 	void finalise();
 	bool initNetwork();
 
-	/** ÍøÂç½Ó¿Ú
-		Æô¶¯·þÎñÆ÷
-		@uid: Ìá¹©Æô¶¯µÄuid²ÎÊý
-		@components: Æô¶¯ÄÄÐ©×é¼þ(¿ÉÄÜ²ÉÈ¡·Ö²¼Ê½Æô¶¯·½°¸)
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+		@uid: ï¿½á¹©ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½uidï¿½ï¿½ï¿½ï¿½
+		@components: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð©ï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½Ü²ï¿½È¡ï¿½Ö²ï¿½Ê½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
 	*/
 	void startserver(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÐÅºÅ´¦Àí
+	/** ï¿½ÅºÅ´ï¿½ï¿½ï¿½
 	*/
 	virtual bool installSignals();
 	virtual void onSignalled(int sigNum);
 
 #if KBE_PLATFORM != PLATFORM_WIN32
 	/**
-	* ÔÚlinuxÏÂÆô¶¯Ò»¸öÐÂ½ø³Ì
+	* ï¿½ï¿½linuxï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Â½ï¿½ï¿½ï¿½
 	*/
 	uint16 startLinuxProcess(int32 uid, COMPONENT_TYPE componentType, uint64 cid, uint16 gus, 
 		std::string& KBE_ROOT, std::string& KBE_RES_PATH, std::string& KBE_BIN_PATH);
 #else
 	/**
-	* ÔÚwindowsÏÂÆô¶¯Ò»¸öÐÂ½ø³Ì
+	* ï¿½ï¿½windowsï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Â½ï¿½ï¿½ï¿½
 	*/
 	DWORD startWindowsProcess(int32 uid, COMPONENT_TYPE componentType, uint64 cid, uint16 gus, 
 		std::string& KBE_ROOT, std::string& KBE_RES_PATH, std::string& KBE_BIN_PATH);
 #endif
 
-	/** ÍøÂç½Ó¿Ú
-		¹Ø±Õ·þÎñÆ÷
-		@uid: Ìá¹©Æô¶¯µÄuid²ÎÊý
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½Ø±Õ·ï¿½ï¿½ï¿½ï¿½ï¿½
+		@uid: ï¿½á¹©ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½uidï¿½ï¿½ï¿½ï¿½
 	*/
 	void stopserver(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-	É±ËÀ·þÎñÆ÷
-	@uid: Ìá¹©Æô¶¯µÄuid²ÎÊý
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	É±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	@uid: ï¿½á¹©ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½uidï¿½ï¿½ï¿½ï¿½
 	*/
 	void killserver(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
 	/**
-		¶Ô±¾»úÔËÐÐµÄ×é¼þ½øÐÐ¼ì²éÊÇ·ñ¿ÉÓÃ
+		ï¿½Ô±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¼ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½
 	*/
 	bool checkComponentUsable(const Components::ComponentInfos* info, bool getdatas, bool autoerase);
 
 protected:
-	// udp¹ã²¥µØÖ·
+	// udpï¿½ã²¥ï¿½ï¿½Ö·
 	u_int32_t					broadcastAddr_;
 	Network::EndPoint			ep_;
 	Network::EndPoint			epBroadcast_;
@@ -159,7 +159,7 @@ protected:
 	Network::UDPPacketReceiver* pEBPacketReceiver_;
 	Network::UDPPacketReceiver* pEPLocalPacketReceiver_;
 
-	// ±¾»úÊ¹ÓÃµÄuid
+	// ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½Ãµï¿½uid
 	std::vector<int32>			localuids_;
 
 	typedef std::vector<COMPONENT_ID> ID_LOGS;

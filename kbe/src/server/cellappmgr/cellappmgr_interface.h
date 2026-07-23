@@ -42,10 +42,10 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	BASEAPPMGRËùÓÐÏûÏ¢½Ó¿ÚÔÚ´Ë¶¨Òå
+	BASEAPPMGRï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½Ó¿ï¿½ï¿½Ú´Ë¶ï¿½ï¿½ï¿½
 */
 NETWORK_INTERFACE_DECLARE_BEGIN(CellappmgrInterface)
-	// Ä³app×¢²á×Ô¼ºµÄ½Ó¿ÚµØÖ·µ½±¾app
+	// Ä³app×¢ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ä½Ó¿Úµï¿½Ö·ï¿½ï¿½ï¿½ï¿½app
 	CELLAPPMGR_MESSAGE_DECLARE_ARGS11(onRegisterNewApp,						NETWORK_VARIABLE_MESSAGE,
 									int32,									uid, 
 									std::string,							username,
@@ -59,63 +59,63 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappmgrInterface)
 									uint16,									extport,
 									std::string,							extaddrEx)
 
-	// Ä³appÖ÷¶¯ÇëÇólook¡£
+	// Ä³appï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½lookï¿½ï¿½
 	CELLAPPMGR_MESSAGE_DECLARE_ARGS0(lookApp,								NETWORK_FIXED_MESSAGE)
 
-	// Ä³¸öappÇëÇó²é¿´¸Ãapp¸ºÔØ×´Ì¬¡£
+	// Ä³ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½é¿´ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½
 	CELLAPPMGR_MESSAGE_DECLARE_ARGS0(queryLoad,								NETWORK_FIXED_MESSAGE)
 
-	// Ä³¸öappÏò±¾app¸æÖª´¦ÓÚ»î¶¯×´Ì¬¡£
+	// Ä³ï¿½ï¿½appï¿½ï¿½appï¿½ï¿½Öªï¿½ï¿½ï¿½Ú»î¶¯×´Ì¬ï¿½ï¿½
 	CELLAPPMGR_MESSAGE_DECLARE_ARGS2(onAppActiveTick,						NETWORK_FIXED_MESSAGE,
 									COMPONENT_TYPE,							componentType, 
 									COMPONENT_ID,							componentID)
 
-	// baseEntityÇëÇó´´½¨ÔÚÒ»¸öÐÂµÄspaceÖÐ¡£
+	// baseEntityï¿½ï¿½ï¿½ó´´½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½spaceï¿½Ð¡ï¿½
 	CELLAPPMGR_MESSAGE_DECLARE_STREAM(reqCreateCellEntityInNewSpace,		NETWORK_VARIABLE_MESSAGE)
 
-	// baseEntityÇëÇó»Ö¸´ÔÚÒ»¸öÐÂµÄspaceÖÐ¡£
+	// baseEntityï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½spaceï¿½Ð¡ï¿½
 	CELLAPPMGR_MESSAGE_DECLARE_STREAM(reqRestoreSpaceInCell,				NETWORK_VARIABLE_MESSAGE)
 
-	// ÏûÏ¢×ª·¢£¬ ÓÉÄ³¸öappÏëÍ¨¹ý±¾app½«ÏûÏ¢×ª·¢¸øÄ³¸öapp¡£
+	// ï¿½ï¿½Ï¢×ªï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä³ï¿½ï¿½appï¿½ï¿½Í¨ï¿½ï¿½ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½Ï¢×ªï¿½ï¿½ï¿½ï¿½Ä³ï¿½ï¿½appï¿½ï¿½
 	CELLAPPMGR_MESSAGE_DECLARE_STREAM(forwardMessage,						NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇó¹Ø±Õ·þÎñÆ÷
+	// ï¿½ï¿½ï¿½ï¿½Ø±Õ·ï¿½ï¿½ï¿½ï¿½ï¿½
 	CELLAPPMGR_MESSAGE_DECLARE_STREAM(reqCloseServer,						NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇó²éÑ¯watcherÊý¾Ý
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¯watcherï¿½ï¿½ï¿½ï¿½
 	CELLAPPMGR_MESSAGE_DECLARE_STREAM(queryWatcher,							NETWORK_VARIABLE_MESSAGE)
 
-	// ¸üÐÂcellappÐÅÏ¢¡£
+	// ï¿½ï¿½ï¿½ï¿½cellappï¿½ï¿½Ï¢ï¿½ï¿½
 	CELLAPPMGR_MESSAGE_DECLARE_ARGS4(updateCellapp,							NETWORK_FIXED_MESSAGE,
 									COMPONENT_ID,							componentID,
 									ENTITY_ID,								numEntities,
 									float,									load,
 									uint32,									flags)
 
-	// ¿ªÊ¼profile
+	// ï¿½ï¿½Ê¼profile
 	CELLAPPMGR_MESSAGE_DECLARE_STREAM(startProfile,							NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇóÇ¿ÖÆÉ±ËÀµ±Ç°app
+	// ï¿½ï¿½ï¿½ï¿½Ç¿ï¿½ï¿½É±ï¿½ï¿½ï¿½ï¿½Ç°app
 	CELLAPPMGR_MESSAGE_DECLARE_STREAM(reqKillServer,						NETWORK_VARIABLE_MESSAGE)
 
-	// cellappÍ¬²½×Ô¼ºµÄ³õÊ¼»¯ÐÅÏ¢
+	// cellappÍ¬ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ä³ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ï¢
 	CELLAPPMGR_MESSAGE_DECLARE_ARGS4(onCellappInitProgress,					NETWORK_FIXED_MESSAGE,
 									COMPONENT_ID,							cid,
 									float,									progress,
 									COMPONENT_ORDER,						componentGlobalOrder,
 									COMPONENT_ORDER,						componentGroupOrder)
 
-	// ²éÑ¯ËùÓÐÏà¹Ø½ø³Ì¸ºÔØÐÅÏ¢
+	// ï¿½ï¿½Ñ¯ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø½ï¿½ï¿½Ì¸ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 	CELLAPPMGR_MESSAGE_DECLARE_STREAM(queryAppsLoads,						NETWORK_VARIABLE_MESSAGE)
 
-	// ²éÑ¯ËùÓÐÏà¹Ø½ø³ÌspaceÐÅÏ¢
+	// ï¿½ï¿½Ñ¯ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø½ï¿½ï¿½ï¿½spaceï¿½ï¿½Ï¢
 	CELLAPPMGR_MESSAGE_DECLARE_STREAM(querySpaces,							NETWORK_VARIABLE_MESSAGE)
 
-	// ¸üÐÂÏà¹Ø½ø³ÌspaceÐÅÏ¢£¬×¢Òâ£º´ËspaceData²¢·ÇAPIÎÄµµÖÐÃèÊöµÄspaceData
-	// ÊÇÖ¸spaceµÄÒ»Ð©ÐÅÏ¢
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø½ï¿½ï¿½ï¿½spaceï¿½ï¿½Ï¢ï¿½ï¿½×¢ï¿½â£ºï¿½ï¿½spaceDataï¿½ï¿½ï¿½ï¿½APIï¿½Äµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½spaceData
+	// ï¿½ï¿½Ö¸spaceï¿½ï¿½Ò»Ð©ï¿½ï¿½Ï¢
 	CELLAPPMGR_MESSAGE_DECLARE_STREAM(updateSpaceData,						NETWORK_VARIABLE_MESSAGE)
 
-	// ¹¤¾ßÇëÇó¸Ä±äspace²é¿´Æ÷£¨º¬Ìí¼ÓºÍÉ¾³ý¹¦ÄÜ£©
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½spaceï¿½é¿´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Óºï¿½É¾ï¿½ï¿½ï¿½ï¿½ï¿½Ü£ï¿½
 	CELLAPPMGR_MESSAGE_DECLARE_STREAM(setSpaceViewer,						NETWORK_VARIABLE_MESSAGE)
 
 NETWORK_INTERFACE_DECLARE_END()

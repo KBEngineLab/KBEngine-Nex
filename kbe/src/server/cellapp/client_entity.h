@@ -56,7 +56,7 @@ class ScriptDefModule;
 
 class ClientEntity : public script::ScriptObject
 {
-	/** ╫╙└р╗п ╜л╥╗╨йpy▓┘╫ў╠ю│ф╜°┼╔╔·└р */
+	/** я┐╜я┐╜я┐╜р╗п я┐╜я┐╜╥╗╨йpyя┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ */
 	INSTANCE_SCRIPT_HREADER(ClientEntity, ScriptObject)
 public:
 	ClientEntity(ENTITY_ID srcEntityID, ENTITY_ID clientEntityID);
@@ -64,12 +64,12 @@ public:
 	~ClientEntity();
 	
 	/** 
-		╜┼▒╛╟ы╟є╗ё╚б╩Ї╨╘╗Є╒▀╖╜╖и 
+		я┐╜┼▒я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜╚бя┐╜я┐╜я┐╜╘╗я┐╜я┐╜▀╖я┐╜я┐╜я┐╜ 
 	*/
 	PyObject* onScriptGetAttribute(PyObject* attr);						
 			
 	/** 
-		╗ё╡├╢╘╧є╡─├ш╩Ў 
+		я┐╜я┐╜├╢я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜ 
 	*/
 	PyObject* tp_repr();
 	PyObject* tp_str();

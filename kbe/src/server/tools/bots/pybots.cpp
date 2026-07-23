@@ -155,7 +155,7 @@ PyObject* PyBots::pyItems()
 	{
 		PyObject * pTuple = PyTuple_New(2);
 		PyObject* clientID = PyLong_FromLong(iter->second->appID());
-		Py_INCREF(iter->second);							// PyObject Entity* Ôö¼ÓÒ»¸öÒýÓÃ
+		Py_INCREF(iter->second);							// PyObject Entity* ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
 		PyTuple_SET_ITEM(pTuple, 0, clientID);
 		PyTuple_SET_ITEM(pTuple, 1, iter->second);

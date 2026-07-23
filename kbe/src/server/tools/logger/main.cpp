@@ -18,7 +18,7 @@ You should have received a copy of the GNU Lesser General Public License
 along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// loggerĞèÒªÔö¼ÓÍÌÍÂÁ¿
+// loggerï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 #define PACKET_MAX_SIZE_TCP 65535
 
 #include "common/common.h"

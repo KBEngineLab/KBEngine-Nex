@@ -135,7 +135,7 @@ public:
 	virtual void onServerClosed();
 
 	/**
-		ÉèÖÃ½Å±¾Êä³öÀàÐÍÇ°×º
+		ï¿½ï¿½ï¿½Ã½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç°×º
 	*/
 	static PyObject* __py_setScriptLogType(PyObject* self, PyObject* args);
 
@@ -146,49 +146,49 @@ public:
 		const std::string& scriptVerInfo, const std::string& protocolMD5, 
 		const std::string& entityDefMD5, COMPONENT_TYPE componentType);
 
-	/** ÍøÂç½Ó¿Ú
-		ºÍ·þÎñ¶ËµÄ°æ±¾²»Æ¥Åä
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½Í·ï¿½ï¿½ï¿½ËµÄ°æ±¾ï¿½ï¿½Æ¥ï¿½ï¿½
 	*/
 	virtual void onVersionNotMatch(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		ºÍ·þÎñ¶ËµÄ½Å±¾²ã°æ±¾²»Æ¥Åä
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½Í·ï¿½ï¿½ï¿½ËµÄ½Å±ï¿½ï¿½ï¿½æ±¾ï¿½ï¿½Æ¥ï¿½ï¿½
 	*/
 	virtual void onScriptVersionNotMatch(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-	   µÇÂ¼³É¹¦
-	   @ip: ·þÎñÆ÷ipµØÖ·
-	   @port: ·þÎñÆ÷¶Ë¿Ú
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	   ï¿½ï¿½Â¼ï¿½É¹ï¿½
+	   @ip: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ipï¿½ï¿½Ö·
+	   @port: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë¿ï¿½
 	*/
 	virtual void onLoginSuccessfully(Network::Channel * pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-	   µÇÂ¼Ê§°Ü»Øµ÷
-	   @failedcode: Ê§°Ü·µ»ØÂë NETWORK_ERR_SRV_NO_READY:·þÎñÆ÷Ã»ÓÐ×¼±¸ºÃ, 
-									NETWORK_ERR_SRV_OVERLOAD:·þÎñÆ÷¸ºÔØ¹ýÖØ, 
-									NETWORK_ERR_NAME_PASSWORD:ÓÃ»§Ãû»òÕßÃÜÂë²»ÕýÈ·
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	   ï¿½ï¿½Â¼Ê§ï¿½Ü»Øµï¿½
+	   @failedcode: Ê§ï¿½Ü·ï¿½ï¿½ï¿½ï¿½ï¿½ NETWORK_ERR_SRV_NO_READY:ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½×¼ï¿½ï¿½ï¿½ï¿½, 
+									NETWORK_ERR_SRV_OVERLOAD:ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø¹ï¿½ï¿½ï¿½, 
+									NETWORK_ERR_NAME_PASSWORD:ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ë²»ï¿½ï¿½È·
 	*/
 	virtual void onLoginFailed(Network::Channel * pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-	   µÇÂ¼Ê§°Ü»Øµ÷
-	   @failedcode: Ê§°Ü·µ»ØÂë NETWORK_ERR_SRV_NO_READY:·þÎñÆ÷Ã»ÓÐ×¼±¸ºÃ, 
-									NETWORK_ERR_ILLEGAL_LOGIN:·Ç·¨µÇÂ¼, 
-									NETWORK_ERR_NAME_PASSWORD:ÓÃ»§Ãû»òÕßÃÜÂë²»ÕýÈ·
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	   ï¿½ï¿½Â¼Ê§ï¿½Ü»Øµï¿½
+	   @failedcode: Ê§ï¿½Ü·ï¿½ï¿½ï¿½ï¿½ï¿½ NETWORK_ERR_SRV_NO_READY:ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½×¼ï¿½ï¿½ï¿½ï¿½, 
+									NETWORK_ERR_ILLEGAL_LOGIN:ï¿½Ç·ï¿½ï¿½ï¿½Â¼, 
+									NETWORK_ERR_NAME_PASSWORD:ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ë²»ï¿½ï¿½È·
 	*/
 	virtual void onLoginBaseappFailed(Network::Channel * pChannel, SERVER_ERROR_CODE failedcode);
 	virtual void onReloginBaseappFailed(Network::Channel * pChannel, SERVER_ERROR_CODE failedcode);
 
-	/** ÍøÂç½Ó¿Ú
-	   ÖØµÇÂ½baseapp³É¹¦
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	   ï¿½Øµï¿½Â½baseappï¿½É¹ï¿½
 	*/
 	virtual void onReloginBaseappSuccessfully(Network::Channel * pChannel, MemoryStream& s);
 
 	virtual void onTargetChanged();
 
 	/** 
-		·þÎñ¶ËÌí¼ÓÁËÄ³¸öspaceµÄ¼¸ºÎÓ³Éä
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä³ï¿½ï¿½spaceï¿½Ä¼ï¿½ï¿½ï¿½Ó³ï¿½ï¿½
 	*/
 	virtual void onAddSpaceGeometryMapping(SPACE_ID spaceID, std::string& respath);
 
@@ -223,27 +223,27 @@ public:
 	}
 
 	/**
-		Í¨¹ýÏà¶ÔÂ·¾¶»ñÈ¡×ÊÔ´µÄÈ«Â·¾¶
+		Í¨ï¿½ï¿½ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½ï¿½È¡ï¿½ï¿½Ô´ï¿½ï¿½È«Â·ï¿½ï¿½
 	*/
 	static PyObject* __py_getResFullPath(PyObject* self, PyObject* args);
 
 	/**
-		Í¨¹ýÏà¶ÔÂ·¾¶ÅÐ¶Ï×ÊÔ´ÊÇ·ñ´æÔÚ
+		Í¨ï¿½ï¿½ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½Ô´ï¿½Ç·ï¿½ï¿½ï¿½ï¿½
 	*/
 	static PyObject* __py_hasRes(PyObject* self, PyObject* args);
 
 	/**
-		openÎÄ¼þ
+		openï¿½Ä¼ï¿½
 	*/
 	static PyObject* __py_kbeOpen(PyObject* self, PyObject* args);
 
 	/**
-		ÁÐ³öÄ¿Â¼ÏÂËùÓÐÎÄ¼þ
+		ï¿½Ð³ï¿½Ä¿Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½
 	*/
 	static PyObject* __py_listPathRes(PyObject* self, PyObject* args);
 
 	/**
-		Æ¥ÅäÏà¶ÔÂ·¾¶»ñµÃÈ«Â·¾¶
+		Æ¥ï¿½ï¿½ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½ï¿½ï¿½È«Â·ï¿½ï¿½
 	*/
 	static PyObject* __py_matchPath(PyObject* self, PyObject* args);
 
@@ -255,7 +255,7 @@ protected:
 
 	COMPONENT_TYPE											componentType_;
 
-	// ±¾×é¼þµÄID
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ID
 	COMPONENT_ID											componentID_;									
 
 	Network::EventDispatcher& 								dispatcher_;
@@ -265,7 +265,7 @@ protected:
 	Network::TCPPacketReceiver*								pTCPPacketReceiver_;
 	Network::BlowfishFilter*								pBlowfishFilter_;
 
-	// Ïß³Ì³Ø
+	// ï¿½ß³Ì³ï¿½
 	thread::ThreadPool										threadPool_;
 
 	PyObjectPtr												entryScript_;

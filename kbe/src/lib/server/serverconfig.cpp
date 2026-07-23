@@ -82,7 +82,7 @@ bool ServerConfig::loadConfig(std::string fileName)
 	
 	if(xml->getRootNode() == NULL)
 	{
-		// root½ÚµãÏÂÃ»ÓÐ×Ó½ÚµãÁË
+		// rootï¿½Úµï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½Ó½Úµï¿½ï¿½ï¿½
 		return true;
 	}
 
@@ -125,7 +125,7 @@ bool ServerConfig::loadConfig(std::string fileName)
 					{
 						Network::g_trace_packet_disables.push_back(c);
 						
-						// ²»debug¼ÓÃÜ°ü
+						// ï¿½ï¿½debugï¿½ï¿½ï¿½Ü°ï¿½
 						if(c == "Encrypted::packets")
 							Network::g_trace_encrypted_packet = false;
 					}
@@ -922,7 +922,7 @@ bool ServerConfig::loadConfig(std::string fileName)
 					else
 						missingFields.push_back("pure");
 
-					// Ä¬ÈÏ¿â²»ÔÊÐíÊÇ´¿¾»¿â£¬ÒýÇæÐèÒª´´½¨ÊµÌå±í
+					// Ä¬ï¿½Ï¿â²»ï¿½ï¿½ï¿½ï¿½ï¿½Ç´ï¿½ï¿½ï¿½ï¿½â£¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½
 					if (name == "default")
 						pDBInfo->isPure = false;
 
@@ -1030,7 +1030,7 @@ bool ServerConfig::loadConfig(std::string fileName)
 	
 					if (pDBInfo == &dbinfo)
 					{
-						// ¼ì²é²»ÄÜÔÚ²»Í¬µÄ½Ó¿ÚÖÐÊ¹ÓÃÏàÍ¬µÄÊý¾Ý¿âÓëÏàÍ¬µÄ±í
+						// ï¿½ï¿½é²»ï¿½ï¿½ï¿½Ú²ï¿½Í¬ï¿½Ä½Ó¿ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½ï¿½ï¿½Í¬ï¿½Ä±ï¿½
 						std::vector<DBInterfaceInfo>::iterator dbinfo_iter = _dbmgrInfo.dbInterfaceInfos.begin();
 						for (; dbinfo_iter != _dbmgrInfo.dbInterfaceInfos.end(); ++dbinfo_iter)
 						{
@@ -1579,7 +1579,7 @@ uint32 ServerConfig::tcp_SOMAXCONN(COMPONENT_TYPE componentType)
 //-------------------------------------------------------------------------------------	
 void ServerConfig::_updateEmailInfos()
 {
-	// Èç¹ûÐ¡ÓÚ64Ôò±íÊ¾Ä¿Ç°»¹ÊÇÃ÷ÎÄÃÜÂë
+	// ï¿½ï¿½ï¿½Ð¡ï¿½ï¿½64ï¿½ï¿½ï¿½Ê¾Ä¿Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if(emailServerInfo_.password.size() < 64)
 	{
 		WARNING_MSG(fmt::format("ServerConfig::loadConfig: email password(email_service.xml) is not encrypted!\nplease use password(rsa):\n{}\n"

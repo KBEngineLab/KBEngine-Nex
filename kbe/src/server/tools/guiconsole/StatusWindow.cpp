@@ -107,7 +107,7 @@ public:
 			int selgot = select(epListen+1, &fds, NULL, NULL, &tv);
 			if(selgot == 0)
 			{
-				// ³¬Ê±, ¿ÉÄÜ¶Ô·½·±Ã¦
+				// ï¿½ï¿½Ê±, ï¿½ï¿½ï¿½Ü¶Ô·ï¿½ï¿½ï¿½Ã¦
 				return false;	
 			}
 			else if(selgot == -1)
@@ -249,10 +249,10 @@ BOOL StatusWindow::OnInitDialog()
 	CDialog::OnInitDialog();
 	
 	DWORD dwStyle = m_statusList.GetExtendedStyle();
-	dwStyle |= LVS_EX_FULLROWSELECT;					//Ñ¡ÖÐÄ³ÐÐÊ¹ÕûÐÐ¸ßÁÁ£¨Ö»ÊÊÓÃÓëreport·ç¸ñµÄlistctrl£©
-	dwStyle |= LVS_EX_GRIDLINES;						//Íø¸ñÏß£¨Ö»ÊÊÓÃÓëreport·ç¸ñµÄlistctrl£©
+	dwStyle |= LVS_EX_FULLROWSELECT;					//Ñ¡ï¿½ï¿½Ä³ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½Ð¸ï¿½ï¿½ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½reportï¿½ï¿½ï¿½ï¿½listctrlï¿½ï¿½
+	dwStyle |= LVS_EX_GRIDLINES;						//ï¿½ï¿½ï¿½ï¿½ï¿½ß£ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½reportï¿½ï¿½ï¿½ï¿½listctrlï¿½ï¿½
 	//dwStyle |= LVS_EX_ONECLICKACTIVATE;
-	m_statusList.SetExtendedStyle(dwStyle);				//ÉèÖÃÀ©Õ¹·ç¸ñ
+	m_statusList.SetExtendedStyle(dwStyle);				//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ¹ï¿½ï¿½ï¿½
 
 	int idx = 0;
 	m_statusList.InsertColumn(idx++, _T("uid"),					LVCFMT_CENTER,	40);

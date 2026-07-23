@@ -295,9 +295,9 @@ int NavTileHandle::findRandomPointAroundCircle(int layer, const Position3D& cent
 	for (uint32 i = 0; i < max_points; i++)
 	{
 		float rnd = frand();
-		float a = maxRadius * rnd;						// °ë¾¶ÔÚmaxRadiusÃ×ÄÚ
-		float b = 360.0f * rnd;							// Ëæ»úÒ»¸ö½Ç¶È
-		currpos.x = centerPos.x + (a * cos(b)); 		// °ë¾¶ * ÕýÓàÐþ
+		float a = maxRadius * rnd;						// ï¿½ë¾¶ï¿½ï¿½maxRadiusï¿½ï¿½ï¿½ï¿½
+		float b = 360.0f * rnd;							// ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ç¶ï¿½
+		currpos.x = centerPos.x + (a * cos(b)); 		// ï¿½ë¾¶ * ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		currpos.z = centerPos.z + (a * sin(b));
 		points.push_back(currpos);
 	}
@@ -531,7 +531,7 @@ bool NavTileHandle::MapSearchNode::GetSuccessors(AStarSearch<MapSearchNode> *ast
 		astarsearch->AddSuccessor( NewNode );
 	}	
 
-	// Èç¹ûÊÇ8·½ÏòÒÆ¶¯
+	// ï¿½ï¿½ï¿½ï¿½ï¿½8ï¿½ï¿½ï¿½ï¿½ï¿½Æ¶ï¿½
 	if(NavTileHandle::pCurrNavTileHandle->direction8())
 	{
 		if( (NavTileHandle::pCurrNavTileHandle->getMap( x + 1, y + 1 ) < TILE_STATE_CLOSED) 
@@ -577,20 +577,20 @@ bool NavTileHandle::MapSearchNode::GetSuccessors(AStarSearch<MapSearchNode> *ast
 float NavTileHandle::MapSearchNode::GetCost( MapSearchNode &successor )
 {
 	/*
-		Ò»¸ötileÑ°Â·µÄÐÔ¼Û±È
-		Ã¿¸ötile¶¼¿ÉÒÔ¶¨Òå´Ó0~5µÄÐÔ¼Û±ÈÖµ£¬ ÖµÔ½´óÐÔ¼Û±ÈÔ½µÍ
-		±ÈÈç£º Ç°·½ËäÈ»ÄÜ¹»Í¨¹ýµ«ÊÇÇ°·½ÊÇÄà°ÍÂ·£¬ ÐÐ×ßÆðÀ´·Ç³£·ÑÁ¦£¬ 
-		»òÕßÊÇÇ°·½Îª¸ßËÙ¹«Â·£¬ ÐÐ×ß·Ç³£¿ì¡£
+		Ò»ï¿½ï¿½tileÑ°Â·ï¿½ï¿½ï¿½Ô¼Û±ï¿½
+		Ã¿ï¿½ï¿½tileï¿½ï¿½ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½0~5ï¿½ï¿½ï¿½Ô¼Û±ï¿½Öµï¿½ï¿½ ÖµÔ½ï¿½ï¿½ï¿½Ô¼Û±ï¿½Ô½ï¿½ï¿½
+		ï¿½ï¿½ï¿½ç£º Ç°ï¿½ï¿½ï¿½ï¿½È»ï¿½Ü¹ï¿½Í¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â·ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½Îªï¿½ï¿½ï¿½Ù¹ï¿½Â·ï¿½ï¿½ ï¿½ï¿½ï¿½ß·Ç³ï¿½ï¿½ì¡£
 	*/
 	
 	/*
-		¼ÆËã´ú¼Û£º
-		Í¨³£ÓÃ¹«Ê½±íÊ¾Îª£ºf = g + h.
-		g¾ÍÊÇ´ÓÆðµãµ½µ±Ç°µãµÄ´ú¼Û.
-		hÊÇµ±Ç°µãµ½ÖÕµãµÄ¹À¼Æ´ú¼Û£¬ÊÇÍ¨¹ý¹À¼Ûº¯Êý¼ÆËã³öÀ´µÄ.
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Û£ï¿½
+		Í¨ï¿½ï¿½ï¿½Ã¹ï¿½Ê½ï¿½ï¿½Ê¾Îªï¿½ï¿½f = g + h.
+		gï¿½ï¿½ï¿½Ç´ï¿½ï¿½ï¿½ãµ½ï¿½ï¿½Ç°ï¿½ï¿½Ä´ï¿½ï¿½ï¿½.
+		hï¿½Çµï¿½Ç°ï¿½ãµ½ï¿½Õµï¿½Ä¹ï¿½ï¿½Æ´ï¿½ï¿½Û£ï¿½ï¿½ï¿½Í¨ï¿½ï¿½ï¿½ï¿½ï¿½Ûºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½.
 
-		¶ÔÓÚÒ»¸ö²»ÔÙ±ßÉÏµÄ½Úµã£¬ËûÖÜÎ§»áÓÐ8¸ö½Úµã£¬¿ÉÒÔ¿´³ÉËûµ½ÖÜÎ§8¸öµãµÄ´ú¼Û¶¼ÊÇ1¡£
-		¾«È·µã£¬µ½ÉÏÏÂ×óÓÒ4¸öµãµÄ´ú¼ÛÊÇ1£¬µ½×óÉÏ×óÏÂÓÒÉÏÓÒÏÂµÄ1.414¾ÍÊÇ¡°¸ùºÅ2¡±£¬Õâ¸öÖµ¾ÍÊÇÇ°ÃæËµµÄg.
+		ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ù±ï¿½ï¿½ÏµÄ½Úµã£¬ï¿½ï¿½ï¿½ï¿½Î§ï¿½ï¿½ï¿½ï¿½8ï¿½ï¿½ï¿½Úµã£¬ï¿½ï¿½ï¿½Ô¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î§8ï¿½ï¿½ï¿½ï¿½Ä´ï¿½ï¿½Û¶ï¿½ï¿½ï¿½1ï¿½ï¿½
+		ï¿½ï¿½È·ï¿½ã£¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½4ï¿½ï¿½ï¿½ï¿½Ä´ï¿½ï¿½ï¿½ï¿½ï¿½1ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Âµï¿½1.414ï¿½ï¿½ï¿½Ç¡ï¿½ï¿½ï¿½ï¿½ï¿½2ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½Ëµï¿½ï¿½g.
 		2.8  2.4  2  2.4  2.8
 		2.4  1.4  1  1.4  2.4
 		2    1    0    1    2
@@ -600,7 +600,7 @@ float NavTileHandle::MapSearchNode::GetCost( MapSearchNode &successor )
 	if(NavTileHandle::pCurrNavTileHandle->direction8())
 	{
 		if (x != successor.x && y != successor.y) {
-			return (float) (NavTileHandle::pCurrNavTileHandle->getMap( x, y ) + 0.41421356/* ±¾ÉíÓÐÖÁÉÙ1µÄÖµ */); //sqrt(2)
+			return (float) (NavTileHandle::pCurrNavTileHandle->getMap( x, y ) + 0.41421356/* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½1ï¿½ï¿½Öµ */); //sqrt(2)
 		}
 	}
 

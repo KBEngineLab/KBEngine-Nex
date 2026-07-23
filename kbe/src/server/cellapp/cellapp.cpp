@@ -146,8 +146,8 @@ void Cellapp::onShutdown(bool first)
 		}
 	}
 
-	// Èç¹ûcountµÈÓÚperSecsDestroyEntitySizeËµÃ÷ÉÏÃæÒÑ¾­Ã»ÓÐ¿É´¦ÀíµÄ¶«Î÷ÁË
-	// Ê£ÏÂµÄÓ¦¸Ã¶¼ÊÇspace£¬¿ÉÒÔ¿ªÊ¼Ïú»ÙÁË
+	// ï¿½ï¿½ï¿½countï¿½ï¿½ï¿½ï¿½perSecsDestroyEntitySizeËµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½Ã»ï¿½Ð¿É´ï¿½ï¿½ï¿½ï¿½Ä¶ï¿½ï¿½ï¿½ï¿½ï¿½
+	// Ê£ï¿½Âµï¿½Ó¦ï¿½Ã¶ï¿½ï¿½ï¿½spaceï¿½ï¿½ï¿½ï¿½ï¿½Ô¿ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if(count == g_serverConfig.getCellApp().perSecsDestroyEntitySize)
 		Spaces::finalise();
 }
@@ -171,7 +171,7 @@ bool Cellapp::installPyModules()
 
 	registerScript(Entity::getScriptType());
 	
-	// ½«app±ê¼Ç×¢²áµ½½Å±¾
+	// ï¿½ï¿½appï¿½ï¿½ï¿½×¢ï¿½áµ½ï¿½Å±ï¿½
 	std::map<uint32, std::string> flagsmaps = createAppFlagsMaps();
 	std::map<uint32, std::string>::iterator fiter = flagsmaps.begin();
 	for (; fiter != flagsmaps.end(); ++fiter)
@@ -182,7 +182,7 @@ bool Cellapp::installPyModules()
 		}
 	}
 
-	// ×¢²á´´½¨entityµÄ·½·¨µ½py
+	// ×¢ï¿½á´´ï¿½ï¿½entityï¿½Ä·ï¿½ï¿½ï¿½ï¿½ï¿½py
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		time,							__py_gametime,											METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		createEntity,					__py_createEntity,										METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(), 		executeRawDatabaseCommand,		__py_executeRawDatabaseCommand,							METH_VARARGS,			0);
@@ -208,7 +208,7 @@ bool Cellapp::installPyModules()
 //-------------------------------------------------------------------------------------
 void Cellapp::onInstallPyModules()
 {
-	// Ìí¼ÓglobalData, cellAppDataÖ§³Ö
+	// ï¿½ï¿½ï¿½ï¿½globalData, cellAppDataÖ§ï¿½ï¿½
 	pCellAppData_ = new GlobalDataClient(DBMGR_TYPE, GlobalDataServer::CELLAPP_DATA);
 	registerPyObjectToScript("cellAppData", pCellAppData_);
 }
@@ -265,7 +265,7 @@ void Cellapp::handleGameTick()
 {
 	AUTO_SCOPED_PROFILE("gameTick");
 
-	// Ò»¶¨ÒªÔÚ×îÇ°Ãæ
+	// Ò»ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½
 	updateLoad();
 
 	EntityApp<Entity>::handleGameTick();
@@ -283,8 +283,8 @@ bool Cellapp::initializeBegin()
 //-------------------------------------------------------------------------------------
 bool Cellapp::initializeEnd()
 {
-	// Èç¹ûÐèÒªpyprofileÔòÔÚ´Ë´¦°²×°
-	// ½áÊøÊ±Ð¶ÔØ²¢Êä³ö½á¹û
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Òªpyprofileï¿½ï¿½ï¿½Ú´Ë´ï¿½ï¿½ï¿½×°
+	// ï¿½ï¿½ï¿½ï¿½Ê±Ð¶ï¿½Ø²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if(g_kbeSrvConfig.getCellApp().profiles.open_pyprofile)
 	{
 		script::PyProfile::start("kbengine");
@@ -292,7 +292,7 @@ bool Cellapp::initializeEnd()
 
 	pWitnessedTimeoutHandler_ = new WitnessedTimeoutHandler();
 
-	// ÊÇ·ñ¹ÜÀíYÖá
+	// ï¿½Ç·ï¿½ï¿½ï¿½ï¿½Yï¿½ï¿½
 	CoordinateSystem::hasY = g_kbeSrvConfig.getCellApp().coordinateSystem_hasY;
 
 	dispatcher_.clearSpareTime();
@@ -507,7 +507,7 @@ PyObject* Cellapp::__py_createEntity(PyObject* self, PyObject* args)
 		return 0;
 	}
 	
-	// ´´½¨entity
+	// ï¿½ï¿½ï¿½ï¿½entity
 	Entity* pEntity = Cellapp::getSingleton().createEntity(entityType, params, false, 0);
 
 	if(pEntity != NULL)
@@ -519,11 +519,11 @@ PyObject* Cellapp::__py_createEntity(PyObject* self, PyObject* args)
 		pEntity->pySetDirection(direction);	
 		pEntity->initializeScript();
 
-		// Ìí¼Óµ½space
+		// ï¿½ï¿½ï¿½Óµï¿½space
 		space->addEntityAndEnterWorld(pEntity);
 
-		// ÓÐ¿ÉÄÜÔÚaddEntityAndEnterWorldÖÐ±»Ïú»ÙÁË
-		// ÕâÀïÐèÒªÈÃÊµÌå·µ»Ø¸ø½Å±¾£¬Ö»²»¹ýÊµÌåÎªisDestroyed = true×´Ì¬
+		// ï¿½Ð¿ï¿½ï¿½ï¿½ï¿½ï¿½addEntityAndEnterWorldï¿½Ð±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½Êµï¿½å·µï¿½Ø¸ï¿½ï¿½Å±ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ÎªisDestroyed = true×´Ì¬
 		//if(pEntity->isDestroyed())
 		//{
 		//	Py_DECREF(pEntity);
@@ -801,10 +801,10 @@ void Cellapp::onDbmgrInitCompleted(Network::Channel* pChannel,
 {
 	EntityApp<Entity>::onDbmgrInitCompleted(pChannel, gametime, startID, endID, startGlobalOrder, startGroupOrder, digest);
 	
-	// ÔÙ´ÎÍ¬²½×Ô¼ºµÄÐÂÐÅÏ¢(startGlobalOrder, startGroupOrderµÈ)µ½machine
+	// ï¿½Ù´ï¿½Í¬ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢(startGlobalOrder, startGroupOrderï¿½ï¿½)ï¿½ï¿½machine
 	Components::getSingleton().broadcastSelf();
 
-	// ÕâÀïÐèÒª¸üÐÂÒ»ÏÂpythonµÄ»·¾³±äÁ¿
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½pythonï¿½Ä»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	this->getScript().setenv("KBE_BOOTIDX_GLOBAL", getenv("KBE_BOOTIDX_GLOBAL"));
 	this->getScript().setenv("KBE_BOOTIDX_GROUP", getenv("KBE_BOOTIDX_GROUP"));
 
@@ -842,7 +842,7 @@ void Cellapp::onBroadcastCellAppDataChanged(Network::Channel* pChannel, KBEngine
 		{
 			SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-			// Í¨Öª½Å±¾
+			// Í¨Öªï¿½Å±ï¿½
 			SCRIPT_OBJECT_CALL_ARGS1(getEntryScript().get(), const_cast<char*>("onCellAppDataDel"), 
 				const_cast<char*>("O"), pyKey, false);
 		}
@@ -862,7 +862,7 @@ void Cellapp::onBroadcastCellAppDataChanged(Network::Channel* pChannel, KBEngine
 		{
 			SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-			// Í¨Öª½Å±¾
+			// Í¨Öªï¿½Å±ï¿½
 			SCRIPT_OBJECT_CALL_ARGS2(getEntryScript().get(), const_cast<char*>("onCellAppData"), 
 				const_cast<char*>("OO"), pyKey, pyValue, false);
 		}
@@ -894,7 +894,7 @@ void Cellapp::onCreateCellEntityInNewSpaceFromBaseapp(Network::Channel* pChannel
 	Space* space = Spaces::createNewSpace(spaceID, entityType);
 	if(space != NULL)
 	{
-		// ´´½¨entity
+		// ï¿½ï¿½ï¿½ï¿½entity
 		Entity* e = createEntity(entityType.c_str(), NULL, false, entitycallEntityID, false);
 		
 		if(e == NULL)
@@ -903,7 +903,7 @@ void Cellapp::onCreateCellEntityInNewSpaceFromBaseapp(Network::Channel* pChannel
 
 			ERROR_MSG("Cellapp::onCreateCellEntityInNewSpaceFromBaseapp: createEntity error!\n");
 
-			/* Ä¿Ç°À´Ëµ³ý·ÇÄÚ´æ»òÕßÏµÍ³ÎÊÌâ£¬·ñÔò²»»á³öÏÖÕâ¸ö´íÎó
+			/* Ä¿Ç°ï¿½ï¿½Ëµï¿½ï¿½ï¿½ï¿½ï¿½Ú´ï¿½ï¿½ï¿½ï¿½ÏµÍ³ï¿½ï¿½ï¿½â£¬ï¿½ï¿½ï¿½ò²»»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 			pBundle->newMessage(BaseappInterface::onCreateCellFailure);
 			BaseappInterface::onCreateCellFailureArgs1::staticAddToBundle(*pBundle, entitycallEntityID);
@@ -914,7 +914,7 @@ void Cellapp::onCreateCellEntityInNewSpaceFromBaseapp(Network::Channel* pChannel
 
 		PyObject* cellData = e->createCellDataFromStream(&s);
 
-		// ÉèÖÃentityµÄbaseEntityCall
+		// ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½baseEntityCall
 		EntityCall* entitycall = new EntityCall(e->pScriptModule(), NULL, componentID, entitycallEntityID, ENTITYCALL_TYPE_BASE);
 		e->baseEntityCall(entitycall);
 		
@@ -925,14 +925,14 @@ void Cellapp::onCreateCellEntityInNewSpaceFromBaseapp(Network::Channel* pChannel
 			KBE_ASSERT(clientEntityCall != Py_None);
 
 			EntityCall* client = static_cast<EntityCall*>(clientEntityCall);
-			// Py_INCREF(clientEntityCall); ÕâÀï²»ÐèÒªÔö¼ÓÒýÓÃ£¬ ÒòÎªÃ¿´Î¶¼»á²úÉúÒ»¸öÐÂµÄ¶ÔÏó
+			// Py_INCREF(clientEntityCall); ï¿½ï¿½ï¿½ï²»ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½ ï¿½ï¿½ÎªÃ¿ï¿½Î¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ÂµÄ¶ï¿½ï¿½ï¿½
 
-			// ÎªÁËÄÜ¹»ÈÃentity.__init__ÖÐÄÜ¹»ÐÞ¸ÄÊôÐÔÁ¢¿ÌÄÜ¹ã²¥µ½¿Í»§¶ËÎÒÃÇÐèÒªÌáÇ°ÉèÖÃÕâÐ©
+			// Îªï¿½ï¿½ï¿½Ü¹ï¿½ï¿½ï¿½entity.__init__ï¿½ï¿½ï¿½Ü¹ï¿½ï¿½Þ¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü¹ã²¥ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð©
 			e->clientEntityCall(client);
 			e->setWitness(Witness::createPoolObject(OBJECTPOOL_POINT));
 		}
 
-		// ´Ë´¦baseapp¿ÉÄÜ»¹ÓÐÃ»³õÊ¼»¯¹ýÀ´£¬ ËùÒÔÓÐÒ»¶¨¸ÅÂÊÊÇÎªNoneµÄ
+		// ï¿½Ë´ï¿½baseappï¿½ï¿½ï¿½Ü»ï¿½ï¿½ï¿½Ã»ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÎªNoneï¿½ï¿½
 		Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
 		if(cinfos == NULL || cinfos->pChannel == NULL)
 		{
@@ -962,7 +962,7 @@ void Cellapp::onCreateCellEntityInNewSpaceFromBaseapp(Network::Channel* pChannel
 		e->initializeEntity(cellData);
 		Py_XDECREF(cellData);
 
-		// Ìí¼Óµ½space
+		// ï¿½ï¿½ï¿½Óµï¿½space
 		space->addEntityToNode(e);
 
 		if (hasClient)
@@ -1007,7 +1007,7 @@ void Cellapp::onRestoreSpaceInCellFromBaseapp(Network::Channel* pChannel, KBEngi
 	Space* space = Spaces::createNewSpace(spaceID, entityType);
 	if(space != NULL)
 	{
-		// ´´½¨entity
+		// ï¿½ï¿½ï¿½ï¿½entity
 		Entity* e = createEntity(entityType.c_str(), NULL, false, entitycallEntityID, false);
 		
 		if(e == NULL)
@@ -1018,7 +1018,7 @@ void Cellapp::onRestoreSpaceInCellFromBaseapp(Network::Channel* pChannel, KBEngi
 
 		PyObject* cellData = e->createCellDataFromStream(&s);
 
-		// ÉèÖÃentityµÄbaseEntityCall
+		// ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½baseEntityCall
 		EntityCall* entitycall = new EntityCall(e->pScriptModule(), NULL, componentID, entitycallEntityID, ENTITYCALL_TYPE_BASE);
 		e->baseEntityCall(entitycall);
 		
@@ -1029,14 +1029,14 @@ void Cellapp::onRestoreSpaceInCellFromBaseapp(Network::Channel* pChannel, KBEngi
 			KBE_ASSERT(clientEntityCall != Py_None);
 
 			EntityCall* client = static_cast<EntityCall*>(clientEntityCall);
-			// Py_INCREF(clientEntityCall); ÕâÀï²»ÐèÒªÔö¼ÓÒýÓÃ£¬ ÒòÎªÃ¿´Î¶¼»á²úÉúÒ»¸öÐÂµÄ¶ÔÏó
+			// Py_INCREF(clientEntityCall); ï¿½ï¿½ï¿½ï²»ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½ ï¿½ï¿½ÎªÃ¿ï¿½Î¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ÂµÄ¶ï¿½ï¿½ï¿½
 
-			// ÎªÁËÄÜ¹»ÈÃentity.__init__ÖÐÄÜ¹»ÐÞ¸ÄÊôÐÔÁ¢¿ÌÄÜ¹ã²¥µ½¿Í»§¶ËÎÒÃÇÐèÒªÌáÇ°ÉèÖÃÕâÐ©
+			// Îªï¿½ï¿½ï¿½Ü¹ï¿½ï¿½ï¿½entity.__init__ï¿½ï¿½ï¿½Ü¹ï¿½ï¿½Þ¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü¹ã²¥ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð©
 			e->clientEntityCall(client);
 			e->setWitness(Witness::createPoolObject(OBJECTPOOL_POINT));
 		}
 
-		// ´Ë´¦baseapp¿ÉÄÜ»¹ÓÐÃ»³õÊ¼»¯¹ýÀ´£¬ ËùÒÔÓÐÒ»¶¨¸ÅÂÊÊÇÎªNoneµÄ
+		// ï¿½Ë´ï¿½baseappï¿½ï¿½ï¿½Ü»ï¿½ï¿½ï¿½Ã»ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÎªNoneï¿½ï¿½
 		Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
 		if(cinfos == NULL || cinfos->pChannel == NULL)
 		{
@@ -1065,7 +1065,7 @@ void Cellapp::onRestoreSpaceInCellFromBaseapp(Network::Channel* pChannel, KBEngi
 		e->createNamespace(cellData);
 		Py_XDECREF(cellData);
 
-		// Ìí¼Óµ½space
+		// ï¿½ï¿½ï¿½Óµï¿½space
 		e->onRestore();
 
 		space->addEntityAndEnterWorld(e, true);
@@ -1116,7 +1116,7 @@ void Cellapp::onCreateCellEntityFromBaseapp(Network::Channel* pChannel, KBEngine
 	s >> hasClient;
 	s >> inRescore;
 
-	// ´Ë´¦baseapp¿ÉÄÜ»¹ÓÐÃ»³õÊ¼»¯¹ýÀ´£¬ ËùÒÔÓÐÒ»¶¨¸ÅÂÊÊÇÎªNoneµÄ
+	// ï¿½Ë´ï¿½baseappï¿½ï¿½ï¿½Ü»ï¿½ï¿½ï¿½Ã»ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÎªNoneï¿½ï¿½
 	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
 	if(cinfos == NULL || cinfos->pChannel == NULL)
 	{
@@ -1149,14 +1149,14 @@ void Cellapp::_onCreateCellEntityFromBaseapp(std::string& entityType, ENTITY_ID 
 											MemoryStream* pCellData, bool hasClient, bool inRescore, COMPONENT_ID componentID, 
 											SPACE_ID spaceID)
 {
-	// ×¢Òâ£º´Ë´¦ÀíÂÛ²»»áÕÒ²»µ½×é¼þ£¬ ÒòÎªonCreateCellEntityFromBaseappÖÐÒÑ¾­½øÐÐ¹ýÒ»´ÎÏûÏ¢»º´æÅÐ¶Ï
+	// ×¢ï¿½â£ºï¿½Ë´ï¿½ï¿½ï¿½ï¿½Û²ï¿½ï¿½ï¿½ï¿½Ò²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ÎªonCreateCellEntityFromBaseappï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½Ð¹ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½
 	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
 	KBE_ASSERT(cinfos != NULL && cinfos->pChannel != NULL);
 
 	Entity* pCreateToEntity = pEntities_->find(createToEntityID);
 
-	// ¿ÉÄÜspaceEntityÒÑ¾­Ïú»ÙÁË£¬ µ«»¹Î´À´µÃ¼°Í¨Öªµ½baseappÊ±
-	// base²¿·ÖÔÚÏòÕâ¸öspace´´½¨entity
+	// ï¿½ï¿½ï¿½ï¿½spaceEntityï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë£ï¿½ ï¿½ï¿½ï¿½ï¿½Î´ï¿½ï¿½ï¿½Ã¼ï¿½Í¨Öªï¿½ï¿½baseappÊ±
+	// baseï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½spaceï¿½ï¿½ï¿½ï¿½entity
 	if(pCreateToEntity == NULL)
 	{
 		ERROR_MSG("Cellapp::_onCreateCellEntityFromBaseapp: not fount spaceEntity. may have been destroyed!\n");
@@ -1176,16 +1176,16 @@ void Cellapp::_onCreateCellEntityFromBaseapp(std::string& entityType, ENTITY_ID 
 	Space* space = Spaces::findSpace(spaceID);
 	if(space != NULL && space->isGood())
 	{
-		// ¸æÖªbaseapp£¬ entityµÄcell´´½¨ÁË
+		// ï¿½ï¿½Öªbaseappï¿½ï¿½ entityï¿½ï¿½cellï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		pBundle->newMessage(BaseappInterface::onEntityGetCell);
 		BaseappInterface::onEntityGetCellArgs3::staticAddToBundle(*pBundle, entityID, componentID_, spaceID);
 		cinfos->pChannel->send(pBundle);
 
-		// ½â°ücellDataÐÅÏ¢.
+		// ï¿½ï¿½ï¿½cellDataï¿½ï¿½Ï¢.
 		PyObject* cellData = NULL;
 	
-		// ´´½¨entity
+		// ï¿½ï¿½ï¿½ï¿½entity
 		Entity* e = createEntity(entityType.c_str(), cellData, false, entityID, false);
 		
 		if(e == NULL)
@@ -1194,7 +1194,7 @@ void Cellapp::_onCreateCellEntityFromBaseapp(std::string& entityType, ENTITY_ID 
 			return;
 		}
 
-		// ÉèÖÃentityµÄbaseEntityCall
+		// ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½baseEntityCall
 		EntityCall* entitycall = new EntityCall(e->pScriptModule(), NULL, componentID, entityID, ENTITYCALL_TYPE_BASE);
 		e->baseEntityCall(entitycall);
 		
@@ -1214,9 +1214,9 @@ void Cellapp::_onCreateCellEntityFromBaseapp(std::string& entityType, ENTITY_ID 
 			KBE_ASSERT(clientEntityCall != Py_None);
 
 			EntityCall* client = static_cast<EntityCall*>(clientEntityCall);	
-			// Py_INCREF(clientEntityCall); ÕâÀï²»ÐèÒªÔö¼ÓÒýÓÃ£¬ ÒòÎªÃ¿´Î¶¼»á²úÉúÒ»¸öÐÂµÄ¶ÔÏó
+			// Py_INCREF(clientEntityCall); ï¿½ï¿½ï¿½ï²»ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½ ï¿½ï¿½ÎªÃ¿ï¿½Î¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ÂµÄ¶ï¿½ï¿½ï¿½
 
-			// ÎªÁËÄÜ¹»ÈÃentity.__init__ÖÐÄÜ¹»ÐÞ¸ÄÊôÐÔÁ¢¿ÌÄÜ¹ã²¥µ½¿Í»§¶ËÎÒÃÇÐèÒªÌáÇ°ÉèÖÃÕâÐ©
+			// Îªï¿½ï¿½ï¿½Ü¹ï¿½ï¿½ï¿½entity.__init__ï¿½ï¿½ï¿½Ü¹ï¿½ï¿½Þ¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü¹ã²¥ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð©
 			e->clientEntityCall(client);
 			e->setWitness(Witness::createPoolObject(OBJECTPOOL_POINT));
 		}
@@ -1234,7 +1234,7 @@ void Cellapp::_onCreateCellEntityFromBaseapp(std::string& entityType, ENTITY_ID 
 
 		Py_XDECREF(cellData);
 		
-		// ÕâÀïÔö¼ÓÒ»¸öÒýÓÃ£¬ ÒòÎª¿ÉÄÜÔÚ½øÈëÊ±±»Ïú»Ù
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½ ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ï¿½Ú½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		Py_INCREF(e);
 
 		space->addEntityToNode(e);
@@ -1244,7 +1244,7 @@ void Cellapp::_onCreateCellEntityFromBaseapp(std::string& entityType, ENTITY_ID 
 		if(isDestroyed == true)
 			return;
 
-		// Èç¹ûÊÇÓÐclientµÄentityÔòÉèÖÃËüµÄcliententitycall, baseapp²¿·ÖµÄonEntityGetCell»á¸æÖª¿Í»§¶Ëenterworld.
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½clientï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½cliententitycall, baseappï¿½ï¿½ï¿½Öµï¿½onEntityGetCellï¿½ï¿½ï¿½Öªï¿½Í»ï¿½ï¿½ï¿½enterworld.
 		if(hasClient)
 		{
 			e->onGetWitness();
@@ -1277,7 +1277,7 @@ void Cellapp::onDestroyCellEntityFromBaseapp(Network::Channel* pChannel, ENTITY_
 
 	if (!e->isReal())
 	{
-		// ÐèÒª×öÖÐ×ª
+		// ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½×ª
 		GhostManager* gm = Cellapp::getSingleton().pGhostManager();
 		if (gm)
 		{
@@ -1308,7 +1308,7 @@ void Cellapp::onEntityCall(Network::Channel* pChannel, KBEngine::MemoryStream& s
 	ENTITYCALL_TYPE	calltype;
 	s >> calltype;
 
-	// ÔÚ±¾µØÇø³¢ÊÔ²éÕÒ¸ÃÊÕ¼þÈËÐÅÏ¢£¬ ¿´ÊÕ¼þÈËÊÇ·ñÊôÓÚ±¾ÇøÓò
+	// ï¿½Ú±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô²ï¿½ï¿½Ò¸ï¿½ï¿½Õ¼ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ ï¿½ï¿½ï¿½Õ¼ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½Ú±ï¿½ï¿½ï¿½ï¿½ï¿½
 	Entity* entity = pEntities_->find(eid);
 	if(entity == NULL)
 	{
@@ -1335,7 +1335,7 @@ void Cellapp::onEntityCall(Network::Channel* pChannel, KBEngine::MemoryStream& s
 
 	switch(calltype)
 	{
-		// ±¾×é¼þÊÇcellapp£¬ÄÇÃ´È·ÈÏÓÊ¼þµÄÄ¿µÄµØÊÇÕâÀï£¬ ÄÇÃ´Ö´ÐÐ×îÖÕ²Ù×÷
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½cellappï¿½ï¿½ï¿½ï¿½Ã´È·ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½Ä¿ï¿½Äµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï£¬ ï¿½ï¿½Ã´Ö´ï¿½ï¿½ï¿½ï¿½ï¿½Õ²ï¿½ï¿½ï¿½
 		case ENTITYCALL_TYPE_CELL:	
 			{
 				if(!entity->isReal())
@@ -1431,12 +1431,12 @@ void Cellapp::onRemoteCallMethodFromClient(Network::Channel* pChannel, KBEngine:
 		return;
 	}
 
-	// Õâ¸ö·½·¨ºô½ÐÈç¹û²»ÊÇÕâ¸öproxy×Ô¼ºµÄ·½·¨Ôò±ØÐëºô½ÐµÄentityºÍproxyµÄcellEntityÔÚÒ»¸öspaceÖÐ¡£
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½proxyï¿½Ô¼ï¿½ï¿½Ä·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½entityï¿½ï¿½proxyï¿½ï¿½cellEntityï¿½ï¿½Ò»ï¿½ï¿½spaceï¿½Ð¡ï¿½
 	try
 	{
 		if (!e->isReal())
 		{
-			// ÐèÒª×öÖÐ×ª
+			// ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½×ª
 			GhostManager* gm = Cellapp::getSingleton().pGhostManager();
 			if (gm)
 			{
@@ -1484,12 +1484,12 @@ void Cellapp::onUpdateDataFromClient(Network::Channel* pChannel, KBEngine::Memor
 		return;
 	}
 
-	// Èç¹ûÊÇ±»ÏµÍ³¿ØÖÆÁË£¬ÓÖ»ò±»±ðÈË¿ØÖÆÁË£¬ÔòºöÂÔÀ´×Ô×Ô¼º¿Í»§¶ËµÄ¸üÐÂÏûÏ¢
+	// ï¿½ï¿½ï¿½ï¿½Ç±ï¿½ÏµÍ³ï¿½ï¿½ï¿½ï¿½ï¿½Ë£ï¿½ï¿½Ö»ò±»±ï¿½ï¿½Ë¿ï¿½ï¿½ï¿½ï¿½Ë£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Í»ï¿½ï¿½ËµÄ¸ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 	if (e->controlledBy() == NULL || e->controlledBy()->id() != srcEntityID)
 	{
-		// phw: ¾­²âÊÔ·¢ÏÖ£¬ÓÉÓÚcontrolledBy¸Ä±äÊ±Í¨Öª¿Í»§¶Ë´æÔÚÒ»¶¨µÄÊ±¼ä²î£¬
-		//      ËùÒÔ¿Í»§¶ËÊÕµ½ÏûÏ¢Ç°ÈÔÈ»·¢ËÍÎ»ÒÆÏûÏ¢£¬ÕâÊ¹µÃÏÂÃæµÄ´íÎóÈÕÖ¾±äµÃÓÐµã¶à£¬
-		//      Òò´Ë×¢ÊÍµôÕâ¸öÈÕÖ¾£¬ÒÔ¼õÉÙ²»±ØÒªµÄÈÕÖ¾Êä³ö¡£
+		// phw: ï¿½ï¿½ï¿½ï¿½ï¿½Ô·ï¿½ï¿½Ö£ï¿½ï¿½ï¿½ï¿½ï¿½controlledByï¿½Ä±ï¿½Ê±Í¨Öªï¿½Í»ï¿½ï¿½Ë´ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½î£¬
+		//      ï¿½ï¿½ï¿½Ô¿Í»ï¿½ï¿½ï¿½ï¿½Õµï¿½ï¿½ï¿½Ï¢Ç°ï¿½ï¿½È»ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä´ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½ï¿½ï¿½Ðµï¿½à£¬
+		//      ï¿½ï¿½ï¿½×¢ï¿½Íµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ù²ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½ï¿½ï¿½ï¿½
 		//ERROR_MSG(fmt::format("Cellapp::onUpdateDataFromClientForControlledEntity: entity {} has no permission to control entity {}!\n", proxiesEntityID, srcEntityID));
 
 		s.done();
@@ -1532,9 +1532,9 @@ void Cellapp::onUpdateDataFromClientForControlledEntity(Network::Channel* pChann
 
 	if (e->controlledBy() == NULL || e->controlledBy()->id() != proxiesEntityID)
 	{
-		// phw: ¾­²âÊÔ·¢ÏÖ£¬ÓÉÓÚcontrolledBy¸Ä±äÊ±Í¨Öª¿Í»§¶Ë´æÔÚÒ»¶¨µÄÊ±¼ä²î£¬
-		//      ËùÒÔ¿Í»§¶ËÊÕµ½ÏûÏ¢Ç°ÈÔÈ»·¢ËÍÎ»ÒÆÏûÏ¢£¬ÕâÊ¹µÃÏÂÃæµÄ´íÎóÈÕÖ¾±äµÃÓÐµã¶à£¬
-		//      Òò´Ë×¢ÊÍµôÕâ¸öÈÕÖ¾£¬ÒÔ¼õÉÙ²»±ØÒªµÄÈÕÖ¾Êä³ö¡£
+		// phw: ï¿½ï¿½ï¿½ï¿½ï¿½Ô·ï¿½ï¿½Ö£ï¿½ï¿½ï¿½ï¿½ï¿½controlledByï¿½Ä±ï¿½Ê±Í¨Öªï¿½Í»ï¿½ï¿½Ë´ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½î£¬
+		//      ï¿½ï¿½ï¿½Ô¿Í»ï¿½ï¿½ï¿½ï¿½Õµï¿½ï¿½ï¿½Ï¢Ç°ï¿½ï¿½È»ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä´ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½ï¿½ï¿½Ðµï¿½à£¬
+		//      ï¿½ï¿½ï¿½×¢ï¿½Íµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ù²ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½ï¿½ï¿½ï¿½
 		//ERROR_MSG(fmt::format("Cellapp::onUpdateDataFromClientForControlledEntity: entity {} has no permission to control entity {}!\n", proxiesEntityID, srcEntityID));
 		
 		s.done();
@@ -1685,7 +1685,7 @@ void Cellapp::forwardEntityMessageToCellappFromClient(Network::Channel* pChannel
 
 	if (!e->isReal())
 	{
-		// ÐèÒª×öÖÐ×ª
+		// ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½×ª
 		GhostManager* gm = Cellapp::getSingleton().pGhostManager();
 		if (gm)
 		{
@@ -1699,7 +1699,7 @@ void Cellapp::forwardEntityMessageToCellappFromClient(Network::Channel* pChannel
 		return;
 	}
 
-	// ¼ì²éÊÇ·ñÊÇentityÏûÏ¢£¬ ·ñÔò²»ºÏ·¨.
+	// ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½entityï¿½ï¿½Ï¢ï¿½ï¿½ ï¿½ï¿½ï¿½ò²»ºÏ·ï¿½.
 	while(s.length() > 0 && !e->isDestroyed())
 	{
 		Network::MessageID currMsgID;
@@ -1741,7 +1741,7 @@ void Cellapp::forwardEntityMessageToCellappFromClient(Network::Channel* pChannel
 			return;
 		}
 
-		// ÁÙÊ±ÉèÖÃÓÐÐ§¶ÁÈ¡Î»£¬ ·ÀÖ¹½Ó¿ÚÖÐÒç³ö²Ù×÷
+		// ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½È¡Î»ï¿½ï¿½ ï¿½ï¿½Ö¹ï¿½Ó¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		size_t wpos = s.wpos();
 		// size_t rpos = s.rpos();
 		size_t frpos = s.rpos() + currMsgLen;
@@ -1759,7 +1759,7 @@ void Cellapp::forwardEntityMessageToCellappFromClient(Network::Channel* pChannel
 			return;
 		}
 
-		// ·ÀÖ¹handleÖÐÃ»ÓÐ½«Êý¾Ýµ¼³ö»ñÈ¡·Ç·¨²Ù×÷
+		// ï¿½ï¿½Ö¹handleï¿½ï¿½Ã»ï¿½Ð½ï¿½ï¿½ï¿½ï¿½Ýµï¿½ï¿½ï¿½ï¿½ï¿½È¡ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½
 		if(currMsgLen > 0)
 		{
 			if(frpos != s.rpos())
@@ -1929,7 +1929,7 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 		return;
 	}
 
-	// ´´½¨entity
+	// ï¿½ï¿½ï¿½ï¿½entity
 	Entity* e = createEntity(EntityDef::findScriptModule(entityType)->getName(), NULL, false, teleportEntityID, false);
 	if (e == NULL)
 	{
@@ -1951,12 +1951,12 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 	Py_INCREF(e);
 	e->createFromStream(s);
 
-	// ÓÐ¿ÉÄÜÐòÁÐ»¯¹ýÀ´µÄghostÄÚÈÝ°üº¬ÒÆ¶¯¿ØÖÆÆ÷£¬Ö®ËùÒÔÐòÁÐ»¯¹ýÀ´ÊÇÎªÁË
-	// ÔÚ´«ËÍÊ§°ÜÊ±¿ÉÒÔÓÃÓÚ»Ö¸´ÏÖ³¡, ÄÇÃ´´«ËÍ³É¹¦ÁËÎÒÃÇÓ¦¸ÃÍ£Ö¹ÒÔÇ°µÄÒÆ¶¯ÐÐÎª
+	// ï¿½Ð¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ghostï¿½ï¿½ï¿½Ý°ï¿½ï¿½ï¿½ï¿½Æ¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½
+	// ï¿½Ú´ï¿½ï¿½ï¿½Ê§ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú»Ö¸ï¿½ï¿½Ö³ï¿½, ï¿½ï¿½Ã´ï¿½ï¿½ï¿½Í³É¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¦ï¿½ï¿½Í£Ö¹ï¿½ï¿½Ç°ï¿½ï¿½ï¿½Æ¶ï¿½ï¿½ï¿½Îª
 	e->stopMove();
 
-	// ¶ÔÓÚ´«ËÍ²Ù×÷À´Ëµ£¬ÊµÌå´«ËÍ¹ýÀ´¾Í²»»áÓÐghost²¿·ÖÁË
-	// µ±Ç°ÊµÌå×ö³öµÄÈÎºÎ¸Ä±ä²»ÐèÒªÍ¬²½µ½Ô­ÓÐcell£¬Õâ¿ÉÄÜ»á²úÉúÍøÂçÏûÏ¢ËÀÑ­»·
+	// ï¿½ï¿½ï¿½Ú´ï¿½ï¿½Í²ï¿½ï¿½ï¿½ï¿½ï¿½Ëµï¿½ï¿½Êµï¿½å´«ï¿½Í¹ï¿½ï¿½ï¿½ï¿½Í²ï¿½ï¿½ï¿½ï¿½ï¿½ghostï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	// ï¿½ï¿½Ç°Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÎºÎ¸Ä±ä²»ï¿½ï¿½ÒªÍ¬ï¿½ï¿½ï¿½ï¿½Ô­ï¿½ï¿½cellï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½Ñ­ï¿½ï¿½
 	//ghostCell = 0;
 	e->ghostCell(0);
 
@@ -1967,10 +1967,10 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 	{
 		e->addFlags(ENTITY_FLAGS_TELEPORT_START);
 		
-		// Èç¹ûÊÇÓÐbaseµÄÊµÌå£¬ÐèÒª½«baseappIDÌîÈë£¬ÒÔ±ãÔÚreqTeleportToCellAppCBÖÐ»Øµ÷¸øbaseapp´«Êä½áÊø×´Ì¬
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½baseï¿½ï¿½Êµï¿½å£¬ï¿½ï¿½Òªï¿½ï¿½baseappIDï¿½ï¿½ï¿½ë£¬ï¿½Ô±ï¿½ï¿½ï¿½reqTeleportToCellAppCBï¿½Ð»Øµï¿½ï¿½ï¿½baseappï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬
 		entityBaseappID = e->baseEntityCall()->componentID();
 
-		// Ïòbaseapp·¢ËÍ´«ËÍµ½´ïÍ¨Öª
+		// ï¿½ï¿½baseappï¿½ï¿½ï¿½Í´ï¿½ï¿½Íµï¿½ï¿½ï¿½Í¨Öª
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(BaseappInterface::onMigrationCellappEnd);
 		(*pBundle) << e->id();
@@ -1978,7 +1978,7 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 		e->baseEntityCall()->sendCall(pBundle);
 	}
 
-	// ½øÈëÐÂspaceÖ®Ç°±ØÐëÍ¨Öª¿Í»§¶ËleaveSpace
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½spaceÖ®Ç°ï¿½ï¿½ï¿½ï¿½Í¨Öªï¿½Í»ï¿½ï¿½ï¿½leaveSpace
 	if (e->clientEntityCall())
 	{
 		Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
@@ -1989,7 +1989,7 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 		e->clientEntityCall()->sendCall(pSendBundle);
 	}
 
-	// ½øÈëÐÂµÄspaceÖÐ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Âµï¿½spaceï¿½ï¿½
 	space->addEntityAndEnterWorld(e);
 
 	Entity* nearbyMBRef = Cellapp::getSingleton().findEntity(nearbyMBRefID);
@@ -2018,22 +2018,22 @@ void Cellapp::reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s
 
 	s >> sourceCellappID >> targetCellappID >> entityBaseappID >> teleportEntityID >> success;
 
-	// Õý³£Çé¿öÏÂ£¬ Ó¦¸Ã´«ËÍ½á¹û·µ»ØÊ±´«ËÍÇ°µÄÊµÌåÓ¦¸ÃÔÚµ±Ç°cellÉÏ£¬ Èç¹ûµ½ÆäËûcellappÉÏÁË£¬ ËµÃ÷ÔÚ´ËÆÚ¼ä±»Ç¨ÒÆ×ßÁË
-	// ´ËÊ±±»Ç¨ÒÆºÜ¿ÉÄÜ»áÓÐÎÊÌâ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â£ï¿½ Ó¦ï¿½Ã´ï¿½ï¿½Í½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½Êµï¿½ï¿½Ó¦ï¿½ï¿½ï¿½Úµï¿½Ç°cellï¿½Ï£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½cellappï¿½ï¿½ï¿½Ë£ï¿½ Ëµï¿½ï¿½ï¿½Ú´ï¿½ï¿½Ú¼ä±»Ç¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	// ï¿½ï¿½Ê±ï¿½ï¿½Ç¨ï¿½ÆºÜ¿ï¿½ï¿½Ü»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if (sourceCellappID != g_componentID)
 	{
 		ERROR_MSG(fmt::format("Cellapp::reqTeleportToCellAppCB(): sourceCellappID={} != currCellappID={}, targetCellappID={}\n", 
 			sourceCellappID, g_componentID, targetCellappID));
 	}
 
-	// ´«ËÍ³É¹¦£¬ÎÒÃÇÏú»ÙÕâ¸öentity
+	// ï¿½ï¿½ï¿½Í³É¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entity
 	if(success)
 	{
 		destroyEntity(teleportEntityID, false);
 		return;
 	}
 
-	// ÊµÌå¿ÉÄÜÃ»ÓÐbase²¿·Ö£¬ÄÇÃ´²»ÐèÒªÍ¨Öªbaseapp
+	// Êµï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½baseï¿½ï¿½ï¿½Ö£ï¿½ï¿½ï¿½Ã´ï¿½ï¿½ï¿½ï¿½ÒªÍ¨Öªbaseapp
 	if (entityBaseappID > 0)
 	{
 		Components::ComponentInfos* pInfos = Components::getSingleton().findComponent(entityBaseappID);
@@ -2052,7 +2052,7 @@ void Cellapp::reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s
 		}
 	}
 
-	// Ä³Ð©Çé¿öÏÂÊµÌå¿ÉÄÜ´ËÊ±ÕÒ²»µ½ÁË£¬ÀýÈç£º¸±±¾Ïú»ÙÁË
+	// Ä³Ð©ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½Ü´ï¿½Ê±ï¿½Ò²ï¿½ï¿½ï¿½ï¿½Ë£ï¿½ï¿½ï¿½ï¿½ç£ºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	Entity* entity = Cellapp::getSingleton().findEntity(teleportEntityID);
 	if(entity == NULL)
 	{
@@ -2063,7 +2063,7 @@ void Cellapp::reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s
 		return;
 	}
 
-	// ´«ËÍÊ§°ÜÁË£¬ÎÒÃÇÐèÒªÖØ»Ö¸´entity
+	// ï¿½ï¿½ï¿½ï¿½Ê§ï¿½ï¿½ï¿½Ë£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½Ø»Ö¸ï¿½entity
 	ENTITY_ID nearbyMBRefID = 0;
 	Position3D pos;
 	Direction3D dir;
@@ -2092,7 +2092,7 @@ void Cellapp::reqTeleportToCellAppOver(Network::Channel* pChannel, MemoryStream&
 
 	s >> teleportEntityID;
 	
-	// Ä³Ð©Çé¿öÏÂÊµÌå¿ÉÄÜ´ËÊ±ÕÒ²»µ½ÁË£¬ÀýÈç£º¸±±¾Ïú»ÙÁË
+	// Ä³Ð©ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½Ü´ï¿½Ê±ï¿½Ò²ï¿½ï¿½ï¿½ï¿½Ë£ï¿½ï¿½ï¿½ï¿½ç£ºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	Entity* entity = Cellapp::getSingleton().findEntity(teleportEntityID);
 	if(entity == NULL)
 	{
@@ -2258,7 +2258,7 @@ void Cellapp::setSpaceViewer(Network::Channel* pChannel, MemoryStream& s)
 	SPACE_ID spaceID;
 	s >> spaceID;
 
-	// Èç¹ûÎª0£¬Ôò²é¿´ËùÓÐcell
+	// ï¿½ï¿½ï¿½Îª0ï¿½ï¿½ï¿½ï¿½é¿´ï¿½ï¿½ï¿½ï¿½cell
 	CELL_ID cellID;
 	s >> cellID;
 

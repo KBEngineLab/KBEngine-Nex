@@ -29,27 +29,27 @@ namespace KBEngine{
 
 class GlobalDataClient : public script::Map
 {	
-	/** ×ÓÀà»¯ ½«Ò»Ð©py²Ù×÷Ìî³ä½øÅÉÉúÀà */
+	/** ï¿½ï¿½ï¿½à»¯ ï¿½ï¿½Ò»Ð©pyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 	INSTANCE_SCRIPT_HREADER(GlobalDataClient, script::Map)
 		
 public:	
 	GlobalDataClient(COMPONENT_TYPE componentType, GlobalDataServer::DATA_TYPE dataType);
 	~GlobalDataClient();
 	
-	/** Ð´Êý¾Ý */
+	/** Ð´ï¿½ï¿½ï¿½ï¿½ */
 	bool write(PyObject* pyKey, PyObject* pyValue);
 	
-	/** É¾³ýÊý¾Ý */
+	/** É¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 	bool del(PyObject* pyKey);
 	
-	/** Êý¾Ý¸Ä±äÍ¨Öª */
+	/** ï¿½ï¿½ï¿½Ý¸Ä±ï¿½Í¨Öª */
 	void onDataChanged(PyObject* key, PyObject* value, bool isDelete = false);
 	
-	/** ÉèÖÃ¸ÃÈ«¾ÖÊý¾Ý¿Í»§¶ËµÄ·þÎñÆ÷×é¼þÀàÐÍ */
+	/** ï¿½ï¿½ï¿½Ã¸ï¿½È«ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿Í»ï¿½ï¿½ËµÄ·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 	void setServerComponentType(COMPONENT_TYPE ct){ serverComponentType_ = ct; }
 	
 private:
-	COMPONENT_TYPE					serverComponentType_;				// GlobalDataServerËùÔÚ·þÎñÆ÷×é¼þµÄÀàÐÍ
+	COMPONENT_TYPE					serverComponentType_;				// GlobalDataServerï¿½ï¿½ï¿½Ú·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	GlobalDataServer::DATA_TYPE 	dataType_;
 } ;
 

@@ -97,7 +97,7 @@ bool ForwardComponent_MessageBuffer::process()
 		if(cinfos == NULL || cinfos->pChannel == NULL)
 			return true;
 
-		// Èç¹ûÊÇmgrÀà×é¼þÐèÒªÅÐ¶ÏÊÇ·ñÒÑ¾­³õÊ¼»¯Íê³É
+		// ï¿½ï¿½ï¿½ï¿½ï¿½mgrï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½Ð¶ï¿½ï¿½Ç·ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½
 		if(g_componentType == CELLAPPMGR_TYPE || g_componentType == BASEAPPMGR_TYPE)
 		{
 			if(cinfos->state != COMPONENT_STATE_RUN)
@@ -213,7 +213,7 @@ bool ForwardAnywhere_MessageBuffer::process()
 		Components::COMPONENTS::iterator ctiter = cts.begin();
 		for(; ctiter != cts.end(); ++ctiter)
 		{
-			// ±ØÐëËùÓÐµÄ×é¼þÆµµÀ¶¼±»ÉèÖÃ£¬Èç¹û²»ÊÇÔòµÈ´ý¡£
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½Æµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È´ï¿½ï¿½ï¿½
 			if((*ctiter).pChannel == NULL)
 				return true;
 
@@ -221,11 +221,11 @@ bool ForwardAnywhere_MessageBuffer::process()
 				hasEnabled = true;
 		}
 
-		// ±ØÐëÓÐ¿ÉÓÃµÄ½ø³Ì
+		// ï¿½ï¿½ï¿½ï¿½ï¿½Ð¿ï¿½ï¿½ÃµÄ½ï¿½ï¿½ï¿½
 		if(!hasEnabled)
 			return true;
 
-		// ×î¶àÃ¿¸ötick´¦Àí5¸ö
+		// ï¿½ï¿½ï¿½Ã¿ï¿½ï¿½tickï¿½ï¿½ï¿½ï¿½5ï¿½ï¿½
 		int icount = 5;
 
 		std::vector<ForwardItem*>::iterator iter = pBundles_.begin();
@@ -235,8 +235,8 @@ bool ForwardAnywhere_MessageBuffer::process()
 				break;
 		}
 		
-		// ±ØÐëËùÓÐµÄForwardItem¶¼´¦ÓÚok×´Ì¬
-		// ºÎÊ±²»´¦ÓÚok×´Ì¬£¿ÀýÈç£ºcellappmgrÖÐµÄForwardItemÐèÒªµÈ´ýcellapp³õÊ¼»¯Íê±ÏÖ®ºó²Åok
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ForwardItemï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ok×´Ì¬
+		// ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ok×´Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½ç£ºcellappmgrï¿½Ðµï¿½ForwardItemï¿½ï¿½Òªï¿½È´ï¿½cellappï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½Ö®ï¿½ï¿½ï¿½ok
 		if (iter == pBundles_.end())
 			return true;
 

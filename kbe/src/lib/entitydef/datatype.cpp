@@ -1535,7 +1535,7 @@ void EntityCallType::addToStream(MemoryStream* mstream, PyObject* pyValue)
 	{
 		PyTypeObject* stype = script::ScriptObject::getScriptObjectType("Entity");
 		{
-			// ÊÇ·ñÊÇÒ»¸öentity?
+			// ï¿½Ç·ï¿½ï¿½ï¿½Ò»ï¿½ï¿½entity?
 			if(PyObject_IsInstance(pyValue, (PyObject *)stype))
 			{
 				PyObject* pyid = PyObject_GetAttrString(pyValue, "id");
@@ -1568,7 +1568,7 @@ void EntityCallType::addToStream(MemoryStream* mstream, PyObject* pyValue)
 				}
 				else
 				{
-					// Ä³Ð©Çé¿öÏÂ»áÎªNULL£¬ ÀýÈç£ºÊ¹ÓÃÁËweakproxy£¬¶øentitycallÒÑ¾­±äÎªNULLÁË
+					// Ä³Ð©ï¿½ï¿½ï¿½ï¿½Â»ï¿½ÎªNULLï¿½ï¿½ ï¿½ï¿½ï¿½ç£ºÊ¹ï¿½ï¿½ï¿½ï¿½weakproxyï¿½ï¿½ï¿½ï¿½entitycallï¿½Ñ¾ï¿½ï¿½ï¿½ÎªNULLï¿½ï¿½
 					SCRIPT_ERROR_CHECK();
 					id = 0;
 					cid = 0;
@@ -1576,7 +1576,7 @@ void EntityCallType::addToStream(MemoryStream* mstream, PyObject* pyValue)
 			}
 		}
 		
-		// Ö»ÄÜÊÇentitycall
+		// Ö»ï¿½ï¿½ï¿½ï¿½entitycall
 		if(id == 0)
 		{
 			EntityCallAbstract* pEntityCallAbstract = static_cast<EntityCallAbstract*>(pyValue);
@@ -1605,7 +1605,7 @@ PyObject* EntityCallType::createFromStream(MemoryStream* mstream)
 
 		(*mstream) >> id >> cid >> type >> utype;
 
-		// ÔÊÐí´«ÊäPy_None
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Py_None
 		if(id > 0)
 		{
 			if (entityCallType2ComponentType((ENTITYCALL_TYPE)type) == g_componentType)
@@ -1980,8 +1980,8 @@ PyObject* FixedDictType::createNewFromObj(PyObject* pyobj)
 		return impl_createObjFromDict(pyobj);
 	}
 
-	// ¿ÉÄÜÔÚ´«Èë²ÎÊýµÄÊ±ºòÒÑ¾­ÊÇFixedDictÀàÐÍÁË, ÒòÎªparseDefaultStr
-	// »á³õÊ¼Îª×îÖÕ¶ÔÏóÀàÐÍ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ú´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½FixedDictï¿½ï¿½ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½ÎªparseDefaultStr
+	// ï¿½ï¿½ï¿½Ê¼Îªï¿½ï¿½ï¿½Õ¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if(PyObject_TypeCheck(pyobj, FixedDict::getScriptType()))
 	{
 		Py_INCREF(pyobj);
@@ -2225,8 +2225,8 @@ bool FixedDictType::setImplModule(PyObject* pyobj)
 //-------------------------------------------------------------------------------------
 PyObject* FixedDictType::impl_createObjFromDict(PyObject* dictData)
 {
-	// ¿ÉÄÜÔÚ´«Èë²ÎÊýµÄÊ±ºòÒÑ¾­ÊÇÓÃ»§ÀàÐÍÁË, ÒòÎªparseDefaultStr
-	// »á³õÊ¼Îª×îÖÕ¶ÔÏóÀàÐÍ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ú´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½ÎªparseDefaultStr
+	// ï¿½ï¿½ï¿½Ê¼Îªï¿½ï¿½ï¿½Õ¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if(!PyObject_TypeCheck(dictData, FixedDict::getScriptType()) && impl_isSameType(dictData))
 	{
 		Py_INCREF(dictData);
@@ -2322,8 +2322,8 @@ bool FixedDictType::isSameType(PyObject* pyValue)
 
 	if(hasImpl())
 	{
-		// ÕâÀï·µ»Øfalseºó»¹¼ÌÐøÅÐ¶ÏµÄÔ­ÒòÊÇisSameTypeÒòÎªÏà¹ØÌØÐÔ
-		// fixeddict»òÕßÓÃ»§²úÉúµÄÀà±ð¶¼Ó¦¸ÃÊÇºÏ·¨µÄ
+		// ï¿½ï¿½ï¿½ï·µï¿½ï¿½falseï¿½ó»¹¼ï¿½ï¿½ï¿½ï¿½Ð¶Ïµï¿½Ô­ï¿½ï¿½ï¿½ï¿½isSameTypeï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+		// fixeddictï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¦ï¿½ï¿½ï¿½ÇºÏ·ï¿½ï¿½ï¿½
 		if(impl_isSameType(pyValue))
 			return true;
 	}

@@ -107,7 +107,7 @@ bool MoveToPointHandler::requestMoveOver(const Position3D& oldPos)
 		if(pController_->pEntity())
 			pController_->pEntity()->onMoveOver(pController_->id(), layer_, oldPos, pyuserarg_);
 
-		// 如果在onMoveOver中调用cancelController（id）会导致MoveController析构导致pController_为NULL
+		// 锟斤拷锟斤拷锟給nMoveOver锟叫碉拷锟斤拷cancelController锟斤拷id锟斤拷锟结导锟斤拷MoveController锟斤拷锟斤拷锟斤拷锟斤拷pController_为NULL
 		pController_->destroy();
 	}
 
@@ -143,7 +143,7 @@ bool MoveToPointHandler::update()
 
 		if (distance_ > 0.0f)
 		{
-			// 单位化向量
+			// 锟斤拷位锟斤拷锟斤拷锟斤拷
 			KBEVec3Normalize(&movement, &movement); 
 				
 			if(dist_len > distance_)
@@ -164,15 +164,15 @@ bool MoveToPointHandler::update()
 	}
 	else
 	{
-		// 单位化向量
+		// 锟斤拷位锟斤拷锟斤拷锟斤拷
 		KBEVec3Normalize(&movement, &movement); 
 
-		// 移动位置
+		// 锟狡讹拷位锟斤拷
 		movement *= velocity_;
 		currpos += movement;
 	}
 	
-	// 是否需要改变面向
+	// 锟角凤拷锟斤拷要锟侥憋拷锟斤拷锟斤拷
 	if (faceMovement_)
 	{
 		if (movement.x != 0.f || movement.z != 0.f)
@@ -182,19 +182,19 @@ bool MoveToPointHandler::update()
 			direction.pitch(movement.pitch());
 	}
 	
-	// 设置entity的新位置和面向
+	// 锟斤拷锟斤拷entity锟斤拷锟斤拷位锟矫猴拷锟斤拷锟斤拷
 	if(!isDestroyed_)
 		pEntity->setPositionAndDirection(currpos, direction);
 
-	// 非navigate都不能确定其在地面上
+	// 锟斤拷navigate锟斤拷锟斤拷锟斤拷确锟斤拷锟斤拷锟节碉拷锟斤拷锟斤拷
 	if(!isDestroyed_)
 		pEntity->isOnGround(isOnGround());
 
-	// 通知脚本
+	// 通知锟脚憋拷
 	if(!isDestroyed_)
 		pEntity->onMove(pController_->id(), layer_, currpos_backup, pyuserarg_);
 
-	// 如果在onMove过程中被停止，又或者达到目的地了，则直接销毁并返回false
+	// 锟斤拷锟斤拷锟給nMove锟斤拷锟斤拷锟叫憋拷停止锟斤拷锟街伙拷锟竭达到目锟侥碉拷锟剿ｏ拷锟斤拷直锟斤拷锟斤拷锟劫诧拷锟斤拷锟斤拷false
 	if (isDestroyed_ || 
 		(!ret && requestMoveOver(currpos_backup)))
 	{

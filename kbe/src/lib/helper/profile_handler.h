@@ -79,22 +79,22 @@ public:
 private:
 	struct ProfileVal
 	{
-		// Ãû³Æ
+		// ï¿½ï¿½ï¿½ï¿½
 		std::string		name;
 
-		// startdºóµÄÊ±¼ä.
+		// startdï¿½ï¿½ï¿½Ê±ï¿½ï¿½.
 		TimeStamp		lastTime;
 		TimeStamp		diff_lastTime;
 
-		// count_´ÎµÄ×ÜÊ±¼ä
+		// count_ï¿½Îµï¿½ï¿½ï¿½Ê±ï¿½ï¿½
 		TimeStamp		sumTime;
 		TimeStamp		diff_sumTime;
 
-		// ¼ÇÂ¼×îºóÒ»´ÎÄÚ²¿Ê±¼äÆ¬
+		// ï¿½ï¿½Â¼ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ú²ï¿½Ê±ï¿½ï¿½Æ¬
 		TimeStamp		lastIntTime;
 		TimeStamp		diff_lastIntTime;
 
-		// count_´ÎÄÚ²¿×ÜÊ±¼ä
+		// count_ï¿½ï¿½ï¿½Ú²ï¿½ï¿½ï¿½Ê±ï¿½ï¿½
 		TimeStamp		sumIntTime;
 		TimeStamp		diff_sumIntTime;
 
@@ -102,8 +102,8 @@ private:
 		uint32			diff_count;
 	};
 
-	// ´ËProfileValÖ»ÔÚ¼ÆÊ±Æ÷¿ªÊ¼Ê±¼ÇÂ¼default.profilesµÄ³õÊ¼Öµ
-	// ÔÚ½áÊøÊ±È¡³ö²îÖµµÃµ½½á¹û
+	// ï¿½ï¿½ProfileValÖ»ï¿½Ú¼ï¿½Ê±ï¿½ï¿½ï¿½ï¿½Ê¼Ê±ï¿½ï¿½Â¼default.profilesï¿½Ä³ï¿½Ê¼Öµ
+	// ï¿½Ú½ï¿½ï¿½ï¿½Ê±È¡ï¿½ï¿½ï¿½ï¿½Öµï¿½Ãµï¿½ï¿½ï¿½ï¿½
 	typedef KBEUnordered_map<std::string,  ProfileVal> PROFILEVALS;
 	PROFILEVALS profileVals_;
 };
@@ -134,15 +134,15 @@ private:
 			count = 0;
 		}
 
-		// Ãû³Æ
+		// ï¿½ï¿½ï¿½ï¿½
 		std::string		name;
 
 		uint32			size;
 		uint32			count;
 	};
 
-	// ´ËProfileValÖ»ÔÚ¼ÆÊ±Æ÷¿ªÊ¼Ê±¼ÇÂ¼default.profilesµÄ³õÊ¼Öµ
-	// ÔÚ½áÊøÊ±È¡³ö²îÖµµÃµ½½á¹û
+	// ï¿½ï¿½ProfileValÖ»ï¿½Ú¼ï¿½Ê±ï¿½ï¿½ï¿½ï¿½Ê¼Ê±ï¿½ï¿½Â¼default.profilesï¿½Ä³ï¿½Ê¼Öµ
+	// ï¿½Ú½ï¿½ï¿½ï¿½Ê±È¡ï¿½ï¿½ï¿½ï¿½Öµï¿½Ãµï¿½ï¿½ï¿½ï¿½
 	typedef KBEUnordered_map<std::string,  ProfileVal> PROFILEVALS;
 
 	typedef KBEUnordered_map< std::string,  PROFILEVALS > PROFILEVALMAP;
@@ -184,7 +184,7 @@ private:
 			total_recv_count = 0;
 		}
 
-		// Ãû³Æ
+		// ï¿½ï¿½ï¿½ï¿½
 		std::string		name;
 
 		uint32			send_size;

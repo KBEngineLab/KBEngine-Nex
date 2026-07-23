@@ -31,9 +31,9 @@ class Entity;
 class MemoryStream;
 
 #define ENTITYREF_FLAG_UNKONWN							0x00000000
-#define ENTITYREF_FLAG_ENTER_CLIENT_PENDING				0x00000001	// ½øÈë¿Í»§¶ËÖÐ±êÖ¾
-#define ENTITYREF_FLAG_LEAVE_CLIENT_PENDING				0x00000002	// Àë¿ª¿Í»§¶ËÖÐ±êÖ¾
-#define ENTITYREF_FLAG_NORMAL							0x00000004	// ³£¹æ×´Ì¬
+#define ENTITYREF_FLAG_ENTER_CLIENT_PENDING				0x00000001	// ï¿½ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½Ð±ï¿½Ö¾
+#define ENTITYREF_FLAG_LEAVE_CLIENT_PENDING				0x00000002	// ï¿½ë¿ªï¿½Í»ï¿½ï¿½ï¿½ï¿½Ð±ï¿½Ö¾
+#define ENTITYREF_FLAG_NORMAL							0x00000004	// ï¿½ï¿½ï¿½ï¿½×´Ì¬
 
 class EntityRef : public PoolObject
 {

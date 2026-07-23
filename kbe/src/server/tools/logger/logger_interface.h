@@ -43,10 +43,10 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	LoggerËùÓÐÏûÏ¢½Ó¿ÚÔÚ´Ë¶¨Òå
+	Loggerï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½Ó¿ï¿½ï¿½Ú´Ë¶ï¿½ï¿½ï¿½
 */
 NETWORK_INTERFACE_DECLARE_BEGIN(LoggerInterface)
-	// Ä³app×¢²á×Ô¼ºµÄ½Ó¿ÚµØÖ·µ½±¾app
+	// Ä³app×¢ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ä½Ó¿Úµï¿½Ö·ï¿½ï¿½ï¿½ï¿½app
 	LOGGER_MESSAGE_DECLARE_ARGS11(onRegisterNewApp,							NETWORK_VARIABLE_MESSAGE,
 									int32,									uid, 
 									std::string,							username,
@@ -60,39 +60,39 @@ NETWORK_INTERFACE_DECLARE_BEGIN(LoggerInterface)
 									uint16,									extport,
 									std::string,							extAddrEx)
 
-	// Ä³appÖ÷¶¯ÇëÇólook¡£
+	// Ä³appï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½lookï¿½ï¿½
 	LOGGER_MESSAGE_DECLARE_ARGS0(lookApp,									NETWORK_FIXED_MESSAGE)
 
-	// Ä³¸öappÇëÇó²é¿´¸Ãapp¸ºÔØ×´Ì¬¡£
+	// Ä³ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½é¿´ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½
 	LOGGER_MESSAGE_DECLARE_ARGS0(queryLoad,									NETWORK_FIXED_MESSAGE)
 
-	// Ä³¸öappÏò±¾app¸æÖª´¦ÓÚ»î¶¯×´Ì¬¡£
+	// Ä³ï¿½ï¿½appï¿½ï¿½appï¿½ï¿½Öªï¿½ï¿½ï¿½Ú»î¶¯×´Ì¬ï¿½ï¿½
 	LOGGER_MESSAGE_DECLARE_ARGS2(onAppActiveTick,							NETWORK_FIXED_MESSAGE,
 									COMPONENT_TYPE,							componentType, 
 									COMPONENT_ID,							componentID)
 
-	// Ô¶³ÌÐ´ÈÕÖ¾
+	// Ô¶ï¿½ï¿½Ð´ï¿½ï¿½Ö¾
 	LOGGER_MESSAGE_DECLARE_STREAM(writeLog,									NETWORK_VARIABLE_MESSAGE)
 
-	// ×¢²álog¼àÌýÕß
+	// ×¢ï¿½ï¿½logï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	LOGGER_MESSAGE_DECLARE_STREAM(registerLogWatcher,						NETWORK_VARIABLE_MESSAGE)
 
-	// ×¢Ïúlog¼àÌýÕß
+	// ×¢ï¿½ï¿½logï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	LOGGER_MESSAGE_DECLARE_STREAM(deregisterLogWatcher,						NETWORK_VARIABLE_MESSAGE)
 
-	// log¼àÌýÕß¸üÐÂ×Ô¼ºµÄÉèÖÃ
+	// logï¿½ï¿½ï¿½ï¿½ï¿½ß¸ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	LOGGER_MESSAGE_DECLARE_STREAM(updateLogWatcherSetting,					NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇó¹Ø±Õ·þÎñÆ÷
+	// ï¿½ï¿½ï¿½ï¿½Ø±Õ·ï¿½ï¿½ï¿½ï¿½ï¿½
 	LOGGER_MESSAGE_DECLARE_STREAM(reqCloseServer,							NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇó²éÑ¯watcherÊý¾Ý
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¯watcherï¿½ï¿½ï¿½ï¿½
 	LOGGER_MESSAGE_DECLARE_STREAM(queryWatcher,								NETWORK_VARIABLE_MESSAGE)
 
-	// ¿ªÊ¼profile
+	// ï¿½ï¿½Ê¼profile
 	LOGGER_MESSAGE_DECLARE_STREAM(startProfile,								NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇóÇ¿ÖÆÉ±ËÀµ±Ç°app
+	// ï¿½ï¿½ï¿½ï¿½Ç¿ï¿½ï¿½É±ï¿½ï¿½ï¿½ï¿½Ç°app
 	LOGGER_MESSAGE_DECLARE_STREAM(reqKillServer,							NETWORK_VARIABLE_MESSAGE)
 
 NETWORK_INTERFACE_DECLARE_END()

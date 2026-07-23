@@ -44,10 +44,10 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	cellappËùÓÐÏûÏ¢½Ó¿ÚÔÚ´Ë¶¨Òå
+	cellappï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½Ó¿ï¿½ï¿½Ú´Ë¶ï¿½ï¿½ï¿½
 */
 NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
-	// Ä³app×¢²á×Ô¼ºµÄ½Ó¿ÚµØÖ·µ½±¾app
+	// Ä³app×¢ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ä½Ó¿Úµï¿½Ö·ï¿½ï¿½ï¿½ï¿½app
 	CELLAPP_MESSAGE_DECLARE_ARGS11(onRegisterNewApp,								NETWORK_VARIABLE_MESSAGE,
 									int32,											uid, 
 									std::string,									username,
@@ -61,17 +61,17 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
 									uint16,											extport,
 									std::string,									extaddrEx)
 
-	// Ä³appÖ÷¶¯ÇëÇólook¡£
+	// Ä³appï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½lookï¿½ï¿½
 	CELLAPP_MESSAGE_DECLARE_ARGS0(lookApp,											NETWORK_FIXED_MESSAGE)
 
-	// Ä³¸öappÇëÇó²é¿´¸Ãapp¸ºÔØ×´Ì¬¡£
+	// Ä³ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½é¿´ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½
 	CELLAPP_MESSAGE_DECLARE_ARGS0(queryLoad,										NETWORK_FIXED_MESSAGE)
 
-	// consoleÔ¶³ÌÖ´ÐÐpythonÓï¾ä¡£
+	// consoleÔ¶ï¿½ï¿½Ö´ï¿½ï¿½pythonï¿½ï¿½ä¡£
 	CELLAPP_MESSAGE_DECLARE_STREAM(onExecScriptCommand,								NETWORK_VARIABLE_MESSAGE)
 
-	// dbmgr¸æÖªÒÑ¾­Æô¶¯µÄÆäËûbaseapp»òÕßcellappµÄµØÖ·
-	// µ±Ç°appÐèÒªÖ÷¶¯µÄÈ¥ÓëËûÃÇ½¨Á¢Á¬½Ó
+	// dbmgrï¿½ï¿½Öªï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½baseappï¿½ï¿½ï¿½ï¿½cellappï¿½Äµï¿½Ö·
+	// ï¿½ï¿½Ç°appï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¥ï¿½ï¿½ï¿½ï¿½ï¿½Ç½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	CELLAPP_MESSAGE_DECLARE_ARGS11(onGetEntityAppFromDbmgr,							NETWORK_VARIABLE_MESSAGE,
 									int32,											uid, 
 									std::string,									username,
@@ -85,12 +85,12 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
 									uint16,											extport,
 									std::string,									extaddrEx)
 
-	// Ä³appÇëÇó»ñÈ¡Ò»¸öentityID¶ÎµÄ»Øµ÷
+	// Ä³appï¿½ï¿½ï¿½ï¿½ï¿½È¡Ò»ï¿½ï¿½entityIDï¿½ÎµÄ»Øµï¿½
 	CELLAPP_MESSAGE_DECLARE_ARGS2(onReqAllocEntityID,								NETWORK_FIXED_MESSAGE,
 									ENTITY_ID,										startID,
 									ENTITY_ID,										endID)
 
-	// Ä³appÇëÇó»ñÈ¡Ò»¸öentityID¶ÎµÄ»Øµ÷
+	// Ä³appï¿½ï¿½ï¿½ï¿½ï¿½È¡Ò»ï¿½ï¿½entityIDï¿½ÎµÄ»Øµï¿½
 	CELLAPP_MESSAGE_DECLARE_ARGS6(onDbmgrInitCompleted,								NETWORK_VARIABLE_MESSAGE,
 									GAME_TIME,										gametime, 
 									ENTITY_ID,										startID,
@@ -99,116 +99,116 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
 									COMPONENT_ORDER,								startGroupOrder,
 									std::string,									digest)
 
-	// globalÊý¾Ý¸Ä±ä
+	// globalï¿½ï¿½ï¿½Ý¸Ä±ï¿½
 	CELLAPP_MESSAGE_DECLARE_STREAM(onBroadcastGlobalDataChanged,					NETWORK_VARIABLE_MESSAGE)
 	CELLAPP_MESSAGE_DECLARE_STREAM(onBroadcastCellAppDataChanged,					NETWORK_VARIABLE_MESSAGE)
 
-	// baseEntityÇëÇó´´½¨ÔÚÒ»¸öÐÂµÄspaceÖÐ¡£
+	// baseEntityï¿½ï¿½ï¿½ó´´½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½spaceï¿½Ð¡ï¿½
 	CELLAPP_MESSAGE_DECLARE_STREAM(onCreateCellEntityInNewSpaceFromBaseapp,			NETWORK_VARIABLE_MESSAGE)
 
-	// baseEntityÇëÇó»Ö¸´ÔÚÒ»¸öÐÂµÄspaceÖÐ¡£
+	// baseEntityï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½spaceï¿½Ð¡ï¿½
 	CELLAPP_MESSAGE_DECLARE_STREAM(onRestoreSpaceInCellFromBaseapp,					NETWORK_VARIABLE_MESSAGE)
 
-	// ÆäËûAPPÇëÇóÔÚ´ËÔÖÄÑ»Ö¸´¡£
+	// ï¿½ï¿½ï¿½ï¿½APPï¿½ï¿½ï¿½ï¿½ï¿½Ú´ï¿½ï¿½ï¿½ï¿½Ñ»Ö¸ï¿½ï¿½ï¿½
 	CELLAPP_MESSAGE_DECLARE_STREAM(requestRestore,									NETWORK_VARIABLE_MESSAGE)
 	
-	// baseappÇëÇóÔÚÕâ¸öcellappÉÏ´´½¨Ò»¸öentity¡£
+	// baseappï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½cellappï¿½Ï´ï¿½ï¿½ï¿½Ò»ï¿½ï¿½entityï¿½ï¿½
 	CELLAPP_MESSAGE_DECLARE_STREAM(onCreateCellEntityFromBaseapp,					NETWORK_VARIABLE_MESSAGE)
 
-	// Ïú»ÙÄ³¸öcellEntity¡£
+	// ï¿½ï¿½ï¿½ï¿½Ä³ï¿½ï¿½cellEntityï¿½ï¿½
 	CELLAPP_MESSAGE_DECLARE_ARGS1(onDestroyCellEntityFromBaseapp,					NETWORK_FIXED_MESSAGE,
 									ENTITY_ID,										eid)
 
-	// Ä³¸öappÏò±¾app¸æÖª´¦ÓÚ»î¶¯×´Ì¬¡£
+	// Ä³ï¿½ï¿½appï¿½ï¿½appï¿½ï¿½Öªï¿½ï¿½ï¿½Ú»î¶¯×´Ì¬ï¿½ï¿½
 	CELLAPP_MESSAGE_DECLARE_ARGS2(onAppActiveTick,									NETWORK_FIXED_MESSAGE,
 									COMPONENT_TYPE,									componentType, 
 									COMPONENT_ID,									componentID)
 
-	// entityÊÕµ½Ô¶³ÌcallÇëÇó, ÓÉÄ³¸öappÉÏµÄentitycall·¢Æð
+	// entityï¿½Õµï¿½Ô¶ï¿½ï¿½callï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½Ä³ï¿½ï¿½appï¿½Ïµï¿½entitycallï¿½ï¿½ï¿½ï¿½
 	CELLAPP_MESSAGE_DECLARE_STREAM(onEntityCall,									NETWORK_VARIABLE_MESSAGE)
 
-	// client·ÃÎÊentityµÄcell·½·¨
+	// clientï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½cellï¿½ï¿½ï¿½ï¿½
 	CELLAPP_MESSAGE_DECLARE_STREAM(onRemoteCallMethodFromClient,					NETWORK_VARIABLE_MESSAGE)
 
-	// client¸üÐÂÊý¾Ý
+	// clientï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	CELLAPP_MESSAGE_DECLARE_STREAM(onUpdateDataFromClient,							NETWORK_VARIABLE_MESSAGE)
 	CELLAPP_MESSAGE_DECLARE_STREAM(onUpdateDataFromClientForControlledEntity,		NETWORK_VARIABLE_MESSAGE)
 
-	// executeRawDatabaseCommand´ÓdbmgrµÄ»Øµ÷
+	// executeRawDatabaseCommandï¿½ï¿½dbmgrï¿½Ä»Øµï¿½
 	CELLAPP_MESSAGE_DECLARE_STREAM(onExecuteRawDatabaseCommandCB,					NETWORK_VARIABLE_MESSAGE)
 
-	// baseÇëÇó»ñÈ¡celldata
+	// baseï¿½ï¿½ï¿½ï¿½ï¿½È¡celldata
 	CELLAPP_MESSAGE_DECLARE_STREAM(reqBackupEntityCellData,							NETWORK_VARIABLE_MESSAGE)
 
-	// baseÇëÇó»ñÈ¡WriteToDB
+	// baseï¿½ï¿½ï¿½ï¿½ï¿½È¡WriteToDB
 	CELLAPP_MESSAGE_DECLARE_STREAM(reqWriteToDBFromBaseapp,							NETWORK_VARIABLE_MESSAGE)
 
-	// ¿Í»§¶ËÖ±½Ó·¢ËÍÏûÏ¢¸øcellÊµÌå
+	// ï¿½Í»ï¿½ï¿½ï¿½Ö±ï¿½Ó·ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½cellÊµï¿½ï¿½
 	CELLAPP_MESSAGE_DECLARE_STREAM(forwardEntityMessageToCellappFromClient,			NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇó¹Ø±Õ·þÎñÆ÷
+	// ï¿½ï¿½ï¿½ï¿½Ø±Õ·ï¿½ï¿½ï¿½ï¿½ï¿½
 	CELLAPP_MESSAGE_DECLARE_STREAM(reqCloseServer,									NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇó²éÑ¯watcherÊý¾Ý
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¯watcherï¿½ï¿½ï¿½ï¿½
 	CELLAPP_MESSAGE_DECLARE_STREAM(queryWatcher,									NETWORK_VARIABLE_MESSAGE)
 
-	// ¿ªÊ¼profile
+	// ï¿½ï¿½Ê¼profile
 	CELLAPP_MESSAGE_DECLARE_STREAM(startProfile,									NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇóteleportµ½µ±Ç°cellappÉÏ
+	// ï¿½ï¿½ï¿½ï¿½teleportï¿½ï¿½ï¿½ï¿½Ç°cellappï¿½ï¿½
 	CELLAPP_MESSAGE_DECLARE_STREAM(reqTeleportToCellApp,							NETWORK_VARIABLE_MESSAGE)
 
-	// entity´«ËÍµ½Ä¿µÄcellappÉÏµÄspaceÖ®ºó£¬ ·µ»Ø¸øÖ®Ç°cellappµÄ»Øµ÷
+	// entityï¿½ï¿½ï¿½Íµï¿½Ä¿ï¿½ï¿½cellappï¿½Ïµï¿½spaceÖ®ï¿½ï¿½ ï¿½ï¿½ï¿½Ø¸ï¿½Ö®Ç°cellappï¿½Ä»Øµï¿½
 	CELLAPP_MESSAGE_DECLARE_STREAM(reqTeleportToCellAppCB,							NETWORK_VARIABLE_MESSAGE)
 
-	// µ±¿çcellapp´«ËÍºóÐèÒªbaseappÉèÖÃÍê³É×´Ì¬ÔÙÇå³ýcellapp¼ÇÂ¼µÄ±ê¼Ç£¬´Ëºócellapp²Å¿ÉÒÔ¼ÌÐøteleport
+	// ï¿½ï¿½ï¿½ï¿½cellappï¿½ï¿½ï¿½Íºï¿½ï¿½ï¿½Òªbaseappï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½cellappï¿½ï¿½Â¼ï¿½Ä±ï¿½Ç£ï¿½ï¿½Ëºï¿½cellappï¿½Å¿ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½teleport
 	CELLAPP_MESSAGE_DECLARE_STREAM(reqTeleportToCellAppOver,						NETWORK_VARIABLE_MESSAGE)
 		
-	// realÇëÇó¸üÐÂÊôÐÔµ½ghost
+	// realï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½ghost
 	CELLAPP_MESSAGE_DECLARE_STREAM(onUpdateGhostPropertys,							NETWORK_VARIABLE_MESSAGE)
 	
-	// ghostÇëÇóµ÷ÓÃdef·½·¨real
+	// ghostï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½defï¿½ï¿½ï¿½ï¿½real
 	CELLAPP_MESSAGE_DECLARE_STREAM(onRemoteRealMethodCall,							NETWORK_VARIABLE_MESSAGE)
 
-	// realÇëÇó¸üÐÂÒ×±äÊý¾Ýµ½ghost
+	// realï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×±ï¿½ï¿½ï¿½ï¿½Ýµï¿½ghost
 	CELLAPP_MESSAGE_DECLARE_STREAM(onUpdateGhostVolatileData,						NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇóÇ¿ÖÆÉ±ËÀµ±Ç°app
+	// ï¿½ï¿½ï¿½ï¿½Ç¿ï¿½ï¿½É±ï¿½ï¿½ï¿½ï¿½Ç°app
 	CELLAPP_MESSAGE_DECLARE_STREAM(reqKillServer,									NETWORK_VARIABLE_MESSAGE)
 
-	// ¹¤¾ßÇëÇó¸Ä±äspace²é¿´Æ÷£¨º¬Ìí¼ÓºÍÉ¾³ý¹¦ÄÜ£©
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½spaceï¿½é¿´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Óºï¿½É¾ï¿½ï¿½ï¿½ï¿½ï¿½Ü£ï¿½
 	CELLAPP_MESSAGE_DECLARE_STREAM(setSpaceViewer,									NETWORK_VARIABLE_MESSAGE)
 
 	//--------------------------------------------Entity----------------------------------------------------------
-	//Ô¶³Ìºô½Ðentity·½·¨
+	//Ô¶ï¿½Ìºï¿½ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½
 	ENTITY_MESSAGE_DECLARE_STREAM(onRemoteMethodCall,								NETWORK_VARIABLE_MESSAGE)
 
-	//¿Í»§¶ËÉèÖÃÐÂÎ»ÖÃ
+	//ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½
 	ENTITY_MESSAGE_DECLARE_ARGS2(setPosition_XZ_int,								NETWORK_FIXED_MESSAGE,
 									int32,											x, 
 									int32,											z)
 	
-	//¿Í»§¶ËÉèÖÃÐÂÎ»ÖÃ
+	//ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½
 	ENTITY_MESSAGE_DECLARE_ARGS3(setPosition_XYZ_int,								NETWORK_FIXED_MESSAGE,
 									int32,											x, 
 									int32,											y, 
 									int32,											z)
 
-	//¿Í»§¶ËÉèÖÃÐÂÎ»ÖÃ
+	//ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½
 	ENTITY_MESSAGE_DECLARE_ARGS2(setPosition_XZ_float,								NETWORK_FIXED_MESSAGE,
 									float,											x, 
 									float,											z)
 
-	//¿Í»§¶ËÉèÖÃÐÂÎ»ÖÃ
+	//ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½
 	ENTITY_MESSAGE_DECLARE_ARGS3(setPosition_XYZ_float,								NETWORK_FIXED_MESSAGE,
 									float,											x, 
 									float,											y, 
 									float,											z)
 
-	//entity°ó¶¨ÁËÒ»¸ö¹Û²ìÕß(¿Í»§¶Ë)
+	//entityï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Û²ï¿½ï¿½ï¿½(ï¿½Í»ï¿½ï¿½ï¿½)
 	ENTITY_MESSAGE_DECLARE_ARGS0(onGetWitnessFromBase,								NETWORK_FIXED_MESSAGE)
 
-	//entity¶ªÊ§ÁËÒ»¸ö¹Û²ìÕß(¿Í»§¶Ë)
+	//entityï¿½ï¿½Ê§ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Û²ï¿½ï¿½ï¿½(ï¿½Í»ï¿½ï¿½ï¿½)
 	ENTITY_MESSAGE_DECLARE_ARGS0(onLoseWitness,										NETWORK_FIXED_MESSAGE)
 NETWORK_INTERFACE_DECLARE_END()
 

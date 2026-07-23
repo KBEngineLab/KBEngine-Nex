@@ -38,7 +38,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	KBCMDÏûÏ¢ºê£¬  ²ÎÊýÎªÁ÷£¬ ÐèÒª×Ô¼º½â¿ª
+	KBCMDï¿½ï¿½Ï¢ï¿½ê£¬  ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Òªï¿½Ô¼ï¿½ï¿½â¿ª
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 #undef KBCMD_MESSAGE_HANDLER_STREAM
@@ -79,7 +79,7 @@ namespace KBEngine{
 																				\
 
 	/**
-	KBCMDÏûÏ¢ºê£¬  Ö»ÓÐÁã¸ö²ÎÊýµÄÏûÏ¢
+	KBCMDï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 	*/
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 #undef KBCMD_MESSAGE_HANDLER_ARGS0
@@ -120,7 +120,7 @@ namespace KBEngine{
 																				\
 
 	/**
-	KBCMDÏûÏ¢ºê£¬  Ö»ÓÐ¶þ¸ö²ÎÊýµÄÏûÏ¢
+	KBCMDï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 	*/
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 #undef KBCMD_MESSAGE_HANDLER_ARGS2
@@ -172,7 +172,7 @@ namespace KBEngine{
 
 
 	/**
-	KBCMDÏûÏ¢ºê£¬  Ö»ÓÐÒ»¸ö²ÎÊýµÄÏûÏ¢
+	KBCMDï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 	*/
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 #undef KBCMD_MESSAGE_HANDLER_ARGS1
@@ -215,7 +215,7 @@ namespace KBEngine{
 																				\
 
 	/**
-	KBCMDÏûÏ¢ºê£¬  Ö»ÓÐËÄ¸ö²ÎÊýµÄÏûÏ¢
+	KBCMDï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½Ä¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 	*/
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 #undef KBCMD_MESSAGE_HANDLER_ARGS4
@@ -283,7 +283,7 @@ namespace KBEngine{
 											ARG_TYPE4, ARG_NAME4)				\
 
 	/**
-	KBCMDÏûÏ¢ºê£¬  Ö»ÓÐÎå¸ö²ÎÊýµÄÏûÏ¢
+	KBCMDï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 	*/
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 #undef KBCMD_MESSAGE_HANDLER_ARGS5
@@ -360,7 +360,7 @@ namespace KBEngine{
 
 
 	/**
-	KBCMDÏûÏ¢ºê£¬  Ö»ÓÐÁù¸ö²ÎÊýµÄÏûÏ¢
+	KBCMDï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 	*/
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 #undef KBCMD_MESSAGE_HANDLER_ARGS6
@@ -444,7 +444,7 @@ namespace KBEngine{
 											ARG_TYPE6, ARG_NAME6)				\
 
 	/**
-	KBCMDÏûÏ¢ºê£¬  Ö»ÓÐ°Ë¸ö²ÎÊýµÄÏûÏ¢
+	KBCMDï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½Ð°Ë¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 	*/
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 #undef KBCMD_MESSAGE_HANDLER_ARGS8

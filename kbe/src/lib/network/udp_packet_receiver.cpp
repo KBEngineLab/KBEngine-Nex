@@ -91,7 +91,7 @@ bool UDPPacketReceiver::processRecv(bool expectingPacket)
 	EventPoller* pPoller = this->dispatcher().pPoller();
 	if (pPoller != NULL && pPoller->supportsCompletion())
 	{
-		// completion ºó¶ËÒÑ¾­±£ÁôÀ´Ô´µØÖ·ºÍ±¨ÎÄ±ß½ç£¬²»ÄÜÍË»Ø recvfrom ¶ÁÈ¡Í¬Ò»¸öÊý¾Ý±¨¡£
+		// completion ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô´ï¿½ï¿½Ö·ï¿½Í±ï¿½ï¿½Ä±ß½ç£¬ï¿½ï¿½ï¿½ï¿½ï¿½Ë»ï¿½ recvfrom ï¿½ï¿½È¡Í¬Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ý±ï¿½ï¿½ï¿½
 		// A completion backend preserves the source address and datagram boundary, so recvfrom must not read the same datagram again.
 		std::vector<char> data;
 		int errorCode = 0;
@@ -119,7 +119,7 @@ bool UDPPacketReceiver::processRecv(bool expectingPacket)
 			return false;
 		}
 
-		// append ±£³Ö UDP ±¨ÎÄµÄÍêÕû±ß½ç£¬²¢¸´ÓÃÔ­ÓÐµÄ Channel ²éÕÒºÍÐ­Òé½âÎöÁ÷³Ì¡£
+		// append ï¿½ï¿½ï¿½ï¿½ UDP ï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß½ç£¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô­ï¿½Ðµï¿½ Channel ï¿½ï¿½ï¿½Òºï¿½Ð­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì¡ï¿½
 		// append preserves the complete UDP datagram boundary while reusing the existing channel lookup and protocol parsing flow.
 		pChannelReceiveWindow->append(data.data(), data.size());
 	}
@@ -189,7 +189,7 @@ bool UDPPacketReceiver::processRecv(bool expectingPacket)
 //-------------------------------------------------------------------------------------
 Reason UDPPacketReceiver::processFilteredPacket(Channel* pChannel, Packet * pPacket)
 {
-	// Èç¹ûÎªNone£¬ Ôò¿ÉÄÜÊÇ±»¹ýÂËÆ÷¹ýÂËµôÁË(¹ýÂËÆ÷ÕýÔÚ°´ÕÕ×Ô¼ºµÄ¹æÔò×é°ü½âÃÜ)
+	// ï¿½ï¿½ï¿½ÎªNoneï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ëµï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú°ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ä¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
 	if(pPacket)
 	{
 		pChannel->addReceiveWindow(pPacket);
@@ -243,7 +243,7 @@ PacketReceiver::RecvState UDPPacketReceiver::checkSocketErrors(int len, bool exp
 			// exceptions is built into BaseApp::onClientNoSuchPort().
 			if (errno == ECONNREFUSED)
 			{
-				// Î´ÊµÏÖ
+				// Î´Êµï¿½ï¿½
 			}
 
 			this->dispatcher().errorReporter().reportException(

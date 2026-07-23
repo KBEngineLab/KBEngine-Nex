@@ -49,7 +49,7 @@ class MemoryStream;
 class ViewTrigger;
 class Space;
 
-/** ¹Û²ìÕßĞÅÏ¢½á¹¹ */
+/** ï¿½Û²ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½á¹¹ */
 struct WitnessInfo
 {
 	WitnessInfo(const int8& lv, Entity* e, const float& r):
@@ -64,17 +64,17 @@ struct WitnessInfo
 				detailLevelLog[i] = false;
 	}
 	
-	int8 detailLevel;							// µ±Ç°ËùÔÚÏêÇé¼¶±ğ
-	Entity* entity;								// Ëù±í´ïµÄentity
-	float range;								// µ±Ç°ÓëÕâ¸öentityµÄ¾àÀë
-	bool detailLevelLog[3];						// ±íÊ¾Õâ¸öentity¶¼½øÈë¹ı¸ÃentityµÄÄÄĞ©ÏêÇé¼¶±ğ£¬ Ìá¹©ÊôĞÔ¹ã²¥ÓÅ»¯ÓÃµÄ
-												// µ±Ã»ÓĞ½øÈë¹ıÄ³¼¶±ğÊ±£¬ »á½«ËùÓĞÕâ¸ö¼¶±ğµÄÊôĞÔ¸üĞÂ¸øËû£¬ ·ñÔòÖ»¸üĞÂ½ü¶ÎÊ±¼äÔø¾­¸Ä±ä¹ıµÄÊôĞÔ
-	std::vector<uint32> changeDefDataLogs[3];	// entityÀë¿ªÁËÄ³¸öÏêÇé¼¶±ğ(Ã»ÓĞÍÑÀëwitness)ºó£¬ ÕâÆÚ¼äÓĞÄ³¸öÏêÇé¼¶±ğµÄÊôĞÔ¸Ä±ä¾ù¼ÇÂ¼ÔÚÕâÀï
+	int8 detailLevel;							// ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½é¼¶ï¿½ï¿½
+	Entity* entity;								// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entity
+	float range;								// ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½Ä¾ï¿½ï¿½ï¿½
+	bool detailLevelLog[3];						// ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½Ğ©ï¿½ï¿½ï¿½é¼¶ï¿½ï¿½ ï¿½á¹©ï¿½ï¿½ï¿½Ô¹ã²¥ï¿½Å»ï¿½ï¿½Ãµï¿½
+												// ï¿½ï¿½Ã»ï¿½Ğ½ï¿½ï¿½ï¿½ï¿½Ä³ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ ï¿½á½«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¸ï¿½ï¿½Â¸ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½Â½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	std::vector<uint32> changeDefDataLogs[3];	// entityï¿½ë¿ªï¿½ï¿½Ä³ï¿½ï¿½ï¿½ï¿½ï¿½é¼¶ï¿½ï¿½(Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½witness)ï¿½ï¿½ ï¿½ï¿½ï¿½Ú¼ï¿½ï¿½ï¿½Ä³ï¿½ï¿½ï¿½ï¿½ï¿½é¼¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¸Ä±ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 };
 
 /**
-	Õâ¸öÄ£¿éÓÃÀ´¼àÊÓÎÒÃÇ¸ĞĞËÈ¤µÄentityÊı¾İ£¬ Èç£ºview£¬ ÊôĞÔ¸üĞÂ£¬ µ÷ÓÃentityµÄ·½·¨
-	²¢½«Æä´«Êä¸ø¼àÊÓÕß¡£
+	ï¿½ï¿½ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç¸ï¿½ï¿½ï¿½È¤ï¿½ï¿½entityï¿½ï¿½ï¿½İ£ï¿½ ï¿½ç£ºviewï¿½ï¿½ ï¿½ï¿½ï¿½Ô¸ï¿½ï¿½Â£ï¿½ ï¿½ï¿½ï¿½ï¿½entityï¿½Ä·ï¿½ï¿½ï¿½
+	ï¿½ï¿½ï¿½ï¿½ï¿½ä´«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß¡ï¿½
 */
 class Witness : public PoolObject, public Updatable
 {
@@ -128,12 +128,12 @@ public:
 	bool pushBundle(Network::Bundle* pBundle);
 
 	/**
-		»ù´¡Î»ÖÃ£¬ Èç¹ûÓĞ×øÆï»ù´¡Î»ÖÃ¿ÉÄÜÊÇ×øÆïµÈ
+		ï¿½ï¿½ï¿½ï¿½Î»ï¿½Ã£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½Ã¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	INLINE const Position3D& basePos();
 
 	/**
-	»ù´¡³¯Ïò£¬ Èç¹ûÓĞ×øÆï»ù´¡³¯Ïò¿ÉÄÜÊÇ×øÆïµÈ
+	ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	INLINE const Direction3D& baseDir();
 
@@ -147,7 +147,7 @@ public:
 	void _onLeaveView(EntityRef* pEntityRef);
 
 	/**
-		»ñµÃÊµÌå±¾´ÎÍ¬²½VolatileÊı¾İµÄ±ê¼Ç
+		ï¿½ï¿½ï¿½Êµï¿½å±¾ï¿½ï¿½Í¬ï¿½ï¿½Volatileï¿½ï¿½ï¿½İµÄ±ï¿½ï¿½
 	*/
 	uint32 getEntityVolatileDataUpdateFlags(Entity* otherEntity);
 	
@@ -158,17 +158,17 @@ public:
 	bool entityID2AliasID(ENTITY_ID id, uint8& aliasID);
 
 	/**
-		Ê¹ÓÃºÎÖÖĞ­ÒéÀ´¸üĞÂ¿Í»§¶Ë
+		Ê¹ï¿½Ãºï¿½ï¿½ï¿½Ğ­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¿Í»ï¿½ï¿½ï¿½
 	*/
 	void addUpdateToStream(Network::Bundle* pForwardBundle, uint32 flags, EntityRef* pEntityRef);
 
 	/**
-		Ìí¼Ó»ù´¡Î»ÖÃµ½¸üĞÂ°ü
+		ï¿½ï¿½ï¿½Ó»ï¿½ï¿½ï¿½Î»ï¿½Ãµï¿½ï¿½ï¿½ï¿½Â°ï¿½
 	*/
 	void addBaseDataToStream(Network::Bundle* pSendBundle);
 
 	/**
-		Ïòwitness¿Í»§¶ËÍÆËÍÒ»ÌõÏûÏ¢
+		ï¿½ï¿½witnessï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Ï¢
 	*/
 	bool sendToClient(const Network::MessageHandler& msgHandler, Network::Bundle* pBundle);
 	Network::Channel* pChannel();
@@ -176,10 +176,10 @@ public:
 	INLINE VIEW_ENTITIES_MAP& viewEntitiesMap();
 	INLINE VIEW_ENTITIES& viewEntities();
 
-	/** »ñµÃviewentityµÄÒıÓÃ */
+	/** ï¿½ï¿½ï¿½viewentityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 	INLINE EntityRef* getViewEntityRef(ENTITY_ID entityID);
 
-	/** entityIDÊÇ·ñÔÚviewÄÚ */
+	/** entityIDï¿½Ç·ï¿½ï¿½ï¿½viewï¿½ï¿½ */
 	INLINE bool entityInView(ENTITY_ID entityID);
 
 	INLINE ViewTrigger* pViewTrigger();
@@ -189,27 +189,27 @@ public:
 	void uninstallViewTrigger();
 
 	/**
-		ÖØÖÃView·¶Î§ÄÚµÄentities£¬ Ê¹ÆäÍ¬²½×´Ì¬»Ö¸´µ½×î³õÎ´Í¬²½µÄ×´Ì¬
+		ï¿½ï¿½ï¿½ï¿½Viewï¿½ï¿½Î§ï¿½Úµï¿½entitiesï¿½ï¿½ Ê¹ï¿½ï¿½Í¬ï¿½ï¿½×´Ì¬ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î´Í¬ï¿½ï¿½ï¿½ï¿½×´Ì¬
 	*/
 	void resetViewEntities();
 
 private:
 	/**
-		Èç¹ûviewÖĞentityÊıÁ¿Ğ¡ÓÚ256ÔòÖ»·¢ËÍË÷ÒıÎ»ÖÃ
+		ï¿½ï¿½ï¿½viewï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½Ğ¡ï¿½ï¿½256ï¿½ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½
 	*/
 	INLINE void _addViewEntityIDToBundle(Network::Bundle* pBundle, EntityRef* pEntityRef);
 	
 	/**
-		µ±updateÖ´ĞĞÊ±viewÁĞ±íÓĞ¸Ä±äµÄÊ±ºòĞèÒª¸üĞÂentityRefµÄaliasID
+		ï¿½ï¿½updateÖ´ï¿½ï¿½Ê±viewï¿½Ğ±ï¿½ï¿½Ğ¸Ä±ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½entityRefï¿½ï¿½aliasID
 	*/
 	void updateEntitiesAliasID();
 		
 private:
 	Entity*									pEntity_;
 
-	// µ±Ç°entityµÄview°ë¾¶
+	// ï¿½ï¿½Ç°entityï¿½ï¿½viewï¿½ë¾¶
 	float									viewRadius_;
-	// µ±Ç°entityviewµÄÒ»¸öÖÍºó·¶Î§
+	// ï¿½ï¿½Ç°entityviewï¿½ï¿½Ò»ï¿½ï¿½ï¿½Íºï¿½Î§
 	float									viewHysteresisArea_;
 
 	ViewTrigger*							pViewTrigger_;

@@ -43,7 +43,7 @@ namespace KBEngine{
 
 class ClientsRemoteEntityMethod : public script::ScriptObject
 {
-	/** ×ÓÀà»¯ ½«Ò»Ð©py²Ù×÷Ìî³ä½øÅÉÉúÀà */
+	/** ï¿½ï¿½ï¿½à»¯ ï¿½ï¿½Ò»Ð©pyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 	INSTANCE_SCRIPT_HREADER(ClientsRemoteEntityMethod, script::ScriptObject)	
 public:	
 	ClientsRemoteEntityMethod(MethodDescription* methodDescription, 
@@ -68,9 +68,9 @@ public:
 	PyObject* callmethod(PyObject* args, PyObject* kwds);
 
 protected:	
-	MethodDescription*		methodDescription_;		// Õâ¸ö·½·¨µÄÃèÊö
+	MethodDescription*		methodDescription_;		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-	bool					otherClients_;			// ÊÇ·ñÖ»ÊÇÆäËû¿Í»§¶Ë£¬ ²»°üÀ¨×Ô¼º
+	bool					otherClients_;			// ï¿½Ç·ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í»ï¿½ï¿½Ë£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½
 
 	ENTITY_ID				id_;					// entityID
 };

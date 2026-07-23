@@ -96,7 +96,7 @@ int UDPPacket::recvFromEndPoint(EndPoint & ep, Address* pAddr)
 {
 	KBE_ASSERT(maxBufferSize() > wpos());
 
-	// µ±½ÓÊÕÀ´µÄ´óĞ¡´óÓÚ½ÓÊÕ»º³åÇøµÄÊ±ºò£¬recvfrom·µ»Ø-1
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä´ï¿½Ğ¡ï¿½ï¿½ï¿½Ú½ï¿½ï¿½Õ»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½recvfromï¿½ï¿½ï¿½ï¿½-1
 	int len = ep.recvfrom(data() + wpos(), size() - wpos(),
 		(u_int16_t*)&pAddr->port, (u_int32_t*)&pAddr->ip);
 

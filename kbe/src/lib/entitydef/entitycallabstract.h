@@ -41,7 +41,7 @@ class Bundle;
 
 class EntityCallAbstract : public script::ScriptObject
 {
-	/** ×ÓÀà»¯ ½«Ò»Ð©py²Ù×÷Ìî³ä½øÅÉÉúÀà */
+	/** ï¿½ï¿½ï¿½à»¯ ï¿½ï¿½Ò»Ð©pyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 	INSTANCE_SCRIPT_HREADER(EntityCallAbstract, ScriptObject)
 public:
 	EntityCallAbstract(PyTypeObject* scriptType, 
@@ -54,7 +54,7 @@ public:
 	virtual ~EntityCallAbstract();
 
 	/** 
-		»ñÈ¡entityID 
+		ï¿½ï¿½È¡entityID 
 	*/
 	INLINE ENTITY_ID id() const;
 
@@ -63,27 +63,27 @@ public:
 	DECLARE_PY_GET_MOTHOD(pyGetID);
 
 	/** 
-		»ñµÃ×é¼þID 
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ID 
 	*/
 	INLINE COMPONENT_ID componentID(void) const;
 
 	/** 
-		ÉèÖÃ×é¼þµÄID 
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ID 
 	*/
 	INLINE void componentID(COMPONENT_ID cid);
 
 	/** 
-		»ñµÃutype 
+		ï¿½ï¿½ï¿½utype 
 	*/
 	INLINE ENTITY_SCRIPT_UID utype(void) const;
 
 	/** 
-		»ñµÃtype 
+		ï¿½ï¿½ï¿½type 
 	*/
 	INLINE ENTITYCALL_TYPE type(void) const;
 
 	/** 
-		Ö§³Öpickler ·½·¨ 
+		Ö§ï¿½ï¿½pickler ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static PyObject* __py_reduce_ex__(PyObject* self, PyObject* protocol);
 	
@@ -107,11 +107,11 @@ public:
 	ScriptDefModule* pScriptDefModule();
 
 protected:
-	COMPONENT_ID							componentID_;			// Ô¶¶Ë»úÆ÷×é¼þµÄID
-	Network::Address						addr_;					// ÆµµÀµØÖ·
-	ENTITYCALL_TYPE							type_;					// ¸ÃentityCallµÄÀàÐÍ
+	COMPONENT_ID							componentID_;			// Ô¶ï¿½Ë»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ID
+	Network::Address						addr_;					// Æµï¿½ï¿½ï¿½ï¿½Ö·
+	ENTITYCALL_TYPE							type_;					// ï¿½ï¿½entityCallï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	ENTITY_ID								id_;					// entityID
-	ENTITY_SCRIPT_UID						utype_;					// entityµÄutype°´ÕÕentities.xmlÖÐµÄ¶¨ÒåË³Ðò
+	ENTITY_SCRIPT_UID						utype_;					// entityï¿½ï¿½utypeï¿½ï¿½ï¿½ï¿½entities.xmlï¿½ÐµÄ¶ï¿½ï¿½ï¿½Ë³ï¿½ï¿½
 };
 
 }

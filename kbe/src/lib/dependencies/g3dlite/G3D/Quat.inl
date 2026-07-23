@@ -35,7 +35,7 @@ inline Quat Quat::operator+(const Quat& other) const {
 }
 
 /*
-* ±ê×¼¶¨Òå
+* ï¿½ï¿½×¼ï¿½ï¿½ï¿½ï¿½
 */
 inline Quat Quat::operator*(const Quat& other) const{
 

@@ -225,11 +225,11 @@ int kbeMainT(int argc, char * argv[], COMPONENT_TYPE componentType,
 		Components::getSingleton().finalise();
 		app.finalise();
 
-		// Èç¹û»¹ÓÐÈÕÖ¾Î´Í¬²½Íê³É£¬ ÕâÀï»á¼ÌÐøÍ¬²½Íê³É²Å½áÊø
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾Î´Í¬ï¿½ï¿½ï¿½ï¿½É£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½É²Å½ï¿½ï¿½ï¿½
 		DebugHelper::getSingleton().finalise();
 
 #if KBE_PLATFORM == PLATFORM_WIN32
-		// µÈ´ý¼¸Ãë£¬ÈÃÓÃ»§ÄÜ¹»ÔÚ´°¿ÚÉÏ¿´µ½ÐÅÏ¢
+		// ï¿½È´ï¿½ï¿½ï¿½ï¿½ë£¬ï¿½ï¿½ï¿½Ã»ï¿½ï¿½Ü¹ï¿½ï¿½Ú´ï¿½ï¿½ï¿½ï¿½Ï¿ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 		Beep(587, 500);
 		KBEngine::sleep(5000);
 #endif
@@ -248,7 +248,7 @@ int kbeMainT(int argc, char * argv[], COMPONENT_TYPE componentType,
 	app.finalise();
 	INFO_MSG(fmt::format("{}({}) has shut down.\n", COMPONENT_NAME_EX(componentType), g_componentID));
 
-	// Èç¹û»¹ÓÐÈÕÖ¾Î´Í¬²½Íê³É£¬ ÕâÀï»á¼ÌÐøÍ¬²½Íê³É²Å½áÊø
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾Î´Í¬ï¿½ï¿½ï¿½ï¿½É£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½É²Å½ï¿½ï¿½ï¿½
 	DebugHelper::getSingleton().finalise();
 	return ret;
 }

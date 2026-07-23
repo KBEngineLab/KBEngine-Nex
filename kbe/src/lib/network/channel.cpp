@@ -216,10 +216,10 @@ bool Channel::initialize(NetworkInterface & networkInterface,
 
 		KBE_ASSERT(pPacketReceiver_->type() == PacketReceiver::TCP_PACKET_RECEIVER);
 
-		// UDP²»ÐèÒª×¢²áÃèÊö·û
+		// UDPï¿½ï¿½ï¿½ï¿½Òª×¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		pNetworkInterface_->dispatcher().registerReadFileDescriptor(*pEndPoint_, pPacketReceiver_);
 
-		// ÐèÒª·¢ËÍÊý¾ÝÊ±ÔÙ×¢²á
+		// ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½×¢ï¿½ï¿½
 		// pPacketSender_ = new TCPPacketSender(*pEndPoint_, *pNetworkInterface_);
 		// pNetworkInterface_->dispatcher().registerWriteFileDescriptor(*pEndPoint_, pPacketSender_);
 	}
@@ -296,7 +296,7 @@ void Channel::startInactivityDetection( float period, float checkPeriod )
 {
 	stopInactivityDetection();
 
-	// Èç¹ûÖÜÆÚÎª¸ºÊýÔò²»¼ì²é
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ï¿½ò²»¼ï¿½ï¿½
 	if (period > 0.1f)
 	{
 		checkPeriod = std::max(1.f, checkPeriod);
@@ -378,7 +378,7 @@ void Channel::clearState( bool warnOnDiscard /*=false*/ )
 		}
 	}
 
-	// ÕâÀïÖ»Çå¿Õ×´Ì¬£¬²»ÊÍ·Å
+	// ï¿½ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½Í·ï¿½
 	//SAFE_RELEASE(pPacketReader_);
 	//SAFE_RELEASE(pPacketSender_);
 
@@ -390,7 +390,7 @@ void Channel::clearState( bool warnOnDiscard /*=false*/ )
 
 	stopInactivityDetection();
 
-	// ÓÉÓÚpEndPointÍ¨³£ÓÉÍâ²¿¸øÈë£¬±ØÐëÊÍ·Å£¬ÆµµÀÖØÐÂ¼¤»îÊ±»áÖØÐÂ¸³Öµ
+	// ï¿½ï¿½ï¿½ï¿½pEndPointÍ¨ï¿½ï¿½ï¿½ï¿½ï¿½â²¿ï¿½ï¿½ï¿½ë£¬ï¿½ï¿½ï¿½ï¿½ï¿½Í·Å£ï¿½Æµï¿½ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½Â¸ï¿½Öµ
 	if(pEndPoint_)
 	{
 		pEndPoint_->destroySSL();
@@ -523,7 +523,7 @@ void Channel::send(Bundle * pBundle)
 
 		pPacketSender_->processSend(this);
 
-		// Èç¹û²»ÄÜÁ¢¼´·¢ËÍµ½ÏµÍ³»º³åÇø£¬ÄÇÃ´½»¸øpoller´¦Àí
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Íµï¿½ÏµÍ³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã´ï¿½ï¿½ï¿½ï¿½pollerï¿½ï¿½ï¿½ï¿½
 		if(bundles_.size() > 0 && condemn() == 0 && !isDestroyed())
 		{
 			flags_ |= FLAG_SENDING;
@@ -746,7 +746,7 @@ bool Channel::handshake(Packet* pPacket)
 		int sslVersion = KB_SSL::isSSLProtocal(pPacket);
 		if (sslVersion != -1)
 		{
-			// ÎÞÂÛ³É¹¦ºÍÊ§°Ü¶¼·µ»Øtrue£¬ÈÃÍâ²¿»ØÊÕÊý¾Ý°ü²¢¼ÌÐøµÈ´ýÎÕÊÖ
+			// ï¿½ï¿½ï¿½Û³É¹ï¿½ï¿½ï¿½Ê§ï¿½Ü¶ï¿½ï¿½ï¿½ï¿½ï¿½trueï¿½ï¿½ï¿½ï¿½ï¿½â²¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È´ï¿½ï¿½ï¿½ï¿½ï¿½
 			pEndPoint_->setupSSL(sslVersion, pPacket);
 
 			if (pPacket->length() == 0)
@@ -755,14 +755,14 @@ bool Channel::handshake(Packet* pPacket)
 	}
 	else
 	{
-		// Èç¹û¿ªÆôÁËsslÍ¨Ñ¶£¬ÒòÄ¿Ç°Ö»Ö§³Öwss£¬ËùÒÔ±ØÐëµÈ´ýwebsocketÎÕÊÖ³É¹¦²ÅËãÍ¨¹ý
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½sslÍ¨Ñ¶ï¿½ï¿½ï¿½ï¿½Ä¿Ç°Ö»Ö§ï¿½ï¿½wssï¿½ï¿½ï¿½ï¿½ï¿½Ô±ï¿½ï¿½ï¿½È´ï¿½websocketï¿½ï¿½ï¿½Ö³É¹ï¿½ï¿½ï¿½ï¿½ï¿½Í¨ï¿½ï¿½
 		if (!websocket::WebSocketProtocol::isWebSocketProtocol(pPacket))
 			return true;
 	}
 
 	flags_ |= FLAG_HANDSHAKE;
 
-	// ´Ë´¦ÅÐ¶¨ÊÇ·ñÎªwebsocket»òÕßÆäËûÐ­ÒéµÄÎÕÊÖ
+	// ï¿½Ë´ï¿½ï¿½Ð¶ï¿½ï¿½Ç·ï¿½Îªwebsocketï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if(websocket::WebSocketProtocol::isWebSocketProtocol(pPacket))
 	{
 		channelType_ = CHANNEL_WEB;
@@ -777,7 +777,7 @@ bool Channel::handshake(Packet* pPacket)
 			pFilter_ = new WebSocketPacketFilter(this);
 			DEBUG_MSG(fmt::format("Channel::handshake: websocket({}) successfully!\n", this->c_str()));
 
-			// ÎÞÂÛÈçºÎ¶¼·µ»Øtrue£¬Ö±µ½ÎÕÊÖ³É¹¦
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î¶ï¿½ï¿½ï¿½ï¿½ï¿½trueï¿½ï¿½Ö±ï¿½ï¿½ï¿½ï¿½ï¿½Ö³É¹ï¿½
 			return true;
 		}
 		else
@@ -879,12 +879,12 @@ Bundle* Channel::createSendBundle()
 		Bundle* pBundle = bundles_.back();
 		Bundle::Packets& packets = pBundle->packets();
 
-		// pBundleºÍpackets[0]¶¼±ØÐëÊÇÃ»ÓÐ±»¶ÔÏó³Ø»ØÊÕµÄ¶ÔÏó
-		// ±ØÐëÊÇÎ´¾­¹ý¼ÓÃÜµÄ°ü£¬Èç¹ûÒÑ¾­¼ÓÃÜÁË¾Í²»ÒªÔÙÖØ¸´ÄÃ³öÀ´ÓÃÁË£¬·ñÔòÍâ²¿ÈÝÒ×ÏòÆäÖÐÌí¼ÓÎ´¼ÓÃÜÊý¾Ý 
+		// pBundleï¿½ï¿½packets[0]ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½Ð±ï¿½ï¿½ï¿½ï¿½ï¿½Ø»ï¿½ï¿½ÕµÄ¶ï¿½ï¿½ï¿½
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÜµÄ°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë¾Í²ï¿½Òªï¿½ï¿½ï¿½Ø¸ï¿½ï¿½Ã³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½â²¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 		if (pBundle->packetHaveSpace() &&
 			!packets[0]->encrypted())
 		{
-			// ÏÈ´Ó¶ÓÁÐÉ¾³ý
+			// ï¿½È´Ó¶ï¿½ï¿½ï¿½É¾ï¿½ï¿½
 			bundles_.pop_back();
 			pBundle->pChannel(this);
 			pBundle->pCurrMsgHandler(NULL);

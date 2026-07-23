@@ -44,8 +44,8 @@ public:
 
 	enum NAV_OBJECT_STATE
 	{
-		NAV_OBJECT_STATE_MOVING = 1,	// ÒÆ¶¯ÖÐ
-		NAV_OBJECT_STATE_MOVEOVER = 2,	// ÒÆ¶¯ÒÑ¾­½áÊøÁË
+		NAV_OBJECT_STATE_MOVING = 1,	// ï¿½Æ¶ï¿½ï¿½ï¿½
+		NAV_OBJECT_STATE_MOVEOVER = 2,	// ï¿½Æ¶ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	};
 
 	NavigationHandle():

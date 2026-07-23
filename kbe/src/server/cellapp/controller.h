@@ -33,17 +33,17 @@ class Controllers;
 class MemoryStream;
 
 /*
-	¿ØÖÆÆ÷£¬ ¹ÜÀítrap¡¢VisionµÈ¡£
+	ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½trapï¿½ï¿½Visionï¿½È¡ï¿½
 */
 class Controller
 {
 public:
 	enum ControllerType
 	{
-		CONTROLLER_TYPE_NORMAL = 0,			// ³£¹æÀàÐÍ
-		CONTROLLER_TYPE_PROXIMITY = 1,		// ·¶Î§´¥·¢Æ÷ÀàÐÍ
-		CONTROLLER_TYPE_MOVE = 2,			// ÒÆ¶¯¿ØÖÆÆ÷ÀàÐÍ
-		CONTROLLER_TYPE_ROTATE = 3,			// Ðý×ª¿ØÖÆÆ÷ÀàÐÍ
+		CONTROLLER_TYPE_NORMAL = 0,			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+		CONTROLLER_TYPE_PROXIMITY = 1,		// ï¿½ï¿½Î§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+		CONTROLLER_TYPE_MOVE = 2,			// ï¿½Æ¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+		CONTROLLER_TYPE_ROTATE = 3,			// ï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	};
 
 	Controller(Controller::ControllerType type, Entity* pEntity, int32 userarg, uint32 id = 0);

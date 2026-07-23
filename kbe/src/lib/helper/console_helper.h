@@ -79,7 +79,7 @@ namespace ConsoleInterface {
 
 		virtual void onInstall()
 		{
-			// 强制这条协议ID
+			// 强锟斤拷锟斤拷锟斤拷协锟斤拷ID
 			msgID = CONSOLE_COMMANDCB_MSGID;
 			msgLen = NETWORK_VARIABLE_MESSAGE;
 			name = "console::execPythonCommand";
@@ -137,7 +137,7 @@ namespace ConsoleInterface {
 
 		virtual void onInstall()
 		{
-			// 强制这条协议ID
+			// 强锟斤拷锟斤拷锟斤拷协锟斤拷ID
 			msgID = CONSOLE_LOG_MSGID;
 			msgLen = NETWORK_VARIABLE_MESSAGE;
 			name = "console::querylogs";
@@ -189,7 +189,7 @@ namespace ConsoleInterface {
 
 		virtual void onInstall()
 		{
-			// 强制这条协议ID
+			// 强锟斤拷锟斤拷锟斤拷协锟斤拷ID
 			msgID = CONSOLE_WATCHERCB_MSGID;
 			msgLen = NETWORK_VARIABLE_MESSAGE;
 			name = "console::queryWatcher";
@@ -241,7 +241,7 @@ namespace ConsoleInterface {
 
 		virtual void onInstall()
 		{
-			// 强制这条协议ID
+			// 强锟斤拷锟斤拷锟斤拷协锟斤拷ID
 			msgID = CONSOLE_PROFILECB_MSGID;
 			msgLen = NETWORK_VARIABLE_MESSAGE;
 			name = "console::profile";
@@ -263,7 +263,7 @@ namespace ConsoleInterface {
 
 		virtual void onInstall()
 		{
-			// 强制这条协议ID
+			// 强锟斤拷锟斤拷锟斤拷协锟斤拷ID
 			msgID = CONSOLE_PROFILECB_MSGID;
 			msgLen = NETWORK_VARIABLE_MESSAGE;
 			name = "console::queryAppsLoads";
@@ -285,7 +285,7 @@ namespace ConsoleInterface {
 
 		virtual void onInstall()
 		{
-			// 强制这条协议ID
+			// 强锟斤拷锟斤拷锟斤拷协锟斤拷ID
 			msgID = CONSOLE_PROFILECB_MSGID;
 			msgLen = NETWORK_VARIABLE_MESSAGE;
 			name = "console::querySpaces";

@@ -27,7 +27,7 @@ namespace KBEngine
 {
 
 /**
- *	抽象一个任务
+ *	锟斤拷锟斤拷一锟斤拷锟斤拷锟斤拷
  */
 class Task
 {

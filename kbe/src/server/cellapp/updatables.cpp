@@ -44,7 +44,7 @@ void Updatables::clear()
 //-------------------------------------------------------------------------------------
 bool Updatables::add(Updatable* updatable)
 {
-	// 由于没有大量优先级需求，因此这里固定优先级数组
+	// 锟斤拷锟斤拷没锟叫达拷锟斤拷锟斤拷锟饺硷拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟教讹拷锟斤拷锟饺硷拷锟斤拷锟斤拷
 	if (objects_.size() == 0)
 	{
 		objects_.push_back(std::map<uint32, Updatable*>());
@@ -56,13 +56,13 @@ bool Updatables::add(Updatable* updatable)
 	static uint32 idx = 1;
 	std::map<uint32, Updatable*>& pools = objects_[updatable->updatePriority()];
 
-	// 防止重复
+	// 锟斤拷止锟截革拷
 	while (pools.find(idx) != pools.end())
 		++idx;
 
 	pools[idx] = updatable;
 
-	// 记录存储位置
+	// 锟斤拷录锟芥储位锟斤拷
 	updatable->removeIdx = idx++;
 
 	return true;

@@ -46,7 +46,7 @@ class AppForwardItem : public ForwardItem
 public:
 	virtual bool isOK()
 	{
-		// ╠ьпК╢Фтзр╩╦Жв╪╠╦╨ц╣д╫ЬЁл
+		// О©╫О©╫О©╫О©╫О©╫О©╫О©╫р╩О©╫О©╫в╪О©╫О©╫О©╫ц╣д╫О©╫О©╫О©╫
 		Components::COMPONENTS& cts = Components::getSingleton().getComponents(BASEAPP_TYPE);
 		Components::COMPONENTS::iterator ctiter = cts.begin();
 		for (; ctiter != cts.end(); ++ctiter)
@@ -139,7 +139,7 @@ void Baseappmgr::handleGameTick()
 //-------------------------------------------------------------------------------------
 void Baseappmgr::onChannelDeregister(Network::Channel * pChannel)
 {
-	// хГ╧ШйгappкюмЖак
+	// О©╫О©╫О©╫О©╫О©╫appО©╫О©╫О©╫О©╫О©╫О©╫
 	if(pChannel->isInternal())
 	{
 		Components::ComponentInfos* cinfo = Components::getSingleton().findComponent(pChannel);
@@ -307,14 +307,14 @@ COMPONENT_ID Baseappmgr::findFreeBaseapp()
 		if ((iter->second.flags() & APP_FLAGS_NOT_PARTCIPATING_LOAD_BALANCING) > 0)
 			continue;
 		
-		// йвох╫ЬЁл╠ьпК╩НвегрЁУй╪╩╞мЙ╠о
+		// О©╫О©╫О©╫х╫О©╫О©╫л╠О©╫О©╫О©╫О©╫О©╫О©╫О©╫рЁО©╫й╪О©╫О©╫О©╫О©╫О©╫
 		if(!iter->second.isDestroyed() && iter->second.initProgress() > 1.f)
 		{
-			// хГ╧Шц╩спхн╨нй╣лЕтРнчлУ╪Ч╥жеД
+			// О©╫О©╫О©╫ц╩О©╫О©╫О©╫н╨О©╫й╣О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
 			if(iter->second.numEntities() == 0)
 				return iter->first;
 
-			// ╠х╫о╡╒╪гб╪╦╨тьвНп║╣д╫ЬЁлвНжу╠╩╥жеД
+			// О©╫х╫о╡О©╫О©╫О©╫б╪О©╫О©╫О©╫О©╫О©╫О©╫п║О©╫д╫О©╫О©╫О©╫О©╫О©╫О©╫у╠О©╫О©╫О©╫О©╫О©╫
 			if(minload > iter->second.load() || 
 				(minload == iter->second.load() && numEntities > iter->second.numEntities()))
 			{
@@ -341,9 +341,9 @@ void Baseappmgr::reqCreateEntityAnywhere(Network::Channel* pChannel, MemoryStrea
 	Components::ComponentInfos* cinfos = 
 		Components::getSingleton().findComponent(pChannel);
 
-	// ╢кй╠©о╤╗йгтзткппв╢л╛жпё╛╣╚сп©идэтз╣х╢Щ╢╢╫╗space
-	// кЫртЁУй╪╩╞╫Ь╤хц╩спмЙЁи, тзж╩спр╩╦Жbaseapp╣дгИ©ЖобхГ╧ШуБ
-	// юО╡╩╫ЬппиХжц╫╚йгр╩╦ЖоЮ╩╔╣х╢Щ╣дв╢л╛
+	// О©╫О©╫й╠О©╫о╤О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫в╢л╛О©╫пёО©╫О©╫О©╫О©╫п©О©╫О©╫О©╫О©╫з╣х╢О©╫О©╫О©╫О©╫О©╫space
+	// О©╫О©╫О©╫тЁО©╫й╪О©╫О©╫О©╫О©╫О©╫О©╫ц╩О©╫О©╫О©╫О©╫О©╫, О©╫О©╫ж╩О©╫О©╫р╩О©╫О©╫baseappО©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
+	// О©╫О╡╩О©╫О©╫О©╫О©╫О©╫О©╫О©╫ц╫О©╫О©╫О©╫р╩О©╫О©╫О©╫Ю╩╔О©╫х╢О©╫О©╫О©╫в╢л╛
 	if(cinfos)
 		cinfos->state = COMPONENT_STATE_RUN;
 
@@ -387,7 +387,7 @@ void Baseappmgr::reqCreateEntityAnywhere(Network::Channel* pChannel, MemoryStrea
 	cinfos->pChannel->send(pBundle);
 	s.done();
 
-	// т╓ох╫╚й╣лЕйЩа©тЖ╪с
+	// т╓О©╫х╫О©╫й╣О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
 	std::map< COMPONENT_ID, Baseapp >::iterator baseapps_iter = baseapps_.find(bestBaseappID_);
 	if (baseapps_iter != baseapps_.end())
 	{
@@ -401,9 +401,9 @@ void Baseappmgr::reqCreateEntityRemotely(Network::Channel* pChannel, MemoryStrea
 	Components::ComponentInfos* cinfos =
 		Components::getSingleton().findComponent(pChannel);
 
-	// ╢кй╠©о╤╗йгтзткппв╢л╛жпё╛╣╚сп©идэтз╣х╢Щ╢╢╫╗space
-	// кЫртЁУй╪╩╞╫Ь╤хц╩спмЙЁи, тзж╩спр╩╦Жbaseapp╣дгИ©ЖобхГ╧ШуБ
-	// юО╡╩╫ЬппиХжц╫╚йгр╩╦ЖоЮ╩╔╣х╢Щ╣дв╢л╛
+	// О©╫О©╫й╠О©╫о╤О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫в╢л╛О©╫пёО©╫О©╫О©╫О©╫п©О©╫О©╫О©╫О©╫з╣х╢О©╫О©╫О©╫О©╫О©╫space
+	// О©╫О©╫О©╫тЁО©╫й╪О©╫О©╫О©╫О©╫О©╫О©╫ц╩О©╫О©╫О©╫О©╫О©╫, О©╫О©╫ж╩О©╫О©╫р╩О©╫О©╫baseappО©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
+	// О©╫О╡╩О©╫О©╫О©╫О©╫О©╫О©╫О©╫ц╫О©╫О©╫О©╫р╩О©╫О©╫О©╫Ю╩╔О©╫х╢О©╫О©╫О©╫в╢л╛
 	if (cinfos)
 		cinfos->state = COMPONENT_STATE_RUN;
 
@@ -442,7 +442,7 @@ void Baseappmgr::reqCreateEntityRemotely(Network::Channel* pChannel, MemoryStrea
 	cinfos->pChannel->send(pBundle);
 	s.done();
 
-	// т╓ох╫╚й╣лЕйЩа©тЖ╪с
+	// т╓О©╫х╫О©╫й╣О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
 	std::map< COMPONENT_ID, Baseapp >::iterator baseapps_iter = baseapps_.find(createToComponentID);
 	if (baseapps_iter != baseapps_.end())
 	{
@@ -456,9 +456,9 @@ void Baseappmgr::reqCreateEntityAnywhereFromDBIDQueryBestBaseappID(Network::Chan
 	Components::ComponentInfos* cinfos =
 		Components::getSingleton().findComponent(pChannel);
 
-	// ╢кй╠©о╤╗йгтзткппв╢л╛жпё╛╣╚сп©идэтз╣х╢Щ╢╢╫╗space
-	// кЫртЁУй╪╩╞╫Ь╤хц╩спмЙЁи, тзж╩спр╩╦Жbaseapp╣дгИ©ЖобхГ╧ШуБ
-	// юО╡╩╫ЬппиХжц╫╚йгр╩╦ЖоЮ╩╔╣х╢Щ╣дв╢л╛
+	// О©╫О©╫й╠О©╫о╤О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫в╢л╛О©╫пёО©╫О©╫О©╫О©╫п©О©╫О©╫О©╫О©╫з╣х╢О©╫О©╫О©╫О©╫О©╫space
+	// О©╫О©╫О©╫тЁО©╫й╪О©╫О©╫О©╫О©╫О©╫О©╫ц╩О©╫О©╫О©╫О©╫О©╫, О©╫О©╫ж╩О©╫О©╫р╩О©╫О©╫baseappО©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
+	// О©╫О╡╩О©╫О©╫О©╫О©╫О©╫О©╫О©╫ц╫О©╫О©╫О©╫р╩О©╫О©╫О©╫Ю╩╔О©╫х╢О©╫О©╫О©╫в╢л╛
 	if (cinfos)
 		cinfos->state = COMPONENT_STATE_RUN;
 
@@ -489,9 +489,9 @@ void Baseappmgr::reqCreateEntityAnywhereFromDBID(Network::Channel* pChannel, Mem
 	Components::ComponentInfos* cinfos = 
 		Components::getSingleton().findComponent(pChannel);
 
-	// ╢кй╠©о╤╗йгтзткппв╢л╛жпё╛╣╚сп©идэтз╣х╢Щ╢╢╫╗space
-	// кЫртЁУй╪╩╞╫Ь╤хц╩спмЙЁи, тзж╩спр╩╦Жbaseapp╣дгИ©ЖобхГ╧ШуБ
-	// юО╡╩╫ЬппиХжц╫╚йгр╩╦ЖоЮ╩╔╣х╢Щ╣дв╢л╛
+	// О©╫О©╫й╠О©╫о╤О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫в╢л╛О©╫пёО©╫О©╫О©╫О©╫п©О©╫О©╫О©╫О©╫з╣х╢О©╫О©╫О©╫О©╫О©╫space
+	// О©╫О©╫О©╫тЁО©╫й╪О©╫О©╫О©╫О©╫О©╫О©╫ц╩О©╫О©╫О©╫О©╫О©╫, О©╫О©╫ж╩О©╫О©╫р╩О©╫О©╫baseappО©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
+	// О©╫О╡╩О©╫О©╫О©╫О©╫О©╫О©╫О©╫ц╫О©╫О©╫О©╫р╩О©╫О©╫О©╫Ю╩╔О©╫х╢О©╫О©╫О©╫в╢л╛
 	if(cinfos)
 		cinfos->state = COMPONENT_STATE_RUN;
 
@@ -530,7 +530,7 @@ void Baseappmgr::reqCreateEntityAnywhereFromDBID(Network::Channel* pChannel, Mem
 	cinfos->pChannel->send(pBundle);
 	s.done();
 
-	// т╓ох╫╚й╣лЕйЩа©тЖ╪с
+	// т╓О©╫х╫О©╫й╣О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
 	std::map< COMPONENT_ID, Baseapp >::iterator baseapps_iter = baseapps_.find(targetComponentID);
 	if (baseapps_iter != baseapps_.end())
 	{
@@ -544,9 +544,9 @@ void Baseappmgr::reqCreateEntityRemotelyFromDBID(Network::Channel* pChannel, Mem
 	Components::ComponentInfos* cinfos =
 		Components::getSingleton().findComponent(pChannel);
 
-	// ╢кй╠©о╤╗йгтзткппв╢л╛жпё╛╣╚сп©идэтз╣х╢Щ╢╢╫╗space
-	// кЫртЁУй╪╩╞╫Ь╤хц╩спмЙЁи, тзж╩спр╩╦Жbaseapp╣дгИ©ЖобхГ╧ШуБ
-	// юО╡╩╫ЬппиХжц╫╚йгр╩╦ЖоЮ╩╔╣х╢Щ╣дв╢л╛
+	// О©╫О©╫й╠О©╫о╤О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫в╢л╛О©╫пёО©╫О©╫О©╫О©╫п©О©╫О©╫О©╫О©╫з╣х╢О©╫О©╫О©╫О©╫О©╫space
+	// О©╫О©╫О©╫тЁО©╫й╪О©╫О©╫О©╫О©╫О©╫О©╫ц╩О©╫О©╫О©╫О©╫О©╫, О©╫О©╫ж╩О©╫О©╫р╩О©╫О©╫baseappО©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
+	// О©╫О╡╩О©╫О©╫О©╫О©╫О©╫О©╫О©╫ц╫О©╫О©╫О©╫р╩О©╫О©╫О©╫Ю╩╔О©╫х╢О©╫О©╫О©╫в╢л╛
 	if (cinfos)
 		cinfos->state = COMPONENT_STATE_RUN;
 
@@ -585,7 +585,7 @@ void Baseappmgr::reqCreateEntityRemotelyFromDBID(Network::Channel* pChannel, Mem
 	cinfos->pChannel->send(pBundle);
 	s.done();
 
-	// т╓ох╫╚й╣лЕйЩа©тЖ╪с
+	// т╓О©╫х╫О©╫й╣О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
 	std::map< COMPONENT_ID, Baseapp >::iterator baseapps_iter = baseapps_.find(targetComponentID);
 	if (baseapps_iter != baseapps_.end())
 	{
@@ -671,7 +671,7 @@ void Baseappmgr::registerPendingAccountToBaseapp(Network::Channel* pChannel, Mem
 	pBundle->appendBlob(datas);
 	cinfos->pChannel->send(pBundle);
 
-	// т╓ох╫╚й╣лЕйЩа©тЖ╪с
+	// т╓О©╫х╫О©╫й╣О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
 	if (baseapps_iter != baseapps_.end())
 	{
 		baseapps_iter->second.incNumProxices();

@@ -38,7 +38,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	PROXYÏûÏ¢ºê£¬  ²ÎÊýÎªÁ÷£¬ ÐèÒª×Ô¼º½â¿ª
+	PROXYï¿½ï¿½Ï¢ï¿½ê£¬  ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Òªï¿½Ô¼ï¿½ï¿½â¿ª
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef PROXY_MESSAGE_HANDLER_STREAM
@@ -93,7 +93,7 @@ namespace KBEngine{
 																				\
 
 /**
-	ProxyÏûÏ¢ºê£¬  Ö»ÓÐÁã¸ö²ÎÊýµÄÏûÏ¢
+	Proxyï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef PROXY_MESSAGE_HANDLER_ARGS0
@@ -148,7 +148,7 @@ namespace KBEngine{
 																				\
 	
 /**
-	ProxyÏûÏ¢ºê£¬  Ö»ÓÐÒ»¸ö²ÎÊýµÄÏûÏ¢
+	Proxyï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef PROXY_MESSAGE_HANDLER_ARGS1

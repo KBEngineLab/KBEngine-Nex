@@ -70,20 +70,20 @@ public:
 	
 	enum ChannelTypes
 	{
-		/// ÆÕÍ¨Í¨µÀ
+		/// ï¿½ï¿½Í¨Í¨ï¿½ï¿½
 		CHANNEL_NORMAL = 0,
 
-		// ä¯ÀÀÆ÷webÍ¨µÀ
+		// ï¿½ï¿½ï¿½ï¿½ï¿½webÍ¨ï¿½ï¿½
 		CHANNEL_WEB = 1,
 	};
 
 	enum Flags
 	{
-		FLAG_SENDING					= 0x00000001,	// ·¢ËÍÐÅÏ¢ÖÐ
-		FLAG_DESTROYED					= 0x00000002,	// Í¨µÀÒÑ¾­Ïú»Ù
-		FLAG_HANDSHAKE					= 0x00000004,	// ÒÑ¾­ÎÕÊÖ¹ý
-		FLAG_CONDEMN_AND_WAIT_DESTROY	= 0x00000008,	// ¸ÃÆµµÀÒÑ¾­±äµÃ²»ºÏ·¨£¬¼´½«ÔÚÊý¾Ý·¢ËÍÍê±Ïºó¹Ø±Õ
-		FLAG_CONDEMN_AND_DESTROY		= 0x00000010,	// ¸ÃÆµµÀÒÑ¾­±äµÃ²»ºÏ·¨£¬¼´½«¹Ø±Õ
+		FLAG_SENDING					= 0x00000001,	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½
+		FLAG_DESTROYED					= 0x00000002,	// Í¨ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½
+		FLAG_HANDSHAKE					= 0x00000004,	// ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½Ö¹ï¿½
+		FLAG_CONDEMN_AND_WAIT_DESTROY	= 0x00000008,	// ï¿½ï¿½Æµï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½Ã²ï¿½ï¿½Ï·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý·ï¿½ï¿½ï¿½ï¿½ï¿½Ïºï¿½Ø±ï¿½
+		FLAG_CONDEMN_AND_DESTROY		= 0x00000010,	// ï¿½ï¿½Æµï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½Ã²ï¿½ï¿½Ï·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø±ï¿½
 		FLAG_CONDEMN					= FLAG_CONDEMN_AND_WAIT_DESTROY | FLAG_CONDEMN_AND_DESTROY,
 	};
 
@@ -129,8 +129,8 @@ public:
 	const Bundles & bundles() const;
 
 	/**
-		´´½¨·¢ËÍbundle£¬¸Ãbundle¿ÉÄÜÊÇ´Ósend·ÅÈë·¢ËÍ¶ÓÁÐÖÐ»ñÈ¡µÄ£¬Èç¹û¶ÓÁÐÎª¿Õ
-		Ôò´´½¨Ò»¸öÐÂµÄ
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½bundleï¿½ï¿½ï¿½ï¿½bundleï¿½ï¿½ï¿½ï¿½ï¿½Ç´ï¿½sendï¿½ï¿½ï¿½ë·¢ï¿½Í¶ï¿½ï¿½ï¿½ï¿½Ð»ï¿½È¡ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½
+		ï¿½ò´´½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½
 	*/
 	Bundle* createSendBundle();
 	void clearBundle();
@@ -278,18 +278,18 @@ private:
 	PacketReceiver*				pPacketReceiver_;
 	PacketSender*				pPacketSender_;
 
-	// Èç¹ûÊÇÍâ²¿Í¨µÀÇÒ´úÀíÁËÒ»¸öÇ°¶ËÔò»á°ó¶¨Ç°¶Ë´úÀíID
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½â²¿Í¨ï¿½ï¿½ï¿½Ò´ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½Ë´ï¿½ï¿½ï¿½ID
 	ENTITY_ID					proxyID_;
 
-	// À©Õ¹ÓÃ
+	// ï¿½ï¿½Õ¹ï¿½ï¿½
 	std::string					strextra_;
 
-	// Í¨µÀÀà±ð
+	// Í¨ï¿½ï¿½ï¿½ï¿½ï¿½
 	ChannelTypes				channelType_;
 
 	COMPONENT_ID				componentID_;
 
-	// Ö§³ÖÖ¸¶¨Ä³¸öÍ¨µÀÊ¹ÓÃÄ³¸öÏûÏ¢handlers
+	// Ö§ï¿½ï¿½Ö¸ï¿½ï¿½Ä³ï¿½ï¿½Í¨ï¿½ï¿½Ê¹ï¿½ï¿½Ä³ï¿½ï¿½ï¿½ï¿½Ï¢handlers
 	KBEngine::Network::MessageHandlers* pMsgHandlers_;
 
 	uint32						flags_;
