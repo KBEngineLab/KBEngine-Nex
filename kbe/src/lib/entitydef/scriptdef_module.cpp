@@ -66,7 +66,11 @@ hasClient_(false),
 pVolatileinfo_(new VolatileInfo()),
 name_(name),
 usePropertyDescrAlias_(false),
-useMethodDescrAlias_(false)
+useMethodDescrAlias_(false),
+componentDescr_uidmap_(),
+componentDescr_(),
+componentDescrVec_(),
+isComponentModule_(false)
 {
 	EntityDef::md5().append((void*)name.c_str(), (int)name.size());
 }
@@ -955,6 +959,77 @@ bool ScriptDefModule::hasMethodName(const std::string& name)
 	return findMethodDescription(name.c_str(), CELLAPP_TYPE) ||
 		findMethodDescription(name.c_str(), BASEAPP_TYPE) ||
 		findMethodDescription(name.c_str(), CLIENT_TYPE);
+}
+
+// 组件名称必须参与冲突检查，避免脚本侧属性覆盖组件命名空间。
+// Component names participate in conflict checks so script properties cannot shadow the component namespace.
+bool ScriptDefModule::hasComponentName(const std::string& name)
+{
+	return findComponentDescription(name.c_str()) != NULL;
+}
+
+// SDK 和定义加载器需要统一判断一个名称是否已被模块占用。
+// The SDK and definition loader share one predicate for checking whether a module name is occupied.
+bool ScriptDefModule::hasName(const std::string& name)
+{
+	return hasPropertyName(name) || hasMethodName(name) || hasComponentName(name);
+}
+
+// 注册组件描述并建立名称和 UID 两套索引，保持生成器查找为 O(log n)。
+// Register a component descriptor in name and UID indexes so generator lookups remain O(log n).
+bool ScriptDefModule::addComponentDescription(const char* compName,
+	ScriptDefModule* compDescription)
+{
+	if (compName == NULL || compDescription == NULL || hasName(compName))
+		return false;
+
+	componentDescr_[compName] = compDescription;
+	componentDescr_uidmap_[static_cast<ENTITY_COMPONENT_UID>(compDescription->getUType())] = compDescription;
+	return true;
+}
+
+// 按组件名称查找描述，未找到时返回空指针而不产生脚本错误。
+// Find a component descriptor by name and return null without raising a script error when absent.
+ScriptDefModule* ScriptDefModule::findComponentDescription(const char* compName)
+{
+	if (compName == NULL)
+		return NULL;
+
+	COMPONENTDESCRIPTION_MAP::iterator iter = componentDescr_.find(compName);
+	return iter == componentDescr_.end() ? NULL : iter->second;
+}
+
+// 按组件 UID 查找描述，供协议编解码和 SDK 生成器使用。
+// Find a component descriptor by UID for protocol encoding and SDK generation.
+ScriptDefModule* ScriptDefModule::findComponentDescription(ENTITY_COMPONENT_UID utype)
+{
+	COMPONENTDESCRIPTION_UIDMAP::iterator iter = componentDescr_uidmap_.find(utype);
+	return iter == componentDescr_uidmap_.end() ? NULL : iter->second;
+}
+
+// 查找组件自身的属性描述；普通属性仍由原有分区索引负责。
+// Find a component-owned property descriptor while ordinary properties keep their existing partition indexes.
+PropertyDescription* ScriptDefModule::findComponentPropertyDescription(const char* attrName)
+{
+	if (attrName == NULL)
+		return NULL;
+
+	PROPERTYDESCRIPTION_MAP::iterator iter = cellPropertyDescr_.find(attrName);
+	if (iter != cellPropertyDescr_.end() && iter->second->getDataType() != NULL &&
+		iter->second->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)
+		return iter->second;
+
+	iter = basePropertyDescr_.find(attrName);
+	if (iter != basePropertyDescr_.end() && iter->second->getDataType() != NULL &&
+		iter->second->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)
+		return iter->second;
+
+	iter = clientPropertyDescr_.find(attrName);
+	if (iter != clientPropertyDescr_.end() && iter->second->getDataType() != NULL &&
+		iter->second->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)
+		return iter->second;
+
+	return NULL;
 }
 
 //-------------------------------------------------------------------------------------

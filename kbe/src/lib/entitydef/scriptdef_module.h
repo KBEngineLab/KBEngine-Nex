@@ -48,6 +48,9 @@ class ScriptDefModule : public RefCountable
 public:
 	typedef std::map<std::string, PropertyDescription*> PROPERTYDESCRIPTION_MAP;
 	typedef std::map<std::string, MethodDescription*> METHODDESCRIPTION_MAP;
+	typedef std::map<std::string, ScriptDefModule*> COMPONENTDESCRIPTION_MAP;
+	typedef std::map<ENTITY_COMPONENT_UID, ScriptDefModule*> COMPONENTDESCRIPTION_UIDMAP;
+	typedef std::vector<ScriptDefModule*> COMPONENTDESCRIPTIONS;
 	typedef std::map<ENTITY_PROPERTY_UID, PropertyDescription*> PROPERTYDESCRIPTION_UIDMAP;
 	typedef std::map<ENTITY_METHOD_UID, MethodDescription*> METHODDESCRIPTION_UIDMAP;
 	typedef std::map<ENTITY_DEF_ALIASID, PropertyDescription*> PROPERTYDESCRIPTION_ALIASMAP;
@@ -88,6 +91,7 @@ public:
 	PropertyDescription* findClientPropertyDescription(const char* attrName);
 	PropertyDescription* findPersistentPropertyDescription(const char* attrName);
 	PropertyDescription* findPropertyDescription(const char* attrName, COMPONENT_TYPE componentType);
+	PropertyDescription* findComponentPropertyDescription(const char* attrName);
 
 	PropertyDescription* findCellPropertyDescription(ENTITY_PROPERTY_UID utype);
 	PropertyDescription* findBasePropertyDescription(ENTITY_PROPERTY_UID utype);
@@ -136,11 +140,21 @@ public:
 
 	bool hasPropertyName(const std::string& name);
 	bool hasMethodName(const std::string& name);
+	bool hasComponentName(const std::string& name);
+	bool hasName(const std::string& name);
 	
 	INLINE METHODDESCRIPTION_MAP& getBaseExposedMethodDescriptions(void);
 	INLINE METHODDESCRIPTION_MAP& getCellExposedMethodDescriptions(void);
 
 	INLINE const char* getName();
+
+	bool addComponentDescription(const char* compName, ScriptDefModule* compDescription);
+	ScriptDefModule* findComponentDescription(const char* compName);
+	ScriptDefModule* findComponentDescription(ENTITY_COMPONENT_UID utype);
+	INLINE COMPONENTDESCRIPTION_MAP& getComponentDescrs();
+	INLINE bool isComponentModule() const;
+	INLINE void isComponentModule(bool value);
+	INLINE size_t numPropertys() const;
 
 	void autoMatchCompOwn();
 
@@ -208,6 +222,13 @@ protected:
 
 	// 这个模块的名称
 	std::string							name_;
+
+	// 组件描述使用独立索引，避免改变普通属性和方法的查找语义。
+	// Component descriptors use separate indexes so ordinary property and method lookup is unchanged.
+	COMPONENTDESCRIPTION_UIDMAP			componentDescr_uidmap_;
+	COMPONENTDESCRIPTION_MAP			componentDescr_;
+	COMPONENTDESCRIPTIONS				componentDescrVec_;
+	bool								isComponentModule_;
 
 	bool								usePropertyDescrAlias_;
 	bool								useMethodDescrAlias_;

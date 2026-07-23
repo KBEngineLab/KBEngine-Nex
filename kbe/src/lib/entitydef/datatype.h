@@ -38,6 +38,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{
 
+class ScriptDefModule;
+
 #define OUT_TYPE_ERROR(T)								\
 {														\
 	char err[] = {"must be set to a " T " type."};		\
@@ -94,6 +96,31 @@ public:
 protected:
 	DATATYPE_UID id_;
 	std::string aliasName_;
+};
+
+/*
+组件数据类型描述只保存组件模块的引用，具体的对象编解码会在运行时组件迁移阶段接入。
+The component data type currently stores the component module descriptor only; runtime object
+serialization is added in the later component lifecycle step so the 1.x ABI remains stable.
+*/
+class EntityComponentType : public DataType
+{
+public:
+	EntityComponentType(ScriptDefModule* pScriptDefModule, DATATYPE_UID did = 0) :
+		DataType(did), pScriptDefModule_(pScriptDefModule) {}
+	~EntityComponentType() override {}
+
+	bool isSameType(PyObject* pyValue) override;
+	void addToStream(MemoryStream* mstream, PyObject* pyValue) override;
+	PyObject* createFromStream(MemoryStream* mstream) override;
+	PyObject* parseDefaultStr(std::string defaultVal) override;
+	const char* getName(void) const override { return "ENTITY_COMPONENT"; }
+	DATATYPE type() const override { return DATA_TYPE_ENTITY_COMPONENT; }
+
+	ScriptDefModule* pScriptDefModule() const { return pScriptDefModule_; }
+
+private:
+	ScriptDefModule* pScriptDefModule_;
 };
 
 template <typename SPECIFY_TYPE>

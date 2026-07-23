@@ -166,6 +166,34 @@ INLINE const char* ScriptDefModule::getName()
 	return name_.c_str(); 
 }
 
+// 返回当前模块声明的组件描述索引。
+// Return the component descriptor index declared by this module.
+INLINE ScriptDefModule::COMPONENTDESCRIPTION_MAP& ScriptDefModule::getComponentDescrs()
+{
+	return componentDescr_;
+}
+
+// 组件模块标记只描述 EntityDef 结构，不触碰实体对象生命周期。
+// The component-module flag describes EntityDef structure without changing entity object lifetime.
+INLINE bool ScriptDefModule::isComponentModule() const
+{
+	return isComponentModule_;
+}
+
+// 设置组件模块标记，供 EntityDef 加载器和 SDK 生成器共享。
+// Set the component-module flag shared by the EntityDef loader and SDK generators.
+INLINE void ScriptDefModule::isComponentModule(bool value)
+{
+	isComponentModule_ = value;
+}
+
+// 保持 Nex SDK 所需的属性数量查询语义，仅统计 base 和 cell 属性。
+// Preserve the Nex SDK property-count semantics by counting base and cell properties only.
+INLINE size_t ScriptDefModule::numPropertys() const
+{
+	return basePropertyDescr_.size() + cellPropertyDescr_.size();
+}
+
 //-------------------------------------------------------------------------------------
 INLINE bool ScriptDefModule::isPersistent() const
 {
