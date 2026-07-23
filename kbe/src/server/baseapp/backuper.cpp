@@ -45,17 +45,17 @@ void Backuper::tick()
 	if (periodInTicks == 0)
 		return;
 
-	// ����Ա��ݵ�entity��һ�·�������
-	// ����㷨����������д�ı������ڻ����tick������ ÿ��tick����һ����entity
+	// 这里对备份的entity做一下分批操作
+	// 大概算法是配置上填写的备份周期换算成tick数量， 每个tick备份一部分entity
 	float numToBackUpFloat = float(Baseapp::getSingleton().pEntities()->size()) / periodInTicks + backupRemainder_;
 
-	// ���α��ݵ�����
+	// 本次备份的数量
 	int numToBackUp = int(numToBackUpFloat);
 
-	// ��������ȵ��µ���ʧ����
+	// 计算出精度导致的损失数量
 	backupRemainder_ = numToBackUpFloat - numToBackUp;
 
-	// ������ݱ���û�������������²���һ���µ�
+	// 如果备份表中没有内容了则重新产生一份新的
 	if (backupEntityIDs_.empty())
 	{
 		this->createBackupTable();
@@ -82,7 +82,7 @@ void Backuper::tick()
 //-------------------------------------------------------------------------------------
 bool Backuper::backup(Entity& entity, MemoryStream& s)
 {
-	// ���￪ʼ����Ҫ���ݵ�����д����
+	// 这里开始将需要备份的数据写入流
 	entity.writeBackupData(&s);
 
 	if(entity.shouldAutoBackup() == KBE_NEXT_ONLY)
@@ -106,7 +106,7 @@ void Backuper::createBackupTable()
 			backupEntityIDs_.push_back(iter->first);
 	}
 
-	// ���һ������
+	// 随机一下序列
 	std::random_shuffle(backupEntityIDs_.begin(), backupEntityIDs_.end());
 }
 

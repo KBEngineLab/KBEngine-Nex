@@ -37,7 +37,7 @@ class ThreadPool;
 class DBUtil;
 
 /*
-	���ݿ�ӿ�
+	数据库接口
 */
 class DBInterface
 {
@@ -66,34 +66,34 @@ public:
 	};
 
 	/**
-		��黷��
+		检查环境
 	*/
 	virtual bool checkEnvironment() = 0;
 	
 	/**
-		������ �Դ�������ݽ��о���
-		����������ɹ�����ʧ��
+		检查错误， 对错误的内容进行纠正
+		如果纠正不成功返回失败
 	*/
 	virtual bool checkErrors() = 0;
 
 	/**
-		��ĳ�����ݿ����
+		与某个数据库关联
 	*/
 	virtual bool attach(const char* databaseName = NULL) = 0;
 	virtual bool detach() = 0;
 
 	/**
-		��ȡ���ݿ����еı���
+		获取数据库所有的表名
 	*/
 	virtual bool getTableNames( std::vector<std::string>& tableNames, const char * pattern) = 0;
 
 	/**
-		��ȡ���ݿ�ĳ�������е��ֶ�����
+		获取数据库某个表所有的字段名称
 	*/
 	virtual bool getTableItemNames(const char* tableName, std::vector<std::string>& itemNames) = 0;
 
 	/**
-		��ѯ��
+		查询表
 	*/
 	virtual bool query(const char* cmd, uint32 size, bool printlog = true, MemoryStream * result = NULL) = 0;
 	virtual bool query(const std::string& cmd, bool printlog = true, MemoryStream * result = NULL)
@@ -102,76 +102,76 @@ public:
 	}
 
 	/**
-		��������ӿڵ�����
+		返回这个接口的名称
 	*/
 	const char* name() const { return name_; }
 
 	/**
-		��������ӿڵ�����
+		返回这个接口的索引
 	*/
 	uint16 dbIndex() const { return dbIndex_; }
 
 	/**
-		��������ӿڵ�����
+		返回这个接口的描述
 	*/
 	virtual const char* c_str() = 0;
 
 	/** 
-		��ȡ����
+		获取错误
 	*/
 	virtual const char* getstrerror() = 0;
 
 	/** 
-		��ȡ������
+		获取错误编号
 	*/
 	virtual int getlasterror() = 0;
 
 	/**
-		����һ��entity�洢��
+		创建一个entity存储表
 	*/
 	virtual EntityTable* createEntityTable(EntityTables* pEntityTables) = 0;
 
 	/** 
-		�����ݿ�ɾ��entity��
+		从数据库删除entity表
 	*/
 	virtual bool dropEntityTableFromDB(const char* tableName) = 0;
 
 	/** 
-		�����ݿ�ɾ��entity���ֶ�
+		从数据库删除entity表字段
 	*/
 	virtual bool dropEntityTableItemFromDB(const char* tableName, const char* tableItemName) = 0;
 
 	/**
-		��ס�ӿڲ���
+		锁住接口操作
 	*/
 	virtual bool lock() = 0;
 	virtual bool unlock() = 0;
 
 	/**
-		�����쳣
+		处理异常
 	*/
 	virtual bool processException(std::exception & e) = 0;
 
 	/**
-		��ȡ���һ�β�ѯ��sql���
+		获取最后一次查询的sql语句
 	*/
 	virtual const std::string& lastquery() const{ return lastquery_; }
 
 protected:
-	char name_[MAX_BUF];									// ���ݿ�ӿڵ�����
-	char db_type_[MAX_BUF];									// ���ݿ�����
-	uint32 db_port_;										// ���ݿ�Ķ˿�
-	char db_ip_[MAX_IP];									// ���ݿ��ip��ַ
-	char db_username_[MAX_BUF];								// ���ݿ���û���
-	char db_password_[MAX_BUF * 10];						// ���ݿ������
-	char db_name_[MAX_BUF];									// ���ݿ���
-	uint16 db_numConnections_;								// ���ݿ��������
-	std::string lastquery_;									// ���һ�β�ѯ����
-	uint16 dbIndex_;										// ��Ӧ�����ݿ�ӿ�����
+	char name_[MAX_BUF];									// 数据库接口的名称
+	char db_type_[MAX_BUF];									// 数据库的类别
+	uint32 db_port_;										// 数据库的端口
+	char db_ip_[MAX_IP];									// 数据库的ip地址
+	char db_username_[MAX_BUF];								// 数据库的用户名
+	char db_password_[MAX_BUF * 10];						// 数据库的密码
+	char db_name_[MAX_BUF];									// 数据库名
+	uint16 db_numConnections_;								// 数据库最大连接
+	std::string lastquery_;									// 最后一次查询描述
+	uint16 dbIndex_;										// 对应的数据库接口索引
 };
 
 /*
-	���ݿ������Ԫ
+	数据库操作单元
 */
 class DBUtil : public Singleton<DBUtil>
 {

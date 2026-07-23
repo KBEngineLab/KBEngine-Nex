@@ -72,7 +72,7 @@ protected:
 	static DATATYPE_MAP dataTypesLowerName_;
 	static UID_DATATYPE_MAP uid_dataTypes_;
 
-	// ���Ͷ�����Ⱥ�˳�����ڴ������ɣ� c++��������Ҫ�Ⱥ�˳������
+	// 类型定义的先后顺序，用于代码生成， c++等语言需要先后顺序依赖
 	static DATATYPE_ORDERS dataTypesOrders_;
 };
 

@@ -29,7 +29,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{ 
 /*---------------------------------------------------------------------------------
-	��ƽ̨�ӿڶ���
+	跨平台接口定义
 ---------------------------------------------------------------------------------*/
 #if defined( __WIN32__ ) || defined( WIN32 ) || defined( _WIN32 )
 
@@ -81,7 +81,7 @@ namespace strutil {
 	std::string toUpper(const std::string& str);
 
 	/*
-	 ת��Ϊ��д
+	 转换为大写
 	*/
 	inline char* str_toupper(char* s)
 	{
@@ -97,7 +97,7 @@ namespace strutil {
 	}
 
 	/*
-	 ת��ΪСд
+	 转换为小写
 	*/
 	inline char* str_tolower(char* s)
 	{
@@ -147,7 +147,7 @@ namespace strutil {
 }
 
 namespace strutil {
-	// vector<string>֮�������ʹ�� std::find_if �������Ƿ����ĳ���ַ���
+	// vector<string>之类的容易使用 std::find_if 来查找是否存在某个字符串
 	template<typename T>
 	class find_vec_string_exist_handle
 	{

@@ -28,7 +28,7 @@ namespace KBEngine
 
 
 /**
- *	openssl rsa�ķ�װ
+ *	openssl rsa的封装
  */
 class KBE_RSA
 {

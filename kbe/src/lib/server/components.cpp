@@ -163,7 +163,7 @@ bool Components::checkComponents(int32 uid, COMPONENT_ID componentID, uint32 pid
 		ComponentInfos* cinfos = findComponent(ct, uid, componentID);
 		if(cinfos != NULL)
 		{
-			if(cinfos->componentType != MACHINE_TYPE && cinfos->pid != 0 /* ����0ͨ����Ԥ�裬 ������������Ȳ����Ƚ� */ && pid != cinfos->pid)
+			if(cinfos->componentType != MACHINE_TYPE && cinfos->pid != 0 /* 等于0通常是预设， 这种情况我们先不作比较 */ && pid != cinfos->pid)
 			{
 				ERROR_MSG(fmt::format("Components::checkComponents: uid:{}, componentType={}, componentID:{} exist.\n",
 					uid, COMPONENT_NAME_EX(ct), componentID));
@@ -198,7 +198,7 @@ void Components::addComponent(int32 uid, const char* username,
 		return;
 	}
 	
-	// �����uid��û���Ѿ����е��κ�����������ô���ü�����
+	// 如果该uid下没有已经运行的任何相关组件，那么重置计数器
 	if (getGameSrvComponentsSize(uid) == 0)
 	{
 		_globalOrderLog[uid] = 0;
@@ -478,7 +478,7 @@ int Components::connectComponent(COMPONENT_TYPE componentType, int32 uid, COMPON
 			pComponentInfos->pChannel->destroy();
 			Network::Channel::reclaimPoolObject(pComponentInfos->pChannel);
 
-			// ��ʱ����ǿ���ͷ��ڴ棬destroy���Ѿ����������
+			// 此时不可强制释放内存，destroy中已经对其减引用
 			// SAFE_RELEASE(pComponentInfos->pChannel);
 			pComponentInfos->pChannel = NULL;
 			return -1;
@@ -771,7 +771,7 @@ const Components::ComponentInfos* Components::lookupLocalComponentRunning(uint32
 //-------------------------------------------------------------------------------------		
 bool Components::updateComponentInfos(const Components::ComponentInfos* info)
 {
-	// ��������machine������
+	// 不对其他machine做处理
 	if(info->componentType == MACHINE_TYPE)
 	{
 		return true;
@@ -823,7 +823,7 @@ bool Components::updateComponentInfos(const Components::ComponentInfos* info)
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 
-	// ����COMMON_NETWORK_MESSAGE������client�� �����bots�� ������Ҫ��������
+	// 由于COMMON_NETWORK_MESSAGE不包含client， 如果是bots， 我们需要单独处理
 	if(info->componentType != BOTS_TYPE)
 	{
 		COMMON_NETWORK_MESSAGE(info->componentType, (*pBundle), lookApp);
@@ -845,7 +845,7 @@ bool Components::updateComponentInfos(const Components::ComponentInfos* info)
 	int selgot = select(epListen+1, &fds, NULL, NULL, &tv);
 	if(selgot == 0)
 	{
-		// ��ʱ, ���ܶԷ���æ
+		// 超时, 可能对方繁忙
 		return true;	
 	}
 	else if(selgot == -1)
@@ -1085,8 +1085,8 @@ bool Components::findLogger()
 	
 	int i = 0;
 	
-	while(i++ < 1/*���Logger��������Ϸ����ͬʱ�����������趨�Ĳ��Ҵ���Խ�࣬
-		�ҵ�Logger�ĸ���Խ�󣬵�ǰֻ�趨����һ�Σ��ٶ��û��Ѿ���ǰ������Logger����*/)
+	while(i++ < 1/*如果Logger与其他游戏进程同时启动，这里设定的查找次数越多，
+		找到Logger的概率越大，当前只设定查找一次，假定用户已经提前好启动Logger服务*/)
 	{
 		srand(KBEngine::getSystemTime());
 		uint16 nport = KBE_PORT_START + (rand() % 1000);
@@ -1151,7 +1151,7 @@ RESTART_RECV:
 					goto RESTART_RECV;
 				}
 
-				// ����Ҳ���
+				// 如果找不到
 				if(args.componentType == UNKNOWN_COMPONENT_TYPE)
 				{
 					isContinue = true;
@@ -1171,7 +1171,7 @@ RESTART_RECV:
 				isContinue = true;
 			}while(bhandler.pCurrPacket()->length() > 0);
 
-			// ��ֹ���յ������ݲ�����Ҫ������
+			// 防止接收到的数据不是想要的数据
 			if(findComponentType == args.componentType)
 			{
 				for(int iconn=0; iconn<5; iconn++)
@@ -1198,7 +1198,7 @@ RESTART_RECV:
 		}
 		else
 		{
-			// �������ݳ�ʱ��
+			// 接受数据超时了
 		}
 	}
 
@@ -1306,7 +1306,7 @@ RESTART_RECV:
 						goto RESTART_RECV;
 					}
 
-					// ����Ҳ���
+					// 如果找不到
 					if(args.componentType == UNKNOWN_COMPONENT_TYPE)
 					{
 						isContinue = true;
@@ -1326,10 +1326,10 @@ RESTART_RECV:
 					isContinue = true;
 				}while(bhandler.pCurrPacket()->length() > 0);
 
-				// ��ֹ���յ������ݲ�����Ҫ������
+				// 防止接收到的数据不是想要的数据
 				if(findComponentType == args.componentType)
 				{
-					// �������������� ��logger������������ȥ�� �������Ծ���ͬ����־
+					// 这里做个特例， 是logger则优先连接上去， 这样可以尽早同步日志
 					if(findComponentType == (int8)LOGGER_TYPE)
 					{
 						findComponentTypes_[findIdx_] = -1;
@@ -1365,7 +1365,7 @@ RESTART_RECV:
 						ERROR_MSG("Components::findComponents: receive error!\n");
 					}
 
-					// �������Щ�������û�ҵ�������
+					// 如果是这些辅助组件没找到则跳过
 					int helperComponentIdx = 0;
 
 					while(1)
@@ -1380,7 +1380,7 @@ RESTART_RECV:
 							WARNING_MSG(fmt::format("Components::findComponents: not found {}!\n",
 								COMPONENT_NAME_EX((COMPONENT_TYPE)findComponentType)));
 
-							findComponentTypes_[findIdx_] = -1; // ������־
+							findComponentTypes_[findIdx_] = -1; // 跳过标志
 							count = 0;
 							findIdx_++;
 							return false;
@@ -1399,7 +1399,7 @@ RESTART_RECV:
 
 	if(state_ == 2)
 	{
-		// ��ʼע�ᵽ���е����
+		// 开始注册到所有的组件
 		while(findComponentTypes_[findIdx_] != UNKNOWN_COMPONENT_TYPE)
 		{
 			if(dispatcher().hasBreakProcessing())
@@ -1458,7 +1458,7 @@ void Components::broadcastSelf()
 		srand(KBEngine::getSystemTime());
 		uint16 nport = KBE_PORT_START + (rand() % 1000);
 
-		// ��������ڹ㲥UDP�����ύ�Լ�������
+		// 向局域网内广播UDP包，提交自己的身份
 		Network::BundleBroadcast bhandler(*pNetworkInterface(), nport);
 
 		if (!bhandler.good())
@@ -1470,7 +1470,7 @@ void Components::broadcastSelf()
 				return;
 			}
 
-			// ���ʧ��������㲥
+			// 如果失败则继续广播
 			--cidex;
 			KBEngine::sleep(10);
 			continue;
@@ -1526,7 +1526,7 @@ bool Components::process()
 			srand(KBEngine::getSystemTime());
 			uint16 nport = KBE_PORT_START + (rand() % 1000);
 
-			// ��������ڹ㲥UDP�����ύ�Լ�������
+			// 向局域网内广播UDP包，提交自己的身份
 			Network::BundleBroadcast bhandler(*pNetworkInterface(), nport);
 
 			if (!bhandler.good())
@@ -1538,7 +1538,7 @@ bool Components::process()
 					return false;
 				}
 
-				// ���ʧ��������㲥
+				// 如果失败则继续广播
 				--cidex;
 				KBEngine::sleep(10);
 				continue;
@@ -1559,8 +1559,8 @@ bool Components::process()
 			
 			bhandler.broadcast();
 
-			// �ȴ�������Ϣ��������ڷ���˵�������Ѿ���ʹ�ã��ý��̲��Ϸ���������������˳�
-			// ���û�з���˵��û��machine�Դ˽�������������Գɹ�����
+			// 等待返回信息，如果存在返回说明身份已经被使用，该进程不合法，程序接下来会退出
+			// 如果没有返回说明没有machine对此进程有意见，可以成功启动
 			int32 timeout = 500000;
 			MachineInterface::onBroadcastInterfaceArgs25 args;
 
@@ -1583,7 +1583,7 @@ bool Components::process()
 
 					hasContinue = true;
 
-					// �����δ֪���������һ��
+					// 如果是未知类型则继续一次
 					if(args.componentType == UNKNOWN_COMPONENT_TYPE)
 						continue;
 
@@ -1595,7 +1595,7 @@ bool Components::process()
 						inet_ntoa((struct in_addr&)args.intaddr),
 						ntohs(args.intport)));
 
-					// ������ͬ���ݣ� ������˳���
+					// 存在相同身份， 程序该退出了
 					if(_pHandler)
 						_pHandler->onIdentityillegal((COMPONENT_TYPE)args.componentType, args.componentID, args.pid, inet_ntoa((struct in_addr&)args.intaddr));
 

@@ -62,7 +62,7 @@ Network::Bundle* GhostManager::createSendBundle(COMPONENT_ID componentID)
 			Network::Bundle* pBundle = iter->second.back();
 			if (pBundle->packetHaveSpace())
 			{
-				// �ȴӶ���ɾ��
+				// 先从队列删除
 				iter->second.pop_back();
 				pBundle->pChannel(NULL);
 				pBundle->pCurrMsgHandler(NULL);
@@ -175,7 +175,7 @@ void GhostManager::syncMessages()
 
 		for(; iter1 != iter->second.end(); ++iter1)
 		{
-			// ����Ϣͬ����ghost
+			// 将消息同步到ghost
 			cinfos->pChannel->send((*iter1));
 		}
 			
@@ -194,7 +194,7 @@ void GhostManager::syncGhosts()
 		COMPONENT_ID ghostCell = iter->second->ghostCell();
 		if(ghostCell > 0)
 		{
-			// ��λ�õ���Ϣͬ����ghost
+			// 将位置等信息同步到ghost
 			Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(ghostCell);
 			if(cinfos == NULL || cinfos->pChannel == NULL)
 			{

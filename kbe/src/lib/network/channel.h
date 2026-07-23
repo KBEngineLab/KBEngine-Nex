@@ -70,20 +70,20 @@ public:
 	
 	enum ChannelTypes
 	{
-		/// ��ͨͨ��
+		/// 普通通道
 		CHANNEL_NORMAL = 0,
 
-		// �����webͨ��
+		// 浏览器web通道
 		CHANNEL_WEB = 1,
 	};
 
 	enum Flags
 	{
-		FLAG_SENDING					= 0x00000001,	// ������Ϣ��
-		FLAG_DESTROYED					= 0x00000002,	// ͨ���Ѿ�����
-		FLAG_HANDSHAKE					= 0x00000004,	// �Ѿ����ֹ�
-		FLAG_CONDEMN_AND_WAIT_DESTROY	= 0x00000008,	// ��Ƶ���Ѿ���ò��Ϸ������������ݷ�����Ϻ�ر�
-		FLAG_CONDEMN_AND_DESTROY		= 0x00000010,	// ��Ƶ���Ѿ���ò��Ϸ��������ر�
+		FLAG_SENDING					= 0x00000001,	// 发送信息中
+		FLAG_DESTROYED					= 0x00000002,	// 通道已经销毁
+		FLAG_HANDSHAKE					= 0x00000004,	// 已经握手过
+		FLAG_CONDEMN_AND_WAIT_DESTROY	= 0x00000008,	// 该频道已经变得不合法，即将在数据发送完毕后关闭
+		FLAG_CONDEMN_AND_DESTROY		= 0x00000010,	// 该频道已经变得不合法，即将关闭
 		FLAG_CONDEMN					= FLAG_CONDEMN_AND_WAIT_DESTROY | FLAG_CONDEMN_AND_DESTROY,
 	};
 
@@ -129,8 +129,8 @@ public:
 	const Bundles & bundles() const;
 
 	/**
-		��������bundle����bundle�����Ǵ�send���뷢�Ͷ����л�ȡ�ģ��������Ϊ��
-		�򴴽�һ���µ�
+		创建发送bundle，该bundle可能是从send放入发送队列中获取的，如果队列为空
+		则创建一个新的
 	*/
 	Bundle* createSendBundle();
 	void clearBundle();
@@ -278,18 +278,18 @@ private:
 	PacketReceiver*				pPacketReceiver_;
 	PacketSender*				pPacketSender_;
 
-	// ������ⲿͨ���Ҵ�����һ��ǰ������ǰ�˴���ID
+	// 如果是外部通道且代理了一个前端则会绑定前端代理ID
 	ENTITY_ID					proxyID_;
 
-	// ��չ��
+	// 扩展用
 	std::string					strextra_;
 
-	// ͨ�����
+	// 通道类别
 	ChannelTypes				channelType_;
 
 	COMPONENT_ID				componentID_;
 
-	// ֧��ָ��ĳ��ͨ��ʹ��ĳ����Ϣhandlers
+	// 支持指定某个通道使用某个消息handlers
 	KBEngine::Network::MessageHandlers* pMsgHandlers_;
 
 	uint32						flags_;

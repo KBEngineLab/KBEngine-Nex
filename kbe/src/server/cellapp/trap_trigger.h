@@ -37,7 +37,7 @@ public:
 
 	
 	/**
-		ĳ���ڵ��������뿪��rangeTrigger
+		某个节点进入或者离开了rangeTrigger
 	*/
 	virtual void onEnter(CoordinateNode * pNode);
 	virtual void onLeave(CoordinateNode * pNode);

@@ -171,7 +171,7 @@ bool InitProgressHandler::process()
 	if(delayTicks_++ < 1)
 		return true;
 
-	// ֻ�е�һ��baseapp�ϻᴴ��EntityAutoLoader���Զ��������ݿ�ʵ��
+	// 只有第一个baseapp上会创建EntityAutoLoader来自动加载数据库实体
 	if(g_componentGroupOrder == 1)
 	{
 		if(autoLoadState_ == -1)
@@ -182,8 +182,8 @@ bool InitProgressHandler::process()
 		}
 		else if(autoLoadState_ == 0)
 		{
-			// ����ȴ�EntityAutoLoaderִ�����
-			// EntityAutoLoaderִ����ϻ�����autoLoadState_ = 1
+			// 必须等待EntityAutoLoader执行完毕
+			// EntityAutoLoader执行完毕会设置autoLoadState_ = 1
 			if(!pEntityAutoLoader_->process())
 				setAutoLoadState(1);
 			
@@ -199,7 +199,7 @@ bool InitProgressHandler::process()
 
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-		// ���нű����������
+		// 所有脚本都加载完毕
 		PyObject* pyResult = PyObject_CallMethod(Baseapp::getSingleton().getEntryScript().get(), 
 											const_cast<char*>("onBaseAppReady"), 
 											const_cast<char*>("O"), 
@@ -220,7 +220,7 @@ bool InitProgressHandler::process()
 	{
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-		// �ص�����Ƿ��ܹ���¼
+		// 回调获得是否能够登录
 		PyObject* pyResult = PyObject_CallMethod(Baseapp::getSingleton().getEntryScript().get(), 
 											const_cast<char*>("onReadyForLogin"), 
 											const_cast<char*>("O"), 

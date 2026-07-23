@@ -135,7 +135,7 @@ bool Logger::initializeEnd()
 {
 	PythonApp::initializeEnd();
 
-	// ����logger��������app��log��������ٰ��������ǳ�����
+	// 由于logger接收其他app的log，如果跟踪包输出将会非常卡。
 	Network::g_trace_packet = 0;
 
 	timer_ = this->dispatcher().addTimer(1000000 / 50, this,
@@ -143,7 +143,7 @@ bool Logger::initializeEnd()
 
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-	// ���нű����������
+	// 所有脚本都加载完毕
 	if (getEntryScript().get())
 	{
 		PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(),
@@ -193,7 +193,7 @@ ShutdownHandler::CAN_SHUTDOWN_STATE Logger::canShutdown()
 {
 	if (getEntryScript().get() && PyObject_HasAttrString(getEntryScript().get(), "onReadyForShutDown") > 0)
 	{
-		// ���нű����������
+		// 所有脚本都加载完毕
 		PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(),
 			const_cast<char*>("onReadyForShutDown"),
 			const_cast<char*>(""));
@@ -229,7 +229,7 @@ void Logger::onShutdownBegin()
 {
 	PythonApp::onShutdownBegin();
 
-	// ֪ͨ�ű�
+	// 通知脚本
 	if (getEntryScript().get())
 	{
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
@@ -299,7 +299,7 @@ void Logger::writeLog(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 	pLogItem->logstream << "- ";
 	pLogItem->logstream << str;
 
-	// ��¼����������־�����ڽű��ص�ʱʹ��
+	// 记录下完整的日志，以在脚本回调时使用
 	std::string sLog = pLogItem->logstream.str();
 
 	static bool notificationScript = getEntryScript().get() && PyObject_HasAttrString(getEntryScript().get(), "onLogWrote") > 0;
@@ -363,7 +363,7 @@ void Logger::writeLog(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 		iter->second.onMessage(pLogItem);
 	}
 
-	// ����һ����log���ṩ���߲鿴logʱ�ܿ��ٻ�ȡ��ʼ������
+	// 缓存一部分log，提供工具查看log时能快速获取初始上下文
 	buffered_logs_.push_back(pLogItem);
 	if(buffered_logs_.size() > 64)
 	{

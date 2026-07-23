@@ -80,7 +80,7 @@ class Channel;
 	return *this;																							\
 
 
-// �Ӷ�����д��������
+// 从对象池中创建与回收
 #define MALLOC_BUNDLE() Network::Bundle::createPoolObject(OBJECTPOOL_POINT)
 #define DELETE_BUNDLE(obj) { Network::Bundle::reclaimPoolObject(obj); obj = NULL; }
 #define RECLAIM_BUNDLE(obj) { Network::Bundle::reclaimPoolObject(obj);}
@@ -112,7 +112,7 @@ public:
 	INLINE const Network::MessageHandler* pCurrMsgHandler() const;
 
 	/**
-		�������а�������ǰ��δд��İ����ܳ���
+		计算所有包包括当前还未写完的包的总长度
 	*/
 	int32 packetsLength(bool calccurr = true);
 
@@ -128,12 +128,12 @@ public:
 	int packetsSize() const;
 
 	/**
-		����һЩ��Ϣ�ֽ�
+		撤销一些消息字节
 	*/
 	bool revokeMessage(int32 size);
 		
 	/**
-		����packetMaxSize-���һ������length��ʣ��Ŀ��ÿռ�
+		计算packetMaxSize-最后一个包的length后剩余的可用空间
 	*/
 	INLINE int32 lastPacketSpace();
 	INLINE bool packetHaveSpace();
@@ -265,7 +265,7 @@ public:
 
     Bundle &operator<<(const std::string &value)
     {
-		int32 len = (int32)value.size() + 1; // +1Ϊ�ַ���β����0λ��
+		int32 len = (int32)value.size() + 1; // +1为字符串尾部的0位置
 		int32 addtotalsize = 0;
 
 		while(len > 0)
@@ -281,7 +281,7 @@ public:
 	
     Bundle &operator<<(const char *str)
     {
-		int32 len = (int32)strlen(str) + 1;  // +1Ϊ�ַ���β����0λ��
+		int32 len = (int32)strlen(str) + 1;  // +1为字符串尾部的0位置
 		int32 addtotalsize = 0;
 
 		while(len > 0)
@@ -386,8 +386,8 @@ public:
 		y -= minf / 2.f;
 		z -= minf;
 
-		// ���ֵ��Ҫ����-256~256
-		// y ��Ҫ����-128~128
+		// 最大值不要超过-256~256
+		// y 不要超过-128~128
         uint32 packed = 0;
         packed |= ((int)(x / 0.25f) & 0x7FF);
         packed |= ((int)(z / 0.25f) & 0x7FF) << 11;
@@ -404,11 +404,11 @@ public:
 		MemoryStream::PackFloatXType zPackData; 
 		zPackData.fv = z;
 		
-		// 0-7λ���β��, 8-10λ���ָ��, 11λ��ű�־
-		// ����ʹ����24λ���洢2��float�� ����Ҫ���ܹ��ﵽ-512~512֮�����
-		// 8λβ��ֻ�ܷ����ֵ256, ָ��ֻ��3λ(�������������ֵΪ2^(2^3)=256) 
-		// ������ȥ��һλʹ��Χ�ﵽ(-512~-2), (2~512)֮��
-		// ����������Ǳ�֤��С��Ϊ-2.f����2.f
+		// 0-7位存放尾数, 8-10位存放指数, 11位存放标志
+		// 由于使用了24位来存储2个float， 并且要求能够达到-512~512之间的数
+		// 8位尾数只能放最大值256, 指数只有3位(决定浮点数最大值为2^(2^3)=256) 
+		// 我们舍去第一位使范围达到(-512~-2), (2~512)之间
+		// 因此这里我们保证最小数为-2.f或者2.f
 		xPackData.fv += xPackData.iv < 0 ? -2.f : 2.f;
 		zPackData.fv += zPackData.iv < 0 ? -2.f : 2.f;
 
@@ -419,26 +419,26 @@ public:
 		const uint32 xCeilingValues[] = { 0, 0x7ff000 };
 		const uint32 zCeilingValues[] = { 0, 0x0007ff };
 
-		// ��������������������������ø�����Ϊ�����
-		// ��������ָ����4λ�ͱ��λ�� �������λ��Ϊ0��϶������ �����4λ��8λβ����Ϊ0�����
+		// 这里如果这个浮点数溢出了则设置浮点数为最大数
+		// 这里检查了指数高4位和标记位， 如果高四位不为0则肯定溢出， 如果低4位和8位尾数不为0则溢出
 		// 0x7c000000 = 1111100000000000000000000000000
 		// 0x40000000 = 1000000000000000000000000000000
 		// 0x3ffc000  = 0000011111111111100000000000000
 		data |= xCeilingValues[((xPackData.uv & 0x7c000000) != 0x40000000) || ((xPackData.uv & 0x3ffc000) == 0x3ffc000)];
 		data |= zCeilingValues[((zPackData.uv & 0x7c000000) != 0x40000000) || ((zPackData.uv & 0x3ffc000) == 0x3ffc000)];
 		
-		// ����8λβ����3λָ���� ���������ʣ��β�����λ��1��+1��������, ���Ҵ�ŵ�data��
+		// 复制8位尾数和3位指数， 如果浮点数剩余尾数最高位是1则+1四舍五入, 并且存放到data中
 		// 0x7ff000 = 11111111111000000000000
 		// 0x0007ff = 00000000000011111111111
 		// 0x4000	= 00000000100000000000000
 		data |= ((xPackData.uv >>  3) & 0x7ff000) + ((xPackData.uv & 0x4000) >> 2);
 		data |= ((zPackData.uv >> 15) & 0x0007ff) + ((zPackData.uv & 0x4000) >> 14);
 		
-		// ȷ��ֵ�ڷ�Χ��
+		// 确保值在范围内
 		// 0x7ff7ff = 11111111111011111111111
 		data &= 0x7ff7ff;
 
-		// ���Ʊ��λ
+		// 复制标记位
 		// 0x800000 = 100000000000000000000000
 		// 0x000800 = 000000000000100000000000
 		data |=  (xPackData.uv >>  8) & 0x800000;
@@ -539,12 +539,12 @@ public:
 
     Bundle &operator>>(COMPONENT_TYPE &value)
     {
-        PACKET_OUT_VALUE(value, sizeof(int32/*�ο�MemoryStream*/));
+        PACKET_OUT_VALUE(value, sizeof(int32/*参考MemoryStream*/));
     }
 
     Bundle &operator>>(ENTITYCALL_TYPE &value)
     {
-        PACKET_OUT_VALUE(value, sizeof(int32/*�ο�MemoryStream*/));
+        PACKET_OUT_VALUE(value, sizeof(int32/*参考MemoryStream*/));
     }
 
     Bundle &operator>>(std::string& value)

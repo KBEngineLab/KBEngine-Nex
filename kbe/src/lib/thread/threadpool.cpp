@@ -573,7 +573,7 @@ bool ThreadPool::addTask(TPTask* tptask)
 	{
 		bool threadStartsImmediately = i > 0;
 
-		// �趨5����δʹ�����˳����߳�
+		// 设定5分钟未使用则退出的线程
 		TPThread* tptd = createThread(ThreadPool::timeout, threadStartsImmediately);
 		if(!tptd)
 		{
@@ -585,12 +585,12 @@ bool ThreadPool::addTask(TPTask* tptask)
 #endif				
 		}
 		
-		// ���е��߳��б�
+		// 所有的线程列表
 		allThreadList_.push_back(tptd);	
 		
 		if (threadStartsImmediately)
 		{
-			// ���õ��߳��б�
+			// 闲置的线程列表
 			freeThreadList_.push_back(tptd);
 			++currentFreeThreadCount_;
 		}
@@ -692,7 +692,7 @@ void* TPThread::threadFunc(void* arg)
 			tptd->processTask(task);
 			tptd->onProcessTaskEnd(task);
 			
-			// ���Լ��������������ȡ��һ����æ��δ����������
+			// 尝试继续从任务队列里取出一个繁忙的未处理的任务
 			TPTask * task1 = tptd->tryGetTask();
 
 			if(!task1)
@@ -751,8 +751,8 @@ bool TPThread::onWaitCondSignal(void)
 		DWORD ret = WaitForSingleObject(cond_, threadWaitSecond_ * 1000);
 		ResetEvent(cond_);
 
-		// �������Ϊ��ʱ�ˣ� ˵������̺ܾ߳�û�б��õ��� ����Ӧ��ע������̡߳�
-		// ֪ͨThreadPoolע���Լ�
+		// 如果是因为超时了， 说明这个线程很久没有被用到， 我们应该注销这个线程。
+		// 通知ThreadPool注销自己
 		if (ret == WAIT_TIMEOUT)
 		{
 			threadPool_->removeHangThread(this);
@@ -785,10 +785,10 @@ bool TPThread::onWaitCondSignal(void)
 		int ret = pthread_cond_timedwait(&cond_, &mutex_, &timeout);
 		unlock();
 		
-		// �������Ϊ��ʱ�ˣ� ˵������̺ܾ߳�û�б��õ��� ����Ӧ��ע������̡߳�
+		// 如果是因为超时了， 说明这个线程很久没有被用到， 我们应该注销这个线程。
 		if (ret == ETIMEDOUT)
 		{
-			// ֪ͨThreadPoolע���Լ�
+			// 通知ThreadPool注销自己
 			threadPool_->removeHangThread(this);
 			return false;
 		}

@@ -158,7 +158,7 @@ typedef G3D::Vector4							Vector4;
 #define KBEClamp								G3D::clamp
 #endif
 
-// ��2��3d��������y�����2d����
+// 从2个3d向量忽略y计算出2d长度
 inline float KBEVec3CalcVec2Length(const Vector3& v1, const Vector3& v2)
 {
 	float x = v1.x - v2.x;
@@ -186,10 +186,10 @@ inline KBEngine::int8 angle2int8(float v, bool half = false)
 	return angle;
 }
 
-typedef Vector3													Position3D;												// ��ʾ3Dλ�ñ�������	
-typedef KBEShared_ptr< std::vector<Position3D> >				VECTOR_POS3D_PTR;										// ָ��Position3D���������ָ����������
+typedef Vector3													Position3D;												// 表示3D位置变量类型	
+typedef KBEShared_ptr< std::vector<Position3D> >				VECTOR_POS3D_PTR;										// 指向Position3D数组的智能指针类型声明
 
-struct Direction3D																										// ��ʾ����λ�ñ�������
+struct Direction3D																										// 表示方向位置变量类型
 {
 	Direction3D():dir(0.f, 0.f, 0.f) {};
 	Direction3D(const Vector3 & v):dir(v){}
@@ -214,7 +214,7 @@ struct Direction3D																										// ��ʾ����λ�ñ��
 	Vector3 dir;
 };
 
-/** �������Ƚ� */
+/** 浮点数比较 */
 #define floatEqual(v1, v3) (abs(v1 - v2) < std::numeric_limits<float>::epsilon())
 inline bool almostEqual(const float f1, const float f2, const float epsilon = 0.0004f)
 {

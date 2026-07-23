@@ -35,8 +35,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /*
-	��������һ�����ǻᱻ���µĶ��� appÿ��tick����������е�
-	Updatable������״̬�� ��Ҫʵ�ֲ�ͬ��Updatable����ɲ�ͬ�ĸ������ԡ�
+	用来描述一个总是会被更新的对象， app每个tick都会调用所有的
+	Updatable来更新状态， 需要实现不同的Updatable来完成不同的更新特性。
 */
 class Updatable
 {
@@ -52,7 +52,7 @@ public:
 
 	std::string c_str() { return updatableName; }
 
-	// ������Updatables�����е�λ��
+	// 自身在Updatables容器中的位置
 	int removeIdx;
 
 	std::string updatableName;

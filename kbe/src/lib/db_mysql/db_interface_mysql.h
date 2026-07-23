@@ -66,7 +66,7 @@ struct MYSQL_TABLE_FIELD
 class DBException;
 
 /*
-	���ݿ�ӿ�
+	数据库接口
 */
 class DBInterfaceMysql : public DBInterface
 {
@@ -77,7 +77,7 @@ public:
 	static bool initInterface(DBInterface* pdbi);
 	
 	/**
-		��ĳ�����ݿ����
+		与某个数据库关联
 	*/
 	bool reattach();
 	virtual bool attach(const char* databaseName = NULL);
@@ -97,13 +97,13 @@ public:
 	void hasLostConnection( bool v )	{ hasLostConnection_ = v; }
 
 	/**
-		��黷��
+		检查环境
 	*/
 	virtual bool checkEnvironment();
 	
 	/**
-		������ �Դ�������ݽ��о���
-		����������ɹ�����ʧ��
+		检查错误， 对错误的内容进行纠正
+		如果纠正不成功返回失败
 	*/
 	virtual bool checkErrors();
 
@@ -112,17 +112,17 @@ public:
 	bool write_query_result(MemoryStream * result);
 
 	/**
-		��ȡ���ݿ����еı���
+		获取数据库所有的表名
 	*/
 	virtual bool getTableNames( std::vector<std::string>& tableNames, const char * pattern);
 
 	/**
-		��ȡ���ݿ�ĳ�������е��ֶ�����
+		获取数据库某个表所有的字段名称
 	*/
 	virtual bool getTableItemNames(const char* tableName, std::vector<std::string>& itemNames);
 
 	/** 
-		�����ݿ�ɾ��entity���ֶ�
+		从数据库删除entity表字段
 	*/
 	virtual bool dropEntityTableItemFromDB(const char* tableName, const char* tableItemName);
 
@@ -150,48 +150,48 @@ public:
 	void getFields(TABLE_FIELDS& outs, const char* tableName);
 
 	/**
-		��������ӿڵ�����
+		返回这个接口的描述
 	*/
 	virtual const char* c_str();
 
 	/** 
-		��ȡ����
+		获取错误
 	*/
 	virtual const char* getstrerror();
 
 	/** 
-		��ȡ������
+		获取错误编号
 	*/
 	virtual int getlasterror();
 
 	/**
-		������ݿⲻ�����򴴽�һ�����ݿ�
+		如果数据库不存在则创建一个数据库
 	*/
 	virtual bool createDatabaseIfNotExist();
 	
 	/**
-		����һ��entity�洢��
+		创建一个entity存储表
 	*/
 	virtual EntityTable* createEntityTable(EntityTables* pEntityTables);
 
 	/** 
-		�����ݿ�ɾ��entity��
+		从数据库删除entity表
 	*/
 	virtual bool dropEntityTableFromDB(const char* tableName);
 
 	/**
-		��ס�ӿڲ���
+		锁住接口操作
 	*/
 	virtual bool lock();
 	virtual bool unlock();
 
 	/**
-		�����쳣
+		处理异常
 	*/
 	bool processException(std::exception & e);
 
 	/**
-		SQL�������С
+		SQL命令最长大小
 	*/
 	static size_t sql_max_allowed_packet(){ return sql_max_allowed_packet_; }
 

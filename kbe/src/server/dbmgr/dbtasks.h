@@ -38,7 +38,7 @@ class Buffered_DBTasks;
 struct ACCOUNT_INFOS;
 
 /*
-	���ݿ��߳����������
+	数据库线程任务基础类
 */
 
 class DBTask : public DBTaskBase
@@ -116,7 +116,7 @@ private:
 };
 
 /**
-	ִ��һ��sql���
+	执行一条sql语句
 */
 class DBTaskExecuteRawDatabaseCommand : public DBTask
 {
@@ -141,7 +141,7 @@ protected:
 
 
 /**
-	ִ��һ��sql���
+	执行一条sql语句
 */
 class DBTaskExecuteRawDatabaseCommandByEntity : public EntityDBTask
 {
@@ -165,7 +165,7 @@ protected:
 };
 
 /**
-	�����ݿ�дentity�� ����entityʱҲ���������
+	向数据库写entity， 备份entity时也是这个机制
 */
 class DBTaskWriteEntity : public EntityDBTask
 {
@@ -192,7 +192,7 @@ protected:
 };
 
 /**
-	�����ݿ���ɾ��entity
+	从数据库中删除entity
 */
 class DBTaskRemoveEntity : public EntityDBTask
 {
@@ -216,7 +216,7 @@ protected:
 };
 
 /**
-	�����ݿ���ɾ��entity
+	从数据库中删除entity
 */
 class DBTaskDeleteEntityByDBID : public DBTask
 {
@@ -243,7 +243,7 @@ protected:
 };
 
 /**
-	�����ݿ����Զ�����ʵ��
+	从数据库中自动加载实体
 */
 class DBTaskEntityAutoLoad : public DBTask
 {
@@ -268,7 +268,7 @@ protected:
 };
 
 /**
-	ͨ��dbid��ѯһ��ʵ���Ƿ�����ݿ���
+	通过dbid查询一个实体是否从数据库检出
 */
 class DBTaskLookUpEntityByDBID : public DBTask
 {
@@ -296,7 +296,7 @@ protected:
 };
 
 /**
-	����һ���˺ŵ����ݿ�
+	创建一个账号到数据库
 */
 class DBTaskCreateAccount : public DBTask
 {
@@ -324,7 +324,7 @@ protected:
 };
 
 /**
-	����һ��email�˺�
+	创建一个email账号
 */
 class DBTaskCreateMailAccount : public DBTask
 {
@@ -349,7 +349,7 @@ protected:
 };
 
 /**
-	����һ��email�˺�
+	创建一个email账号
 */
 class DBTaskActivateAccount : public DBTask
 {
@@ -370,7 +370,7 @@ protected:
 };
 
 /**
-	���������˺�
+	请求重置账号
 */
 class DBTaskReqAccountResetPassword : public DBTask
 {
@@ -393,7 +393,7 @@ protected:
 };
 
 /**
-	��������˺�
+	完成重置账号
 */
 class DBTaskAccountResetPassword : public DBTask
 {
@@ -417,7 +417,7 @@ protected:
 };
 
 /**
-	�����email
+	请求绑定email
 */
 class DBTaskReqAccountBindEmail : public DBTask
 {
@@ -443,7 +443,7 @@ protected:
 };
 
 /**
-	��ɰ�email
+	完成绑定email
 */
 class DBTaskAccountBindEmail : public DBTask
 {
@@ -465,7 +465,7 @@ protected:
 };
 
 /**
-	����������
+	设置新密码
 */
 class DBTaskAccountNewPassword : public DBTask
 {
@@ -488,7 +488,7 @@ protected:
 };
 
 /**
-	baseapp�����ѯaccount��Ϣ
+	baseapp请求查询account信息
 */
 class DBTaskQueryAccount : public EntityDBTask
 {
@@ -523,7 +523,7 @@ protected:
 };
 
 /**
-	�˺�����
+	账号上线
 */
 class DBTaskAccountOnline : public EntityDBTask
 {
@@ -545,7 +545,7 @@ protected:
 
 
 /**
-	entity����
+	entity下线
 */
 class DBTaskEntityOffline : public EntityDBTask
 {
@@ -565,7 +565,7 @@ protected:
 
 
 /**
-	һ�����û���¼�� ��Ҫ���Ϸ���
+	一个新用户登录， 需要检查合法性
 */
 class DBTaskAccountLogin : public DBTask
 {
@@ -598,7 +598,7 @@ protected:
 };
 
 /**
-	baseapp�����ѯentity��Ϣ
+	baseapp请求查询entity信息
 */
 class DBTaskQueryEntity : public EntityDBTask
 {
@@ -624,7 +624,7 @@ protected:
 	MemoryStream* s_;
 	ENTITY_ID entityID_;
 
-	// ���ʵ���Ѿ�������������ָ��ʵ������app
+	// 如果实体已经激活，则这个属性指向实体所在app
 	bool wasActive_;
 	COMPONENT_ID wasActiveCID_;
 	ENTITY_ID wasActiveEntityID_;
@@ -633,7 +633,7 @@ protected:
 };
 
 /**
-	д��������־
+	写服务器日志
 */
 class DBTaskServerLog : public DBTask
 {
@@ -651,7 +651,7 @@ protected:
 };
 
 /**
-	����ĳ��baseapp��¼��entitylog
+	擦除某个baseapp记录的entitylog
 */
 class DBTaskEraseBaseappEntityLog : public DBTask
 {

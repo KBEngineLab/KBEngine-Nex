@@ -139,7 +139,7 @@ bool BundleBroadcast::broadcast(uint16 port)
 
 	epBroadcast_.sendto(packets()[0]->data(), packets()[0]->length(), htons(port), Network::BROADCAST);
 
-	// ���ָ���˵�ַ�أ��������е�ַ������Ϣ
+	// 如果指定了地址池，则向所有地址发送消息
 	std::vector< std::string >::iterator addr_iter = machine_addresses_.begin();
 	for (; addr_iter != machine_addresses_.end(); ++addr_iter)
 	{

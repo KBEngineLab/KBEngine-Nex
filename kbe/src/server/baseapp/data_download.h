@@ -69,7 +69,7 @@ protected:
 
 	uint32 totalBytes_;
 
-	// �ܹ����͵��ֽ���
+	// 总共发送的字节数
 	uint32 totalSentBytes_;
 	uint32 remainSent_;
 	uint32 currSent_;

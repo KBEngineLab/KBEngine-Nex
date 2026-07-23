@@ -194,7 +194,7 @@ PyObject* ClientEntityMethod::callmethod(PyObject* args, PyObject* kwds)
 
 		ENTITY_MESSAGE_FORWARD_CLIENT_END(pSendBundle, msgHandler, viewEntityMessage);
 
-		// ��¼����¼���������������С
+		// 记录这个事件产生的数据量大小
 		g_publicClientEventHistoryStats.trackEvent(srcEntity->scriptName(), 
 			(std::string(e->scriptName()) + "." + methodDescription->getName()), 
 			pSendBundle->currMsgLength(), 

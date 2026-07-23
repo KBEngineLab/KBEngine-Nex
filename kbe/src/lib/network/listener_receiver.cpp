@@ -64,7 +64,7 @@ int ListenerReceiver::handleInputNotification(int fd)
 		if (completion)
 		{
 			// Completion backends already created the socket asynchronously; consume it without calling accept again.
-			// ���ģ���Ѿ��첽���� socket������ֱ�����ѽ���������ٴε��� accept��
+			// 完成模型已经异步创建 socket，这里直接消费结果，不能再次调用 accept。
 			KBESOCKET acceptedSocket = (KBESOCKET)-1;
 			if (!pPoller->takeAcceptedSocket(fd, acceptedSocket))
 				break;
@@ -77,7 +77,7 @@ int ListenerReceiver::handleInputNotification(int fd)
 			if (pNewEndPoint->getremoteaddress(&networkPort, &networkAddr) != 0)
 			{
 				// Reclaim failed completion results so an invalid peer never leaks its native socket.
-				// ����ʧ�ܵ���ɽ����������Ч�Զ˵���ԭ�� socket й©��
+				// 回收失败的完成结果，避免无效对端导致原生 socket 泄漏。
 				pNewEndPoint->close();
 				EndPoint::reclaimPoolObject(pNewEndPoint);
 				continue;

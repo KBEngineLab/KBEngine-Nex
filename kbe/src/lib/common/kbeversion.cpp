@@ -26,7 +26,7 @@ namespace KBEVersion
 std::string g_versionString;
 
 /**
-	�ű���汾
+	脚本层版本
 */
 std::string g_scriptVersion = "0.0.0";
 

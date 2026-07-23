@@ -91,7 +91,7 @@ bool UDPPacketReceiver::processRecv(bool expectingPacket)
 	EventPoller* pPoller = this->dispatcher().pPoller();
 	if (pPoller != NULL && pPoller->supportsCompletion())
 	{
-		// completion ����Ѿ�������Դ��ַ�ͱ��ı߽磬�����˻� recvfrom ��ȡͬһ�����ݱ���
+		// completion 后端已经保留来源地址和报文边界，不能退回 recvfrom 读取同一个数据报。
 		// A completion backend preserves the source address and datagram boundary, so recvfrom must not read the same datagram again.
 		std::vector<char> data;
 		int errorCode = 0;
@@ -119,7 +119,7 @@ bool UDPPacketReceiver::processRecv(bool expectingPacket)
 			return false;
 		}
 
-		// append ���� UDP ���ĵ������߽磬������ԭ�е� Channel ���Һ�Э��������̡�
+		// append 保持 UDP 报文的完整边界，并复用原有的 Channel 查找和协议解析流程。
 		// append preserves the complete UDP datagram boundary while reusing the existing channel lookup and protocol parsing flow.
 		pChannelReceiveWindow->append(data.data(), data.size());
 	}
@@ -189,7 +189,7 @@ bool UDPPacketReceiver::processRecv(bool expectingPacket)
 //-------------------------------------------------------------------------------------
 Reason UDPPacketReceiver::processFilteredPacket(Channel* pChannel, Packet * pPacket)
 {
-	// ���ΪNone�� ������Ǳ����������˵���(���������ڰ����Լ��Ĺ����������)
+	// 如果为None， 则可能是被过滤器过滤掉了(过滤器正在按照自己的规则组包解密)
 	if(pPacket)
 	{
 		pChannel->addReceiveWindow(pPacket);
@@ -243,7 +243,7 @@ PacketReceiver::RecvState UDPPacketReceiver::checkSocketErrors(int len, bool exp
 			// exceptions is built into BaseApp::onClientNoSuchPort().
 			if (errno == ECONNREFUSED)
 			{
-				// δʵ��
+				// 未实现
 			}
 
 			this->dispatcher().errorReporter().reportException(

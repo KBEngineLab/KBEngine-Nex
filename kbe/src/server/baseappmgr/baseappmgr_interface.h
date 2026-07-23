@@ -44,10 +44,10 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	BASEAPPMGR������Ϣ�ӿ��ڴ˶���
+	BASEAPPMGR所有消息接口在此定义
 */
 NETWORK_INTERFACE_DECLARE_BEGIN(BaseappmgrInterface)
-	// ĳappע���Լ��Ľӿڵ�ַ����app
+	// 某app注册自己的接口地址到本app
 	BASEAPPMGR_MESSAGE_DECLARE_ARGS11(onRegisterNewApp,									NETWORK_VARIABLE_MESSAGE,
 									int32,												uid, 
 									std::string,										username,
@@ -61,53 +61,53 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappmgrInterface)
 									uint16,												extport,
 									std::string,										extaddrEx)
 
-	// ĳapp��������look��
+	// 某app主动请求look。
 	BASEAPPMGR_MESSAGE_DECLARE_ARGS0(lookApp,											NETWORK_FIXED_MESSAGE)
 
-	// ĳ��app����鿴��app����״̬��
+	// 某个app请求查看该app负载状态。
 	BASEAPPMGR_MESSAGE_DECLARE_ARGS0(queryLoad,											NETWORK_FIXED_MESSAGE)
 
-	// ĳ��app��app��֪���ڻ״̬��
+	// 某个app向本app告知处于活动状态。
 	BASEAPPMGR_MESSAGE_DECLARE_ARGS2(onAppActiveTick,									NETWORK_FIXED_MESSAGE,
 									COMPONENT_TYPE,										componentType, 
 									COMPONENT_ID,										componentID)
 
-	// baseEntity���󴴽���һ���µ�space�С�
+	// baseEntity请求创建在一个新的space中。
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(reqCreateEntityAnywhere,							NETWORK_VARIABLE_MESSAGE)
 
-	// baseEntity���󴴽���һ���µ�space�С�
+	// baseEntity请求创建在一个新的space中。
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(reqCreateEntityRemotely,							NETWORK_VARIABLE_MESSAGE)
 
-	// baseEntity���󴴽���һ���µ�space�У���ѯ��ǰ��õ����ID
+	// baseEntity请求创建在一个新的space中，查询当前最好的组件ID
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(reqCreateEntityAnywhereFromDBIDQueryBestBaseappID,NETWORK_VARIABLE_MESSAGE)
 
-	// baseEntity���󴴽���һ���µ�space�С�
+	// baseEntity请求创建在一个新的space中。
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(reqCreateEntityAnywhereFromDBID,					NETWORK_VARIABLE_MESSAGE)
 
-	// baseEntity���󴴽���һ���µ�space�С�
+	// baseEntity请求创建在一个新的space中。
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(reqCreateEntityRemotelyFromDBID,					NETWORK_VARIABLE_MESSAGE)
 	
-	// ��Ϣת���� ��ĳ��app��ͨ����app����Ϣת����ĳ��app��	
+	// 消息转发， 由某个app想通过本app将消息转发给某个app。	
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(forwardMessage,									NETWORK_VARIABLE_MESSAGE)
 
-	// ĳ��app��app��֪���ڻ״̬��
+	// 某个app向本app告知处于活动状态。
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(registerPendingAccountToBaseapp,					NETWORK_VARIABLE_MESSAGE)
 
-	// ��ȡ��baseapp�ĵ�ַ��
+	// 获取到baseapp的地址。
 	BASEAPPMGR_MESSAGE_DECLARE_ARGS4(onPendingAccountGetBaseappAddr,					NETWORK_VARIABLE_MESSAGE,
 									std::string,										loginName, 
 									std::string,										accountName,
 									std::string,										addr,
 									uint16,												port)
 									
-	// һ���µ�¼���˺Ż�úϷ�����baseapp��Ȩ���� ������Ҫ���˺�ע���ָ����baseapp
-	// ʹ�������ڴ�baseapp�ϵ�¼��
+	// 一个新登录的账号获得合法登入baseapp的权利， 现在需要将账号注册给指定的baseapp
+	// 使其允许在此baseapp上登录。
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(registerPendingAccountToBaseappAddr,				NETWORK_VARIABLE_MESSAGE)
 
-	// ����رշ�����
+	// 请求关闭服务器
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(reqCloseServer,									NETWORK_VARIABLE_MESSAGE)
 
-	// ����baseapp��Ϣ��
+	// 更新baseapp信息。
 	BASEAPPMGR_MESSAGE_DECLARE_ARGS5(updateBaseapp,										NETWORK_FIXED_MESSAGE,
 									COMPONENT_ID,										componentID,
 									ENTITY_ID,											numBases,
@@ -115,24 +115,24 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappmgrInterface)
 									float,												load,
 									uint32,												flags)
 
-	// �����ѯwatcher����
+	// 请求查询watcher数据
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(queryWatcher,										NETWORK_VARIABLE_MESSAGE)
 
-	// baseappͬ���Լ��ĳ�ʼ����Ϣ
+	// baseapp同步自己的初始化信息
 	BASEAPPMGR_MESSAGE_DECLARE_ARGS2(onBaseappInitProgress,								NETWORK_FIXED_MESSAGE,
 									COMPONENT_ID,										cid,
 									float,												progress)
 
-	// ��ʼprofile
+	// 开始profile
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(startProfile,										NETWORK_VARIABLE_MESSAGE)
 
-	// ����ǿ��ɱ����ǰapp
+	// 请求强制杀死当前app
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(reqKillServer,									NETWORK_VARIABLE_MESSAGE)
 
-	// ��ѯ������ؽ��̸�����Ϣ
+	// 查询所有相关进程负载信息
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(queryAppsLoads,									NETWORK_VARIABLE_MESSAGE)
 
-	// baseapp�����email������ʱ��Ҫ�ҵ�loginapp�ĵ�ַ��
+	// baseapp请求绑定email（返回时需要找到loginapp的地址）
 	BASEAPPMGR_MESSAGE_DECLARE_ARGS6(reqAccountBindEmailAllocCallbackLoginapp,			NETWORK_VARIABLE_MESSAGE,
 									COMPONENT_ID,										reqBaseappID,
 									ENTITY_ID,											entityID,
@@ -141,7 +141,7 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappmgrInterface)
 									SERVER_ERROR_CODE,									failedcode,
 									std::string,										code)
 
-	// baseapp�����email������ʱ��Ҫ�ҵ�loginapp�ĵ�ַ��
+	// baseapp请求绑定email（返回时需要找到loginapp的地址）
 	BASEAPPMGR_MESSAGE_DECLARE_ARGS8(onReqAccountBindEmailCBFromLoginapp,				NETWORK_VARIABLE_MESSAGE,
 									COMPONENT_ID,										reqBaseappID,
 									ENTITY_ID,											entityID,

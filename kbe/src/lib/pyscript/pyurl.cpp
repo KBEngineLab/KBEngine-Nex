@@ -37,7 +37,7 @@ bool PyUrl::initialize(Script* pScript)
 	
 	isInit = true;
 
-	// ע�����uuid������py
+	// 注册产生uuid方法到py
 	APPEND_SCRIPT_MODULE_METHOD(pScript->getModule(),	urlopen,	__py_urlopen,	METH_VARARGS,	0);
 	return isInit;
 }
@@ -103,7 +103,7 @@ PyObject* PyUrl::__py_urlopen(PyObject* self, PyObject* args)
 		PyObject* pyobj = NULL;
 		ret = PyArg_ParseTuple(args, "s|O|O", &surl, &pyCallback, &pyobj);
 
-		// �����headers����post data
+		// 检查是headers还是post data
 		if (PyDict_Check(pyobj))
 		{
 			PyObject *key, *value;
@@ -142,7 +142,7 @@ PyObject* PyUrl::__py_urlopen(PyObject* self, PyObject* args)
 		PyObject* pyheaders = NULL;
 		ret = PyArg_ParseTuple(args, "s|O|O|O", &surl, &pyCallback, &pypost, &pyheaders);
 
-		// �����headers����post data
+		// 检查是headers还是post data
 		if (PyDict_Check(pyheaders))
 		{
 			PyObject *key, *value;

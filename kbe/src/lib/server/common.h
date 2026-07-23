@@ -28,33 +28,33 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine { 
 
-// ��Ϣת����ĳ�����
+// 消息转发到某个组件
 #define NETWORK_MESSAGE_FORWARD(SEND_INTERFACE, SENDBUNDLE, FORWARDBUNDLE, MYCOMPONENT_ID, FORWARD_COMPONENT_ID)						\
 	SENDBUNDLE.newMessage(SEND_INTERFACE::forwardMessage);																				\
 	SENDBUNDLE << MYCOMPONENT_ID << FORWARD_COMPONENT_ID;																				\
 	FORWARDBUNDLE.finiMessage(true);																									\
 	SENDBUNDLE.append(FORWARDBUNDLE);																									\
 
-// cellappת����Ϣ���ͻ���
+// cellapp转发消息给客户端
 #define NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT(ENTITYID, SENDBUNDLE, FORWARDBUNDLE)														\
 	SENDBUNDLE.newMessage(BaseappInterface::forwardMessageToClientFromCellapp);															\
 	SENDBUNDLE << ENTITYID;																												\
 	FORWARDBUNDLE.finiMessage(true);																									\
 	SENDBUNDLE.append(FORWARDBUNDLE);																									\
 
-// cellappת����Ϣ��cellapp
+// cellapp转发消息给cellapp
 #define NETWORK_ENTITY_MESSAGE_FORWARD_CELLAPP(ENTITYID, SENDBUNDLE, FORWARDBUNDLE)														\
 	SENDBUNDLE.newMessage(BaseappInterface::forwardMessageToCellappFromCellapp);														\
 	SENDBUNDLE << ENTITYID;																												\
 	FORWARDBUNDLE.finiMessage(true);																									\
 	SENDBUNDLE.append(FORWARDBUNDLE);	
 
-// cellappת����Ϣ���ͻ��˿�ʼ
+// cellapp转发消息给客户端开始
 #define NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(ENTITYID, SENDBUNDLE)																\
 	SENDBUNDLE.newMessage(BaseappInterface::forwardMessageToClientFromCellapp);															\
 	SENDBUNDLE << ENTITYID;																												\
 
-// cellappת����Ϣ���ͻ�����Ϣ��׷����Ϣ
+// cellapp转发消息给客户端消息包追加消息
 #define NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_APPEND(SENDBUNDLE, FORWARDBUNDLE)															\
 	FORWARDBUNDLE.finiMessage(true);																									\
 	SENDBUNDLE.append(FORWARDBUNDLE);																									\
@@ -99,7 +99,7 @@ namespace KBEngine {
 }																																		\
 
 
-// cellappת����Ϣ���ͻ�����Ϣ��׷����Ϣ(ֱ����SENDBUNDLE׷��)
+// cellapp转发消息给客户端消息包追加消息(直接在SENDBUNDLE追加)
 #define ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(SENDBUNDLE, MESSAGEHANDLE, ACTIONNAME)														\
 	(*SENDBUNDLE) << MESSAGEHANDLE.msgID;																								\
 	size_t currMsgLengthPos_##ACTIONNAME = 0;																							\
@@ -121,7 +121,7 @@ namespace KBEngine {
 	size_t messageLength_last_##ACTIONNAME = SENDBUNDLE->currMsgLength();																\
 
 
-// ������Ϣ
+// 公共消息
 #define COMMON_NETWORK_MESSAGE(COMPONENTTYPE, BUNDLE, MESSAGENAME)											\
 		switch(COMPONENTTYPE)																				\
 		{																									\
@@ -194,13 +194,13 @@ namespace KBEngine {
 		};																									\
 
 /**
-����ת��Ϊtick
-@lowerBound: ���ٲ�����Ntick
+将秒转换为tick
+@lowerBound: 最少不低于Ntick
 */
 int32 secondsToTicks(float seconds, int lowerBound);
 
 /**
-	����Ϊ��λ��ʱ��ת��Ϊÿ�����ĵ�stamps
+	将秒为单位的时间转换为每秒所耗的stamps
 */
 inline uint64 secondsToStamps(float seconds)
 {
@@ -210,22 +210,22 @@ inline uint64 secondsToStamps(float seconds)
 void autoFixUserDigestUID();
 
 /*
- �˺ź�������󳤶�
+ 账号和密码最大长度
 */
 #define ACCOUNT_NAME_MAX_LENGTH						128
 #define ACCOUNT_PASSWD_MAX_LENGTH					255
 
-// ��¼ע��ʱ��������Ϣ��󳤶�
+// 登录注册时附带的信息最大长度
 #define ACCOUNT_DATA_MAX_LENGTH						1024
 
-// �����������κ�ֻ��һ�κ��Զ�����Ϊ������ѡ��
+// 被用来描述任何只做一次后自动设置为不做的选项
 #define KBE_NEXT_ONLY								2
 
-/** c/c++�������ת����KBEDataTypeID */
+/** c/c++数据类别转换成KBEDataTypeID */
 #define KBE_DATATYPE2ID_MAX							21
 uint16 datatype2id(std::string datatype);
 
-/** c/c++�������ת����ԭ�����UINT16 ... */
+/** c/c++数据类别转换成原生类别UINT16 ... */
 std::string datatype2nativetype(std::string datatype);
 std::string datatype2nativetype(uint16 datatype);
 

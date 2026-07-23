@@ -70,7 +70,7 @@ public:
 	void handleMainTick();
 	void handleCheckStatusTick();
 
-	/* ��ʼ����ؽӿ� */
+	/* 初始化相关接口 */
 	bool initializeBegin();
 	bool inInitialize();
 	bool initializeEnd();
@@ -89,17 +89,17 @@ public:
 	virtual void onShutdownBegin();
 	virtual void onShutdownEnd();
 
-	/** ��ȡID������ָ�� */
+	/** 获取ID服务器指针 */
 	IDServer<ENTITY_ID>& idServer(void){ return idServer_; }
 
-	/** ����ӿ�
-		�������һ��ENTITY_ID��
+	/** 网络接口
+		请求分配一个ENTITY_ID段
 	*/
 	void onReqAllocEntityID(Network::Channel* pChannel, COMPONENT_ORDER componentType, COMPONENT_ID componentID);
 
-	/* ����ӿ�
-		ע��һ���¼����baseapp����cellapp����dbmgr
-		ͨ����һ���µ�app�������ˣ� ����Ҫ��ĳЩ���ע���Լ���
+	/* 网络接口
+		注册一个新激活的baseapp或者cellapp或者dbmgr
+		通常是一个新的app被启动了， 它需要向某些组件注册自己。
 	*/
 	virtual void onRegisterNewApp(Network::Channel* pChannel, 
 							int32 uid, 
@@ -108,121 +108,121 @@ public:
 							uint32 intaddr, uint16 intport, uint32 extaddr, uint16 extport, std::string& extaddrEx);
 
 
-	/** ����ӿ�
-		dbmgr�㲥global���ݵĸı�
+	/** 网络接口
+		dbmgr广播global数据的改变
 	*/
 	void onGlobalDataClientLogon(Network::Channel* pChannel, COMPONENT_TYPE componentType);
 	void onBroadcastGlobalDataChanged(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 	
-	/** ����ӿ�
-		���󴴽��˺�
+	/** 网络接口
+		请求创建账号
 	*/
 	void reqCreateAccount(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 	void onCreateAccountCBFromInterfaces(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ����ӿ�
-		��������ͻ�����������
+	/** 网络接口
+		请求擦除客户端请求任务
 	*/
 	void eraseClientReq(Network::Channel* pChannel, std::string& logkey);
 
-	/** ����ӿ�
-		һ�����û���¼�� ��Ҫ���Ϸ���
+	/** 网络接口
+		一个新用户登录， 需要检查合法性
 	*/
 	void onAccountLogin(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 	void onLoginAccountCBBFromInterfaces(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ����ӿ�
-		baseapp�����ѯaccount��Ϣ
+	/** 网络接口
+		baseapp请求查询account信息
 	*/
 	void queryAccount(Network::Channel* pChannel, std::string& accountName, std::string& password, bool needCheckPassword,
 		COMPONENT_ID componentID, ENTITY_ID entityID, DBID entityDBID, uint32 ip, uint16 port);
 
-	/** ����ӿ�
-		ʵ���Զ����ع���
+	/** 网络接口
+		实体自动加载功能
 	*/
 	void entityAutoLoad(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ����ӿ�
-		�˺Ŵ�baseapp������
+	/** 网络接口
+		账号从baseapp上线了
 	*/
 	void onAccountOnline(Network::Channel* pChannel, std::string& accountName, 
 		COMPONENT_ID componentID, ENTITY_ID entityID);
 
-	/** ����ӿ�
-		entity-baseapp������
+	/** 网络接口
+		entity-baseapp下线了
 	*/
 	void onEntityOffline(Network::Channel* pChannel, DBID dbid, ENTITY_SCRIPT_UID sid, uint16 dbInterfaceIndex);
 
-	/** ����ӿ�
-		ִ�����ݿ��ѯ
+	/** 网络接口
+		执行数据库查询
 	*/
 	void executeRawDatabaseCommand(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ����ӿ�
-		ĳ��entity�浵
+	/** 网络接口
+		某个entity存档
 	*/
 	void writeEntity(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ����ӿ�
-		ɾ��ĳ��entity�Ĵ浵����
+	/** 网络接口
+		删除某个entity的存档数据
 	*/
 	void removeEntity(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ����ӿ�
-		ͨ��dbid�����ݿ���ɾ��һ��ʵ��Ļص�
+	/** 网络接口
+		通过dbid从数据库中删除一个实体的回调
 	*/
 	void deleteEntityByDBID(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ����ӿ�
-		ͨ��dbid��ѯһ��ʵ���Ƿ�����ݿ���
+	/** 网络接口
+		通过dbid查询一个实体是否从数据库检出
 	*/
 	void lookUpEntityByDBID(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ����ӿ�
-		�����db��ȡentity����������
+	/** 网络接口
+		请求从db获取entity的所有数据
 	*/
 	void queryEntity(Network::Channel* pChannel, uint16 dbInterfaceIndex, COMPONENT_ID componentID, int8	queryMode, DBID dbid, 
 		std::string& entityType, CALLBACK_ID callbackID, ENTITY_ID entityID);
 
-	/** ����ӿ�
-		ͬ��entity��ģ��
+	/** 网络接口
+		同步entity流模板
 	*/
 	void syncEntityStreamTemplate(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
 	virtual bool initializeWatcher();
 
-	/** ����ӿ�
-		�����ֵ
+	/** 网络接口
+		请求充值
 	*/
 	void charge(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ����ӿ�
-		��ֵ�ص�
+	/** 网络接口
+		充值回调
 	*/
 	void onChargeCB(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
 
-	/** ����ӿ�
-		����ص�
+	/** 网络接口
+		激活回调
 	*/
 	void accountActivate(Network::Channel* pChannel, std::string& scode);
 
-	/** ����ӿ�
-		�˺���������
+	/** 网络接口
+		账号重置密码
 	*/
 	void accountReqResetPassword(Network::Channel* pChannel, std::string& accountName);
 	void accountResetPassword(Network::Channel* pChannel, std::string& accountName, 
 		std::string& newpassword, std::string& code);
 
-	/** ����ӿ�
-		�˺Ű�����
+	/** 网络接口
+		账号绑定邮箱
 	*/
 	void accountReqBindMail(Network::Channel* pChannel, ENTITY_ID entityID, std::string& accountName, 
 		std::string& password, std::string& email);
 	void accountBindMail(Network::Channel* pChannel, std::string& username, std::string& scode);
 
-	/** ����ӿ�
-		�˺��޸�����
+	/** 网络接口
+		账号修改密码
 	*/
 	void accountNewPassword(Network::Channel* pChannel, ENTITY_ID entityID, std::string& accountName, 
 		std::string& password, std::string& newpassword);
@@ -246,7 +246,7 @@ public:
 	InterfacesHandler* findBestInterfacesHandler();
 
 	/**
-		��dbmgr����ִ��һ�����ݿ�����
+		向dbmgr请求执行一个数据库命令
 	*/
 	static PyObject* __py_executeRawDatabaseCommand(PyObject* self, PyObject* args);
 	void executeRawDatabaseCommand(const char* datas, uint32 size, PyObject* pycallback, ENTITY_ID eid, const std::string& dbInterfaceName);
@@ -258,7 +258,7 @@ protected:
 	TimerHandle											loopCheckTimerHandle_;
 	TimerHandle											mainProcessTimer_;
 
-	// entityID��������
+	// entityID分配服务端
 	IDServer<ENTITY_ID>									idServer_;
 
 	// globalData

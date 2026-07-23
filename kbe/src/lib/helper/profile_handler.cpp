@@ -166,7 +166,7 @@ void CProfileHandler::sendStream(MemoryStream* s)
 //-------------------------------------------------------------------------------------
 bool CProfileHandler::process()
 {
-	// ����ÿ��tick�����һ�飬 ��ֹ��;���¼����profileValû���ռ���
+	// 这里每个tick都检查一遍， 防止中途有新加入的profileVal没被收集到
 	ProfileGroup& defaultGroup = ProfileGroup::defaultGroup();
 	ProfileGroup::PROFILEVALS::const_iterator iter = defaultGroup.profiles().begin();
 
@@ -181,7 +181,7 @@ bool CProfileHandler::process()
 
 		CProfileHandler::PROFILEVALS::iterator iter1 = profileVals_.find(name);
 		
-		// ����Ѿ���ʼ���������
+		// 如果已经初始化过则忽略
 		if(iter1 != profileVals_.end())
 		{
 			CProfileHandler::ProfileVal& profileVal = iter1->second;

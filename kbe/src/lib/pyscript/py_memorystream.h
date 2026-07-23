@@ -31,7 +31,7 @@ namespace KBEngine{ namespace script{
 
 class PyMemoryStream : public ScriptObject
 {		
-	/** ���໯ ��һЩpy�������������� */
+	/** 子类化 将一些py操作填充进派生类 */
 	INSTANCE_SCRIPT_HREADER(PyMemoryStream, ScriptObject)
 public:	
 	static PySequenceMethods seqMethods;
@@ -46,24 +46,24 @@ public:
 
 
 	/**
-	֧��pickler ����
+	支持pickler 方法
 	*/
 	static PyObject* __py_reduce_ex__(PyObject* self, PyObject* protocol);
 
 	/**
-	unpickle����
+	unpickle方法
 	*/
 	static PyObject* __unpickle__(PyObject* self, PyObject* args);
 
 	/**
-	�ű�����װʱ������
+	脚本被安装时被调用
 	*/
 	static void onInstallScript(PyObject* mod);
 
 	static PyObject* py_new();
 
 	/**
-	��ʼ���̶��ֵ�
+	初始化固定字典
 	*/
 	void initialize(std::string strDictInitData);
 	void initialize(PyObject* pyDictInitData);
@@ -80,7 +80,7 @@ public:
 	void createFromStream(MemoryStream* mstream);
 
 	/** 
-		��ö�������� 
+		获得对象的描述 
 	*/
 	PyObject* tp_repr();
 	PyObject* tp_str();

@@ -33,9 +33,9 @@ class MoveToPointHandler : public Updatable
 public:
 	enum MoveType
 	{
-		MOVE_TYPE_POINT = 0,		// ��������
-		MOVE_TYPE_ENTITY = 1,		// ��Χ����������
-		MOVE_TYPE_NAV = 2,			// �ƶ�����������
+		MOVE_TYPE_POINT = 0,		// 常规类型
+		MOVE_TYPE_ENTITY = 1,		// 范围触发器类型
+		MOVE_TYPE_NAV = 2,			// 移动控制器类型
 	};
 
 	void addToStream(KBEngine::MemoryStream& s);
@@ -68,9 +68,9 @@ public:
 
 protected:
 	Position3D destPos_;
-	float velocity_;			// �ٶ�
-	bool faceMovement_;			// �Ƿ񲻸ı������ƶ�
-	bool moveVertically_;		// true����Է������ƶ���������
+	float velocity_;			// 速度
+	bool faceMovement_;			// 是否不改变面向移动
+	bool moveVertically_;		// true则可以飞起来移动否则贴地
 	PyObject* pyuserarg_;
 	float distance_;
 	KBEShared_ptr<Controller> pController_;

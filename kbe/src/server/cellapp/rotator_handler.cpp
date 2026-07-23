@@ -85,7 +85,7 @@ bool RotatorHandler::requestTurnOver()
 		if (pController_->pEntity())
 			pController_->pEntity()->onTurn(pController_->id(), pyuserarg_);
 
-		// �����onTurn�е���cancelController��id���ᵼ��Controller��������pController_ΪNULL
+		// 如果在onTurn中调用cancelController（id）会导致Controller析构导致pController_为NULL
 		if (pController_)
 			pController_->destroy();
 	}
@@ -114,11 +114,11 @@ bool RotatorHandler::update()
 	const Direction3D& dstDir = destDir();
 	Direction3D currDir = pEntity->direction();
 
-	// �õ���ֵ
+	// 得到差值
 	float deltaYaw = dstDir.yaw() - currDir.yaw();
 
 	if (deltaYaw > KBE_PI)
-		deltaYaw = (float)((double)deltaYaw - KBE_2PI/* �������ǵĻ��ȱ�ʾ��Χ��-PI ~ PI���˴���ֹ��� */);
+		deltaYaw = (float)((double)deltaYaw - KBE_2PI/* 由于我们的弧度表示范围在-PI ~ PI，此处防止溢出 */);
 	else if (deltaYaw < -KBE_PI)
 		deltaYaw = (float)((double)deltaYaw + KBE_2PI);
 
@@ -138,11 +138,11 @@ bool RotatorHandler::update()
 	else if (currDir.yaw() < -KBE_PI)
 		currDir.yaw((float((double)currDir.yaw() + KBE_2PI)));
 
-	// ����entity����λ�ú�����
+	// 设置entity的新位置和面向
 	if (pController_)
 		pEntity->setPositionAndDirection(pEntity->position(), currDir);
 
-	// ����ﵽĿ�ĵ��򷵻�true
+	// 如果达到目的地则返回true
 	if (fabs(deltaYaw) < 0.0001f && requestTurnOver())
 	{
 		Py_DECREF(pEntity);

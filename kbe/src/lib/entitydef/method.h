@@ -41,16 +41,16 @@ namespace KBEngine{
 class MethodDescription
 {
 public:
-	// ��¶����������
+	// 暴露方法的类型
 	enum EXPOSED_TYPE
 	{
-		// Ĭ�ϣ��Ǳ�¶����
+		// 默认，非暴露方法
 		NO_EXPOSED = 0,
 
-		// Ĭ�ϣ��ű��������Բ��ӵ����߲���
+		// 默认，脚本方法可以不加调用者参数
 		EXPOSED = 1,
 
-		// �ű�������һ������Ϊ������ID���ṩ�ű��������ߺϷ���
+		// 脚本方法第一个参数为调用者ID，提供脚本检查调用者合法性
 		EXPOSED_AND_CALLER_CHECK = 2
 	};
 
@@ -80,23 +80,23 @@ public:
 	size_t getArgSize(void);
 	
 	/** 
-		���һ��call�Ƿ�Ϸ� 
+		检查一个call是否合法 
 	*/
 	bool checkArgs(PyObject* args);		
 	
 	/** 
-		��ÿ������������ӵ����� 
-		��������������Ϣ����������ڽű�������ʱ�ﴫ��Ĳ��� 
+		将每个参数打包添加到流， 
+		这个流里包含的信息是这个方法在脚本被调用时里传入的参数 
 	*/
 	void addToStream(MemoryStream* mstream, PyObject* args);
 
 	/** 
-		��һ��call����� ������һ��PyObject���͵�args 
+		将一个call流解包 并返回一个PyObject类型的args 
 	*/
 	PyObject* createFromStream(MemoryStream* mstream);
 	
 	/** 
-		����һ������ 
+		呼叫一个方法 
 	*/
 	PyObject* call(PyObject* func, PyObject* args);	
 
@@ -109,28 +109,28 @@ public:
 	INLINE bool isBase() const;
 
 	/** 
-		����id�� ����¶�ķ������߹㲥�������ܸ���С��255ʱ
-		���ǲ�ʹ��utype��ʹ��1�ֽڵ�aliasID������
+		别名id， 当暴露的方法或者广播的属性总个数小于255时
+		我们不使用utype而使用1字节的aliasID来传输
 	*/
 	INLINE int16 aliasID() const;
 	INLINE uint8 aliasIDAsUint8() const;
 	INLINE void aliasID(int16 v);
 	
 protected:
-	static uint32							methodDescriptionCount_;					// ���е���������������
+	static uint32							methodDescriptionCount_;					// 所有的属性描述的数量
 
 	COMPONENT_ID							methodDomain_;
 
-	std::string								name_;										// �������������
-	ENTITY_METHOD_UID						utype_;										// ���������������� ���������ϴ���ʶ��
+	std::string								name_;										// 这个方法的名称
+	ENTITY_METHOD_UID						utype_;										// 这个方法的数字类别， 用于网络上传输识别
 
-	std::vector<DataType*>					argTypes_;									// ������ԵĲ�������б�
+	std::vector<DataType*>					argTypes_;									// 这个属性的参数类别列表
 
-	EXPOSED_TYPE							exposedType_;								// �Ƿ���һ����¶����
+	EXPOSED_TYPE							exposedType_;								// 是否是一个暴露方法
 
-	ENTITY_ID								currCallerID_;								// ��ǰ������������ĵ�����ID, �ṩ��¶��������ʱ���ű��жϵ���Դ��ֹ����
+	ENTITY_ID								currCallerID_;								// 当前调用这个方法的调用者ID, 提供暴露方法调用时给脚本判断调用源防止作弊
 
-	int16									aliasID_;									// ����id�� ����¶�ķ������߹㲥�������ܸ���С��255ʱ�� ���ǲ�ʹ��utype��ʹ��1�ֽڵ�aliasID������
+	int16									aliasID_;									// 别名id， 当暴露的方法或者广播的属性总个数小于255时， 我们不使用utype而使用1字节的aliasID来传输
 };
 
 }

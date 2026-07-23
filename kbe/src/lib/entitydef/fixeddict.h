@@ -32,7 +32,7 @@ namespace KBEngine{
 
 class FixedDict : public script::Map
 {		
-	/** ���໯ ��һЩpy�������������� */
+	/** 子类化 将一些py操作填充进派生类 */
 	INSTANCE_SCRIPT_HREADER(FixedDict, Map)
 public:	
 	static PyMappingMethods mappingMethods;
@@ -46,22 +46,22 @@ public:
 	DataType* getDataType(void){ return _dataType; }
 
 	/** 
-		֧��pickler ���� 
+		支持pickler 方法 
 	*/
 	static PyObject* __py_reduce_ex__(PyObject* self, PyObject* protocol);
 
 	/** 
-		unpickle���� 
+		unpickle方法 
 	*/
 	static PyObject* __unpickle__(PyObject* self, PyObject* args);
 	
 	/** 
-		�ű�����װʱ������ 
+		脚本被安装时被调用 
 	*/
 	static void onInstallScript(PyObject* mod);
 	
 	/** 
-		map����������� 
+		map操作函数相关 
 	*/
 	static PyObject* mp_subscript(PyObject* self, PyObject* key);
 
@@ -71,26 +71,26 @@ public:
 	static int mp_length(PyObject* self);
 
 	/** 
-		��ʼ���̶��ֵ�
+		初始化固定字典
 	*/
 	void initialize(std::string strDictInitData);
 	void initialize(PyObject* pyDictInitData);
 	void initialize(MemoryStream* streamInitData, bool isPersistentsStream);
 
 	/** 
-		������ݸı� 
+		检查数据改变 
 	*/
 	bool checkDataChanged(const char* keyName, 
 		PyObject* value,
 		bool isDelete = false);
 	
 	/**
-		�����ֵ����ݵ��Լ��������� 
+		更新字典数据到自己的数据中 
 	*/
 	PyObject* update(PyObject* args);
 
 	/** 
-		��ö�������� 
+		获得对象的描述 
 	*/
 	PyObject* tp_repr();
 	PyObject* tp_str();

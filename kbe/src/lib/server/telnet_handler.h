@@ -84,25 +84,25 @@ public:
 	void sendNewLine();
 	void sendBackSpace();
 
-	/** telnetЭ��
-		IAC WILL SUPPRESS GO AHEAD, ���Ƽ�������
+	/** telnet协议
+		IAC WILL SUPPRESS GO AHEAD, 抑制继续进行
 	*/
 	void sendWillSuppressGoAhead();
 
 	void sendDOTT();
 
-	/** telnetЭ��
-		IAC DO 24, ͬ��ѯ���ն�����
+	/** telnet协议
+		IAC DO 24, 同意询问终端类型
 	*/
 	void sendQueryClientTerminalType();
 
-	/** telnetЭ��
-		IAC SB 24 0'v' 't' '1' '0' '0' IAC SE, ���ͷ���˵��ն�����
+	/** telnet协议
+		IAC SB 24 0'v' 't' '1' '0' '0' IAC SE, 发送服务端的终端类型
 	*/
 	void sendServerTerminalType();
 
-	/** telnetЭ��
-		IAC WILL ECHO, ����
+	/** telnet协议
+		IAC WILL ECHO, 回显
 	*/
 	void sendWillEcho();
 	

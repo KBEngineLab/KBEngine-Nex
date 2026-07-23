@@ -28,9 +28,9 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{
 
-/** entity ���鼶�����Ͷ��� 
-	Ĭ����3������ֱ�Ϊ:
-	 ���� �У� Զ
+/** entity 详情级别类型定义 
+	默认有3个级别分别为:
+	 近， 中， 远
 */
 struct DetailLevel
 {
@@ -57,7 +57,7 @@ struct DetailLevel
 	{
 	}
 
-	Level level[3]; // ���� �У� Զ
+	Level level[3]; // 近， 中， 远
 };
 
 }

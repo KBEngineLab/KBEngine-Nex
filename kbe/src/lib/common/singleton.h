@@ -20,11 +20,11 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 
 /*
-	�÷�:
+	用法:
 		class A:public Singleton<A>
 		{
 		};
-		��cpp�ļ���:
+		在cpp文件中:
 		template<> A* Singleton<A>::singleton_ = 0;
 */
 #ifndef KBE_SINGLETON_H

@@ -99,7 +99,7 @@ PyObject* Proxy::pyDisconnect()
 //-------------------------------------------------------------------------------------
 void Proxy::kick()
 {
-	// ���������Ƶ����Ȼ�������ر�
+	// 如果被销毁频道仍然存活则将其关闭
 	Network::Channel* pChannel = Baseapp::getSingleton().networkInterface().findChannel(addr_);
 	if(pChannel && !pChannel->isDestroyed())
 	{
@@ -167,7 +167,7 @@ void Proxy::initClientCellPropertys()
 
 	MemoryStream* s = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 
-	// celldata��ȡ�ͻ��˸���Ȥ�����ݳ�ʼ���ͻ��� ��:ALL_CLIENTS
+	// celldata获取客户端感兴趣的数据初始化客户端 如:ALL_CLIENTS
 	try
 	{
 		addCellDataToStream(ED_FLAG_ALL_CLIENTS|ED_FLAG_CELL_PUBLIC_AND_OWN|ED_FLAG_OWN_CLIENT, s, true);
@@ -249,7 +249,7 @@ void Proxy::onClientDeath(void)
 //-------------------------------------------------------------------------------------
 void Proxy::onClientGetCell(Network::Channel* pChannel, COMPONENT_ID componentID)
 {	
-	// �ص����ű��������cell
+	// 回调给脚本，获得了cell
 	if(cellEntityCall_ == NULL)
 		cellEntityCall_ = new EntityCall(pScriptModule_, NULL, componentID, id_, ENTITYCALL_TYPE_CELL);
 
@@ -301,7 +301,7 @@ PyObject* Proxy::pyGiveClientTo(PyObject* pyOterProxy)
 		return 0;
 	}
 
-	// ���ΪNone ������ΪNULL
+	// 如果为None 则设置为NULL
 	Proxy* oterProxy = NULL;
 	if(pyOterProxy != Py_None)
 		oterProxy = static_cast<Proxy*>(pyOterProxy);
@@ -387,22 +387,22 @@ void Proxy::giveClientTo(Proxy* proxy)
 
 		if(cellEntityCall())
 		{
-			// ��ǰ���entity�����cell��˵���Ѿ�����witness�� ��ô��Ȼ���ǽ�����Ȩ
-			// ����������һ��entity�� ���entity��Ҫ���witness��
-			// ֪ͨcell��ʧwitness
+			// 当前这个entity如果有cell，说明已经绑定了witness， 那么既然我们将控制权
+			// 交换给了另一个entity， 这个entity需要解绑定witness。
+			// 通知cell丢失witness
 			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 			(*pBundle).newMessage(CellappInterface::onLoseWitness);
 			(*pBundle) << this->id();
 			sendToCellapp(pBundle);
 		}
 
-		// ��Ȼ�ͻ���ʧȥ����Ŀ���, ��ô֪ͨclient�������entity
+		// 既然客户端失去对其的控制, 那么通知client销毁这个entity
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(ClientInterface::onEntityDestroyed);
 		(*pBundle) << this->id();
 		sendToClient(ClientInterface::onEntityDestroyed, pBundle);
 
-		// ������Ȩ����
+		// 将控制权交换
 		clientEnabled_ = false;
 		clientEntityCall()->addr(Network::Address::NONE);
 		Py_DECREF(clientEntityCall());
@@ -425,8 +425,8 @@ void Proxy::onGiveClientTo(Network::Channel* lpChannel)
 	addr(lpChannel->addr());
 	Baseapp::getSingleton().createClientProxies(this);
 
-	// �����cell, ��Ҫ֪ͨ����witness�� ��Ϊ����ͻ��˸ոհ󶨵����proxy
-	// ��ʱ���entity��ʹ��cell�������������û��witness�ġ�
+	// 如果有cell, 需要通知其获得witness， 因为这个客户端刚刚绑定到这个proxy
+	// 此时这个entity即使有cell正常情况必须是没有witness的。
 	onGetWitness();
 }
 
@@ -435,7 +435,7 @@ void Proxy::onGetWitness()
 {
 	if(cellEntityCall())
 	{
-		// ֪ͨcell��ÿͻ���
+		// 通知cell获得客户端
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(CellappInterface::onGetWitnessFromBase);
 		(*pBundle) << this->id();
@@ -778,7 +778,7 @@ bool Proxy::pushBundle(Network::Bundle* pBundle)
 	pChannel->pushBundle(pBundle);
 
 	{
-		// ������ݴ�������������ȥ���ᱨ��
+		// 如果数据大量阻塞发不出去将会报警
 		//AUTO_SCOPED_PROFILE("pushBundleAndSendToClient");
 		//pChannel->send(pBundle);
 	}
@@ -828,7 +828,7 @@ bool Proxy::sendToClient(bool expectData)
 	}
 
 	{
-		// ������ݴ�������������ȥ���ᱨ��
+		// 如果数据大量阻塞发不出去将会报警
 		AUTO_SCOPED_PROFILE("sendToClient");
 		pChannel->send();
 	}

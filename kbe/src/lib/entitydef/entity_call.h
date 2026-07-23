@@ -45,7 +45,7 @@ class MethodDescription;
 
 class EntityCall : public EntityCallAbstract
 {
-	/** ���໯ ��һЩpy�������������� */
+	/** 子类化 将一些py操作填充进派生类 */
 	INSTANCE_SCRIPT_HREADER(EntityCall, EntityCallAbstract)
 public:
 	typedef std::tr1::function<RemoteEntityMethod* (MethodDescription* pMethodDescription, EntityCall* pEntityCall)> EntityCallCallHookFunc;
@@ -58,12 +58,12 @@ public:
 	~EntityCall();
 	
 	/** 
-		�ű������ȡ���Ի��߷��� 
+		脚本请求获取属性或者方法 
 	*/
 	PyObject* onScriptGetAttribute(PyObject* attr);						
 			
 	/** 
-		��ö�������� 
+		获得对象的描述 
 	*/
 	PyObject* tp_repr();
 	PyObject* tp_str();
@@ -71,36 +71,36 @@ public:
 	void c_str(char* s, size_t size);
 
 	/** 
-		unpickle���� 
+		unpickle方法 
 	*/
 	static PyObject* __unpickle__(PyObject* self, PyObject* args);
 
 	/** 
-		�ű�����װʱ������ 
+		脚本被安装时被调用 
 	*/
 	static void onInstallScript(PyObject* mod);
 
 	/** 
-		ͨ��entity��ID����Ѱ������ʵ��
+		通过entity的ID尝试寻找它的实例
 	*/
 	static PyObject* tryGetEntity(COMPONENT_ID componentID, ENTITY_ID entityID);
 
 	/** 
-		����entityCall��__getEntityFunc������ַ 
+		设置entityCall的__getEntityFunc函数地址 
 	*/
 	static void setGetEntityFunc(GetEntityFunc func){ 
 		__getEntityFunc = func; 
 	};
 
 	/** 
-		����entityCall��__findChannelFunc������ַ 
+		设置entityCall的__findChannelFunc函数地址 
 	*/
 	static void setFindChannelFunc(FindChannelFunc func){ 
 		__findChannelFunc = func; 
 	};
 
 	/** 
-		����entityCall��__hookCallFunc������ַ 
+		设置entityCall的__hookCallFunc函数地址 
 	*/
 	static void setEntityCallCallHookFunc(EntityCallCallHookFunc* pFunc) {
 		__hookCallFuncPtr = pFunc; 
@@ -122,7 +122,7 @@ public:
 	static ENTITYCALLS entityCalls;
 	
 private:
-	// ���һ��entity��ʵ��ĺ�����ַ
+	// 获得一个entity的实体的函数地址
 	static GetEntityFunc					__getEntityFunc;
 	static EntityCallCallHookFunc*			__hookCallFuncPtr;
 	static FindChannelFunc					__findChannelFunc;
@@ -130,7 +130,7 @@ private:
 protected:
 	std::string								scriptModuleName_;
 
-	// ��entity��ʹ�õĽű�ģ�����
+	// 该entity所使用的脚本模块对象
 	ScriptDefModule*						pScriptModule_;	
 
 	void _setATIdx(ENTITYCALLS::size_type idx) {

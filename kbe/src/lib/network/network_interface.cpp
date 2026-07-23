@@ -62,7 +62,7 @@ NetworkInterface::NetworkInterface(Network::EventDispatcher * pDispatcher,
 		this->initialize("EXTERNAL", htons(extlisteningPort_min), htons(extlisteningPort_max),
 			extlisteningInterface, &extEndpoint_, pExtListenerReceiver_, extrbuffer, extwbuffer);
 
-		// ��������˶���˿ڷ�Χ�� �����Χ��С����extEndpoint_����û�ж˿ڿ�����
+		// 如果配置了对外端口范围， 如果范围过小这里extEndpoint_可能没有端口可用了
 		if(extlisteningPort_min != -1)
 		{
 			KBE_ASSERT(extEndpoint_.good() && "Channel::EXTERNAL: no available port, "
@@ -163,7 +163,7 @@ bool NetworkInterface::initialize(const char* pEndPointName, uint16 listeningPor
 	bool listeningInterfaceEmpty =
 		(listeningInterface == NULL || listeningInterface[0] == 0);
 
-	// ����ָ���ӿ��� NIP��MAC��IP�Ƿ����
+	// 查找指定接口名 NIP、MAC、IP是否可用
 	if(pEP->findIndicatedInterface(listeningInterface, ifIPAddr) == 0)
 	{
 		char szIp[MAX_IP] = {0};
@@ -173,14 +173,14 @@ bool NetworkInterface::initialize(const char* pEndPointName, uint16 listeningPor
 			pEndPointName, listeningInterface, szIp));
 	}
 
-	// �����Ϊ�����Ҳ�����ô�����û���������ã�ͬʱ���ǲ���Ĭ�ϵķ�ʽ(�󶨵�INADDR_ANY)
+	// 如果不为空又找不到那么警告用户错误的设置，同时我们采用默认的方式(绑定到INADDR_ANY)
 	else if (!listeningInterfaceEmpty)
 	{
 		WARNING_MSG(fmt::format("NetworkInterface::initialize({}): Couldn't parse interface spec '{}' so using all interfaces\n",
 			pEndPointName, listeningInterface));
 	}
 	
-	// ���԰󶨵��˿ڣ������ռ��������
+	// 尝试绑定到端口，如果被占用向后递增
 	bool foundport = false;
 	uint32 listeningPort = listeningPort_min;
 	if(listeningPort_min != listeningPort_max)
@@ -207,7 +207,7 @@ bool NetworkInterface::initialize(const char* pEndPointName, uint16 listeningPor
 		}
 	}
 
-	// ����޷��󶨵����ʵĶ˿���ô�������أ����̽��˳�
+	// 如果无法绑定到合适的端口那么报错返回，进程将退出
 	if(!foundport)
 	{
 		ERROR_MSG(fmt::format("NetworkInterface::initialize({}): Couldn't bind the socket to {}:{} ({})\n",
@@ -217,7 +217,7 @@ bool NetworkInterface::initialize(const char* pEndPointName, uint16 listeningPor
 		return false;
 	}
 
-	// ��õ�ǰ�󶨵ĵ�ַ�������INADDR_ANY�����õ�IP��0
+	// 获得当前绑定的地址，如果是INADDR_ANY这里获得的IP是0
 	pEP->getlocaladdress( (u_int16_t*)&address.port,
 		(u_int32_t*)&address.ip );
 

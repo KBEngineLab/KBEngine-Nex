@@ -51,7 +51,7 @@ bool g_isReload = false;
 bool EntityDef::__entityAliasID = false;
 bool EntityDef::__entitydefAliasID = false;
 
-// ��������ʱ�Զ�����utype�õ�
+// 方法产生时自动产生utype用的
 ENTITY_METHOD_UID g_methodUtypeAuto = 1;
 std::vector<ENTITY_METHOD_UID> g_methodCusUtypes;																									
 
@@ -166,22 +166,22 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 	std::string defFilePath = __entitiesPath + "entity_defs/";
 	ENTITY_SCRIPT_UID utype = 1;
 	
-	// ��ʼ���������
+	// 初始化数据类别
 	// assets/scripts/entity_defs/types.xml
 	if(!DataTypes::initialize(defFilePath + "types.xml"))
 		return false;
 
-	// �����entities.xml�ļ�
+	// 打开这个entities.xml文件
 	SmartPointer<XML> xml(new XML());
 	if(!xml->openSection(entitiesFile.c_str()))
 		return false;
 	
-	// ���entities.xml���ڵ�, ���û�ж���һ��entity��ôֱ�ӷ���true
+	// 获得entities.xml根节点, 如果没有定义一个entity那么直接返回true
 	TiXmlNode* node = xml->getRootNode();
 	if(node == NULL)
 		return true;
 
-	// ��ʼ�������е�entity�ڵ�
+	// 开始遍历所有的entity节点
 	XML_FOR_BEGIN(node)
 	{
 		std::string moduleName = xml.get()->getKey(node);
@@ -198,11 +198,11 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 		TiXmlNode* defNode = defxml->getRootNode();
 		if(defNode == NULL)
 		{
-			// root�ڵ���û���ӽڵ���
+			// root节点下没有子节点了
 			continue;
 		}
 
-		// ����def�ļ��еĶ���
+		// 加载def文件中的定义
 		if(!loadDefInfo(defFilePath, moduleName, defxml.get(), defNode, pScriptModule))
 		{
 			ERROR_MSG(fmt::format("EntityDef::initialize: failed to load entity({}) module!\n",
@@ -211,7 +211,7 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 			return false;
 		}
 		
-		// ��������entity�ļ��м���detailLevel����
+		// 尝试在主entity文件中加载detailLevel数据
 		if(!loadDetailLevelInfo(defFilePath, moduleName, defxml.get(), defNode, pScriptModule))
 		{
 			ERROR_MSG(fmt::format("EntityDef::initialize: failed to load entity({}) DetailLevelInfo!\n",
@@ -247,7 +247,7 @@ bool EntityDef::loadDefInfo(const std::string& defFilePath,
 		return false;
 	}
 	
-	// �������е�interface�� �������ǵķ��������Լ��뵽ģ����
+	// 遍历所有的interface， 并将他们的方法和属性加入到模块中
 	if(!loadInterfaces(defFilePath, moduleName, defxml, defNode, pScriptModule))
 	{
 		ERROR_MSG(fmt::format("EntityDef::loadDefInfo: failed to load entity:{} interface.\n",
@@ -256,7 +256,7 @@ bool EntityDef::loadDefInfo(const std::string& defFilePath,
 		return false;
 	}
 	
-	// ���ظ������е�����
+	// 加载父类所有的内容
 	if(!loadParentClass(defFilePath, moduleName, defxml, defNode, pScriptModule))
 	{
 		ERROR_MSG(fmt::format("EntityDef::loadDefInfo: failed to load entity:{} parentClass.\n",
@@ -265,7 +265,7 @@ bool EntityDef::loadDefInfo(const std::string& defFilePath,
 		return false;
 	}
 
-	// ���Լ���detailLevel����
+	// 尝试加载detailLevel数据
 	if(!loadDetailLevelInfo(defFilePath, moduleName, defxml, defNode, pScriptModule))
 	{
 		ERROR_MSG(fmt::format("EntityDef::loadDefInfo: failed to load entity:{} DetailLevelInfo.\n",
@@ -274,7 +274,7 @@ bool EntityDef::loadDefInfo(const std::string& defFilePath,
 		return false;
 	}
 
-	// ���Լ���VolatileInfo����
+	// 尝试加载VolatileInfo数据
 	if(!loadVolatileInfo(defFilePath, moduleName, defxml, defNode, pScriptModule))
 	{
 		ERROR_MSG(fmt::format("EntityDef::loadDefInfo: failed to load entity:{} VolatileInfo.\n",
@@ -479,7 +479,7 @@ bool EntityDef::loadInterfaces(const std::string& defFilePath,
 		TiXmlNode* interfaceRootNode = interfaceXml->getRootNode();
 		if(interfaceRootNode == NULL)
 		{
-			// root�ڵ���û���ӽڵ���
+			// root节点下没有子节点了
 			return true;
 		}
 
@@ -491,7 +491,7 @@ bool EntityDef::loadInterfaces(const std::string& defFilePath,
 			return false;
 		}
 
-		// ���Լ���detailLevel����
+		// 尝试加载detailLevel数据
 		if(!loadDetailLevelInfo(defFilePath, moduleName, interfaceXml.get(), interfaceRootNode, pScriptModule))
 		{
 			ERROR_MSG(fmt::format("EntityDef::loadInterfaces: failed to load entity:{} DetailLevelInfo.\n",
@@ -500,7 +500,7 @@ bool EntityDef::loadInterfaces(const std::string& defFilePath,
 			return false;
 		}
 
-		// �������е�interface�� �������ǵķ��������Լ��뵽ģ����
+		// 遍历所有的interface， 并将他们的方法和属性加入到模块中
 		if(!loadInterfaces(defFilePath, moduleName, interfaceXml.get(), interfaceRootNode, pScriptModule))
 		{
 			ERROR_MSG(fmt::format("EntityDef::loadInterfaces: failed to load entity:{} interface.\n",
@@ -536,11 +536,11 @@ bool EntityDef::loadParentClass(const std::string& defFilePath,
 	TiXmlNode* parentClassdefNode = parentClassXml->getRootNode();
 	if(parentClassdefNode == NULL)
 	{
-		// root�ڵ���û���ӽڵ���
+		// root节点下没有子节点了
 		return true;
 	}
 
-	// ����def�ļ��еĶ���
+	// 加载def文件中的定义
 	if(!loadDefInfo(defFilePath, parentClassName, parentClassXml.get(), parentClassdefNode, pScriptModule))
 	{
 		ERROR_MSG(fmt::format("EntityDef::loadParentClass: failed to load entity:{} parentClass.\n",
@@ -558,11 +558,11 @@ bool EntityDef::loadAllDefDescriptions(const std::string& moduleName,
 									  TiXmlNode* defNode, 
 									  ScriptDefModule* pScriptModule)
 {
-	// ������������
+	// 加载属性描述
 	if(!loadDefPropertys(moduleName, defxml, defxml->enterNode(defNode, "Properties"), pScriptModule))
 		return false;
 	
-	// ����cell��������
+	// 加载cell方法描述
 	if(!loadDefCellMethods(moduleName, defxml, defxml->enterNode(defNode, "CellMethods"), pScriptModule))
 	{
 		ERROR_MSG(fmt::format("EntityDef::loadAllDefDescription:loadDefCellMethods[{}] is failed!\n",
@@ -571,7 +571,7 @@ bool EntityDef::loadAllDefDescriptions(const std::string& moduleName,
 		return false;
 	}
 
-	// ����base��������
+	// 加载base方法描述
 	if(!loadDefBaseMethods(moduleName, defxml, defxml->enterNode(defNode, "BaseMethods"), pScriptModule))
 	{
 		ERROR_MSG(fmt::format("EntityDef::loadAllDefDescription:loadDefBaseMethods[{}] is failed!\n",
@@ -580,7 +580,7 @@ bool EntityDef::loadAllDefDescriptions(const std::string& moduleName,
 		return false;
 	}
 
-	// ����client��������
+	// 加载client方法描述
 	if(!loadDefClientMethods(moduleName, defxml, defxml->enterNode(defNode, "ClientMethods"), pScriptModule))
 	{
 		ERROR_MSG(fmt::format("EntityDef::loadAllDefDescription:loadDefClientMethods[{}] is failed!\n",
@@ -660,8 +660,8 @@ bool EntityDef::loadDefPropertys(const std::string& moduleName,
 			int32						hasClientFlags = 0;
 			DataType*					dataType = NULL;
 			bool						isPersistent = false;
-			bool						isIdentifier = false;		// �Ƿ���һ��������
-			uint32						databaseLength = 0;			// ������������ݿ��еĳ���
+			bool						isIdentifier = false;		// 是否是一个索引键
+			uint32						databaseLength = 0;			// 这个属性在数据库中的长度
 			std::string					indexType;
 			DETAIL_TYPE					detailLevel = DETAIL_LEVEL_FAR;
 			std::string					detailLevelStr = "";
@@ -834,7 +834,7 @@ bool EntityDef::loadDefPropertys(const std::string& moduleName,
 					return false;
 				}
 
-				// ����Ƿ����ظ���Utype
+				// 检查是否有重复的Utype
 				std::vector<ENTITY_PROPERTY_UID>::iterator iter =
 					std::find(g_propertyUtypes.begin(), g_propertyUtypes.end(), futype);
 
@@ -890,7 +890,7 @@ bool EntityDef::loadDefPropertys(const std::string& moduleName,
 				g_propertyUtypes.push_back(futype);
 			}
 
-			// ����һ����������ʵ��
+			// 产生一个属性描述实例
 			PropertyDescription* propertyDescription = PropertyDescription::createDescription(futype, strType, 
 															name, flags, isPersistent, 
 															dataType, isIdentifier, indexType,
@@ -899,7 +899,7 @@ bool EntityDef::loadDefPropertys(const std::string& moduleName,
 
 			bool ret = true;
 
-			// ���ӵ�ģ����
+			// 添加到模块中
 			if(hasCellFlags > 0)
 				ret = pScriptModule->addPropertyDescription(name.c_str(),
 						propertyDescription, CELLAPP_TYPE);
@@ -940,7 +940,7 @@ bool EntityDef::loadDefCellMethods(const std::string& moduleName,
 			MethodDescription* methodDescription = new MethodDescription(0, CELLAPP_TYPE, name);
 			TiXmlNode* argNode = defMethodNode->FirstChild();
 			
-			// ����û�в���
+			// 可能没有参数
 			if(argNode)
 			{
 				XML_FOR_BEGIN(argNode)
@@ -1000,7 +1000,7 @@ bool EntityDef::loadDefCellMethods(const std::string& moduleName,
 				XML_FOR_END(argNode);		
 			}
 
-			// ���������û�����ù�utype, �����
+			// 如果配置中没有设置过utype, 则产生
 			if(methodDescription->getUType() <= 0)
 			{
 				ENTITY_METHOD_UID muid = 0;
@@ -1021,7 +1021,7 @@ bool EntityDef::loadDefCellMethods(const std::string& moduleName,
 			}
 			else
 			{
-				// ����Ƿ����ظ���Utype
+				// 检查是否有重复的Utype
 				ENTITY_METHOD_UID muid = methodDescription->getUType();
 				std::vector<ENTITY_METHOD_UID>::iterator iter =
 					std::find(g_methodCusUtypes.begin(), g_methodCusUtypes.end(), muid);
@@ -1083,7 +1083,7 @@ bool EntityDef::loadDefBaseMethods(const std::string& moduleName, XML* xml,
 			MethodDescription* methodDescription = new MethodDescription(0, BASEAPP_TYPE, name);
 			TiXmlNode* argNode = defMethodNode->FirstChild();
 
-			// ����û�в���
+			// 可能没有参数
 			if(argNode)
 			{
 				XML_FOR_BEGIN(argNode)
@@ -1143,7 +1143,7 @@ bool EntityDef::loadDefBaseMethods(const std::string& moduleName, XML* xml,
 				XML_FOR_END(argNode);		
 			}
 
-			// ���������û�����ù�utype, �����
+			// 如果配置中没有设置过utype, 则产生
 			if(methodDescription->getUType() <= 0)
 			{
 				ENTITY_METHOD_UID muid = 0;
@@ -1164,7 +1164,7 @@ bool EntityDef::loadDefBaseMethods(const std::string& moduleName, XML* xml,
 			}
 			else
 			{
-				// ����Ƿ����ظ���Utype
+				// 检查是否有重复的Utype
 				ENTITY_METHOD_UID muid = methodDescription->getUType();
 				std::vector<ENTITY_METHOD_UID>::iterator iter =
 					std::find(g_methodCusUtypes.begin(), g_methodCusUtypes.end(), muid);
@@ -1226,7 +1226,7 @@ bool EntityDef::loadDefClientMethods(const std::string& moduleName, XML* xml,
 			MethodDescription* methodDescription = new MethodDescription(0, CLIENT_TYPE, name);
 			TiXmlNode* argNode = defMethodNode->FirstChild();
 
-			// ����û�в���
+			// 可能没有参数
 			if(argNode)
 			{
 				XML_FOR_BEGIN(argNode)
@@ -1282,7 +1282,7 @@ bool EntityDef::loadDefClientMethods(const std::string& moduleName, XML* xml,
 				XML_FOR_END(argNode);		
 			}
 
-			// ���������û�����ù�utype, �����
+			// 如果配置中没有设置过utype, 则产生
 			if(methodDescription->getUType() <= 0)
 			{
 				ENTITY_METHOD_UID muid = 0;
@@ -1303,7 +1303,7 @@ bool EntityDef::loadDefClientMethods(const std::string& moduleName, XML* xml,
 			}
 			else
 			{
-				// ����Ƿ����ظ���Utype
+				// 检查是否有重复的Utype
 				ENTITY_METHOD_UID muid = methodDescription->getUType();
 				std::vector<ENTITY_METHOD_UID>::iterator iter =
 					std::find(g_methodCusUtypes.begin(), g_methodCusUtypes.end(), muid);
@@ -1450,7 +1450,7 @@ bool EntityDef::checkDefMethod(ScriptDefModule* pScriptModule,
 		{
 			if (pyGetfullargspec)
 			{
-				// def�����еĲ�������
+				// def方法中的参数个数
 				size_t methodArgsSize = iter->second->getArgSize();
 
 				PyObject* pyGetMethodArgs = PyObject_CallFunction(pyGetfullargspec,
@@ -1473,17 +1473,17 @@ bool EntityDef::checkDefMethod(ScriptDefModule* pScriptModule,
 					{
 						size_t argsSize = (size_t)PyObject_Size(pyGetMethodArgsResult);
 
-						// ��ȥself�������
+						// 减去self这个参数
 						KBE_ASSERT(argsSize > 0);
 						argsSize -= 1;
 
 						Py_DECREF(pyGetMethodArgsResult);
 
-						// �������ĸ����Ƿ�ƥ��
+						// 检查参数的个数是否匹配
 						if (methodArgsSize != argsSize)
 						{
-							// �����ƥ�䣬 ������һ��exposed��������������һ������������Ϊ��ʾ�ļ����˵�һ������callerID���ڽű���������
-							// ����������������һ����Ϊ��������ȷ
+							// 如果不匹配， 并且是一个exposed方法，参数多了一个，可以理解为显示的加入了第一个参数callerID用于脚本检查调用者
+							// 如果不是这种情况，一律视为参数不正确
 							if (iter->second->isExposed() && methodArgsSize + 1 == argsSize)
 							{
 								iter->second->setExposed(MethodDescription::EXPOSED_AND_CALLER_CHECK);
@@ -1581,7 +1581,7 @@ bool EntityDef::loadAllScriptModules(std::string entitiesPath,
 		if (g_isReload && pyModule)
 			pyModule = PyImport_ReloadModule(pyModule);
 
-		// ����ģ��·���Ƿ���KBE�ű�Ŀ¼�µģ���ֹ���û�ȡ����pythonģ�����Ƴ�ͻ��������ϵͳģ��
+		// 检查该模块路径是否是KBE脚本目录下的，防止因用户取名与python模块名称冲突而误导入了系统模块
 		if (pyModule)
 		{
 			std::string userScriptsPath = Resmgr::getSingleton().getPyUserScriptsPath();
@@ -1611,7 +1611,7 @@ bool EntityDef::loadAllScriptModules(std::string entitiesPath,
 
 		if (pyModule == NULL)
 		{
-			// �Ƿ�������ģ�� ��ȡ�����Ƿ���def�ļ��ж������뵱ǰ�����صķ����������ԣ�
+			// 是否加载这个模块 （取决于是否在def文件中定义了与当前组件相关的方法或者属性）
 			if(isLoadScriptModule(pScriptModule))
 			{
 				ERROR_MSG(fmt::format("EntityDef::initialize: Could not load module[{}]\n", 
@@ -1623,7 +1623,7 @@ bool EntityDef::loadAllScriptModules(std::string entitiesPath,
 
 			PyErr_Clear();
 
-			// ��������������ã� ����֮ǰ���ûᵼ��isLoadScriptModuleʧЧ���Ӷ�û�д������
+			// 必须在这里才设置， 在这之前设置会导致isLoadScriptModule失效，从而没有错误输出
 			setScriptModuleHasComponentEntity(pScriptModule, false);
 			continue;
 		}
@@ -1699,7 +1699,7 @@ bool EntityDef::loadAllScriptModules(std::string entitiesPath,
 //-------------------------------------------------------------------------------------
 ScriptDefModule* EntityDef::findScriptModule(ENTITY_SCRIPT_UID utype)
 {
-	// utype ��СΪ1
+	// utype 最小为1
 	if (utype == 0 || utype >= __scriptModules.size() + 1)
 	{
 		ERROR_MSG(fmt::format("EntityDef::findScriptModule: is not exist(utype:{})!\n", utype));

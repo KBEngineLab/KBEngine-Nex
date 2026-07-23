@@ -105,7 +105,7 @@ bool DBUtil::initialize()
 
 		if ((*dbinfo_iter).db_passwordEncrypt)
 		{
-			// ���С��64�������ǰ��������������
+			// 如果小于64则表明当前是明文密码配置
 			if (strlen((*dbinfo_iter).db_password) < 64)
 			{
 				WARNING_MSG(fmt::format("DBUtil::initialize: db({}) password is not encrypted!\nplease use password(rsa):\n{}\n",

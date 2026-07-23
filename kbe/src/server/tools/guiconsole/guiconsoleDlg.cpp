@@ -196,7 +196,7 @@ public:
 			if(!bhandler.broadcast())
 			{
 				ERROR_MSG("CguiconsoleDlg::OnTimer: broadcast error!\n");
-				::AfxMessageBox(L"��ʼ�����󣺲��ܷ��ͷ�����̽�����");
+				::AfxMessageBox(L"初始化错误：不能发送服务器探测包。");
 				return false;
 			}
 
@@ -244,7 +244,7 @@ RESTART_RECV:
 					isContinue = true;
 				}while(bhandler.pCurrPacket()->length() > 0);
 
-				// ��ֹ���յ������ݲ�����Ҫ������
+				// 防止接收到的数据不是想要的数据
 				if(findComponentType == args.componentType)
 				{
 					//ifind++;
@@ -569,7 +569,7 @@ void CguiconsoleDlg::commitPythonCommand(CString strCommand)
 	CString strCommand1 = strCommand;
 
 	/*
-	// ����ͨ���������print �÷�����������Ϣ
+	// 对普通的输入加入print 让服务器回显信息
     if((strCommand.Find(L"=")) == -1 &&
 		(strCommand.Find(L"print(")) == -1 &&
 		(strCommand.Find(L"import ")) == -1 &&
@@ -619,7 +619,7 @@ void CguiconsoleDlg::commitPythonCommand(CString strCommand)
 
 void CguiconsoleDlg::saveHistory()
 {
-    //����һ��XML���ĵ�����
+    //创建一个XML的文档对象。
     TiXmlDocument *pDocument = new TiXmlDocument();
 
 	int i = 0;
@@ -1188,7 +1188,7 @@ void CguiconsoleDlg::OnNMRClickTree1(NMHDR *pNMHDR, LRESULT *pResult)
     CMenu* pPopup = menu.GetSubMenu(0);
 	
 	CPoint point;
-	GetCursorPos(&point); //���λ��
+	GetCursorPos(&point); //鼠标位置
     pPopup->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
 }
 
@@ -1572,7 +1572,7 @@ void CguiconsoleDlg::OnNMClickTree1(NMHDR *pNMHDR, LRESULT *pResult)
 
 	bool changeToChecked = false;
 
-	// ��ѡ��ѡ�о����ӷ���Ͽ�����
+	// 复选框被选中就连接否则断开连接
 	if(TVHT_ONITEMSTATEICON & hittestInfo.flags)
 	{
 		m_tree.SelectItem(hItem);
@@ -1601,7 +1601,7 @@ void CguiconsoleDlg::OnNMClickTree1(NMHDR *pNMHDR, LRESULT *pResult)
 		m_debugWnd.displaybufferWnd()->GetWindowTextW(s);
 		
 		if(s.GetLength() <= 0)
-			s += L">>>��������Ĵ���дpython���������Է���ˡ�\r\n>>>ctrl+enter ����\r\n>>>����ʹ����ʷ����\r\n\r\n";
+			s += L">>>请在下面的窗口写python代码来调试服务端。\r\n>>>ctrl+enter 发送\r\n>>>↑↓使用历史命令\r\n\r\n";
 		else
 			s += L">>>";
 
@@ -1688,14 +1688,14 @@ void CguiconsoleDlg::OnToolBar_StartServer()
 		if(!bhandler.broadcast())
 		{
 			ERROR_MSG("CguiconsoleDlg::OnToolBar_StartServer: broadcast error!\n");
-			//::AfxMessageBox(L"���ܷ��ͷ�������������");
+			//::AfxMessageBox(L"不能发送服务器启动包。");
 			break;
 		}
 
 		if(!bhandler.receive(NULL, 0, 1000000))
 		{
 			ERROR_MSG("CguiconsoleDlg::OnToolBar_StartServer: recv error!\n");
-			//::AfxMessageBox(L"���շ���������������");
+			//::AfxMessageBox(L"接收服务器启动包错误。");
 			break;
 		}
 		
@@ -1756,14 +1756,14 @@ void CguiconsoleDlg::OnToolBar_StopServer()
 		if(!bhandler.broadcast())
 		{
 			ERROR_MSG("CguiconsoleDlg::OnToolBar_StartServer: broadcast error!\n");
-			//::AfxMessageBox(L"���ܷ��ͷ�������������");
+			//::AfxMessageBox(L"不能发送服务器启动包。");
 			break;
 		}
 
 		if(!bhandler.receive(NULL, 0, 3000000))
 		{
 			ERROR_MSG("CguiconsoleDlg::OnToolBar_StartServer: recv error!\n");
-			//::AfxMessageBox(L"���շ���������������");
+			//::AfxMessageBox(L"接收服务器启动包错误。");
 			break;
 		}
 		

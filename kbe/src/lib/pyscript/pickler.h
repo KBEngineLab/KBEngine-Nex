@@ -30,24 +30,24 @@ class Pickler
 {						
 public:	
 	/** 
-		���� cPicket.dumps 
+		代理 cPicket.dumps 
 	*/
 	static std::string pickle(PyObject* pyobj);
 	static std::string pickle(PyObject* pyobj, int8 protocol);
 
 	/** 
-		���� cPicket.loads 
+		代理 cPicket.loads 
 	*/
 	static PyObject* unpickle(const std::string& str);
 
 	/** 
-		��ʼ��pickler 
+		初始化pickler 
 	*/
 	static bool initialize(void);
 	static void finalise(void);
 	
 	/** 
-		��ȡunpickle������ģ����� 
+		获取unpickle函数表模块对象 
 	*/
 	static PyObject* getUnpickleFuncTableModule(void){ return pyPickleFuncTableModule_; }
 	static PyObject* getUnpickleFunc(const char* funcName);
@@ -55,12 +55,12 @@ public:
 	static void registerUnpickleFunc(PyObject* pyFunc, const char* funcName);
 
 private:
-	static PyObject* picklerMethod_;						// cPicket.dumps����ָ��
-	static PyObject* unPicklerMethod_;						// cPicket.loads����ָ��
+	static PyObject* picklerMethod_;						// cPicket.dumps方法指针
+	static PyObject* unPicklerMethod_;						// cPicket.loads方法指针
 
-	static PyObject* pyPickleFuncTableModule_;				// unpickle������ģ����� �����Զ������unpickle��������Ҫ�ڴ�ע��
+	static PyObject* pyPickleFuncTableModule_;				// unpickle函数表模块对象 所有自定义类的unpickle函数都需要在此注册
 
-	static bool	isInit;										// �Ƿ��Ѿ�����ʼ��
+	static bool	isInit;										// 是否已经被初始化
 } ;
 
 }

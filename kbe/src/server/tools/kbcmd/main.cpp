@@ -184,7 +184,7 @@ int process_make_client_sdk(int argc, char* argv[], const std::string clientType
 
 		app.finalise();
 
-		// ���������־δͬ����ɣ� ��������ͬ����ɲŽ���
+		// 如果还有日志未同步完成， 这里会继续同步完成才结束
 		DebugHelper::getSingleton().finalise();
 		return -1;
 	}
@@ -196,7 +196,7 @@ int process_make_client_sdk(int argc, char* argv[], const std::string clientType
 
 		app.finalise();
 
-		// ���������־δͬ����ɣ� ��������ͬ����ɲŽ���
+		// 如果还有日志未同步完成， 这里会继续同步完成才结束
 		DebugHelper::getSingleton().finalise();
 		return -1;
 	}
@@ -226,7 +226,7 @@ int process_make_client_sdk(int argc, char* argv[], const std::string clientType
 		compressionType = 1;
 	}
 
-	// �����⵽������zip�ļ�����ô��zip�ļ��õ�path
+	// 如果检测到设置了zip文件，那么从zip文件得到path
 	if (compressionfile.size() > 0)
 	{
 		std::vector<std::string> tmpvec;
@@ -263,7 +263,7 @@ int process_make_client_sdk(int argc, char* argv[], const std::string clientType
 		ret = -1;
 	}
 
-	// ��ʼ���
+	// 开始打包
 	if (compressionfile.size() > 0)
 	{
 		if (compressionType == 1)
@@ -293,7 +293,7 @@ int process_make_client_sdk(int argc, char* argv[], const std::string clientType
 	app.finalise();
 	INFO_MSG(fmt::format("{}({}) has shut down. ClientSDK={}\n", COMPONENT_NAME_EX(g_componentType), g_componentID, (pClientSDK ? pClientSDK->good() : false)));
 
-	// ���������־δͬ����ɣ� ��������ͬ����ɲŽ���
+	// 如果还有日志未同步完成， 这里会继续同步完成才结束
 	DebugHelper::getSingleton().finalise();
 
 	if(pClientSDK)
@@ -304,7 +304,7 @@ int process_make_client_sdk(int argc, char* argv[], const std::string clientType
 
 int process_newassets(int argc, char* argv[], const std::string assetsType)
 {
-	// ����assetsType����KBE_RES_PATH����Ŀ��������
+	// 根据assetsType设置KBE_RES_PATH的项目环境变量
 	std::string res_path = getenv("KBE_RES_PATH") == NULL ? "" : getenv("KBE_RES_PATH");
 	std::string root_path = getenv("KBE_ROOT") == NULL ? "" : getenv("KBE_ROOT");
 
@@ -356,7 +356,7 @@ int process_newassets(int argc, char* argv[], const std::string assetsType)
 
 		app.finalise();
 
-		// ���������־δͬ����ɣ� ��������ͬ����ɲŽ���
+		// 如果还有日志未同步完成， 这里会继续同步完成才结束
 		DebugHelper::getSingleton().finalise();
 		return -1;
 	}
@@ -368,7 +368,7 @@ int process_newassets(int argc, char* argv[], const std::string assetsType)
 
 		app.finalise();
 
-		// ���������־δͬ����ɣ� ��������ͬ����ɲŽ���
+		// 如果还有日志未同步完成， 这里会继续同步完成才结束
 		DebugHelper::getSingleton().finalise();
 		return -1;
 	}
@@ -406,7 +406,7 @@ int process_newassets(int argc, char* argv[], const std::string assetsType)
 	app.finalise();
 	INFO_MSG(fmt::format("{}({}) has shut down. ServerAssets={}\n", COMPONENT_NAME_EX(g_componentType), g_componentID, (pServerAssets ? pServerAssets->good() : false)));
 
-	// ���������־δͬ����ɣ� ��������ͬ����ɲŽ���
+	// 如果还有日志未同步完成， 这里会继续同步完成才结束
 	DebugHelper::getSingleton().finalise();
 
 	if (pServerAssets)

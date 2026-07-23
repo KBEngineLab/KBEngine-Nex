@@ -28,7 +28,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{
 
-/** ��ȫ���ͷ�һ��ָ���ڴ� */
+/** 安全的释放一个指针内存 */
 #define SAFE_RELEASE(i)										\
 	if (i)													\
 		{													\
@@ -36,7 +36,7 @@ namespace KBEngine{
 			i = NULL;										\
 		}
 
-/** ��ȫ���ͷ�һ��ָ�������ڴ� */
+/** 安全的释放一个指针数组内存 */
 #define SAFE_RELEASE_ARRAY(i)								\
 	if (i)													\
 		{													\
@@ -50,15 +50,15 @@ namespace KBEngine{
     #define INLINE
 #endif
 
-/** kbeʱ�� */
+/** kbe时间 */
 extern GAME_TIME g_kbetime;
 
-/** �˺ŵ���� */
+/** 账号的类别 */
 enum ACCOUNT_TYPE
 {
-	ACCOUNT_TYPE_NORMAL = 1,	// ��ͨ�˺�
-	ACCOUNT_TYPE_MAIL = 2,		// email�˺�(�輤��)
-	ACCOUNT_TYPE_SMART = 3		// ����ʶ��
+	ACCOUNT_TYPE_NORMAL = 1,	// 普通账号
+	ACCOUNT_TYPE_MAIL = 2,		// email账号(需激活)
+	ACCOUNT_TYPE_SMART = 3		// 智能识别
 };
 
 enum ACCOUNT_FLAGS
@@ -68,26 +68,26 @@ enum ACCOUNT_FLAGS
 	ACCOUNT_FLAG_NOT_ACTIVATED = 0x000000002
 };
 
-/** ��������������״̬ */
+/** 定义服务器各组件状态 */
 enum COMPONENT_STATE
 {
-	// ��ʼ״̬
+	// 初始状态
 	COMPONENT_STATE_INIT = 0,
 
-	// ��������������
+	// 进程正在运行中
 	COMPONENT_STATE_RUN = 1,
 
-	// ���̿�ʼ�ر�
+	// 进程开始关闭
 	COMPONENT_STATE_SHUTTINGDOWN_BEGIN = 2,
 
-	// �������ڹر�
+	// 进程正在关闭
 	COMPONENT_STATE_SHUTTINGDOWN_RUNNING = 3,
 
-	// ���̹ر������
+	// 进程关闭完成了
 	COMPONENT_STATE_STOP = 4
 };
 
-/** ����������������� */
+/** 定义服务器各组件类别 */
 enum COMPONENT_TYPE
 {
 	UNKNOWN_COMPONENT_TYPE	= 0,
@@ -108,11 +108,11 @@ enum COMPONENT_TYPE
 	COMPONENT_END_TYPE		= 15,
 };
 
-/** ��ǰ�������������ID */
+/** 当前服务器组件类别和ID */
 extern COMPONENT_TYPE g_componentType;
 extern COMPONENT_ID g_componentID;
 
-/** ������������������ */
+/** 定义服务器各组件名称 */
 const char COMPONENT_NAME[][255] = {
 	"unknown",
 	"dbmgr",
@@ -208,27 +208,27 @@ inline COMPONENT_TYPE ComponentName2ComponentType(const char* name)
 	return UNKNOWN_COMPONENT_TYPE;
 }
 
-// ���е�����б�
+// 所有的组件列表
 const COMPONENT_TYPE ALL_COMPONENT_TYPES[] = {BASEAPPMGR_TYPE, CELLAPPMGR_TYPE, DBMGR_TYPE, CELLAPP_TYPE, 
 						BASEAPP_TYPE, LOGINAPP_TYPE, MACHINE_TYPE, CONSOLE_TYPE, TOOL_TYPE, LOGGER_TYPE,
 						WATCHER_TYPE, INTERFACES_TYPE, BOTS_TYPE, UNKNOWN_COMPONENT_TYPE};
 
-// ���еĺ������б�
+// 所有的后端组件列表
 const COMPONENT_TYPE ALL_SERVER_COMPONENT_TYPES[] = {BASEAPPMGR_TYPE, CELLAPPMGR_TYPE, DBMGR_TYPE, CELLAPP_TYPE, 
 						BASEAPP_TYPE, LOGINAPP_TYPE, MACHINE_TYPE, LOGGER_TYPE, 
 						WATCHER_TYPE, INTERFACES_TYPE, BOTS_TYPE, UNKNOWN_COMPONENT_TYPE};
 
-// ���еĺ������б�
+// 所有的后端组件列表
 const COMPONENT_TYPE ALL_GAME_SERVER_COMPONENT_TYPES[] = {BASEAPPMGR_TYPE, CELLAPPMGR_TYPE, DBMGR_TYPE, CELLAPP_TYPE, 
 						BASEAPP_TYPE, LOGINAPP_TYPE, INTERFACES_TYPE, UNKNOWN_COMPONENT_TYPE};
 
-// ���еĸ��������
+// 所有的辅助性组件
 const COMPONENT_TYPE ALL_HELPER_COMPONENT_TYPE[] = {LOGGER_TYPE, UNKNOWN_COMPONENT_TYPE};
 
-// �����Ƿ���һ����Ч�����
+// 返回是否是一个有效的组件
 #define VALID_COMPONENT(C_TYPE) ((C_TYPE) > 0 && (C_TYPE) < COMPONENT_END_TYPE)
 
-/** ����Ƿ�Ϊһ����Ϸ����������� */
+/** 检查是否为一个游戏服务端组件类别 */
 inline bool isGameServerComponentType(COMPONENT_TYPE componentType)
 {
 	int i = 0;
@@ -245,24 +245,24 @@ inline bool isGameServerComponentType(COMPONENT_TYPE componentType)
 	return false;
 }
 
-// ǰ��Ӧ�õ����, All client type
+// 前端应用的类别, All client type
 enum COMPONENT_CLIENT_TYPE
 {
 	UNKNOWN_CLIENT_COMPONENT_TYPE	= 0,
 
-	// �ƶ��࣬�ֻ���ƽ�����
+	// 移动类，手机，平板电脑
 	// Mobile, Phone, Pad
 	CLIENT_TYPE_MOBILE				= 1,
 
-	// ������WindowsӦ�ó���
+	// 独立的Windows应用程序
 	// Windows Application program
 	CLIENT_TYPE_WIN					= 2,
 
-	// ������LinuxӦ�ó���
+	// 独立的Linux应用程序
 	// Linux Application program
 	CLIENT_TYPE_LINUX				= 3,
 		
-	// MacӦ�ó���
+	// Mac应用程序
 	// Mac Application program
 	CLIENT_TYPE_MAC					= 4,
 				
@@ -272,14 +272,14 @@ enum COMPONENT_CLIENT_TYPE
 	// bots
 	CLIENT_TYPE_BOTS				= 6,
 
-	// �����
+	// 轻端类
 	CLIENT_TYPE_MINI				= 7,
 
 	// End
 	CLIENT_TYPE_END					= 8
 };
 
-/** ����ǰ��Ӧ�õ�������� */
+/** 定义前端应用的类别名称 */
 const char COMPONENT_CLIENT_NAME[][255] = {
 	"UNKNOWN_CLIENT_COMPONENT_TYPE",
 	"CLIENT_TYPE_MOBILE",
@@ -291,13 +291,13 @@ const char COMPONENT_CLIENT_NAME[][255] = {
 	"CLIENT_TYPE_MINI",
 };
 
-// ����ǰ��Ӧ�õ����
+// 所有前端应用的类别
 const COMPONENT_CLIENT_TYPE ALL_CLIENT_TYPES[] = {CLIENT_TYPE_MOBILE, CLIENT_TYPE_WIN, CLIENT_TYPE_LINUX, CLIENT_TYPE_MAC, 
 												CLIENT_TYPE_BROWSER, CLIENT_TYPE_BOTS, CLIENT_TYPE_MINI, UNKNOWN_CLIENT_COMPONENT_TYPE};
 
 typedef int8 CLIENT_CTYPE;
 
-/** entity��entityCall��� */
+/** entity的entityCall类别 */
 enum ENTITYCALL_TYPE
 {
 	ENTITYCALL_TYPE_CELL = 0,
@@ -309,7 +309,7 @@ enum ENTITYCALL_TYPE
 	ENTITYCALL_TYPE_CLIENT_VIA_BASE = 6,
 };
 
-/** ͨ��entityCall������ø�entity��Ӧ��������� */
+/** 通过entityCall的类别获得该entity对应的组件类型 */
 inline COMPONENT_TYPE entityCallType2ComponentType(ENTITYCALL_TYPE type)
 {
 	switch (type)
@@ -335,7 +335,7 @@ inline COMPONENT_TYPE entityCallType2ComponentType(ENTITYCALL_TYPE type)
 	return UNKNOWN_COMPONENT_TYPE;
 };
 
-/** entityCall�����Ի�Ϊ�ַ������� �ϸ��ENTITYCALL_TYPE����ƥ�� */
+/** entityCall的类别对换为字符串名称 严格和ENTITYCALL_TYPE索引匹配 */
 const char ENTITYCALL_TYPE_TO_NAME_TABLE[][8] =
 {
 	"cell",
@@ -347,7 +347,7 @@ const char ENTITYCALL_TYPE_TO_NAME_TABLE[][8] =
 	"client",
 };
 
-/** entityCall�����Ի�Ϊ�ַ������� �ϸ��ENTITYCALL_TYPE����ƥ�� */
+/** entityCall的类别对换为字符串名称 严格和ENTITYCALL_TYPE索引匹配 */
 const char ENTITYCALL_TYPE_TO_NAME_TABLE_EX[][14] =
 {
 	"cell",
@@ -360,14 +360,14 @@ const char ENTITYCALL_TYPE_TO_NAME_TABLE_EX[][14] =
 };
 
 /*
- APP���õı�־
+ APP设置的标志
 */
-// Ĭ�ϵ�(δ���ñ��)
+// 默认的(未设置标记)
 #define APP_FLAGS_NONE								0x00000000
-// �����븺�ؾ���
+// 不参与负载均衡
 #define APP_FLAGS_NOT_PARTCIPATING_LOAD_BALANCING	0x00000001
 
-// ����һ��ͨ�����ֵ�õ����Ƶ�map���ṩ��ʼ��python��¶���ű�ʹ��
+// 建立一个通过标记值得到名称的map，提供初始化python暴露给脚本使用
 inline std::map<uint32, std::string> createAppFlagsMaps()
 {
 	std::map<uint32, std::string> datas;
@@ -376,17 +376,17 @@ inline std::map<uint32, std::string> createAppFlagsMaps()
 	return datas;
 }
 
-// ǰ���Ƿ�֧�ָ�����
+// 前端是否支持浮点数
 // #define CLIENT_NO_FLOAT
 
-// һ��cell��Ĭ�ϵı߽������С��С
+// 一个cell的默认的边界或者最小大小
 #define CELL_DEF_MIN_AREA_SIZE						500.0f
 
-/** һ���ռ��һ��chunk��С */
+/** 一个空间的一个chunk大小 */
 #define SPACE_CHUNK_SIZE							100
 
 
-/** ����û����Ϸ��� */
+/** 检查用户名合法性 */
 inline bool validName(const char* name, int size)
 {
 	if(size >= 256)
@@ -409,8 +409,8 @@ inline bool validName(const std::string& name)
 	return validName(name.c_str(), (int)name.size());
 }
 
-/** ���email��ַ�Ϸ��� 
-�ϸ�ƥ���������±���ʽ
+/** 检查email地址合法性 
+严格匹配请用如下表达式
 [a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?
 */
 #ifdef USE_REGEX
@@ -469,7 +469,7 @@ inline bool email_isvalid(const char *address)
 	return (count >= 1);
 }
 
-//���ID����չ����
+//组件ID的扩展倍数
 #define COMPONENT_ID_MULTIPLE	1000000000 
 
 }

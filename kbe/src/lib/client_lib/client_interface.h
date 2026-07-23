@@ -39,78 +39,78 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	CLIENT������Ϣ�ӿ��ڴ˶���
+	CLIENT所有消息接口在此定义
 */
 NETWORK_INTERFACE_DECLARE_BEGIN(ClientInterface)
-	// �����hello���ء�
+	// 服务端hello返回。
 	CLIENT_MESSAGE_DECLARE_STREAM(onHelloCB,								NETWORK_VARIABLE_MESSAGE)
 
-	// �ͷ���˵İ汾��ƥ��
+	// 和服务端的版本不匹配
 	CLIENT_MESSAGE_DECLARE_STREAM(onVersionNotMatch,						NETWORK_VARIABLE_MESSAGE)
 
-	// �ͷ���˵Ľű���汾��ƥ��
+	// 和服务端的脚本层版本不匹配
 	CLIENT_MESSAGE_DECLARE_STREAM(onScriptVersionNotMatch,					NETWORK_VARIABLE_MESSAGE)
 
-	// �����˺�ʧ�ܡ�
+	// 创建账号失败。
 	CLIENT_MESSAGE_DECLARE_STREAM(onCreateAccountResult,					NETWORK_VARIABLE_MESSAGE)
 
-	// ��¼�ɹ���
+	// 登录成功。
 	CLIENT_MESSAGE_DECLARE_STREAM(onLoginSuccessfully,						NETWORK_VARIABLE_MESSAGE)
 
-	// ��¼ʧ�ܡ�
+	// 登录失败。
 	CLIENT_MESSAGE_DECLARE_STREAM(onLoginFailed,							NETWORK_VARIABLE_MESSAGE)
 
-	// ���������Ѿ�������һ����ͻ��˹����Ĵ���Entity || ��¼���سɹ���
+	// 服务器端已经创建了一个与客户端关联的代理Entity || 登录网关成功。
 	CLIENT_MESSAGE_DECLARE_ARGS3(onCreatedProxies,							NETWORK_VARIABLE_MESSAGE,
 								uint64,										rndUUID,
 								ENTITY_ID,									eid,
 								std::string,								entityType)
 
-	// ��¼����ʧ�ܡ�
+	// 登录网关失败。
 	CLIENT_MESSAGE_DECLARE_ARGS1(onLoginBaseappFailed,						NETWORK_FIXED_MESSAGE,
 								SERVER_ERROR_CODE,							failedcode)
 
-	// ��¼����ʧ�ܡ�
+	// 登录网关失败。
 	CLIENT_MESSAGE_DECLARE_ARGS1(onReloginBaseappFailed,					NETWORK_FIXED_MESSAGE,
 								SERVER_ERROR_CODE,							failedcode)
 
-	// �������ϵ�entity�Ѿ�������Ϸ�����ˡ�
+	// 服务器上的entity已经进入游戏世界了。
 	CLIENT_MESSAGE_DECLARE_STREAM(onEntityEnterWorld,						NETWORK_VARIABLE_MESSAGE)
 
-	// �������ϵ�entity�Ѿ��뿪��Ϸ�����ˡ�
+	// 服务器上的entity已经离开游戏世界了。
 	CLIENT_MESSAGE_DECLARE_ARGS1(onEntityLeaveWorld,						NETWORK_FIXED_MESSAGE,
 								ENTITY_ID,									eid)
 
-	// �������ϵ�entity�Ѿ��뿪��Ϸ�����ˡ�
+	// 服务器上的entity已经离开游戏世界了。
 	CLIENT_MESSAGE_DECLARE_STREAM(onEntityLeaveWorldOptimized,				NETWORK_VARIABLE_MESSAGE)
 
-	// ���߿ͻ���ĳ��entity�����ˣ� ����entityͨ���ǻ�δonEntityEnterWorld��
+	// 告诉客户端某个entity销毁了， 此类entity通常是还未onEntityEnterWorld。
 	CLIENT_MESSAGE_DECLARE_ARGS1(onEntityDestroyed,							NETWORK_FIXED_MESSAGE,
 								ENTITY_ID,									eid)
 
-	// �������ϵ�entity�Ѿ�����space�ˡ�
+	// 服务器上的entity已经进入space了。
 	CLIENT_MESSAGE_DECLARE_STREAM(onEntityEnterSpace,						NETWORK_VARIABLE_MESSAGE)
 
-	// �������ϵ�entity�Ѿ��뿪space�ˡ�
+	// 服务器上的entity已经离开space了。
 	CLIENT_MESSAGE_DECLARE_ARGS1(onEntityLeaveSpace,						NETWORK_FIXED_MESSAGE,
 								ENTITY_ID,									eid)
 
-	// Զ�̺���entity����
+	// 远程呼叫entity方法
 	CLIENT_MESSAGE_DECLARE_STREAM(onRemoteMethodCall,						NETWORK_VARIABLE_MESSAGE)
 	CLIENT_MESSAGE_DECLARE_STREAM(onRemoteMethodCallOptimized,				NETWORK_VARIABLE_MESSAGE)
 
-	// ���߳�������
+	// 被踢出服务器
 	CLIENT_MESSAGE_DECLARE_ARGS1(onKicked,									NETWORK_FIXED_MESSAGE,
 								SERVER_ERROR_CODE,							failedcode)
 
-	// ����������entity����
+	// 服务器更新entity属性
 	CLIENT_MESSAGE_DECLARE_STREAM(onUpdatePropertys,						NETWORK_VARIABLE_MESSAGE)
 	CLIENT_MESSAGE_DECLARE_STREAM(onUpdatePropertysOptimized,				NETWORK_VARIABLE_MESSAGE)
 
-	// ������ǿ������entity��λ���볯��
+	// 服务器强制设置entity的位置与朝向
 	CLIENT_MESSAGE_DECLARE_STREAM(onSetEntityPosAndDir,						NETWORK_VARIABLE_MESSAGE)
 
-	// ���������°�
+	// 服务器更新包
 	CLIENT_MESSAGE_DECLARE_ARGS3(onUpdateBasePos,							NETWORK_FIXED_MESSAGE,
 								float,										x,
 								float,										y,
@@ -175,66 +175,66 @@ NETWORK_INTERFACE_DECLARE_BEGIN(ClientInterface)
 	CLIENT_MESSAGE_DECLARE_STREAM(onUpdateData_xyz_p_optimized,				NETWORK_VARIABLE_MESSAGE)
 	CLIENT_MESSAGE_DECLARE_STREAM(onUpdateData_xyz_r_optimized,				NETWORK_VARIABLE_MESSAGE)
 
-	// download stream��ʼ�� 
+	// download stream开始了 
 	CLIENT_MESSAGE_DECLARE_ARGS3(onStreamDataStarted,						NETWORK_VARIABLE_MESSAGE,
 								int16,										id,
 								uint32,										datasize,
 								std::string,								descr)
 
-	// ���յ�streamData
+	// 接收到streamData
 	CLIENT_MESSAGE_DECLARE_STREAM(onStreamDataRecv,							NETWORK_VARIABLE_MESSAGE)
 
-	// download stream����� 
+	// download stream完成了 
 	CLIENT_MESSAGE_DECLARE_ARGS1(onStreamDataCompleted,						NETWORK_FIXED_MESSAGE,
 								int16,										id)
 
-	// ����Э��
+	// 导入协议
 	CLIENT_MESSAGE_DECLARE_STREAM(onImportClientMessages,					NETWORK_VARIABLE_MESSAGE)
 	
-	// ����entitydef
+	// 导入entitydef
 	CLIENT_MESSAGE_DECLARE_STREAM(onImportClientEntityDef,					NETWORK_VARIABLE_MESSAGE)
 
-	// ��������������
+	// 错误码描述导出
 	CLIENT_MESSAGE_DECLARE_STREAM(onImportServerErrorsDescr,				NETWORK_VARIABLE_MESSAGE)
 
-	// ���յ���sdk��Ϣ
+	// 接收导入sdk消息
 	CLIENT_MESSAGE_DECLARE_STREAM(onImportClientSDK,						NETWORK_VARIABLE_MESSAGE)
 
-	// ����˳�ʼ��spacedata
+	// 服务端初始化spacedata
 	CLIENT_MESSAGE_DECLARE_STREAM(initSpaceData,							NETWORK_VARIABLE_MESSAGE)
 
-	// �����������spacedata
+	// 服务端设置了spacedata
 	CLIENT_MESSAGE_DECLARE_ARGS3(setSpaceData,								NETWORK_VARIABLE_MESSAGE,
 								SPACE_ID,									spaceID,
 								std::string,								key,
 								std::string,								val)
 
-	// �����ɾ����spacedata
+	// 服务端删除了spacedata
 	CLIENT_MESSAGE_DECLARE_ARGS2(delSpaceData,								NETWORK_VARIABLE_MESSAGE,
 								SPACE_ID,									spaceID,
 								std::string,								key)
 
-	// �����˺��������󷵻�
+	// 重置账号密码请求返回
 	CLIENT_MESSAGE_DECLARE_ARGS1(onReqAccountResetPasswordCB,				NETWORK_FIXED_MESSAGE,
 								SERVER_ERROR_CODE,							failedcode)
 
-	// �����˺��������󷵻�
+	// 重置账号密码请求返回
 	CLIENT_MESSAGE_DECLARE_ARGS1(onReqAccountBindEmailCB,					NETWORK_FIXED_MESSAGE,
 								SERVER_ERROR_CODE,							failedcode)
 
-	// �����˺��������󷵻�
+	// 重置账号密码请求返回
 	CLIENT_MESSAGE_DECLARE_ARGS1(onReqAccountNewPasswordCB,					NETWORK_FIXED_MESSAGE,
 								SERVER_ERROR_CODE,							failedcode)
 
-	// �ص�½���سɹ� 
+	// 重登陆网关成功 
 	CLIENT_MESSAGE_DECLARE_STREAM(onReloginBaseappSuccessfully,				NETWORK_VARIABLE_MESSAGE)
 									
-	// ���߿ͻ��ˣ��㵱ǰ���𣨻�ȡ��������˭��λ��ͬ��
+	// 告诉客户端：你当前负责（或取消）控制谁的位移同步
 	CLIENT_MESSAGE_DECLARE_ARGS2(onControlEntity,							NETWORK_FIXED_MESSAGE,
 									ENTITY_ID,								eid,
 									int8,									isControlled)
 
-	// �����������ص�
+	// 服务器心跳回调
 	CLIENT_MESSAGE_DECLARE_ARGS0(onAppActiveTickCB,							NETWORK_FIXED_MESSAGE)
 
 	NETWORK_INTERFACE_DECLARE_END()

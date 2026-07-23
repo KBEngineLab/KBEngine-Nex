@@ -97,7 +97,7 @@ void SpaceViewers::handleTimeout(TimerHandle handle, void * arg)
 	std::map< Network::Address, SpaceViewer>::iterator iter = spaceViews_.begin();
 	for (; iter != spaceViews_.end(); )
 	{
-		// �����viewer��ַ�Ҳ������������
+		// 如果该viewer地址找不到了则将其擦除
 		Network::Channel* pChannel = Cellapp::getSingleton().networkInterface().findChannel(iter->second.addr());
 		if (pChannel == NULL)
 		{
@@ -167,10 +167,10 @@ void SpaceViewer::timeout()
 {
 	switch (updateType_)
 	{
-	case 0: // ��ʼ��
+	case 0: // 初始化
 		initClient();
 		break;
-	default: // ����ʵ��
+	default: // 更新实体
 		updateClient();
 	};
 }
@@ -204,7 +204,7 @@ void SpaceViewer::initClient()
 {
 	MemoryStream s;
 
-	// ���·��ű�ID��Ӧ�ű�ģ������ƣ����ڽ��ͺ���ʵ��ͬ������ʵ��ֻͬ��id��ȥ
+	// 先下发脚本ID对应脚本模块的名称，便于降低后面实体同步量，实体只同步id过去
 	const EntityDef::SCRIPT_MODULES& scriptModules = EntityDef::getScriptModules();
 	s << (uint32)scriptModules.size();
 
@@ -217,7 +217,7 @@ void SpaceViewer::initClient()
 
 	sendStream(&s, updateType_);
 
-	// �ı�Ϊ����ʵ��
+	// 改变为更新实体
 	updateType_ = 1;
 
 	lastUpdateVersion_ = 0;
@@ -235,18 +235,18 @@ void SpaceViewer::updateClient()
 		return;
 	}
 
-	// ���ÿ�θ���500��ʵ��
+	// 最多每次更新500个实体
 	const int MAX_UPDATE_COUNT = 100;
 	int updateCount = 0;
 
-	// ��ȡ�������ϴν���Ĳ�ֵ������ֵ����stream�и��µ��ͻ���
-	// ��ֵ����������ʵ�壬�Լ��Ѿ��е�ʵ���λ�ñ仯
+	// 获取本次与上次结果的差值，将差值放入stream中更新到客户端
+	// 差值包括新增的实体，以及已经有的实体的位置变化
 	MemoryStream s;
 
 	Entities<Entity>* pEntities = Cellapp::getSingleton().pEntities();
 	Entities<Entity>::ENTITYS_MAP& entitiesMap = pEntities->getEntities();
 
-	// �ȼ���Ѿ����ӵ�ʵ�壬���ڰ汾�Žϵ͵����ȸ���
+	// 先检查已经监视的实体，对于版本号较低的优先更新
 	if (updateCount < MAX_UPDATE_COUNT)
 	{
 		std::map< ENTITY_ID, ViewEntity >::iterator viewerIter = viewedEntities.begin();
@@ -264,14 +264,14 @@ void SpaceViewer::updateClient()
 
 			Entities<Entity>::ENTITYS_MAP::iterator iter = entitiesMap.find(viewerIter->first);
 
-			// �Ҳ���ʵ�壬 ˵���Ѿ����ٻ����ܵ�����������
-			// ������������̣� �������̻Ὣ����µ��ͻ���
+			// 找不到实体， 说明已经销毁或者跑到其他进程了
+			// 如果在其他进程， 其他进程会将其更新到客户端
 			if (iter == entitiesMap.end())
 			{
 				s << viewerIter->first;
-				s << false; // trueΪ���£� falseΪ����
+				s << false; // true为更新， false为销毁
 
-				// �����viewedEntitiesɾ��
+				// 将其从viewedEntities删除
 				viewedEntities.erase(viewerIter++);
 			}
 			else
@@ -279,7 +279,7 @@ void SpaceViewer::updateClient()
 				Entity* pEntity = static_cast<Entity*>(iter->second.get());
 				if (pEntity->spaceID() != spaceID_)
 				{
-					// �����viewedEntitiesɾ��
+					// 将其从viewedEntities删除
 					viewedEntities.erase(viewerIter++);
 					continue;
 				}
@@ -287,14 +287,14 @@ void SpaceViewer::updateClient()
 				/*
 				if (pEntity->cellID() != cellID_)
 				{
-					// �����viewedEntitiesɾ��
+					// 将其从viewedEntities删除
 					viewedEntities.erase(viewerIter++);
 					continue;
 				}
 				*/
 
-				// ��������ʵ������Ѿ��۲쵽��ʵ�壬���λ�ñ仯
-				// ���û�б仯��pass
+				// 有新增的实体或者已经观察到的实体，检查位置变化
+				// 如果没有变化则pass
 				if ((viewEntity.position - pEntity->position()).length() <= 0.0004f &&
 					(viewEntity.direction.dir - pEntity->direction().dir).length() <= 0.0004f)
 				{
@@ -308,7 +308,7 @@ void SpaceViewer::updateClient()
 				++viewEntity.updateVersion;
 
 				s << viewEntity.entityID;
-				s << true; // trueΪ���£� falseΪ����
+				s << true; // true为更新， false为销毁
 				s << pEntity->pScriptModule()->getUType();
 				s << viewEntity.position.x << viewEntity.position.y << viewEntity.position.z;
 				s << viewEntity.direction.roll() << viewEntity.direction.pitch() << viewEntity.direction.yaw();
@@ -319,7 +319,7 @@ void SpaceViewer::updateClient()
 		}
 	}
 
-	// �ټ���Ƿ���������ʵ��
+	// 再检查是否有新增的实体
 	if (updateCount < MAX_UPDATE_COUNT)
 	{
 		Entities<Entity>::ENTITYS_MAP::iterator iter = entitiesMap.begin();
@@ -352,7 +352,7 @@ void SpaceViewer::updateClient()
 			++updateCount;
 
 			s << viewEntity.entityID;
-			s << true; // trueΪ���£� falseΪ����
+			s << true; // true为更新， false为销毁
 			s << pEntity->pScriptModule()->getUType();
 			s << viewEntity.position.x << viewEntity.position.y << viewEntity.position.z;
 			s << viewEntity.direction.roll() << viewEntity.direction.pitch() << viewEntity.direction.yaw();
@@ -361,7 +361,7 @@ void SpaceViewer::updateClient()
 
 	sendStream(&s, updateType_);
 
-	// ���ȫ��������ϣ������汾��
+	// 如果全部更新完毕，更换版本号
 	if (updateCount < MAX_UPDATE_COUNT)
 		++lastUpdateVersion_;
 }

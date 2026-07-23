@@ -43,101 +43,101 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	LOGINAPP������Ϣ�ӿ��ڴ˶���
+	LOGINAPP所有消息接口在此定义
 */
 NETWORK_INTERFACE_DECLARE_BEGIN(LoginappInterface)
-	// �ͻ���Э�鵼����
+	// 客户端协议导出。
 	LOGINAPP_MESSAGE_EXPOSED(importClientMessages)
 	LOGINAPP_MESSAGE_DECLARE_ARGS0(importClientMessages,							NETWORK_FIXED_MESSAGE)
 
-	// ����������������
+	// 错误码描述导出。
 	LOGINAPP_MESSAGE_EXPOSED(importServerErrorsDescr)
 	LOGINAPP_MESSAGE_DECLARE_ARGS0(importServerErrorsDescr,							NETWORK_FIXED_MESSAGE)
 
-	// �ͻ���SDK������
+	// 客户端SDK导出。
 	LOGINAPP_MESSAGE_EXPOSED(importClientSDK)
 	LOGINAPP_MESSAGE_DECLARE_STREAM(importClientSDK,								NETWORK_VARIABLE_MESSAGE)
 
-	// ĳapp����������ߡ�
+	// 某app主动请求断线。
 	LOGINAPP_MESSAGE_DECLARE_ARGS0(reqClose,										NETWORK_FIXED_MESSAGE)
 
-	// ĳapp��������look��
+	// 某app主动请求look。
 	LOGINAPP_MESSAGE_DECLARE_ARGS0(lookApp,											NETWORK_FIXED_MESSAGE)
 
-	// ĳ��app����鿴��app����״̬��
+	// 某个app请求查看该app负载状态。
 	LOGINAPP_MESSAGE_DECLARE_ARGS0(queryLoad,										NETWORK_FIXED_MESSAGE)
 
-	// hello���֡�
+	// hello握手。
 	NETWORK_MESSAGE_EXPOSED(Loginapp, hello)
 	LOGINAPP_MESSAGE_DECLARE_STREAM(hello,											NETWORK_VARIABLE_MESSAGE)
 
-	// ĳ��app��app��֪���ڻ״̬��
+	// 某个app向本app告知处于活动状态。
 	LOGINAPP_MESSAGE_EXPOSED(onClientActiveTick)
 	LOGINAPP_MESSAGE_DECLARE_ARGS0(onClientActiveTick,								NETWORK_FIXED_MESSAGE)
 	
-	// ���󴴽��˺�
+	// 请求创建账号
 	LOGINAPP_MESSAGE_EXPOSED(reqCreateAccount)
 	LOGINAPP_MESSAGE_DECLARE_STREAM(reqCreateAccount,								NETWORK_VARIABLE_MESSAGE)
 
 	LOGINAPP_MESSAGE_EXPOSED(reqCreateMailAccount)
 	LOGINAPP_MESSAGE_DECLARE_STREAM(reqCreateMailAccount,							NETWORK_VARIABLE_MESSAGE)
 
-	// �����˺���������
+	// 重置账号密码申请
 	LOGINAPP_MESSAGE_EXPOSED(reqAccountResetPassword)
 	LOGINAPP_MESSAGE_DECLARE_ARGS1(reqAccountResetPassword,							NETWORK_VARIABLE_MESSAGE,
 									std::string,									accountName)
 
-	// �����˺���������Ļص�
+	// 重置账号密码申请的回调
 	LOGINAPP_MESSAGE_DECLARE_ARGS4(onReqAccountResetPasswordCB,						NETWORK_VARIABLE_MESSAGE,
 									std::string,									accountName,
 									std::string,									email,
 									SERVER_ERROR_CODE,								failedcode,
 									std::string,									code)
-	// �û���¼������ 
+	// 用户登录服务器 
 	LOGINAPP_MESSAGE_EXPOSED(login)
 	LOGINAPP_MESSAGE_DECLARE_STREAM(login,											NETWORK_VARIABLE_MESSAGE)
 
-	// ĳapp�����ȡһ��entityID�εĻص�
+	// 某app请求获取一个entityID段的回调
 	LOGINAPP_MESSAGE_DECLARE_ARGS3(onDbmgrInitCompleted,							NETWORK_VARIABLE_MESSAGE,
 									COMPONENT_ORDER,								startGlobalOrder,
 									COMPONENT_ORDER,								startGroupOrder,
 									std::string,									digest)
 
-	// ĳ��app��app��֪���ڻ״̬��
+	// 某个app向本app告知处于活动状态。
 	LOGINAPP_MESSAGE_DECLARE_ARGS2(onAppActiveTick,									NETWORK_FIXED_MESSAGE,
 									COMPONENT_TYPE,									componentType, 
 									COMPONENT_ID,									componentID)
 
-	// ��dbmgr��ѯ���û��Ϸ��Խ��
+	// 从dbmgr查询到用户合法性结果
 	LOGINAPP_MESSAGE_DECLARE_STREAM(onLoginAccountQueryResultFromDbmgr,				NETWORK_VARIABLE_MESSAGE)
 
-	// baseappmgr���صĵ�¼���ص�ַ
+	// baseappmgr返回的登录网关地址
 	LOGINAPP_MESSAGE_DECLARE_ARGS4(onLoginAccountQueryBaseappAddrFromBaseappmgr,	NETWORK_VARIABLE_MESSAGE,
 									std::string,									loginName, 
 									std::string,									accountName,
 									std::string,									addr,
 									uint16,											port)
 
-	// ��dbmgr���󴴽��˺ŷ��ؽ��
+	// 向dbmgr请求创建账号返回结果
 	LOGINAPP_MESSAGE_DECLARE_STREAM(onReqCreateAccountResult,						NETWORK_VARIABLE_MESSAGE)
 	LOGINAPP_MESSAGE_DECLARE_STREAM(onReqCreateMailAccountResult,					NETWORK_VARIABLE_MESSAGE)
 
-	// dbmgr�˺ż����
+	// dbmgr账号激活返回
 	LOGINAPP_MESSAGE_DECLARE_ARGS2(onAccountActivated,								NETWORK_VARIABLE_MESSAGE,
 									std::string,									code, 
 									bool,											success)
 	
-	// dbmgr�˺Ű�email����
+	// dbmgr账号绑定email返回
 	LOGINAPP_MESSAGE_DECLARE_ARGS2(onAccountBindedEmail,							NETWORK_VARIABLE_MESSAGE,
 									std::string,									code, 
 									bool,											success)
 
-	// dbmgr�˺��������뷵��
+	// dbmgr账号重设密码返回
 	LOGINAPP_MESSAGE_DECLARE_ARGS2(onAccountResetPassword,							NETWORK_VARIABLE_MESSAGE,
 									std::string,									code, 
 									bool,											success)
 
-	// baseapp�����email������ʱ��Ҫ�ҵ�loginapp�ĵ�ַ��
+	// baseapp请求绑定email（返回时需要找到loginapp的地址）
 	LOGINAPP_MESSAGE_DECLARE_ARGS6(onReqAccountBindEmailAllocCallbackLoginapp,		NETWORK_VARIABLE_MESSAGE,
 									COMPONENT_ID,									reqBaseappID,
 									ENTITY_ID,										entityID,
@@ -146,21 +146,21 @@ NETWORK_INTERFACE_DECLARE_BEGIN(LoginappInterface)
 									SERVER_ERROR_CODE,								failedcode,
 									std::string,									code)
 
-	// ����رշ�����
+	// 请求关闭服务器
 	LOGINAPP_MESSAGE_DECLARE_STREAM(reqCloseServer,									NETWORK_VARIABLE_MESSAGE)
 
 
-	// �����ѯwatcher����
+	// 请求查询watcher数据
 	LOGINAPP_MESSAGE_DECLARE_STREAM(queryWatcher,									NETWORK_VARIABLE_MESSAGE)
 
-	// baseappͬ���Լ��ĳ�ʼ����Ϣ
+	// baseapp同步自己的初始化信息
 	LOGINAPP_MESSAGE_DECLARE_ARGS1(onBaseappInitProgress,							NETWORK_FIXED_MESSAGE,
 									float,											progress)
 
-	// ��ʼprofile
+	// 开始profile
 	LOGINAPP_MESSAGE_DECLARE_STREAM(startProfile,									NETWORK_VARIABLE_MESSAGE)
 
-	// ����ǿ��ɱ����ǰapp
+	// 请求强制杀死当前app
 	LOGINAPP_MESSAGE_DECLARE_STREAM(reqKillServer,									NETWORK_VARIABLE_MESSAGE)
 
 NETWORK_INTERFACE_DECLARE_END()

@@ -35,13 +35,13 @@ class Bundle;
 class Entity;
 
 /*
-	* cell1: entity(1) is real, ����GhostManager�д����entityIDs_���м��  (������ghost����)
+	* cell1: entity(1) is real, 则在GhostManager中存放于entityIDs_进行检查  (向其他ghost更新)
 
-	* cell2: entity(1) is ghost, ���cell2������Ǩ���ߣ�����Ҫ��ghost_route_��ʱ����һ��·�ɵ�ַ�� ·�������һ���հ�����һ��ʱ�������
-	                    ����ڼ���һЩ����ת�������� ��ô�Ҳ���entity�Ͳ�ѯ·�ɱ���������ת����ghostEntity(����real������Ҫ����������ghost)��
+	* cell2: entity(1) is ghost, 如果cell2被整体迁移走，则需要向ghost_route_临时设置一个路由地址， 路由在最后一次收包超过一定时间擦除。
+	                    如果期间有一些包被转发过来， 那么找不到entity就查询路由表，并继续转发到ghostEntity(例如real销毁了要求立即销毁ghost)。
 
-	* cell1: entity(1) is real, �������Ǩ�Ƶ�cell3�� ����Ҫ��ghost_route_��ʱ����һ��·�ɵ�ַ�� ·�������һ����ghost���������һ��ʱ�������
-	                    ����ڼ���һЩghost�������ת�������� ��ô�Ҳ���entity�Ͳ�ѯ·�ɱ���������ת����realEntity��
+	* cell1: entity(1) is real, 如果被再迁移到cell3， 则需要向ghost_route_临时设置一个路由地址， 路由在最后一次收ghost请求包超过一定时间擦除。
+	                    如果期间有一些ghost请求包被转发过来， 那么找不到entity就查询路由表，并继续转发到realEntity。
 */
 class GhostManager : public TimerHandler
 {
@@ -56,8 +56,8 @@ public:
 	void addRoute(ENTITY_ID entityID, COMPONENT_ID componentID);
 
 	/**
-	��������bundle����bundle�����Ǵ�send���뷢�Ͷ����л�ȡ�ģ��������Ϊ��
-	�򴴽�һ���µ�
+	创建发送bundle，该bundle可能是从send放入发送队列中获取的，如果队列为空
+	则创建一个新的
 	*/
 	Network::Bundle* createSendBundle(COMPONENT_ID componentID);
 
@@ -89,15 +89,15 @@ private:
 	};
 
 private:
-	// ���д���ghost�����entity
+	// 所有存在ghost的相关entity
 	std::map<ENTITY_ID, Entity*> 	realEntities_;
 	
-	// ghost·�ɣ� �ֲ�ʽ����ĳЩʱ���޷���֤ͬ���� ��ô�ڱ����ϵ�ĳЩentity��Ǩ�����˵�
-	// ʱ����ܻỹ���յ�һЩ������Ϣ�� ��Ϊ����app���ܻ��޷������õ�Ǩ�Ƶ�ַ�� ��ʱ����
-	// �����ڵ�ǰapp�Ͻ�Ǩ���ߵ�entityָ�򻺴�һ�£� ��������Ϣ�������ǿ��Լ���ת�����µĵ�ַ
+	// ghost路由， 分布式程序某些时候无法保证同步， 那么在本机上的某些entity被迁移走了的
+	// 时候可能会还会收到一些网络消息， 因为其他app可能还无法立即得到迁移地址， 此时我们
+	// 可以在当前app上将迁移走的entity指向缓存一下， 有网络消息过来我们可以继续转发到新的地址
 	std::map<ENTITY_ID, ROUTE_INFO> ghost_route_;
 
-	// ������Ҫ�㲥���¼���Ϣ
+	// 所有需要广播的事件消息
 	std::map<COMPONENT_ID, std::vector< Network::Bundle* > > messages_;
 
 	TimerHandle* pTimerHandle_;

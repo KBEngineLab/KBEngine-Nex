@@ -42,7 +42,7 @@ namespace KBEngine {
 class DBException;
 
 /*
-	���ݿ�ӿ�
+	数据库接口
 	tbl_Account_Auto_increment = uint64(1)
 	tbl_Account:1 = hashes(name, password, xxx)
 	tbl_Account:2 = hashes(name, password, xxx)
@@ -76,35 +76,35 @@ public:
 	void hasLostConnection( bool v )	{ hasLostConnection_ = v; }
 	
 	/**
-		��黷��
+		检查环境
 	*/
 	virtual bool checkEnvironment();
 	
 	/**
-		������ �Դ�������ݽ��о���
-		����������ɹ�����ʧ��
+		检查错误， 对错误的内容进行纠正
+		如果纠正不成功返回失败
 	*/
 	virtual bool checkErrors();
 
 	/**
-		��ĳ�����ݿ����
+		与某个数据库关联
 	*/
 	bool reattach();
 	virtual bool attach(const char* databaseName = NULL);
 	virtual bool detach();
 
 	/**
-		��ȡ���ݿ����еı���
+		获取数据库所有的表名
 	*/
 	virtual bool getTableNames( std::vector<std::string>& tableNames, const char * pattern);
 
 	/**
-		��ȡ���ݿ�ĳ�������е��ֶ�����
+		获取数据库某个表所有的字段名称
 	*/
 	virtual bool getTableItemNames(const char* tableName, std::vector<std::string>& itemNames);
 
 	/**
-		��ѯ��
+		查询表
 	*/
 	virtual bool query(const char* cmd, uint32 size, bool printlog = true, MemoryStream * result = NULL);
 	bool query(const std::string& cmd, redisReply** pRedisReply, bool printlog = true);
@@ -116,37 +116,37 @@ public:
 	void write_query_result_element(redisReply* pRedisReply, MemoryStream * result);
 		
 	/**
-		��������ӿڵ�����
+		返回这个接口的描述
 	*/
 	virtual const char* c_str();
 
 	/** 
-		��ȡ����
+		获取错误
 	*/
 	virtual const char* getstrerror();
 
 	/** 
-		��ȡ������
+		获取错误编号
 	*/
 	virtual int getlasterror();
 
 	/**
-		����һ��entity�洢��
+		创建一个entity存储表
 	*/
 	virtual EntityTable* createEntityTable(EntityTables* pEntityTables);
 
 	/** 
-		�����ݿ�ɾ��entity��
+		从数据库删除entity表
 	*/
 	virtual bool dropEntityTableFromDB(const char* tableName);
 	
 	/** 
-		�����ݿ�ɾ��entity���ֶ�
+		从数据库删除entity表字段
 	*/
 	virtual bool dropEntityTableItemFromDB(const char* tableName, const char* tableItemName);
 
 	/**
-		��ס�ӿڲ���
+		锁住接口操作
 	*/
 	virtual bool lock();
 	virtual bool unlock();
@@ -154,7 +154,7 @@ public:
 	void throwError(DBException* pDBException);
 	
 	/**
-		�����쳣
+		处理异常
 	*/
 	virtual bool processException(std::exception & e);
 	

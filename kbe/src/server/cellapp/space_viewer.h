@@ -53,7 +53,7 @@ public:
 		Position3D position;
 		Direction3D direction;
 
-		// �������кţ� ����ʵ�嶼������������к�+1�� ��ĳЩʱ�����Ƚϴ�����ÿ�ε���һ����ʵ�����
+		// 更新序列号， 所有实体都更新完毕则序列号+1， 在某些时候量比较大的情况每次迭代一部分实体更新
 		int updateVersion;
 	};
 
@@ -71,7 +71,7 @@ public:
 	}
 
 protected:
-	// �ı��˲鿴space��cell
+	// 改变了查看space的cell
 	void onChangedSpaceOrCell();
 	void resetViewer();
 
@@ -80,7 +80,7 @@ protected:
 
 	Network::Address addr_;
 
-	// ��ǰ���鿴��space��cell
+	// 当前所查看的space和cell
 	SPACE_ID spaceID_;
 	CELL_ID cellID_;
 
@@ -88,7 +88,7 @@ protected:
 
 	int updateType_;
 
-	// �������кţ� ����ʵ�嶼������������к�+1�� ��ĳЩʱ�����Ƚϴ�����ÿ�ε���һ����ʵ�����
+	// 更新序列号， 所有实体都更新完毕则序列号+1， 在某些时候量比较大的情况每次迭代一部分实体更新
 	int lastUpdateVersion_;
 };
 

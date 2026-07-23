@@ -37,7 +37,7 @@ namespace Network{
 }
 
 /*
-	�����Ʒѡ���������Ӫ�˺š�ע���¼ϵͳ�ȹҽ�
+	处理计费、第三方运营账号、注册登录系统等挂接
 */
 class InterfacesHandler
 {

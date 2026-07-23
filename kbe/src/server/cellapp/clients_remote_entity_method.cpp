@@ -68,8 +68,8 @@ PyObject* ClientsRemoteEntityMethod::tp_call(PyObject* self, PyObject* args,
 //-------------------------------------------------------------------------------------
 PyObject* ClientsRemoteEntityMethod::callmethod(PyObject* args, PyObject* kwds)
 {
-	// ��ȡentityView��Χ������entity
-	// ����Щentity��client������������ĵ���
+	// 获取entityView范围内其他entity
+	// 向这些entity的client推送这个方法的调用
 	MethodDescription* methodDescription = getDescription();
 
 	Entity* pEntity = Cellapp::getSingleton().findEntity(id_);
@@ -90,7 +90,7 @@ PyObject* ClientsRemoteEntityMethod::callmethod(PyObject* args, PyObject* kwds)
 			S_Return;
 	}
 	
-	// �ȷ����Լ�
+	// 先发给自己
 	if(methodDescription->checkArgs(args))
 	{
 		MemoryStream* mstream = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
@@ -148,7 +148,7 @@ PyObject* ClientsRemoteEntityMethod::callmethod(PyObject* args, PyObject* kwds)
 					DebugHelper::getSingleton().changeLogger(COMPONENT_NAME_EX(g_componentType));
 			}
 
-			// ��¼����¼���������������С
+			// 记录这个事件产生的数据量大小
 			g_publicClientEventHistoryStats.trackEvent(pEntity->scriptName(),
 				methodDescription->getName(),
 				pSendBundle->currMsgLength(),
@@ -158,7 +158,7 @@ PyObject* ClientsRemoteEntityMethod::callmethod(PyObject* args, PyObject* kwds)
 			pEntity->pWitness()->sendToClient(ClientInterface::onRemoteMethodCall, pSendBundle);
 		}
 
-		// �㲥��������
+		// 广播给其他人
 		std::list<ENTITY_ID>::const_iterator iter = entities.begin();
 		for(; iter != entities.end(); ++iter)
 		{
@@ -174,8 +174,8 @@ PyObject* ClientsRemoteEntityMethod::callmethod(PyObject* args, PyObject* kwds)
 			if(pChannel == NULL)
 				continue;
 
-			// ����������Ǵ��ڵģ�����������Դ��createWitnessFromStream()
-			// �����Լ���entity��δ��Ŀ��ͻ����ϴ���
+			// 这个可能性是存在的，例如数据来源于createWitnessFromStream()
+			// 又如自己的entity还未在目标客户端上创建
 			if (!pViewEntity->pWitness()->entityInView(pEntity->id()))
 				continue;
 			
@@ -230,7 +230,7 @@ PyObject* ClientsRemoteEntityMethod::callmethod(PyObject* args, PyObject* kwds)
 
 			ENTITY_MESSAGE_FORWARD_CLIENT_END(pSendBundle, msgHandler, viewEntityMessage);
 
-			// ��¼����¼���������������С
+			// 记录这个事件产生的数据量大小
 			g_publicClientEventHistoryStats.trackEvent(pViewEntity->scriptName(),
 				methodDescription->getName(), 
 				pSendBundle->currMsgLength(), 

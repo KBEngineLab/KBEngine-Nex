@@ -71,7 +71,7 @@ bool Config::loadConfig(std::string fileName)
 	
 	if(xml->getRootNode() == NULL)
 	{
-		// root�ڵ���û���ӽڵ���
+		// root节点下没有子节点了
 		return true;
 	}
 
@@ -107,7 +107,7 @@ bool Config::loadConfig(std::string fileName)
 					{
 						Network::g_trace_packet_disables.push_back(c);
 
-						// ��debug���ܰ�
+						// 不debug加密包
 						if(c == "Encrypted::packets")
 							Network::g_trace_encrypted_packet = false;
 					}

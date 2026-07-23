@@ -35,7 +35,7 @@ namespace KBEngine{
 #define CLIENTAPP ClientApp
 
 /**
-	Client��Ϣ�꣬  ����Ϊ���� ��Ҫ�Լ��⿪
+	Client消息宏，  参数为流， 需要自己解开
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CLIENT_MESSAGE_HANDLER_STREAM
@@ -76,7 +76,7 @@ namespace KBEngine{
 																				\
 
 /**
-	Client��Ϣ�꣬  ֻ�������������Ϣ
+	Client消息宏，  只有零个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CLIENT_MESSAGE_HANDLER_ARGS0
@@ -118,7 +118,7 @@ namespace KBEngine{
 
 
 /**
-	Client��Ϣ�꣬  ֻ��һ����������Ϣ
+	Client消息宏，  只有一个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CLIENT_MESSAGE_HANDLER_ARGS1
@@ -162,7 +162,7 @@ namespace KBEngine{
 	
 
 /**
-	Client��Ϣ�꣬  ֻ�ж�����������Ϣ
+	Client消息宏，  只有二个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CLIENT_MESSAGE_HANDLER_ARGS2
@@ -215,7 +215,7 @@ namespace KBEngine{
 
 
 /**
-	Client��Ϣ�꣬  ֻ��������������Ϣ
+	Client消息宏，  只有三个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CLIENT_MESSAGE_HANDLER_ARGS3
@@ -277,7 +277,7 @@ namespace KBEngine{
 
 
 /**
-	Client��Ϣ�꣬  ֻ���ĸ���������Ϣ
+	Client消息宏，  只有四个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CLIENT_MESSAGE_HANDLER_ARGS4
@@ -345,7 +345,7 @@ namespace KBEngine{
 											ARG_TYPE4, ARG_NAME4)				\
 
 /**
-	Client��Ϣ�꣬  ֻ�������������Ϣ
+	Client消息宏，  只有五个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CLIENT_MESSAGE_HANDLER_ARGS5
@@ -422,7 +422,7 @@ namespace KBEngine{
 
 
 /**
-	Client��Ϣ�꣬  ֻ��������������Ϣ
+	Client消息宏，  只有六个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CLIENT_MESSAGE_HANDLER_ARGS6
@@ -506,7 +506,7 @@ namespace KBEngine{
 											ARG_TYPE6, ARG_NAME6)				\
 
 /**
-	Client��Ϣ�꣬  ֻ�а˸���������Ϣ
+	Client消息宏，  只有八个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef CLIENT_MESSAGE_HANDLER_ARGS8

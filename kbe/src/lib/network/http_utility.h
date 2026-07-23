@@ -57,7 +57,7 @@ namespace Http
             {      
                 buf[0] = sIn[ix];
             }
-            //else if ( isspace( (uint8)sIn[ix] ) ) //ò�ưѿո�����%20����+������
+            //else if ( isspace( (uint8)sIn[ix] ) ) //貌似把空格编码成%20或者+都可以
             //{
             //    buf[0] = '+';
             //}
@@ -135,7 +135,7 @@ namespace Http
 		Status setHeader(const std::map<std::string, std::string>& headers);
 		Status setHeader(const std::string& header);
 
-		// set cert、ca、key
+		// set cert銆乧a銆乲ey
 		Status setCAInfo(const std::string& cainfo);
 		Status setSSLCert(const std::string& sslCert);
 		Status setSSLKey(const std::string& sslKey);

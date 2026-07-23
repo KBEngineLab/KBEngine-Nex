@@ -44,10 +44,10 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	cellapp������Ϣ�ӿ��ڴ˶���
+	cellapp所有消息接口在此定义
 */
 NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
-	// ĳappע���Լ��Ľӿڵ�ַ����app
+	// 某app注册自己的接口地址到本app
 	CELLAPP_MESSAGE_DECLARE_ARGS11(onRegisterNewApp,								NETWORK_VARIABLE_MESSAGE,
 									int32,											uid, 
 									std::string,									username,
@@ -61,17 +61,17 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
 									uint16,											extport,
 									std::string,									extaddrEx)
 
-	// ĳapp��������look��
+	// 某app主动请求look。
 	CELLAPP_MESSAGE_DECLARE_ARGS0(lookApp,											NETWORK_FIXED_MESSAGE)
 
-	// ĳ��app����鿴��app����״̬��
+	// 某个app请求查看该app负载状态。
 	CELLAPP_MESSAGE_DECLARE_ARGS0(queryLoad,										NETWORK_FIXED_MESSAGE)
 
-	// consoleԶ��ִ��python��䡣
+	// console远程执行python语句。
 	CELLAPP_MESSAGE_DECLARE_STREAM(onExecScriptCommand,								NETWORK_VARIABLE_MESSAGE)
 
-	// dbmgr��֪�Ѿ�����������baseapp����cellapp�ĵ�ַ
-	// ��ǰapp��Ҫ������ȥ�����ǽ�������
+	// dbmgr告知已经启动的其他baseapp或者cellapp的地址
+	// 当前app需要主动的去与他们建立连接
 	CELLAPP_MESSAGE_DECLARE_ARGS11(onGetEntityAppFromDbmgr,							NETWORK_VARIABLE_MESSAGE,
 									int32,											uid, 
 									std::string,									username,
@@ -85,12 +85,12 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
 									uint16,											extport,
 									std::string,									extaddrEx)
 
-	// ĳapp�����ȡһ��entityID�εĻص�
+	// 某app请求获取一个entityID段的回调
 	CELLAPP_MESSAGE_DECLARE_ARGS2(onReqAllocEntityID,								NETWORK_FIXED_MESSAGE,
 									ENTITY_ID,										startID,
 									ENTITY_ID,										endID)
 
-	// ĳapp�����ȡһ��entityID�εĻص�
+	// 某app请求获取一个entityID段的回调
 	CELLAPP_MESSAGE_DECLARE_ARGS6(onDbmgrInitCompleted,								NETWORK_VARIABLE_MESSAGE,
 									GAME_TIME,										gametime, 
 									ENTITY_ID,										startID,
@@ -99,116 +99,116 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
 									COMPONENT_ORDER,								startGroupOrder,
 									std::string,									digest)
 
-	// global���ݸı�
+	// global数据改变
 	CELLAPP_MESSAGE_DECLARE_STREAM(onBroadcastGlobalDataChanged,					NETWORK_VARIABLE_MESSAGE)
 	CELLAPP_MESSAGE_DECLARE_STREAM(onBroadcastCellAppDataChanged,					NETWORK_VARIABLE_MESSAGE)
 
-	// baseEntity���󴴽���һ���µ�space�С�
+	// baseEntity请求创建在一个新的space中。
 	CELLAPP_MESSAGE_DECLARE_STREAM(onCreateCellEntityInNewSpaceFromBaseapp,			NETWORK_VARIABLE_MESSAGE)
 
-	// baseEntity����ָ���һ���µ�space�С�
+	// baseEntity请求恢复在一个新的space中。
 	CELLAPP_MESSAGE_DECLARE_STREAM(onRestoreSpaceInCellFromBaseapp,					NETWORK_VARIABLE_MESSAGE)
 
-	// ����APP�����ڴ����ѻָ���
+	// 其他APP请求在此灾难恢复。
 	CELLAPP_MESSAGE_DECLARE_STREAM(requestRestore,									NETWORK_VARIABLE_MESSAGE)
 	
-	// baseapp���������cellapp�ϴ���һ��entity��
+	// baseapp请求在这个cellapp上创建一个entity。
 	CELLAPP_MESSAGE_DECLARE_STREAM(onCreateCellEntityFromBaseapp,					NETWORK_VARIABLE_MESSAGE)
 
-	// ����ĳ��cellEntity��
+	// 销毁某个cellEntity。
 	CELLAPP_MESSAGE_DECLARE_ARGS1(onDestroyCellEntityFromBaseapp,					NETWORK_FIXED_MESSAGE,
 									ENTITY_ID,										eid)
 
-	// ĳ��app��app��֪���ڻ״̬��
+	// 某个app向本app告知处于活动状态。
 	CELLAPP_MESSAGE_DECLARE_ARGS2(onAppActiveTick,									NETWORK_FIXED_MESSAGE,
 									COMPONENT_TYPE,									componentType, 
 									COMPONENT_ID,									componentID)
 
-	// entity�յ�Զ��call����, ��ĳ��app�ϵ�entitycall����
+	// entity收到远程call请求, 由某个app上的entitycall发起
 	CELLAPP_MESSAGE_DECLARE_STREAM(onEntityCall,									NETWORK_VARIABLE_MESSAGE)
 
-	// client����entity��cell����
+	// client访问entity的cell方法
 	CELLAPP_MESSAGE_DECLARE_STREAM(onRemoteCallMethodFromClient,					NETWORK_VARIABLE_MESSAGE)
 
-	// client��������
+	// client更新数据
 	CELLAPP_MESSAGE_DECLARE_STREAM(onUpdateDataFromClient,							NETWORK_VARIABLE_MESSAGE)
 	CELLAPP_MESSAGE_DECLARE_STREAM(onUpdateDataFromClientForControlledEntity,		NETWORK_VARIABLE_MESSAGE)
 
-	// executeRawDatabaseCommand��dbmgr�Ļص�
+	// executeRawDatabaseCommand从dbmgr的回调
 	CELLAPP_MESSAGE_DECLARE_STREAM(onExecuteRawDatabaseCommandCB,					NETWORK_VARIABLE_MESSAGE)
 
-	// base�����ȡcelldata
+	// base请求获取celldata
 	CELLAPP_MESSAGE_DECLARE_STREAM(reqBackupEntityCellData,							NETWORK_VARIABLE_MESSAGE)
 
-	// base�����ȡWriteToDB
+	// base请求获取WriteToDB
 	CELLAPP_MESSAGE_DECLARE_STREAM(reqWriteToDBFromBaseapp,							NETWORK_VARIABLE_MESSAGE)
 
-	// �ͻ���ֱ�ӷ�����Ϣ��cellʵ��
+	// 客户端直接发送消息给cell实体
 	CELLAPP_MESSAGE_DECLARE_STREAM(forwardEntityMessageToCellappFromClient,			NETWORK_VARIABLE_MESSAGE)
 
-	// ����رշ�����
+	// 请求关闭服务器
 	CELLAPP_MESSAGE_DECLARE_STREAM(reqCloseServer,									NETWORK_VARIABLE_MESSAGE)
 
-	// �����ѯwatcher����
+	// 请求查询watcher数据
 	CELLAPP_MESSAGE_DECLARE_STREAM(queryWatcher,									NETWORK_VARIABLE_MESSAGE)
 
-	// ��ʼprofile
+	// 开始profile
 	CELLAPP_MESSAGE_DECLARE_STREAM(startProfile,									NETWORK_VARIABLE_MESSAGE)
 
-	// ����teleport����ǰcellapp��
+	// 请求teleport到当前cellapp上
 	CELLAPP_MESSAGE_DECLARE_STREAM(reqTeleportToCellApp,							NETWORK_VARIABLE_MESSAGE)
 
-	// entity���͵�Ŀ��cellapp�ϵ�space֮�� ���ظ�֮ǰcellapp�Ļص�
+	// entity传送到目的cellapp上的space之后， 返回给之前cellapp的回调
 	CELLAPP_MESSAGE_DECLARE_STREAM(reqTeleportToCellAppCB,							NETWORK_VARIABLE_MESSAGE)
 
-	// ����cellapp���ͺ���Ҫbaseapp�������״̬�����cellapp��¼�ı�ǣ��˺�cellapp�ſ��Լ���teleport
+	// 当跨cellapp传送后需要baseapp设置完成状态再清除cellapp记录的标记，此后cellapp才可以继续teleport
 	CELLAPP_MESSAGE_DECLARE_STREAM(reqTeleportToCellAppOver,						NETWORK_VARIABLE_MESSAGE)
 		
-	// real����������Ե�ghost
+	// real请求更新属性到ghost
 	CELLAPP_MESSAGE_DECLARE_STREAM(onUpdateGhostPropertys,							NETWORK_VARIABLE_MESSAGE)
 	
-	// ghost�������def����real
+	// ghost请求调用def方法real
 	CELLAPP_MESSAGE_DECLARE_STREAM(onRemoteRealMethodCall,							NETWORK_VARIABLE_MESSAGE)
 
-	// real��������ױ����ݵ�ghost
+	// real请求更新易变数据到ghost
 	CELLAPP_MESSAGE_DECLARE_STREAM(onUpdateGhostVolatileData,						NETWORK_VARIABLE_MESSAGE)
 
-	// ����ǿ��ɱ����ǰapp
+	// 请求强制杀死当前app
 	CELLAPP_MESSAGE_DECLARE_STREAM(reqKillServer,									NETWORK_VARIABLE_MESSAGE)
 
-	// ��������ı�space�鿴���������Ӻ�ɾ�����ܣ�
+	// 工具请求改变space查看器（含添加和删除功能）
 	CELLAPP_MESSAGE_DECLARE_STREAM(setSpaceViewer,									NETWORK_VARIABLE_MESSAGE)
 
 	//--------------------------------------------Entity----------------------------------------------------------
-	//Զ�̺���entity����
+	//远程呼叫entity方法
 	ENTITY_MESSAGE_DECLARE_STREAM(onRemoteMethodCall,								NETWORK_VARIABLE_MESSAGE)
 
-	//�ͻ���������λ��
+	//客户端设置新位置
 	ENTITY_MESSAGE_DECLARE_ARGS2(setPosition_XZ_int,								NETWORK_FIXED_MESSAGE,
 									int32,											x, 
 									int32,											z)
 	
-	//�ͻ���������λ��
+	//客户端设置新位置
 	ENTITY_MESSAGE_DECLARE_ARGS3(setPosition_XYZ_int,								NETWORK_FIXED_MESSAGE,
 									int32,											x, 
 									int32,											y, 
 									int32,											z)
 
-	//�ͻ���������λ��
+	//客户端设置新位置
 	ENTITY_MESSAGE_DECLARE_ARGS2(setPosition_XZ_float,								NETWORK_FIXED_MESSAGE,
 									float,											x, 
 									float,											z)
 
-	//�ͻ���������λ��
+	//客户端设置新位置
 	ENTITY_MESSAGE_DECLARE_ARGS3(setPosition_XYZ_float,								NETWORK_FIXED_MESSAGE,
 									float,											x, 
 									float,											y, 
 									float,											z)
 
-	//entity����һ���۲���(�ͻ���)
+	//entity绑定了一个观察者(客户端)
 	ENTITY_MESSAGE_DECLARE_ARGS0(onGetWitnessFromBase,								NETWORK_FIXED_MESSAGE)
 
-	//entity��ʧ��һ���۲���(�ͻ���)
+	//entity丢失了一个观察者(客户端)
 	ENTITY_MESSAGE_DECLARE_ARGS0(onLoseWitness,										NETWORK_FIXED_MESSAGE)
 NETWORK_INTERFACE_DECLARE_END()
 

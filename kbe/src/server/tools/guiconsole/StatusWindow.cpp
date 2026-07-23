@@ -107,7 +107,7 @@ public:
 			int selgot = select(epListen+1, &fds, NULL, NULL, &tv);
 			if(selgot == 0)
 			{
-				// ��ʱ, ���ܶԷ���æ
+				// 超时, 可能对方繁忙
 				return false;	
 			}
 			else if(selgot == -1)
@@ -249,10 +249,10 @@ BOOL StatusWindow::OnInitDialog()
 	CDialog::OnInitDialog();
 	
 	DWORD dwStyle = m_statusList.GetExtendedStyle();
-	dwStyle |= LVS_EX_FULLROWSELECT;					//ѡ��ĳ��ʹ���и�����ֻ������report����listctrl��
-	dwStyle |= LVS_EX_GRIDLINES;						//�����ߣ�ֻ������report����listctrl��
+	dwStyle |= LVS_EX_FULLROWSELECT;					//选中某行使整行高亮（只适用与report风格的listctrl）
+	dwStyle |= LVS_EX_GRIDLINES;						//网格线（只适用与report风格的listctrl）
 	//dwStyle |= LVS_EX_ONECLICKACTIVATE;
-	m_statusList.SetExtendedStyle(dwStyle);				//������չ���
+	m_statusList.SetExtendedStyle(dwStyle);				//设置扩展风格
 
 	int idx = 0;
 	m_statusList.InsertColumn(idx++, _T("uid"),					LVCFMT_CENTER,	40);

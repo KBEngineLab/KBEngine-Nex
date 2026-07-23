@@ -45,7 +45,7 @@ class ProxyForwarder;
 
 class Proxy : public Entity
 {
-	/** ���໯��һЩpy�������������� */
+	/** 子类化将一些py操作填充进派生类 */
 	BASE_SCRIPT_HREADER(Proxy, Entity)
 
 public:
@@ -59,14 +59,14 @@ public:
 	bool pushBundle(Network::Bundle* pBundle);
 
 	/**
-		��witness�ͻ�������һ����Ϣ
+		向witness客户端推送一条消息
 	*/
 	bool sendToClient(const Network::MessageHandler& msgHandler, Network::Bundle* pBundle);
 	bool sendToClient(Network::Bundle* pBundle, bool immediately = false);
 	bool sendToClient(bool expectData = true);
 
 	/** 
-		�ű������ȡ���ӵ�rttֵ
+		脚本请求获取连接的rtt值
 	*/
 	double getRoundTripTime() const;
 	DECLARE_PY_GET_MOTHOD(pyGetRoundTripTime);
@@ -78,67 +78,67 @@ public:
 	DECLARE_PY_GET_MOTHOD(pyGetTimeSinceHeardFromClient);
 
 	/** 
-		�ű������ȡ�Ƿ���client�󶨵�proxy��
+		脚本请求获取是否有client绑定到proxy上
 	*/
 	bool hasClient() const;
 	DECLARE_PY_GET_MOTHOD(pyHasClient);
 
 	/** 
-		�ű������ȡclient��ַ
+		脚本请求获取client地址
 	*/
 	DECLARE_PY_GET_MOTHOD(pyClientAddr);
 
 	/** 
-		ʵ���Ƿ����
+		实体是否可用
 	*/
 	INLINE bool clientEnabled() const;
 	DECLARE_PY_GET_MOTHOD(pyGetClientEnabled);
 
 	/**
-		���entity��������, �ڿͻ��˳�ʼ���ö�Ӧ��entity�� �������������
+		这个entity被激活了, 在客户端初始化好对应的entity后， 这个方法被调用
 	*/
 	void onClientEnabled(void);
 	
 	/**
-		һ�����������������
+		一个数据下载任务完成
 	*/
 	void onStreamComplete(int16 id, bool success);
 
 	/**
-		��½���ԣ� �������ĵ�½ʧ��֮�� ��������ӿ��ٽ��г��� 
+		登陆尝试， 当正常的登陆失败之后， 调用这个接口再进行尝试 
 	*/
 	int32 onLogOnAttempt(const char* addr, uint32 port, const char* password);
 	
 	/**
-		��ʼ���ͻ���proxy������
+		初始化客户端proxy的属性
 	*/
 	void initClientBasePropertys();
 	void initClientCellPropertys();
 
 	/** 
-		��������entity��Ӧ�Ŀͻ���socket�Ͽ�ʱ������ 
+		当察觉这个entity对应的客户端socket断开时被调用 
 	*/
 	void onClientDeath(void);
 	
-	/** ����ӿ�
-		���ͻ��������������entity��cell������ʱ�������� 
+	/** 网络接口
+		当客户端所关联的这个entity的cell被创建时，被调用 
 	*/
 	void onClientGetCell(Network::Channel* pChannel, COMPONENT_ID componentID);
 
 	/**
-		��ȡǰ�����
+		获取前端类别
 	*/
 	INLINE COMPONENT_CLIENT_TYPE getClientType() const;
 	INLINE void setClientType(COMPONENT_CLIENT_TYPE ctype);
 	DECLARE_PY_MOTHOD_ARG0(pyGetClientType);
 
 	/**
-		�Ͽ��ͻ�������
+		断开客户端连接
 	*/
 	DECLARE_PY_MOTHOD_ARG0(pyDisconnect);
 
 	/**
-		��ȡǰ�˸�������
+		获取前端附带数据
 	*/
 	INLINE const std::string& getLoginDatas();
 	INLINE void setLoginDatas(const std::string& datas);
@@ -149,13 +149,13 @@ public:
 	DECLARE_PY_MOTHOD_ARG0(pyGetClientDatas);
 
 	/**
-		ÿ��proxy����֮�󶼻���ϵͳ����һ��uuid�� �ṩǰ���ص�½ʱ��������ʶ��
+		每个proxy创建之后都会由系统产生一个uuid， 提供前端重登陆时用作身份识别
 	*/
 	INLINE uint64 rndUUID() const;
 	INLINE void rndUUID(uint64 uid);
 
 	/** 
-		���������������Ŀͻ���ת����һ��proxyȥ���� 
+		将其自身所关联的客户端转给另一个proxy去关联 
 	*/
 	void giveClientTo(Proxy* proxy);
 	void onGiveClientTo(Network::Channel* lpChannel);
@@ -163,31 +163,31 @@ public:
 	DECLARE_PY_MOTHOD_ARG1(pyGiveClientTo, PyObject_ptr);
 
 	/**
-		�ļ�����������
+		文件流数据下载
 	*/
 	static PyObject* __py_pyStreamFileToClient(PyObject* self, PyObject* args);
 	int16 streamFileToClient(PyObjectPtr objptr, 
 		const std::string& descr = "", int16 id = -1);
 
 	/**
-		�ַ�������������
+		字符串流数据下载
 	*/
 	static PyObject* __py_pyStreamStringToClient(PyObject* self, PyObject* args);
 	int16 streamStringToClient(PyObjectPtr objptr, 
 		const std::string& descr = "", int16 id = -1);
 
 	/**
-		����witness
+		绑定了witness
 	*/
 	void onGetWitness();
 
 	/**
-		���ͻ��˴ӷ������߳�
+		将客户端从服务器踢出
 	*/
 	void kick();
 
 	/**
-		������proxy�Ŀͻ������Ӷ���
+		获得这个proxy的客户端连接对象
 	*/
 	Network::Channel* pChannel();
 
@@ -198,20 +198,20 @@ protected:
 
 	bool clientEnabled_;
 
-	// ���ƿͻ���ÿ������ʹ�õĴ���
+	// 限制客户端每秒所能使用的带宽
 	int32 bandwidthPerSecond_;
 
-	// ͨ�ż���key Ĭ��blowfish
+	// 通信加密key 默认blowfish
 	std::string encryptionKey;
 
 	ProxyForwarder* pProxyForwarder_;
 
 	COMPONENT_CLIENT_TYPE clientComponentType_;
 
-	// ��½ʱ������datas���ݣ����浵��
+	// 登陆时附带的datas数据（不存档）
 	std::string loginDatas_;
 
-	// ע��ʱ������datas���ݣ����ô浵��
+	// 注册时附带的datas数据（永久存档）
 	std::string createDatas_;
 };
 

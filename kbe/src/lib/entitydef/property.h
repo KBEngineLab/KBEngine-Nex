@@ -56,82 +56,82 @@ public:
 	virtual ~PropertyDescription();
 	
 	/** 
-		��ȡ������Ե�detailLevel 
+		获取这个属性的detailLevel 
 	*/
 	INLINE int8 getDetailLevel(void) const;
 	
 	/** 
-		�Ƿ���һ�����浽���ݿ��е����� 
+		是否是一个保存到数据库中的属性 
 	*/
 	INLINE bool isPersistent(void) const;
 	
 	/** 
-		��ȡ������Ե�������� 
+		获取这个属性的数据类别 
 	*/
 	INLINE DataType* getDataType(void) const;
 	
 	/** 
-		��ȡ���Եı�־ cell_public�� 
+		获取属性的标志 cell_public等 
 	*/
 	INLINE uint32 getFlags(void) const;
 	
 	/** 
-		��ȡ�������� 
+		获取属性名称 
 	*/
 	INLINE const char* getName(void) const;
 	
 	/** 
-		��ȡ�ַ������������ UINT32, BAG..
+		获取字符串数据类别名 UINT32, BAG..
 	*/
 	INLINE const char* getDataTypeName(void) const;
 	
 	/** 
-		��ȡ��ʼֵ�ַ���
+		获取初始值字符串
 	*/
 	INLINE const char* getDefaultValStr(void) const;
 
 	/** 
-		���Ե�������� ���������ϴ���ʶ�� 
+		属性的数字类别， 用于网络上传输识别 
 	*/
 	INLINE ENTITY_PROPERTY_UID getUType(void) const;
 	
 	/** 
-		��ȡ�����������
+		获取属性索引类别
 	*/
 	INLINE const char* indexType(void) const;
 
 	/** 
-		����id�� ����¶�ķ������߹㲥�������ܸ���С��255ʱ
-		���ǲ�ʹ��utype��ʹ��1�ֽڵ�aliasID������
+		别名id， 当暴露的方法或者广播的属性总个数小于255时
+		我们不使用utype而使用1字节的aliasID来传输
 	*/
 	INLINE int16 aliasID() const;
 	INLINE uint8 aliasIDAsUint8() const;
 	INLINE void aliasID(int16 v);
 
 	/** 
-		�����������Ϊ������ 
+		设置这个属性为索引键 
 	*/
 	INLINE void setIdentifier(bool isIdentifier);
 	
 	/** 
-		����������������ݿ��еĳ��� 
+		设置这个属性在数据库中的长度 
 	*/
 	INLINE void setDatabaseLength(uint32 databaseLength);
 	INLINE uint32 getDatabaseLength() const;
 
 	/** 
-		��ȡ�������������def�ļ��б������Ĭ��ֵ 
+		获取这个属性描述在def文件中被定义的默认值 
 	*/
 	PyObject* newDefaultVal(void);
 	
 	/** 
-		������������������� 
+		获得属性描述的总数量 
 	*/
 	static uint32 getDescriptionCount(void){ return propertyDescriptionCount_; }
 	static void resetDescriptionCount(void){ propertyDescriptionCount_ = 0; }
 
 	/** 
-		�������Ͳ���һ������ʵ�� 
+		根据类型产生一个描述实例 
 	*/
 	static PropertyDescription* createDescription(ENTITY_PROPERTY_UID utype, 
 		std::string& dataTypeName, 
@@ -146,7 +146,7 @@ public:
 		DETAIL_TYPE detailLevel);
 	
 	/** 
-		�ű���������������Ե�ֵ 
+		脚本请求设置这个属性的值 
 	*/
 	virtual PyObject* onSetValue(PyObject* parentObj, PyObject* value);	
 
@@ -162,19 +162,19 @@ public:
 	INLINE bool hasClient(void) const;
 	
 protected:	
-	static uint32				propertyDescriptionCount_;						// ���е���������������	
-	std::string					name_;											// ������Ե�����
-	std::string					dataTypeName_;									// ������Ե��ַ������������
-	uint32						flags_;											// ������Ե�һЩ��־  ���� cell_public
-	bool						isPersistent_;									// �Ƿ���һ���洢�����ݿ������
-	DataType*					dataType_;										// ������Ե��������
-	bool						isIdentifier_;									// �Ƿ���һ��������
-	uint32						databaseLength_;								// ������������ݿ��еĳ���
-	ENTITY_PROPERTY_UID			utype_;											// ������Ե�������� ���������ϴ���ʶ��
-	std::string					defaultValStr_;									// ������Ե�Ĭ��ֵ
-	DETAIL_TYPE					detailLevel_;									// ������Ե�lod���鼶�� ��common�е�:���Ե�lod�㲥����Χ�Ķ���
-	int16						aliasID_;										// ����id�� ����¶�ķ������߹㲥�������ܸ���С��255ʱ�� ���ǲ�ʹ��utype��ʹ��1�ֽڵ�aliasID������
-	std::string					indexType_;										// ���Ե��������UNIQUE, INDEX���ֱ��Ӧ�����á�Ψһ��������ͨ����
+	static uint32				propertyDescriptionCount_;						// 所有的属性描述的数量	
+	std::string					name_;											// 这个属性的名称
+	std::string					dataTypeName_;									// 这个属性的字符串数据类别名
+	uint32						flags_;											// 这个属性的一些标志  比如 cell_public
+	bool						isPersistent_;									// 是否是一个存储到数据库的属性
+	DataType*					dataType_;										// 这个属性的数据类别
+	bool						isIdentifier_;									// 是否是一个索引键
+	uint32						databaseLength_;								// 这个属性在数据库中的长度
+	ENTITY_PROPERTY_UID			utype_;											// 这个属性的数字类别， 用于网络上传输识别
+	std::string					defaultValStr_;									// 这个属性的默认值
+	DETAIL_TYPE					detailLevel_;									// 这个属性的lod详情级别 看common中的:属性的lod广播级别范围的定义
+	int16						aliasID_;										// 别名id， 当暴露的方法或者广播的属性总个数小于255时， 我们不使用utype而使用1字节的aliasID来传输
+	std::string					indexType_;										// 属性的索引类别，UNIQUE, INDEX，分别对应无设置、唯一索引、普通索引
 };
 
 class FixedDictDescription : public PropertyDescription
@@ -195,7 +195,7 @@ public:
 	virtual ~FixedDictDescription();
 	
 	/** 
-		�ű���������������Ե�ֵ 
+		脚本请求设置这个属性的值 
 	*/
 	PyObject* onSetValue(PyObject* parentObj, PyObject* value);	
 
@@ -226,7 +226,7 @@ public:
 	virtual ~ArrayDescription();
 	
 	/** 
-		�ű���������������Ե�ֵ 
+		脚本请求设置这个属性的值 
 	*/
 	PyObject* onSetValue(PyObject* parentObj, PyObject* value);
 
@@ -255,7 +255,7 @@ public:
 	virtual ~VectorDescription();
 	
 	/** 
-		�ű���������������Ե�ֵ 
+		脚本请求设置这个属性的值 
 	*/
 	PyObject* onSetValue(PyObject* parentObj, PyObject* value);
 	

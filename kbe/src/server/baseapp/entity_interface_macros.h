@@ -38,7 +38,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	BASE��Ϣ�꣬  ����Ϊ���� ��Ҫ�Լ��⿪
+	BASE消息宏，  参数为流， 需要自己解开
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef ENTITY_MESSAGE_HANDLER_STREAM
@@ -113,7 +113,7 @@ namespace KBEngine{
 																				\
 
 /**
-	Entity��Ϣ�꣬  ֻ�������������Ϣ
+	Entity消息宏，  只有零个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef ENTITY_MESSAGE_HANDLER_ARGS0
@@ -188,7 +188,7 @@ namespace KBEngine{
 																				\
 
 /**
-	Entity��Ϣ�꣬  ֻ��һ����������Ϣ
+	Entity消息宏，  只有一个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef ENTITY_MESSAGE_HANDLER_ARGS1
@@ -265,7 +265,7 @@ namespace KBEngine{
 																				\
 
 /**
-	Entity��Ϣ�꣬  ֻ�ж�����������Ϣ
+	Entity消息宏，  只有二个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef ENTITY_MESSAGE_HANDLER_ARGS2
@@ -351,7 +351,7 @@ namespace KBEngine{
 
 
 /**
-	Entity��Ϣ�꣬  ֻ��������������Ϣ
+	Entity消息宏，  只有三个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef ENTITY_MESSAGE_HANDLER_ARGS3
@@ -442,7 +442,7 @@ namespace KBEngine{
 																				\
 
 /**
-	Entity��Ϣ�꣬  ֻ���ĸ���������Ϣ
+	Entity消息宏，  只有四个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef ENTITY_MESSAGE_HANDLER_ARGS4

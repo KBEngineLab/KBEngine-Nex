@@ -36,7 +36,7 @@ namespace KBEngine {
 class ClientObject : public ClientObjectBase
 {
 	/** 
-		���໯ ��һЩpy�������������� 
+		子类化 将一些py操作填充进派生类 
 	*/
 	INSTANCE_SCRIPT_HREADER(ClientObject, ClientObjectBase)	
 
@@ -83,29 +83,29 @@ public:
 		const std::string& scriptVerInfo, const std::string& protocolMD5, 
 		const std::string& entityDefMD5, COMPONENT_TYPE componentType);
 
-	/** ����ӿ�
-		�����˺ųɹ���ʧ�ܻص�
-	   @failedcode: ʧ�ܷ����� NETWORK_ERR_SRV_NO_READY:������û��׼����, 
-									NETWORK_ERR_ACCOUNT_CREATE:����ʧ�ܣ��Ѿ����ڣ�, 
-									NETWORK_SUCCESS:�˺Ŵ����ɹ�
+	/** 网络接口
+		创建账号成功和失败回调
+	   @failedcode: 失败返回码 NETWORK_ERR_SRV_NO_READY:服务器没有准备好, 
+									NETWORK_ERR_ACCOUNT_CREATE:创建失败（已经存在）, 
+									NETWORK_SUCCESS:账号创建成功
 
 									SERVER_ERROR_CODE failedcode;
-		@�����Ƹ�������:�����ƶ�������: uint32���� + bytearray
+		@二进制附带数据:二进制额外数据: uint32长度 + bytearray
 	*/
 	virtual void onCreateAccountResult(Network::Channel * pChannel, MemoryStream& s);
 
-	/** ����ӿ�
-	   ��¼ʧ�ܻص�
-	   @failedcode: ʧ�ܷ����� NETWORK_ERR_SRV_NO_READY:������û��׼����, 
-									NETWORK_ERR_SRV_OVERLOAD:���������ع���, 
-									NETWORK_ERR_NAME_PASSWORD:�û����������벻��ȷ
+	/** 网络接口
+	   登录失败回调
+	   @failedcode: 失败返回码 NETWORK_ERR_SRV_NO_READY:服务器没有准备好, 
+									NETWORK_ERR_SRV_OVERLOAD:服务器负载过重, 
+									NETWORK_ERR_NAME_PASSWORD:用户名或者密码不正确
 	*/
 	virtual void onLoginFailed(Network::Channel * pChannel, MemoryStream& s);
 
-	/** ����ӿ�
-	   ��¼�ɹ�
-	   @ip: ������ip��ַ
-	   @port: �������˿�
+	/** 网络接口
+	   登录成功
+	   @ip: 服务器ip地址
+	   @port: 服务器端口
 	*/
 	virtual void onLoginSuccessfully(Network::Channel * pChannel, MemoryStream& s);
 

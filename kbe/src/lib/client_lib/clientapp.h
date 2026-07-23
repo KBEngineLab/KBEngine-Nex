@@ -135,7 +135,7 @@ public:
 	virtual void onServerClosed();
 
 	/**
-		���ýű��������ǰ׺
+		设置脚本输出类型前缀
 	*/
 	static PyObject* __py_setScriptLogType(PyObject* self, PyObject* args);
 
@@ -146,49 +146,49 @@ public:
 		const std::string& scriptVerInfo, const std::string& protocolMD5, 
 		const std::string& entityDefMD5, COMPONENT_TYPE componentType);
 
-	/** ����ӿ�
-		�ͷ���˵İ汾��ƥ��
+	/** 网络接口
+		和服务端的版本不匹配
 	*/
 	virtual void onVersionNotMatch(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ����ӿ�
-		�ͷ���˵Ľű���汾��ƥ��
+	/** 网络接口
+		和服务端的脚本层版本不匹配
 	*/
 	virtual void onScriptVersionNotMatch(Network::Channel* pChannel, MemoryStream& s);
 
-	/** ����ӿ�
-	   ��¼�ɹ�
-	   @ip: ������ip��ַ
-	   @port: �������˿�
+	/** 网络接口
+	   登录成功
+	   @ip: 服务器ip地址
+	   @port: 服务器端口
 	*/
 	virtual void onLoginSuccessfully(Network::Channel * pChannel, MemoryStream& s);
 
-	/** ����ӿ�
-	   ��¼ʧ�ܻص�
-	   @failedcode: ʧ�ܷ����� NETWORK_ERR_SRV_NO_READY:������û��׼����, 
-									NETWORK_ERR_SRV_OVERLOAD:���������ع���, 
-									NETWORK_ERR_NAME_PASSWORD:�û����������벻��ȷ
+	/** 网络接口
+	   登录失败回调
+	   @failedcode: 失败返回码 NETWORK_ERR_SRV_NO_READY:服务器没有准备好, 
+									NETWORK_ERR_SRV_OVERLOAD:服务器负载过重, 
+									NETWORK_ERR_NAME_PASSWORD:用户名或者密码不正确
 	*/
 	virtual void onLoginFailed(Network::Channel * pChannel, MemoryStream& s);
 
-	/** ����ӿ�
-	   ��¼ʧ�ܻص�
-	   @failedcode: ʧ�ܷ����� NETWORK_ERR_SRV_NO_READY:������û��׼����, 
-									NETWORK_ERR_ILLEGAL_LOGIN:�Ƿ���¼, 
-									NETWORK_ERR_NAME_PASSWORD:�û����������벻��ȷ
+	/** 网络接口
+	   登录失败回调
+	   @failedcode: 失败返回码 NETWORK_ERR_SRV_NO_READY:服务器没有准备好, 
+									NETWORK_ERR_ILLEGAL_LOGIN:非法登录, 
+									NETWORK_ERR_NAME_PASSWORD:用户名或者密码不正确
 	*/
 	virtual void onLoginBaseappFailed(Network::Channel * pChannel, SERVER_ERROR_CODE failedcode);
 	virtual void onReloginBaseappFailed(Network::Channel * pChannel, SERVER_ERROR_CODE failedcode);
 
-	/** ����ӿ�
-	   �ص�½baseapp�ɹ�
+	/** 网络接口
+	   重登陆baseapp成功
 	*/
 	virtual void onReloginBaseappSuccessfully(Network::Channel * pChannel, MemoryStream& s);
 
 	virtual void onTargetChanged();
 
 	/** 
-		�����������ĳ��space�ļ���ӳ��
+		服务端添加了某个space的几何映射
 	*/
 	virtual void onAddSpaceGeometryMapping(SPACE_ID spaceID, std::string& respath);
 
@@ -223,27 +223,27 @@ public:
 	}
 
 	/**
-		ͨ�����·����ȡ��Դ��ȫ·��
+		通过相对路径获取资源的全路径
 	*/
 	static PyObject* __py_getResFullPath(PyObject* self, PyObject* args);
 
 	/**
-		ͨ�����·���ж���Դ�Ƿ����
+		通过相对路径判断资源是否存在
 	*/
 	static PyObject* __py_hasRes(PyObject* self, PyObject* args);
 
 	/**
-		open�ļ�
+		open文件
 	*/
 	static PyObject* __py_kbeOpen(PyObject* self, PyObject* args);
 
 	/**
-		�г�Ŀ¼�������ļ�
+		列出目录下所有文件
 	*/
 	static PyObject* __py_listPathRes(PyObject* self, PyObject* args);
 
 	/**
-		ƥ�����·�����ȫ·��
+		匹配相对路径获得全路径
 	*/
 	static PyObject* __py_matchPath(PyObject* self, PyObject* args);
 
@@ -255,7 +255,7 @@ protected:
 
 	COMPONENT_TYPE											componentType_;
 
-	// �������ID
+	// 本组件的ID
 	COMPONENT_ID											componentID_;									
 
 	Network::EventDispatcher& 								dispatcher_;
@@ -265,7 +265,7 @@ protected:
 	Network::TCPPacketReceiver*								pTCPPacketReceiver_;
 	Network::BlowfishFilter*								pBlowfishFilter_;
 
-	// �̳߳�
+	// 线程池
 	thread::ThreadPool										threadPool_;
 
 	PyObjectPtr												entryScript_;

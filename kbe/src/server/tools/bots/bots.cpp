@@ -76,7 +76,7 @@ Bots::~Bots()
 //-------------------------------------------------------------------------------------
 bool Bots::initialize()
 {
-	// �㲥�Լ��ĵ�ַ�������ϵ�����kbemachine
+	// 广播自己的地址给网上上的所有kbemachine
 	this->dispatcher().addTask(&Components::getSingleton());
 	return ClientApp::initialize();
 }
@@ -111,7 +111,7 @@ bool Bots::initializeEnd()
 		return false;
 	}
 
-	// ���нű����������
+	// 所有脚本都加载完毕
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
 										const_cast<char*>("onInit"), 
 										const_cast<char*>("i"), 
@@ -133,7 +133,7 @@ bool Bots::initializeEnd()
 //-------------------------------------------------------------------------------------
 void Bots::finalise()
 {
-	// ����֪ͨ�ű�
+	// 结束通知脚本
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
 										const_cast<char*>("onFinish"),
 										const_cast<char*>(""));
@@ -194,7 +194,7 @@ bool Bots::installPyModules()
 	
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(), addBots, __py_addBots,	METH_VARARGS, 0);
 
-	// ע�����ýű��������
+	// 注册设置脚本输出类型
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	scriptLogType,	__py_setScriptLogType,	METH_VARARGS,	0)
 	if(PyModule_AddIntConstant(this->getScript().getModule(), "LOG_TYPE_NORMAL", log4cxx::ScriptLevel::SCRIPT_INT))
 	{
@@ -223,7 +223,7 @@ bool Bots::installPyModules()
 
 	registerScript(client::Entity::getScriptType());
 
-	// ��װ���ģ��
+	// 安装入口模块
 	PyObject *entryScriptFileName = PyUnicode_FromString(g_kbeSrvConfig.getBots().entryScriptFile);
 	if(entryScriptFileName != NULL)
 	{
@@ -485,7 +485,7 @@ void Bots::onExecScriptCommand(Network::Channel* pChannel, KBEngine::MemoryStrea
 
 	if(getScript().run_simpleString(PyBytes_AsString(pycmd1), &retbuf) == 0)
 	{
-		// ��������ظ��ͻ���
+		// 将结果返回给客户端
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		ConsoleInterface::ConsoleExecCommandCBMessageHandler msgHandler;
 		(*pBundle).newMessage(msgHandler);

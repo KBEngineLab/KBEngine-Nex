@@ -82,7 +82,7 @@ NavigationHandlePtr Navigation::findNavigation(std::string resPath)
 		}
 		else if (iter->second->type() == NavigationHandle::NAV_TILE)
 		{
-			// ����tile��Ҫ����ײ�� ÿһ��space����Ҫһ���µ����ݣ� ����������ÿ����ķ�ʽ�����ӹ����ٶ�
+			// 由于tile需要做碰撞， 每一个space都需要一份新的数据， 我们这里采用拷贝的方式来增加构造速度
 			NavTileHandle* pNavTileHandle = new NavTileHandle(*(KBEngine::NavTileHandle*)iter->second.get());
 			DEBUG_MSG(fmt::format("Navigation::findNavigation: copy NavTileHandle({:p})!\n", (void*)pNavTileHandle));
 			return NavigationHandlePtr(pNavTileHandle);

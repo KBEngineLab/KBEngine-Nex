@@ -61,7 +61,7 @@ PropertyDescription::PropertyDescription(ENTITY_PROPERTY_UID utype,
 {
 	dataType_->incRef();
 
-	// entitycall �޷�����
+	// entitycall 无法保存
 	if(isPersistent && strcmp(dataType_->getName(), "ENTITYCALL") == 0)
 	{
 		isPersistent_ = false;
@@ -116,7 +116,7 @@ PyObject* PropertyDescription::parseDefaultStr(const std::string& defaultVal)
 //-------------------------------------------------------------------------------------
 void PropertyDescription::addPersistentToStream(MemoryStream* mstream, PyObject* pyValue)
 {
-	// ����ʹ��Ĭ��ֵ������һ����
+	// 允许使用默认值来创建一个流
 	if(pyValue == NULL)
 	{
 		pyValue = newDefaultVal();
@@ -268,7 +268,7 @@ PyObject* FixedDictDescription::onSetValue(PyObject* parentObj, PyObject* value)
 //-------------------------------------------------------------------------------------
 void FixedDictDescription::addPersistentToStream(MemoryStream* mstream, PyObject* pyValue)
 {
-	// ����ʹ��Ĭ��ֵ������һ����
+	// 允许使用默认值来创建一个流
 	if(pyValue == NULL)
 	{
 		pyValue = newDefaultVal();
@@ -327,7 +327,7 @@ PyObject* ArrayDescription::onSetValue(PyObject* parentObj, PyObject* value)
 //-------------------------------------------------------------------------------------
 void ArrayDescription::addPersistentToStream(MemoryStream* mstream, PyObject* pyValue)
 {
-	// ����ʹ��Ĭ��ֵ������һ����
+	// 允许使用默认值来创建一个流
 	if(pyValue == NULL)
 	{
 		pyValue = newDefaultVal();

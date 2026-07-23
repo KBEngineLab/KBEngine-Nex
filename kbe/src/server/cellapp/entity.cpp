@@ -219,8 +219,8 @@ void Entity::onDestroy(bool callScript)
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 		SCRIPT_OBJECT_CALL_ARGS0(this, const_cast<char*>("onDestroy"), false);
 		
-		// �����֪ͨ�ű��� ��ôҲ�����������ص�
-		// ͨ������һ��entity��֪ͨ�ű�������Ǩ�ƻ��ߴ�����ɵ�
+		// 如果不通知脚本， 那么也不会产生这个回调
+		// 通常销毁一个entity不通知脚本可能是迁移或者传送造成的
 		if(baseEntityCall_ != NULL)
 		{
 			this->backupCellData();
@@ -234,7 +234,7 @@ void Entity::onDestroy(bool callScript)
 
 	stopMove();
 
-	// ��������ߵ�����
+	// 解除控制者的引用
 	S_RELEASE(controlledBy_);
 
 	if(pWitness_)
@@ -244,7 +244,7 @@ void Entity::onDestroy(bool callScript)
 		pWitness_ = NULL;
 	}
 
-	// ��entity�ӳ������޳�
+	// 将entity从场景中剔除
 	Space* space = Spaces::findSpace(this->spaceID());
 	if(space)
 	{
@@ -256,10 +256,10 @@ void Entity::onDestroy(bool callScript)
 			this->scriptName(), this->id(), spaceID()));
 	}
 	
-	// �ڽ���ǿ�ƹر�ʱ������ܲ�Ϊ0
+	// 在进程强制关闭时这里可能不为0
 	//KBE_ASSERT(spaceID() == 0);
 
-	// ��ʱ��Ӧ�û���witnesses������ΪView BUG
+	// 此时不应该还有witnesses，否则为View BUG
 	if (witnesses_count_ > 0)
 	{
 		ERROR_MSG(fmt::format("{}::onDestroy(): id={}, witnesses_count({}/{}) != 0, isReal={}, spaceID={}, position=({},{},{})\n", 
@@ -450,7 +450,7 @@ int Entity::pySetControlledBy(PyObject *value)
 
 		entityCall = static_cast<EntityCall *>(value);
 
-		// ����������ң��Ͳ�Ҫ������
+		// 如果看不见我，就不要控制我
 		if (!entityInWitnessed(entityCall->id()) && entityCall->id() != id())
 		{
 			PyErr_Format(PyExc_AssertionError, "%s: entity '%d' can't witnessed me!\n",
@@ -477,7 +477,7 @@ bool Entity::setControlledBy(EntityCall* controllerBaseEntityCall)
 {
 	EntityCall *oldEntityCall = controlledBy();
 
-	//  ����¾ɵ�entityCall��ͬһ���ˣ������κθ���
+	//  如果新旧的entityCall是同一个人，则不做任何更改
 	if (oldEntityCall != NULL && controllerBaseEntityCall != NULL &&
 		oldEntityCall->id() == controllerBaseEntityCall->id())
 	{
@@ -487,13 +487,13 @@ bool Entity::setControlledBy(EntityCall* controllerBaseEntityCall)
 
 	if (oldEntityCall != NULL)
 	{
-		// ����ɵĿ����������Լ��Ŀͻ��ˣ�
-		// �Ǿ���Ҫ֪ͨ�Լ��Ŀͻ��ˣ��㲻���ٿ������Լ��ˣ�Ҳ�����㱻�����˿�����
+		// 如果旧的控制者是我自己的客户端，
+		// 那就需要通知自己的客户端：你不能再控制你自己了，也就是你被其它人控制了
 		if (oldEntityCall->id() == id())
 			sendControlledByStatusMessage(oldEntityCall, 1);
 
-		// ����ɵĿ�����Ҳ���ҵĹ۲���֮һ���Ǿͱ�ʾ���Ŀͻ����ܿ����ң�
-		// ���ԣ���Ҫ֪ͨ�ɵĿͻ��ˣ��㲻���ٿ���ĳ�˵�λ����
+		// 如果旧的控制者也是我的观察者之一，那就表示它的客户端能看到我，
+		// 所以，需要通知旧的客户端：你不能再控制某人的位移了
 		else if (entityInWitnessed(oldEntityCall->id()))
 			sendControlledByStatusMessage(oldEntityCall, 0);
 
@@ -501,23 +501,23 @@ bool Entity::setControlledBy(EntityCall* controllerBaseEntityCall)
 		{
 			controlledBy(controllerBaseEntityCall);
 
-			// ����ǻָ����ҿ��ƣ���ô��Ҫ֪ͨ�ҵĿͻ��ˣ�û���˿�������
+			// 如果是恢复自我控制，那么需要通知我的客户端：没有人控制你了
 			if (controllerBaseEntityCall->id() == id())
 			{
 				KBE_ASSERT(clientEntityCall_);
 				sendControlledByStatusMessage(controllerBaseEntityCall, 0);
 			}
 
-			// ����Ǳ��˽����˿��ƣ���ôֻ��Ҫ֪ͨ�����߼��ɣ�
-			//     ������Ϊ֮ǰ�Լ����Ǳ����˿����ŵģ����Բ���Ҫ����֪ͨ��
-			// ���ԣ�֪ͨ���ֵĿ����ߣ��������˭
+			// 如果是别人接手了控制，那么只需要通知接手者即可，
+			//     ——因为之前自己还是被别人控制着的，所以不需要另行通知，
+			// 所以，通知接手的控制者：你控制了谁
 			else
 			{
 				sendControlledByStatusMessage(controllerBaseEntityCall, 1);
 			}
 
 		}
-		else  // NULL��ʾ����ϵͳ���ƣ����Բ���Ҫ֪ͨ������
+		else  // NULL表示交由系统控制，所以不需要通知其他人
 		{
 			controlledBy(NULL);
 		}
@@ -526,19 +526,19 @@ bool Entity::setControlledBy(EntityCall* controllerBaseEntityCall)
 	{
 		controlledBy(controllerBaseEntityCall);
 		
-		// ��Ȼ���µĿ������ˣ�ϵͳ���ƶ���ΪҲ�ͱ���ֹͣ��
+		// 既然有新的控制者了，系统的移动行为也就必须停止了
 		stopMove();
 		
-		// ����ǻָ����ҿ��ƣ���ô��Ҫ֪ͨ�ҵĿͻ��ˣ�û���˿�������
+		// 如果是恢复自我控制，那么需要通知我的客户端：没有人控制你了
 		if (controllerBaseEntityCall->id() == id())
 		{
 			KBE_ASSERT(clientEntityCall_);
 			sendControlledByStatusMessage(controllerBaseEntityCall, 0);
 		}
 
-		// ����Ǳ��˽����˿��ƣ���ôֻ��Ҫ֪ͨ�����߼��ɣ�
-		//     ������Ϊ֮ǰ�Լ����Ǳ����˿����ŵģ����Բ���Ҫ����֪ͨ��
-		// ���ԣ�֪ͨ���ֵĿ����ߣ��������˭
+		// 如果是别人接手了控制，那么只需要通知接手者即可，
+		//     ——因为之前自己还是被别人控制着的，所以不需要另行通知，
+		// 所以，通知接手的控制者：你控制了谁
 		else
 		{
 			sendControlledByStatusMessage(controllerBaseEntityCall, 1);
@@ -647,7 +647,7 @@ PyObject* Entity::onScriptGetAttribute(PyObject* attr)
 {
 	DEBUG_OP_ATTRIBUTE("get", attr)
 
-	// �����ghost����def��������Ҫrpc���á�
+	// 如果是ghost调用def方法则需要rpc调用。
 	if(!isReal())
 	{
 		const char* ccattr = PyUnicode_AsUTF8AndSize(attr, NULL);
@@ -668,7 +668,7 @@ PyObject* Entity::onScriptGetAttribute(PyObject* attr)
 //-------------------------------------------------------------------------------------
 void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, PyObject* pyData)
 {
-	// �������һ��realEntity�����ڳ�ʼ��������
+	// 如果不是一个realEntity或者在初始化则不理会
 	if(!isReal() || initing())
 		return;
 
@@ -677,13 +677,13 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 	
 	uint32 flags = propertyDescription->getFlags();
 
-	// ���ȴ���һ����Ҫ�㲥��ģ����
+	// 首先创建一个需要广播的模板流
 	MemoryStream* mstream = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 
 	propertyDescription->getDataType()->addToStream(mstream, pyData);
 
-	// �ж��Ƿ���Ҫ�㲥��������cellapp, �⻹��һ��ǰ����entity����ӵ��ghostʵ��
-	// ֻ����cell�߽�һ����Χ�ڵ�entity��ӵ��ghostʵ��, ��������תspaceʱҲ����ݵ���Ϊghost״̬
+	// 判断是否需要广播给其他的cellapp, 这还需一个前提是entity必须拥有ghost实体
+	// 只有在cell边界一定范围内的entity才拥有ghost实体, 或者在跳转space时也会短暂的置为ghost状态
 	if((flags & ENTITY_BROADCAST_CELL_FLAGS) > 0 && hasGhost())
 	{
 		GhostManager* gm = Cellapp::getSingleton().pGhostManager();
@@ -696,7 +696,7 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 
 			pForwardBundle->append(*mstream);
 
-			// ��¼����¼���������������С
+			// 记录这个事件产生的数据量大小
 			g_publicCellEventHistoryStats.trackEvent(scriptName(), 
 				propertyDescription->getName(), 
 				pForwardBundle->currMsgLength());
@@ -725,8 +725,8 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 			if(pChannel == NULL)
 				continue;
 
-			// ����������Ǵ��ڵģ�����������Դ��createWitnessFromStream()
-			// �����Լ���entity��δ��Ŀ��ͻ����ϴ���
+			// 这个可能性是存在的，例如数据来源于createWitnessFromStream()
+			// 又如自己的entity还未在目标客户端上创建
 			if(!pEntity->pWitness()->entityInView(id()))
 				continue;
 
@@ -762,7 +762,7 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 
 				pSendBundle->append(*mstream);
 				
-				// ��¼����¼���������������С
+				// 记录这个事件产生的数据量大小
 				g_publicClientEventHistoryStats.trackEvent(scriptName(), 
 					propertyDescription->getName(), 
 					pSendBundle->currMsgLength());
@@ -775,7 +775,7 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 	}
 
 	/*
-	// �ж���������Ƿ���Ҫ�㲥�������ͻ���
+	// 判断这个属性是否还需要广播给其他客户端
 	if((flags & ENTITY_BROADCAST_OTHER_CLIENT_FLAGS) > 0)
 	{
 		int8 detailLevel = propertyDescription->getDetailLevel();
@@ -796,9 +796,9 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 			}
 		}
 
-		// ��������Ѿ����¹��� ����Щ��Ϣ���ӵ������������������entity�� �����ڿ�����Զ��һ�㣬 �����������½������detaillevel
-		// ʱ������½����е����Զ����µ����Ŀͻ��˿��ܲ����ʣ� ���Ǽ�¼������Եĸı䣬 �´������½�������ֻ��Ҫ�������ڼ��й��ı��
-		// ���ݷ��͵����Ŀͻ��˸���
+		// 这个属性已经更新过， 将这些信息添加到曾经进入过这个级别的entity， 但现在可能走远了一点， 在他回来重新进入这个detaillevel
+		// 时如果重新将所有的属性都更新到他的客户端可能不合适， 我们记录这个属性的改变， 下次他重新进入我们只需要将所有期间有过改变的
+		// 数据发送到他的客户端更新
 		for(int8 i=detailLevel; i<=DETAIL_LEVEL_FAR; ++i)
 		{
 			std::map<ENTITY_ID, Entity*>::iterator iter = witnessEntities_[i].begin();
@@ -818,7 +818,7 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 					}
 				}
 
-				// ��¼����¼���������������С
+				// 记录这个事件产生的数据量大小
 				std::string event_name = this->scriptName();
 				event_name += ".";
 				event_name += propertyDescription->getName();
@@ -829,7 +829,7 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 	}
 	*/
 
-	// �ж���������Ƿ���Ҫ�㲥���Լ��Ŀͻ���
+	// 判断这个属性是否还需要广播给自己的客户端
 	if((flags & ENTITY_BROADCAST_OWN_CLIENT_FLAGS) > 0 && clientEntityCall_ != NULL && pWitness_)
 	{
 		Network::Bundle* pSendBundle = NULL;
@@ -852,7 +852,7 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 
 		pSendBundle->append(*mstream);
 		
-		// ��¼����¼���������������С
+		// 记录这个事件产生的数据量大小
 		if((flags & ENTITY_BROADCAST_OTHER_CLIENT_FLAGS) <= 0)
 		{
 			g_privateClientEventHistoryStats.trackEvent(scriptName(), 
@@ -1064,7 +1064,7 @@ void Entity::backupCellData()
 
 		bool dataDirty = memcmp((void*)&persistentDigest_[0], (void*)&digest[0], sizeof(persistentDigest_)) != 0;
 
-		// ��������Ƿ��б仯���б仯�����ݱ��ݲ��Ҽ�¼����hash
+		// 检查数据是否有变化，有变化则将数据备份并且记录数据hash
 		if (!dataDirty)
 		{
 			MemoryStream::reclaimPoolObject(s);
@@ -1074,7 +1074,7 @@ void Entity::backupCellData()
 			setDirty((uint32*)&digest[0]);
 		}
 
-		// ����ǰ��cell�������ݴ��һ���͸�base���ֱ���
+		// 将当前的cell部分数据打包一起发送给base部分备份
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(BaseappInterface::onBackupEntityCellData);
 		(*pBundle) << id_;
@@ -1232,8 +1232,8 @@ void Entity::bufferCallback(bool enable)
 	{
 		if (_scriptCallbacksBufferCount - 1 == 0)
 		{
-			// ��Ȼ��Ҫȡ�������ˣ���ôִ������callback������Ҫע����ִ�й����п����ֲ�����callback����
-			// ��ô��Ҫ���뵽���к���
+			// 既然将要取消缓存了，那么执行所有callback，但需要注意在执行过程中可能又产生了callback缓存
+			// 那么需要加入到队列后面
 			while (_scriptCallbacksBufferNum > 0)
 			{
 				BufferedScriptCall* pBufferedScriptCall = (*_scriptCallbacksBuffer.begin());
@@ -1259,7 +1259,7 @@ void Entity::bufferCallback(bool enable)
 			}
 		}
 
-		// �����ִ�м���������ִֹ��callback�ڼ������󻺴�callback
+		// 最后再执行减操作，防止执行callback期间又请求缓存callback
 		--_scriptCallbacksBufferCount;
 		KBE_ASSERT(_scriptCallbacksBufferCount >= 0);
 	}
@@ -1335,7 +1335,7 @@ void Entity::delWitnessed(Entity* entity)
 			const_cast<char*>("i"), entity->id(), false);
 	}
 
-	// ��ʱִ��
+	// 延时执行
 	// onDelWitnessed();
 
 	if(Cellapp::getSingleton().pWitnessedTimeoutHandler())
@@ -1416,7 +1416,7 @@ uint32 Entity::addProximity(float range_xz, float range_y, int32 userarg)
 		return 0;
 	}
 
-	// ��space��Ͷ��һ������
+	// 在space中投放一个陷阱
 	KBEShared_ptr<Controller> p( new ProximityController(this, range_xz, range_y, userarg, pControllers_->freeID()) );
 
 	bool ret = pControllers_->add(p);
@@ -1558,7 +1558,7 @@ PyObject* Entity::__py_pyCancelController(PyObject* self, PyObject* args)
 		id = PyLong_AsLong(pyargobj);
 	}
 
-	// ֻҪ�������ƶ��������ķ��룬��Ӧ����stopMove()���Ա�����ַ�ʽ�Ĵ������������ϵ�����
+	// 只要是属于移动控制器的范畴，就应该走stopMove()，以避免多种方式的存在引发调用上的歧议
 	if ((pobj->pMoveController_ && pobj->pMoveController_->id() == id) || 
 		(pobj->pTurnController_ && pobj->pTurnController_->id() == id))
 	{
@@ -1896,7 +1896,7 @@ void Entity::onGetWitnessFromBase(Network::Channel* pChannel)
 {
 	if (!isReal())
 	{
-		// ��Ҫ����ת
+		// 需要做中转
 		GhostManager* gm = Cellapp::getSingleton().pGhostManager();
 		if (gm)
 		{
@@ -1919,19 +1919,19 @@ void Entity::onGetWitness(bool fromBase)
 
 	if(fromBase)
 	{
-		// proxy��giveClientTo���ܻ���reloginBaseapp�� ���һ��entity�Ѿ�������cell�� ��������Ȩ��
-		// ����entityʱ��һ��û��clientEntityCall�ġ�
+		// proxy的giveClientTo功能或者reloginBaseapp， 如果一个entity已经创建了cell， 并将控制权绑定
+		// 到该entity时是一定没有clientEntityCall的。
 		if(clientEntityCall() == NULL)
 		{
 			PyObject* clientMB = PyObject_GetAttrString(baseEntityCall(), "client");
 			KBE_ASSERT(clientMB != Py_None);
 
 			EntityCall* client = static_cast<EntityCall*>(clientMB);	
-			// Py_INCREF(clientEntityCall); ���ﲻ��Ҫ�������ã� ��Ϊÿ�ζ������һ���µĶ���
+			// Py_INCREF(clientEntityCall); 这里不需要增加引用， 因为每次都会产生一个新的对象
 			clientEntityCall(client);
 		}
 
-		// ���һ��ʵ���Ѿ���cell�������giveToClient����ô��Ҫ�����µĿͻ�������ֵ���µ��ͻ���
+		// 如果一个实体已经有cell的情况下giveToClient，那么需要将最新的客户端属性值更新到客户端
 		Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(id(), (*pSendBundle));
 
@@ -1971,20 +1971,20 @@ void Entity::onGetWitness(bool fromBase)
 		else
 		{
 			/*
-				���°󶨣�ͨ���ǿͻ����ص�½������������һ���˺ż���
-				��һ���ͻ��˵�½�Ŀͻ���, ��Entity�����ڴ��в����Ѿ�
-				����witness(�������Ҳ�����Ƿ���˻�δ��鵽�ͻ��˶���)
+				重新绑定，通常是客户端重登陆或者重连或者一个账号挤掉
+				另一个客户端登陆的客户端, 而Entity还在内存中并且已经
+				绑定了witness(这种情况也可能是服务端还未侦查到客户端断线)
 
-				�������������Ȼ��Ҫ��һЩ���鱣֤�ͻ��˵���ȷ�ԣ� ���緢��enterworld
+				这种情况我们仍然需要做一些事情保证客户端的正确性， 例如发送enterworld
 			*/
 			pWitness_->onAttach(this);
 
-			// View�е�ʵ��Ҳ��Ҫ���ã�����ͬ�����ͻ���
+			// View中的实体也需要重置，重新同步给客户端
 			pWitness_->resetViewEntities();
 		}
 	}
 
-	// ��ֹ�Լ���һЩ�ű��ص��б����٣�������Լ���һ������
+	// 防止自己在一些脚本回调中被销毁，这里对自己做一次引用
 	Py_INCREF(this);
 
 	Space* space = Spaces::findSpace(this->spaceID());
@@ -1993,7 +1993,7 @@ void Entity::onGetWitness(bool fromBase)
 		space->onEntityAttachWitness(this);
 	}
 
-	// �������controlledByΪ�Լ���base
+	// 最后，设置controlledBy为自己的base
 	controlledBy(baseEntityCall());
 	
 	{
@@ -2012,7 +2012,7 @@ void Entity::onLoseWitness(Network::Channel* pChannel)
 
 	if (!isReal())
 	{
-		// ��Ҫ����ת
+		// 需要做中转
 		GhostManager* gm = Cellapp::getSingleton().pGhostManager();
 		if (gm)
 		{
@@ -2137,7 +2137,7 @@ bool Entity::checkMoveForTopSpeed(const Position3D& position)
 	Position3D movment = position - this->position();
 	bool move = true;
 	
-	// ����ƶ�
+	// 检查移动
 	if(topSpeedY_ > 0.01f && movment.y > topSpeedY_)
 	{
 		move = false;
@@ -2206,8 +2206,8 @@ void Entity::onUpdateDataFromClient(KBEngine::MemoryStream& s)
 		
 		// this->position(currpos);
 
-		// ������Ѿ������ƣ���ô�����ݵ���Դ���ǿ����ߵĿͻ��ˣ�
-		// ���ԣ�������Ҫ������֪ͨ��Դ�ͻ��ˣ������������Լ��Ŀͻ��ˡ�
+		// 如果我已经被控制，那么，数据的来源则是控制者的客户端，
+		// 所以，我们需要做的是通知来源客户端，而不仅仅是自己的客户端。
 		Witness* pW = NULL;
 		KBEngine::ENTITY_ID targetID = 0;
 
@@ -2227,10 +2227,10 @@ void Entity::onUpdateDataFromClient(KBEngine::MemoryStream& s)
 				pW = this->pWitness();
 		}
 		
-		// �ڿ����teleportʱ�����������ghost����ĳ��״̬��witness��ʱ����ΪNone
+		// 在跨进程teleport时，极端情况（ghost）在某种状态下witness此时可能为None
 		if(pW)
 		{
-			// ֪ͨ����
+			// 通知重置
 			Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 			NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(targetID, (*pSendBundle));
 			
@@ -2309,8 +2309,8 @@ PyObject* Entity::pyGetWitnesses()
 		if (pChannel == NULL)
 			continue;
 
-		// ����������Ǵ��ڵģ�����������Դ��createWitnessFromStream()
-		// �����Լ���entity��δ��Ŀ��ͻ����ϴ���
+		// 这个可能性是存在的，例如数据来源于createWitnessFromStream()
+		// 又如自己的entity还未在目标客户端上创建
 		if (!pEntity->pWitness()->entityInView(id()))
 			continue;
 
@@ -2436,7 +2436,7 @@ bool Entity::navigatePathPoints( std::vector<Position3D>& outPaths, const Positi
 		break;
 	}
 
-	// ��һ��������ǵ�ǰλ�ã���˿��Թ��˵�
+	// 第一个坐标点是当前位置，因此可以过滤掉
 	if (iter != outPaths.begin())
 	{
 		outPaths.erase(outPaths.begin(), iter);
@@ -2464,7 +2464,7 @@ PyObject* Entity::pyNavigatePathPoints(PyObject_ptr pyDestination, float maxSear
 		return 0;
 	}
 
-	// ��������Ϣ��ȡ����
+	// 将坐标信息提取出来
 	script::ScriptVector3::convertPyObjectToVector3(destination, pyDestination);
 
 	std::vector<Position3D> outPaths;
@@ -2547,7 +2547,7 @@ PyObject* Entity::pyNavigate(PyObject_ptr pyDestination, float velocity, float d
 		return 0;
 	}
 
-	// ��������Ϣ��ȡ����
+	// 将坐标信息提取出来
 	script::ScriptVector3::convertPyObjectToVector3(destination, pyDestination);
 
 	return PyLong_FromLong(navigate(destination, velocity, distance, maxMoveDistance, 
@@ -2598,7 +2598,7 @@ PyObject* Entity::pyGetRandomPoints(PyObject_ptr pyCenterPos, float maxRadius, u
 		return 0;
 	}
 
-	// ��������Ϣ��ȡ����
+	// 将坐标信息提取出来
 	script::ScriptVector3::convertPyObjectToVector3(centerPos, pyCenterPos);
 
 	std::vector<Position3D> outPoints;
@@ -2673,7 +2673,7 @@ PyObject* Entity::pyMoveToPoint(PyObject_ptr pyDestination, float velocity, floa
 		return 0;
 	}
 
-	// ��������Ϣ��ȡ����
+	// 将坐标信息提取出来
 	script::ScriptVector3::convertPyObjectToVector3(destination, pyDestination);
 
 	return PyLong_FromLong(moveToPoint(destination, velocity, distance, userData, faceMovement > 0, moveVertically > 0));
@@ -2750,7 +2750,7 @@ PyObject* Entity::__py_pyMoveToEntity(PyObject* self, PyObject* args)
 	Position3D offsetPos;
 	if (pyOffset && pyOffset != Py_None)
 	{
-		// ��������Ϣ��ȡ����
+		// 将坐标信息提取出来
 		script::ScriptVector3::convertPyObjectToVector3(offsetPos, pyOffset);
 	}
 
@@ -3077,7 +3077,7 @@ PyObject* Entity::__py_pyEntitiesInRange(PyObject* self, PyObject* args)
 	PyObject* pyPosition = NULL, *pyEntityType = NULL;
 	float radius = 0.f;
 
-	if (pobj->isDestroyed() && !pobj->hasFlags(ENTITY_FLAGS_DESTROYING) /* �����������ڼ���� */)
+	if (pobj->isDestroyed() && !pobj->hasFlags(ENTITY_FLAGS_DESTROYING) /* 允许在销毁期间调用 */)
 	{
 		PyErr_Format(PyExc_TypeError, "%s::entitiesInRange: entity(%d) is destroyed!",
 			pobj->scriptName(), pobj->id());
@@ -3151,7 +3151,7 @@ PyObject* Entity::__py_pyEntitiesInRange(PyObject* self, PyObject* args)
 	const char* pEntityType = NULL;
 	Position3D originpos;
 
-	// ��������Ϣ��ȡ����
+	// 将坐标信息提取出来
 	if (pyPosition && pyPosition != Py_None)
 	{
 		script::ScriptVector3::convertPyObjectToVector3(originpos, pyPosition);
@@ -3181,7 +3181,7 @@ PyObject* Entity::__py_pyEntitiesInRange(PyObject* self, PyObject* args)
 
 	std::vector<Entity*> findentities;
 
-	// �û�����������entity������Ѱ�� ������Ǵ���������
+	// 用户总是期望在entity附近搜寻， 因此我们从身边搜索
 	EntityCoordinateNode::entitiesInRange(findentities, pobj->pEntityCoordinateNode(), originpos, radius, entityUType);
 
 	PyObject* pyList = PyList_New(findentities.size());
@@ -3299,7 +3299,7 @@ void Entity::teleportRefEntity(Entity* entity, Position3D& pos, Direction3D& dir
 	
 	SPACE_ID lastSpaceID = this->spaceID();
 	
-	/* ��ʹentity�Ѿ����٣� ���ڴ�δ�ͷ�ʱspaceIDӦ������ȷ�ģ� �������ۿ����ҵ�space
+	/* 即使entity已经销毁， 但内存未释放时spaceID应该是正确的， 所以理论可以找到space
 	if(entity->isDestroyed())
 	{
 		ERROR_MSG("Entity::teleport: nearbyMBRef is destroyed!\n");
@@ -3308,7 +3308,7 @@ void Entity::teleportRefEntity(Entity* entity, Position3D& pos, Direction3D& dir
 	}
 	*/
 
-	/* ��ʹ��ghost�� ��space�϶����ڵ�ǰcell�ϣ� ֱ�Ӳ���Ӧ�ò���������
+	/* 即使是ghost， 但space肯定是在当前cell上， 直接操作应该不会有问题
 	if(!entity->isReal())
 	{
 		ERROR_MSG("Entity::teleport: nearbyMBRef is ghost!\n");
@@ -3319,18 +3319,18 @@ void Entity::teleportRefEntity(Entity* entity, Position3D& pos, Direction3D& dir
 
 	SPACE_ID spaceID = entity->spaceID();
 
-	// �������ͬspace��Ϊ������ת
+	// 如果是相同space则为本地跳转
 	if(spaceID == this->spaceID())
 	{
 		teleportLocal(entity, pos, dir);
 	}
 	else
 	{
-		// ����Ϊ��ǰcellapp�ϵ�space�� ��ô����Ҳ�ܹ�ֱ��ִ�в���
+		// 否则为当前cellapp上的space， 那么我们也能够直接执行操作
 		Space* currspace = Spaces::findSpace(this->spaceID());
 		Space* space = Spaces::findSpace(spaceID);
 
-		// ���Ҫ��ת��space�����ڻ������õ�entity�����space�Ĵ��������Ѿ����٣� ��ô��Ӧ������תʧ��
+		// 如果要跳转的space不存在或者引用的entity是这个space的创建者且已经销毁， 那么都应该是跳转失败
 		if(space == NULL || !space->isGood() || entity->isDestroyed())
 		{
 			if (entity->isDestroyed())
@@ -3383,25 +3383,25 @@ void Entity::teleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Dir
 		return;
 	}
 
-	// ������entity��base���֣� �����Ǳ����̼���Ĵ��ͣ���ô��ز�������������ִ��
-	// ����ǿ�cellapp�Ĵ��ͣ� ��ô���ǿ���������entityΪghost���������л�entity����Ŀ��cellapp
-	// ����ڼ���base����Ϣ���͹����� entity��ghost�����ܹ�ת��real��ȥ�� ��˴���֮ǰ����Ҫ��base
-	// ��һЩ���ã����ͳɹ���������base�Ĺ�ϵbase�ڱ��ı��ϵ����Ȼ��0.1���ʱ���յ�����������ghost��
-	// ���һֱ�а���һֱˢ��ʱ��ֱ��û���κΰ���Ҫ�㲥���ҳ�ʱ0.1��֮��İ��Ż�ֱ�ӷ���real��, �������ĺô��Ǵ��Ͳ�����Ҫ�ǳ���������base���
-	// ���͹��������κδ���Ҳ����Ӱ�쵽base���֣�base���ֵİ�Ҳ�ܹ�������������real��
+	// 如果这个entity有base部分， 假如是本进程级别的传送，那么相关操作按照正常的执行
+	// 如果是跨cellapp的传送， 那么我们可以先设置entity为ghost并立即序列化entity发往目的cellapp
+	// 如果期间有base的消息发送过来， entity的ghost机制能够转到real上去， 因此传送之前不需要对base
+	// 做一些设置，传送成功后先设置base的关系base在被改变关系后仍然有0.1秒的时间收到包继续发往ghost，
+	// 如果一直有包则一直刷新时间直到没有任何包需要广播并且超时0.1秒之后的包才会直接发往real）, 这样做的好处是传送并不需要非常谨慎的与base耦合
+	// 传送过程中有任何错误也不会影响到base部分，base部分的包也能够按照秩序送往real。
 	if(this->baseEntityCall() != NULL)
 	{
-		// �����base����, ���ǻ���Ҫ����һ�±��ݹ��ܡ�
-		// ����ghost���ܻ�addCellDataToStreamһ���������������ڴ���ʧ��ʱ�����ø�ʵ��
-		// ������ﲻ��Ҫ���б���
+		// 如果有base部分, 我们还需要调用一下备份功能。
+		// 由于ghost功能会addCellDataToStream一次数据流，并且在传送失败时能重用该实体
+		// 因此这里不需要进行备份
 		// this->backupCellData();
 		
 		Network::Channel* pBaseChannel = baseEntityCall()->getChannel();
 		if(pBaseChannel)
 		{
-			// ͬʱ��Ҫ֪ͨbase�ݴ淢��cellapp����Ϣ����Ϊ���������ת�ɹ���Ҫ�л�cellEntityCallӳ���ϵ���µ�cellapp
-			// Ϊ�˱������л���һ˲����Ϣ����������(�ɵ�cellapp��ϢҲ��ת���µ�cellapp��)�� �����Ҫ�ڴ���ǰ����
-			// �ݴ棬 ���ͳɹ���֪ͨ�ɵ�cellapp����entity֮��ͬʱ֪ͨbaseapp�ı�ӳ���ϵ��
+			// 同时需要通知base暂存发往cellapp的消息，因为后面如果跳转成功需要切换cellEntityCall映射关系到新的cellapp
+			// 为了避免在切换的一瞬间消息次序发生混乱(旧的cellapp消息也会转到新的cellapp上)， 因此需要在传送前进行
+			// 暂存， 传送成功后通知旧的cellapp销毁entity之后同时通知baseapp改变映射关系。
 			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 			(*pBundle).newMessage(BaseappInterface::onMigrationCellappStart);
 			(*pBundle) << id();
@@ -3424,7 +3424,7 @@ void Entity::teleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Dir
 //-------------------------------------------------------------------------------------
 void Entity::onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Direction3D& dir)
 {
-	// ������Ҫ��entity�������Ŀ��cellapp
+	// 我们需要将entity打包发往目的cellapp
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(CellappInterface::reqTeleportToCellApp);
 	(*pBundle) << id();
@@ -3454,33 +3454,33 @@ void Entity::onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, D
 	(*pBundle).append(s);
 	MemoryStream::reclaimPoolObject(s);
 
-	// ��ʱ���������entity, ���Ǳ߳ɹ�����֮���ٻ�������
-	// ���ڼ����Ϣ����ͨ��ghostת����real
-	// ���δ����ȷ�����ȥ����Դӵ�ǰcell�����ָ�entity.
+	// 暂时不销毁这个entity, 等那边成功创建之后再回来销毁
+	// 此期间的消息可以通过ghost转发给real
+	// 如果未能正确传输过去则可以从当前cell继续恢复entity.
 	// Cellapp::getSingleton().destroyEntity(id(), false);
 
 	nearbyMBRef->sendCall(pBundle);
 
-	// ���л���entity��ֹͣ�ƶ��� �������ʧ��������Ը������л������ݽ��лָ�
+	// 序列化后将entity先停止移动， 如果传送失败了则可以根据序列化的内容进行恢复
 	stopMove();
 }
 
 //-------------------------------------------------------------------------------------
 void Entity::teleportLocal(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& dir)
 {
-	// ������ת��δ����Ҫ����space���ָ�Ϊ��cell������� ��ǰֱ�Ӳ���
+	// 本地跳转在未来需要考虑space被分割为多cell的情况， 当前直接操作
 	SPACE_ID lastSpaceID = this->spaceID();
 
-	// ��Ҫ��CoordinateSystem��ɾ��entity�ڵ�
+	// 先要从CoordinateSystem中删除entity节点
 	Space* currspace = Spaces::findSpace(this->spaceID());
 	this->uninstallCoordinateNodes(currspace->pCoordinateSystem());
 
-	// ��ʱ�����Ŷ�ranglist
+	// 此时不会扰动ranglist
 	this->setPositionAndDirection(pos, dir);
 
 	if(this->pWitness())
 	{
-		// ֪ͨλ��ǿ�Ƹı�
+		// 通知位置强制改变
 		Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(id(), (*pSendBundle));
 		
@@ -3510,12 +3510,12 @@ void Entity::teleportLocal(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3
 		if (pChannel == NULL)
 			continue;
 
-		// ����������Ǵ��ڵģ�����������Դ��createWitnessFromStream()
-		// �����Լ���entity��δ��Ŀ��ͻ����ϴ���
+		// 这个可能性是存在的，例如数据来源于createWitnessFromStream()
+		// 又如自己的entity还未在目标客户端上创建
 		if (!pEntity->pWitness()->entityInView(id()))
 			continue;
 
-		// ֪ͨλ��ǿ�Ƹı�
+		// 通知位置强制改变
 		Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pEntity->id(), (*pSendBundle));
 		
@@ -3535,42 +3535,42 @@ void Entity::teleportLocal(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3
 void Entity::teleport(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& dir)
 {
 	/*
-		1: �κ���ʽ��teleport������Ϊ��˲���ƶ��ģ���ͻ�ƿռ����ƽ��뵽�κοռ䣩�� �������ڵ�ǰλ��ֻ�ƶ���0.1��, �����������ǰentity
-			�պ���ĳ��trap�У� teleport��ǰ�ƶ�0.1�׵���û�г�trap�� ��Ϊ����˲���ƶ�����������Ŀǰ��Ϊ
-			entity�����뿪trap���Ҵ�����ػص�, Ȼ��˲ʱ����������һ���㣬 ��ô��Ϊ�õ�Ҳ���ڵ�ǰtrap�������ֻ��׳�����trap�ص�.
+		1: 任何形式的teleport都被认为是瞬间移动的（可突破空间限制进入到任何空间）， 哪怕是在当前位置只移动了0.1米, 这就造成如果当前entity
+			刚好在某个trap中， teleport向前移动0.1米但是没有出trap， 因为这是瞬间移动的特性我们目前认为
+			entity会先离开trap并且触发相关回调, 然后瞬时出现在了另一个点， 那么因为该点也是在当前trap中所以又会抛出进入trap回调.
 
-		2: ����ǵ�ǰspace����ת�����������ƶ�����
+		2: 如果是当前space上跳转则立即进行移动操作
 
-		3: �������ת������space��, �����Ǹ�spaceҲ�ڵ�ǰcellapp�ϵ����ʱ�� ����ִ����ת����(��Ϊ����Ҫ�����κ�������ϵ��ά���� ֱ���л��ͺ���)�� 
+		3: 如果是跳转到其他space上, 但是那个space也在当前cellapp上的情况时， 立即执行跳转操作(因为不需要进行任何其他关系的维护， 直接切换就好了)。 
 		
-		4: ���Ҫ��ת��Ŀ��space����һ��cellapp�ϣ�
-			4.1: ��ǰentityû��base���֣� ������ά��base���ֵĹ�ϵ�� ���ǻ���Ҫ�����������������תʧ�ܣ� ��ô��ʱӦ�÷�����תʧ�ܻص����Ҽ���
-			���������ڵ�ǰspace�ϡ�
+		4: 如果要跳转的目标space在另一个cellapp上：
+			4.1: 当前entity没有base部分， 不考虑维护base部分的关系， 但是还是要考虑意外情况导致跳转失败， 那么此时应该返回跳转失败回调并且继续
+			正常存在于当前space上。
 		
-			4.2: ��ǰentity��base���֣� ��ô������Ҫ�ı�base��ӳ���cell����(������δ��ʽ�л���ϵʱbaseapp�������ʹ�cell����Ϣ��Ӧ�ò�����ʧ)�� Ϊ�˰�ȫ������Ҫ��һЩ����
+			4.2: 当前entity有base部分， 那么我们需要改变base所映射的cell部分(并且在未正式切换关系时baseapp上所有送达cell的消息都应该不被丢失)， 为了安全我们需要做一些工作
 	*/
 
 	Py_INCREF(this);
 
-	// ���ΪNone����entity�Լ����ڱ�space����ת��ĳλ��
+	// 如果为None则是entity自己想在本space上跳转到某位置
 	if(nearbyMBRef == Py_None)
 	{
-		// ֱ��ִ�в���
+		// 直接执行操作
 		teleportLocal(nearbyMBRef, pos, dir);
 	}
 	else
 	{
 		//EntityCall* mb = NULL;
 
-		// �����entity��һ�����ڱ�cellapp�ϣ� ����ֱ�ӽ��в���
+		// 如果是entity则一定是在本cellapp上， 可以直接进行操作
 		if(PyObject_TypeCheck(nearbyMBRef, Entity::getScriptType()))
 		{
 			teleportRefEntity(static_cast<Entity*>(nearbyMBRef), pos, dir);
 		}
 		else
 		{
-			// �����entityCall, �ȼ�鱾cell���Ƿ��ܹ�ͨ�����entityCall��ID�ҵ�entity
-			// ������ҵ���Ҳ���ڱ�cellapp�Ͽ�ֱ�ӽ��в���
+			// 如果是entityCall, 先检查本cell上是否能够通过这个entityCall的ID找到entity
+			// 如果能找到则也是在本cellapp上可直接进行操作
 			if(PyObject_TypeCheck(nearbyMBRef, EntityCall::getScriptType()))
 			{
 				EntityCall* mb = static_cast<EntityCall*>(nearbyMBRef);
@@ -3587,7 +3587,7 @@ void Entity::teleport(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& di
 			}
 			else
 			{
-				// �������entity�� Ҳ����entityCallͬʱҲ����None? �ǿ϶����������
+				// 如果不是entity， 也不是entityCall同时也不是None? 那肯定是输入错误
 				PyErr_Format(PyExc_Exception, "%s::teleport: %d, nearbyRef error!\n", scriptName(), id());
 				PyErr_PrintEx(0);
 
@@ -3602,7 +3602,7 @@ void Entity::teleport(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& di
 //-------------------------------------------------------------------------------------
 void Entity::onTeleport()
 {
-	// �����������base.teleport��ת֮ǰ�����ã� cell.teleport�ǲ��ᱻ���õġ�
+	// 这个方法仅在base.teleport跳转之前被调用， cell.teleport是不会被调用的。
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
 	bufferOrExeCallback(const_cast<char*>("onTeleport"), NULL);
@@ -3628,7 +3628,7 @@ void Entity::onTeleportSuccess(PyObject* nearbyEntity, SPACE_ID lastSpaceID)
 		_sendBaseTeleportResult(this->id(), mb->componentID(), this->spaceID(), lastSpaceID, true);
 	}
 
-	// ���������trap�ȴ����������������ӽ�ȥ
+	// 如果身上有trap等触发器还得重新添加进去
 	restoreProximitys();
 
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
@@ -3765,11 +3765,11 @@ void Entity::onUpdateGhostVolatileData(KBEngine::MemoryStream& s)
 //-------------------------------------------------------------------------------------
 void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s)
 {
-	// һ��entityҪת��Ϊghost
-	// ������Ҫ����������realCell
-	// ������def�������ӽ���
-	// ���л�controller��ֹͣ���е�controller(timer, navigate, trap,...)
-	// ж��witness�� �������л�
+	// 一个entity要转变为ghost
+	// 首先需要设置自身的realCell
+	// 将所有def数据添加进流
+	// 序列化controller并停止所有的controller(timer, navigate, trap,...)
+	// 卸载witness， 并且序列化
 	KBE_ASSERT(isReal() == true && "Entity::changeToGhost(): not is real.\n");
 	KBE_ASSERT(realCell_ != g_componentID);
 
@@ -3785,7 +3785,7 @@ void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s)
 	DEBUG_MSG(fmt::format("{}::changeToGhost(): {}, realCell={}, spaceID={}, position=({},{},{}).\n", 
 		scriptName(), id(), realCell_, spaceID_, position().x, position().y, position().z));
 	
-	// �������ǰ��
+	// 必须放在前面
 	addToStream(s);
 
 	//witnesses_.clear();
@@ -3811,11 +3811,11 @@ void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s)
 //-------------------------------------------------------------------------------------
 void Entity::changeToReal(COMPONENT_ID ghostCell, KBEngine::MemoryStream& s)
 {
-	// һ��entityҪת��Ϊreal
-	// ������Ҫ����������ghostCell
-	// ������def�������ӽ���
-	// �����л�controller���ָ����е�controller(timer, navigate, trap,...)
-	// �����л���װwitness
+	// 一个entity要转变为real
+	// 首先需要设置自身的ghostCell
+	// 将所有def数据添加进流
+	// 反序列化controller并恢复所有的controller(timer, navigate, trap,...)
+	// 反序列化安装witness
 	KBE_ASSERT(isReal() == false && "Entity::changeToReal(): not is ghost.\n");
 
 	ghostCell_ = ghostCell;
@@ -3879,20 +3879,20 @@ void Entity::createFromStream(KBEngine::MemoryStream& s)
 		pCustomVolatileinfo_->createFromStream(s);
 	}
 
-	// ��ʱǿ������Ϊ���ڵ��棬�޷��ж����Ƿ��ڵ��棬��ɫ��Ҫ�ͻ����ϱ��Ƿ��ڵ���
-	// ������˵�NPC�����ƶ����Ƿ��ڵ������ж���
+	// 此时强制设置为不在地面，无法判定其是否在地面，角色需要客户端上报是否在地面
+	// 而服务端的NPC则与移动后是否在地面来判定。
 	isOnGround_ = false;
 
 	this->pScriptModule_ = EntityDef::findScriptModule(scriptUType);
 
 	KBE_ASSERT(this->pScriptModule_);
 
-	// ����entity��baseEntityCall
+	// 设置entity的baseEntityCall
 	if(baseEntityCallComponentID > 0)
 		baseEntityCall(new EntityCall(pScriptModule(), NULL, baseEntityCallComponentID, id_, ENTITYCALL_TYPE_BASE));
 
-	// �������ǰ�Ŀ�������ϵͳ���Լ��Ŀͻ��ˣ����������
-	// ����������ͻ����ڿ��ƣ����Իָ����ƹ�ϵ������޷��ָ���������
+	// 如果传送前的控制者是系统或自己的客户端，则继续保持
+	// 如果是其它客户端在控制，则尝试恢复控制关系，如果无法恢复，则重置
 	if (controlledByID == id())
 		controlledBy(baseEntityCall());
 	else if (controlledByID == 0)
@@ -3928,7 +3928,7 @@ void Entity::addControllersToStream(KBEngine::MemoryStream& s)
 	{
 		s << true;
 
-		// �����������ƶ���ص�Controllers
+		// 必须先清理移动相关的Controllers
 		stopMove();
 
 		pControllers_->addToStream(s);
@@ -4056,7 +4056,7 @@ void Entity::createWitnessFromStream(KBEngine::MemoryStream& s)
 		EntityCall* client = static_cast<EntityCall*>(clientMB);	
 		clientEntityCall(client);
 
-		// ��Ҫʹ��setWitness����Ϊ��ʱ����Ҫ��onAttach���̣��ͻ��˲���Ҫ����enterworld��
+		// 不要使用setWitness，因为此时不需要走onAttach流程，客户端不需要重新enterworld。
 		// setWitness(Witness::createPoolObject());
 		pWitness_ = Witness::createPoolObject(OBJECTPOOL_POINT);
 		pWitness_->pEntity(this);

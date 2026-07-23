@@ -275,7 +275,7 @@ int EndPoint::findIndicatedInterface(const char * spec, u_int32_t & address)
 		return -1;
 	}
 
-	// �Ƿ�ָ����ַ
+	// 是否指定地址
 	if (0 == Address::string2ip(spec, address))
 	{
 		return 0;
@@ -382,7 +382,7 @@ int EndPoint::getInterfaceAddressByMAC(const char * mac, u_int32_t & address)
 		return ret;
 	}
 
-	// mac��ַת��
+	// mac地址转换
 	unsigned char macAddress[16] = {0};
 	unsigned char macAddressIdx = 0;
 	char szTemp[2] = {0};
@@ -673,11 +673,11 @@ static long ssl_bio_callback(BIO *bio, int cmd, const char *argp, int argi, long
 
 	Packet* pPacket = (Packet*)BIO_get_callback_arg(bio);
 
-	// ����recv�� argi��buffer��argl��buffer���ȣ������ж�pPacket���ڳ��ȷ���ָ�����ȣ�С�ڳ����򷵻ض�ȡ���ĳ���
+	// 类似recv， argi是buffer，argl是buffer长度，这里判断pPacket大于长度返回指定长度，小于长度则返回读取到的长度
 	if ((int)pPacket->length() < argi)
 		argi = (int)pPacket->length();
 
-	// �����ǵ�buffer����ȥ
+	// 将我们的buffer填充进去
 	if ((cmd & BIO_CB_RETURN) > 0)
 	{
 		memcpy((void*)argp, pPacket->data() + pPacket->rpos(), argi);

@@ -69,7 +69,7 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 	{
 		if(fragmentDatasFlag_ == FRAGMENT_DATA_UNKNOW)
 		{
-			// ���û��ID��Ϣ���Ȼ�ȡID
+			// 如果没有ID信息，先获取ID
 			if(currMsgID_ == 0)
 			{
 				if(NETWORK_MESSAGE_ID_SIZE > 1 && pPacket->length() < NETWORK_MESSAGE_ID_SIZE)
@@ -89,7 +89,7 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 				MemoryStream* pPacket1 = pFragmentStream_ != NULL ? pFragmentStream_ : pPacket;
 				TRACE_MESSAGE_PACKET(true, pPacket1, pMsgHandler, pPacket1->length(), pChannel_->c_str(), false);
 				
-				// ��������ʱ�ȶ�
+				// 用作调试时比对
 				uint32 rpos = pPacket1->rpos();
 				pPacket1->rpos(0);
 				TRACE_MESSAGE_PACKET(true, pPacket1, pMsgHandler, pPacket1->length(), pChannel_->c_str(), false);
@@ -104,18 +104,18 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 				break;
 			}
 
-			// ���û�пɲ��������������˳��ȴ���һ����������
-			// ������һ���޲������ݰ�
+			// 如果没有可操作的数据了则退出等待下一个包处理。
+			// 可能是一个无参数数据包
 			//if(pPacket->opsize() == 0)	
 			//	break;
 			
-			// ���������Ϣû�л�ã���ȴ���ȡ������Ϣ
+			// 如果长度信息没有获得，则等待获取长度信息
 			if(currMsgLen_ == 0)
 			{
-				// ���������Ϣ�ǿɱ�Ļ�����������Զ����������Ϣѡ��ʱ�������з�����������
+				// 如果长度信息是可变的或者配置了永远包含长度信息选项时，从流中分析长度数据
 				if(pMsgHandler->msgLen == NETWORK_VARIABLE_MESSAGE)
 				{
-					// ���������Ϣ����������ȴ���һ��������
+					// 如果长度信息不完整，则等待下一个包处理
 					if(pPacket->length() < NETWORK_MESSAGE_LENGTH_SIZE)
 					{
 						writeFragmentMessage(FRAGMENT_DATA_MESSAGE_LENGTH, pPacket, NETWORK_MESSAGE_LENGTH_SIZE);
@@ -123,7 +123,7 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 					}
 					else
 					{
-						// �˴�����˳�����Ϣ
+						// 此处获得了长度信息
 						Network::MessageLength currlen;
 						(*pPacket) >> currlen;
 						currMsgLen_ = currlen;
@@ -144,18 +144,18 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 				}
 			}
 
-			// �������ռ��˵��ʹ������չ���ȣ����ǻ���Ҫ�ȴ���չ������Ϣ
+			// 如果长度占满说明使用了扩展长度，我们还需要等待扩展长度信息
 			if (currMsgLen_ == NETWORK_MESSAGE_MAX_SIZE1)
 			{
 				if (pPacket->length() < NETWORK_MESSAGE_LENGTH1_SIZE)
 				{
-					// ���������Ϣ����������ȴ���һ��������
+					// 如果长度信息不完整，则等待下一个包处理
 					writeFragmentMessage(FRAGMENT_DATA_MESSAGE_LENGTH1, pPacket, NETWORK_MESSAGE_LENGTH1_SIZE);
 					break;
 				}
 				else
 				{
-					// �˴��������չ������Ϣ
+					// 此处获得了扩展长度信息
 					(*pPacket) >> currMsgLen_;
 
 					NetworkStats::getSingleton().trackMessage(NetworkStats::RECV, *pMsgHandler,
@@ -171,7 +171,7 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 				MemoryStream* pPacket1 = pFragmentStream_ != NULL ? pFragmentStream_ : pPacket;
 				TRACE_MESSAGE_PACKET(true, pPacket1, pMsgHandler, pPacket1->length(), pChannel_->c_str(), false);
 
-				// ��������ʱ�ȶ�
+				// 用作调试时比对
 				uint32 rpos = pPacket1->rpos();
 				pPacket1->rpos(0);
 				TRACE_MESSAGE_PACKET(true, pPacket1, pMsgHandler, pPacket1->length(), pChannel_->c_str(), false);
@@ -200,7 +200,7 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 					break;
 				}
 
-				// ��ʱ������Ч��ȡλ�� ��ֹ�ӿ����������
+				// 临时设置有效读取位， 防止接口中溢出操作
 				size_t wpos = pPacket->wpos();
 				// size_t rpos = pPacket->rpos();
 				size_t frpos = pPacket->rpos() + currMsgLen_;
@@ -209,7 +209,7 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 				TRACE_MESSAGE_PACKET(true, pPacket, pMsgHandler, currMsgLen_, pChannel_->c_str(), true);
 				pMsgHandler->handle(pChannel_, *pPacket);
 
-				// ���handlerû�д��������������һ������
+				// 如果handler没有处理完数据则输出一个警告
 				if(currMsgLen_ > 0)
 				{
 					if(frpos != pPacket->rpos())
@@ -272,23 +272,23 @@ void PacketReader::mergeFragmentMessage(Packet* pPacket)
 
 		switch(fragmentDatasFlag_)
 		{
-		case FRAGMENT_DATA_MESSAGE_ID:			// ��ϢID��Ϣ��ȫ
+		case FRAGMENT_DATA_MESSAGE_ID:			// 消息ID信息不全
 			memcpy(&currMsgID_, pFragmentDatas_, NETWORK_MESSAGE_ID_SIZE);
 			break;
 
-		case FRAGMENT_DATA_MESSAGE_LENGTH:		// ��Ϣ������Ϣ��ȫ
+		case FRAGMENT_DATA_MESSAGE_LENGTH:		// 消息长度信息不全
 			memcpy(&currMsgLen_, pFragmentDatas_, NETWORK_MESSAGE_LENGTH_SIZE);
 			if (currMsgLen_ == NETWORK_MESSAGE_MAX_SIZE) 
 				currMsgLen_ = NETWORK_MESSAGE_MAX_SIZE1;
 			break;
 
-		case FRAGMENT_DATA_MESSAGE_LENGTH1:		// ��Ϣ������Ϣ��ȫ
+		case FRAGMENT_DATA_MESSAGE_LENGTH1:		// 消息长度信息不全
 			memcpy(&currMsgLen_, pFragmentDatas_, NETWORK_MESSAGE_LENGTH1_SIZE);
 			if (currMsgLen_ == NETWORK_MESSAGE_MAX_SIZE1) 
 				pChannel_->condemn("PacketReader::mergeFragmentMessage: msglen1 exceeds the limit!");
 			break;
 
-		case FRAGMENT_DATA_MESSAGE_BODY:		// ��Ϣ������Ϣ��ȫ
+		case FRAGMENT_DATA_MESSAGE_BODY:		// 消息内容信息不全
 			pFragmentStream_ = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 			pFragmentStream_->append(pFragmentDatas_, currMsgLen_);
 			break;

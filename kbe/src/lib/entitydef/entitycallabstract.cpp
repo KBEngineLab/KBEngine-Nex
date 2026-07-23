@@ -75,10 +75,10 @@ EntityCallAbstract::~EntityCallAbstract()
 //-------------------------------------------------------------------------------------
 void EntityCallAbstract::newCall(Network::Bundle& bundle)
 {
-	// �����server�˵�entitycall
+	// 如果是server端的entitycall
 	if(g_componentType != CLIENT_TYPE && g_componentType != BOTS_TYPE)
 	{
-		// ���IDΪ0��������һ���ͻ������������Ϊ����ˡ�
+		// 如果ID为0，则这是一个客户端组件，否则为服务端。
 		if(componentID_ == 0)
 		{
 			bundle.newMessage(ClientInterface::onRemoteMethodCall);
@@ -89,7 +89,7 @@ void EntityCallAbstract::newCall(Network::Bundle& bundle)
 
 			if(cinfos != NULL)
 			{
-				// �ҵ���Ӧ�����Ͷ�ݹ�ȥ�� ������entitycall����Ҫ��ת���� e.base.cell �� ����baseappת��cellapp
+				// 找到对应的组件投递过去， 如果这个entitycall还需要中转比如 e.base.cell ， 则由baseapp转往cellapp
 				if(cinfos->componentType == BASEAPP_TYPE)
 				{
 					bundle.newMessage(BaseappInterface::onEntityCall);
@@ -108,13 +108,13 @@ void EntityCallAbstract::newCall(Network::Bundle& bundle)
 
 		bundle << id_;
 		
-		// ����Ƿ����ͻ��˵İ������踽������һ������
+		// 如果是发往客户端的包则无需附加这样一个类型
 		if(componentID_ > 0)
 			bundle << type_;
 	}
 	else
 	{
-		// ����ǿͻ����ϵ�entitycall���÷���˷���ֻ���ڵ���cell����base
+		// 如果是客户端上的entitycall调用服务端方法只存在调用cell或者base
 		switch(type_)
 		{
 		case ENTITYCALL_TYPE_BASE:

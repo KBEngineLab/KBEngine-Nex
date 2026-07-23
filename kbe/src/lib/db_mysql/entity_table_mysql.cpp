@@ -35,7 +35,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine { 
 
-// ͬ���ɹ�ʱ�ص�
+// 同步成功时回调
 typedef void (*onSyncItemToDBSuccessPtr)(DBInterface*, const char*, const char*);
 
 bool sync_item_to_db(DBInterface* pdbi, 
@@ -56,7 +56,7 @@ bool sync_item_to_db(DBInterface* pdbi,
 			MYSQL_TABLE_FIELD& tf = iter->second;
 			if (tf.type == sqlitemtype && ((tf.flags & ALL_MYSQL_SET_FLAGS) == itemflags))
 			{
-				if ((length == 0) || (sqlitemtype == FIELD_TYPE_VAR_STRING ? (int32)length == tf.length / SYSTEM_CHARSET_MBMAXLEN/*Mysql��length�Ŵ���N��*/ : 
+				if ((length == 0) || (sqlitemtype == FIELD_TYPE_VAR_STRING ? (int32)length == tf.length / SYSTEM_CHARSET_MBMAXLEN/*Mysql将length放大了N倍*/ : 
 					(int32)length == tf.length))
 					return true;
 			}
@@ -118,7 +118,7 @@ bool sync_item_to_db(DBInterface* pdbi,
 
 void sync_autoload_item_index(DBInterface* pdbi, const char* tableName, const char* itemName)
 {
-	// ����sm_autoLoad������
+	// 创建sm_autoLoad的索引
 	std::string sql = fmt::format("ALTER TABLE " ENTITY_TABLE_PERFIX "_{} ADD INDEX ({})", tableName, itemName);
 
 	try
@@ -144,10 +144,10 @@ EntityTableMysql::~EntityTableMysql()
 //-------------------------------------------------------------------------------------
 bool EntityTableMysql::initialize(ScriptDefModule* sm, std::string name)
 {
-	// ��ȡ����
+	// 获取表名
 	tableName(name);
 
-	// �ҵ����д洢���Բ��Ҵ��������е��ֶ�
+	// 找到所有存储属性并且创建出所有的字段
 	ScriptDefModule::PROPERTYDESCRIPTION_MAP& pdescrsMap = sm->getPersistentPropertyDescriptions();
 	ScriptDefModule::PROPERTYDESCRIPTION_MAP::const_iterator iter = pdescrsMap.begin();
 
@@ -172,7 +172,7 @@ bool EntityTableMysql::initialize(ScriptDefModule* sm, std::string name)
 		addItem(pETItem);
 	}
 
-	// ���⴦���� ���ݿⱣ�淽���λ��
+	// 特殊处理， 数据库保存方向和位置
 	if(sm->hasCell())
 	{
 		ENTITY_PROPERTY_UID posuid = ENTITY_BASE_PROPERTY_UTYPE_POSITION_XYZ;
@@ -219,7 +219,7 @@ void EntityTableMysql::init_db_item_name()
 	EntityTable::TABLEITEM_MAP::iterator iter = tableItems_.begin();
 	for(; iter != tableItems_.end(); ++iter)
 	{
-		// ����fixedDict�ֶ����Ƶ��������
+		// 处理fixedDict字段名称的特例情况
 		std::string exstrFlag = "";
 		if(iter->second->type() == TABLE_ITEM_TYPE_FIXEDDICT)
 		{
@@ -303,7 +303,7 @@ bool EntityTableMysql::syncIndexToDB(DBInterface* pdbi)
 		{
 			bool deleteIndex = fiter->second != (*iiter)->indexType();
 			
-			// ɾ���Ѿ������ģ�ʣ�µľ���Ҫ�����ݿ�ɾ����index
+			// 删除已经处理的，剩下的就是要从数据库删除的index
 			currDBKeys.erase(fiter);
 			
 			if(deleteIndex)
@@ -340,7 +340,7 @@ bool EntityTableMysql::syncIndexToDB(DBInterface* pdbi)
 		done = true;
 	}
 
-	// ʣ�µľ���Ҫ�����ݿ�ɾ����index
+	// 剩下的就是要从数据库删除的index
 	KBEUnordered_map<std::string, std::string>::iterator dbkey_iter = currDBKeys.begin();
 	for(; dbkey_iter != currDBKeys.end(); ++dbkey_iter)
 	{
@@ -348,7 +348,7 @@ bool EntityTableMysql::syncIndexToDB(DBInterface* pdbi)
 		done = true;		
 	}
 	
-	// û����Ҫ�޸Ļ������ӵ�
+	// 没有需要修改或者添加的
 	if(!done)
 		return true;
 	
@@ -426,7 +426,7 @@ bool EntityTableMysql::syncToDB(DBInterface* pdbi)
 
 	pdbi->getTableItemNames(ttablename.c_str(), dbTableItemNames);
 
-	// ����Ƿ�����Ҫɾ���ı��ֶ�
+	// 检查是否有需要删除的表字段
 	std::vector<std::string>::iterator iter0 = dbTableItemNames.begin();
 	for(; iter0 != dbTableItemNames.end(); ++iter0)
 	{
@@ -458,7 +458,7 @@ bool EntityTableMysql::syncToDB(DBInterface* pdbi)
 		}
 	}
 
-	// ͬ��������
+	// 同步表索引
 	if(!syncIndexToDB(pdbi))
 		return false;
 
@@ -796,11 +796,11 @@ DBID EntityTableMysql::writeTable(DBInterface* pdbi, DBID dbid, int8 shouldAutoL
 
 	dbid = context.dbid;
 
-	// ���dbidΪ0��洢ʧ�ܷ���
+	// 如果dbid为0则存储失败返回
 	if(dbid <= 0)
 		return dbid;
 
-	// ����ʵ���Ƿ��Զ�����
+	// 设置实体是否自动加载
 	if(shouldAutoLoad > -1)
 		entityShouldAutoLoad(pdbi, dbid, shouldAutoLoad > 0);
 
@@ -1212,7 +1212,7 @@ bool EntityTableItemMysql_ARRAY::initialize(const PropertyDescription* pProperty
 	if(!ret)
 		return false;
 
-	// �����ӱ�
+	// 创建子表
 	EntityTableMysql* pTable = new EntityTableMysql(this->pParentTable()->pEntityTables());
 
 	std::string tname = this->pParentTable()->tableName();
@@ -1281,7 +1281,7 @@ bool EntityTableItemMysql_ARRAY::initialize(const PropertyDescription* pProperty
 //-------------------------------------------------------------------------------------
 bool EntityTableItemMysql_ARRAY::syncToDB(DBInterface* pdbi, void* pData)
 {
-	// ���еı�������bool EntityTables::syncToDB(DBInterface* pdbi)�б�ͬ���������ӱ����������������һ��ͬ��
+	// 所有的表都会在bool EntityTables::syncToDB(DBInterface* pdbi)中被同步（包括子表），因此无需再做一次同步
 	//if(pChildTable_)
 	//	return pChildTable_->syncToDB(pdbi);
 
@@ -1686,7 +1686,7 @@ bool EntityTableItemMysql_STRING::syncToDB(DBInterface* pdbi, void* pData)
 	uint32 length = pPropertyDescription_->getDatabaseLength();
 	char sql_str[SQL_BUF];
 
-	// �������Item�Ǹ��̶��ֵ䣬��ô��Ҫ�жϵ�ǰitem�����ڹ̶��ֵ�������DatabaseLength
+	// 如果父表Item是个固定字典，那么需要判断当前item有无在固定字典中设置DatabaseLength
 	if (this->pParentTableItem() && this->pParentTableItem()->type() == TABLE_ITEM_TYPE_FIXEDDICT)
 	{
 		length = static_cast<KBEngine::EntityTableItemMysql_FIXED_DICT*>(pParentTableItem())->getItemDatabaseLength(this->itemName());
@@ -1694,7 +1694,7 @@ bool EntityTableItemMysql_STRING::syncToDB(DBInterface* pdbi, void* pData)
 
 	if (length <= 0)
 	{
-		// Ĭ�ϳ���255
+		// 默认长度255
 		length = 255;
 	}
 
@@ -1758,7 +1758,7 @@ bool EntityTableItemMysql_UNICODE::syncToDB(DBInterface* pdbi, void* pData)
 	uint32 length = pPropertyDescription_->getDatabaseLength();
 	char sql_str[SQL_BUF];
 
-	// �������Item�Ǹ��̶��ֵ䣬��ô��Ҫ�жϵ�ǰitem�����ڹ̶��ֵ�������DatabaseLength
+	// 如果父表Item是个固定字典，那么需要判断当前item有无在固定字典中设置DatabaseLength
 	if (this->pParentTableItem() && this->pParentTableItem()->type() == TABLE_ITEM_TYPE_FIXEDDICT)
 	{
 		length = static_cast<KBEngine::EntityTableItemMysql_FIXED_DICT*>(pParentTableItem())->getItemDatabaseLength(this->itemName());
@@ -1766,7 +1766,7 @@ bool EntityTableItemMysql_UNICODE::syncToDB(DBInterface* pdbi, void* pData)
 
 	if (length <= 0)
 	{
-		// Ĭ�ϳ���255
+		// 默认长度255
 		length = 255;
 	}
 

@@ -30,26 +30,26 @@ class PyStruct
 {						
 public:	
 	/** 
-		���� struct.pack
+		代理 struct.pack
 	*/
 	static std::string pack(PyObject* fmt, PyObject* args);
 
 	/** 
-		���� struct.unpack
+		代理 struct.unpack
 	*/
 	static PyObject* unpack(PyObject* fmt, PyObject* args);
 
 	/** 
-		��ʼ��pickler 
+		初始化pickler 
 	*/
 	static bool initialize(void);
 	static void finalise(void);
 	
 private:
-	static PyObject* pack_;									// struct.pack����ָ��
-	static PyObject* unpack_;								// struct.unpack����ָ��
+	static PyObject* pack_;									// struct.pack方法指针
+	static PyObject* unpack_;								// struct.unpack方法指针
 
-	static bool	isInit;										// �Ƿ��Ѿ�����ʼ��
+	static bool	isInit;										// 是否已经被初始化
 } ;
 
 }

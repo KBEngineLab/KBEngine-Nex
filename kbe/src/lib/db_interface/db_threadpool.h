@@ -33,7 +33,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{ 
 
 /*
-	���ݿ��߳�����buffer
+	数据库线程任务buffer
 */
 class TPThread;
 

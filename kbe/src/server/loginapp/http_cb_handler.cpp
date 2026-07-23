@@ -236,7 +236,7 @@ int HTTPCBHandler::handleInputNotification(int fd)
 
 			if(type == 1)
 			{
-				// ��dbmgr�����˺�
+				// 向dbmgr激活账号
 				Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 				(*pBundle).newMessage(DbmgrInterface::accountActivate);
 				(*pBundle) << code;
@@ -283,7 +283,7 @@ int HTTPCBHandler::handleInputNotification(int fd)
 					username = Network::Http::URLDecode(username);
 					password = Network::Http::URLDecode(password);
 
-					// ��dbmgr�����˺�
+					// 向dbmgr重置账号
 					Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 					(*pBundle).newMessage(DbmgrInterface::accountResetPassword);
 					(*pBundle) << KBEngine::strutil::kbe_trim(username);
@@ -314,7 +314,7 @@ int HTTPCBHandler::handleInputNotification(int fd)
 				{
 					username = Network::Http::URLDecode(username);
 
-					// ��dbmgr���˺��˺�
+					// 向dbmgr绑定账号账号
 					Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 					(*pBundle).newMessage(DbmgrInterface::accountBindMail);
 					(*pBundle) << KBEngine::strutil::kbe_trim(username);

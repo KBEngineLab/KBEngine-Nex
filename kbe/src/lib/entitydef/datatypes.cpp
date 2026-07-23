@@ -60,7 +60,7 @@ void DataTypes::finalise(void)
 //-------------------------------------------------------------------------------------
 bool DataTypes::validTypeName(const std::string& typeName)
 {
-	// ������ǰ���_, ��Ϊ�ڲ�������һЩ��ʱ�ṹǰ��ʹ����_, ��������
+	// 不允许前面加_, 因为内部产生的一些临时结构前面使用了_, 避免误判
 	if (typeName.size() > 0 && typeName[0] == '_')
 		return false;
 
@@ -70,7 +70,7 @@ bool DataTypes::validTypeName(const std::string& typeName)
 //-------------------------------------------------------------------------------------
 bool DataTypes::initialize(std::string file)
 {
-	// ��ʼ��һЩ�������
+	// 初始化一些基础类别
 	addDataType("UINT8",		new IntType<uint8>);
 	addDataType("UINT16",		new IntType<uint16>);
 	addDataType("UINT64",		new UInt64Type);
@@ -125,7 +125,7 @@ bool DataTypes::loadTypes(SmartPointer<XML>& xml)
 
 	if(node == NULL)
 	{
-		// root�ڵ���û���ӽڵ���
+		// root节点下没有子节点了
 		return true;
 	}
 

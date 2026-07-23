@@ -19,7 +19,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 /*
-	��Դ��������
+	资源管理器。
 */
 #ifndef KBE_RESMGR_H
 #define KBE_RESMGR_H
@@ -42,7 +42,7 @@ namespace KBEngine{
 class Resmgr : public Singleton<Resmgr>, public TimerHandler
 {
 public:
-	// ���滷������
+	// 引擎环境变量
 	struct KBEEnv
 	{
 		std::string root_path;
@@ -66,7 +66,7 @@ public:
 	const Resmgr::KBEEnv& getEnv() { return kb_env_; }
 
 	/*
-		����Դ·����(����������ָ����)ƥ�䵽��������Դ��ַ
+		从资源路径中(环境变量中指定的)匹配到完整的资源地址
 	*/
 	std::string matchRes(const std::string& res);
 	std::string matchRes(const char* res);
@@ -76,12 +76,12 @@ public:
 	FILE* openRes(std::string res, const char* mode = "r");
 
 	/*
-		�г�Ŀ¼�����е���Դ�ļ�
+		列出目录下所有的资源文件
 	*/
 	bool listPathRes(std::wstring path, const std::wstring& extendName, std::vector<std::wstring>& results);
 
 	/*
-		����Դ·����(����������ָ����)ƥ�䵽Ŀ¼
+		从资源路径中(环境变量中指定的)匹配到目录
 	*/
 	std::string matchPath(const std::string& path);
 	std::string matchPath(const char* path);
@@ -97,31 +97,31 @@ public:
 	}
 
 	/**
-		�������ϵͳ����ԴĿ¼
+		获得引擎系统级资源目录
 		kbe\\res\\*
 	*/
 	std::string getPySysResPath();
 
 	/**
-		����û�����ԴĿ¼
+		获得用户级资源目录
 		assets\\res\\*
 	*/
 	std::string getPyUserResPath();
 
 	/**
-		����û����ű�Ŀ¼
+		获得用户级脚本目录
 		assets\\scripts\\*
 	*/
 	std::string getPyUserScriptsPath();
 
 	/**
-		����û������̽ű�Ŀ¼
-		assets\\scripts\\cell��base��client
+		获得用户级进程脚本目录
+		assets\\scripts\\cell、base、client
 	*/
 	std::string getPyUserComponentScriptsPath(COMPONENT_TYPE componentType = UNKNOWN_COMPONENT_TYPE);
 
 	/**
-		����û�����Ŀ¼
+		获得用户级库目录
 		assets\\*
 	*/
 	std::string getPyUserAssetsPath();

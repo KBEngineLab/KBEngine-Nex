@@ -59,7 +59,7 @@ namespace KBEngine{
 ServerConfig g_serverConfig;
 KBE_SINGLETON_INIT(Baseapp);
 
-// ����һ����������ʵ����ֵ䣬������ʵ�����еĳ־û����Ժ�����
+// 创建一个用于生成实体的字典，包含了实体所有的持久化属性和数据
 PyObject* createDictDataFromPersistentStream(MemoryStream& s, const char* entityType)
 {
 	PyObject* pyDict = PyDict_New();
@@ -73,7 +73,7 @@ PyObject* createDictDataFromPersistentStream(MemoryStream& s, const char* entity
 		return pyDict;
 	}
 
-	// �Ƚ�celldata�еĴ洢����ȡ��
+	// 先将celldata中的存储属性取出
 	ScriptDefModule::PROPERTYDESCRIPTION_MAP& propertyDescrs = pScriptModule->getPersistentPropertyDescriptions();
 	ScriptDefModule::PROPERTYDESCRIPTION_MAP::const_iterator iter = propertyDescrs.begin();
 
@@ -204,7 +204,7 @@ Baseapp::Baseapp(Network::EventDispatcher& dispatcher,
 //-------------------------------------------------------------------------------------
 Baseapp::~Baseapp()
 {
-	// ����Ҫ�����ͷ�
+	// 不需要主动释放
 	pInitProgressHandler_ = NULL;
 
 	EntityCall::resetCallHooks();
@@ -230,7 +230,7 @@ ShutdownHandler::CAN_SHUTDOWN_STATE Baseapp::canShutdown()
 
 	if (getEntryScript().get() && PyObject_HasAttrString(getEntryScript().get(), "onReadyForShutDown") > 0)
 	{
-		// ���нű����������
+		// 所有脚本都加载完毕
 		PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(),
 			const_cast<char*>("onReadyForShutDown"),
 			const_cast<char*>(""));
@@ -278,7 +278,7 @@ void Baseapp::onShutdownBegin()
 {
 	EntityApp<Entity>::onShutdownBegin();
 
-	// ֪ͨ�ű�
+	// 通知脚本
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	SCRIPT_OBJECT_CALL_ARGS1(getEntryScript().get(), const_cast<char*>("onBaseAppShutDown"), 
 		const_cast<char*>("i"), 0, false);
@@ -293,7 +293,7 @@ void Baseapp::onShutdown(bool first)
 
 	if(first)
 	{
-		// ֪ͨ�ű�
+		// 通知脚本
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 		SCRIPT_OBJECT_CALL_ARGS1(getEntryScript().get(), const_cast<char*>("onBaseAppShutDown"), 
 			const_cast<char*>("i"), 1, false);
@@ -340,7 +340,7 @@ void Baseapp::onShutdownEnd()
 {
 	EntityApp<Entity>::onShutdownEnd();
 
-	// ֪ͨ�ű�
+	// 通知脚本
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	SCRIPT_OBJECT_CALL_ARGS1(getEntryScript().get(), const_cast<char*>("onBaseAppShutDown"), 
 		const_cast<char*>("i"), 2, false);
@@ -368,7 +368,7 @@ bool Baseapp::installPyModules()
 	registerScript(Entity::getScriptType());
 	registerScript(Proxy::getScriptType());
 
-	// ��app���ע�ᵽ�ű�
+	// 将app标记注册到脚本
 	std::map<uint32, std::string> flagsmaps = createAppFlagsMaps();
 	std::map<uint32, std::string>::iterator fiter = flagsmaps.begin();
 	for (; fiter != flagsmaps.end(); ++fiter)
@@ -379,7 +379,7 @@ bool Baseapp::installPyModules()
 		}
 	}
 
-	// ע�ᴴ��entity�ķ�����py 
+	// 注册创建entity的方法到py 
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		time,							__py_gametime,												METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		createEntity,					__py_createEntity,											METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		createEntityLocally,			__py_createEntity,											METH_VARARGS,			0);
@@ -409,7 +409,7 @@ bool Baseapp::installPyModules()
 //-------------------------------------------------------------------------------------
 void Baseapp::onInstallPyModules()
 {
-	// ����globalData, globalBases֧��
+	// 添加globalData, globalBases支持
 	pBaseAppData_ = new GlobalDataClient(DBMGR_TYPE, GlobalDataServer::BASEAPP_DATA);
 	registerPyObjectToScript("baseAppData", pBaseAppData_);
 
@@ -510,7 +510,7 @@ void Baseapp::handleGameTick()
 {
 	AUTO_SCOPED_PROFILE("gameTick");
 
-	// һ��Ҫ����ǰ��
+	// 一定要在最前面
 	updateLoad();
 
 	EntityApp<Entity>::handleGameTick();
@@ -561,7 +561,7 @@ bool Baseapp::initializeBegin()
 //-------------------------------------------------------------------------------------
 bool Baseapp::initializeEnd()
 {
-	// ����һ��timer�� ÿ����һЩ״̬
+	// 添加一个timer， 每秒检查一些状态
 	loopCheckTimerHandle_ = this->dispatcher().addTimer(1000000, this,
 							reinterpret_cast<void *>(TIMEOUT_CHECK_STATUS));
 
@@ -579,8 +579,8 @@ bool Baseapp::initializeEnd()
 
 	new SyncEntityStreamTemplateHandler(this->networkInterface());
 
-	// �����Ҫpyprofile���ڴ˴���װ
-	// ����ʱж�ز�������
+	// 如果需要pyprofile则在此处安装
+	// 结束时卸载并输出结果
 	if(g_kbeSrvConfig.getBaseApp().profiles.open_pyprofile)
 	{
 		script::PyProfile::start("kbengine");
@@ -749,7 +749,7 @@ void Baseapp::onChannelDeregister(Network::Channel * pChannel)
 {
 	ENTITY_ID pid = pChannel->proxyID();
 
-	// �����cellapp������
+	// 如果是cellapp死亡了
 	if(pChannel->isInternal())
 	{
 		Components::ComponentInfos* cinfo = Components::getSingleton().findComponent(pChannel);
@@ -764,7 +764,7 @@ void Baseapp::onChannelDeregister(Network::Channel * pChannel)
 
 	EntityApp<Entity>::onChannelDeregister(pChannel);
 	
-	// �й���entity�Ŀͻ����˳�����Ҫ����entity��client
+	// 有关联entity的客户端退出则需要设置entity的client
 	if(pid > 0)
 	{
 		Proxy* proxy = static_cast<Proxy*>(this->findEntity(pid));
@@ -1252,8 +1252,8 @@ void Baseapp::onCreateEntityFromDBIDCallback(Network::Channel* pChannel, KBEngin
 				}
 				else
 				{
-					// ���createEntityFromDBID��ӿڷ���ʵ���Ѿ�������ڵ�ǰ�����ϣ����ǵ�ǰ�������޷��ҵ�ʵ��ʱӦ�ø�������
-					// �������ͨ�����첽�Ļ����д�db��ѯ���Ѿ���������Ȼص�ʱ����ʵ���Ѿ������˶���ɵ�
+					// 如果createEntityFromDBID类接口返回实体已经检出且在当前进程上，但是当前进程上无法找到实体时应该给出错误
+					// 这种情况通常是异步的环境中从db查询到已经检出，但等回调时可能实体已经销毁了而造成的
 					if(wasActiveCID != g_componentID)
 					{
 						baseEntityRef = static_cast<PyObject*>(new EntityCall(EntityDef::findScriptModule(entityType.c_str()), 
@@ -1331,7 +1331,7 @@ void Baseapp::onCreateEntityFromDBIDCallback(Network::Channel* pChannel, KBEngin
 			PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID);
 			if(pyfunc)
 			{
-				// ����Ҫ֪ͨ�ű�
+				// 不需要通知脚本
 			}
 		}
 
@@ -1535,7 +1535,7 @@ void Baseapp::onGetCreateEntityAnywhereFromDBIDBestBaseappID(Network::Channel* p
 	COMPONENT_ID targetComponentID;
 	s >> targetComponentID;
 
-	// ���Ϊ0˵��û�п��õģ���ô�����Լ�����������
+	// 如果为0说明没有可用的，那么就用自己来创建好了
 	if (targetComponentID == 0)
 		targetComponentID = g_componentID;
 
@@ -1627,8 +1627,8 @@ void Baseapp::onCreateEntityAnywhereFromDBIDCallback(Network::Channel* pChannel,
 				}
 				else
 				{
-					// ���createEntityFromDBID��ӿڷ���ʵ���Ѿ�������ڵ�ǰ�����ϣ����ǵ�ǰ�������޷��ҵ�ʵ��ʱӦ�ø�������
-					// �������ͨ�����첽�Ļ����д�db��ѯ���Ѿ���������Ȼص�ʱ����ʵ���Ѿ������˶���ɵ�
+					// 如果createEntityFromDBID类接口返回实体已经检出且在当前进程上，但是当前进程上无法找到实体时应该给出错误
+					// 这种情况通常是异步的环境中从db查询到已经检出，但等回调时可能实体已经销毁了而造成的
 					if(wasActiveCID != g_componentID)
 					{
 						baseEntityRef = static_cast<PyObject*>(new EntityCall(EntityDef::findScriptModule(entityType.c_str()), 
@@ -1706,7 +1706,7 @@ void Baseapp::onCreateEntityAnywhereFromDBIDCallback(Network::Channel* pChannel,
 	stream->append(s);
 	s.done();
 
-	// ֪ͨbaseappmgr������baseapp�ϴ���entity
+	// 通知baseappmgr在其他baseapp上创建entity
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	pBundle->newMessage(BaseappmgrInterface::reqCreateEntityAnywhereFromDBID);
 	pBundle->append((*stream));
@@ -1773,21 +1773,21 @@ void Baseapp::createEntityAnywhereFromDBIDOtherBaseapp(Network::Channel* pChanne
 			PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID);
 			if(pyfunc)
 			{
-				// ����Ҫ֪ͨ�ű�
+				// 不需要通知脚本
 			}
 		}
 
 		return;
 	}
 
-	// �Ƿ񱾵�������Ƿ���Դ�� �����ֱ���ڱ��ص��ûص�
+	// 是否本地组件就是发起源， 如果是直接在本地调用回调
 	if(g_componentID == sourceBaseappID)
 	{
 		onCreateEntityAnywhereFromDBIDOtherBaseappCallback(pChannel, g_componentID, entityType, static_cast<Entity*>(e)->id(), callbackID, dbid);
 	}
 	else
 	{
-		// ֪ͨbaseapp, ��������
+		// 通知baseapp, 创建好了
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		pBundle->newMessage(BaseappInterface::onCreateEntityAnywhereFromDBIDOtherBaseappCallback);
 
@@ -2106,8 +2106,8 @@ void Baseapp::onCreateEntityRemotelyFromDBIDCallback(Network::Channel* pChannel,
 				}
 				else
 				{
-					// ���createEntityFromDBID��ӿڷ���ʵ���Ѿ�������ڵ�ǰ�����ϣ����ǵ�ǰ�������޷��ҵ�ʵ��ʱӦ�ø�������
-					// �������ͨ�����첽�Ļ����д�db��ѯ���Ѿ���������Ȼص�ʱ����ʵ���Ѿ������˶���ɵ�
+					// 如果createEntityFromDBID类接口返回实体已经检出且在当前进程上，但是当前进程上无法找到实体时应该给出错误
+					// 这种情况通常是异步的环境中从db查询到已经检出，但等回调时可能实体已经销毁了而造成的
 					if(wasActiveCID != g_componentID)
 					{
 						baseEntityRef = static_cast<PyObject*>(new EntityCall(EntityDef::findScriptModule(entityType.c_str()), 
@@ -2185,7 +2185,7 @@ void Baseapp::onCreateEntityRemotelyFromDBIDCallback(Network::Channel* pChannel,
 	stream->append(s);
 	s.done();
 
-	// ֪ͨbaseappmgr������baseapp�ϴ���entity
+	// 通知baseappmgr在其他baseapp上创建entity
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	pBundle->newMessage(BaseappmgrInterface::reqCreateEntityRemotelyFromDBID);
 	pBundle->append((*stream));
@@ -2252,21 +2252,21 @@ void Baseapp::createEntityRemotelyFromDBIDOtherBaseapp(Network::Channel* pChanne
 			PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID);
 			if(pyfunc)
 			{
-				// ����Ҫ֪ͨ�ű�
+				// 不需要通知脚本
 			}
 		}
 
 		return;
 	}
 
-	// �Ƿ񱾵�������Ƿ���Դ�� �����ֱ���ڱ��ص��ûص�
+	// 是否本地组件就是发起源， 如果是直接在本地调用回调
 	if(g_componentID == sourceBaseappID)
 	{
 		onCreateEntityRemotelyFromDBIDOtherBaseappCallback(pChannel, g_componentID, entityType, static_cast<Entity*>(e)->id(), callbackID, dbid);
 	}
 	else
 	{
-		// ֪ͨbaseapp, ��������
+		// 通知baseapp, 创建好了
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		pBundle->newMessage(BaseappInterface::onCreateEntityRemotelyFromDBIDOtherBaseappCallback);
 
@@ -2365,9 +2365,9 @@ void Baseapp::createCellEntityInNewSpace(Entity* pEntity, PyObject* pyCellappInd
 		return;
 	}
 
-	// ���cellappIndexΪ0���������ǿ��ָ��cellapp
-	// ��0������£�ѡ���cellapp������1,2,3,4������
-	// ����Ԥ����4��cellapp�� ���粻��4���� ֻ��3���� ��ô4����1
+	// 如果cellappIndex为0，则代表不强制指定cellapp
+	// 非0的情况下，选择的cellapp可以用1,2,3,4来代替
+	// 假如预期有4个cellapp， 假如不够4个， 只有3个， 那么4代表1
 	uint32 cellappIndex = 0;
 
 	if (PyLong_Check(pyCellappIndex))
@@ -2567,7 +2567,7 @@ void Baseapp::onCreateEntityAnywhere(Network::Channel* pChannel, MemoryStream& s
 		return;
 	}
 
-	// ��������ڷ��𴴽�entity��baseapp�ϴ�������Ҫת���ص�������
+	// 如果不是在发起创建entity的baseapp上创建则需要转发回调到发起方
 	if(componentID != componentID_)
 	{
 		Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(componentID);
@@ -2590,7 +2590,7 @@ void Baseapp::onCreateEntityAnywhere(Network::Channel* pChannel, MemoryStream& s
 
 		Network::Channel* lpChannel = cinfos->pChannel;
 
-		// ��Ҫbaseappmgrת����Ŀ��baseapp
+		// 需要baseappmgr转发给目的baseapp
 		Network::Bundle* pForwardbundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pForwardbundle).newMessage(BaseappInterface::onCreateEntityAnywhereCallback);
 		(*pForwardbundle) << callbackID;
@@ -2630,7 +2630,7 @@ void Baseapp::_onCreateEntityAnywhereCallback(Network::Channel* pChannel, CALLBA
 {
 	if(callbackID == 0)
 	{
-		// û���趨�ص�
+		// 没有设定回调
 		//ERROR_MSG(fmt::format("Baseapp::_onCreateEntityAnywhereCallback: error(callbackID == 0)! entityType={}, componentID={}\n", 
 		//	entityType, componentID));
 
@@ -2652,7 +2652,7 @@ void Baseapp::_onCreateEntityAnywhereCallback(Network::Channel* pChannel, CALLBA
 			return;
 		}
 		
-		// ���entity������һ��baseapp��������������entitycall
+		// 如果entity属于另一个baseapp创建则设置它的entitycall
 		Network::Channel* pOtherBaseappChannel = Components::getSingleton().findComponent(componentID)->pChannel;
 		KBE_ASSERT(pOtherBaseappChannel != NULL);
 		PyObject* mb = static_cast<EntityCall*>(new EntityCall(sm, NULL, componentID, eid, ENTITYCALL_TYPE_BASE));
@@ -2730,7 +2730,7 @@ void Baseapp::createEntityRemotely(const char* entityType, COMPONENT_ID componen
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(BaseappmgrInterface::reqCreateEntityRemotely);
 
-	// ��������������
+	// 创建到这个组件上
 	(*pBundle) << componentID;
 
 	(*pBundle) << entityType;
@@ -2801,7 +2801,7 @@ void Baseapp::onCreateEntityRemotely(Network::Channel* pChannel, MemoryStream& s
 		return;
 	}
 
-	// ��������ڷ��𴴽�entity��baseapp�ϴ�������Ҫת���ص�������
+	// 如果不是在发起创建entity的baseapp上创建则需要转发回调到发起方
 	if (reqComponentID != componentID_)
 	{
 		Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(reqComponentID);
@@ -2824,7 +2824,7 @@ void Baseapp::onCreateEntityRemotely(Network::Channel* pChannel, MemoryStream& s
 
 		Network::Channel* lpChannel = cinfos->pChannel;
 
-		// ��Ҫbaseappmgrת����Ŀ��baseapp
+		// 需要baseappmgr转发给目的baseapp
 		Network::Bundle* pForwardbundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pForwardbundle).newMessage(BaseappInterface::onCreateEntityRemotelyCallback);
 		(*pForwardbundle) << callbackID;
@@ -2864,7 +2864,7 @@ void Baseapp::_onCreateEntityRemotelyCallback(Network::Channel* pChannel, CALLBA
 {
 	if (callbackID == 0)
 	{
-		// û���趨�ص�
+		// 没有设定回调
 		//ERROR_MSG(fmt::format("Baseapp::_onCreateEntityRemotelyCallback: error(callbackID == 0)! entityType={}, componentID={}\n", 
 		//	entityType, componentID));
 
@@ -2886,7 +2886,7 @@ void Baseapp::_onCreateEntityRemotelyCallback(Network::Channel* pChannel, CALLBA
 			return;
 		}
 
-		// ���entity������һ��baseapp��������������entitycall
+		// 如果entity属于另一个baseapp创建则设置它的entitycall
 		Network::Channel* pOtherBaseappChannel = Components::getSingleton().findComponent(componentID)->pChannel;
 		KBE_ASSERT(pOtherBaseappChannel != NULL);
 		PyObject* mb = static_cast<EntityCall*>(new EntityCall(sm, NULL, componentID, eid, ENTITYCALL_TYPE_BASE));
@@ -2970,7 +2970,7 @@ void Baseapp::createCellEntity(EntityCallAbstract* createToCellEntityCall, Entit
 	EntityCall* clientEntityCall = pEntity->clientEntityCall();
 	bool hasClient = (clientEntityCall != NULL);
 	
-	(*pBundle) << createToCellEntityCall->id();				// �����entitycall���ڵ�cellspace�ϴ���
+	(*pBundle) << createToCellEntityCall->id();				// 在这个entitycall所在的cellspace上创建
 	(*pBundle) << entityType;
 	(*pBundle) << id;
 	(*pBundle) << componentID_;
@@ -3018,7 +3018,7 @@ void Baseapp::onCreateCellFailure(Network::Channel* pChannel, ENTITY_ID entityID
 
 	Entity* pEntity = pEntities_->find(entityID);
 
-	// ���ܿͻ������ڼ������
+	// 可能客户端在期间掉线了
 	if(pEntity == NULL)
 	{
 		ERROR_MSG(fmt::format("Baseapp::onCreateCellFailure: not found entity({})!\n", entityID));
@@ -3039,7 +3039,7 @@ void Baseapp::onEntityGetCell(Network::Channel* pChannel, ENTITY_ID id,
 
 	// DEBUG_MSG("Baseapp::onEntityGetCell: entityID %d.\n", id);
 	
-	// ���ܿͻ������ڼ������
+	// 可能客户端在期间掉线了
 	if(pEntity == NULL)
 	{
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
@@ -3054,7 +3054,7 @@ void Baseapp::onEntityGetCell(Network::Channel* pChannel, ENTITY_ID id,
 	if(pEntity->spaceID() != spaceID)
 		pEntity->spaceID(spaceID);
 
-	// ������пͻ��˵�entity����Ҫ��֪�ͻ��ˣ� ����entity�Ѿ����������ˡ�
+	// 如果是有客户端的entity则需要告知客户端， 自身entity已经进入世界了。
 	if(pEntity->clientEntityCall() != NULL)
 	{
 		onClientEntityEnterWorld(static_cast<Proxy*>(pEntity), componentID);
@@ -3077,19 +3077,19 @@ bool Baseapp::createClientProxies(Proxy* pEntity, bool reload)
 {
 	Py_INCREF(pEntity);
 	
-	// ��ͨ�������Ĺ�ϵ���entity�󶨣� �ں���ͨ���п��ṩ���ݺϷ���ʶ��
+	// 将通道代理的关系与该entity绑定， 在后面通信中可提供身份合法性识别
 	Network::Channel* pChannel = pEntity->clientEntityCall()->getChannel();
 	pChannel->proxyID(pEntity->id());
 	pEntity->addr(pChannel->addr());
 
-	// ��������һ��ID
+	// 重新生成一个ID
 	if(reload)
 		pEntity->rndUUID(genUUID64());
 	
-	// һЩ���ݱ�����ʵ�崴������������
+	// 一些数据必须在实体创建后立即访问
 	pEntity->initClientBasePropertys();
 
-	// �ÿͻ���֪���Ѿ�������proxices, ����ʼ��һ��������
+	// 让客户端知道已经创建了proxices, 并初始化一部分属性
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(ClientInterface::onCreatedProxies);
 	(*pBundle) << pEntity->rndUUID();
@@ -3098,7 +3098,7 @@ bool Baseapp::createClientProxies(Proxy* pEntity, bool reload)
 	//pEntity->clientEntityCall()->sendCall((*pBundle));
 	pEntity->sendToClient(ClientInterface::onCreatedProxies, pBundle);
 
-	// ��Ӧ���ɿͻ��˸�֪�Ѿ�������entity���������ӿڡ�
+	// 本应该由客户端告知已经创建好entity后调用这个接口。
 	//if(!reload)
 	pEntity->onClientEnabled();
 	Py_DECREF(pEntity);
@@ -3523,10 +3523,10 @@ void Baseapp::onDbmgrInitCompleted(Network::Channel* pChannel,
 	EntityApp<Entity>::onDbmgrInitCompleted(pChannel, gametime, startID, endID, 
 		startGlobalOrder, startGroupOrder, digest);
 
-	// �ٴ�ͬ���Լ�������Ϣ(startGlobalOrder, startGroupOrder��)��machine
+	// 再次同步自己的新信息(startGlobalOrder, startGroupOrder等)到machine
 	Components::getSingleton().broadcastSelf();
 
-	// ������Ҫ����һ��python�Ļ�������
+	// 这里需要更新一下python的环境变量
 	this->getScript().setenv("KBE_BOOTIDX_GLOBAL", getenv("KBE_BOOTIDX_GLOBAL"));
 	this->getScript().setenv("KBE_BOOTIDX_GROUP", getenv("KBE_BOOTIDX_GROUP"));
 
@@ -3579,7 +3579,7 @@ void Baseapp::onBroadcastBaseAppDataChanged(Network::Channel* pChannel, KBEngine
 		{
 			SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-			// ֪ͨ�ű�
+			// 通知脚本
 			SCRIPT_OBJECT_CALL_ARGS1(getEntryScript().get(), const_cast<char*>("onBaseAppDataDel"), 
 				const_cast<char*>("O"), pyKey, false);
 		}
@@ -3598,7 +3598,7 @@ void Baseapp::onBroadcastBaseAppDataChanged(Network::Channel* pChannel, KBEngine
 		{
 			SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-			// ֪ͨ�ű�
+			// 通知脚本
 			SCRIPT_OBJECT_CALL_ARGS2(getEntryScript().get(), const_cast<char*>("onBaseAppData"), 
 				const_cast<char*>("OO"), pyKey, pyValue, false);
 		}
@@ -3777,7 +3777,7 @@ void Baseapp::loginBaseapp(Network::Channel* pChannel,
 		return;
 	}
 
-	// ���entityID����0��˵����entity�Ǵ��״̬��¼
+	// 如果entityID大于0则说明此entity是存活状态登录
 	if(ptinfos->entityID > 0)
 	{
 		INFO_MSG(fmt::format("Baseapp::loginBaseapp: user[{}] has entity({}).\n",
@@ -3792,10 +3792,10 @@ void Baseapp::loginBaseapp(Network::Channel* pChannel,
 			return;
 		}
 
-		// ��ֹ��onLogOnAttempt��������
+		// 防止在onLogOnAttempt中销毁了
 		Py_INCREF(pEntity);
 
-		// ֪ͨ�ű��쳣��¼�����нű������Ƿ��������ͨ��ǿ�Ƶ�¼
+		// 通知脚本异常登录请求有脚本决定是否允许这个通道强制登录
 		int32 ret = pEntity->onLogOnAttempt(pChannel->addr().ipAsString(), 
 			ntohs(pChannel->addr().port), password.c_str());
 
@@ -3812,7 +3812,7 @@ void Baseapp::loginBaseapp(Network::Channel* pChannel,
 		case LOG_ON_ACCEPT:
 			if(pEntity->clientEntityCall() != NULL)
 			{
-				// ͨ���ڱ𴦵�¼
+				// 通告在别处登录
 				Network::Channel* pOldClientChannel = pEntity->clientEntityCall()->getChannel();
 				if(pOldClientChannel != NULL)
 				{
@@ -3835,7 +3835,7 @@ void Baseapp::loginBaseapp(Network::Channel* pChannel,
 			}
 			else
 			{
-				// ����entity�Ŀͻ���entitycall
+				// 创建entity的客户端entitycall
 				EntityCall* entityClientEntityCall = new EntityCall(pEntity->pScriptModule(), 
 					&pChannel->addr(), 0, pEntity->id(), ENTITYCALL_TYPE_CLIENT);
 
@@ -3844,7 +3844,7 @@ void Baseapp::loginBaseapp(Network::Channel* pChannel,
 				pEntity->setClientType(ptinfos->ctype);
 				pEntity->setLoginDatas(ptinfos->datas);
 
-				// ��ͨ�������Ĺ�ϵ���entity�󶨣� �ں���ͨ���п��ṩ���ݺϷ���ʶ��
+				// 将通道代理的关系与该entity绑定， 在后面通信中可提供身份合法性识别
 				entityClientEntityCall->getChannel()->proxyID(pEntity->id());
 				createClientProxies(pEntity, true);
 				pEntity->onGetWitness();
@@ -3874,7 +3874,7 @@ void Baseapp::loginBaseapp(Network::Channel* pChannel,
 		dbmgrinfos->pChannel->send(pBundle);
 	}
 
-	// ��¼�ͻ��˵�ַ
+	// 记录客户端地址
 	ptinfos->addr = pChannel->addr();
 }
 
@@ -3940,7 +3940,7 @@ void Baseapp::reloginBaseapp(Network::Channel* pChannel, std::string& accountNam
 			pMBChannel->proxyID(0);
 			pMBChannel->condemn("", true);
 			Py_INCREF(entityClientEntityCall);
-			// ���ٵ���onClientDeath�����ܽű����ڴ�ʱ����������ʵ�嵼�º����޷���������
+			// 不再调用onClientDeath，可能脚本会在此时立即销毁了实体导致后面无法继续流程
 			//proxy->onClientDeath();
 			proxy->clientEntityCall(entityClientEntityCall);
 		}
@@ -3949,21 +3949,21 @@ void Baseapp::reloginBaseapp(Network::Channel* pChannel, std::string& accountNam
 	}
 	else
 	{
-		// ����entity�Ŀͻ���entitycall
+		// 创建entity的客户端entitycall
 		entityClientEntityCall = new EntityCall(proxy->pScriptModule(), 
 			&pChannel->addr(), 0, proxy->id(), ENTITYCALL_TYPE_CLIENT);
 
 		proxy->clientEntityCall(entityClientEntityCall);
 	}
 
-	// ��ͨ�������Ĺ�ϵ���entity�󶨣� �ں���ͨ���п��ṩ���ݺϷ���ʶ��
+	// 将通道代理的关系与该entity绑定， 在后面通信中可提供身份合法性识别
 	proxy->addr(pChannel->addr());
 	pChannel->proxyID(proxy->id());
 	proxy->rndUUID(KBEngine::genUUID64());
 
-	// �ͻ�������Ҳ��Ҫ�������������ط����ͻ��ˣ� �൱�ڵ�¼֮���õ����ݡ�
-	// ��Ϊ�����ڼ䲻��ȷ�����������������ѷ����仯
-	// �ͻ�����Ҫ�ؽ���������
+	// 客户端重连也需要将完整的数据重发给客户端， 相当于登录之后获得的数据。
+	// 因为断线期间不能确保包括场景等数据已发生变化
+	// 客户端需要重建所有数据
 	Py_INCREF(proxy);
 	createClientProxies(proxy, true);
 	proxy->onGetWitness();
@@ -4081,7 +4081,7 @@ void Baseapp::onQueryAccountCBFromDbmgr(Network::Channel* pChannel, KBEngine::Me
 
 	if(pClientChannel != NULL)
 	{
-		// ����entity�Ŀͻ���entitycall
+		// 创建entity的客户端entitycall
 		EntityCall* entityClientEntityCall = new EntityCall(pEntity->pScriptModule(), 
 			&pClientChannel->addr(), 0, pEntity->id(), ENTITYCALL_TYPE_CLIENT);
 
@@ -4376,7 +4376,7 @@ void Baseapp::onEntityCall(Network::Channel* pChannel, KBEngine::MemoryStream& s
 	ENTITYCALL_TYPE	calltype;
 	s >> calltype;
 
-	// �ڱ��������Բ��Ҹ��ռ�����Ϣ�� ���ռ����Ƿ����ڱ�����
+	// 在本地区尝试查找该收件人信息， 看收件人是否属于本区域
 	Entity* pEntity = pEntities_->find(eid);
 	if(pEntity == NULL)
 	{
@@ -4387,7 +4387,7 @@ void Baseapp::onEntityCall(Network::Channel* pChannel, KBEngine::MemoryStream& s
 
 	switch(calltype)
 	{
-		// �������baseapp����ôȷ���ʼ���Ŀ�ĵ������ ��ôִ�����ղ���
+		// 本组件是baseapp，那么确认邮件的目的地是这里， 那么执行最终操作
 		case ENTITYCALL_TYPE_BASE:		
 			pEntity->onRemoteMethodCall(pChannel, s);
 			break;
@@ -4711,8 +4711,8 @@ void Baseapp::onHello(Network::Channel* pChannel,
 	(*pBundle) << EntityDef::md5().getDigestStr();
 	(*pBundle) << g_componentType;
 
-	// ����Ϣ���������ܣ������趨�Ѽ��ܺ����ٴμ��ܣ�����һ��send��Ϣ���������������ǽ���epoll֪ͨʱ��������������һ�����ڲ��ԣ����滷��������֣�
-	// webЭ�����Ҫ���ܣ����Բ�������Ϊtrue
+	// 此消息不允许加密，所以设定已加密忽略再次加密，当第一次send消息不是立即发生而是交由epoll通知时会出现这种情况（一般用于测试，正规环境不会出现）
+	// web协议必须要加密，所以不能设置为true
 	if (pChannel->type() != KBEngine::Network::Channel::CHANNEL_WEB)
 		pBundle->pCurrPacket()->encrypted(true);
 
@@ -4722,7 +4722,7 @@ void Baseapp::onHello(Network::Channel* pChannel,
 	{
 		if(encryptedKey.size() > 3)
 		{
-			// �滻Ϊһ�����ܵĹ�����
+			// 替换为一个加密的过滤器
 			pChannel->pFilter(Network::createEncryptionFilter(Network::g_channelExternalEncryptType, encryptedKey));
 		}
 		else

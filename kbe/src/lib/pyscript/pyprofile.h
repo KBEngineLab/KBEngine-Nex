@@ -37,7 +37,7 @@ class PyProfile
 {						
 public:	
 	/** 
-		������ֹͣĳ��profile
+		激活与停止某个profile
 	*/
 	static bool start(std::string profile);
 	static bool stop(std::string profile);
@@ -48,7 +48,7 @@ public:
 	static void print_stats(const std::string& sort = "time", const std::string& profileName = "kbengine");
 
 	/** 
-		��ʼ��pickler 
+		初始化pickler 
 	*/
 	static bool initialize(Script* pScript);
 	static void finalise(void);
@@ -59,7 +59,7 @@ private:
 
 	static PyObject* profileMethod_;
 
-	static bool	isInit;										// �Ƿ��Ѿ�����ʼ��
+	static bool	isInit;										// 是否已经被初始化
 
 	static Script* pScript_;
 } ;

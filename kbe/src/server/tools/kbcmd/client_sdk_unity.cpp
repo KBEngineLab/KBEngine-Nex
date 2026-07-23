@@ -750,8 +750,8 @@ bool ClientSDKUnity::createArrayChildClass(DataType* pRootDataType, DataType* pD
 		sourcefileBody_ += fmt::format("{}\tprivate DATATYPE_{} itemType = new DATATYPE_{}();\n\n",
 			tabs, pDataType->aliasName(), pDataType->aliasName());
 
-		// ����Ƿ����������飬���һ�����Ӧ��ֱ������Ϊ�����ֵ����
-		// ��������ΪϵͳList���
+		// 如果是非匿名的数组，则第一层解析应该直接设置为有名字的类别
+		// 否则设置为系统List类别
 		if (numLayer == 1)
 		{
 			if (strlen(pRootDataType->aliasName()) == 0 || pRootDataType->aliasName()[0] == '_')
@@ -808,8 +808,8 @@ bool ClientSDKUnity::createArrayChildClass(DataType* pRootDataType, DataType* pD
 
 		std::string classNameStr = typeName;
 		
-		// ����Ƿ����������飬���һ�����Ӧ��ֱ������Ϊ�����ֵ����
-		// ��������ΪϵͳList���
+		// 如果是非匿名的数组，则第一层解析应该直接设置为有名字的类别
+		// 否则设置为系统List类别
 		if (numLayer == 1)
 		{
 			if (strlen(pRootDataType->aliasName()) == 0 || pRootDataType->aliasName()[0] == '_')
@@ -937,7 +937,7 @@ bool ClientSDKUnity::writeCustomDataType(const DataType* pDataType)
 
 		FixedDictType* dictdatatype = const_cast<FixedDictType*>(static_cast<const FixedDictType*>(pDataType));
 
-		// �ȴ�������
+		// 先创建属性
 		{
 			FixedDictType::FIXEDDICT_KEYTYPE_MAP& keys = dictdatatype->getKeyTypes();
 			FixedDictType::FIXEDDICT_KEYTYPE_MAP::const_iterator keyiter = keys.begin();
@@ -980,7 +980,7 @@ bool ClientSDKUnity::writeCustomDataType(const DataType* pDataType)
 			}
 		}
 
-		// ����createFromStreamEx����
+		// 创建createFromStreamEx方法
 		{
 			sourcefileBody_ += fmt::format("\t\tpublic {} createFromStreamEx(MemoryStream stream)\n\t\t{{\n", typeName);
 
@@ -1014,7 +1014,7 @@ bool ClientSDKUnity::writeCustomDataType(const DataType* pDataType)
 			sourcefileBody_ += fmt::format("\t\t}}\n\n");
 		}
 
-		// ����addToStreamEx����
+		// 创建addToStreamEx方法
 		{
 			sourcefileBody_ += fmt::format("\t\tpublic void addToStreamEx(Bundle stream, {} v)\n\t\t{{\n", typeName);
 
@@ -1200,7 +1200,7 @@ bool ClientSDKUnity::writeEntityDefsModuleInitScript_ScriptModule(ScriptDefModul
 //-------------------------------------------------------------------------------------
 bool ClientSDKUnity::writeEntityDefsModuleInitScript_MethodDescr(ScriptDefModule* pScriptDefModule, MethodDescription* pDescr, COMPONENT_TYPE componentType)
 {
-	// ���pDescrΪNone�������ǿͻ��˷�������ô��Ҫǿ���趨useMethodDescrAliasΪtrue������Ĭ��Ϊfalse�����������
+	// 如果pDescr为None，并且是客户端方法，那么需要强制设定useMethodDescrAlias为true，否则默认为false将会出现问题
 	if (!pDescr && componentType == CLIENT_TYPE)
 	{
 		sourcefileBody_ += fmt::format("\t\t\tp{}Module.useMethodDescrAlias = true;\n", pScriptDefModule->getName());
@@ -1705,7 +1705,7 @@ bool ClientSDKUnity::writeEntityModuleBegin(ScriptDefModule* pEntityScriptDefMod
 
 	sourcefileBody_ += fmt::format("\tpublic abstract class {} : Entity\n\t{{\n", newModuleName);
 
-	// дentityCall����
+	// 写entityCall属性
 	sourcefileBody_ += fmt::format("\t\tpublic EntityBaseEntityCall_{} baseEntityCall = null;\n", newModuleName);
 	sourcefileBody_ += fmt::format("\t\tpublic EntityCellEntityCall_{} cellEntityCall = null;\n\n", newModuleName);
 	return true;
@@ -1725,7 +1725,7 @@ bool ClientSDKUnity::getArrayType(DataType* pDataType, std::string& outstr)
 	{
 		FixedArrayType* pFixedArrayType = static_cast<FixedArrayType*>(pDataType);
 
-		// ���Ԫ����������
+		// 如果元素又是数组
 		if (pFixedArrayType->getDataType()->type() == DATA_TYPE_FIXEDARRAY)
 		{
 			if (outstr.size() > 0)
@@ -1785,7 +1785,7 @@ bool ClientSDKUnity::writeEntityProcessMessagesMethod(ScriptDefModule* pEntitySc
 	sourcefileBody_ += fmt::format("\t\t\treturn cellEntityCall;\n");
 	sourcefileBody_ += "\t\t}\n";
 
-	// ��������
+	// 处理方法
 	sourcefileBody_ += fmt::format("\n\t\tpublic override void onRemoteMethodCall(Method method, MemoryStream stream)\n\t\t{{\n");
 	sourcefileBody_ += fmt::format("\t\t\tswitch(method.methodUtype)\n\t\t\t{{\n");
 
@@ -1863,7 +1863,7 @@ bool ClientSDKUnity::writeEntityProcessMessagesMethod(ScriptDefModule* pEntitySc
 	sourcefileBody_ += fmt::format("\t\t\t}};\n");
 	sourcefileBody_ += "\t\t}\n";
 
-	// ��������
+	// 处理属性
 	ENTITY_PROPERTY_UID posuid = 0;
 	if (posuid == 0)
 	{
@@ -2003,7 +2003,7 @@ bool ClientSDKUnity::writeEntityProcessMessagesMethod(ScriptDefModule* pEntitySc
 	sourcefileBody_ += fmt::format("\t\t\t}};\n");
 	sourcefileBody_ += "\t\t}\n";
 
-	// ��������callPropertysSetMethods
+	// 处理属性callPropertysSetMethods
 	sourcefileBody_ += fmt::format("\n\t\tpublic override void callPropertysSetMethods()\n\t\t{{\n");
 	sourcefileBody_ += fmt::format("\t\t\tScriptModule sm = EntityDef.moduledefs[className];\n");
 	sourcefileBody_ += fmt::format("\t\t\tDictionary<UInt16, Property> pdatas = sm.idpropertys;\n\n");
@@ -2397,7 +2397,7 @@ bool ClientSDKUnity::writeEntityMethod(ScriptDefModule* pEntityScriptDefModule,
 //-------------------------------------------------------------------------------------
 bool ClientSDKUnity::writeEntityMethodArgs_ARRAY(FixedArrayType* pFixedArrayType, std::string& stackArgsTypeBody, const std::string& childItemName)
 {
-	// ��������������Ҫ����������ֱ������������
+	// 对于匿名数组需要解析，否则直接填类型名称
 	if (childItemName.size() == 0 || childItemName[0] == '_')
 	{
 		std::string typeStr;

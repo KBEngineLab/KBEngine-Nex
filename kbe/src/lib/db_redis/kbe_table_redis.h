@@ -31,7 +31,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine { 
 
 /*
-	kbeϵͳ��
+	kbe系统表
 */
 class KBEEntityLogTableRedis : public KBEEntityLogTable
 {
@@ -40,7 +40,7 @@ public:
 	virtual ~KBEEntityLogTableRedis(){}
 	
 	/**
-		ͬ���������ݿ���
+		同步表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi);
 	virtual bool syncIndexToDB(DBInterface* pdbi){ return true; }
@@ -64,7 +64,7 @@ public:
 	virtual ~KBEServerLogTableRedis(){}
 	
 	/**
-		ͬ���������ݿ���
+		同步表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi);
 	virtual bool syncIndexToDB(DBInterface* pdbi){ return true; }
@@ -89,7 +89,7 @@ public:
 	virtual ~KBEAccountTableRedis(){}
 	
 	/**
-		ͬ���������ݿ���
+		同步表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi);
 	virtual bool syncIndexToDB(DBInterface* pdbi){ return true; }
@@ -111,7 +111,7 @@ public:
 	virtual ~KBEEmailVerificationTableRedis();
 
 	/**
-		ͬ���������ݿ���
+		同步表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi);
 	virtual bool syncIndexToDB(DBInterface* pdbi){ return true; }

@@ -34,7 +34,7 @@ namespace KBEConcurrency
 {
 
 /**
-	���̴߳��ڿ���ʱ����
+	主线程处于空闲时触发
 */
 inline void onStartMainThreadIdling()
 {
@@ -43,7 +43,7 @@ inline void onStartMainThreadIdling()
 }
 
 /**
-	���߳̽������п�ʼ��æʱ����
+	主线程结束空闲开始繁忙时触发
 */
 inline void onEndMainThreadIdling()
 {
@@ -52,8 +52,8 @@ inline void onEndMainThreadIdling()
 }
 
 /**
-	���ûص�����
-	���ص�����ʱ֪ͨ����
+	设置回调函数
+	当回调触发时通知他们
 */
 inline void setMainThreadIdleCallbacks(void (*pStartCallback)(), void (*pEndCallback)())
 {

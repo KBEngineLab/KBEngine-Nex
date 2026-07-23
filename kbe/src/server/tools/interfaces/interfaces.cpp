@@ -92,7 +92,7 @@ void Interfaces::onShutdownBegin()
 {
 	PythonApp::onShutdownBegin();
 
-	// ֪ͨ�ű�
+	// 通知脚本
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	SCRIPT_OBJECT_CALL_ARGS0(getEntryScript().get(), const_cast<char*>("onInterfaceAppShutDown"), false);
 }
@@ -146,7 +146,7 @@ bool Interfaces::inInitialize()
 {
 	PythonApp::inInitialize();
 
-	// �㲥�Լ��ĵ�ַ�������ϵ�����kbemachine
+	// 广播自己的地址给网上上的所有kbemachine
 	Components::getSingleton().pHandler(this);
 	return true;
 }
@@ -159,7 +159,7 @@ bool Interfaces::initializeEnd()
 	mainProcessTimer_ = this->dispatcher().addTimer(1000000 / g_kbeSrvConfig.gameUpdateHertz(), this,
 							reinterpret_cast<void *>(TIMEOUT_TICK));
 
-	// ����Ƶ����ʱ���
+	// 不做频道超时检查
 	CLOSE_CHANNEL_INACTIVITIY_DETECTION();
 
 	if (!initDB())
@@ -167,7 +167,7 @@ bool Interfaces::initializeEnd()
 
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-	// ���нű����������
+	// 所有脚本都加载完毕
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
 										const_cast<char*>("onInterfaceAppReady"), 
 										const_cast<char*>(""));
@@ -536,7 +536,7 @@ void Interfaces::reqCreateAccount(Network::Channel* pChannel, KBEngine::MemorySt
 
 	reqCreateAccount_requests_[pinfo->commitName] = pinfo;
 
-	// �������ɽű�����
+	// 把请求交由脚本处理
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	SCOPED_PROFILE(SCRIPTCALL_CREATEACCOUNT_PROFILE);
 
@@ -560,7 +560,7 @@ void Interfaces::createAccountResponse(std::string commitName, std::string realA
 	REQCREATE_MAP::iterator iter = reqCreateAccount_requests_.find(commitName);
 	if (iter == reqCreateAccount_requests_.end())
 	{
-		// �����ϲ������Ҳ�������������Ҳ��������Ǹ��ֲܿ������飬����д��־��¼����
+		// 理论上不可能找不到，但如果真找不到，这是个很恐怖的事情，必须写日志记录下来
 		ERROR_MSG(fmt::format("Interfaces::createAccountResponse: accountName '{}' not found!" \
 			"realAccountName = '{}', extra datas = '{}', error code = '{}'\n", 
 			commitName, 
@@ -593,7 +593,7 @@ void Interfaces::createAccountResponse(std::string commitName, std::string realA
 		Network::Bundle::reclaimPoolObject(pBundle);
 	}
 
-	// ����
+	// 清理
 	reqCreateAccount_requests_.erase(iter);
 	delete task;
 }
@@ -648,7 +648,7 @@ void Interfaces::onAccountLogin(Network::Channel* pChannel, KBEngine::MemoryStre
 
 	reqAccountLogin_requests_[pinfo->commitName] = pinfo;
 
-	// �������ɽű�����
+	// 把请求交由脚本处理
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	SCOPED_PROFILE(SCRIPTCALL_ACCOUNTLOGIN_PROFILE);
 
@@ -672,7 +672,7 @@ void Interfaces::accountLoginResponse(std::string commitName, std::string realAc
 	REQLOGIN_MAP::iterator iter = reqAccountLogin_requests_.find(commitName);
 	if (iter == reqAccountLogin_requests_.end())
 	{
-		// �����ϲ������Ҳ�������������Ҳ��������Ǹ��ֲܿ������飬����д��־��¼����
+		// 理论上不可能找不到，但如果真找不到，这是个很恐怖的事情，必须写日志记录下来
 		ERROR_MSG(fmt::format("Interfaces::accountLoginResponse: commitName '{}' not found! " \
 			"realAccountName = '{}', extra datas = '{}', error code = '{}'\n", 
 			commitName, 
@@ -705,7 +705,7 @@ void Interfaces::accountLoginResponse(std::string commitName, std::string realAc
 		Network::Bundle::reclaimPoolObject(pBundle);
 	}
 
-	// ����
+	// 清理
 	reqAccountLogin_requests_.erase(iter);
 	delete task;
 }
@@ -763,7 +763,7 @@ void Interfaces::charge(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 	pinfo->pOrders = pOrdersCharge;
 	orders_[pOrdersCharge->ordersID].reset(pOrdersCharge);
 	
-	// �������ɽű�����
+	// 把请求交由脚本处理
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	SCOPED_PROFILE(SCRIPTCALL_CHARGE_PROFILE);
 
@@ -791,9 +791,9 @@ void Interfaces::chargeResponse(std::string orderID, std::string extraDatas, KBE
 			extraDatas, 
 			errorCode));
 		
-		// �������Ҳ��Ҫbaseapp����onLoseChargeCB
-		// ����ĳЩʱ��ͻ��˳�����δ�������ע����������ţ����ǼƷ�ƽ̨�з��ص����
-		// ���������͸�ע������е�dbmgr
+		// 这种情况也需要baseapp处理onLoseChargeCB
+		// 例如某些时候客户端出问题未向服务器注册这个订单号，但是计费平台有返回的情况
+		// 将订单发送给注册的所有的dbmgr
 		const Network::NetworkInterface::ChannelMap& channels = Interfaces::getSingleton().networkInterface().channels();
 		if(channels.size() > 0)
 		{

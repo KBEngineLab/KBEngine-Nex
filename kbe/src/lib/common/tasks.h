@@ -28,7 +28,7 @@ namespace KBEngine
 {
 
 /**
- *	��������
+ *	任务容器
  */
 class Tasks
 {

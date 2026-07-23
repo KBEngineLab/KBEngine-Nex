@@ -115,21 +115,21 @@ struct DBInterfaceInfo
 	}
 
 	int index;
-	bool isPure;											// �Ƿ�Ϊ�����⣨û�����洴����ʵ�����
-	char name[MAX_BUF];										// ���ݿ�Ľӿ�����
-	char db_type[MAX_BUF];									// ���ݿ�����
-	uint32 db_port;											// ���ݿ�Ķ˿�
-	char db_ip[MAX_BUF];									// ���ݿ��ip��ַ
-	char db_username[MAX_NAME];								// ���ݿ���û���
-	char db_password[MAX_BUF * 10];							// ���ݿ������
-	bool db_passwordEncrypt;								// db�����Ƿ��Ǽ��ܵ�
-	char db_name[MAX_NAME];									// ���ݿ���
-	uint16 db_numConnections;								// ���ݿ��������
-	std::string db_unicodeString_characterSet;				// �������ݿ��ַ���
+	bool isPure;											// 是否为纯净库（没有引擎创建的实体表）
+	char name[MAX_BUF];										// 数据库的接口名称
+	char db_type[MAX_BUF];									// 数据库的类别
+	uint32 db_port;											// 数据库的端口
+	char db_ip[MAX_BUF];									// 数据库的ip地址
+	char db_username[MAX_NAME];								// 数据库的用户名
+	char db_password[MAX_BUF * 10];							// 数据库的密码
+	bool db_passwordEncrypt;								// db密码是否是加密的
+	char db_name[MAX_NAME];									// 数据库名
+	uint16 db_numConnections;								// 数据库最大连接
+	std::string db_unicodeString_characterSet;				// 设置数据库字符集
 	std::string db_unicodeString_collation;
 };
 
-// ���������Ϣ�ṹ��
+// 引擎组件信息结构体
 typedef struct EngineComponentInfo
 {
 	EngineComponentInfo()
@@ -152,99 +152,99 @@ typedef struct EngineComponentInfo
 	{
 	}
 
-	uint32 port;											// ��������к�����Ķ˿�
-	char ip[MAX_BUF];										// �����������ip��ַ
+	uint32 port;											// 组件的运行后监听的端口
+	char ip[MAX_BUF];										// 组件的运行期ip地址
 
-	std::vector< std::string > machine_addresses;			// �����и��������е�machine�ĵ�ַ
+	std::vector< std::string > machine_addresses;			// 配置中给出的所有的machine的地址
 	
-	char entryScriptFile[MAX_NAME];							// �������ڽű��ļ�
-	char dbAccountEntityScriptType[MAX_NAME];				// ���ݿ��ʺŽű����
-	float defaultViewRadius;								// ������cellapp�ڵ��е�player��view�뾶��С
-	float defaultViewHysteresisArea;						// ������cellapp�ڵ��е�player��view���ͺ�Χ
-	uint16 witness_timeout;									// �۲���Ĭ�ϳ�ʱʱ��(��)
-	const Network::Address* externalAddr;					// �ⲿ��ַ
-	const Network::Address* internalAddr;					// �ڲ���ַ
+	char entryScriptFile[MAX_NAME];							// 组件的入口脚本文件
+	char dbAccountEntityScriptType[MAX_NAME];				// 数据库帐号脚本类别
+	float defaultViewRadius;								// 配置在cellapp节点中的player的view半径大小
+	float defaultViewHysteresisArea;						// 配置在cellapp节点中的player的view的滞后范围
+	uint16 witness_timeout;									// 观察者默认超时时间(秒)
+	const Network::Address* externalAddr;					// 外部地址
+	const Network::Address* internalAddr;					// 内部地址
 	COMPONENT_ID componentID;
 
-	float ghostDistance;									// ghost�������
-	uint16 ghostingMaxPerCheck;								// ÿ����ghost����
-	uint16 ghostUpdateHertz;								// ghost����hz
+	float ghostDistance;									// ghost区域距离
+	uint16 ghostingMaxPerCheck;								// 每秒检查ghost次数
+	uint16 ghostUpdateHertz;								// ghost更新hz
 	
-	bool use_coordinate_system;								// �Ƿ�ʹ������ϵͳ ���Ϊfalse, view, trap, move�ȹ��ܽ�����ά��
-	bool coordinateSystem_hasY;								// ��Χ�������ǹ���Y�ᣬ ע����y����view��trap�ȹ������˸߶ȣ� ��y��Ĺ��������һ��������
-	uint16 entity_posdir_additional_updates;				// ʵ��λ��ֹͣ�����ı�����������ͻ��˸���tick�ε�λ����Ϣ��Ϊ0�����Ǹ��¡�
-	uint16 entity_posdir_updates_type;						// ʵ��λ�ø��·�ʽ��0�����Ż��߾���ͬ��, 1:�Ż�ͬ��, 2:����ѡ��ģʽ
-	uint16 entity_posdir_updates_smart_threshold;			// ʵ��λ�ø�������ģʽ�µ�ͬ��������ֵ
+	bool use_coordinate_system;								// 是否使用坐标系统 如果为false, view, trap, move等功能将不再维护
+	bool coordinateSystem_hasY;								// 范围管理器是管理Y轴， 注：有y轴则view、trap等功能有了高度， 但y轴的管理会带来一定的消耗
+	uint16 entity_posdir_additional_updates;				// 实体位置停止发生改变后，引擎继续向客户端更新tick次的位置信息，为0则总是更新。
+	uint16 entity_posdir_updates_type;						// 实体位置更新方式，0：非优化高精度同步, 1:优化同步, 2:智能选择模式
+	uint16 entity_posdir_updates_smart_threshold;			// 实体位置更新智能模式下的同屏人数阈值
 
-	bool aliasEntityID;										// �Ż�EntityID��view��Χ��С��255��EntityID, ���䵽clientʱʹ��1�ֽ�αID 
-	bool entitydefAliasID;									// �Ż�entity���Ժͷ����㲥ʱռ�õĴ�����entity�ͻ������Ի��߿ͻ��˲�����255��ʱ�� ����uid������uid���䵽clientʱʹ��1�ֽڱ���ID
+	bool aliasEntityID;										// 优化EntityID，view范围内小于255个EntityID, 传输到client时使用1字节伪ID 
+	bool entitydefAliasID;									// 优化entity属性和方法广播时占用的带宽，entity客户端属性或者客户端不超过255个时， 方法uid和属性uid传输到client时使用1字节别名ID
 
-	char internalInterface[MAX_NAME];						// �ڲ������ӿ�����
-	char externalInterface[MAX_NAME];						// �ⲿ�����ӿ�����
-	char externalAddress[MAX_NAME];							// �ⲿIP��ַ
-	int32 externalPorts_min;								// ����socket�˿�ʹ��ָ����Χ
+	char internalInterface[MAX_NAME];						// 内部网卡接口名称
+	char externalInterface[MAX_NAME];						// 外部网卡接口名称
+	char externalAddress[MAX_NAME];							// 外部IP地址
+	int32 externalPorts_min;								// 对外socket端口使用指定范围
 	int32 externalPorts_max;
 
-	std::vector<DBInterfaceInfo> dbInterfaceInfos;			// ���ݿ�ӿ�
-	bool notFoundAccountAutoCreate;							// ��¼�Ϸ�ʱ��Ϸ���ݿ��Ҳ�����Ϸ�˺����Զ�����
-	bool allowEmptyDigest;									// �Ƿ���defs-MD5
-	bool account_registration_enable;						// �Ƿ񿪷�ע��
-	bool account_reset_password_enable;						// �Ƿ񿪷��������빦��
-	bool isShareDB;											// �Ƿ������ݿ�
+	std::vector<DBInterfaceInfo> dbInterfaceInfos;			// 数据库接口
+	bool notFoundAccountAutoCreate;							// 登录合法时游戏数据库找不到游戏账号则自动创建
+	bool allowEmptyDigest;									// 是否检查defs-MD5
+	bool account_registration_enable;						// 是否开放注册
+	bool account_reset_password_enable;						// 是否开放重设密码功能
+	bool isShareDB;											// 是否共享数据库
 
-	float archivePeriod;									// entity�洢���ݿ�����
-	float backupPeriod;										// entity��������
-	bool backUpUndefinedProperties;							// entity�Ƿ񱸷�δ��������
-	uint16 entityRestoreSize;								// entity restoreÿtick���� 
+	float archivePeriod;									// entity存储数据库周期
+	float backupPeriod;										// entity备份周期
+	bool backUpUndefinedProperties;							// entity是否备份未定义属性
+	uint16 entityRestoreSize;								// entity restore每tick数量 
 
-	float loadSmoothingBias;								// baseapp������ƽ�����ֵ�� 
-	uint32 login_port;										// ��������¼�˿� Ŀǰbots����
-	uint32 login_port_min;									// ��������¼�˿�ʹ��ָ����Χ Ŀǰbots����
+	float loadSmoothingBias;								// baseapp负载滤平衡调整值， 
+	uint32 login_port;										// 服务器登录端口 目前bots在用
+	uint32 login_port_min;									// 服务器登录端口使用指定范围 目前bots在用
 	uint32 login_port_max;
-	char login_ip[MAX_BUF];									// ��������¼ip��ַ
+	char login_ip[MAX_BUF];									// 服务器登录ip地址
 
-	ENTITY_ID ids_criticallyLowSize;						// idʣ����ô���ʱ��dbmgr�����µ�id��Դ
-	ENTITY_ID ids_increasing_range;							// ����IDʱidÿ�ε�����Χ
+	ENTITY_ID ids_criticallyLowSize;						// id剩余这么多个时向dbmgr申请新的id资源
+	ENTITY_ID ids_increasing_range;							// 申请ID时id每次递增范围
 
-	uint32 downloadBitsPerSecondTotal;						// ���пͻ���ÿ�����ش���������
-	uint32 downloadBitsPerSecondPerClient;					// ÿ���ͻ���ÿ������ش���
+	uint32 downloadBitsPerSecondTotal;						// 所有客户端每秒下载带宽总上限
+	uint32 downloadBitsPerSecondPerClient;					// 每个客户端每秒的下载带宽
 
 	Profiles_Config profiles;
 
-	uint32 defaultAddBots_totalCount;						// Ĭ���������̺��Զ�������ô���bots ����������
-	float defaultAddBots_tickTime;							// Ĭ���������̺��Զ�������ô���bots ÿ����������ʱ��(s)
-	uint32 defaultAddBots_tickCount;						// Ĭ���������̺��Զ�������ô���bots ÿ����������
+	uint32 defaultAddBots_totalCount;						// 默认启动进程后自动添加这么多个bots 添加总数量
+	float defaultAddBots_tickTime;							// 默认启动进程后自动添加这么多个bots 每次添加所用时间(s)
+	uint32 defaultAddBots_tickCount;						// 默认启动进程后自动添加这么多个bots 每次添加数量
 
-	bool forceInternalLogin;								// ��Ӧbaseapp��externalAddress�Ľ����������externalAddressǿ���·�����IP�ṩ��½ʱ��
-															// ����������ڲ�ʹ�û����˲���Ҳ�߹���IP���������ܻ᲻���ʣ���ʱ��������Ϊtrue����½ʱǿ��ֱ��ʹ����������
+	bool forceInternalLogin;								// 对应baseapp的externalAddress的解决方案，当externalAddress强制下发公网IP提供登陆时，
+															// 如果局域网内部使用机器人测试也走公网IP和流量可能会不合适，此时可以设置为true，登陆时强制直接使用内网环境
 
-	std::string bots_account_name_prefix;					// �������˺����Ƶ�ǰ׺
-	uint32 bots_account_name_suffix_inc;					// �������˺����Ƶĺ�׺����, 0ʹ������������� ������baseNum��д��������
-	std::string bots_account_passwd;						// �������˺ŵ�����
+	std::string bots_account_name_prefix;					// 机器人账号名称的前缀
+	uint32 bots_account_name_suffix_inc;					// 机器人账号名称的后缀递增, 0使用随机数递增， 否则按照baseNum填写的数递增
+	std::string bots_account_passwd;						// 机器人账号的密码
 
-	uint32 tcp_SOMAXCONN;									// listen�����������ֵ
+	uint32 tcp_SOMAXCONN;									// listen监听队列最大值
 
-	int8 encrypt_login;										// ���ܵ�¼��Ϣ
+	int8 encrypt_login;										// 加密登录信息
 
 	uint32 telnet_port;
 	std::string telnet_passwd;
 	std::string telnet_deflayer;
 
-	uint32 perSecsDestroyEntitySize;						// ÿ������entity����
+	uint32 perSecsDestroyEntitySize;						// 每秒销毁entity数量
 
 	uint64 respool_timeout;
 	uint32 respool_buffersize;
 
-	uint8 account_type;										// 1: ��ͨ�˺�, 2: email�˺�(��Ҫ����), 3: �����˺�(�Զ�ʶ��email�� ��ͨ�����) 
-	uint32 accountDefaultFlags;								// ���˺�Ĭ�ϱ��(ACCOUNT_FLAGS�ɵ��ӣ� ��дʱ��ʮ���Ƹ�ʽ) 
-	uint64 accountDefaultDeadline;							// ���˺�Ĭ�Ϲ���ʱ��(��, �������ϵ�ǰʱ��)
+	uint8 account_type;										// 1: 普通账号, 2: email账号(需要激活), 3: 智能账号(自动识别email， 普通号码等) 
+	uint32 accountDefaultFlags;								// 新账号默认标记(ACCOUNT_FLAGS可叠加， 填写时按十进制格式) 
+	uint64 accountDefaultDeadline;							// 新账号默认过期时间(秒, 引擎会加上当前时间)
 	
 	std::string http_cbhost;
-	uint16 http_cbport;										// �û�http�ص��ӿڣ�������֤���������õ�
+	uint16 http_cbport;										// 用户http回调接口，处理认证、密码重置等
 
-	bool debugDBMgr;										// debugģʽ�¿������д������Ϣ
+	bool debugDBMgr;										// debug模式下可输出读写操作信息
 
-	bool isOnInitCallPropertysSetMethods;					// ������(bots)ר�ã���Entity��ʼ��ʱ�Ƿ񴥷����Ե�set_*�¼�
+	bool isOnInitCallPropertysSetMethods;					// 机器人(bots)专用：在Entity初始化时是否触发属性的set_*事件
 } ENGINE_COMPONENT_INFO;
 
 class ServerConfig : public Singleton<ServerConfig>
@@ -320,7 +320,7 @@ public:
 
 	ChannelCommon channelCommon_;
 
-	// ÿ���ͻ���ÿ��ռ�õ�������
+	// 每个客户端每秒占用的最大带宽
 	uint32 bitsPerSecondToClient_;		
 
 	std::string interfacesAddress_;
@@ -332,8 +332,8 @@ public:
 	float shutdown_time_;
 	float shutdown_waitTickTime_;
 
-	float callback_timeout_;										// callbackĬ�ϳ�ʱʱ��(��)
-	float thread_timeout_;											// Ĭ�ϳ�ʱʱ��(��)
+	float callback_timeout_;										// callback默认超时时间(秒)
+	float thread_timeout_;											// 默认超时时间(秒)
 
 	uint32 thread_init_create_, thread_pre_create_, thread_max_create_;
 	

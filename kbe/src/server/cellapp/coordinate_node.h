@@ -27,16 +27,16 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 #define COORDINATE_NODE_FLAG_UNKNOWN				0x00000000
-#define COORDINATE_NODE_FLAG_ENTITY					0x00000001		// һ��Entity�ڵ�
-#define COORDINATE_NODE_FLAG_TRIGGER				0x00000002		// һ���������ڵ�
-#define COORDINATE_NODE_FLAG_HIDE					0x00000004		// ���ؽڵ�(�����ڵ㲻�ɼ�)
-#define COORDINATE_NODE_FLAG_REMOVING				0x00000008		// ɾ���еĽڵ�
-#define COORDINATE_NODE_FLAG_REMOVED				0x00000010		// ɾ���ڵ�
-#define COORDINATE_NODE_FLAG_PENDING				0x00000020		// ����ڵ㴦��update�����С�
-#define COORDINATE_NODE_FLAG_ENTITY_NODE_UPDATING	0x00000040		// entity�ڵ�����ִ��update����
-#define COORDINATE_NODE_FLAG_INSTALLING				0x00000080		// �ڵ����ڰ�װ����
-#define COORDINATE_NODE_FLAG_POSITIVE_BOUNDARY		0x00000100		// �ڵ��Ǵ����������߽�
-#define COORDINATE_NODE_FLAG_NEGATIVE_BOUNDARY		0x00000200		// �ڵ��Ǵ������ĸ��߽�
+#define COORDINATE_NODE_FLAG_ENTITY					0x00000001		// 一个Entity节点
+#define COORDINATE_NODE_FLAG_TRIGGER				0x00000002		// 一个触发器节点
+#define COORDINATE_NODE_FLAG_HIDE					0x00000004		// 隐藏节点(其他节点不可见)
+#define COORDINATE_NODE_FLAG_REMOVING				0x00000008		// 删除中的节点
+#define COORDINATE_NODE_FLAG_REMOVED				0x00000010		// 删除节点
+#define COORDINATE_NODE_FLAG_PENDING				0x00000020		// 这类节点处于update操作中。
+#define COORDINATE_NODE_FLAG_ENTITY_NODE_UPDATING	0x00000040		// entity节点正在执行update操作
+#define COORDINATE_NODE_FLAG_INSTALLING				0x00000080		// 节点正在安装操作
+#define COORDINATE_NODE_FLAG_POSITIVE_BOUNDARY		0x00000100		// 节点是触发器的正边界
+#define COORDINATE_NODE_FLAG_NEGATIVE_BOUNDARY		0x00000200		// 节点是触发器的负边界
 
 #define COORDINATE_NODE_FLAG_HIDE_OR_REMOVED		(COORDINATE_NODE_FLAG_REMOVED | COORDINATE_NODE_FLAG_HIDE)
 
@@ -54,8 +54,8 @@ public:
 	INLINE bool hasFlags(uint32 v) const;
 
 	/**
-		(�ڵ㱾��������)
-		x && z�ɲ�ͬ��Ӧ��ʵ��(�Ӳ�ͬ����ȡ)
+		(节点本身的坐标)
+		x && z由不同的应用实现(从不同处获取)
 	*/
 	virtual float x() const { return x_; }
 	virtual float y() const { return y_; }
@@ -66,8 +66,8 @@ public:
 	virtual void z(float v) { z_ = v; }
 
 	/**
-		(��չ����)
-		x && z�ɲ�ͬ��Ӧ��ʵ��(�Ӳ�ͬ����ȡ)
+		(扩展坐标)
+		x && z由不同的应用实现(从不同处获取)
 	*/
 	virtual float xx() const { return 0.f; }
 	virtual float yy() const { return 0.f; }
@@ -107,7 +107,7 @@ public:
 	}
 
 	/**
-		��ȡ������ǰ���ָ��
+		获取链表的前后端指针
 	*/
 	INLINE CoordinateNode* pPrevX() const;
 	INLINE CoordinateNode* pNextX() const;
@@ -117,7 +117,7 @@ public:
 	INLINE CoordinateNode* pNextZ() const;
 
 	/**
-		����������ǰ���ָ��
+		设置链表的前后端指针
 	*/
 	INLINE void pPrevX(CoordinateNode* pNode);
 	INLINE void pNextX(CoordinateNode* pNode);
@@ -127,8 +127,8 @@ public:
 	INLINE void pNextZ(CoordinateNode* pNode);
 
 	/**
-		ĳ���ڵ�䶯�����˱��ڵ�
-		@isfront: ��ǰ�ƶ���������ƶ�
+		某个节点变动经过了本节点
+		@isfront: 向前移动还是向后移动
 	*/
 	virtual void onNodePassX(CoordinateNode* pNode, bool isfront);
 	virtual void onNodePassY(CoordinateNode* pNode, bool isfront);
@@ -137,14 +137,14 @@ public:
 	virtual void onRemove();
 
 	/**
-		���ڵ�ɾ��
+		父节点删除
 	*/
 	virtual void onParentRemove(CoordinateNode* pParentNode) {
 	}
 
 	/**
-		���ڵ��б䶯ʱ����Ҫ��������list�е�
-		���λ�õ���Ϣ
+		当节点有变动时，需要更新它在list中的
+		相关位置等信息
 	*/
 	virtual void update();
 
@@ -157,7 +157,7 @@ public:
 #endif
 
 protected:
-	// ������ǰ�˺ͺ��
+	// 链表的前端和后端
 	CoordinateNode* pPrevX_;
 	CoordinateNode* pNextX_;
 	CoordinateNode* pPrevY_;

@@ -1535,7 +1535,7 @@ void EntityCallType::addToStream(MemoryStream* mstream, PyObject* pyValue)
 	{
 		PyTypeObject* stype = script::ScriptObject::getScriptObjectType("Entity");
 		{
-			// �Ƿ���һ��entity?
+			// 是否是一个entity?
 			if(PyObject_IsInstance(pyValue, (PyObject *)stype))
 			{
 				PyObject* pyid = PyObject_GetAttrString(pyValue, "id");
@@ -1568,7 +1568,7 @@ void EntityCallType::addToStream(MemoryStream* mstream, PyObject* pyValue)
 				}
 				else
 				{
-					// ĳЩ����»�ΪNULL�� ���磺ʹ����weakproxy����entitycall�Ѿ���ΪNULL��
+					// 某些情况下会为NULL， 例如：使用了weakproxy，而entitycall已经变为NULL了
 					SCRIPT_ERROR_CHECK();
 					id = 0;
 					cid = 0;
@@ -1576,7 +1576,7 @@ void EntityCallType::addToStream(MemoryStream* mstream, PyObject* pyValue)
 			}
 		}
 		
-		// ֻ����entitycall
+		// 只能是entitycall
 		if(id == 0)
 		{
 			EntityCallAbstract* pEntityCallAbstract = static_cast<EntityCallAbstract*>(pyValue);
@@ -1605,7 +1605,7 @@ PyObject* EntityCallType::createFromStream(MemoryStream* mstream)
 
 		(*mstream) >> id >> cid >> type >> utype;
 
-		// ��������Py_None
+		// 允许传输Py_None
 		if(id > 0)
 		{
 			if (entityCallType2ComponentType((ENTITYCALL_TYPE)type) == g_componentType)
@@ -1980,8 +1980,8 @@ PyObject* FixedDictType::createNewFromObj(PyObject* pyobj)
 		return impl_createObjFromDict(pyobj);
 	}
 
-	// �����ڴ��������ʱ���Ѿ���FixedDict������, ��ΪparseDefaultStr
-	// ���ʼΪ���ն�������
+	// 可能在传入参数的时候已经是FixedDict类型了, 因为parseDefaultStr
+	// 会初始为最终对象类型
 	if(PyObject_TypeCheck(pyobj, FixedDict::getScriptType()))
 	{
 		Py_INCREF(pyobj);
@@ -2225,8 +2225,8 @@ bool FixedDictType::setImplModule(PyObject* pyobj)
 //-------------------------------------------------------------------------------------
 PyObject* FixedDictType::impl_createObjFromDict(PyObject* dictData)
 {
-	// �����ڴ��������ʱ���Ѿ����û�������, ��ΪparseDefaultStr
-	// ���ʼΪ���ն�������
+	// 可能在传入参数的时候已经是用户类型了, 因为parseDefaultStr
+	// 会初始为最终对象类型
 	if(!PyObject_TypeCheck(dictData, FixedDict::getScriptType()) && impl_isSameType(dictData))
 	{
 		Py_INCREF(dictData);
@@ -2322,8 +2322,8 @@ bool FixedDictType::isSameType(PyObject* pyValue)
 
 	if(hasImpl())
 	{
-		// ���ﷵ��false�󻹼����жϵ�ԭ����isSameType��Ϊ�������
-		// fixeddict�����û����������Ӧ���ǺϷ���
+		// 这里返回false后还继续判断的原因是isSameType因为相关特性
+		// fixeddict或者用户产生的类别都应该是合法的
 		if(impl_isSameType(pyValue))
 			return true;
 	}

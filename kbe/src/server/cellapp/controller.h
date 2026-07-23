@@ -33,17 +33,17 @@ class Controllers;
 class MemoryStream;
 
 /*
-	�������� ����trap��Vision�ȡ�
+	控制器， 管理trap、Vision等。
 */
 class Controller
 {
 public:
 	enum ControllerType
 	{
-		CONTROLLER_TYPE_NORMAL = 0,			// ��������
-		CONTROLLER_TYPE_PROXIMITY = 1,		// ��Χ����������
-		CONTROLLER_TYPE_MOVE = 2,			// �ƶ�����������
-		CONTROLLER_TYPE_ROTATE = 3,			// ��ת����������
+		CONTROLLER_TYPE_NORMAL = 0,			// 常规类型
+		CONTROLLER_TYPE_PROXIMITY = 1,		// 范围触发器类型
+		CONTROLLER_TYPE_MOVE = 2,			// 移动控制器类型
+		CONTROLLER_TYPE_ROTATE = 3,			// 旋转控制器类型
 	};
 
 	Controller(Controller::ControllerType type, Entity* pEntity, int32 userarg, uint32 id = 0);

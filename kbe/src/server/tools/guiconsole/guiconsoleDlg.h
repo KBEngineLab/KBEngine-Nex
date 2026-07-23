@@ -35,7 +35,7 @@ public:
 
 // Implementation
 public:
-	/** ������ִ��ָ����ϻ��� */
+	/** 服务器执行指令完毕回显 */
 	void onExecScriptCommandCB(Network::Channel* pChannel, std::string& command);
 
 	BOOL PreTranslateMessage(MSG* pMsg);
@@ -134,7 +134,7 @@ private:
 	CToolBar m_ToolBar;
 	CImageList m_ImageList;
 
-	// �̳߳�
+	// 线程池
 	thread::ThreadPool threadPool_;	
 
 public:

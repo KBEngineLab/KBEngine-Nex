@@ -20,14 +20,14 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 
 /*
-	���ü���ʵ����
+	引用计数实现类
 
-	ʹ�÷���:
+	使用方法:
 		class AA:public RefCountable
 		{
 		public:
 			AA(){}
-			~AA(){ printf("����"); }
+			~AA(){ printf("析构"); }
 		};
 		
 		--------------------------------------------
@@ -40,8 +40,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 		delete s;
 		delete s1;
 		
-		ִ�н��:
-			����
+		执行结果:
+			析构
 */
 #ifndef KBE_REFCOUNTABLE_H
 #define KBE_REFCOUNTABLE_H
@@ -64,7 +64,7 @@ public:
 		int currRef = --refCount_;
 		assert(currRef >= 0 && "RefCountable:currRef maybe a error!");
 		if (0 >= currRef)
-			onRefOver();											// ���ý�����
+			onRefOver();											// 引用结束了
 	}
 
 	virtual void onRefOver(void) const
@@ -111,7 +111,7 @@ public:
 		long currRef =::InterlockedDecrement(&refCount_);
 		assert(currRef >= 0 && "RefCountable:currRef maybe a error!");
 		if (0 >= currRef)
-			onRefOver();											// ���ý�����
+			onRefOver();											// 引用结束了
 	}
 
 	virtual void onRefOver(void) const
@@ -162,7 +162,7 @@ public:
 		long currRef = intDecRef();
 		assert(currRef >= 0 && "RefCountable:currRef maybe a error!");
 		if (0 >= currRef)
-			onRefOver();											// ���ý�����
+			onRefOver();											// 引用结束了
 	}
 
 	virtual void onRefOver(void) const

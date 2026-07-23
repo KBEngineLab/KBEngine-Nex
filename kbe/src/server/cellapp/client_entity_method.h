@@ -43,7 +43,7 @@ namespace KBEngine{
 
 class ClientEntityMethod : public script::ScriptObject
 {
-	/** ���໯ ��һЩpy�������������� */
+	/** 子类化 将一些py操作填充进派生类 */
 	INSTANCE_SCRIPT_HREADER(ClientEntityMethod, script::ScriptObject)	
 public:	
 	ClientEntityMethod(MethodDescription* methodDescription, 
@@ -67,7 +67,7 @@ public:
 	PyObject* callmethod(PyObject* args, PyObject* kwds);
 
 protected:	
-	MethodDescription*						methodDescription_;		// �������������
+	MethodDescription*						methodDescription_;		// 这个方法的描述
 
 	ENTITY_ID								srcEntityID_;						// srcEntityID_
 

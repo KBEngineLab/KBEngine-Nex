@@ -41,12 +41,12 @@ public:
 	}
 	
 	/**
-		ͬ��entity�������ݿ���
+		同步entity表到数据库中
 	*/
 	virtual bool syncToDB(DBInterface* pdbi) = 0;
 	
 	/**
-		��ʼ��
+		初始化
 	*/
 	virtual bool initialize(ScriptDefModule* sm, std::string name) { return true; };
 	
@@ -57,7 +57,7 @@ protected:
 };
 
 /*
-	kbeϵͳ��
+	kbe系统表
 */
 class KBEEntityLogTable : public KBETable
 {
@@ -70,7 +70,7 @@ public:
 		uint16 port;
 		COMPONENT_ID componentID;
 
-		// ��˭��¼
+		// 由谁记录
 		COMPONENT_ID serverGroupID;
 	};
 
@@ -97,7 +97,7 @@ protected:
 };
 
 /*
-	kbeϵͳ��
+	kbe系统表
 */
 class KBEServerLogTable : public KBETable
 {
@@ -108,7 +108,7 @@ public:
 	{
 		uint64 heartbeatTime;
 
-		// ��˭��¼
+		// 由谁记录
 		COMPONENT_ID serverGroupID;
 
 		uint8 isShareDB;

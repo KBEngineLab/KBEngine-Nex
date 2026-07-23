@@ -109,7 +109,7 @@ namespace strutil {
 		return kbe_ltrim(kbe_rtrim(s));
 	}
 
-	// �ַ����滻
+	// 字符串替换
 	int kbe_replace(std::string& str,  const std::string& pattern,  const std::string& newpat) 
 	{ 
 		int count = 0; 

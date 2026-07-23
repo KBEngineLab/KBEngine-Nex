@@ -44,34 +44,34 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	Bots������Ϣ�ӿ��ڴ˶���
+	Bots所有消息接口在此定义
 */
 NETWORK_INTERFACE_DECLARE_BEGIN(BotsInterface)
 
-	// ĳapp��������look��
+	// 某app主动请求look。
 	BOTS_MESSAGE_DECLARE_ARGS0(lookApp,									NETWORK_FIXED_MESSAGE)
 
-	// ����رշ�����
+	// 请求关闭服务器
 	BOTS_MESSAGE_DECLARE_STREAM(reqCloseServer,							NETWORK_VARIABLE_MESSAGE)
 
-	// consoleԶ��ִ��python��䡣
+	// console远程执行python语句。
 	BOTS_MESSAGE_DECLARE_STREAM(onExecScriptCommand,					NETWORK_VARIABLE_MESSAGE)
 
-	// ĳ��app��app��֪���ڻ״̬��
+	// 某个app向本app告知处于活动状态。
 	BOTS_MESSAGE_DECLARE_ARGS2(onAppActiveTick,							NETWORK_FIXED_MESSAGE,
 								COMPONENT_TYPE,							componentType, 
 								COMPONENT_ID,							componentID)
 
-	// ����bots��
+	// 添加bots。
 	BOTS_MESSAGE_DECLARE_STREAM(addBots,								NETWORK_VARIABLE_MESSAGE)
 
-	// �����ѯwatcher����
+	// 请求查询watcher数据
 	BOTS_MESSAGE_DECLARE_STREAM(queryWatcher,							NETWORK_VARIABLE_MESSAGE)
 
-	// ��ʼprofile
+	// 开始profile
 	BOTS_MESSAGE_DECLARE_STREAM(startProfile,							NETWORK_VARIABLE_MESSAGE)
 
-	// ����ǿ��ɱ����ǰapp
+	// 请求强制杀死当前app
 	BOTS_MESSAGE_DECLARE_STREAM(reqKillServer,							NETWORK_VARIABLE_MESSAGE)
 
 NETWORK_INTERFACE_DECLARE_END()

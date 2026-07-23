@@ -30,7 +30,7 @@ class TrapTrigger;
 class CoordinateNode;
 
 /*
-	����trap��
+	管理trap。
 */
 class ProximityController : public Controller
 {

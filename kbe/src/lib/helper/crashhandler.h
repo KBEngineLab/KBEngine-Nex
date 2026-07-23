@@ -39,13 +39,13 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 	
 namespace KBEngine{ namespace exception {
-/** ��װ */
+/** 安装 */
 void installCrashHandler(int svnVer, const char* dumpType);
 
-/** ����dump�ļ����� */
+/** 创建dump文件函数 */
 void createMiniDump(EXCEPTION_POINTERS* pep ); 
 
-/**  �Զ���� minidump callback */
+/**  自定义的 minidump callback */
 BOOL CALLBACK dumpCallback(
 	PVOID                            pParam, 
 	const PMINIDUMP_CALLBACK_INPUT   pInput, 
@@ -53,11 +53,11 @@ BOOL CALLBACK dumpCallback(
 ); 
 
 #ifndef _DEBUG
-	/** ��Ҫ�ػ�crash�Ĵ����ʼ�ĵط�д������� */
+	/** 在要截获crash的代码最开始的地方写上这个宏 */
 	#define THREAD_TRY_EXECUTION int exceptionCode = 0;																												\
 								__try{
 		
-	/** ��Ҫ�ػ�crash�Ĵ�����ĩβ�ĵط�д������� */
+	/** 在要截获crash的代码最末尾的地方写上这个宏 */
 	#define THREAD_HANDLE_CRASH  }__except(exceptionCode = GetExceptionCode(), KBEngine::exception::createMiniDump(GetExceptionInformation()),						\
 															EXCEPTION_EXECUTE_HANDLER) {																			\
 									printf("%x\n", exceptionCode);																									\

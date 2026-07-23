@@ -27,7 +27,7 @@ namespace KBEngine
 {
 
 /**
- *	����һ������
+ *	抽象一个任务
  */
 class Task
 {

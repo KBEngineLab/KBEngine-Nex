@@ -142,11 +142,11 @@ bool RestoreEntityHandler::process()
 
 	int count = 0;
 
-	// ������Ҫ�ҵ����cell�ϵ�space
+	// 首先需要找到这个cell上的space
 	// KBE_ASSERT(restoreSpaces_.size() > 0);
-	// ���spaceEntity�������baseapp�ϴ���������ȴ�
-	// ��spaceEntity��cell��������֮���㲥�����е�baseapp�� ÿ��baseapp
-	// ȥ�ж��Ƿ�����Ҫ�ָ���entity
+	// 如果spaceEntity不在这个baseapp上创建则继续等待
+	// 当spaceEntity的cell创建好了之后会广播给所有的baseapp， 每个baseapp
+	// 去判断是否有需要恢复的entity
 	if(restoreSpaces_.size() > 0)
 	{
 		if(timestamp() - tickReport_ > uint64( 3 * stampsPerSecond() ))
@@ -158,7 +158,7 @@ bool RestoreEntityHandler::process()
 
 		int spaceCellCount = 0;
 
-		// ����ȴ�space�ָ�
+		// 必须等待space恢复
 		std::vector<RestoreData>::iterator restoreSpacesIter = restoreSpaces_.begin();
 		for(; restoreSpacesIter != restoreSpaces_.end(); ++restoreSpacesIter)
 		{
@@ -202,7 +202,7 @@ bool RestoreEntityHandler::process()
 		if(spaceCellCount != (int)restoreSpaces_.size())
 			return true;
 
-		// ֪ͨ����baseapp�� space�ָ���cell
+		// 通知其他baseapp， space恢复了cell
 		if(!broadcastOtherBaseapps_)
 		{
 			broadcastOtherBaseapps_ = true;
@@ -262,7 +262,7 @@ bool RestoreEntityHandler::process()
 		return true;
 	}
 
-	// �ָ�����entity
+	// 恢复其他entity
 	std::vector<RestoreData>::iterator iter = entities_.begin();
 	for(; iter != entities_.end(); )
 	{

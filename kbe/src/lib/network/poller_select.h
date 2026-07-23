@@ -50,10 +50,10 @@ private:
 	fd_set						fdReadSet_;
 	fd_set						fdWriteSet_;
 
-	// ���ע���socket������ ������д��
+	// 最后注册的socket描述符 （读或写）
 	int							fdLargest_;
 
-	// ע��д��socket����������
+	// 注册写的socket描述符数量
 	int							fdWriteCount_;
 };
 

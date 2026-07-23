@@ -76,7 +76,7 @@ namespace KBEngine{
 																				\
 
 /**
-	Interfaces��Ϣ�꣬  ֻ�������������Ϣ
+	Interfaces消息宏，  只有零个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef INTERFACES_MESSAGE_HANDLER_ARGS0
@@ -118,7 +118,7 @@ namespace KBEngine{
 
 
 /**
-	Interfaces��Ϣ�꣬  ֻ��һ����������Ϣ
+	Interfaces消息宏，  只有一个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef INTERFACES_MESSAGE_HANDLER_ARGS1
@@ -161,7 +161,7 @@ namespace KBEngine{
 																				\
 	
 /**
-	Interfaces��Ϣ�꣬  ֻ�ж�����������Ϣ
+	Interfaces消息宏，  只有二个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef INTERFACES_MESSAGE_HANDLER_ARGS2
@@ -213,7 +213,7 @@ namespace KBEngine{
 
 
 /**
-	Interfaces��Ϣ�꣬  ֻ��������������Ϣ
+	Interfaces消息宏，  只有三个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef INTERFACES_MESSAGE_HANDLER_ARGS3
@@ -274,7 +274,7 @@ namespace KBEngine{
 
 
 /**
-	Interfaces��Ϣ�꣬  ֻ���ĸ���������Ϣ
+	Interfaces消息宏，  只有四个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef INTERFACES_MESSAGE_HANDLER_ARGS4
@@ -342,7 +342,7 @@ namespace KBEngine{
 											ARG_TYPE4, ARG_NAME4)				\
 
 /**
-	Interfaces��Ϣ�꣬  ֻ�������������Ϣ
+	Interfaces消息宏，  只有五个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef INTERFACES_MESSAGE_HANDLER_ARGS5
@@ -419,7 +419,7 @@ namespace KBEngine{
 
 
 /**
-	Interfaces��Ϣ�꣬  ֻ��������������Ϣ
+	Interfaces消息宏，  只有六个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef INTERFACES_MESSAGE_HANDLER_ARGS6
@@ -503,7 +503,7 @@ namespace KBEngine{
 											ARG_TYPE6, ARG_NAME6)				\
 
 /**
-	Interfaces��Ϣ�꣬  ֻ�а˸���������Ϣ
+	Interfaces消息宏，  只有八个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef INTERFACES_MESSAGE_HANDLER_ARGS8
@@ -605,7 +605,7 @@ namespace KBEngine{
 
 
 /**
-	Interfaces��Ϣ�꣬  ֻ�оŸ���������Ϣ
+	Interfaces消息宏，  只有九个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef INTERFACES_MESSAGE_HANDLER_ARGS9
@@ -715,7 +715,7 @@ namespace KBEngine{
 
 
 /**
-	Interfaces��Ϣ�꣬  ֻ��ʮ����������Ϣ
+	Interfaces消息宏，  只有十个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef INTERFACES_MESSAGE_HANDLER_ARGS10
@@ -834,7 +834,7 @@ namespace KBEngine{
 
 
 /**
-	Interfaces��Ϣ�꣬  ֻ��ʮһ����������Ϣ
+	Interfaces消息宏，  只有十一个参数的消息
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef INTERFACES_MESSAGE_HANDLER_ARGS11

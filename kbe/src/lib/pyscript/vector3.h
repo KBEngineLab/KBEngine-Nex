@@ -29,7 +29,7 @@ namespace KBEngine{ namespace script{
 	
 class ScriptVector3 : public ScriptObject
 {		
-	/** ���໯ ��һЩpy�������������� */
+	/** 子类化 将一些py操作填充进派生类 */
 	INSTANCE_SCRIPT_HREADER(ScriptVector3, ScriptObject)
 public:	
 	typedef std::tr1::function<void (void)> PYVector3ChangedCallback;
@@ -43,18 +43,18 @@ public:
 	virtual ~ScriptVector3();
 
 	/** 
-		��ö�������� 
+		获得对象的描述 
 	*/
 	PyObject* tp_repr();
 	PyObject* tp_str();
 
 	/** 
-		�ű�ģ������python�д��� 
+		脚本模块对象从python中创建 
 	*/
 	static PyObject* tp_new(PyTypeObject* type, PyObject* args, PyObject* kwds);
 
 	/** 
-		seq��ز��� 
+		seq相关操作 
 	*/
 	static Py_ssize_t seq_length(PyObject* self);
 	static PyObject* seq_item(PyObject* self, Py_ssize_t index);
@@ -62,7 +62,7 @@ public:
 	static int seq_ass_item(PyObject* self, Py_ssize_t index, PyObject* value);
 	
 	/** 
-		�Ӽ��˳���ز��� 
+		加减乘除相关操作 
 	*/
 	static PyObject* py_add(PyObject *a, PyObject *b);
 	static PyObject* py_subtract(PyObject *a, PyObject *b);
@@ -80,7 +80,7 @@ public:
 	static PyObject* py_inplace_divide(PyObject *self, PyObject *b);
 	
 	/** 
-		��©һЩ���� 
+		暴漏一些方法 
 	*/
 	static PyObject* __py_pyFlatDistTo(PyObject* self, PyObject* args);
 	static PyObject* __py_pyFlatDistSqrTo(PyObject* self, PyObject* args);
@@ -102,17 +102,17 @@ public:
 	DECLARE_PY_GETSET_MOTHOD(pyGetZ, pySetZ);
 	
 	/** 
-		֧��pickler ���� 
+		支持pickler 方法 
 	*/
 	static PyObject* __reduce_ex__(PyObject* self, PyObject* protocol);
 
 	/** 
-		unpickle���� 
+		unpickle方法 
 	*/
 	static PyObject* __unpickle__(PyObject* self, PyObject* args);
 
 	/** 
-		�ű�����װʱ������ 
+		脚本被安装时被调用 
 	*/
 	static void onInstallScript(PyObject* mod);
 	
@@ -123,17 +123,17 @@ public:
 	void setVectorFromPy(const Vector3& v);
 
 	/** 
-		���ĳ��python�����Ƿ����ת��Ϊ������ 
+		检查某个python对象是否可以转换为本类型 
 	*/
 	static bool check(PyObject* value, bool isPrintErr = true);
 	
 	/** 
-		��ĳ������check������python����ת��Ϊvector3 
+		将某个经过check检查过的python对象转换为vector3 
 	*/
 	static bool convertPyObjectToVector3(Vector3& v, PyObject* obj);
 
 	/** 
-		����entitycall��__getEntityFunc������ַ 
+		设置entitycall的__getEntityFunc函数地址 
 	*/
 	void setPYVector3ChangedCallback(PYVector3ChangedCallback* func){ 
 		_pyVector3ChangedCallback = func; 

@@ -42,10 +42,10 @@ BOOL CProfileWindow::OnInitDialog()
 	CDialog::OnInitDialog();
 	
 	DWORD dwStyle = m_profileShowList.GetExtendedStyle();
-	dwStyle |= LVS_EX_FULLROWSELECT;					//ѡ��ĳ��ʹ���и�����ֻ������report����listctrl��
-	dwStyle |= LVS_EX_GRIDLINES;						//�����ߣ�ֻ������report����listctrl��
+	dwStyle |= LVS_EX_FULLROWSELECT;					//选中某行使整行高亮（只适用与report风格的listctrl）
+	dwStyle |= LVS_EX_GRIDLINES;						//网格线（只适用与report风格的listctrl）
 	//dwStyle |= LVS_EX_ONECLICKACTIVATE;
-	m_profileShowList.SetExtendedStyle(dwStyle);				//������չ���
+	m_profileShowList.SetExtendedStyle(dwStyle);				//设置扩展风格
 
 	std::stringstream ss;
 	ss << KBEngine::genUUID64();

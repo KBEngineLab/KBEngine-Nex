@@ -97,7 +97,7 @@ bool ForwardComponent_MessageBuffer::process()
 		if(cinfos == NULL || cinfos->pChannel == NULL)
 			return true;
 
-		// �����mgr�������Ҫ�ж��Ƿ��Ѿ���ʼ�����
+		// 如果是mgr类组件需要判断是否已经初始化完成
 		if(g_componentType == CELLAPPMGR_TYPE || g_componentType == BASEAPPMGR_TYPE)
 		{
 			if(cinfos->state != COMPONENT_STATE_RUN)
@@ -213,7 +213,7 @@ bool ForwardAnywhere_MessageBuffer::process()
 		Components::COMPONENTS::iterator ctiter = cts.begin();
 		for(; ctiter != cts.end(); ++ctiter)
 		{
-			// �������е����Ƶ���������ã����������ȴ���
+			// 必须所有的组件频道都被设置，如果不是则等待。
 			if((*ctiter).pChannel == NULL)
 				return true;
 
@@ -221,11 +221,11 @@ bool ForwardAnywhere_MessageBuffer::process()
 				hasEnabled = true;
 		}
 
-		// �����п��õĽ���
+		// 必须有可用的进程
 		if(!hasEnabled)
 			return true;
 
-		// ���ÿ��tick����5��
+		// 最多每个tick处理5个
 		int icount = 5;
 
 		std::vector<ForwardItem*>::iterator iter = pBundles_.begin();
@@ -235,8 +235,8 @@ bool ForwardAnywhere_MessageBuffer::process()
 				break;
 		}
 		
-		// �������е�ForwardItem������ok״̬
-		// ��ʱ������ok״̬�����磺cellappmgr�е�ForwardItem��Ҫ�ȴ�cellapp��ʼ�����֮���ok
+		// 必须所有的ForwardItem都处于ok状态
+		// 何时不处于ok状态？例如：cellappmgr中的ForwardItem需要等待cellapp初始化完毕之后才ok
 		if (iter == pBundles_.end())
 			return true;
 

@@ -42,7 +42,7 @@ namespace Network{
 }
 
 /** 
-	֧��uft-8�����ַ������ 
+	支持uft-8编码字符串输出 
 */
 void vutf8printf(FILE *out, const char *str, va_list* ap);
 void utf8printf(FILE *out, const char *str, ...);
@@ -179,7 +179,7 @@ public:
 	void shouldWriteToSyslog(bool v = true);
 
 	/** 
-		ͬ����־��logger
+		同步日志到logger
 	*/
 	void sync();
 
@@ -213,8 +213,8 @@ private:
 
 	uint64 loseLoggerTime_;
 
-	// ��¼�����߳�ID�������ж��Ƿ������߳������־
-	// �����߳������־ʱ���������־���л��浽���߳�ʱ��ͬ����logger
+	// 记录下主线程ID，用于判断是否是子线程输出日志
+	// 当子线程输出日志时，对相关日志进行缓存到主线程时再同步给logger
 #if KBE_PLATFORM == PLATFORM_WIN32
 	DWORD mainThreadID_;
 #else
@@ -226,22 +226,22 @@ private:
 };
 
 /*---------------------------------------------------------------------------------
-	������Ϣ����ӿ�
+	调试信息输出接口
 ---------------------------------------------------------------------------------*/
-#define SCRIPT_INFO_MSG(m)				DebugHelper::getSingleton().script_info_msg((m))							// ���info��Ϣ
-#define SCRIPT_ERROR_MSG(m)				DebugHelper::getSingleton().script_error_msg((m))							// ���������Ϣ
+#define SCRIPT_INFO_MSG(m)				DebugHelper::getSingleton().script_info_msg((m))							// 输出info信息
+#define SCRIPT_ERROR_MSG(m)				DebugHelper::getSingleton().script_error_msg((m))							// 输出错误信息
 
-#define PRINT_MSG(m)					DebugHelper::getSingleton().print_msg((m))									// ����κ���Ϣ
-#define ERROR_MSG(m)					DebugHelper::getSingleton().error_msg((m))									// ���һ������
-#define DEBUG_MSG(m)					DebugHelper::getSingleton().debug_msg((m))									// ���һ��debug��Ϣ
-#define INFO_MSG(m)						DebugHelper::getSingleton().info_msg((m))									// ���һ��info��Ϣ
-#define WARNING_MSG(m)					DebugHelper::getSingleton().warning_msg((m))								// ���һ��������Ϣ
+#define PRINT_MSG(m)					DebugHelper::getSingleton().print_msg((m))									// 输出任何信息
+#define ERROR_MSG(m)					DebugHelper::getSingleton().error_msg((m))									// 输出一个错误
+#define DEBUG_MSG(m)					DebugHelper::getSingleton().debug_msg((m))									// 输出一个debug信息
+#define INFO_MSG(m)						DebugHelper::getSingleton().info_msg((m))									// 输出一个info信息
+#define WARNING_MSG(m)					DebugHelper::getSingleton().warning_msg((m))								// 输出一个警告信息
 #define CRITICAL_MSG(m)					DebugHelper::getSingleton().setFile(__FUNCTION__, \
 										__FILE__, __LINE__); \
 										DebugHelper::getSingleton().critical_msg((m))
 
 /*---------------------------------------------------------------------------------
-	���Ժ�
+	调试宏
 ---------------------------------------------------------------------------------*/
 #ifdef KBE_USE_ASSERTS
 void myassert(const char* exp, const char * func, const char * file, unsigned int line);

@@ -71,7 +71,7 @@ CoordinateSystem::~CoordinateSystem()
 			pNode = pNextNode;
 		}
 		
-		// �����Ѿ����ٹ���
+		// 上面已经销毁过了
 		first_x_coordinateNode_ = NULL;
 		first_y_coordinateNode_ = NULL;
 		first_z_coordinateNode_ = NULL;
@@ -83,7 +83,7 @@ CoordinateSystem::~CoordinateSystem()
 //-------------------------------------------------------------------------------------
 bool CoordinateSystem::insert(CoordinateNode* pNode)
 {
-	// ��������ǿյ�, ��ʼ��һ�������һ��xz�ڵ�Ϊ�ýڵ�
+	// 如果链表是空的, 初始第一个和最后一个xz节点为该节点
 	if(isEmpty())
 	{
 		first_x_coordinateNode_ = pNode;
@@ -106,7 +106,7 @@ bool CoordinateSystem::insert(CoordinateNode* pNode)
 
 		size_ = 1;
 		
-		// ֻ��һ���ڵ㲻��Ҫ����
+		// 只有一个节点不需要更新
 		// update(pNode);
 		pNode->resetOld();
 		return true;
@@ -150,8 +150,8 @@ bool CoordinateSystem::remove(CoordinateNode* pNode)
 	
 	pNode->addFlags(COORDINATE_NODE_FLAG_REMOVED);
 
-	// ������update�����п��ܻ���Ϊ�༶update�Ľ��е���COORDINATE_NODE_FLAG_PENDING��־��ȡ������˴˴������ܺܺõ��ж�
-	// ����ʵ���˱�ǵļ�����������ǿ�����е���Ϊ������dels_�� ��releaseNodes��space�н��е���ͳһ�ͷ�
+	// 由于在update过程中可能会因为多级update的进行导致COORDINATE_NODE_FLAG_PENDING标志被取消，因此此处并不能很好的判断
+	// 除非实现了标记的计数器，这里强制所有的行为都放入dels_， 由releaseNodes在space中进行调用统一释放
 	if(true /*pNode->hasFlags(COORDINATE_NODE_FLAG_PENDING)*/)
 	{
 		std::list<CoordinateNode*>::iterator iter = std::find(dels_.begin(), dels_.end(), pNode);
@@ -207,7 +207,7 @@ bool CoordinateSystem::removeReal(CoordinateNode* pNode)
 		return true;
 	}
 
-	// ����ǵ�һ���ڵ�
+	// 如果是第一个节点
 	if(first_x_coordinateNode_ == pNode)
 	{
 		first_x_coordinateNode_ = first_x_coordinateNode_->pNextX();
@@ -227,7 +227,7 @@ bool CoordinateSystem::removeReal(CoordinateNode* pNode)
 
 	if(CoordinateSystem::hasY)
 	{
-		// ����ǵ�һ���ڵ�
+		// 如果是第一个节点
 		if(first_y_coordinateNode_ == pNode)
 		{
 			first_y_coordinateNode_ = first_y_coordinateNode_->pNextY();
@@ -246,7 +246,7 @@ bool CoordinateSystem::removeReal(CoordinateNode* pNode)
 		}
 	}
 
-	// ����ǵ�һ���ڵ�
+	// 如果是第一个节点
 	if(first_z_coordinateNode_ == pNode)
 	{
 		first_z_coordinateNode_ = first_z_coordinateNode_->pNextZ();
@@ -563,7 +563,7 @@ void CoordinateSystem::update(CoordinateNode* pNode)
 	DEBUG_MSG(fmt::format("CoordinateSystem::update enter:[{:p}]:  ({}  {}  {})\n", (void*)pNode, pNode->xx(), pNode->yy(), pNode->zz()));
 #endif
 
-	// û�м�����֧�֣������Ǻܿ�����;��update�ӷ�֧ȡ�������û������
+	// 没有计数器支持，这个标记很可能中途被update子分支取消，因此没有意义
 	//pNode->addFlags(COORDINATE_NODE_FLAG_PENDING);
 
 	++updating_;

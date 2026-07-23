@@ -98,8 +98,8 @@ void TCPPacketSender::onGetError(Channel* pChannel, const std::string& err)
 {
 	pChannel->condemn(err);
 	
-	// �˴������������٣����ܵ���bufferedReceives_�ڲ������������ƻ�
-	// ����TCPPacketReceiver��������
+	// 此处不必立即销毁，可能导致bufferedReceives_内部遍历迭代器破坏
+	// 交给TCPPacketReceiver处理即可
 	//pChannel->networkInterface().deregisterChannel(pChannel);
 	//pChannel->destroy();
 }
@@ -109,7 +109,7 @@ bool TCPPacketSender::processSend(Channel* pChannel)
 {
 	bool noticed = pChannel == NULL;
 
-	// �������poller֪ͨ�ģ�������Ҫͨ����ַ�ҵ�channel
+	// 如果是由poller通知的，我们需要通过地址找到channel
 	if(noticed)
 		pChannel = getChannel();
 
@@ -150,13 +150,13 @@ bool TCPPacketSender::processSend(Channel* pChannel)
 
 			if (reason == REASON_RESOURCE_UNAVAILABLE)
 			{
-				/* �˴�������ܻ����debugHelper������
+				/* 此处输出可能会造成debugHelper处死锁
 					WARNING_MSG(fmt::format("TCPPacketSender::processSend: "
 						"Transmit queue full, waiting for space(kbengine.xml->channelCommon->writeBufferSize->{})...\n",
 						(pChannel->isInternal() ? "internal" : "external")));
 				*/
 
-				// ��������10����֪ͨ����
+				// 连续超过10次则通知出错
 				if (++sendfailCount_ >= 10 && pChannel->isExternal())
 				{
 					onGetError(pChannel, "TCPPacketSender::processSend: sendfailCount >= 10");
@@ -221,7 +221,7 @@ Reason TCPPacketSender::processFilterPacket(Channel* pChannel, Packet * pPacket)
 	if (pPoller != NULL && pPoller->supportsCompletion())
 	{
 		// Completion backends own a copy of the packet until WSASend completes, so the packet can leave the Channel queue now.
-		// ���ģ�ͻ��� WSASend ���ǰ���� packet ��������˴˴����������Ƴ� Channel ���С�
+		// 完成模型会在 WSASend 完成前持有 packet 副本，因此此处可以立即移出 Channel 队列。
 		const int remaining = pPacket->length() - pPacket->sentSize;
 		if (!pPoller->queueTcpSend(static_cast<int>(*pEndpoint), pPacket->data() + pPacket->sentSize, remaining))
 		{
@@ -250,7 +250,7 @@ Reason TCPPacketSender::processFilterPacket(Channel* pChannel, Packet * pPacket)
 	}
 	else
 	{
-		// ���ֻ������һ�������ݣ�����Ϊ��REASON_RESOURCE_UNAVAILABLE
+		// 如果只发送了一部分数据，则认为是REASON_RESOURCE_UNAVAILABLE
 		if (len > 0)
 			return REASON_RESOURCE_UNAVAILABLE;
 	}

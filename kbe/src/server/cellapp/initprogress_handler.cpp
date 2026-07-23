@@ -151,7 +151,7 @@ bool InitProgressHandler::process()
 
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-		// ���нű����������
+		// 所有脚本都加载完毕
 		PyObject* pyResult = PyObject_CallMethod(Cellapp::getSingleton().getEntryScript().get(),
 			const_cast<char*>("onInit"),
 			const_cast<char*>("i"),
@@ -170,7 +170,7 @@ bool InitProgressHandler::process()
 
 	if(PyObject_HasAttrString(Cellapp::getSingleton().getEntryScript().get(), "onReadyForLogin") > 0)
 	{
-		// ���нű����������
+		// 所有脚本都加载完毕
 		PyObject* pyResult = PyObject_CallMethod(Cellapp::getSingleton().getEntryScript().get(), 
 											const_cast<char*>("onReadyForLogin"), 
 											const_cast<char*>("i"), 

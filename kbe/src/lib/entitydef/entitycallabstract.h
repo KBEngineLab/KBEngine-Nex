@@ -41,7 +41,7 @@ class Bundle;
 
 class EntityCallAbstract : public script::ScriptObject
 {
-	/** ���໯ ��һЩpy�������������� */
+	/** 子类化 将一些py操作填充进派生类 */
 	INSTANCE_SCRIPT_HREADER(EntityCallAbstract, ScriptObject)
 public:
 	EntityCallAbstract(PyTypeObject* scriptType, 
@@ -54,7 +54,7 @@ public:
 	virtual ~EntityCallAbstract();
 
 	/** 
-		��ȡentityID 
+		获取entityID 
 	*/
 	INLINE ENTITY_ID id() const;
 
@@ -63,27 +63,27 @@ public:
 	DECLARE_PY_GET_MOTHOD(pyGetID);
 
 	/** 
-		������ID 
+		获得组件ID 
 	*/
 	INLINE COMPONENT_ID componentID(void) const;
 
 	/** 
-		���������ID 
+		设置组件的ID 
 	*/
 	INLINE void componentID(COMPONENT_ID cid);
 
 	/** 
-		���utype 
+		获得utype 
 	*/
 	INLINE ENTITY_SCRIPT_UID utype(void) const;
 
 	/** 
-		���type 
+		获得type 
 	*/
 	INLINE ENTITYCALL_TYPE type(void) const;
 
 	/** 
-		֧��pickler ���� 
+		支持pickler 方法 
 	*/
 	static PyObject* __py_reduce_ex__(PyObject* self, PyObject* protocol);
 	
@@ -107,11 +107,11 @@ public:
 	ScriptDefModule* pScriptDefModule();
 
 protected:
-	COMPONENT_ID							componentID_;			// Զ�˻��������ID
-	Network::Address						addr_;					// Ƶ����ַ
-	ENTITYCALL_TYPE							type_;					// ��entityCall������
+	COMPONENT_ID							componentID_;			// 远端机器组件的ID
+	Network::Address						addr_;					// 频道地址
+	ENTITYCALL_TYPE							type_;					// 该entityCall的类型
 	ENTITY_ID								id_;					// entityID
-	ENTITY_SCRIPT_UID						utype_;					// entity��utype����entities.xml�еĶ���˳��
+	ENTITY_SCRIPT_UID						utype_;					// entity的utype按照entities.xml中的定义顺序
 };
 
 }
