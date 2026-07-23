@@ -9,4 +9,19 @@
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
   </ItemDefinitionGroup>
+
+  <!--
+    x64 工程统一使用 vcpkg manifest 和静态 triplet，避免各项目分别维护依赖路径。
+    Use the vcpkg manifest and one static x64 triplet for every x64 project so dependency paths stay centralized.
+
+    不在工程中写死开发机路径；VCPKG_ROOT 由构建环境提供，便于 CI 和其他开发机复用。
+    Keep the vcpkg root outside the project file so CI and other developer machines can provide their own installation.
+  -->
+  <PropertyGroup Condition="'$(Platform)' == 'x64' Or '$(Platform)' == 'Win64'">
+    <VcpkgEnableManifest>true</VcpkgEnableManifest>
+    <VcpkgManifestInstall>false</VcpkgManifestInstall>
+    <VcpkgUseStatic>true</VcpkgUseStatic>
+    <VcpkgTriplet>x64-windows-static</VcpkgTriplet>
+    <VcpkgConfiguration Condition="'$(Configuration)' == 'Debug'">Debug</VcpkgConfiguration>
+  </PropertyGroup>
 </Project>
