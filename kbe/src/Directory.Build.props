@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <!--
+    统一告诉 MSVC 源文件和执行字符集均使用 UTF-8，避免中文注释或字符串按本地代码页解析。
+    Set both source and execution character sets to UTF-8 so MSVC does not reinterpret comments or literals using the local code page.
+  -->
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>

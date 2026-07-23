@@ -37,12 +37,12 @@ public:
 	~CoordinateSystem();
 
 	/**
-		ÏòlistÖÐ²åÈë½Úµã
+		ï¿½ï¿½listï¿½Ð²ï¿½ï¿½ï¿½Úµï¿½
 	*/
 	bool insert(CoordinateNode* pNode);
 
 	/**
-		½«½Úµã´ÓlistÖÐÒÆ³ý
+		ï¿½ï¿½ï¿½Úµï¿½ï¿½listï¿½ï¿½ï¿½Æ³ï¿½
 	*/
 	bool remove(CoordinateNode* pNode);
 	bool removeReal(CoordinateNode* pNode);
@@ -50,13 +50,13 @@ public:
 	void releaseNodes();
 
 	/**
-		µ±Ä³¸ö½ÚµãÓÐ±ä¶¯Ê±£¬ÐèÒª¸üÐÂËüÔÚlistÖÐµÄ
-		Ïà¹ØÎ»ÖÃµÈÐÅÏ¢
+		ï¿½ï¿½Ä³ï¿½ï¿½ï¿½Úµï¿½ï¿½Ð±ä¶¯Ê±ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½listï¿½Ðµï¿½
+		ï¿½ï¿½ï¿½Î»ï¿½Ãµï¿½ï¿½ï¿½Ï¢
 	*/
 	void update(CoordinateNode* pNode);
 
 	/**
-		ÒÆ¶¯½Úµã
+		ï¿½Æ¶ï¿½ï¿½Úµï¿½
 	*/
 	void moveNodeX(CoordinateNode* pNode, float px, CoordinateNode* pCurrNode);
 	void moveNodeY(CoordinateNode* pNode, float py, CoordinateNode* pCurrNode);
@@ -78,7 +78,7 @@ public:
 private:
 	uint32 size_;
 
-	// Á´±íµÄÊ×Î²Ö¸Õë
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î²Ö¸ï¿½ï¿½
 	CoordinateNode* first_x_coordinateNode_;
 	CoordinateNode* first_y_coordinateNode_;
 	CoordinateNode* first_z_coordinateNode_;

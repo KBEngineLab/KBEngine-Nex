@@ -32,7 +32,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine
 {
 
-// »ñµÃÄ³¸öentityµÄº¯ÊýµØÖ·
+// ï¿½ï¿½ï¿½Ä³ï¿½ï¿½entityï¿½Äºï¿½ï¿½ï¿½ï¿½ï¿½Ö·
 EntityCall::GetEntityFunc EntityCall::__getEntityFunc;
 EntityCall::FindChannelFunc EntityCall::__findChannelFunc;
 EntityCall::EntityCallCallHookFunc*	EntityCall::__hookCallFuncPtr = NULL;
@@ -78,7 +78,7 @@ EntityCall::~EntityCall()
 	KBE_ASSERT(atIdx_ < EntityCall::entityCalls.size());
 	KBE_ASSERT(EntityCall::entityCalls[ atIdx_ ] == this);
 
-	// Èç¹ûÓÐ2¸ö»òÒÔÉÏµÄEntityCallÔò½«×îºóÒ»¸öEntityCallÒÆÖÁÉ¾³ýµÄÕâ¸öEntityCallËùÔÚÎ»ÖÃ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½2ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½EntityCallï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½EntityCallï¿½ï¿½ï¿½ï¿½É¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½EntityCallï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½
 	EntityCall* pBack = EntityCall::entityCalls.back();
 	pBack->_setATIdx(atIdx_);
 	EntityCall::entityCalls[atIdx_] = pBack;
@@ -144,7 +144,7 @@ PyObject* EntityCall::onScriptGetAttribute(PyObject* attr)
 		return createRemoteMethod(pMethodDescription);
 	}
 
-	// Ê×ÏÈÒªÇóÃû³Æ²»ÄÜÎª×Ô¼º  ±ÈÈç£º×ÔÉíÊÇÒ»¸öcell£¬ ²»ÄÜÊ¹ÓÃcell.cell
+	// ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½Æ²ï¿½ï¿½ï¿½Îªï¿½Ô¼ï¿½  ï¿½ï¿½ï¿½ç£ºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½cellï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½cell.cell
 	if(strcmp(ccattr, ENTITYCALL_TYPE_TO_NAME_TABLE[type_]) != 0)
 	{
 		int8 mbtype = -1;

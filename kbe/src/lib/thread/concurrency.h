@@ -34,7 +34,7 @@ namespace KBEConcurrency
 {
 
 /**
-	Ö÷Ïß³Ì´¦ÓÚ¿ÕÏÐÊ±´¥·¢
+	ï¿½ï¿½ï¿½ß³Ì´ï¿½ï¿½Ú¿ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½
 */
 inline void onStartMainThreadIdling()
 {
@@ -43,7 +43,7 @@ inline void onStartMainThreadIdling()
 }
 
 /**
-	Ö÷Ïß³Ì½áÊø¿ÕÏÐ¿ªÊ¼·±Ã¦Ê±´¥·¢
+	ï¿½ï¿½ï¿½ß³Ì½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¿ï¿½Ê¼ï¿½ï¿½Ã¦Ê±ï¿½ï¿½ï¿½ï¿½
 */
 inline void onEndMainThreadIdling()
 {
@@ -52,8 +52,8 @@ inline void onEndMainThreadIdling()
 }
 
 /**
-	ÉèÖÃ»Øµ÷º¯Êý
-	µ±»Øµ÷´¥·¢Ê±Í¨ÖªËûÃÇ
+	ï¿½ï¿½ï¿½Ã»Øµï¿½ï¿½ï¿½ï¿½ï¿½
+	ï¿½ï¿½ï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½Ê±Í¨Öªï¿½ï¿½ï¿½ï¿½
 */
 inline void setMainThreadIdleCallbacks(void (*pStartCallback)(), void (*pEndCallback)())
 {

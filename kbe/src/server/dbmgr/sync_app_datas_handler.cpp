@@ -114,8 +114,8 @@ bool SyncAppDatasHandler::process()
 
 	std::string digest = EntityDef::md5().getDigestStr();
 
-	// 如果是连接到dbmgr则需要等待接收app初始信息
-	// 例如：初始会分配entityID段以及这个app启动的顺序信息（是否第一个baseapp启动）
+	// 锟斤拷锟斤拷锟斤拷锟斤拷拥锟絛bmgr锟斤拷锟斤拷要锟饺达拷锟斤拷锟斤拷app锟斤拷始锟斤拷息
+	// 锟斤拷锟界：锟斤拷始锟斤拷锟斤拷锟絜ntityID锟斤拷锟皆硷拷锟斤拷锟絘pp锟斤拷锟斤拷锟斤拷顺锟斤拷锟斤拷息锟斤拷锟角凤拷锟揭伙拷锟絙aseapp锟斤拷锟斤拷锟斤拷
 	iter = apps_.begin();
 	for(; iter != apps_.end(); ++iter)
 	{

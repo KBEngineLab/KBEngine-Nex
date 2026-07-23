@@ -101,7 +101,7 @@ bool MoveToPointHandler::update(TimerHandle& handle)
 
 		if(distance_ > 0.0f)
 		{
-			// µ¥Î»»¯ÏòÁ¿
+			// ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 			KBEVec3Normalize(&movement, &movement); 
 			movement *= distance_;
 			currpos -= movement;
@@ -114,29 +114,29 @@ bool MoveToPointHandler::update(TimerHandle& handle)
 	}
 	else
 	{
-		// µ¥Î»»¯ÏòÁ¿
+		// ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		KBEVec3Normalize(&movement, &movement); 
 
-		// ÒÆ¶¯Î»ÖÃ
+		// ï¿½Æ¶ï¿½Î»ï¿½ï¿½
 		movement *= velocity_;
 		currpos += movement;
 	}
 	
-	// ÊÇ·ñÐèÒª¸Ä±äÃæÏò
+	// ï¿½Ç·ï¿½ï¿½ï¿½Òªï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½
 	if (faceMovement_ && (movement.x != 0.f || movement.z != 0.f))
 		direction.yaw(movement.yaw());
 	
-	// ÉèÖÃentityµÄÐÂÎ»ÖÃºÍÃæÏò
+	// ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½Î»ï¿½Ãºï¿½ï¿½ï¿½ï¿½ï¿½
 	pEntity_->clientPos(currpos);
 	pEntity_->clientDir(direction);
 
-	// ·Çnavigate¶¼²»ÄÜÈ·¶¨ÆäÔÚµØÃæÉÏ
+	// ï¿½ï¿½navigateï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½ï¿½Úµï¿½ï¿½ï¿½ï¿½ï¿½
 	pEntity_->isOnGround(false);
 
-	// Í¨Öª½Å±¾
+	// Í¨Öªï¿½Å±ï¿½
 	pEntity->onMove(scriptCallbacks_.getIDForHandle(handle), layer_, currpos_backup, pyuserarg_);
 
-	// Èç¹û´ïµ½Ä¿µÄµØÔò·µ»Øtrue
+	// ï¿½ï¿½ï¿½ï¿½ïµ½Ä¿ï¿½Äµï¿½ï¿½ò·µ»ï¿½true
 	if(!ret)
 	{
 		return !requestMoveOver(handle, currpos_backup);

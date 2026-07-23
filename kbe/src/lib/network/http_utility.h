@@ -57,7 +57,7 @@ namespace Http
             {      
                 buf[0] = sIn[ix];
             }
-            //else if ( isspace( (uint8)sIn[ix] ) ) //Ã²ËÆ°Ñ¿Õ¸ñ±àÂë³É%20»òÕß+¶¼¿ÉÒÔ
+            //else if ( isspace( (uint8)sIn[ix] ) ) //Ã²ï¿½Æ°Ñ¿Õ¸ï¿½ï¿½ï¿½ï¿½ï¿½%20ï¿½ï¿½ï¿½ï¿½+ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             //{
             //    buf[0] = '+';
             //}

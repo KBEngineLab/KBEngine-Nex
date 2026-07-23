@@ -35,8 +35,8 @@ public:
 	static void finalise();
 
 	/**
-		╩╟╖ё╬кHttps/Wss╨н╥щ
-		╖╡╗╪╛▀╠х╨н╥щ░ц▒╛
+		я┐╜╟╖я┐╜╬кHttps/Wss╨ня┐╜я┐╜
+		я┐╜я┐╜я┐╜╪╛я┐╜я┐╜я┐╜╨ня┐╜я┐╜ц▒╛
 	*/
 	static int isSSLProtocal(MemoryStream* s);
 

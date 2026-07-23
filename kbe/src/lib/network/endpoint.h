@@ -67,7 +67,7 @@ public:
 	INLINE void setFileDescriptor(int fd);
 #if KBE_PLATFORM == PLATFORM_WIN32
 	// Windows SOCKET uses a pointer-sized integer and must not be narrowed to int.
-	// Windows SOCKET Ê¹ÓÃÖ¸Õë¿í¶ÈÕûÊý£¬²»ÄÜËõÕ­Îª int¡£
+	// Windows SOCKET Ê¹ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ­Îª intï¿½ï¿½
 	INLINE void setFileDescriptor(KBESOCKET fd);
 #endif
 

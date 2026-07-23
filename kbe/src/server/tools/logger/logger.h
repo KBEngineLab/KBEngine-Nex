@@ -90,7 +90,7 @@ public:
 	void handleTimeout(TimerHandle handle, void * arg);
 	void handleTick();
 
-	/* ³õÊ¼»¯Ïà¹Ø½Ó¿Ú */
+	/* ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ø½Ó¿ï¿½ */
 	bool initializeBegin();
 	bool inInitialize();
 	bool initializeEnd();
@@ -104,23 +104,23 @@ public:
 		return (uint32)buffered_logs_.size();
 	}
 
-	/** ÍøÂç½Ó¿Ú
-		Ð´ÈÕÖ¾
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Ð´ï¿½ï¿½Ö¾
 	*/
 	void writeLog(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		×¢²álog¼àÌýÕß
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		×¢ï¿½ï¿½logï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void registerLogWatcher(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		×¢Ïúlog¼àÌýÕß
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		×¢ï¿½ï¿½logï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void deregisterLogWatcher(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-		log¼àÌýÕß¸üÐÂ×Ô¼ºµÄÉèÖÃ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		logï¿½ï¿½ï¿½ï¿½ï¿½ß¸ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void updateLogWatcherSetting(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 

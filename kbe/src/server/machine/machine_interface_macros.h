@@ -38,7 +38,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	MachineÏûÏ¢ºê£¬  ²ÎÊýÎªÁ÷£¬ ÐèÒª×Ô¼º½â¿ª
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Òªï¿½Ô¼ï¿½ï¿½â¿ª
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_STREAM
@@ -79,7 +79,7 @@ namespace KBEngine{
 																				\
 
 /**
-	MachineÏûÏ¢ºê£¬  Ö»ÓÐÁã¸ö²ÎÊýµÄÏûÏ¢
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_ARGS0
@@ -121,7 +121,7 @@ namespace KBEngine{
 
 
 /**
-	MachineÏûÏ¢ºê£¬  Ö»ÓÐÒ»¸ö²ÎÊýµÄÏûÏ¢
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_ARGS1
@@ -164,7 +164,7 @@ namespace KBEngine{
 																				\
 
 /**
-	MachineÏûÏ¢ºê£¬  Ö»ÓÐ¶þ¸ö²ÎÊýµÄÏûÏ¢
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_ARGS2
@@ -216,7 +216,7 @@ namespace KBEngine{
 
 
 /**
-	MachineÏûÏ¢ºê£¬  Ö»ÓÐÈý¸ö²ÎÊýµÄÏûÏ¢
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_ARGS3
@@ -277,7 +277,7 @@ namespace KBEngine{
 
 
 /**
-	MachineÏûÏ¢ºê£¬  Ö»ÓÐËÄ¸ö²ÎÊýµÄÏûÏ¢
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½Ä¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_ARGS4
@@ -345,7 +345,7 @@ namespace KBEngine{
 											ARG_TYPE4, ARG_NAME4)				\
 
 /**
-	MachineÏûÏ¢ºê£¬  Ö»ÓÐÎå¸ö²ÎÊýµÄÏûÏ¢
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_ARGS5
@@ -422,7 +422,7 @@ namespace KBEngine{
 
 
 /**
-	MachineÏûÏ¢ºê£¬  Ö»ÓÐÁù¸ö²ÎÊýµÄÏûÏ¢
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_ARGS6
@@ -507,7 +507,7 @@ namespace KBEngine{
 
 
 /**
-	MachineÏûÏ¢ºê£¬  Ö»ÓÐÆß¸ö²ÎÊýµÄÏûÏ¢
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½ß¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_ARGS7
@@ -602,7 +602,7 @@ namespace KBEngine{
 
 
 /**
-	MachineÏûÏ¢ºê£¬  Ö»ÓÐ°Ë¸ö²ÎÊýµÄÏûÏ¢
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½Ð°Ë¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_ARGS8
@@ -704,7 +704,7 @@ namespace KBEngine{
 
 
 /**
-	MachineÏûÏ¢ºê£¬  Ö»ÓÐ¾Å¸ö²ÎÊýµÄÏûÏ¢
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½Ð¾Å¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_ARGS9
@@ -814,7 +814,7 @@ namespace KBEngine{
 
 
 /**
-	MachineÏûÏ¢ºê£¬  Ö»ÓÐÊ®¸ö²ÎÊýµÄÏûÏ¢
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½Ê®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_ARGS10
@@ -933,7 +933,7 @@ namespace KBEngine{
 
 
 /**
-	MachineÏûÏ¢ºê£¬  Ö»ÓÐÊ®Ò»¸ö²ÎÊýµÄÏûÏ¢
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½Ê®Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_ARGS11
@@ -1060,7 +1060,7 @@ namespace KBEngine{
 
 
 /**
-	MachineÏûÏ¢ºê£¬  Ö»ÓÐÊ®Îå¸ö²ÎÊýµÄÏûÏ¢
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½Ê®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_ARGS15
@@ -1220,7 +1220,7 @@ namespace KBEngine{
 
 
 /**
-	MachineÏûÏ¢ºê£¬  Ö»ÓÐÊ®Áù¸ö²ÎÊýµÄÏûÏ¢
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½Ê®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_ARGS16
@@ -1389,7 +1389,7 @@ namespace KBEngine{
 
 
 /**
-	MachineÏûÏ¢ºê£¬  Ö»ÓÐÊ®°Ë¸ö²ÎÊýµÄÏûÏ¢
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½Ê®ï¿½Ë¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_ARGS18
@@ -1574,7 +1574,7 @@ namespace KBEngine{
 
 
 /**
-	MachineÏûÏ¢ºê£¬  Ö»ÓÐ¶þÊ®¸ö²ÎÊýµÄÏûÏ¢
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½Ð¶ï¿½Ê®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_ARGS20
@@ -1776,7 +1776,7 @@ namespace KBEngine{
 
 
 /**
-	MachineÏûÏ¢ºê£¬  Ö»ÓÐ¶þÊ®Ò»¸ö²ÎÊýµÄÏûÏ¢
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½Ð¶ï¿½Ê®Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_ARGS21
@@ -1987,7 +1987,7 @@ namespace KBEngine{
 
 
 /**
-	MachineÏûÏ¢ºê£¬  Ö»ÓÐ¶þÊ®¶þ¸ö²ÎÊýµÄÏûÏ¢
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½Ð¶ï¿½Ê®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_ARGS22
@@ -2207,7 +2207,7 @@ namespace KBEngine{
 
 
 /**
-	MachineÏûÏ¢ºê£¬  Ö»ÓÐ¶þÊ®ËÄ¸ö²ÎÊýµÄÏûÏ¢
+	Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½Ð¶ï¿½Ê®ï¿½Ä¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef MACHINE_MESSAGE_HANDLER_ARGS24
@@ -2443,7 +2443,7 @@ namespace KBEngine{
 
 
 /**
-MachineÏûÏ¢ºê£¬  Ö»ÓÐ¶þÊ®Îå¸ö²ÎÊýµÄÏûÏ¢
+Machineï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½Ð¶ï¿½Ê®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 #undef MACHINE_MESSAGE_HANDLER_ARGS25

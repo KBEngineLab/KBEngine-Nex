@@ -268,7 +268,7 @@ namespace KBEngine{
 }																											\
 
 
-// ÊµÌåµÄ±êÖ¾
+// Êµï¿½ï¿½Ä±ï¿½Ö¾
 #define ENTITY_FLAGS_UNKNOWN						0x00000000
 #define ENTITY_FLAGS_DESTROYING						0x00000001
 #define ENTITY_FLAGS_INITING						0x00000002
@@ -663,7 +663,7 @@ public:																										\
 					Py_ssize_t ob_refcnt = value->ob_refcnt;												\
 					PyObject* pySetObj = propertyDescription->onSetValue(this, value);						\
 																											\
-					/* Èç¹ûdefÊôÐÔÊý¾ÝÓÐ¸Ä±ä£¬ ÄÇÃ´¿ÉÄÜÐèÒª¹ã²¥ */												\
+					/* ï¿½ï¿½ï¿½defï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¸Ä±ä£¬ ï¿½ï¿½Ã´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ã²¥ */												\
 					if(pySetObj != NULL)																	\
 					{																						\
 						onDefDataChanged(propertyDescription, pySetObj);									\
@@ -716,7 +716,7 @@ public:																										\
 		}																									\
 		else if(g_componentType == BASEAPP_TYPE)															\
 		{																									\
-			extra = -1;	/* shouldAutoLoad -1Ä¬ÈÏ²»¸Ä±äÉèÖÃ */												\
+			extra = -1;	/* shouldAutoLoad -1Ä¬ï¿½Ï²ï¿½ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ */												\
 		}																									\
 																											\
 		if(currargsSize == 1)																				\

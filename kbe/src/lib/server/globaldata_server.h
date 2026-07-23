@@ -43,26 +43,26 @@ public:
 	GlobalDataServer(DATA_TYPE dataType);
 	~GlobalDataServer();
 			
-	/** 写数据 */
+	/** 写锟斤拷锟斤拷 */
 	bool write(Network::Channel* pChannel, COMPONENT_TYPE componentType, const std::string& key, const std::string& value);
 	
-	/** 删除数据 */
+	/** 删锟斤拷锟斤拷锟斤拷 */
 	bool del(Network::Channel* pChannel, COMPONENT_TYPE componentType, const std::string& key);	
 	
-	/** 添加该服务器所需要关心的组件类别 */
+	/** 锟斤拷锟接该凤拷锟斤拷锟斤拷锟斤拷锟斤拷要锟斤拷锟侥碉拷锟斤拷锟斤拷锟斤拷 */
 	void addConcernComponentType(COMPONENT_TYPE ct){ concernComponentTypes_.push_back(ct); }
 	
-	/** 广播一个数据的改变给所关心的组件 */
+	/** 锟姐播一锟斤拷锟斤拷锟捷的改憋拷锟斤拷锟斤拷锟斤拷牡锟斤拷锟斤拷 */
 	void broadcastDataChanged(Network::Channel* pChannel, COMPONENT_TYPE componentType, const std::string& key, 
 							const std::string& value, bool isDelete = false);
 	
-	/** 一个新的客户端登陆 */
+	/** 一锟斤拷锟铰的客伙拷锟剿碉拷陆 */
 	void onGlobalDataClientLogon(Network::Channel* client, COMPONENT_TYPE componentType);
 
 private:
 	DATA_TYPE dataType_;
 
-	std::vector<COMPONENT_TYPE> concernComponentTypes_;						// 该GlobalDataServer所需要关心的组件类别
+	std::vector<COMPONENT_TYPE> concernComponentTypes_;						// 锟斤拷GlobalDataServer锟斤拷锟斤拷要锟斤拷锟侥碉拷锟斤拷锟斤拷锟斤拷
 	typedef std::map<std::string, std::string> DATA_MAP;
 	typedef DATA_MAP::iterator DATA_MAP_KEY;
 	DATA_MAP dict_;

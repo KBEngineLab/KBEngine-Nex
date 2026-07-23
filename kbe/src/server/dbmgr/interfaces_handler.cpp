@@ -85,7 +85,7 @@ bool InterfacesHandler_Dbmgr::createAccount(Network::Channel* pChannel, std::str
 		return false;
 	}
 
-	// Èç¹ûÊÇemail£¬ÏÈ²éÑ¯ÕËºÅÊÇ·ñ´æÔÚÈ»ºó½«ÆäµÇ¼ÇÈë¿â
+	// ï¿½ï¿½ï¿½ï¿½ï¿½emailï¿½ï¿½ï¿½È²ï¿½Ñ¯ï¿½Ëºï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½È»ï¿½ï¿½ï¿½ï¿½Ç¼ï¿½ï¿½ï¿½ï¿½
 	if(uatype == ACCOUNT_TYPE_MAIL)
 	{
 		pThreadPool->addTask(new DBTaskCreateMailAccount(pChannel->addr(),
@@ -531,7 +531,7 @@ bool InterfacesHandler_Interfaces::reconnect()
 		}
 	}
 
-	// ²»¼ì²é³¬Ê±
+	// ï¿½ï¿½ï¿½ï¿½é³¬Ê±
 	pInterfacesChannel->stopInactivityDetection();
 
 	if (!Dbmgr::getSingleton().networkInterface().registerChannel(pInterfacesChannel))
@@ -624,7 +624,7 @@ void InterfacesHandler_Interfaces::onChargeCB(KBEngine::MemoryStream& s)
 		ERROR_MSG(fmt::format("InterfacesHandler_Interfaces::onChargeCB: baseapp not found!, chargeID={}, cid={}.\n", 
 			chargeID, cid));
 
-		// ´ËÊ±Ó¦¸ÃËæ»úÕÒÒ»¸öbaseappµ÷ÓÃonLoseChargeCB
+		// ï¿½ï¿½Ê±Ó¦ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½baseappï¿½ï¿½ï¿½ï¿½onLoseChargeCB
 		bool found = false;
 
 		Components::COMPONENTS& components = Components::getSingleton().getComponents(BASEAPP_TYPE);
@@ -686,21 +686,21 @@ void InterfacesHandler_Interfaces::eraseClientReq(Network::Channel* pChannel, st
 //-------------------------------------------------------------------------------------
 void InterfacesHandler_Interfaces::accountActivate(Network::Channel* pChannel, std::string& scode)
 {
-	// ¸Ã¹¦ÄÜ²»Ö§³ÖµÚÈý·½ÏµÍ³£¬ËùÒÔµ±×ö±¾µØÕËºÅÏµÍ³Ö´ÐÐ
+	// ï¿½Ã¹ï¿½ï¿½Ü²ï¿½Ö§ï¿½Öµï¿½ï¿½ï¿½ï¿½ï¿½ÏµÍ³ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ëºï¿½ÏµÍ³Ö´ï¿½ï¿½
 	InterfacesHandler_Dbmgr::accountActivate(pChannel, scode);
 }
 
 //-------------------------------------------------------------------------------------
 void InterfacesHandler_Interfaces::accountReqResetPassword(Network::Channel* pChannel, std::string& accountName)
 {
-	// ¸Ã¹¦ÄÜ²»Ö§³ÖµÚÈý·½ÏµÍ³£¬ËùÒÔµ±×ö±¾µØÕËºÅÏµÍ³Ö´ÐÐ
+	// ï¿½Ã¹ï¿½ï¿½Ü²ï¿½Ö§ï¿½Öµï¿½ï¿½ï¿½ï¿½ï¿½ÏµÍ³ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ëºï¿½ÏµÍ³Ö´ï¿½ï¿½
 	InterfacesHandler_Dbmgr::accountReqResetPassword(pChannel, accountName);
 }
 
 //-------------------------------------------------------------------------------------
 void InterfacesHandler_Interfaces::accountResetPassword(Network::Channel* pChannel, std::string& accountName, std::string& newpassword, std::string& scode)
 {
-	// ¸Ã¹¦ÄÜ²»Ö§³ÖµÚÈý·½ÏµÍ³£¬ËùÒÔµ±×ö±¾µØÕËºÅÏµÍ³Ö´ÐÐ
+	// ï¿½Ã¹ï¿½ï¿½Ü²ï¿½Ö§ï¿½Öµï¿½ï¿½ï¿½ï¿½ï¿½ÏµÍ³ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ëºï¿½ÏµÍ³Ö´ï¿½ï¿½
 	InterfacesHandler_Dbmgr::accountResetPassword(pChannel, accountName, newpassword, scode);
 }
 
@@ -708,14 +708,14 @@ void InterfacesHandler_Interfaces::accountResetPassword(Network::Channel* pChann
 void InterfacesHandler_Interfaces::accountReqBindMail(Network::Channel* pChannel, ENTITY_ID entityID, std::string& accountName,
 												   std::string& password, std::string& email)
 {
-	// ¸Ã¹¦ÄÜ²»Ö§³ÖµÚÈý·½ÏµÍ³£¬ËùÒÔµ±×ö±¾µØÕËºÅÏµÍ³Ö´ÐÐ
+	// ï¿½Ã¹ï¿½ï¿½Ü²ï¿½Ö§ï¿½Öµï¿½ï¿½ï¿½ï¿½ï¿½ÏµÍ³ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ëºï¿½ÏµÍ³Ö´ï¿½ï¿½
 	InterfacesHandler_Dbmgr::accountReqBindMail(pChannel, entityID, accountName, password, email);
 }
 
 //-------------------------------------------------------------------------------------
 void InterfacesHandler_Interfaces::accountBindMail(Network::Channel* pChannel, std::string& username, std::string& scode)
 {
-	// ¸Ã¹¦ÄÜ²»Ö§³ÖµÚÈý·½ÏµÍ³£¬ËùÒÔµ±×ö±¾µØÕËºÅÏµÍ³Ö´ÐÐ
+	// ï¿½Ã¹ï¿½ï¿½Ü²ï¿½Ö§ï¿½Öµï¿½ï¿½ï¿½ï¿½ï¿½ÏµÍ³ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ëºï¿½ÏµÍ³Ö´ï¿½ï¿½
 	InterfacesHandler_Dbmgr::accountBindMail(pChannel, username, scode);
 }
 
@@ -723,7 +723,7 @@ void InterfacesHandler_Interfaces::accountBindMail(Network::Channel* pChannel, s
 void InterfacesHandler_Interfaces::accountNewPassword(Network::Channel* pChannel, ENTITY_ID entityID, std::string& accountName,
 												   std::string& password, std::string& newpassword)
 {
-	// ¸Ã¹¦ÄÜ²»Ö§³ÖµÚÈý·½ÏµÍ³£¬ËùÒÔµ±×ö±¾µØÕËºÅÏµÍ³Ö´ÐÐ
+	// ï¿½Ã¹ï¿½ï¿½Ü²ï¿½Ö§ï¿½Öµï¿½ï¿½ï¿½ï¿½ï¿½ÏµÍ³ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ëºï¿½ÏµÍ³Ö´ï¿½ï¿½
 	InterfacesHandler_Dbmgr::accountNewPassword(pChannel, entityID, accountName, password, newpassword);
 }
 

@@ -62,7 +62,7 @@ NetworkInterface::NetworkInterface(Network::EventDispatcher * pDispatcher,
 		this->initialize("EXTERNAL", htons(extlisteningPort_min), htons(extlisteningPort_max),
 			extlisteningInterface, &extEndpoint_, pExtListenerReceiver_, extrbuffer, extwbuffer);
 
-		// Èç¹ûÅäÖÃÁË¶ÔÍâ¶Ë¿Ú·¶Î§£¬ Èç¹û·¶Î§¹ıĞ¡ÕâÀïextEndpoint_¿ÉÄÜÃ»ÓĞ¶Ë¿Ú¿ÉÓÃÁË
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë¶ï¿½ï¿½ï¿½Ë¿Ú·ï¿½Î§ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Î§ï¿½ï¿½Ğ¡ï¿½ï¿½ï¿½ï¿½extEndpoint_ï¿½ï¿½ï¿½ï¿½Ã»ï¿½Ğ¶Ë¿Ú¿ï¿½ï¿½ï¿½ï¿½ï¿½
 		if(extlisteningPort_min != -1)
 		{
 			KBE_ASSERT(extEndpoint_.good() && "Channel::EXTERNAL: no available port, "
@@ -163,7 +163,7 @@ bool NetworkInterface::initialize(const char* pEndPointName, uint16 listeningPor
 	bool listeningInterfaceEmpty =
 		(listeningInterface == NULL || listeningInterface[0] == 0);
 
-	// ²éÕÒÖ¸¶¨½Ó¿ÚÃû NIP¡¢MAC¡¢IPÊÇ·ñ¿ÉÓÃ
+	// ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½Ó¿ï¿½ï¿½ï¿½ NIPï¿½ï¿½MACï¿½ï¿½IPï¿½Ç·ï¿½ï¿½ï¿½ï¿½
 	if(pEP->findIndicatedInterface(listeningInterface, ifIPAddr) == 0)
 	{
 		char szIp[MAX_IP] = {0};
@@ -173,14 +173,14 @@ bool NetworkInterface::initialize(const char* pEndPointName, uint16 listeningPor
 			pEndPointName, listeningInterface, szIp));
 	}
 
-	// Èç¹û²»Îª¿ÕÓÖÕÒ²»µ½ÄÇÃ´¾¯¸æÓÃ»§´íÎóµÄÉèÖÃ£¬Í¬Ê±ÎÒÃÇ²ÉÓÃÄ¬ÈÏµÄ·½Ê½(°ó¶¨µ½INADDR_ANY)
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ï¿½Ò²ï¿½ï¿½ï¿½ï¿½ï¿½Ã´ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½Í¬Ê±ï¿½ï¿½ï¿½Ç²ï¿½ï¿½ï¿½Ä¬ï¿½ÏµÄ·ï¿½Ê½(ï¿½ó¶¨µï¿½INADDR_ANY)
 	else if (!listeningInterfaceEmpty)
 	{
 		WARNING_MSG(fmt::format("NetworkInterface::initialize({}): Couldn't parse interface spec '{}' so using all interfaces\n",
 			pEndPointName, listeningInterface));
 	}
 	
-	// ³¢ÊÔ°ó¶¨µ½¶Ë¿Ú£¬Èç¹û±»Õ¼ÓÃÏòºóµİÔö
+	// ï¿½ï¿½ï¿½Ô°ó¶¨µï¿½ï¿½Ë¿Ú£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	bool foundport = false;
 	uint32 listeningPort = listeningPort_min;
 	if(listeningPort_min != listeningPort_max)
@@ -207,7 +207,7 @@ bool NetworkInterface::initialize(const char* pEndPointName, uint16 listeningPor
 		}
 	}
 
-	// Èç¹ûÎŞ·¨°ó¶¨µ½ºÏÊÊµÄ¶Ë¿ÚÄÇÃ´±¨´í·µ»Ø£¬½ø³Ì½«ÍË³ö
+	// ï¿½ï¿½ï¿½ï¿½Ş·ï¿½ï¿½ó¶¨µï¿½ï¿½ï¿½ï¿½ÊµÄ¶Ë¿ï¿½ï¿½ï¿½Ã´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø£ï¿½ï¿½ï¿½ï¿½Ì½ï¿½ï¿½Ë³ï¿½
 	if(!foundport)
 	{
 		ERROR_MSG(fmt::format("NetworkInterface::initialize({}): Couldn't bind the socket to {}:{} ({})\n",
@@ -217,7 +217,7 @@ bool NetworkInterface::initialize(const char* pEndPointName, uint16 listeningPor
 		return false;
 	}
 
-	// »ñµÃµ±Ç°°ó¶¨µÄµØÖ·£¬Èç¹ûÊÇINADDR_ANYÕâÀï»ñµÃµÄIPÊÇ0
+	// ï¿½ï¿½Ãµï¿½Ç°ï¿½ó¶¨µÄµï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½INADDR_ANYï¿½ï¿½ï¿½ï¿½ï¿½Ãµï¿½IPï¿½ï¿½0
 	pEP->getlocaladdress( (u_int16_t*)&address.port,
 		(u_int32_t*)&address.ip );
 

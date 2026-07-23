@@ -105,7 +105,7 @@ bool DBUtil::initialize()
 
 		if ((*dbinfo_iter).db_passwordEncrypt)
 		{
-			// ╚ч╣√╨б╙┌64╘Є▒э├ў╡▒╟░╩╟├ў╬─├▄┬ы┼ф╓├
+			// я┐╜я┐╜я┐╜╨бя┐╜я┐╜64я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜╟░я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜я┐╜
 			if (strlen((*dbinfo_iter).db_password) < 64)
 			{
 				WARNING_MSG(fmt::format("DBUtil::initialize: db({}) password is not encrypted!\nplease use password(rsa):\n{}\n",

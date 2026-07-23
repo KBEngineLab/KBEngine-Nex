@@ -136,8 +136,8 @@ public:
 
 //-------------------------------------------------------------------------------------
 /**
- ²éÕÒÀëÖÐÐÄµã×î½üµÄ½Úµã
- Ä£°æ²ÎÊý NODEWRAP È¡ÖµÎªÒÔÏÂÈýÕßÖ®Ò»£º
+ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½ï¿½ï¿½Ä½Úµï¿½
+ Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ NODEWRAP È¡ÖµÎªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö®Ò»ï¿½ï¿½
    - CoordinateNodeWrapX
    - CoordinateNodeWrapZ
    - CoordinateNodeWrapY
@@ -148,9 +148,9 @@ CoordinateNode* findNearestNode(CoordinateNode* rootNode, const Position3D& orig
 	CoordinateNode* pRN = NULL;
 	CoordinateNode* pCoordinateNode = rootNode;
 
-	// ÏÈÕÒµ½Ò»¸öEntityNode×öÖ§µã
+	// ï¿½ï¿½ï¿½Òµï¿½Ò»ï¿½ï¿½EntityNodeï¿½ï¿½Ö§ï¿½ï¿½
 	{
-		// ÏÈÕÒµ±Ç°½Úµã£¬ÕÒ²»µ½ÔòÍù×ó±ß±éÀúÑ°ÕÒ
+		// ï¿½ï¿½ï¿½Òµï¿½Ç°ï¿½Úµã£¬ï¿½Ò²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß±ï¿½ï¿½ï¿½Ñ°ï¿½ï¿½
 		NODEWRAP wrap(rootNode, originPos);
 		do
 		{
@@ -161,7 +161,7 @@ CoordinateNode* findNearestNode(CoordinateNode* rootNode, const Position3D& orig
 			}
 		} while (wrap.prev());
 
-		// Èç¹ûÕÒ²»µ½£¬ÔòÍùÓÒ±ß±àÀúÑ°ÕÒ
+		// ï¿½ï¿½ï¿½ï¿½Ò²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò±ß±ï¿½ï¿½ï¿½Ñ°ï¿½ï¿½
 		if (!pRN)
 		{
 			wrap.reset();
@@ -174,29 +174,29 @@ CoordinateNode* findNearestNode(CoordinateNode* rootNode, const Position3D& orig
 				}
 			}
 
-			// ÀíÂÛÉÏ²»¿ÉÄÜÕÒ²»µ½
+			// ï¿½ï¿½ï¿½ï¿½ï¿½Ï²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò²ï¿½ï¿½ï¿½
 			if (!pRN)
 				return NULL;
 		}
 	}
 
-	// ÄÜÀ´µ½ÕâÀï£¬±íÊ¾Ò»¶¨ÊÇÕÒµ½ÁË£¬¿ªÊ¼ÕÒÀëÄ¿±êÎ»ÖÃ×î½üµÄNode
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï£¬ï¿½ï¿½Ê¾Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Òµï¿½ï¿½Ë£ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ä¿ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Node
 	NODEWRAP wrap(pRN, originPos);
 	int v = wrap.compare();
 	
-	if (v == 0)  // ÏàµÈ
+	if (v == 0)  // ï¿½ï¿½ï¿½
 	{
 		return wrap.currentNode();
 	}
-	else if (v > 0)  // Entity NodeÔÚÖÐÐÄµãµÄÓÒ±ß
+	else if (v > 0)  // Entity Nodeï¿½ï¿½ï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½Ò±ï¿½
 	{
 		pCoordinateNode = wrap.currentNode();
 		while (wrap.prev())
 		{
 			if (wrap.isEntityNode() && wrap.valid())
 			{
-				// ÓÉÓÚÊÇ´ÓÖÐÐÄµãµÄÓÒ±ßÍù×ó±ß±éÀú£¬
-				// Òò´ËµÚÒ»¸öpositionÐ¡ÓÚÖÐÐÄµãµÄentity¾ÍÒ»¶¨ÊÇÀëÖÐÐÄµã×î½üµÄ
+				// ï¿½ï¿½ï¿½ï¿½ï¿½Ç´ï¿½ï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½Ò±ï¿½ï¿½ï¿½ï¿½ï¿½ß±ï¿½ï¿½ï¿½ï¿½ï¿½
+				// ï¿½ï¿½Ëµï¿½Ò»ï¿½ï¿½positionÐ¡ï¿½ï¿½ï¿½ï¿½ï¿½Äµï¿½ï¿½entityï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 				if (wrap.compare() <= 0)
 				{
 					return wrap.currentNode();
@@ -207,15 +207,15 @@ CoordinateNode* findNearestNode(CoordinateNode* rootNode, const Position3D& orig
 		}
 		return pCoordinateNode;
 	}
-	else   // Entity NodeÔÚÖÐÐÄµãµÄ×ó±ß
+	else   // Entity Nodeï¿½ï¿½ï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½ï¿½ï¿½
 	{
 		pCoordinateNode = wrap.currentNode();
 		while (wrap.next())
 		{
 			if (wrap.isEntityNode() && wrap.valid())
 			{
-				// ÓÉÓÚÊÇ´ÓÖÐÐÄµãµÄ×ó±ßÍùÓÒ±ß±éÀú£¬
-				// Òò´ËµÚÒ»¸öposition´óÓÚÖÐÐÄµãµÄentity¾ÍÒ»¶¨ÊÇÀëÖÐÐÄµã×î½üµÄ
+				// ï¿½ï¿½ï¿½ï¿½ï¿½Ç´ï¿½ï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò±ß±ï¿½ï¿½ï¿½ï¿½ï¿½
+				// ï¿½ï¿½Ëµï¿½Ò»ï¿½ï¿½positionï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Äµï¿½ï¿½entityï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 				if (wrap.compare() >= 0)
 				{
 					return wrap.currentNode();
@@ -231,8 +231,8 @@ CoordinateNode* findNearestNode(CoordinateNode* rootNode, const Position3D& orig
 
 //-------------------------------------------------------------------------------------
 /**
- ²éÕÒÒ»¸öÖáÉÏ·ûºÏ·¶Î§µÄentity
- Ä£°æ²ÎÊý NODEWRAP È¡ÖµÎªÒÔÏÂÈýÕßÖ®Ò»£º
+ ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ï·ï¿½ï¿½Ï·ï¿½Î§ï¿½ï¿½entity
+ Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ NODEWRAP È¡ÖµÎªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö®Ò»ï¿½ï¿½
    - CoordinateNodeWrapX
    - CoordinateNodeWrapZ
    - CoordinateNodeWrapY
@@ -247,7 +247,7 @@ void entitiesInAxisRange(std::set<Entity*>& foundEntities, CoordinateNode* rootN
 
 	NODEWRAP wrap(pCoordinateNode, originPos);
 
-	// Èç¹û½Úµã×Ô¼ºÒ²·ûºÏÌõ¼þ£¬Ôò°Ñ×Ô¼º¼Ó½øÈ¥
+	// ï¿½ï¿½ï¿½ï¿½Úµï¿½ï¿½Ô¼ï¿½Ò²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ó½ï¿½È¥
 	if (wrap.isEntityNode() && wrap.valid())
 	{
 		Entity* pEntity = wrap.currentNodeEntity();
@@ -362,9 +362,9 @@ float EntityCoordinateNode::zz() const
 //-------------------------------------------------------------------------------------
 void EntityCoordinateNode::update()
 {
-	// ÔÚÕâÀï×öÒ»ÏÂ¸üÐÂµÄÔ­ÒòÊÇ£¬ºÜ¿ÉÄÜÔÚCoordinateNode::update()µÄ¹ý³ÌÖÐµ¼ÖÂÊµÌåÎ»ÖÃ±»ÒÆ¶¯
-	// ¶øµ¼ÖÂ´ÎÊýupdate±»µ÷ÓÃ£¬ÔÚÄ³ÖÖÇé¿öÏÂ»á³öÏÖÎÊÌâ
-	// ÀýÈç£º// A->B, B-A£¨´ËÊ±old_*ÊÇB£©, A->B£¨´ËÊ±old_*ÊÇB£¬¶øxxµÈÄ¿µÄµØ¾ÍÊÇB£©,´ËÊ±updateÖÐ»áÎóÅÐÎªÃ»ÓÐÒÆ¶¯¡£
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½Â¸ï¿½ï¿½Âµï¿½Ô­ï¿½ï¿½ï¿½Ç£ï¿½ï¿½Ü¿ï¿½ï¿½ï¿½ï¿½ï¿½CoordinateNode::update()ï¿½Ä¹ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½Êµï¿½ï¿½Î»ï¿½Ã±ï¿½ï¿½Æ¶ï¿½
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Â´ï¿½ï¿½ï¿½updateï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½ï¿½ï¿½Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	// ï¿½ï¿½ï¿½ç£º// A->B, B-Aï¿½ï¿½ï¿½ï¿½Ê±old_*ï¿½ï¿½Bï¿½ï¿½, A->Bï¿½ï¿½ï¿½ï¿½Ê±old_*ï¿½ï¿½Bï¿½ï¿½ï¿½ï¿½xxï¿½ï¿½Ä¿ï¿½ÄµØ¾ï¿½ï¿½ï¿½Bï¿½ï¿½,ï¿½ï¿½Ê±updateï¿½Ð»ï¿½ï¿½ï¿½ï¿½ï¿½ÎªÃ»ï¿½ï¿½ï¿½Æ¶ï¿½ï¿½ï¿½
 	// https://github.com/kbengine/kbengine/issues/407
 	old_xx(x());
 	old_yy(y());
@@ -375,7 +375,7 @@ void EntityCoordinateNode::update()
 	addFlags(COORDINATE_NODE_FLAG_ENTITY_NODE_UPDATING);
 	++entityNodeUpdating_;
 
-	// ´Ë´¦±ØÐëÊ¹ÓÃwatcherNodes_.size()¶ø²»ÄÜÊ¹ÓÃµü´úÆ÷±éÀú£¬·ÀÖ¹ÔÚupdateÖÐµ¼ÖÂÔö¼ÓÁËwatcherNodes_ÊýÁ¿¶øÆÆ»µµü´úÆ÷
+	// ï¿½Ë´ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½watcherNodes_.size()ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½Ãµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¹ï¿½ï¿½updateï¿½Ðµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½watcherNodes_ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	for (WATCHER_NODES::size_type i = 0; i < watcherNodes_.size(); ++i)
 	{
 		CoordinateNode* pCoordinateNode = watcherNodes_[i];
@@ -429,9 +429,9 @@ void EntityCoordinateNode::onRemove()
 		if (!pCoordinateNode)
 			continue;
 
-		// ÏÈÉèÖÃÎªNULL£¬ ÔÚºóÃæupdateÊ±½øÐÐÉ¾³ý
-		// ´Ë´¦²»ÄÜ¶ÔwatcherNodes_×ö´óÐ¡×öÐÞ¸Ä£¬ÒòÎª¿ÉÄÜÓÉEntityCoordinateNode::update()ÖÐµ¼ÖÂ¸Ã´¦µ÷ÓÃ
-		// ÄÇÃ´¿ÉÄÜµ¼ÖÂEntityCoordinateNode::update()ÔÚÑ­»·watcherNodes_ÖÐ±»ÐÞ¸Ä¶ø³ö´í¡£
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÎªNULLï¿½ï¿½ ï¿½Úºï¿½ï¿½ï¿½updateÊ±ï¿½ï¿½ï¿½ï¿½É¾ï¿½ï¿½
+		// ï¿½Ë´ï¿½ï¿½ï¿½ï¿½Ü¶ï¿½watcherNodes_ï¿½ï¿½ï¿½ï¿½Ð¡ï¿½ï¿½ï¿½Þ¸Ä£ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½EntityCoordinateNode::update()ï¿½Ðµï¿½ï¿½Â¸Ã´ï¿½ï¿½ï¿½ï¿½ï¿½
+		// ï¿½ï¿½Ã´ï¿½ï¿½ï¿½Üµï¿½ï¿½ï¿½EntityCoordinateNode::update()ï¿½ï¿½Ñ­ï¿½ï¿½watcherNodes_ï¿½Ð±ï¿½ï¿½Þ¸Ä¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		watcherNodes_[i] = NULL;
 		++delWatcherNodeNum_;
 
@@ -491,7 +491,7 @@ void EntityCoordinateNode::entitiesInRange(std::vector<Entity*>& foundEntities, 
 	entitiesInAxisRange<CoordinateNodeWrapX>(entities_X, rootNode, originPos, radius, entityUType);
 	entitiesInAxisRange<CoordinateNodeWrapZ>(entities_Z, rootNode, originPos, radius, entityUType);
 
-	// ²éÕÒY
+	// ï¿½ï¿½ï¿½ï¿½Y
 	if (CoordinateSystem::hasY)
 	{
 		std::set<Entity*> entities_Y;

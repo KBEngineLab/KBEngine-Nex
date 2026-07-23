@@ -45,7 +45,7 @@ class MethodDescription;
 
 class EntityCall : public EntityCallAbstract
 {
-	/** ×ÓÀà»¯ ½«Ò»Ð©py²Ù×÷Ìî³ä½øÅÉÉúÀà */
+	/** ï¿½ï¿½ï¿½à»¯ ï¿½ï¿½Ò»Ð©pyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 	INSTANCE_SCRIPT_HREADER(EntityCall, EntityCallAbstract)
 public:
 	typedef std::tr1::function<RemoteEntityMethod* (MethodDescription* pMethodDescription, EntityCall* pEntityCall)> EntityCallCallHookFunc;
@@ -58,12 +58,12 @@ public:
 	~EntityCall();
 	
 	/** 
-		½Å±¾ÇëÇó»ñÈ¡ÊôÐÔ»òÕß·½·¨ 
+		ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½Ô»ï¿½ï¿½ß·ï¿½ï¿½ï¿½ 
 	*/
 	PyObject* onScriptGetAttribute(PyObject* attr);						
 			
 	/** 
-		»ñµÃ¶ÔÏóµÄÃèÊö 
+		ï¿½ï¿½Ã¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	PyObject* tp_repr();
 	PyObject* tp_str();
@@ -71,36 +71,36 @@ public:
 	void c_str(char* s, size_t size);
 
 	/** 
-		unpickle·½·¨ 
+		unpickleï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static PyObject* __unpickle__(PyObject* self, PyObject* args);
 
 	/** 
-		½Å±¾±»°²×°Ê±±»µ÷ÓÃ 
+		ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½×°Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static void onInstallScript(PyObject* mod);
 
 	/** 
-		Í¨¹ýentityµÄID³¢ÊÔÑ°ÕÒËüµÄÊµÀý
+		Í¨ï¿½ï¿½entityï¿½ï¿½IDï¿½ï¿½ï¿½ï¿½Ñ°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½
 	*/
 	static PyObject* tryGetEntity(COMPONENT_ID componentID, ENTITY_ID entityID);
 
 	/** 
-		ÉèÖÃentityCallµÄ__getEntityFuncº¯ÊýµØÖ· 
+		ï¿½ï¿½ï¿½ï¿½entityCallï¿½ï¿½__getEntityFuncï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö· 
 	*/
 	static void setGetEntityFunc(GetEntityFunc func){ 
 		__getEntityFunc = func; 
 	};
 
 	/** 
-		ÉèÖÃentityCallµÄ__findChannelFuncº¯ÊýµØÖ· 
+		ï¿½ï¿½ï¿½ï¿½entityCallï¿½ï¿½__findChannelFuncï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö· 
 	*/
 	static void setFindChannelFunc(FindChannelFunc func){ 
 		__findChannelFunc = func; 
 	};
 
 	/** 
-		ÉèÖÃentityCallµÄ__hookCallFuncº¯ÊýµØÖ· 
+		ï¿½ï¿½ï¿½ï¿½entityCallï¿½ï¿½__hookCallFuncï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö· 
 	*/
 	static void setEntityCallCallHookFunc(EntityCallCallHookFunc* pFunc) {
 		__hookCallFuncPtr = pFunc; 
@@ -122,7 +122,7 @@ public:
 	static ENTITYCALLS entityCalls;
 	
 private:
-	// »ñµÃÒ»¸öentityµÄÊµÌåµÄº¯ÊýµØÖ·
+	// ï¿½ï¿½ï¿½Ò»ï¿½ï¿½entityï¿½ï¿½Êµï¿½ï¿½Äºï¿½ï¿½ï¿½ï¿½ï¿½Ö·
 	static GetEntityFunc					__getEntityFunc;
 	static EntityCallCallHookFunc*			__hookCallFuncPtr;
 	static FindChannelFunc					__findChannelFunc;
@@ -130,7 +130,7 @@ private:
 protected:
 	std::string								scriptModuleName_;
 
-	// ¸ÃentityËùÊ¹ÓÃµÄ½Å±¾Ä£¿é¶ÔÏó
+	// ï¿½ï¿½entityï¿½ï¿½Ê¹ï¿½ÃµÄ½Å±ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½
 	ScriptDefModule*						pScriptModule_;	
 
 	void _setATIdx(ENTITYCALLS::size_type idx) {

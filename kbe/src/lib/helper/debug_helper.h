@@ -42,7 +42,7 @@ namespace Network{
 }
 
 /** 
-	Ö§³Öuft-8±àÂë×Ö·û´®Êä³ö 
+	Ö§ï¿½ï¿½uft-8ï¿½ï¿½ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 */
 void vutf8printf(FILE *out, const char *str, va_list* ap);
 void utf8printf(FILE *out, const char *str, ...);
@@ -179,7 +179,7 @@ public:
 	void shouldWriteToSyslog(bool v = true);
 
 	/** 
-		Í¬²½ÈÕÖ¾µ½logger
+		Í¬ï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½logger
 	*/
 	void sync();
 
@@ -213,8 +213,8 @@ private:
 
 	uint64 loseLoggerTime_;
 
-	// ¼ÇÂ¼ÏÂÖ÷Ïß³ÌID£¬ÓÃÓÚÅÐ¶ÏÊÇ·ñÊÇ×ÓÏß³ÌÊä³öÈÕÖ¾
-	// µ±×ÓÏß³ÌÊä³öÈÕÖ¾Ê±£¬¶ÔÏà¹ØÈÕÖ¾½øÐÐ»º´æµ½Ö÷Ïß³ÌÊ±ÔÙÍ¬²½¸ølogger
+	// ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ß³ï¿½IDï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ß³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½ï¿½Ð»ï¿½ï¿½æµ½ï¿½ï¿½ï¿½ß³ï¿½Ê±ï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½logger
 #if KBE_PLATFORM == PLATFORM_WIN32
 	DWORD mainThreadID_;
 #else
@@ -226,22 +226,22 @@ private:
 };
 
 /*---------------------------------------------------------------------------------
-	µ÷ÊÔÐÅÏ¢Êä³ö½Ó¿Ú
+	ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
 ---------------------------------------------------------------------------------*/
-#define SCRIPT_INFO_MSG(m)				DebugHelper::getSingleton().script_info_msg((m))							// Êä³öinfoÐÅÏ¢
-#define SCRIPT_ERROR_MSG(m)				DebugHelper::getSingleton().script_error_msg((m))							// Êä³ö´íÎóÐÅÏ¢
+#define SCRIPT_INFO_MSG(m)				DebugHelper::getSingleton().script_info_msg((m))							// ï¿½ï¿½ï¿½infoï¿½ï¿½Ï¢
+#define SCRIPT_ERROR_MSG(m)				DebugHelper::getSingleton().script_error_msg((m))							// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 
-#define PRINT_MSG(m)					DebugHelper::getSingleton().print_msg((m))									// Êä³öÈÎºÎÐÅÏ¢
-#define ERROR_MSG(m)					DebugHelper::getSingleton().error_msg((m))									// Êä³öÒ»¸ö´íÎó
-#define DEBUG_MSG(m)					DebugHelper::getSingleton().debug_msg((m))									// Êä³öÒ»¸ödebugÐÅÏ¢
-#define INFO_MSG(m)						DebugHelper::getSingleton().info_msg((m))									// Êä³öÒ»¸öinfoÐÅÏ¢
-#define WARNING_MSG(m)					DebugHelper::getSingleton().warning_msg((m))								// Êä³öÒ»¸ö¾¯¸æÐÅÏ¢
+#define PRINT_MSG(m)					DebugHelper::getSingleton().print_msg((m))									// ï¿½ï¿½ï¿½ï¿½Îºï¿½ï¿½ï¿½Ï¢
+#define ERROR_MSG(m)					DebugHelper::getSingleton().error_msg((m))									// ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+#define DEBUG_MSG(m)					DebugHelper::getSingleton().debug_msg((m))									// ï¿½ï¿½ï¿½Ò»ï¿½ï¿½debugï¿½ï¿½Ï¢
+#define INFO_MSG(m)						DebugHelper::getSingleton().info_msg((m))									// ï¿½ï¿½ï¿½Ò»ï¿½ï¿½infoï¿½ï¿½Ï¢
+#define WARNING_MSG(m)					DebugHelper::getSingleton().warning_msg((m))								// ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 #define CRITICAL_MSG(m)					DebugHelper::getSingleton().setFile(__FUNCTION__, \
 										__FILE__, __LINE__); \
 										DebugHelper::getSingleton().critical_msg((m))
 
 /*---------------------------------------------------------------------------------
-	µ÷ÊÔºê
+	ï¿½ï¿½ï¿½Ôºï¿½
 ---------------------------------------------------------------------------------*/
 #ifdef KBE_USE_ASSERTS
 void myassert(const char* exp, const char * func, const char * file, unsigned int line);

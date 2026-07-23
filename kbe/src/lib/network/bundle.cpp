@@ -122,8 +122,8 @@ void Bundle::onReclaimObject()
 //-------------------------------------------------------------------------------------
 void Bundle::copy(const Bundle& bundle)
 {
-	// ÕâĞ©±ØĞëÔÚÇ°ÃæÉèÖÃ
-	// ·ñÔòÖĞÍ¾´´½¨packet¿ÉÄÜ´íÎó
+	// ï¿½ï¿½Ğ©ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¾ï¿½ï¿½ï¿½ï¿½packetï¿½ï¿½ï¿½Ü´ï¿½ï¿½ï¿½
 	isTCPPacket_ = bundle.isTCPPacket_;
 	pChannel_ = bundle.pChannel_;
 	pCurrMsgHandler_ = bundle.pCurrMsgHandler_;
@@ -155,8 +155,8 @@ void Bundle::copy(const Bundle& bundle)
 //-------------------------------------------------------------------------------------
 void Bundle::_calcPacketMaxSize()
 {
-	// Èç¹ûÊ¹ÓÃÁËopenssl¼ÓÃÜÍ¨Ñ¶ÔòÎÒÃÇ±£Ö¤Ò»¸ö°ü×î´óÄÜ±»Blowfish::BLOCK_SIZE³ı¾¡
-	// ÕâÑùÎÒÃÇÔÚ¼ÓÃÜÒ»¸öÂúÔØ°üÊ±²»ĞèÒª¶îÍâÌî³ä×Ö½Ú
+	// ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½ï¿½opensslï¿½ï¿½ï¿½ï¿½Í¨Ñ¶ï¿½ï¿½ï¿½ï¿½ï¿½Ç±ï¿½Ö¤Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü±ï¿½Blowfish::BLOCK_SIZEï¿½ï¿½ï¿½ï¿½
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú¼ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ø°ï¿½Ê±ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö½ï¿½
 	if(g_channelExternalEncryptType == 1)
 	{
 		packetMaxSize_ = isTCPPacket_ ? (int)(TCPPacket::maxBufferSize() - ENCRYPTTION_WASTAGE_SIZE) :
@@ -201,7 +201,7 @@ int32 Bundle::onPacketAppend(int32 addsize, bool inseparable)
 	if(inseparable)
 		fwpos += addsize;
 
-	// Èç¹ûµ±Ç°°ü×°²»ÏÂ±¾´ÎappendµÄÊı¾İ£¬½«ÆäÌî³äµ½ĞÂ°üÖĞ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½×°ï¿½ï¿½ï¿½Â±ï¿½ï¿½ï¿½appendï¿½ï¿½ï¿½ï¿½ï¿½İ£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½äµ½ï¿½Â°ï¿½ï¿½ï¿½
 	if(fwpos >= packetMaxSize_)
 	{
 		packets_.push_back(pCurrPacket_);
@@ -213,7 +213,7 @@ int32 Bundle::onPacketAppend(int32 addsize, bool inseparable)
 	int32 remainsize = packetMaxSize_ - totalsize;
 	int32 taddsize = addsize;
 
-	// Èç¹ûµ±Ç°°üÊ£Óà¿Õ¼äĞ¡ÓÚÒªÌí¼ÓµÄ×Ö½ÚÔò±¾´ÎÌîÂú´Ë°ü
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½Ê£ï¿½ï¿½Õ¼ï¿½Ğ¡ï¿½ï¿½Òªï¿½ï¿½ï¿½Óµï¿½ï¿½Ö½ï¿½ï¿½ò±¾´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë°ï¿½
 	if(remainsize < addsize)
 		taddsize = remainsize;
 	
@@ -314,7 +314,7 @@ void Bundle::newMessage(const MessageHandler& msgHandler)
 	(*this) << msgHandler.msgID;
 	pCurrPacket_->messageID(msgHandler.msgID);
 
-	// ´Ë´¦¶ÔÓÚ·Ç¹Ì¶¨³¤¶ÈµÄÏûÏ¢À´ËµĞèÒªÏÈÉèÖÃËüµÄÏûÏ¢³¤¶ÈÎ»Îª0£¬ µ½×îºóĞèÒªÌî³ä³¤¶È
+	// ï¿½Ë´ï¿½ï¿½ï¿½ï¿½Ú·Ç¹Ì¶ï¿½ï¿½ï¿½ï¿½Èµï¿½ï¿½ï¿½Ï¢ï¿½ï¿½Ëµï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½Î»Îª0ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ä³¤ï¿½ï¿½
 	if(msgHandler.msgLen == NETWORK_VARIABLE_MESSAGE)
 	{
 		MessageLength msglen = 0;
@@ -341,7 +341,7 @@ void Bundle::finiMessage(bool isSend)
 		packets_.push_back(pCurrPacket_);
 	}
 
-	// ¶ÔÏûÏ¢½øĞĞ¸ú×Ù
+	// ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½Ğ¸ï¿½ï¿½ï¿½
 	if(pCurrMsgHandler_){
 		if(isSend || numMessages_ > 1)
 		{
@@ -350,7 +350,7 @@ void Bundle::finiMessage(bool isSend)
 		}
 	}
 
-	// ´Ë´¦¶ÔÓÚ·Ç¹Ì¶¨³¤¶ÈµÄÏûÏ¢À´ËµĞèÒªÉèÖÃËüµÄ×îÖÕ³¤¶ÈĞÅÏ¢
+	// ï¿½Ë´ï¿½ï¿½ï¿½ï¿½Ú·Ç¹Ì¶ï¿½ï¿½ï¿½ï¿½Èµï¿½ï¿½ï¿½Ï¢ï¿½ï¿½Ëµï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ³ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 	if(currMsgID_ > 0 && (currMsgHandlerLength_ < 0))
 	{
 		Packet* pPacket = pCurrPacket_;
@@ -360,15 +360,15 @@ void Bundle::finiMessage(bool isSend)
 		currMsgLength_ -= NETWORK_MESSAGE_ID_SIZE;
 		currMsgLength_ -= NETWORK_MESSAGE_LENGTH_SIZE;
 
-		// °´ÕÕÉè¼ÆÒ»¸ö°ü×î´óÒ²²»¿ÉÄÜ³¬¹ıNETWORK_MESSAGE_MAX_SIZE
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò²ï¿½ï¿½ï¿½ï¿½ï¿½Ü³ï¿½ï¿½ï¿½NETWORK_MESSAGE_MAX_SIZE
 		if(g_componentType == BOTS_TYPE || g_componentType == CLIENT_TYPE)
 		{
 			KBE_ASSERT(currMsgLength_ <= NETWORK_MESSAGE_MAX_SIZE);
 		}
 
-		// Èç¹ûÏûÏ¢³¤¶È´óÓÚµÈÓÚNETWORK_MESSAGE_MAX_SIZE
-		// Ê¹ÓÃÀ©Õ¹ÏûÏ¢³¤¶È»úÖÆ£¬ÏòÏûÏ¢³¤¶ÈºóÃæÔÙÌî³ä4×Ö½Ú
-		// ÓÃÓÚÃèÊö¸ü´óµÄ³¤¶È
+		// ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½È´ï¿½ï¿½Úµï¿½ï¿½ï¿½NETWORK_MESSAGE_MAX_SIZE
+		// Ê¹ï¿½ï¿½ï¿½ï¿½Õ¹ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½È»ï¿½ï¿½Æ£ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½Èºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½4ï¿½Ö½ï¿½
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä³ï¿½ï¿½ï¿½
 		if(currMsgLength_ >= NETWORK_MESSAGE_MAX_SIZE)
 		{
 			MessageLength1 ex_msg_length = currMsgLength_;
@@ -421,7 +421,7 @@ void Bundle::debugCurrentMessages(MessageID currMsgID, const Network::MessageHan
 
 	if (pCurrMsgHandler->msgLen == NETWORK_VARIABLE_MESSAGE)
 	{
-		// ÒòÎªBundle::finiMessageµÈµØ·½Óöµ½¿É±ä²ÎÊıÏûÏ¢Ê±½«³¤¶ÈÈ¥µôÁËÏûÏ¢Í·²¿£¬ÕâÀïÒª»¹Ô­ÏûÏ¢¾ÍÒª¼Ó»ØÀ´
+		// ï¿½ï¿½ÎªBundle::finiMessageï¿½ÈµØ·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢Í·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½Ô­ï¿½ï¿½Ï¢ï¿½ï¿½Òªï¿½Ó»ï¿½ï¿½ï¿½
 		currMsgLength += NETWORK_MESSAGE_ID_SIZE;
 		currMsgLength += NETWORK_MESSAGE_LENGTH_SIZE;
 		if (currMsgLength - NETWORK_MESSAGE_ID_SIZE - NETWORK_MESSAGE_LENGTH_SIZE >= NETWORK_MESSAGE_MAX_SIZE)
@@ -439,11 +439,11 @@ void Bundle::debugCurrentMessages(MessageID currMsgID, const Network::MessageHan
 
 	MemoryStream* pMemoryStream = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 	
-	// Í¨¹ıÏûÏ¢³¤¶ÈÕÒµ½ÏûÏ¢Í·£¬È»ºó½«ÏûÏ¢ÄÚÈİÊä³ö
+	// Í¨ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½Òµï¿½ï¿½ï¿½Ï¢Í·ï¿½ï¿½È»ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	int msglen = currMsgLength;
 	if(pCurrPacket)
 	{
-		// Èç¹ûµ±Ç°ÏûÏ¢ËùÓĞÄÚÈİ¶¼ÔÚµ±Ç°°üÖĞ£¬Ö±½ÓÊä³öÄÚÈİ¼´¿É
+		// ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½İ¶ï¿½ï¿½Úµï¿½Ç°ï¿½ï¿½ï¿½Ğ£ï¿½Ö±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½İ¼ï¿½ï¿½ï¿½
 		msglen -= pCurrPacket->length();
 		if(msglen <= 0)
 		{
@@ -460,11 +460,11 @@ void Bundle::debugCurrentMessages(MessageID currMsgID, const Network::MessageHan
 
 				Network::Packet* pPacket = (*packiter);
 
-				// µ±Ç°°ü¿ÉÄÜÒÑ¾­¼ÆËã¹ı
+				// ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 				if (pCurrPacket == pPacket)
 					continue;
 
-				// Èç¹ûËùÓĞÄÚÈİ¶¼ÔÚ°üÖĞ
+				// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½İ¶ï¿½ï¿½Ú°ï¿½ï¿½ï¿½
 				if((int)pPacket->length() >= msglen)
 				{
 					int wpos = pPacket->length() - msglen;
@@ -474,15 +474,15 @@ void Bundle::debugCurrentMessages(MessageID currMsgID, const Network::MessageHan
 					{
 						Network::Packet* pPacket1 = packets[i];
 						
-						// Õâ¸ö°üÒÑ¾­ÔÚÉÏÃæ´¦Àí¹ıÁË
+						// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½æ´¦ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 						if (pPacket1 == pPacket || pCurrPacket == pPacket1)
 							continue;
 						
-						// ÆÚ¼äµÄ°üÄÚÈİÈ«²¿¼ÓÈë
+						// ï¿½Ú¼ï¿½Ä°ï¿½ï¿½ï¿½ï¿½ï¿½È«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 						pMemoryStream->append(pPacket1->data() + pPacket1->rpos(), pPacket1->length());
 					}
 					
-					// °Ñµ±Ç°µÄ°üÄÚÈİÈ«²¿¼Ó½øÈ¥
+					// ï¿½Ñµï¿½Ç°ï¿½Ä°ï¿½ï¿½ï¿½ï¿½ï¿½È«ï¿½ï¿½ï¿½Ó½ï¿½È¥
 					pMemoryStream->append(pCurrPacket->data() + pCurrPacket->rpos(), pCurrPacket->length());
 					break;
 				}
@@ -494,7 +494,7 @@ void Bundle::debugCurrentMessages(MessageID currMsgID, const Network::MessageHan
 		}
 	}
 	
-	// Ò»Ğ©sendto²Ù×÷µÄ°üµ¼ÖÂ, ÕâÀà°üÒ²²»ĞèÒª×·×Ù
+	// Ò»Ğ©sendtoï¿½ï¿½ï¿½ï¿½ï¿½Ä°ï¿½ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½ï¿½Ò²ï¿½ï¿½ï¿½ï¿½Òª×·ï¿½ï¿½
 	if(pMemoryStream->length() < NETWORK_MESSAGE_ID_SIZE)
 	{
 		MemoryStream::reclaimPoolObject(pMemoryStream);

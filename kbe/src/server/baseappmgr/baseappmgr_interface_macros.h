@@ -38,7 +38,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	BaseappmgrÏûÏ¢ºê£¬  ²ÎÊýÎªÁ÷£¬ ÐèÒª×Ô¼º½â¿ª
+	Baseappmgrï¿½ï¿½Ï¢ï¿½ê£¬  ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Òªï¿½Ô¼ï¿½ï¿½â¿ª
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef BASEAPPMGR_MESSAGE_HANDLER_STREAM
@@ -79,7 +79,7 @@ namespace KBEngine{
 																				\
 
 /**
-	BaseappmgrÏûÏ¢ºê£¬  Ö»ÓÐÁã¸ö²ÎÊýµÄÏûÏ¢
+	Baseappmgrï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef BASEAPPMGR_MESSAGE_HANDLER_ARGS0
@@ -120,7 +120,7 @@ namespace KBEngine{
 																				\
 
 /**
-	BaseappmgrÏûÏ¢ºê£¬  Ö»ÓÐÒ»¸ö²ÎÊýµÄÏûÏ¢
+	Baseappmgrï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef BASEAPPMGR_MESSAGE_HANDLER_ARGS1
@@ -163,7 +163,7 @@ namespace KBEngine{
 																				\
 
 /**
-	BaseappmgrÏûÏ¢ºê£¬  Ö»ÓÐ¶þ¸ö²ÎÊýµÄÏûÏ¢
+	Baseappmgrï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef BASEAPPMGR_MESSAGE_HANDLER_ARGS2
@@ -215,7 +215,7 @@ namespace KBEngine{
 
 
 /**
-	BaseappmgrÏûÏ¢ºê£¬  Ö»ÓÐÈý¸ö²ÎÊýµÄÏûÏ¢
+	Baseappmgrï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef BASEAPPMGR_MESSAGE_HANDLER_ARGS3
@@ -275,7 +275,7 @@ namespace KBEngine{
 											ARG_TYPE3, ARG_NAME3)				\
 
 /**
-	BaseappmgrÏûÏ¢ºê£¬  Ö»ÓÐËÄ¸ö²ÎÊýµÄÏûÏ¢
+	Baseappmgrï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½Ä¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef BASEAPPMGR_MESSAGE_HANDLER_ARGS4
@@ -343,7 +343,7 @@ namespace KBEngine{
 											ARG_TYPE4, ARG_NAME4)				\
 
 /**
-	BaseappmgrÏûÏ¢ºê£¬  Ö»ÓÐÎå¸ö²ÎÊýµÄÏûÏ¢
+	Baseappmgrï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef BASEAPPMGR_MESSAGE_HANDLER_ARGS5
@@ -420,7 +420,7 @@ namespace KBEngine{
 
 
 /**
-	BaseappmgrÏûÏ¢ºê£¬  Ö»ÓÐÁù¸ö²ÎÊýµÄÏûÏ¢
+	Baseappmgrï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef BASEAPPMGR_MESSAGE_HANDLER_ARGS6
@@ -505,7 +505,7 @@ namespace KBEngine{
 
 
 /**
-	BaseappmgrÏûÏ¢ºê£¬  Ö»ÓÐÆß¸ö²ÎÊýµÄÏûÏ¢
+	Baseappmgrï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½ï¿½ß¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef BASEAPPMGR_MESSAGE_HANDLER_ARGS7
@@ -599,7 +599,7 @@ namespace KBEngine{
 
 
 /**
-	BaseappmgrÏûÏ¢ºê£¬  Ö»ÓÐ°Ë¸ö²ÎÊýµÄÏûÏ¢
+	Baseappmgrï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½Ð°Ë¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef BASEAPPMGR_MESSAGE_HANDLER_ARGS8
@@ -700,7 +700,7 @@ namespace KBEngine{
 											ARG_TYPE8, ARG_NAME8)				\
 
 /**
-	BaseappmgrÏûÏ¢ºê£¬  Ö»ÓÐ¾Å¸ö²ÎÊýµÄÏûÏ¢
+	Baseappmgrï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½Ð¾Å¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef BASEAPPMGR_MESSAGE_HANDLER_ARGS9
@@ -809,7 +809,7 @@ namespace KBEngine{
 											ARG_TYPE9, ARG_NAME9)				\
 
 /**
-	BaseappmgrÏûÏ¢ºê£¬  Ö»ÓÐÊ®¸ö²ÎÊýµÄÏûÏ¢
+	Baseappmgrï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½Ê®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef BASEAPPMGR_MESSAGE_HANDLER_ARGS10
@@ -928,7 +928,7 @@ namespace KBEngine{
 
 
 /**
-	BaseappmgrÏûÏ¢ºê£¬  Ö»ÓÐÊ®Ò»¸ö²ÎÊýµÄÏûÏ¢
+	Baseappmgrï¿½ï¿½Ï¢ï¿½ê£¬  Ö»ï¿½ï¿½Ê®Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 */
 #if defined(NETWORK_INTERFACE_DECLARE_BEGIN)
 	#undef BASEAPPMGR_MESSAGE_HANDLER_ARGS11

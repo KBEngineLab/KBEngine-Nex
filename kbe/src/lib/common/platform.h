@@ -56,7 +56,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include <chrono>
 //#define FD_SETSIZE 1024
 #ifndef WIN32_LEAN_AND_MEAN 
-#include <winsock2.h>		// ±ØÐëÔÚwindows.hÖ®Ç°°üº¬£¬ ·ñÔòÍøÂçÄ£¿é±àÒë»á³ö´í
+#include <winsock2.h>		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½windows.hÖ®Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 #include <mswsock.h> 
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -110,11 +110,11 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #define SIGSYS	32
 #endif
 
-/** ¶¨ÒåÒýÇæÃû×Ö¿Õ¼ä */
+/** ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¿Õ¼ï¿½ */
 namespace KBEngine
 { 
 
-/** ¶¨ÒåÒýÇæ×Ö½ÚÐò */
+/** ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö½ï¿½ï¿½ï¿½ */
 #define KBENGINE_LITTLE_ENDIAN							0
 #define KBENGINE_BIG_ENDIAN								1
 #if !defined(KBENGINE_ENDIAN)
@@ -212,7 +212,7 @@ namespace KBEngine
 #endif
 
 /*---------------------------------------------------------------------------------
-	ÀàÐÍ¶¨Òå
+	ï¿½ï¿½ï¿½Í¶ï¿½ï¿½ï¿½
 ---------------------------------------------------------------------------------*/
 #ifndef TCHAR
 #ifdef _UNICODE
@@ -328,22 +328,22 @@ typedef uint32													uintptr;
 #define PRAppID													PRIu64
 #define PRDBID													PRIu64
 
-typedef uint16													ENTITY_TYPE;											// entityµÄÀà±ðÀàÐÍ¶¨ÒåÖ§³Ö0-65535¸öÀà±ð
-typedef int32													ENTITY_ID;												// entityIDµÄÀàÐÍ
-typedef uint32													SPACE_ID;												// Ò»¸öspaceµÄid
-typedef uint32													CALLBACK_ID;											// Ò»¸öcallbackÓÉCallbackMgr·ÖÅäµÄid
-typedef uint64													COMPONENT_ID;											// Ò»¸ö·þÎñÆ÷×é¼þµÄid
-typedef int32													COMPONENT_ORDER;										// Ò»¸ö×é¼þµÄÆô¶¯Ë³Ðò
-typedef int32													COMPONENT_GUS;											// Ò»¸ö×é¼þµÄgenuuid_sections²úÉúËæ»úÊýµÄÇø¼ä¶Î
-typedef	uint32													TIMER_ID;												// Ò»¸ötimerµÄidÀàÐÍ
-typedef uint8													ENTITYCALL_CALL_TYPE;									// entityCall ËùÍ¶µÝµÄcallÀà±ðµÄÀà±ð
+typedef uint16													ENTITY_TYPE;											// entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¶ï¿½ï¿½ï¿½Ö§ï¿½ï¿½0-65535ï¿½ï¿½ï¿½ï¿½ï¿½
+typedef int32													ENTITY_ID;												// entityIDï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+typedef uint32													SPACE_ID;												// Ò»ï¿½ï¿½spaceï¿½ï¿½id
+typedef uint32													CALLBACK_ID;											// Ò»ï¿½ï¿½callbackï¿½ï¿½CallbackMgrï¿½ï¿½ï¿½ï¿½ï¿½id
+typedef uint64													COMPONENT_ID;											// Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½id
+typedef int32													COMPONENT_ORDER;										// Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë³ï¿½ï¿½
+typedef int32													COMPONENT_GUS;											// Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½genuuid_sectionsï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+typedef	uint32													TIMER_ID;												// Ò»ï¿½ï¿½timerï¿½ï¿½idï¿½ï¿½ï¿½ï¿½
+typedef uint8													ENTITYCALL_CALL_TYPE;									// entityCall ï¿½ï¿½Í¶ï¿½Ýµï¿½callï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 typedef uint32													GAME_TIME;
 typedef uint32													GameTime;
 typedef int32													ScriptID;
-typedef uint32													ArraySize;												// ÈÎºÎÊý×éµÄ´óÐ¡¶¼ÓÃÕâ¸öÃèÊö
-typedef uint64													DBID;													// Ò»¸öÔÚÊý¾Ý¿âÖÐµÄË÷ÒýÓÃÀ´µ±×öÄ³ID
+typedef uint32													ArraySize;												// ï¿½Îºï¿½ï¿½ï¿½ï¿½ï¿½Ä´ï¿½Ð¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+typedef uint64													DBID;													// Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä³ID
 typedef uint32													CELL_ID;
-typedef KBEUnordered_map< std::string, std::string >			SPACE_DATA;												// spaceÖÐ´æ´¢µÄÊý¾Ý
+typedef KBEUnordered_map< std::string, std::string >			SPACE_DATA;												// spaceï¿½Ð´æ´¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
 #if KBE_PLATFORM == PLATFORM_WIN32
 	#define IFNAMSIZ											16
@@ -374,7 +374,7 @@ typedef KBEUnordered_map< std::string, std::string >			SPACE_DATA;												//
 #endif
 
 /*---------------------------------------------------------------------------------
-	¶¨»á¶àÖÖÆ½Ì¨ÉÏµÄ¶àÏß³ÌÏà¹Ø
+	ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ½Ì¨ï¿½ÏµÄ¶ï¿½ï¿½ß³ï¿½ï¿½ï¿½ï¿½
 ---------------------------------------------------------------------------------*/
 #if KBE_PLATFORM == PLATFORM_WIN32
 	#define THREAD_ID											HANDLE
@@ -401,7 +401,7 @@ typedef KBEUnordered_map< std::string, std::string >			SPACE_DATA;												//
 #endif
 
 /*---------------------------------------------------------------------------------
-	¿çÆ½Ì¨ºê¶¨Òå
+	ï¿½ï¿½Æ½Ì¨ï¿½ê¶¨ï¿½ï¿½
 ---------------------------------------------------------------------------------*/
 #if 0
 #define ARRAYCLR(v)					memset((v), 0x0, sizeof(v))
@@ -497,23 +497,23 @@ inline const T & max( const T & a, const T & b )
 
 #endif
 
-// ËùÓÐÃû³Æ×Ö·û´®µÄ×î´ó³¤¶È
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ó³¤¶ï¿½
 #define MAX_NAME 256	
 
-// ip×Ö·û´®µÄ×î´ó³¤¶È
+// ipï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ó³¤¶ï¿½
 #define MAX_IP 256
 
-// ³£¹æµÄbuf³¤¶È
+// ï¿½ï¿½ï¿½ï¿½ï¿½bufï¿½ï¿½ï¿½ï¿½
 #define MAX_BUF 256
 
-// ³£¹æµÄbuf³¤¶È
+// ï¿½ï¿½ï¿½ï¿½ï¿½bufï¿½ï¿½ï¿½ï¿½
 #define SQL_BUF 65535
 
 #ifndef MAX_PATH
 #define MAX_PATH 260
 #endif
 
-// »ñµÃÏµÍ³²úÉúµÄ×îºóÒ»´Î´íÎóÃèÊö
+// ï¿½ï¿½ï¿½ÏµÍ³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½Î´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 inline char* kbe_strerror(int ierrorno = 0)
 {
 #if KBE_PLATFORM == PLATFORM_WIN32
@@ -552,7 +552,7 @@ inline int kbe_lasterror()
 #endif
 }
 
-/** »ñÈ¡ÓÃ»§UID */
+/** ï¿½ï¿½È¡ï¿½Ã»ï¿½UID */
 inline int32 getUserUID()
 {
 	static int32 iuid = 0;
@@ -584,7 +584,7 @@ inline int32 getUserUID()
 	return iuid;
 }
 
-/** »ñÈ¡ÓÃ»§Ãû */
+/** ï¿½ï¿½È¡ï¿½Ã»ï¿½ï¿½ï¿½ */
 inline const char * getUsername()
 {
 #if KBE_PLATFORM == PLATFORM_WIN32
@@ -603,7 +603,7 @@ inline const char * getUsername()
 
 		if (outsize == 0)
 		{
-			// ¿ÉÄÜÊÇÖÐÎÄÃû£¬²»Ö§³ÖÖÐÎÄÃû³Æ
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 			strcpy(username, "error_name");
 		}
 		else
@@ -623,7 +623,7 @@ inline const char * getUsername()
 #endif
 }
 
-/** »ñÈ¡½ø³ÌID */
+/** ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ID */
 inline int32 getProcessPID()
 {
 #if KBE_PLATFORM != PLATFORM_WIN32
@@ -633,11 +633,11 @@ inline int32 getProcessPID()
 #endif
 }
 
-/** »ñÈ¡ÏµÍ³Ê±¼ä(¾«È·µ½ºÁÃë) */
+/** ï¿½ï¿½È¡ÏµÍ³Ê±ï¿½ï¿½(ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½) */
 #if KBE_PLATFORM == PLATFORM_WIN32
 	inline uint32 getSystemTime() 
 	{ 
-		// ×¢ÒâÕâ¸öº¯ÊýwindowsÉÏÖ»ÄÜÕýÈ·Î¬³Ö49Ìì¡£
+		// ×¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½windowsï¿½ï¿½Ö»ï¿½ï¿½ï¿½ï¿½È·Î¬ï¿½ï¿½49ï¿½ì¡£
 		return ::GetTickCount(); 
 	};
 #else
@@ -650,10 +650,10 @@ inline int32 getProcessPID()
 	};
 #endif
 
-/** »ñÈ¡2¸öÏµÍ³Ê±¼ä²î */
+/** ï¿½ï¿½È¡2ï¿½ï¿½ÏµÍ³Ê±ï¿½ï¿½ï¿½ */
 inline uint32 getSystemTimeDiff(uint32 oldTime, uint32 newTime)
 {
-    // ·ÀÖ¹getSystemTime()Òç³öµÄÇé¿ö
+    // ï¿½ï¿½Ö¹getSystemTime()ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     if (oldTime > newTime)
     {
         return (uint32)((int64)0xFFFFFFFF + 1 - (int64)oldTime) + newTime;
@@ -718,7 +718,7 @@ inline uint64 getTimeMs()
 #endif
 }
 
-/* ²úÉúÒ»¸ö64Î»µÄuuid 
+/* ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½64Î»ï¿½ï¿½uuid 
 */
 extern COMPONENT_ORDER g_componentGlobalOrder;
 extern COMPONENT_ORDER g_componentGroupOrder;
@@ -740,7 +740,7 @@ inline uint64 genUUID64()
 	
 	if(g_genuuid_sections <= 0)
 	{
-		// Ê±¼ä´Á32Î»£¬Ëæ»úÊý16Î»£¬16Î»µü´úÊý£¨×î´óÎª65535-1£©
+		// Ê±ï¿½ï¿½ï¿½32Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½16Î»ï¿½ï¿½16Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îª65535-1ï¿½ï¿½
 		static uint32 rnd = 0;
 		if(rnd == 0)
 		{
@@ -754,7 +754,7 @@ inline uint64 genUUID64()
 	}
 	else
 	{
-		// Ê±¼ä´Á32Î»£¬app×éID16Î»£¬16Î»µü´úÊý£¨×î´óÎª65535-1£©
+		// Ê±ï¿½ï¿½ï¿½32Î»ï¿½ï¿½appï¿½ï¿½ID16Î»ï¿½ï¿½16Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îª65535-1ï¿½ï¿½
 		static uint32 sections = g_genuuid_sections << 16;
 		
 		assert(lastNum < 65535 && "genUUID64(): overflow!");
@@ -763,7 +763,7 @@ inline uint64 genUUID64()
 	}
 }
 
-/** sleep ¿çÆ½Ì¨ */
+/** sleep ï¿½ï¿½Æ½Ì¨ */
 #if KBE_PLATFORM == PLATFORM_WIN32
 	inline void sleep(uint32 ms)
 	{ 
@@ -779,21 +779,21 @@ inline uint64 genUUID64()
 	}	
 #endif
 
-/** ÅÐ¶ÏÆ½Ì¨ÊÇ·ñÎªÐ¡¶Ë×Ö½ÚÐò */
+/** ï¿½Ð¶ï¿½Æ½Ì¨ï¿½Ç·ï¿½ÎªÐ¡ï¿½ï¿½ï¿½Ö½ï¿½ï¿½ï¿½ */
 inline bool isPlatformLittleEndian()
 {
    int n = 1;
    return *((char*)&n) ? true : false;
 }
 
-/** ÉèÖÃ»·¾³±äÁ¿ */
+/** ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 #if KBE_PLATFORM == PLATFORM_WIN32
 	inline void setenv(const std::string& name, const std::string& value, int overwrite)
 	{
 		_putenv_s(name.c_str(), value.c_str());
 	}
 #else
-	// LinuxÏÂÃæÖ±½ÓÊ¹ÓÃsetenv
+	// Linuxï¿½ï¿½ï¿½ï¿½Ö±ï¿½ï¿½Ê¹ï¿½ï¿½setenv
 #endif
 
 }

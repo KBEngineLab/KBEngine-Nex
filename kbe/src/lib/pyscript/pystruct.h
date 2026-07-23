@@ -30,26 +30,26 @@ class PyStruct
 {						
 public:	
 	/** 
-		´úÀí struct.pack
+		ï¿½ï¿½ï¿½ï¿½ struct.pack
 	*/
 	static std::string pack(PyObject* fmt, PyObject* args);
 
 	/** 
-		´úÀí struct.unpack
+		ï¿½ï¿½ï¿½ï¿½ struct.unpack
 	*/
 	static PyObject* unpack(PyObject* fmt, PyObject* args);
 
 	/** 
-		³õÊ¼»¯pickler 
+		ï¿½ï¿½Ê¼ï¿½ï¿½pickler 
 	*/
 	static bool initialize(void);
 	static void finalise(void);
 	
 private:
-	static PyObject* pack_;									// struct.pack·½·¨Ö¸Õë
-	static PyObject* unpack_;								// struct.unpack·½·¨Ö¸Õë
+	static PyObject* pack_;									// struct.packï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½
+	static PyObject* unpack_;								// struct.unpackï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½
 
-	static bool	isInit;										// ÊÇ·ñÒÑ¾­±»³õÊ¼»¯
+	static bool	isInit;										// ï¿½Ç·ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½
 } ;
 
 }

@@ -42,7 +42,7 @@ namespace KBEngine {
 class DBException;
 
 /*
-	Êý¾Ý¿â½Ó¿Ú
+	ï¿½ï¿½ï¿½Ý¿ï¿½Ó¿ï¿½
 	tbl_Account_Auto_increment = uint64(1)
 	tbl_Account:1 = hashes(name, password, xxx)
 	tbl_Account:2 = hashes(name, password, xxx)
@@ -76,35 +76,35 @@ public:
 	void hasLostConnection( bool v )	{ hasLostConnection_ = v; }
 	
 	/**
-		¼ì²é»·¾³
+		ï¿½ï¿½é»·ï¿½ï¿½
 	*/
 	virtual bool checkEnvironment();
 	
 	/**
-		¼ì²é´íÎó£¬ ¶Ô´íÎóµÄÄÚÈÝ½øÐÐ¾ÀÕý
-		Èç¹û¾ÀÕý²»³É¹¦·µ»ØÊ§°Ü
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ô´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý½ï¿½ï¿½Ð¾ï¿½ï¿½ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É¹ï¿½ï¿½ï¿½ï¿½ï¿½Ê§ï¿½ï¿½
 	*/
 	virtual bool checkErrors();
 
 	/**
-		ÓëÄ³¸öÊý¾Ý¿â¹ØÁª
+		ï¿½ï¿½Ä³ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½ï¿½
 	*/
 	bool reattach();
 	virtual bool attach(const char* databaseName = NULL);
 	virtual bool detach();
 
 	/**
-		»ñÈ¡Êý¾Ý¿âËùÓÐµÄ±íÃû
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½ï¿½ÐµÄ±ï¿½ï¿½ï¿½
 	*/
 	virtual bool getTableNames( std::vector<std::string>& tableNames, const char * pattern);
 
 	/**
-		»ñÈ¡Êý¾Ý¿âÄ³¸ö±íËùÓÐµÄ×Ö¶ÎÃû³Æ
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½Ý¿ï¿½Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual bool getTableItemNames(const char* tableName, std::vector<std::string>& itemNames);
 
 	/**
-		²éÑ¯±í
+		ï¿½ï¿½Ñ¯ï¿½ï¿½
 	*/
 	virtual bool query(const char* cmd, uint32 size, bool printlog = true, MemoryStream * result = NULL);
 	bool query(const std::string& cmd, redisReply** pRedisReply, bool printlog = true);
@@ -116,37 +116,37 @@ public:
 	void write_query_result_element(redisReply* pRedisReply, MemoryStream * result);
 		
 	/**
-		·µ»ØÕâ¸ö½Ó¿ÚµÄÃèÊö
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¿Úµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual const char* c_str();
 
 	/** 
-		»ñÈ¡´íÎó
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual const char* getstrerror();
 
 	/** 
-		»ñÈ¡´íÎó±àºÅ
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual int getlasterror();
 
 	/**
-		´´½¨Ò»¸öentity´æ´¢±í
+		ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½entityï¿½æ´¢ï¿½ï¿½
 	*/
 	virtual EntityTable* createEntityTable(EntityTables* pEntityTables);
 
 	/** 
-		´ÓÊý¾Ý¿âÉ¾³ýentity±í
+		ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½É¾ï¿½ï¿½entityï¿½ï¿½
 	*/
 	virtual bool dropEntityTableFromDB(const char* tableName);
 	
 	/** 
-		´ÓÊý¾Ý¿âÉ¾³ýentity±í×Ö¶Î
+		ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½É¾ï¿½ï¿½entityï¿½ï¿½ï¿½Ö¶ï¿½
 	*/
 	virtual bool dropEntityTableItemFromDB(const char* tableName, const char* tableItemName);
 
 	/**
-		Ëø×¡½Ó¿Ú²Ù×÷
+		ï¿½ï¿½×¡ï¿½Ó¿Ú²ï¿½ï¿½ï¿½
 	*/
 	virtual bool lock();
 	virtual bool unlock();
@@ -154,7 +154,7 @@ public:
 	void throwError(DBException* pDBException);
 	
 	/**
-		´¦ÀíÒì³£
+		ï¿½ï¿½ï¿½ï¿½ï¿½ì³£
 	*/
 	virtual bool processException(std::exception & e);
 	

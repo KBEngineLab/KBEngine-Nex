@@ -35,8 +35,8 @@ public:
 	virtual ~EntityCoordinateNode();
 
 	/**
-		(扩展坐标)
-		x && z由不同的应用实现(从不同处获取)
+		(锟斤拷展锟斤拷锟斤拷)
+		x && z锟缴诧拷同锟斤拷应锟斤拷实锟斤拷(锟接诧拷同锟斤拷锟斤拷取)
 	*/
 	virtual float xx() const;
 	virtual float yy() const;

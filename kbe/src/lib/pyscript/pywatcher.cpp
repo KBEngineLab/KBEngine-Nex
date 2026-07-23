@@ -198,7 +198,7 @@ static PyObject* delWatcher(PyObject* self, PyObject* args)
 //-------------------------------------------------------------------------------------
 bool initializePyWatcher(Script* pScript)
 {
-	// ×¢²á²úÉúuuid·½·¨µ½py
+	// ×¢ï¿½ï¿½ï¿½ï¿½ï¿½uuidï¿½ï¿½ï¿½ï¿½ï¿½ï¿½py
 	APPEND_SCRIPT_MODULE_METHOD(pScript->getModule(),		addWatcher,			addWatcher,					METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(pScript->getModule(),		delWatcher,			delWatcher,					METH_VARARGS,			0);
 	return true;

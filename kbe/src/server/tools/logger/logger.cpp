@@ -135,7 +135,7 @@ bool Logger::initializeEnd()
 {
 	PythonApp::initializeEnd();
 
-	// ÓÉÓÚlogger½ÓÊÕÆäËûappµÄlog£¬Èç¹û¸ú×Ù°üÊä³ö½«»á·Ç³£¿¨¡£
+	// ï¿½ï¿½ï¿½ï¿½loggerï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½appï¿½ï¿½logï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ù°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç³ï¿½ï¿½ï¿½ï¿½ï¿½
 	Network::g_trace_packet = 0;
 
 	timer_ = this->dispatcher().addTimer(1000000 / 50, this,
@@ -143,7 +143,7 @@ bool Logger::initializeEnd()
 
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-	// ËùÓÐ½Å±¾¶¼¼ÓÔØÍê±Ï
+	// ï¿½ï¿½ï¿½Ð½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if (getEntryScript().get())
 	{
 		PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(),
@@ -193,7 +193,7 @@ ShutdownHandler::CAN_SHUTDOWN_STATE Logger::canShutdown()
 {
 	if (getEntryScript().get() && PyObject_HasAttrString(getEntryScript().get(), "onReadyForShutDown") > 0)
 	{
-		// ËùÓÐ½Å±¾¶¼¼ÓÔØÍê±Ï
+		// ï¿½ï¿½ï¿½Ð½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(),
 			const_cast<char*>("onReadyForShutDown"),
 			const_cast<char*>(""));
@@ -229,7 +229,7 @@ void Logger::onShutdownBegin()
 {
 	PythonApp::onShutdownBegin();
 
-	// Í¨Öª½Å±¾
+	// Í¨Öªï¿½Å±ï¿½
 	if (getEntryScript().get())
 	{
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
@@ -299,7 +299,7 @@ void Logger::writeLog(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 	pLogItem->logstream << "- ";
 	pLogItem->logstream << str;
 
-	// ¼ÇÂ¼ÏÂÍêÕûµÄÈÕÖ¾£¬ÒÔÔÚ½Å±¾»Øµ÷Ê±Ê¹ÓÃ
+	// ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½ï¿½ï¿½ï¿½Ú½Å±ï¿½ï¿½Øµï¿½Ê±Ê¹ï¿½ï¿½
 	std::string sLog = pLogItem->logstream.str();
 
 	static bool notificationScript = getEntryScript().get() && PyObject_HasAttrString(getEntryScript().get(), "onLogWrote") > 0;
@@ -363,7 +363,7 @@ void Logger::writeLog(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 		iter->second.onMessage(pLogItem);
 	}
 
-	// »º´æÒ»²¿·Ölog£¬Ìá¹©¹¤¾ß²é¿´logÊ±ÄÜ¿ìËÙ»ñÈ¡³õÊ¼ÉÏÏÂÎÄ
+	// ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½logï¿½ï¿½ï¿½á¹©ï¿½ï¿½ï¿½ß²é¿´logÊ±ï¿½Ü¿ï¿½ï¿½Ù»ï¿½È¡ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	buffered_logs_.push_back(pLogItem);
 	if(buffered_logs_.size() > 64)
 	{

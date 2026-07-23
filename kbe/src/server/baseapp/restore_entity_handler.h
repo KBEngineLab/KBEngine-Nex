@@ -49,13 +49,13 @@ public:
 	void pushEntity(ENTITY_ID id);
 
 	/** 
-		Ä³¸öbaseappÉÏµÄspace»Ö¸´ÁËcell£¬ ÅÐ¶Ïµ±Ç°baseappÊÇ·ñÓÐÏà¹ØentityÐèÒª»Ö¸´cell
+		Ä³ï¿½ï¿½baseappï¿½Ïµï¿½spaceï¿½Ö¸ï¿½ï¿½ï¿½cellï¿½ï¿½ ï¿½Ð¶Ïµï¿½Ç°baseappï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½Òªï¿½Ö¸ï¿½cell
 	*/
 	void onRestoreSpaceCellFromOtherBaseapp(COMPONENT_ID baseappID, COMPONENT_ID cellappID, 
 		SPACE_ID spaceID, ENTITY_ID spaceEntityID, ENTITY_SCRIPT_UID utype, bool destroyed);
 
 	/** 
-		ÊÇ·ñÔÊÐí½øÐÐ»Ö¸´
+		ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð»Ö¸ï¿½
 	*/
 	bool canRestore() const{ return canRestore_; }
 	void canRestore(bool v){ canRestore_ = v; }
@@ -69,7 +69,7 @@ private:
 	std::vector<RestoreData> restoreSpaces_;
 	std::vector<RestoreData> otherRestoredSpaces_;
 
-	// space´´½¨ºÃcellºó¹ã²¥¸øÆäËûbaseapp
+	// spaceï¿½ï¿½ï¿½ï¿½ï¿½ï¿½cellï¿½ï¿½ã²¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½baseapp
 	bool broadcastOtherBaseapps_;
 
 	uint64 tickReport_;

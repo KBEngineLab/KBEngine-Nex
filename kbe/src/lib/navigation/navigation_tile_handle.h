@@ -41,13 +41,13 @@ public:
 
 	enum TILE_STATE
 	{
-		TILE_STATE_OPENED_COST0 = 0,	// ´ò¿ª×´Ì¬, ÔÊÐíÍ¨¹ý
-		TILE_STATE_OPENED_COST1 = 1,	// ´ò¿ª×´Ì¬, ÔÊÐíÍ¨¹ý
-		TILE_STATE_OPENED_COST2 = 2,	// ´ò¿ª×´Ì¬, ÔÊÐíÍ¨¹ý
-		TILE_STATE_OPENED_COST3 = 3,	// ´ò¿ª×´Ì¬, ÔÊÐíÍ¨¹ý
-		TILE_STATE_OPENED_COST4 = 4,	// ´ò¿ª×´Ì¬, ÔÊÐíÍ¨¹ý
-		TILE_STATE_OPENED_COST5 = 5,	// ´ò¿ª×´Ì¬, ÔÊÐíÍ¨¹ý
-		TILE_STATE_CLOSED = 9			// ¹Ø±Õ×´Ì¬
+		TILE_STATE_OPENED_COST0 = 0,	// ï¿½ï¿½×´Ì¬, ï¿½ï¿½ï¿½ï¿½Í¨ï¿½ï¿½
+		TILE_STATE_OPENED_COST1 = 1,	// ï¿½ï¿½×´Ì¬, ï¿½ï¿½ï¿½ï¿½Í¨ï¿½ï¿½
+		TILE_STATE_OPENED_COST2 = 2,	// ï¿½ï¿½×´Ì¬, ï¿½ï¿½ï¿½ï¿½Í¨ï¿½ï¿½
+		TILE_STATE_OPENED_COST3 = 3,	// ï¿½ï¿½×´Ì¬, ï¿½ï¿½ï¿½ï¿½Í¨ï¿½ï¿½
+		TILE_STATE_OPENED_COST4 = 4,	// ï¿½ï¿½×´Ì¬, ï¿½ï¿½ï¿½ï¿½Í¨ï¿½ï¿½
+		TILE_STATE_OPENED_COST5 = 5,	// ï¿½ï¿½×´Ì¬, ï¿½ï¿½ï¿½ï¿½Í¨ï¿½ï¿½
+		TILE_STATE_CLOSED = 9			// ï¿½Ø±ï¿½×´Ì¬
 	};
 
 	class MapSearchNode

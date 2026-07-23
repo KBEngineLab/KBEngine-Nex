@@ -41,12 +41,12 @@ public:
 	}
 	
 	/**
-		Í¬²½entity±íµ½Êý¾Ý¿âÖÐ
+		Í¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 	*/
 	virtual bool syncToDB(DBInterface* pdbi) = 0;
 	
 	/**
-		³õÊ¼»¯
+		ï¿½ï¿½Ê¼ï¿½ï¿½
 	*/
 	virtual bool initialize(ScriptDefModule* sm, std::string name) { return true; };
 	
@@ -57,7 +57,7 @@ protected:
 };
 
 /*
-	kbeÏµÍ³±í
+	kbeÏµÍ³ï¿½ï¿½
 */
 class KBEEntityLogTable : public KBETable
 {
@@ -70,7 +70,7 @@ public:
 		uint16 port;
 		COMPONENT_ID componentID;
 
-		// ÓÉË­¼ÇÂ¼
+		// ï¿½ï¿½Ë­ï¿½ï¿½Â¼
 		COMPONENT_ID serverGroupID;
 	};
 
@@ -97,7 +97,7 @@ protected:
 };
 
 /*
-	kbeÏµÍ³±í
+	kbeÏµÍ³ï¿½ï¿½
 */
 class KBEServerLogTable : public KBETable
 {
@@ -108,7 +108,7 @@ public:
 	{
 		uint64 heartbeatTime;
 
-		// ÓÉË­¼ÇÂ¼
+		// ï¿½ï¿½Ë­ï¿½ï¿½Â¼
 		COMPONENT_ID serverGroupID;
 
 		uint8 isShareDB;

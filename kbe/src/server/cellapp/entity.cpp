@@ -219,8 +219,8 @@ void Entity::onDestroy(bool callScript)
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 		SCRIPT_OBJECT_CALL_ARGS0(this, const_cast<char*>("onDestroy"), false);
 		
-		// »зєы≤їЌ®÷™љ≈±Њ£ђ ƒ«√і“≤≤їїб≤ъ…ъ’вЄцїЎµч
-		// Ќ®≥£ѕъїў“їЄцentity≤їЌ®÷™љ≈±Њњ…ƒ№ ««®“∆їт’яіЂЋЌ‘м≥…µƒ
+		// пњљпњљпњљпњљпњљЌ®÷™пњљ≈±пњљпњљпњљ пњљпњљ√і“≤пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљЎµпњљ
+		// Ќ®пњљпњљпњљпњљпњљпњљ“їпњљпњљentityпњљпњљЌ®÷™пњљ≈±пњљпњљпњљпњљпњљпњљпњљ«®пњљ∆їпњљпњљяіпњљпњљпњљпњљпњљ…µпњљ
 		if(baseEntityCall_ != NULL)
 		{
 			this->backupCellData();
@@ -234,7 +234,7 @@ void Entity::onDestroy(bool callScript)
 
 	stopMove();
 
-	// љв≥эњЎ÷∆’яµƒ“э”√
+	// пњљпњљпњљпњљпњљпњљпњљпњљяµпњљпњљпњљпњљпњљ
 	S_RELEASE(controlledBy_);
 
 	if(pWitness_)
@@ -244,7 +244,7 @@ void Entity::onDestroy(bool callScript)
 		pWitness_ = NULL;
 	}
 
-	// љЂentityі”≥°Њ∞÷–ћё≥э
+	// пњљпњљentityпњљ”≥пњљпњљпњљпњљпњљпњљё≥пњљ
 	Space* space = Spaces::findSpace(this->spaceID());
 	if(space)
 	{
@@ -256,10 +256,10 @@ void Entity::onDestroy(bool callScript)
 			this->scriptName(), this->id(), spaceID()));
 	}
 	
-	// ‘Џљш≥ћ«њ÷∆єЎ±’ ±’вјпњ…ƒ№≤їќ™0
+	// пњљЏљпњљпњљпњљ«њпњљ∆єЎ±пњљ ±пњљпњљпњљпњљпњљпњљ№≤пњљќ™0
 	//KBE_ASSERT(spaceID() == 0);
 
-	// іЋ ±≤ї”¶Є√їє”–witnesses£ђЈс‘тќ™View BUG
+	// пњљпњљ ±пњљпњљ”¶пњљ√їпњљпњљпњљwitnessesпњљпњљпњљпњљпњљпњљќ™View BUG
 	if (witnesses_count_ > 0)
 	{
 		ERROR_MSG(fmt::format("{}::onDestroy(): id={}, witnesses_count({}/{}) != 0, isReal={}, spaceID={}, position=({},{},{})\n", 
@@ -450,7 +450,7 @@ int Entity::pySetControlledBy(PyObject *value)
 
 		entityCall = static_cast<EntityCall *>(value);
 
-		// »зєыњі≤їЉыќ“£ђЊЌ≤ї“™њЎ÷∆ќ“
+		// пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ“£пњљпњљЌ≤пњљ“™пњљпњљпњљпњљпњљпњљ
 		if (!entityInWitnessed(entityCall->id()) && entityCall->id() != id())
 		{
 			PyErr_Format(PyExc_AssertionError, "%s: entity '%d' can't witnessed me!\n",
@@ -477,7 +477,7 @@ bool Entity::setControlledBy(EntityCall* controllerBaseEntityCall)
 {
 	EntityCall *oldEntityCall = controlledBy();
 
-	//  »зєы–¬Њ…µƒentityCall «Ќђ“їЄц»Ћ£ђ‘т≤ї„ц»ќЇќЄьЄƒ
+	//  пњљпњљпњљпњљ¬Њ…µпњљentityCallпњљпњљЌђ“їпњљпњљпњљЋ£пњљпњљпњљпњљпњљпњљќЇќЄпњљпњљпњљ
 	if (oldEntityCall != NULL && controllerBaseEntityCall != NULL &&
 		oldEntityCall->id() == controllerBaseEntityCall->id())
 	{
@@ -487,13 +487,13 @@ bool Entity::setControlledBy(EntityCall* controllerBaseEntityCall)
 
 	if (oldEntityCall != NULL)
 	{
-		// »зєыЊ…µƒњЎ÷∆’я «ќ“„‘ЉЇµƒњЌїІґЋ£ђ
-		// ƒ«ЊЌ–и“™Ќ®÷™„‘ЉЇµƒњЌїІґЋ£Їƒг≤їƒ№‘ўњЎ÷∆ƒг„‘ЉЇЅЋ£ђ“≤ЊЌ «ƒг±ї∆дЋь»ЋњЎ÷∆ЅЋ
+		// пњљпњљпњљпњљ…µƒњпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ‘ЉпњљпњљƒњЌїпњљпњљЋ£пњљ
+		// пњљ«Њпњљпњљпњљ“™Ќ®÷™пњљ‘ЉпњљпњљƒњЌїпњљпњљЋ£пњљпњљг≤їпњљпњљпњљўњпњљпњљпњљпњљпњљпњљ‘ЉпњљпњљЋ£пњљ“≤пњљпњљпњљпњљпњљг±їпњљпњљпњљпњљпњљЋњпњљпњљпњљпњљпњљ
 		if (oldEntityCall->id() == id())
 			sendControlledByStatusMessage(oldEntityCall, 1);
 
-		// »зєыЊ…µƒњЎ÷∆’я“≤ «ќ“µƒєџ≤м’я÷Ѓ“ї£ђƒ«ЊЌ±н ЊЋьµƒњЌїІґЋƒ№њіµљќ“£ђ
-		// Ћщ“‘£ђ–и“™Ќ®÷™Њ…µƒњЌїІґЋ£Їƒг≤їƒ№‘ўњЎ÷∆ƒ≥»Ћµƒќї“∆ЅЋ
+		// пњљпњљпњљпњљ…µƒњпњљпњљпњљпњљпњљ“≤пњљпњљпњљ“µƒєџ≤пњљпњљпњљ÷Ѓ“їпњљпњљпњљ«ЊЌ±пњљ ЊпњљпњљпњљƒњЌїпњљпњљпњљпњљ№њпњљпњљпњљпњљ“£пњљ
+		// пњљпњљпњљ‘£пњљпњљпњљ“™Ќ®÷™пњљ…µƒњЌїпњљпњљЋ£пњљпњљг≤їпњљпњљпњљўњпњљпњљпњљƒ≥пњљЋµпњљќїпњљпњљпњљпњљ
 		else if (entityInWitnessed(oldEntityCall->id()))
 			sendControlledByStatusMessage(oldEntityCall, 0);
 
@@ -501,23 +501,23 @@ bool Entity::setControlledBy(EntityCall* controllerBaseEntityCall)
 		{
 			controlledBy(controllerBaseEntityCall);
 
-			// »зєы «ї÷Єі„‘ќ“њЎ÷∆£ђƒ«√і–и“™Ќ®÷™ќ“µƒњЌїІґЋ£Ї√ї”–»ЋњЎ÷∆ƒгЅЋ
+			// пњљпњљпњљпњљ«ї÷Єпњљпњљпњљпњљ“њпњљпњљ∆£пњљпњљпњљ√іпњљпњљ“™Ќ®÷™пњљ“µƒњЌїпњљпњљЋ£пњљ√їпњљпњљпњљЋњпњљпњљпњљпњљпњљпњљпњљ
 			if (controllerBaseEntityCall->id() == id())
 			{
 				KBE_ASSERT(clientEntityCall_);
 				sendControlledByStatusMessage(controllerBaseEntityCall, 0);
 			}
 
-			// »зєы «±р»Ћљ” ÷ЅЋњЎ÷∆£ђƒ«√і÷ї–и“™Ќ®÷™љ” ÷’яЉіњ…£ђ
-			//     °™°™“тќ™÷Ѓ«∞„‘ЉЇїє «±ї±р»ЋњЎ÷∆„≈µƒ£ђЋщ“‘≤ї–и“™Ѕн––Ќ®÷™£ђ
-			// Ћщ“‘£ђЌ®÷™љ” ÷µƒњЎ÷∆’я£ЇƒгњЎ÷∆ЅЋЋ≠
+			// пњљпњљпњљпњљ«±пњљпњљЋљпњљпњљпњљпњљЋњпњљпњљ∆£пњљпњљпњљ√і÷їпњљпњљ“™Ќ®÷™пњљпњљпњљпњљпњљяЉпњљпњљ…£пњљ
+			//     пњљпњљпњљпњљпњљпњљќ™÷Ѓ«∞пњљ‘Љпњљпњљпњљпњљ«±пњљпњљпњљпњљЋњпњљпњљпњљпњљ≈µƒ£пњљпњљпњљпњљ‘≤пњљпњљпњљ“™пњљпњљпњљпњљЌ®÷™пњљпњљ
+			// пњљпњљпњљ‘£пњљЌ®÷™пњљпњљпњљ÷µƒњпњљпњљпњљпњљя£пњљпњљпњљпњљпњљпњљпњљпњљЋ≠
 			else
 			{
 				sendControlledByStatusMessage(controllerBaseEntityCall, 1);
 			}
 
 		}
-		else  // NULL±н Њљї”…ѕµЌ≥њЎ÷∆£ђЋщ“‘≤ї–и“™Ќ®÷™∆дЋы»Ћ
+		else  // NULLпњљпњљ ЊпњљпњљпњљпњљѕµЌ≥пњљпњљпњљ∆£пњљпњљпњљпњљ‘≤пњљпњљпњљ“™Ќ®÷™пњљпњљпњљпњљпњљпњљ
 		{
 			controlledBy(NULL);
 		}
@@ -526,19 +526,19 @@ bool Entity::setControlledBy(EntityCall* controllerBaseEntityCall)
 	{
 		controlledBy(controllerBaseEntityCall);
 		
-		// Љ»»ї”––¬µƒњЎ÷∆’яЅЋ£ђѕµЌ≥µƒ“∆ґѓ––ќ™“≤ЊЌ±Ў–лЌ£÷єЅЋ
+		// пњљпњљ»їпњљпњљпњљ¬µƒњпњљпњљпњљпњљпњљпњљЋ£пњљѕµЌ≥пњљпњљпњљ∆ґпњљпњљпњљќ™“≤пњљЌ±пњљпњљпњљЌ£÷єпњљпњљ
 		stopMove();
 		
-		// »зєы «ї÷Єі„‘ќ“њЎ÷∆£ђƒ«√і–и“™Ќ®÷™ќ“µƒњЌїІґЋ£Ї√ї”–»ЋњЎ÷∆ƒгЅЋ
+		// пњљпњљпњљпњљ«ї÷Єпњљпњљпњљпњљ“њпњљпњљ∆£пњљпњљпњљ√іпњљпњљ“™Ќ®÷™пњљ“µƒњЌїпњљпњљЋ£пњљ√їпњљпњљпњљЋњпњљпњљпњљпњљпњљпњљпњљ
 		if (controllerBaseEntityCall->id() == id())
 		{
 			KBE_ASSERT(clientEntityCall_);
 			sendControlledByStatusMessage(controllerBaseEntityCall, 0);
 		}
 
-		// »зєы «±р»Ћљ” ÷ЅЋњЎ÷∆£ђƒ«√і÷ї–и“™Ќ®÷™љ” ÷’яЉіњ…£ђ
-		//     °™°™“тќ™÷Ѓ«∞„‘ЉЇїє «±ї±р»ЋњЎ÷∆„≈µƒ£ђЋщ“‘≤ї–и“™Ѕн––Ќ®÷™£ђ
-		// Ћщ“‘£ђЌ®÷™љ” ÷µƒњЎ÷∆’я£ЇƒгњЎ÷∆ЅЋЋ≠
+		// пњљпњљпњљпњљ«±пњљпњљЋљпњљпњљпњљпњљЋњпњљпњљ∆£пњљпњљпњљ√і÷їпњљпњљ“™Ќ®÷™пњљпњљпњљпњљпњљяЉпњљпњљ…£пњљ
+		//     пњљпњљпњљпњљпњљпњљќ™÷Ѓ«∞пњљ‘Љпњљпњљпњљпњљ«±пњљпњљпњљпњљЋњпњљпњљпњљпњљ≈µƒ£пњљпњљпњљпњљ‘≤пњљпњљпњљ“™пњљпњљпњљпњљЌ®÷™пњљпњљ
+		// пњљпњљпњљ‘£пњљЌ®÷™пњљпњљпњљ÷µƒњпњљпњљпњљпњљя£пњљпњљпњљпњљпњљпњљпњљпњљЋ≠
 		else
 		{
 			sendControlledByStatusMessage(controllerBaseEntityCall, 1);
@@ -647,7 +647,7 @@ PyObject* Entity::onScriptGetAttribute(PyObject* attr)
 {
 	DEBUG_OP_ATTRIBUTE("get", attr)
 
-	// »зєы «ghostµч”√defЈљЈ®‘т–и“™rpcµч”√°£
+	// пњљпњљпњљпњљпњљghostпњљпњљпњљпњљdefпњљпњљпњљпњљпњљпњљпњљпњљ“™rpcпњљпњљпњљ√°пњљ
 	if(!isReal())
 	{
 		const char* ccattr = PyUnicode_AsUTF8AndSize(attr, NULL);
@@ -668,7 +668,7 @@ PyObject* Entity::onScriptGetAttribute(PyObject* attr)
 //-------------------------------------------------------------------------------------
 void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, PyObject* pyData)
 {
-	// »зєы≤ї «“їЄцrealEntityїт’я‘Џ≥х Љїѓ‘т≤їјнїб
+	// пњљпњљпњљпњљпњљпњљпњљ“їпњљпњљrealEntityпњљпњљпњљпњљпњљЏ≥пњљ Љпњљпњљпњљпњљпњљпњљпњљпњљ
 	if(!isReal() || initing())
 		return;
 
@@ -677,13 +677,13 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 	
 	uint32 flags = propertyDescription->getFlags();
 
-	//  „ѕ»ііљ®“їЄц–и“™єг≤•µƒƒ£∞еЅч
+	// пњљпњљпњљ»іпњљпњљпњљ“їпњљпњљпњљпњљ“™пњљг≤•пњљпњљƒ£пњљпњљпњљпњљ
 	MemoryStream* mstream = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 
 	propertyDescription->getDataType()->addToStream(mstream, pyData);
 
-	// ≈–ґѕ «Јс–и“™єг≤•Єш∆дЋыµƒcellapp, ’вїє–и“їЄц«∞ћб «entity±Ў–л”µ”–ghost µће
-	// ÷ї”–‘Џcell±яљз“їґ®ЈґќІƒЏµƒentity≤≈”µ”–ghost µће, їт’я‘Џћш„™space ±“≤їбґћ‘Ёµƒ÷√ќ™ghost„іћђ
+	// пњљ–ґпњљпњљ«Јпњљпњљпњљ“™пњљг≤•пњљпњљпњљпњљпњљпњљпњљпњљcellapp, пњљвїєпњљпњљ“їпњљпњљ«∞пњљпњљпњљпњљentityпњљпњљпњљпњљ”µпњљпњљghost µпњљпњљ
+	// ÷їпњљпњљпњљпњљcellпњљяљпњљ“їпњљпњљпњљпњљќІпњљЏµпњљentityпњљпњљ”µпњљпњљghost µпњљпњљ, пњљпњљпњљпњљпњљпњљпњљпњљ„™space ±“≤пњљпњљпњљпњљЁµпњљпњљпњљќ™ghost„іћђ
 	if((flags & ENTITY_BROADCAST_CELL_FLAGS) > 0 && hasGhost())
 	{
 		GhostManager* gm = Cellapp::getSingleton().pGhostManager();
@@ -696,7 +696,7 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 
 			pForwardBundle->append(*mstream);
 
-			// Љ«¬Љ’вЄц ¬Љю≤ъ…ъµƒ эЊЁЅњіу–°
+			// пњљпњљ¬Љпњљпњљпњљпњљ¬Љпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ–°
 			g_publicCellEventHistoryStats.trackEvent(scriptName(), 
 				propertyDescription->getName(), 
 				pForwardBundle->currMsgLength());
@@ -725,8 +725,8 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 			if(pChannel == NULL)
 				continue;
 
-			// ’вЄцњ…ƒ№–‘ «іж‘Џµƒ£ђјэ»з эЊЁјі‘і”ЏcreateWitnessFromStream()
-			// ”÷»з„‘ЉЇµƒentityїєќі‘Џƒњ±књЌїІґЋ…ѕііљ®
+			// пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ«іпњљпњљЏµƒ£пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ‘іпњљпњљcreateWitnessFromStream()
+			// пњљпњљпњљпњљпњљ‘ЉпњљпњљпњљentityпњљпњљќіпњљпњљƒњпњљпњљЌїпњљпњљпњљпњљѕіпњљпњљпњљ
 			if(!pEntity->pWitness()->entityInView(id()))
 				continue;
 
@@ -762,7 +762,7 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 
 				pSendBundle->append(*mstream);
 				
-				// Љ«¬Љ’вЄц ¬Љю≤ъ…ъµƒ эЊЁЅњіу–°
+				// пњљпњљ¬Љпњљпњљпњљпњљ¬Љпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ–°
 				g_publicClientEventHistoryStats.trackEvent(scriptName(), 
 					propertyDescription->getName(), 
 					pSendBundle->currMsgLength());
@@ -775,7 +775,7 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 	}
 
 	/*
-	// ≈–ґѕ’вЄц ф–‘ «Јсїє–и“™єг≤•Єш∆дЋыњЌїІґЋ
+	// пњљ–ґпњљпњљпњљпњљпњљпњљпњљпњљпњљ«Јпњљпњљпњљ“™пњљг≤•пњљпњљпњљпњљпњљпњљпњљЌїпњљпњљпњљ
 	if((flags & ENTITY_BROADCAST_OTHER_CLIENT_FLAGS) > 0)
 	{
 		int8 detailLevel = propertyDescription->getDetailLevel();
@@ -796,9 +796,9 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 			}
 		}
 
-		// ’вЄц ф–‘“—Њ≠Єь–¬єэ£ђ љЂ’в–©–≈ѕҐћнЉ”µљ‘шЊ≠љш»лєэ’вЄцЉґ±рµƒentity£ђ µЂѕ÷‘Џњ…ƒ№„я‘ґЅЋ“їµг£ђ ‘ЏЋыїЎјі÷Ў–¬љш»л’вЄцdetaillevel
-		//  ±»зєы÷Ў–¬љЂЋщ”–µƒ ф–‘ґЉЄь–¬µљЋыµƒњЌїІґЋњ…ƒ№≤їЇѕ  £ђ ќ“√«Љ«¬Љ’вЄц ф–‘µƒЄƒ±д£ђ ѕ¬іќЋы÷Ў–¬љш»лќ“√«÷ї–и“™љЂЋщ”–∆ЏЉд”–єэЄƒ±дµƒ
-		//  эЊЁЈҐЋЌµљЋыµƒњЌїІґЋЄь–¬
+		// пњљпњљпњљпњљпњљпњљпњљпњљ—Њпњљпњљпњљпњљ¬єпњљпњљпњљ пњљпњљпњљпњљ–©пњљпњљѕҐпњљпњљпњљ”µпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљentityпњљпњљ пњљпњљпњљпњљпњљЏњпњљпњљпњљпњљпњљ‘ґпњљпњљ“їпњљг£ђ пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ¬љпњљпњљпњљпњљпњљпњљdetaillevel
+		//  ±пњљпњљпњљпњљпњљпњљ¬љпњљпњљпњљпњљ–µпњљпњљпњљпњљ‘ґпњљпњљпњљпњљ¬µпњљпњљпњљпњљƒњЌїпњљпњљЋњпњљпњљ№≤пњљпњљпњљпњљ £пњљ пњљпњљпњљ«Љпњљ¬Љпњљпњљпњљпњљпњљпњљ‘µƒЄƒ±д£ђ пњљ¬іпњљпњљпњљпњљпњљпњљ¬љпњљпњљпњљпњљпњљпњљпњљ÷їпњљпњљ“™пњљпњљпњљпњљпњљпњљпњљЏЉпњљпњљ–єпњљпњљƒ±пњљпњљ
+		// пњљпњљпњљЁЈпњљпњљЌµпњљпњљпњљпњљƒњЌїпњљпњљЋЄпњљпњљпњљ
 		for(int8 i=detailLevel; i<=DETAIL_LEVEL_FAR; ++i)
 		{
 			std::map<ENTITY_ID, Entity*>::iterator iter = witnessEntities_[i].begin();
@@ -818,7 +818,7 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 					}
 				}
 
-				// Љ«¬Љ’вЄц ¬Љю≤ъ…ъµƒ эЊЁЅњіу–°
+				// пњљпњљ¬Љпњљпњљпњљпњљ¬Љпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ–°
 				std::string event_name = this->scriptName();
 				event_name += ".";
 				event_name += propertyDescription->getName();
@@ -829,7 +829,7 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 	}
 	*/
 
-	// ≈–ґѕ’вЄц ф–‘ «Јсїє–и“™єг≤•Єш„‘ЉЇµƒњЌїІґЋ
+	// пњљ–ґпњљпњљпњљпњљпњљпњљпњљпњљпњљ«Јпњљпњљпњљ“™пњљг≤•пњљпњљпњљ‘ЉпњљпњљƒњЌїпњљпњљпњљ
 	if((flags & ENTITY_BROADCAST_OWN_CLIENT_FLAGS) > 0 && clientEntityCall_ != NULL && pWitness_)
 	{
 		Network::Bundle* pSendBundle = NULL;
@@ -852,7 +852,7 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 
 		pSendBundle->append(*mstream);
 		
-		// Љ«¬Љ’вЄц ¬Љю≤ъ…ъµƒ эЊЁЅњіу–°
+		// пњљпњљ¬Љпњљпњљпњљпњљ¬Љпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ–°
 		if((flags & ENTITY_BROADCAST_OTHER_CLIENT_FLAGS) <= 0)
 		{
 			g_privateClientEventHistoryStats.trackEvent(scriptName(), 
@@ -1064,7 +1064,7 @@ void Entity::backupCellData()
 
 		bool dataDirty = memcmp((void*)&persistentDigest_[0], (void*)&digest[0], sizeof(persistentDigest_)) != 0;
 
-		// Љм≤й эЊЁ «Јс”–±дїѓ£ђ”–±дїѓ‘тљЂ эЊЁ±ЄЈЁ≤Ґ«“Љ«¬Љ эЊЁhash
+		// пњљпњљпњљпњљпњљпњљпњљпњљ«Јпњљпњљ–±дїѓпњљпњљпњљ–±дїѓпњљпњљпњљпњљпњљЁ±пњљпњљЁ≤пњљпњљ“Љпњљ¬Љпњљпњљпњљпњљhash
 		if (!dataDirty)
 		{
 			MemoryStream::reclaimPoolObject(s);
@@ -1074,7 +1074,7 @@ void Entity::backupCellData()
 			setDirty((uint32*)&digest[0]);
 		}
 
-		// љЂµ±«∞µƒcell≤њЈ÷ эЊЁіт∞ь“ї∆рЈҐЋЌЄшbase≤њЈ÷±ЄЈЁ
+		// пњљпњљпњљпњљ«∞пњљпњљcellпњљпњљпњљпњљпњљпњљпњљЁіпњљпњљ“їпњљпњљпњљЌЄпњљbaseпњљпњљпњљ÷±пњљпњљпњљ
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(BaseappInterface::onBackupEntityCellData);
 		(*pBundle) << id_;
@@ -1232,8 +1232,8 @@ void Entity::bufferCallback(bool enable)
 	{
 		if (_scriptCallbacksBufferCount - 1 == 0)
 		{
-			// Љ»»їљЂ“™»°ѕыїЇіжЅЋ£ђƒ«√і÷і––Ћщ”–callback£ђµЂ–и“™„Ґ“в‘Џ÷і––єэ≥ћ÷–њ…ƒ№”÷≤ъ…ъЅЋcallbackїЇіж
-			// ƒ«√і–и“™Љ”»лµљґ”Ѕ–Їу√ж
+			// пњљпњљ»їпњљпњљ“™»°пњљпњљпњљпњљпњљпњљпњљЋ£пњљпњљпњљ√і÷іпњљпњљпњљпњљпњљпњљcallbackпњљпњљпњљпњљпњљпњљ“™„Ґпњљпњљпњљпњљ÷іпњљ–єпњљпњљпњљпњљ–њпњљпњљпњљпњљ÷≤пњљпњљпњљпњљпњљcallbackпњљпњљпњљпњљ
+			// пњљпњљ√іпњљпњљ“™пњљпњљпњљлµљпњљпњљпњљ–Їпњљпњљпњљ
 			while (_scriptCallbacksBufferNum > 0)
 			{
 				BufferedScriptCall* pBufferedScriptCall = (*_scriptCallbacksBuffer.begin());
@@ -1259,7 +1259,7 @@ void Entity::bufferCallback(bool enable)
 			}
 		}
 
-		// „оЇу‘ў÷і––Љх≤ў„ч£ђЈј÷є÷і––callback∆ЏЉд”÷«л«уїЇіжcallback
+		// пњљпњљпњљпњљпњљ÷іпњљ–Љпњљпњљпњљпњљпњљпњљпњљпњљпњљ÷є÷іпњљпњљcallbackпњљЏЉпњљпњљпњљпњљпњљпњљуїЇіпњљcallback
 		--_scriptCallbacksBufferCount;
 		KBE_ASSERT(_scriptCallbacksBufferCount >= 0);
 	}
@@ -1335,7 +1335,7 @@ void Entity::delWitnessed(Entity* entity)
 			const_cast<char*>("i"), entity->id(), false);
 	}
 
-	// —” ±÷і––
+	// пњљпњљ ±÷іпњљпњљ
 	// onDelWitnessed();
 
 	if(Cellapp::getSingleton().pWitnessedTimeoutHandler())
@@ -1416,7 +1416,7 @@ uint32 Entity::addProximity(float range_xz, float range_y, int32 userarg)
 		return 0;
 	}
 
-	// ‘Џspace÷–ЌґЈ≈“їЄцѕЁЏе
+	// пњљпњљspaceпњљпњљЌґпњљпњљ“їпњљпњљпњљпњљпњљпњљ
 	KBEShared_ptr<Controller> p( new ProximityController(this, range_xz, range_y, userarg, pControllers_->freeID()) );
 
 	bool ret = pControllers_->add(p);
@@ -1558,7 +1558,7 @@ PyObject* Entity::__py_pyCancelController(PyObject* self, PyObject* args)
 		id = PyLong_AsLong(pyargobj);
 	}
 
-	// ÷ї“™ « ф”Џ“∆ґѓњЎ÷∆∆чµƒЈґ≥л£ђЊЌ”¶Є√„яstopMove()£ђ“‘±№√вґа÷÷Јљ љµƒіж‘Џ“эЈҐµч”√…ѕµƒ∆з“й
+	// ÷ї“™пњљпњљпњљпњљпњљпњљпњљ∆ґпњљпњљпњљпњљпњљпњљпњљпњљƒЈпњљпњљл£ђпњљпњљ”¶пњљпњљпњљпњљstopMove()пњљпњљпњљ‘±пњљпњљпњљпњљпњљ÷Јпњљ љпњљƒіпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљѕµпњљпњљпњљпњљпњљ
 	if ((pobj->pMoveController_ && pobj->pMoveController_->id() == id) || 
 		(pobj->pTurnController_ && pobj->pTurnController_->id() == id))
 	{
@@ -1896,7 +1896,7 @@ void Entity::onGetWitnessFromBase(Network::Channel* pChannel)
 {
 	if (!isReal())
 	{
-		// –и“™„ц÷–„™
+		// пњљпњљ“™пњљпњљпњљпњљ„™
 		GhostManager* gm = Cellapp::getSingleton().pGhostManager();
 		if (gm)
 		{
@@ -1919,19 +1919,19 @@ void Entity::onGetWitness(bool fromBase)
 
 	if(fromBase)
 	{
-		// proxyµƒgiveClientToє¶ƒ№їт’яreloginBaseapp£ђ »зєы“їЄцentity“—Њ≠ііљ®ЅЋcell£ђ ≤ҐљЂњЎ÷∆»®∞уґ®
-		// µљЄ√entity ± «“їґ®√ї”–clientEntityCallµƒ°£
+		// proxyпњљпњљgiveClientToпњљпњљпњљ№їпњљпњљпњљreloginBaseappпњљпњљ пњљпњљпњљ“їпњљпњљentityпњљ—Њпњљпњљпњљпњљпњљпњљпњљcellпњљпњљ пњљпњљпњљпњљпњљпњљпњљпњљ»®пњљпњљ
+		// пњљпњљпњљпњљentity ±пњљпњљ“їпњљпњљ√їпњљпњљclientEntityCallпњљƒ°пњљ
 		if(clientEntityCall() == NULL)
 		{
 			PyObject* clientMB = PyObject_GetAttrString(baseEntityCall(), "client");
 			KBE_ASSERT(clientMB != Py_None);
 
 			EntityCall* client = static_cast<EntityCall*>(clientMB);	
-			// Py_INCREF(clientEntityCall); ’вјп≤ї–и“™‘цЉ”“э”√£ђ “тќ™√њіќґЉїб≤ъ…ъ“їЄц–¬µƒґ‘ѕу
+			// Py_INCREF(clientEntityCall); пњљпњљпњљп≤їпњљпњљ“™пњљпњљпњљпњљпњљпњљпњљ√£пњљ пњљпњљќ™√њпњљќґпњљпњљпњљпњљпњљпњљ“їпњљпњљпњљ¬µƒґпњљпњљпњљ
 			clientEntityCall(client);
 		}
 
-		// »зєы“їЄц µће“—Њ≠”–cellµƒ«йњцѕ¬giveToClient£ђƒ«√і–и“™љЂ„о–¬µƒњЌїІґЋ ф–‘÷µЄь–¬µљњЌїІґЋ
+		// пњљпњљпњљ“їпњљпњљ µпњљпњљпњљ—ЊпњљпњљпњљcellпњљпњљпњљпњљпњљпњљпњљgiveToClientпњљпњљпњљпњљ√іпњљпњљ“™пњљпњљпњљпњљпњљ¬µƒњЌїпњљпњљпњљпњљпњљпњљпњљ÷µпњљпњљпњљ¬µпњљпњљЌїпњљпњљпњљ
 		Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(id(), (*pSendBundle));
 
@@ -1971,20 +1971,20 @@ void Entity::onGetWitness(bool fromBase)
 		else
 		{
 			/*
-				÷Ў–¬∞уґ®£ђЌ®≥£ «њЌїІґЋ÷Ўµ«¬љїт’я÷ЎЅђїт’я“їЄц’ЋЇ≈ЉЈµф
-				Ѕн“їЄцњЌїІґЋµ«¬љµƒњЌїІґЋ, ґшEntityїє‘ЏƒЏіж÷–≤Ґ«““—Њ≠
-				∞уґ®ЅЋwitness(’в÷÷«йњц“≤њ…ƒ№ «ЈюќсґЋїєќі’м≤йµљњЌїІґЋґѕѕя)
+				пњљпњљпњљ¬∞уґ®£пњљЌ®пњљпњљпњљ«њЌїпњљпњљпњљпњљЎµпњљ¬љпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ“їпњљпњљпњљЋЇ≈Љпњљпњљпњљ
+				пњљпњљ“їпњљпњљпњљЌїпњљпњљЋµпњљ¬љпњљƒњЌїпњљпњљпњљ, пњљпњљEntityпњљпњљпњљпњљпњљЏіпњљпњљ–≤пњљпњљпњљпњљ—Њпњљ
+				пњљпњљпњљпњљwitness(пњљпњљпњљпњљпњљпњљпњљ“≤пњљпњљпњљпњљпњљ«ЈпњљпњљпњљЋїпњљќіпњљпњљйµљпњљЌїпњљпњљЋґпњљпњљпњљ)
 
-				’в÷÷«йњцќ“√«»‘»ї–и“™„ц“ї–© ¬«й±£÷§њЌїІґЋµƒ’э»Ј–‘£ђ јэ»зЈҐЋЌenterworld
+				пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ»їпњљпњљ“™пњљпњљ“ї–©пњљпњљпњљй±£÷§пњљЌїпњљпњљЋµпњљпњљпњљ»Јпњљ‘£пњљ пњљпњљпњљзЈҐпњљпњљenterworld
 			*/
 			pWitness_->onAttach(this);
 
-			// View÷–µƒ µће“≤–и“™÷Ў÷√£ђ÷Ў–¬Ќђ≤љЄшњЌїІґЋ
+			// Viewпњљ–µпњљ µпњљпњљ“≤пњљпњљ“™пњљпњљпњљ√£пњљпњљпњљпњљпњљЌђпњљпњљпњљпњљпњљЌїпњљпњљпњљ
 			pWitness_->resetViewEntities();
 		}
 	}
 
-	// Јј÷є„‘ЉЇ‘Џ“ї–©љ≈±ЊїЎµч÷–±їѕъїў£ђ’вјпґ‘„‘ЉЇ„ц“їіќ“э”√
+	// пњљпњљ÷єпњљ‘Љпњљпњљпњљ“ї–©пњљ≈±пњљпњљЎµпњљпњљ–±пњљпњљпњљпњљў£пњљпњљпњљпњљпњљпњљпњљ‘Љпњљпњљпњљ“їпњљпњљпњљпњљпњљпњљ
 	Py_INCREF(this);
 
 	Space* space = Spaces::findSpace(this->spaceID());
@@ -1993,7 +1993,7 @@ void Entity::onGetWitness(bool fromBase)
 		space->onEntityAttachWitness(this);
 	}
 
-	// „оЇу£ђ…и÷√controlledByќ™„‘ЉЇµƒbase
+	// пњљпњљпњљпњљпњљпњљпњљcontrolledByќ™пњљ‘Љпњљпњљпњљbase
 	controlledBy(baseEntityCall());
 	
 	{
@@ -2012,7 +2012,7 @@ void Entity::onLoseWitness(Network::Channel* pChannel)
 
 	if (!isReal())
 	{
-		// –и“™„ц÷–„™
+		// пњљпњљ“™пњљпњљпњљпњљ„™
 		GhostManager* gm = Cellapp::getSingleton().pGhostManager();
 		if (gm)
 		{
@@ -2137,7 +2137,7 @@ bool Entity::checkMoveForTopSpeed(const Position3D& position)
 	Position3D movment = position - this->position();
 	bool move = true;
 	
-	// Љм≤й“∆ґѓ
+	// пњљпњљпњљпњљ∆ґпњљ
 	if(topSpeedY_ > 0.01f && movment.y > topSpeedY_)
 	{
 		move = false;
@@ -2206,8 +2206,8 @@ void Entity::onUpdateDataFromClient(KBEngine::MemoryStream& s)
 		
 		// this->position(currpos);
 
-		// »зєыќ““—Њ≠±їњЎ÷∆£ђƒ«√і£ђ эЊЁµƒјі‘і‘т «њЎ÷∆’яµƒњЌїІґЋ£ђ
-		// Ћщ“‘£ђќ“√«–и“™„цµƒ «Ќ®÷™јі‘іњЌїІґЋ£ђґш≤їљцљц «„‘ЉЇµƒњЌїІґЋ°£
+		// пњљпњљпњљпњљпњљпњљ—Њпњљпњљпњљпњљпњљпњљ∆£пњљпњљпњљ√іпњљпњљпњљпњљпњљЁµпњљпњљпњљ‘іпњљпњљпњљ«њпњљпњљпњљпњљяµƒњЌїпњљпњљЋ£пњљ
+		// пњљпњљпњљ‘£пњљпњљпњљпњљпњљпњљпњљ“™пњљпњљпњљпњљпњљпњљЌ®÷™пњљпњљ‘іпњљЌїпњљпњљЋ£пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ‘ЉпњљпњљƒњЌїпњљпњљЋ°пњљ
 		Witness* pW = NULL;
 		KBEngine::ENTITY_ID targetID = 0;
 
@@ -2227,10 +2227,10 @@ void Entity::onUpdateDataFromClient(KBEngine::MemoryStream& s)
 				pW = this->pWitness();
 		}
 		
-		// ‘Џњзљш≥ћteleport ±£ђЉЂґЋ«йњц£®ghost£©‘Џƒ≥÷÷„іћђѕ¬witnessіЋ ±њ…ƒ№ќ™None
+		// пњљЏњпњљпњљпњљпњљteleport ±пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљghostпњљпњљпњљпњљƒ≥пњљпњљ„іћђпњљпњљwitnessпњљпњљ ±пњљпњљпњљпњљќ™None
 		if(pW)
 		{
-			// Ќ®÷™÷Ў÷√
+			// Ќ®÷™пњљпњљпњљпњљ
 			Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 			NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(targetID, (*pSendBundle));
 			
@@ -2309,8 +2309,8 @@ PyObject* Entity::pyGetWitnesses()
 		if (pChannel == NULL)
 			continue;
 
-		// ’вЄцњ…ƒ№–‘ «іж‘Џµƒ£ђјэ»з эЊЁјі‘і”ЏcreateWitnessFromStream()
-		// ”÷»з„‘ЉЇµƒentityїєќі‘Џƒњ±књЌїІґЋ…ѕііљ®
+		// пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ«іпњљпњљЏµƒ£пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ‘іпњљпњљcreateWitnessFromStream()
+		// пњљпњљпњљпњљпњљ‘ЉпњљпњљпњљentityпњљпњљќіпњљпњљƒњпњљпњљЌїпњљпњљпњљпњљѕіпњљпњљпњљ
 		if (!pEntity->pWitness()->entityInView(id()))
 			continue;
 
@@ -2436,7 +2436,7 @@ bool Entity::navigatePathPoints( std::vector<Position3D>& outPaths, const Positi
 		break;
 	}
 
-	// µЏ“їЄц„ш±кµг «µ±«∞ќї÷√£ђ“тіЋњ…“‘єэ¬Ћµф
+	// пњљпњљ“їпњљпњљпњљпњљпњљпњљпњљпњљ«µпњљ«∞ќїпњљ√£пњљпњљпњљЋњпњљпњљ‘єпњљпњљЋµпњљ
 	if (iter != outPaths.begin())
 	{
 		outPaths.erase(outPaths.begin(), iter);
@@ -2464,7 +2464,7 @@ PyObject* Entity::pyNavigatePathPoints(PyObject_ptr pyDestination, float maxSear
 		return 0;
 	}
 
-	// љЂ„ш±к–≈ѕҐћб»°≥цјі
+	// пњљпњљпњљпњљпњљпњљпњљпњљѕҐпњљпњљ»°пњљпњљпњљпњљ
 	script::ScriptVector3::convertPyObjectToVector3(destination, pyDestination);
 
 	std::vector<Position3D> outPaths;
@@ -2547,7 +2547,7 @@ PyObject* Entity::pyNavigate(PyObject_ptr pyDestination, float velocity, float d
 		return 0;
 	}
 
-	// љЂ„ш±к–≈ѕҐћб»°≥цјі
+	// пњљпњљпњљпњљпњљпњљпњљпњљѕҐпњљпњљ»°пњљпњљпњљпњљ
 	script::ScriptVector3::convertPyObjectToVector3(destination, pyDestination);
 
 	return PyLong_FromLong(navigate(destination, velocity, distance, maxMoveDistance, 
@@ -2598,7 +2598,7 @@ PyObject* Entity::pyGetRandomPoints(PyObject_ptr pyCenterPos, float maxRadius, u
 		return 0;
 	}
 
-	// љЂ„ш±к–≈ѕҐћб»°≥цјі
+	// пњљпњљпњљпњљпњљпњљпњљпњљѕҐпњљпњљ»°пњљпњљпњљпњљ
 	script::ScriptVector3::convertPyObjectToVector3(centerPos, pyCenterPos);
 
 	std::vector<Position3D> outPoints;
@@ -2673,7 +2673,7 @@ PyObject* Entity::pyMoveToPoint(PyObject_ptr pyDestination, float velocity, floa
 		return 0;
 	}
 
-	// љЂ„ш±к–≈ѕҐћб»°≥цјі
+	// пњљпњљпњљпњљпњљпњљпњљпњљѕҐпњљпњљ»°пњљпњљпњљпњљ
 	script::ScriptVector3::convertPyObjectToVector3(destination, pyDestination);
 
 	return PyLong_FromLong(moveToPoint(destination, velocity, distance, userData, faceMovement > 0, moveVertically > 0));
@@ -2750,7 +2750,7 @@ PyObject* Entity::__py_pyMoveToEntity(PyObject* self, PyObject* args)
 	Position3D offsetPos;
 	if (pyOffset && pyOffset != Py_None)
 	{
-		// љЂ„ш±к–≈ѕҐћб»°≥цјі
+		// пњљпњљпњљпњљпњљпњљпњљпњљѕҐпњљпњљ»°пњљпњљпњљпњљ
 		script::ScriptVector3::convertPyObjectToVector3(offsetPos, pyOffset);
 	}
 
@@ -3077,7 +3077,7 @@ PyObject* Entity::__py_pyEntitiesInRange(PyObject* self, PyObject* args)
 	PyObject* pyPosition = NULL, *pyEntityType = NULL;
 	float radius = 0.f;
 
-	if (pobj->isDestroyed() && !pobj->hasFlags(ENTITY_FLAGS_DESTROYING) /* ‘ –н‘Џѕъїў∆ЏЉдµч”√ */)
+	if (pobj->isDestroyed() && !pobj->hasFlags(ENTITY_FLAGS_DESTROYING) /* пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљЏЉпњљпњљпњљпњљ */)
 	{
 		PyErr_Format(PyExc_TypeError, "%s::entitiesInRange: entity(%d) is destroyed!",
 			pobj->scriptName(), pobj->id());
@@ -3151,7 +3151,7 @@ PyObject* Entity::__py_pyEntitiesInRange(PyObject* self, PyObject* args)
 	const char* pEntityType = NULL;
 	Position3D originpos;
 
-	// љЂ„ш±к–≈ѕҐћб»°≥цјі
+	// пњљпњљпњљпњљпњљпњљпњљпњљѕҐпњљпњљ»°пњљпњљпњљпњљ
 	if (pyPosition && pyPosition != Py_None)
 	{
 		script::ScriptVector3::convertPyObjectToVector3(originpos, pyPosition);
@@ -3181,7 +3181,7 @@ PyObject* Entity::__py_pyEntitiesInRange(PyObject* self, PyObject* args)
 
 	std::vector<Entity*> findentities;
 
-	// ”√їІ„№ «∆ЏЌы‘ЏentityЄљљьЋ——∞£ђ “тіЋќ“√«і”…н±яЋ—Ћч
+	// пњљ√їпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљentityпњљпњљпњљпњљпњљпњљ—∞пњљпњљ пњљпњљпњљпњљпњљпњљ«іпњљпњљпњљпњљпњљпњљпњљпњљпњљ
 	EntityCoordinateNode::entitiesInRange(findentities, pobj->pEntityCoordinateNode(), originpos, radius, entityUType);
 
 	PyObject* pyList = PyList_New(findentities.size());
@@ -3299,7 +3299,7 @@ void Entity::teleportRefEntity(Entity* entity, Position3D& pos, Direction3D& dir
 	
 	SPACE_ID lastSpaceID = this->spaceID();
 	
-	/* Љі єentity“—Њ≠ѕъїў£ђ µЂƒЏіжќі ЌЈ≈ ±spaceID”¶Є√ «’э»Јµƒ£ђ Ћщ“‘јн¬џњ…“‘’“µљspace
+	/* пњљпњљ єentityпњљ—Њпњљпњљпњљпњљў£пњљ пњљпњљпњљЏіпњљќіпњљЌЈпњљ ±spaceID”¶пњљпњљпњљпњљпњљпњљ»Јпњљƒ£пњљ пњљпњљпњљпњљпњљпњљпњљџњпњљпњљпњљпњљ“µпњљspace
 	if(entity->isDestroyed())
 	{
 		ERROR_MSG("Entity::teleport: nearbyMBRef is destroyed!\n");
@@ -3308,7 +3308,7 @@ void Entity::teleportRefEntity(Entity* entity, Position3D& pos, Direction3D& dir
 	}
 	*/
 
-	/* Љі є «ghost£ђ µЂspaceњѕґ® «‘Џµ±«∞cell…ѕ£ђ ÷±љ”≤ў„ч”¶Є√≤їїб”–ќ ћв
+	/* пњљпњљ єпњљпњљghostпњљпњљ пњљпњљspaceпњљѕґпњљпњљпњљпњљЏµпњљ«∞cellпњљѕ£пњљ ÷±пњљ”≤пњљпњљпњљ”¶пњљ√≤пњљпњљпњљпњљпњљпњљпњљпњљпњљ
 	if(!entity->isReal())
 	{
 		ERROR_MSG("Entity::teleport: nearbyMBRef is ghost!\n");
@@ -3319,18 +3319,18 @@ void Entity::teleportRefEntity(Entity* entity, Position3D& pos, Direction3D& dir
 
 	SPACE_ID spaceID = entity->spaceID();
 
-	// »зєы «ѕаЌђspace‘тќ™±ЊµЎћш„™
+	// пњљпњљпњљпњљпњљпњљпњљЌђspaceпњљпњљќ™пњљпњљпњљпњљпњљпњљ„™
 	if(spaceID == this->spaceID())
 	{
 		teleportLocal(entity, pos, dir);
 	}
 	else
 	{
-		// Јс‘тќ™µ±«∞cellapp…ѕµƒspace£ђ ƒ«√іќ“√«“≤ƒ№єї÷±љ”÷і––≤ў„ч
+		// пњљпњљпњљпњљќ™пњљпњљ«∞cellappпњљѕµпњљspaceпњљпњљ пњљпњљ√іпњљпњљпњљпњљ“≤пњљ№єпњљ÷±пњљпњљ÷іпњљ–≤пњљпњљпњљ
 		Space* currspace = Spaces::findSpace(this->spaceID());
 		Space* space = Spaces::findSpace(spaceID);
 
-		// »зєы“™ћш„™µƒspace≤їіж‘Џїт’я“э”√µƒentity «’вЄцspaceµƒііљ®’я«““—Њ≠ѕъїў£ђ ƒ«√іґЉ”¶Є√ «ћш„™ І∞№
+		// пњљпњљпњљ“™пњљпњљ„™пњљпњљspaceпњљпњљпњљпњљпњљЏїпњљпњљпњљпњљпњљпњљ√µпњљentityпњљпњљпњљпњљпњљspaceпњљƒіпњљпњљпњљпњљпњљпњљпњљпњљ—Њпњљпњљпњљпњљў£пњљ пњљпњљ√іпњљпњљ”¶пњљпњљпњљпњљпњљпњљ„™ Іпњљпњљ
 		if(space == NULL || !space->isGood() || entity->isDestroyed())
 		{
 			if (entity->isDestroyed())
@@ -3383,25 +3383,25 @@ void Entity::teleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Dir
 		return;
 	}
 
-	// »зєы’вЄцentity”–base≤њЈ÷£ђ Љў»з «±Њљш≥ћЉґ±рµƒіЂЋЌ£ђƒ«√іѕаєЎ≤ў„ч∞і’’’э≥£µƒ÷і––
-	// »зєы «њзcellappµƒіЂЋЌ£ђ ƒ«√іќ“√«њ…“‘ѕ»…и÷√entityќ™ghost≤ҐЅҐЉі–тЅ–їѓentityЈҐЌщƒњµƒcellapp
-	// »зєы∆ЏЉд”–baseµƒѕыѕҐЈҐЋЌєэјі£ђ entityµƒghostїъ÷∆ƒ№єї„™µљreal…ѕ»•£ђ “тіЋіЂЋЌ÷Ѓ«∞≤ї–и“™ґ‘base
-	// „ц“ї–©…и÷√£ђіЂЋЌ≥…є¶Їуѕ»…и÷√baseµƒєЎѕµbase‘Џ±їЄƒ±дєЎѕµЇу»‘»ї”–0.1√лµƒ ±Љд ’µљ∞ьЉћ–шЈҐЌщghost£ђ
-	// »зєы“ї÷±”–∞ь‘т“ї÷±ЋҐ–¬ ±Љд÷±µљ√ї”–»ќЇќ∞ь–и“™єг≤•≤Ґ«“≥ђ ±0.1√л÷ЃЇуµƒ∞ь≤≈їб÷±љ”ЈҐЌщreal£©, ’в—щ„цµƒЇ√і¶ «іЂЋЌ≤Ґ≤ї–и“™Ј«≥£љч…чµƒ”лbaseсоЇѕ
-	// іЂЋЌєэ≥ћ÷–”–»ќЇќінќу“≤≤їїб”∞ѕмµљbase≤њЈ÷£ђbase≤њЈ÷µƒ∞ь“≤ƒ№єї∞і’’÷»–тЋЌЌщreal°£
+	// пњљпњљпњљпњљпњљпњљentityпњљпњљbaseпњљпњљпњљ÷£пњљ пњљпњљпњљпњљпњљ«±пњљпњљпњљпњљћЉпњљпњљпњљƒіпњљпњљЌ£пњљпњљпњљ√іпњљпњљЎ≤пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ÷іпњљпњљ
+	// пњљпњљпњљпњљ«њпњљcellappпњљƒіпњљпњљЌ£пњљ пњљпњљ√іпњљпњљпњљ«њпњљпњљпњљпњљпњљпњљпњљпњљпњљentityќ™ghostпњљпњљпњљпњљпњљпњљпњљпњљпњљ–їпњљentityпњљпњљпњљпњљƒњпњљпњљcellapp
+	// пњљпњљпњљпњљЏЉпњљпњљпњљbaseпњљпњљпњљпњљѕҐпњљпњљпњљЌєпњљпњљпњљпњљпњљ entityпњљпњљghostпњљпњљпњљпњљпњљ№єпњљ„™пњљпњљrealпњљпњљ»•пњљпњљ пњљпњљЋіпњљпњљпњљ÷Ѓ«∞пњљпњљпњљпњљ“™пњљпњљbase
+	// пњљпњљ“ї–©пњљпњљпњљ√£пњљпњљпњљпњљЌ≥…єпњљпњљпњљпњљпњљпњљпњљпњљпњљbaseпњљƒєпњљѕµbaseпњљЏ±пњљпњљƒ±пњљпњљѕµпњљпњљпњљпњљ»їпњљпњљ0.1пњљпњљпњљ ±пњљпњљпњљ’µпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљghostпњљпњљ
+	// пњљпњљпњљ“ї÷±пњљ–∞пњљпњљпњљ“ї÷±ЋҐпњљпњљ ±пњљпњљ÷±пњљпњљ√їпњљпњљпњљќЇќ∞пњљпњљпњљ“™пњљг≤•пњљпњљпњљ“≥пњљ ±0.1пњљпњљ÷Ѓпњљпњљƒ∞пњљпњљ≈їпњљ÷±пњљ”Јпњљпњљпњљrealпњљпњљ, пњљпњљпњљпњљпњљпњљпњљƒЇ√іпњљпњљ«іпњљпњљЌ≤пњљпњљпњљпњљпњљ“™пњљ«≥пњљпњљпњљпњљпњљпњљпњљпњљпњљbaseпњљпњљпњљ
+	// пњљпњљпњљЌєпњљпњљпњљпњљпњљпњљпњљпњљќЇќіпњљпњљпњљ“≤пњљпњљпњљпњљ”∞пњљмµљbaseпњљпњљпњљ÷£пњљbaseпњљпњљпњљ÷µƒ∞пњљ“≤пњљ№єпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљrealпњљпњљ
 	if(this->baseEntityCall() != NULL)
 	{
-		// »зєы”–base≤њЈ÷, ќ“√«їє–и“™µч”√“їѕ¬±ЄЈЁє¶ƒ№°£
-		// ”…”Џghostє¶ƒ№їбaddCellDataToStream“їіќ эЊЁЅч£ђ≤Ґ«“‘ЏіЂЋЌ І∞№ ±ƒ№÷Ў”√Є√ µће
-		// “тіЋ’вјп≤ї–и“™љш––±ЄЈЁ
+		// пњљпњљпњљпњљпњљbaseпњљпњљпњљпњљ, пњљпњљпњљ«їпњљпњљпњљ“™пњљпњљпњљпњљ“їпњљ¬±пњљпњљЁєпњљпњљ№°пњљ
+		// пњљпњљпњљпњљghostпњљпњљпњљ№їпњљaddCellDataToStream“їпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљЏіпњљпњљпњљ Іпњљпњљ ±пњљпњљпњљпњљпњљ√Єпњљ µпњљпњљ
+		// пњљпњљпњљпњљпњљпњљп≤їпњљпњљ“™пњљпњљпњљ–±пњљпњљпњљ
 		// this->backupCellData();
 		
 		Network::Channel* pBaseChannel = baseEntityCall()->getChannel();
 		if(pBaseChannel)
 		{
-			// Ќђ ±–и“™Ќ®÷™base‘ЁіжЈҐЌщcellappµƒѕыѕҐ£ђ“тќ™Їу√ж»зєыћш„™≥…є¶–и“™«–їїcellEntityCall”≥…дєЎѕµµљ–¬µƒcellapp
-			// ќ™ЅЋ±№√в‘Џ«–їїµƒ“їЋ≤ЉдѕыѕҐіќ–тЈҐ…ъїм¬“(Њ…µƒcellappѕыѕҐ“≤їб„™µљ–¬µƒcellapp…ѕ)£ђ “тіЋ–и“™‘ЏіЂЋЌ«∞љш––
-			// ‘Ёіж£ђ іЂЋЌ≥…є¶ЇуЌ®÷™Њ…µƒcellappѕъїўentity÷ЃЇуЌђ ±Ќ®÷™baseappЄƒ±д”≥…дєЎѕµ°£
+			// Ќђ ±пњљпњљ“™Ќ®÷™baseпњљЁіжЈҐпњљпњљcellappпњљпњљпњљпњљѕҐпњљпњљпњљпњљќ™пњљпњљпњљпњљпњљпњљпњљпњљпњљ„™пњљ…єпњљпњљпњљ“™пњљ–їпњљcellEntityCall”≥пњљпњљпњљѕµпњљпњљпњљ¬µпњљcellapp
+			// ќ™пњљЋ±пњљпњљпњљпњљпњљпњљ–їпњљпњљпњљ“їЋ≤пњљпњљпњљпњљѕҐпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ(пњљ…µпњљcellappпњљпњљѕҐ“≤пњљпњљ„™пњљпњљпњљ¬µпњљcellappпњљпњљ)пњљпњљ пњљпњљпњљпњљпњљ“™пњљЏіпњљпњљпњљ«∞пњљпњљпњљпњљ
+			// пњљЁіж£ђ пњљпњљпњљЌ≥…єпњљпњљпњљЌ®÷™пњљ…µпњљcellappпњљпњљпњљпњљentity÷ЃпњљпњљЌђ ±Ќ®÷™baseappпњљƒ±пњљ”≥пњљпњљпњљѕµпњљпњљ
 			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 			(*pBundle).newMessage(BaseappInterface::onMigrationCellappStart);
 			(*pBundle) << id();
@@ -3424,7 +3424,7 @@ void Entity::teleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Dir
 //-------------------------------------------------------------------------------------
 void Entity::onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Direction3D& dir)
 {
-	// ќ“√«–и“™љЂentityіт∞ьЈҐЌщƒњµƒcellapp
+	// пњљпњљпњљпњљпњљпњљ“™пњљпњљentityпњљпњљпњљпњљпњљпњљпњљƒњпњљпњљcellapp
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(CellappInterface::reqTeleportToCellApp);
 	(*pBundle) << id();
@@ -3454,33 +3454,33 @@ void Entity::onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, D
 	(*pBundle).append(s);
 	MemoryStream::reclaimPoolObject(s);
 
-	// ‘Ё ±≤їѕъїў’вЄцentity, µ»ƒ«±я≥…є¶ііљ®÷ЃЇу‘ўїЎјіѕъїў
-	// іЋ∆ЏЉдµƒѕыѕҐњ…“‘Ќ®єэghost„™ЈҐЄшreal
-	// »зєыќіƒ№’э»ЈіЂ дєэ»•‘тњ…“‘і”µ±«∞cellЉћ–шї÷Єіentity.
+	// пњљпњљ ±пњљпњљпњљпњљпњљпњљпњљпњљпњљentity, пњљпњљпњљ«±я≥…єпњљпњљпњљпњљпњљ÷Ѓпњљпњљпњљўїпњљпњљпњљпњљпњљпњљпњљ
+	// пњљпњљпњљЏЉпњљпњљпњљпњљѕҐпњљпњљпњљпњљЌ®пњљпњљghost„™пњљпњљпњљпњљreal
+	// пњљпњљпњљќіпњљпњљпњљпњљ»Јпњљпњљпњљпњљпњљ»•пњљпњљпњљпњљ‘і”µпњљ«∞cellпњљпњљпњљпњљпњљ÷Єпњљentity.
 	// Cellapp::getSingleton().destroyEntity(id(), false);
 
 	nearbyMBRef->sendCall(pBundle);
 
-	// –тЅ–їѓЇуљЂentityѕ»Ќ£÷є“∆ґѓ£ђ »зєыіЂЋЌ І∞№ЅЋ‘тњ…“‘ЄщЊЁ–тЅ–їѓµƒƒЏ»Ёљш––ї÷Єі
+	// пњљпњљпњљ–їпњљпњљпњљentityпњљпњљЌ£÷єпњљ∆ґпњљпњљпњљ пњљпњљпњљпњљпњљпњљпњљ Іпњљпњљпњљпњљпњљпњљпњљпњљ‘Єпњљпњљпњљпњљпњљпњљ–їпњљпњљпњљпњљпњљпњљЁљпњљпњљ–ї÷Єпњљ
 	stopMove();
 }
 
 //-------------------------------------------------------------------------------------
 void Entity::teleportLocal(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& dir)
 {
-	// ±ЊµЎћш„™‘Џќіјі–и“™њЉ¬«space±їЈ÷Єоќ™ґаcellµƒ«йњц£ђ µ±«∞÷±љ”≤ў„ч
+	// пњљпњљпњљпњљпњљпњљ„™пњљпњљќіпњљпњљпњљпњљ“™пњљпњљпњљпњљspaceпњљпњљпњљ÷Єпњљќ™пњљпњљcellпњљпњљпњљпњљпњљпњљпњљ пњљпњљ«∞÷±пњљ”≤пњљпњљпњљ
 	SPACE_ID lastSpaceID = this->spaceID();
 
-	// ѕ»“™і”CoordinateSystem÷–…Њ≥эentityљЏµг
+	// пњљпњљ“™пњљпњљCoordinateSystemпњљпњљ…ЊпњљпњљentityпњљЏµпњљ
 	Space* currspace = Spaces::findSpace(this->spaceID());
 	this->uninstallCoordinateNodes(currspace->pCoordinateSystem());
 
-	// іЋ ±≤їїб»≈ґѓranglist
+	// пњљпњљ ±пњљпњљпњљпњљпњљ≈ґпњљranglist
 	this->setPositionAndDirection(pos, dir);
 
 	if(this->pWitness())
 	{
-		// Ќ®÷™ќї÷√«њ÷∆Єƒ±д
+		// Ќ®÷™ќїпњљпњљ«њпњљ∆Єƒ±пњљ
 		Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(id(), (*pSendBundle));
 		
@@ -3510,12 +3510,12 @@ void Entity::teleportLocal(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3
 		if (pChannel == NULL)
 			continue;
 
-		// ’вЄцњ…ƒ№–‘ «іж‘Џµƒ£ђјэ»з эЊЁјі‘і”ЏcreateWitnessFromStream()
-		// ”÷»з„‘ЉЇµƒentityїєќі‘Џƒњ±књЌїІґЋ…ѕііљ®
+		// пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ«іпњљпњљЏµƒ£пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ‘іпњљпњљcreateWitnessFromStream()
+		// пњљпњљпњљпњљпњљ‘ЉпњљпњљпњљentityпњљпњљќіпњљпњљƒњпњљпњљЌїпњљпњљпњљпњљѕіпњљпњљпњљ
 		if (!pEntity->pWitness()->entityInView(id()))
 			continue;
 
-		// Ќ®÷™ќї÷√«њ÷∆Єƒ±д
+		// Ќ®÷™ќїпњљпњљ«њпњљ∆Єƒ±пњљ
 		Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pEntity->id(), (*pSendBundle));
 		
@@ -3535,42 +3535,42 @@ void Entity::teleportLocal(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3
 void Entity::teleport(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& dir)
 {
 	/*
-		1: »ќЇќ–ќ љµƒteleportґЉ±ї»ѕќ™ «Ћ≤Љд“∆ґѓµƒ£®њ…Ќї∆∆њ’Љдѕё÷∆љш»лµљ»ќЇќњ’Љд£©£ђ ƒƒ≈¬ «‘Џµ±«∞ќї÷√÷ї“∆ґѓЅЋ0.1√„, ’вЊЌ‘м≥…»зєыµ±«∞entity
-			Є’Ї√‘Џƒ≥Єцtrap÷–£ђ teleportѕт«∞“∆ґѓ0.1√„µЂ «√ї”–≥цtrap£ђ “тќ™’в «Ћ≤Љд“∆ґѓµƒћЎ–‘ќ“√«ƒњ«∞»ѕќ™
-			entityїбѕ»јлњ™trap≤Ґ«“і•ЈҐѕаєЎїЎµч, »їЇуЋ≤ ±≥цѕ÷‘ЏЅЋЅн“їЄцµг£ђ ƒ«√і“тќ™Є√µг“≤ «‘Џµ±«∞trap÷–Ћщ“‘”÷їб≈„≥цљш»лtrapїЎµч.
+		1: пњљќЇпњљпњљпњљ љпњљпњљteleportпњљпњљпњљпњљпњљпњљќ™пњљпњљЋ≤пњљпњљпњљ∆ґпњљпњљƒ£пњљпњљпњљЌїпњљ∆њ’Љпњљпњљпњљпњљ∆љпњљпњљлµљпњљќЇќњ’Љд£©пњљпњљ пњљпњљпњљпњљпњљпњљпњљЏµпњљ«∞ќїпњљпњљ÷їпњљ∆ґпњљпњљпњљ0.1пњљпњљ, пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ«∞entity
+			пњљ’Їпњљпњљпњљƒ≥пњљпњљtrapпњљ–£пњљ teleportпњљпњљ«∞пњљ∆ґпњљ0.1пњљ„µпњљпњљпњљ√їпњљ–≥пњљtrapпњљпњљ пњљпњљќ™пњљпњљпњљпњљЋ≤пњљпњљпњљ∆ґпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљƒњ«∞пњљпњљќ™
+			entityпњљпњљпњљпњљпњљлњ™trapпњљпњљпњљ“іпњљпњљпњљпњљпњљЎїЎµпњљ, »їпњљпњљЋ≤ ±пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ“їпњљпњљпњљг£ђ пњљпњљ√іпњљпњљќ™пњљ√µпњљ“≤пњљпњљпњљЏµпњљ«∞trapпњљпњљпњљпњљпњљпњљпњљ÷їпњљпњљ„≥пњљпњљпњљпњљпњљtrapпњљЎµпњљ.
 
-		2: »зєы «µ±«∞space…ѕћш„™‘тЅҐЉіљш––“∆ґѓ≤ў„ч
+		2: пњљпњљпњљпњљ«µпњљ«∞spaceпњљпњљпњљпњљ„™пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ∆ґпњљпњљпњљпњљпњљ
 
-		3: »зєы «ћш„™µљ∆дЋыspace…ѕ, µЂ «ƒ«Єцspace“≤‘Џµ±«∞cellapp…ѕµƒ«йњц ±£ђ ЅҐЉі÷і––ћш„™≤ў„ч(“тќ™≤ї–и“™љш––»ќЇќ∆дЋыєЎѕµµƒќђї§£ђ ÷±љ”«–їїЊЌЇ√ЅЋ)°£ 
+		3: пњљпњљпњљпњљпњљпњљпњљ„™пњљпњљпњљпњљпњљпњљspaceпњљпњљ, пњљпњљпњљпњљпњљ«Єпњљspace“≤пњљЏµпњљ«∞cellappпњљѕµпњљпњљпњљпњљ ±пњљпњљ пњљпњљпњљпњљ÷іпњљпњљпњљпњљ„™пњљпњљпњљпњљ(пњљпњљќ™пњљпњљпњљпњљ“™пњљпњљпњљпњљпњљќЇпњљпњљпњљпњљпњљпњљпњљѕµпњљпњљќђпњљпњљпњљпњљ ÷±пњљпњљпњљ–їпњљпњљЌЇпњљпњљпњљ)пњљпњљ 
 		
-		4: »зєы“™ћш„™µƒƒњ±кspace‘ЏЅн“їЄцcellapp…ѕ£Ї
-			4.1: µ±«∞entity√ї”–base≤њЈ÷£ђ ≤їњЉ¬«ќђї§base≤њЈ÷µƒєЎѕµ£ђ µЂ «їє «“™њЉ¬«“вЌв«йњцµЉ÷¬ћш„™ І∞№£ђ ƒ«√ііЋ ±”¶Є√ЈµїЎћш„™ І∞№їЎµч≤Ґ«“Љћ–ш
-			’э≥£іж‘Џ”Џµ±«∞space…ѕ°£
+		4: пњљпњљпњљ“™пњљпњљ„™пњљпњљƒњпњљпњљspaceпњљпњљпњљпњљ“їпњљпњљcellappпњљѕ£пњљ
+			4.1: пњљпњљ«∞entity√їпњљпњљbaseпњљпњљпњљ÷£пњљ пњљпњљпњљпњљпњљпњљќђпњљпњљbaseпњљпњљпњљ÷µƒєпњљѕµпњљпњљ пњљпњљпњљ«їпњљпњљпњљ“™пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ„™ Іпњљ№£пњљ пњљпњљ√іпњљпњљ ±”¶пњљ√Јпњљпњљпњљпњљпњљ„™ Іпњљ№їЎµпњљпњљпњљпњљ“Љпњљпњљпњљ
+			пњљпњљпњљпњљпњљпњљпњљпњљпњљЏµпњљ«∞spaceпњљѕ°пњљ
 		
-			4.2: µ±«∞entity”–base≤њЈ÷£ђ ƒ«√іќ“√«–и“™Єƒ±дbaseЋщ”≥…дµƒcell≤њЈ÷(≤Ґ«“‘Џќі’э љ«–їїєЎѕµ ±baseapp…ѕЋщ”–ЋЌіпcellµƒѕыѕҐґЉ”¶Є√≤ї±їґ™ І)£ђ ќ™ЅЋ∞≤»Ђќ“√«–и“™„ц“ї–©є§„ч
+			4.2: пњљпњљ«∞entityпњљпњљbaseпњљпњљпњљ÷£пњљ пњљпњљ√іпњљпњљпњљпњљпњљпњљ“™пњљƒ±пњљbaseпњљпњљ”≥пњљпњљпњљcellпњљпњљпњљпњљ(пњљпњљпњљпњљпњљпњљќіпњљпњљ љпњљ–їпњљпњљпњљѕµ ±baseappпњљпњљпњљпњљпњљпњљпњљЌіпњљcellпњљпњљпњљпњљѕҐпњљпњљ”¶пњљ√≤пњљпњљпњљпњљпњљ І)пњљпњљ ќ™пњљЋ∞пњљ»Ђпњљпњљпњљпњљпњљпњљ“™пњљпњљ“ї–©пњљпњљпњљпњљ
 	*/
 
 	Py_INCREF(this);
 
-	// »зєыќ™None‘т «entity„‘ЉЇѕл‘Џ±Њspace…ѕћш„™µљƒ≥ќї÷√
+	// пњљпњљпњљќ™Noneпњљпњљпњљпњљentityпњљ‘ЉпњљпњљпњљпњљЏ±пњљspaceпњљпњљпњљпњљ„™пњљпњљƒ≥ќїпњљпњљ
 	if(nearbyMBRef == Py_None)
 	{
-		// ÷±љ”÷і––≤ў„ч
+		// ÷±пњљпњљ÷іпњљ–≤пњљпњљпњљ
 		teleportLocal(nearbyMBRef, pos, dir);
 	}
 	else
 	{
 		//EntityCall* mb = NULL;
 
-		// »зєы «entity‘т“їґ® «‘Џ±Њcellapp…ѕ£ђ њ…“‘÷±љ”љш––≤ў„ч
+		// пњљпњљпњљпњљпњљentityпњљпњљ“їпњљпњљпњљпњљпњљЏ±пњљcellappпњљѕ£пњљ пњљпњљпњљпњљ÷±пњљ”љпњљпњљ–≤пњљпњљпњљ
 		if(PyObject_TypeCheck(nearbyMBRef, Entity::getScriptType()))
 		{
 			teleportRefEntity(static_cast<Entity*>(nearbyMBRef), pos, dir);
 		}
 		else
 		{
-			// »зєы «entityCall, ѕ»Љм≤й±Њcell…ѕ «Јсƒ№єїЌ®єэ’вЄцentityCallµƒID’“µљentity
-			// »зєыƒ№’“µљ‘т“≤ «‘Џ±Њcellapp…ѕњ…÷±љ”љш––≤ў„ч
+			// пњљпњљпњљпњљпњљentityCall, пњљ»Љпњљй±Њcellпњљпњљпњљ«Јпњљпњљ№єпњљЌ®пњљпњљпњљпњљпњљentityCallпњљпњљIDпњљ“µпњљentity
+			// пњљпњљпњљпњљпњљпњљ“µпњљпњљпњљ“≤пњљпњљпњљЏ±пњљcellappпњљѕњпњљ÷±пњљ”љпњљпњљ–≤пњљпњљпњљ
 			if(PyObject_TypeCheck(nearbyMBRef, EntityCall::getScriptType()))
 			{
 				EntityCall* mb = static_cast<EntityCall*>(nearbyMBRef);
@@ -3587,7 +3587,7 @@ void Entity::teleport(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& di
 			}
 			else
 			{
-				// »зєы≤ї «entity£ђ “≤≤ї «entityCallЌђ ±“≤≤ї «None? ƒ«њѕґ® « д»лінќу
+				// пњљпњљпњљпњљпњљпњљпњљentityпњљпњљ “≤пњљпњљпњљпњљentityCallЌђ ±“≤пњљпњљпњљпњљNone? пњљ«њѕґпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ
 				PyErr_Format(PyExc_Exception, "%s::teleport: %d, nearbyRef error!\n", scriptName(), id());
 				PyErr_PrintEx(0);
 
@@ -3602,7 +3602,7 @@ void Entity::teleport(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& di
 //-------------------------------------------------------------------------------------
 void Entity::onTeleport()
 {
-	// ’вЄцЈљЈ®љц‘Џbase.teleportћш„™÷Ѓ«∞±їµч”√£ђ cell.teleport «≤їїб±їµч”√µƒ°£
+	// пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљbase.teleportпњљпњљ„™÷Ѓ«∞пњљпњљпњљпњљпњљ√£пњљ cell.teleportпњљ«≤пњљпњљб±їпњљпњљпњљ√µƒ°пњљ
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
 	bufferOrExeCallback(const_cast<char*>("onTeleport"), NULL);
@@ -3628,7 +3628,7 @@ void Entity::onTeleportSuccess(PyObject* nearbyEntity, SPACE_ID lastSpaceID)
 		_sendBaseTeleportResult(this->id(), mb->componentID(), this->spaceID(), lastSpaceID, true);
 	}
 
-	// »зєы…н…ѕ”–trapµ»і•ЈҐ∆чїєµ√÷Ў–¬ћнЉ”љш»•
+	// пњљпњљпњљпњљпњљпњљпњљпњљпњљtrapпњљ»іпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ”љпњљ»•
 	restoreProximitys();
 
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
@@ -3765,11 +3765,11 @@ void Entity::onUpdateGhostVolatileData(KBEngine::MemoryStream& s)
 //-------------------------------------------------------------------------------------
 void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s)
 {
-	// “їЄцentity“™„™±дќ™ghost
-	//  „ѕ»–и“™…и÷√„‘…нµƒrealCell
-	// љЂЋщ”–def эЊЁћнЉ”љшЅч
-	// –тЅ–їѓcontroller≤ҐЌ£÷єЋщ”–µƒcontroller(timer, navigate, trap,...)
-	// –ґ‘Ўwitness£ђ ≤Ґ«“–тЅ–їѓ
+	// “їпњљпњљentity“™„™пњљпњљќ™ghost
+	// пњљпњљпњљпњљпњљпњљ“™пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљrealCell
+	// пњљпњљпњљпњљпњљпњљdefпњљпњљпњљпњљпњљпњљпњљ”љпњљпњљпњљ
+	// пњљпњљпњљ–їпњљcontrollerпњљпњљЌ£÷єпњљпњљпњљ–µпњљcontroller(timer, navigate, trap,...)
+	// –ґпњљпњљwitnessпњљпњљ пњљпњљпњљпњљпњљпњљпњљ–їпњљ
 	KBE_ASSERT(isReal() == true && "Entity::changeToGhost(): not is real.\n");
 	KBE_ASSERT(realCell_ != g_componentID);
 
@@ -3785,7 +3785,7 @@ void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s)
 	DEBUG_MSG(fmt::format("{}::changeToGhost(): {}, realCell={}, spaceID={}, position=({},{},{}).\n", 
 		scriptName(), id(), realCell_, spaceID_, position().x, position().y, position().z));
 	
-	// ±Ў–лЈ≈‘Џ«∞√ж
+	// пњљпњљпњљпњљпњљпњљпњљ«∞пњљпњљ
 	addToStream(s);
 
 	//witnesses_.clear();
@@ -3811,11 +3811,11 @@ void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s)
 //-------------------------------------------------------------------------------------
 void Entity::changeToReal(COMPONENT_ID ghostCell, KBEngine::MemoryStream& s)
 {
-	// “їЄцentity“™„™±дќ™real
-	//  „ѕ»–и“™…и÷√„‘…нµƒghostCell
-	// љЂЋщ”–def эЊЁћнЉ”љшЅч
-	// Јі–тЅ–їѓcontroller≤Ґї÷ЄіЋщ”–µƒcontroller(timer, navigate, trap,...)
-	// Јі–тЅ–їѓ∞≤„∞witness
+	// “їпњљпњљentity“™„™пњљпњљќ™real
+	// пњљпњљпњљпњљпњљпњљ“™пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљghostCell
+	// пњљпњљпњљпњљпњљпњљdefпњљпњљпњљпњљпњљпњљпњљ”љпњљпњљпњљ
+	// пњљпњљпњљпњљпњљ–їпњљcontrollerпњљпњљпњљ÷Єпњљпњљпњљпњљ–µпњљcontroller(timer, navigate, trap,...)
+	// пњљпњљпњљпњљпњљ–їпњљпњљпњљ„∞witness
 	KBE_ASSERT(isReal() == false && "Entity::changeToReal(): not is ghost.\n");
 
 	ghostCell_ = ghostCell;
@@ -3879,20 +3879,20 @@ void Entity::createFromStream(KBEngine::MemoryStream& s)
 		pCustomVolatileinfo_->createFromStream(s);
 	}
 
-	// іЋ ±«њ÷∆…и÷√ќ™≤ї‘ЏµЎ√ж£ђќёЈ®≈–ґ®∆д «Јс‘ЏµЎ√ж£ђљ«…Ђ–и“™њЌїІґЋ…ѕ±® «Јс‘ЏµЎ√ж
-	// ґшЈюќсґЋµƒNPC‘т”л“∆ґѓЇу «Јс‘ЏµЎ√жјі≈–ґ®°£
+	// пњљпњљ ±«њпњљпњљпњљпњљпњљпњљќ™пњљпњљпњљЏµпњљпњљж£ђпњљёЈпњљпњљ–ґпњљпњљпњљпњљ«ЈпњљпњљЏµпњљпњљж£ђпњљпњљ…Ђпњљпњљ“™пњљЌїпњљпњљпњљпњљѕ±пњљпњљ«ЈпњљпњљЏµпњљпњљпњљ
+	// пњљпњљпњљпњљпњљпњљЋµпњљNPCпњљпњљпњљпњљпњљ∆ґпњљпњљпњљпњљ«ЈпњљпњљЏµпњљпњљпњљпњљпњљпњљ–ґпњљпњљпњљ
 	isOnGround_ = false;
 
 	this->pScriptModule_ = EntityDef::findScriptModule(scriptUType);
 
 	KBE_ASSERT(this->pScriptModule_);
 
-	// …и÷√entityµƒbaseEntityCall
+	// пњљпњљпњљпњљentityпњљпњљbaseEntityCall
 	if(baseEntityCallComponentID > 0)
 		baseEntityCall(new EntityCall(pScriptModule(), NULL, baseEntityCallComponentID, id_, ENTITYCALL_TYPE_BASE));
 
-	// »зєыіЂЋЌ«∞µƒњЎ÷∆’я «ѕµЌ≥їт„‘ЉЇµƒњЌїІґЋ£ђ‘тЉћ–ш±£≥÷
-	// »зєы «∆дЋьњЌїІґЋ‘ЏњЎ÷∆£ђ‘т≥Ґ ‘ї÷ЄіњЎ÷∆єЎѕµ£ђ»зєыќёЈ®ї÷Єі£ђ‘т÷Ў÷√
+	// пњљпњљпњљпњљпњљпњљпњљ«∞пњљƒњпњљпњљпњљпњљпњљпњљпњљѕµЌ≥пњљпњљпњљ‘ЉпњљпњљƒњЌїпњљпњљЋ£пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ
+	// пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљЌїпњљпњљпњљпњљЏњпњљпњљ∆£пњљпњљпњљпњљ‘ї÷Єпњљпњљпњљпњљ∆єпњљѕµпњљпњљпњљпњљпњљпњљёЈпњљпњљ÷Єпњљпњљпњљпњљпњљпњљпњљпњљпњљ
 	if (controlledByID == id())
 		controlledBy(baseEntityCall());
 	else if (controlledByID == 0)
@@ -3928,7 +3928,7 @@ void Entity::addControllersToStream(KBEngine::MemoryStream& s)
 	{
 		s << true;
 
-		// ±Ў–лѕ»«ејн“∆ґѓѕаєЎµƒControllers
+		// пњљпњљпњљпњљпњљпњљпњљпњљпњљпњљпњљ∆ґпњљпњљпњљЎµпњљControllers
 		stopMove();
 
 		pControllers_->addToStream(s);
@@ -4056,7 +4056,7 @@ void Entity::createWitnessFromStream(KBEngine::MemoryStream& s)
 		EntityCall* client = static_cast<EntityCall*>(clientMB);	
 		clientEntityCall(client);
 
-		// ≤ї“™ є”√setWitness£ђ“тќ™іЋ ±≤ї–и“™„яonAttachЅч≥ћ£ђњЌїІґЋ≤ї–и“™÷Ў–¬enterworld°£
+		// пњљпњљ“™ єпњљпњљsetWitnessпњљпњљпњљпњљќ™пњљпњљ ±пњљпњљпњљпњљ“™пњљпњљonAttachпњљпњљпњљћ£пњљпњљЌїпњљпњљЋ≤пњљпњљпњљ“™пњљпњљпњљпњљenterworldпњљпњљ
 		// setWitness(Witness::createPoolObject());
 		pWitness_ = Witness::createPoolObject(OBJECTPOOL_POINT);
 		pWitness_->pEntity(this);

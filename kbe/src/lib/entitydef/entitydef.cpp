@@ -51,7 +51,7 @@ bool g_isReload = false;
 bool EntityDef::__entityAliasID = false;
 bool EntityDef::__entitydefAliasID = false;
 
-// ·½·¨²úÉúÊ±×Ô¶¯²úÉúutypeÓÃµÄ
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½utypeï¿½Ãµï¿½
 ENTITY_METHOD_UID g_methodUtypeAuto = 1;
 std::vector<ENTITY_METHOD_UID> g_methodCusUtypes;																									
 
@@ -166,22 +166,22 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 	std::string defFilePath = __entitiesPath + "entity_defs/";
 	ENTITY_SCRIPT_UID utype = 1;
 	
-	// ³õÊ¼»¯Êý¾ÝÀà±ð
+	// ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	// assets/scripts/entity_defs/types.xml
 	if(!DataTypes::initialize(defFilePath + "types.xml"))
 		return false;
 
-	// ´ò¿ªÕâ¸öentities.xmlÎÄ¼þ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½entities.xmlï¿½Ä¼ï¿½
 	SmartPointer<XML> xml(new XML());
 	if(!xml->openSection(entitiesFile.c_str()))
 		return false;
 	
-	// »ñµÃentities.xml¸ù½Úµã, Èç¹ûÃ»ÓÐ¶¨ÒåÒ»¸öentityÄÇÃ´Ö±½Ó·µ»Øtrue
+	// ï¿½ï¿½ï¿½entities.xmlï¿½ï¿½ï¿½Úµï¿½, ï¿½ï¿½ï¿½Ã»ï¿½Ð¶ï¿½ï¿½ï¿½Ò»ï¿½ï¿½entityï¿½ï¿½Ã´Ö±ï¿½Ó·ï¿½ï¿½ï¿½true
 	TiXmlNode* node = xml->getRootNode();
 	if(node == NULL)
 		return true;
 
-	// ¿ªÊ¼±éÀúËùÓÐµÄentity½Úµã
+	// ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½entityï¿½Úµï¿½
 	XML_FOR_BEGIN(node)
 	{
 		std::string moduleName = xml.get()->getKey(node);
@@ -198,11 +198,11 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 		TiXmlNode* defNode = defxml->getRootNode();
 		if(defNode == NULL)
 		{
-			// root½ÚµãÏÂÃ»ÓÐ×Ó½ÚµãÁË
+			// rootï¿½Úµï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½Ó½Úµï¿½ï¿½ï¿½
 			continue;
 		}
 
-		// ¼ÓÔØdefÎÄ¼þÖÐµÄ¶¨Òå
+		// ï¿½ï¿½ï¿½ï¿½defï¿½Ä¼ï¿½ï¿½ÐµÄ¶ï¿½ï¿½ï¿½
 		if(!loadDefInfo(defFilePath, moduleName, defxml.get(), defNode, pScriptModule))
 		{
 			ERROR_MSG(fmt::format("EntityDef::initialize: failed to load entity({}) module!\n",
@@ -211,7 +211,7 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 			return false;
 		}
 		
-		// ³¢ÊÔÔÚÖ÷entityÎÄ¼þÖÐ¼ÓÔØdetailLevelÊý¾Ý
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½Ä¼ï¿½ï¿½Ð¼ï¿½ï¿½ï¿½detailLevelï¿½ï¿½ï¿½ï¿½
 		if(!loadDetailLevelInfo(defFilePath, moduleName, defxml.get(), defNode, pScriptModule))
 		{
 			ERROR_MSG(fmt::format("EntityDef::initialize: failed to load entity({}) DetailLevelInfo!\n",
@@ -247,7 +247,7 @@ bool EntityDef::loadDefInfo(const std::string& defFilePath,
 		return false;
 	}
 	
-	// ±éÀúËùÓÐµÄinterface£¬ ²¢½«ËûÃÇµÄ·½·¨ºÍÊôÐÔ¼ÓÈëµ½Ä£¿éÖÐ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½interfaceï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÇµÄ·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ëµ½Ä£ï¿½ï¿½ï¿½ï¿½
 	if(!loadInterfaces(defFilePath, moduleName, defxml, defNode, pScriptModule))
 	{
 		ERROR_MSG(fmt::format("EntityDef::loadDefInfo: failed to load entity:{} interface.\n",
@@ -256,7 +256,7 @@ bool EntityDef::loadDefInfo(const std::string& defFilePath,
 		return false;
 	}
 	
-	// ¼ÓÔØ¸¸ÀàËùÓÐµÄÄÚÈÝ
+	// ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½ï¿½
 	if(!loadParentClass(defFilePath, moduleName, defxml, defNode, pScriptModule))
 	{
 		ERROR_MSG(fmt::format("EntityDef::loadDefInfo: failed to load entity:{} parentClass.\n",
@@ -265,7 +265,7 @@ bool EntityDef::loadDefInfo(const std::string& defFilePath,
 		return false;
 	}
 
-	// ³¢ÊÔ¼ÓÔØdetailLevelÊý¾Ý
+	// ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½detailLevelï¿½ï¿½ï¿½ï¿½
 	if(!loadDetailLevelInfo(defFilePath, moduleName, defxml, defNode, pScriptModule))
 	{
 		ERROR_MSG(fmt::format("EntityDef::loadDefInfo: failed to load entity:{} DetailLevelInfo.\n",
@@ -274,7 +274,7 @@ bool EntityDef::loadDefInfo(const std::string& defFilePath,
 		return false;
 	}
 
-	// ³¢ÊÔ¼ÓÔØVolatileInfoÊý¾Ý
+	// ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½VolatileInfoï¿½ï¿½ï¿½ï¿½
 	if(!loadVolatileInfo(defFilePath, moduleName, defxml, defNode, pScriptModule))
 	{
 		ERROR_MSG(fmt::format("EntityDef::loadDefInfo: failed to load entity:{} VolatileInfo.\n",
@@ -479,7 +479,7 @@ bool EntityDef::loadInterfaces(const std::string& defFilePath,
 		TiXmlNode* interfaceRootNode = interfaceXml->getRootNode();
 		if(interfaceRootNode == NULL)
 		{
-			// root½ÚµãÏÂÃ»ÓÐ×Ó½ÚµãÁË
+			// rootï¿½Úµï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½Ó½Úµï¿½ï¿½ï¿½
 			return true;
 		}
 
@@ -491,7 +491,7 @@ bool EntityDef::loadInterfaces(const std::string& defFilePath,
 			return false;
 		}
 
-		// ³¢ÊÔ¼ÓÔØdetailLevelÊý¾Ý
+		// ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½detailLevelï¿½ï¿½ï¿½ï¿½
 		if(!loadDetailLevelInfo(defFilePath, moduleName, interfaceXml.get(), interfaceRootNode, pScriptModule))
 		{
 			ERROR_MSG(fmt::format("EntityDef::loadInterfaces: failed to load entity:{} DetailLevelInfo.\n",
@@ -500,7 +500,7 @@ bool EntityDef::loadInterfaces(const std::string& defFilePath,
 			return false;
 		}
 
-		// ±éÀúËùÓÐµÄinterface£¬ ²¢½«ËûÃÇµÄ·½·¨ºÍÊôÐÔ¼ÓÈëµ½Ä£¿éÖÐ
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½interfaceï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÇµÄ·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ëµ½Ä£ï¿½ï¿½ï¿½ï¿½
 		if(!loadInterfaces(defFilePath, moduleName, interfaceXml.get(), interfaceRootNode, pScriptModule))
 		{
 			ERROR_MSG(fmt::format("EntityDef::loadInterfaces: failed to load entity:{} interface.\n",
@@ -536,11 +536,11 @@ bool EntityDef::loadParentClass(const std::string& defFilePath,
 	TiXmlNode* parentClassdefNode = parentClassXml->getRootNode();
 	if(parentClassdefNode == NULL)
 	{
-		// root½ÚµãÏÂÃ»ÓÐ×Ó½ÚµãÁË
+		// rootï¿½Úµï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½Ó½Úµï¿½ï¿½ï¿½
 		return true;
 	}
 
-	// ¼ÓÔØdefÎÄ¼þÖÐµÄ¶¨Òå
+	// ï¿½ï¿½ï¿½ï¿½defï¿½Ä¼ï¿½ï¿½ÐµÄ¶ï¿½ï¿½ï¿½
 	if(!loadDefInfo(defFilePath, parentClassName, parentClassXml.get(), parentClassdefNode, pScriptModule))
 	{
 		ERROR_MSG(fmt::format("EntityDef::loadParentClass: failed to load entity:{} parentClass.\n",
@@ -558,11 +558,11 @@ bool EntityDef::loadAllDefDescriptions(const std::string& moduleName,
 									  TiXmlNode* defNode, 
 									  ScriptDefModule* pScriptModule)
 {
-	// ¼ÓÔØÊôÐÔÃèÊö
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if(!loadDefPropertys(moduleName, defxml, defxml->enterNode(defNode, "Properties"), pScriptModule))
 		return false;
 	
-	// ¼ÓÔØcell·½·¨ÃèÊö
+	// ï¿½ï¿½ï¿½ï¿½cellï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if(!loadDefCellMethods(moduleName, defxml, defxml->enterNode(defNode, "CellMethods"), pScriptModule))
 	{
 		ERROR_MSG(fmt::format("EntityDef::loadAllDefDescription:loadDefCellMethods[{}] is failed!\n",
@@ -571,7 +571,7 @@ bool EntityDef::loadAllDefDescriptions(const std::string& moduleName,
 		return false;
 	}
 
-	// ¼ÓÔØbase·½·¨ÃèÊö
+	// ï¿½ï¿½ï¿½ï¿½baseï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if(!loadDefBaseMethods(moduleName, defxml, defxml->enterNode(defNode, "BaseMethods"), pScriptModule))
 	{
 		ERROR_MSG(fmt::format("EntityDef::loadAllDefDescription:loadDefBaseMethods[{}] is failed!\n",
@@ -580,7 +580,7 @@ bool EntityDef::loadAllDefDescriptions(const std::string& moduleName,
 		return false;
 	}
 
-	// ¼ÓÔØclient·½·¨ÃèÊö
+	// ï¿½ï¿½ï¿½ï¿½clientï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if(!loadDefClientMethods(moduleName, defxml, defxml->enterNode(defNode, "ClientMethods"), pScriptModule))
 	{
 		ERROR_MSG(fmt::format("EntityDef::loadAllDefDescription:loadDefClientMethods[{}] is failed!\n",
@@ -660,8 +660,8 @@ bool EntityDef::loadDefPropertys(const std::string& moduleName,
 			int32						hasClientFlags = 0;
 			DataType*					dataType = NULL;
 			bool						isPersistent = false;
-			bool						isIdentifier = false;		// ÊÇ·ñÊÇÒ»¸öË÷Òý¼ü
-			uint32						databaseLength = 0;			// Õâ¸öÊôÐÔÔÚÊý¾Ý¿âÖÐµÄ³¤¶È
+			bool						isIdentifier = false;		// ï¿½Ç·ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+			uint32						databaseLength = 0;			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ÐµÄ³ï¿½ï¿½ï¿½
 			std::string					indexType;
 			DETAIL_TYPE					detailLevel = DETAIL_LEVEL_FAR;
 			std::string					detailLevelStr = "";
@@ -834,7 +834,7 @@ bool EntityDef::loadDefPropertys(const std::string& moduleName,
 					return false;
 				}
 
-				// ¼ì²éÊÇ·ñÓÐÖØ¸´µÄUtype
+				// ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½ï¿½Utype
 				std::vector<ENTITY_PROPERTY_UID>::iterator iter =
 					std::find(g_propertyUtypes.begin(), g_propertyUtypes.end(), futype);
 
@@ -890,7 +890,7 @@ bool EntityDef::loadDefPropertys(const std::string& moduleName,
 				g_propertyUtypes.push_back(futype);
 			}
 
-			// ²úÉúÒ»¸öÊôÐÔÃèÊöÊµÀý
+			// ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½
 			PropertyDescription* propertyDescription = PropertyDescription::createDescription(futype, strType, 
 															name, flags, isPersistent, 
 															dataType, isIdentifier, indexType,
@@ -899,7 +899,7 @@ bool EntityDef::loadDefPropertys(const std::string& moduleName,
 
 			bool ret = true;
 
-			// Ìí¼Óµ½Ä£¿éÖÐ
+			// ï¿½ï¿½ï¿½Óµï¿½Ä£ï¿½ï¿½ï¿½ï¿½
 			if(hasCellFlags > 0)
 				ret = pScriptModule->addPropertyDescription(name.c_str(),
 						propertyDescription, CELLAPP_TYPE);
@@ -940,7 +940,7 @@ bool EntityDef::loadDefCellMethods(const std::string& moduleName,
 			MethodDescription* methodDescription = new MethodDescription(0, CELLAPP_TYPE, name);
 			TiXmlNode* argNode = defMethodNode->FirstChild();
 			
-			// ¿ÉÄÜÃ»ÓÐ²ÎÊý
+			// ï¿½ï¿½ï¿½ï¿½Ã»ï¿½Ð²ï¿½ï¿½ï¿½
 			if(argNode)
 			{
 				XML_FOR_BEGIN(argNode)
@@ -1000,7 +1000,7 @@ bool EntityDef::loadDefCellMethods(const std::string& moduleName,
 				XML_FOR_END(argNode);		
 			}
 
-			// Èç¹ûÅäÖÃÖÐÃ»ÓÐÉèÖÃ¹ýutype, Ôò²úÉú
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½Ã¹ï¿½utype, ï¿½ï¿½ï¿½ï¿½ï¿½
 			if(methodDescription->getUType() <= 0)
 			{
 				ENTITY_METHOD_UID muid = 0;
@@ -1021,7 +1021,7 @@ bool EntityDef::loadDefCellMethods(const std::string& moduleName,
 			}
 			else
 			{
-				// ¼ì²éÊÇ·ñÓÐÖØ¸´µÄUtype
+				// ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½ï¿½Utype
 				ENTITY_METHOD_UID muid = methodDescription->getUType();
 				std::vector<ENTITY_METHOD_UID>::iterator iter =
 					std::find(g_methodCusUtypes.begin(), g_methodCusUtypes.end(), muid);
@@ -1083,7 +1083,7 @@ bool EntityDef::loadDefBaseMethods(const std::string& moduleName, XML* xml,
 			MethodDescription* methodDescription = new MethodDescription(0, BASEAPP_TYPE, name);
 			TiXmlNode* argNode = defMethodNode->FirstChild();
 
-			// ¿ÉÄÜÃ»ÓÐ²ÎÊý
+			// ï¿½ï¿½ï¿½ï¿½Ã»ï¿½Ð²ï¿½ï¿½ï¿½
 			if(argNode)
 			{
 				XML_FOR_BEGIN(argNode)
@@ -1143,7 +1143,7 @@ bool EntityDef::loadDefBaseMethods(const std::string& moduleName, XML* xml,
 				XML_FOR_END(argNode);		
 			}
 
-			// Èç¹ûÅäÖÃÖÐÃ»ÓÐÉèÖÃ¹ýutype, Ôò²úÉú
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½Ã¹ï¿½utype, ï¿½ï¿½ï¿½ï¿½ï¿½
 			if(methodDescription->getUType() <= 0)
 			{
 				ENTITY_METHOD_UID muid = 0;
@@ -1164,7 +1164,7 @@ bool EntityDef::loadDefBaseMethods(const std::string& moduleName, XML* xml,
 			}
 			else
 			{
-				// ¼ì²éÊÇ·ñÓÐÖØ¸´µÄUtype
+				// ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½ï¿½Utype
 				ENTITY_METHOD_UID muid = methodDescription->getUType();
 				std::vector<ENTITY_METHOD_UID>::iterator iter =
 					std::find(g_methodCusUtypes.begin(), g_methodCusUtypes.end(), muid);
@@ -1226,7 +1226,7 @@ bool EntityDef::loadDefClientMethods(const std::string& moduleName, XML* xml,
 			MethodDescription* methodDescription = new MethodDescription(0, CLIENT_TYPE, name);
 			TiXmlNode* argNode = defMethodNode->FirstChild();
 
-			// ¿ÉÄÜÃ»ÓÐ²ÎÊý
+			// ï¿½ï¿½ï¿½ï¿½Ã»ï¿½Ð²ï¿½ï¿½ï¿½
 			if(argNode)
 			{
 				XML_FOR_BEGIN(argNode)
@@ -1282,7 +1282,7 @@ bool EntityDef::loadDefClientMethods(const std::string& moduleName, XML* xml,
 				XML_FOR_END(argNode);		
 			}
 
-			// Èç¹ûÅäÖÃÖÐÃ»ÓÐÉèÖÃ¹ýutype, Ôò²úÉú
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½Ã¹ï¿½utype, ï¿½ï¿½ï¿½ï¿½ï¿½
 			if(methodDescription->getUType() <= 0)
 			{
 				ENTITY_METHOD_UID muid = 0;
@@ -1303,7 +1303,7 @@ bool EntityDef::loadDefClientMethods(const std::string& moduleName, XML* xml,
 			}
 			else
 			{
-				// ¼ì²éÊÇ·ñÓÐÖØ¸´µÄUtype
+				// ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½ï¿½Utype
 				ENTITY_METHOD_UID muid = methodDescription->getUType();
 				std::vector<ENTITY_METHOD_UID>::iterator iter =
 					std::find(g_methodCusUtypes.begin(), g_methodCusUtypes.end(), muid);
@@ -1450,7 +1450,7 @@ bool EntityDef::checkDefMethod(ScriptDefModule* pScriptModule,
 		{
 			if (pyGetfullargspec)
 			{
-				// def·½·¨ÖÐµÄ²ÎÊý¸öÊý
+				// defï¿½ï¿½ï¿½ï¿½ï¿½ÐµÄ²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 				size_t methodArgsSize = iter->second->getArgSize();
 
 				PyObject* pyGetMethodArgs = PyObject_CallFunction(pyGetfullargspec,
@@ -1473,17 +1473,17 @@ bool EntityDef::checkDefMethod(ScriptDefModule* pScriptModule,
 					{
 						size_t argsSize = (size_t)PyObject_Size(pyGetMethodArgsResult);
 
-						// ¼õÈ¥selfÕâ¸ö²ÎÊý
+						// ï¿½ï¿½È¥selfï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 						KBE_ASSERT(argsSize > 0);
 						argsSize -= 1;
 
 						Py_DECREF(pyGetMethodArgsResult);
 
-						// ¼ì²é²ÎÊýµÄ¸öÊýÊÇ·ñÆ¥Åä
+						// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¸ï¿½ï¿½ï¿½ï¿½Ç·ï¿½Æ¥ï¿½ï¿½
 						if (methodArgsSize != argsSize)
 						{
-							// Èç¹û²»Æ¥Åä£¬ ²¢ÇÒÊÇÒ»¸öexposed·½·¨£¬²ÎÊý¶àÁËÒ»¸ö£¬¿ÉÒÔÀí½âÎªÏÔÊ¾µÄ¼ÓÈëÁËµÚÒ»¸ö²ÎÊýcallerIDÓÃÓÚ½Å±¾¼ì²éµ÷ÓÃÕß
-							// Èç¹û²»ÊÇÕâÖÖÇé¿ö£¬Ò»ÂÉÊÓÎª²ÎÊý²»ÕýÈ·
+							// ï¿½ï¿½ï¿½ï¿½ï¿½Æ¥ï¿½ä£¬ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½exposedï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½Ê¾ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½Ëµï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½callerIDï¿½ï¿½ï¿½Ú½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+							// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È·
 							if (iter->second->isExposed() && methodArgsSize + 1 == argsSize)
 							{
 								iter->second->setExposed(MethodDescription::EXPOSED_AND_CALLER_CHECK);
@@ -1581,7 +1581,7 @@ bool EntityDef::loadAllScriptModules(std::string entitiesPath,
 		if (g_isReload && pyModule)
 			pyModule = PyImport_ReloadModule(pyModule);
 
-		// ¼ì²é¸ÃÄ£¿éÂ·¾¶ÊÇ·ñÊÇKBE½Å±¾Ä¿Â¼ÏÂµÄ£¬·ÀÖ¹ÒòÓÃ»§È¡ÃûÓëpythonÄ£¿éÃû³Æ³åÍ»¶øÎóµ¼ÈëÁËÏµÍ³Ä£¿é
+		// ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½Â·ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½KBEï¿½Å±ï¿½Ä¿Â¼ï¿½ÂµÄ£ï¿½ï¿½ï¿½Ö¹ï¿½ï¿½ï¿½Ã»ï¿½È¡ï¿½ï¿½ï¿½ï¿½pythonÄ£ï¿½ï¿½ï¿½ï¿½ï¿½Æ³ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÏµÍ³Ä£ï¿½ï¿½
 		if (pyModule)
 		{
 			std::string userScriptsPath = Resmgr::getSingleton().getPyUserScriptsPath();
@@ -1611,7 +1611,7 @@ bool EntityDef::loadAllScriptModules(std::string entitiesPath,
 
 		if (pyModule == NULL)
 		{
-			// ÊÇ·ñ¼ÓÔØÕâ¸öÄ£¿é £¨È¡¾öÓÚÊÇ·ñÔÚdefÎÄ¼þÖÐ¶¨ÒåÁËÓëµ±Ç°×é¼þÏà¹ØµÄ·½·¨»òÕßÊôÐÔ£©
+			// ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½ ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½defï¿½Ä¼ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ëµ±Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ØµÄ·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô£ï¿½
 			if(isLoadScriptModule(pScriptModule))
 			{
 				ERROR_MSG(fmt::format("EntityDef::initialize: Could not load module[{}]\n", 
@@ -1623,7 +1623,7 @@ bool EntityDef::loadAllScriptModules(std::string entitiesPath,
 
 			PyErr_Clear();
 
-			// ±ØÐëÔÚÕâÀï²ÅÉèÖÃ£¬ ÔÚÕâÖ®Ç°ÉèÖÃ»áµ¼ÖÂisLoadScriptModuleÊ§Ð§£¬´Ó¶øÃ»ÓÐ´íÎóÊä³ö
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½ ï¿½ï¿½ï¿½ï¿½Ö®Ç°ï¿½ï¿½ï¿½Ã»áµ¼ï¿½ï¿½isLoadScriptModuleÊ§Ð§ï¿½ï¿½ï¿½Ó¶ï¿½Ã»ï¿½Ð´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 			setScriptModuleHasComponentEntity(pScriptModule, false);
 			continue;
 		}
@@ -1699,7 +1699,7 @@ bool EntityDef::loadAllScriptModules(std::string entitiesPath,
 //-------------------------------------------------------------------------------------
 ScriptDefModule* EntityDef::findScriptModule(ENTITY_SCRIPT_UID utype)
 {
-	// utype ×îÐ¡Îª1
+	// utype ï¿½ï¿½Ð¡Îª1
 	if (utype == 0 || utype >= __scriptModules.size() + 1)
 	{
 		ERROR_MSG(fmt::format("EntityDef::findScriptModule: is not exist(utype:{})!\n", utype));

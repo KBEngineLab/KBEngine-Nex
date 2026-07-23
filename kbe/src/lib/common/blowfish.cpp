@@ -103,7 +103,7 @@ const char * KBEBlowfish::strBlowFishKey() const
 int KBEBlowfish::encrypt( const unsigned char * src, unsigned char * dest,
 	int length )
 {
-	// BLOCK_SIZEµÄÕûÊý±¶
+	// BLOCK_SIZEï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if(length % BLOCK_SIZE != 0)
 	{
 		CRITICAL_MSG(fmt::format("Blowfish::encrypt: "

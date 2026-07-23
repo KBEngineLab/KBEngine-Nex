@@ -44,10 +44,10 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	BASEAPPMGRËùÓÐÏûÏ¢½Ó¿ÚÔÚ´Ë¶¨Òå
+	BASEAPPMGRï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½Ó¿ï¿½ï¿½Ú´Ë¶ï¿½ï¿½ï¿½
 */
 NETWORK_INTERFACE_DECLARE_BEGIN(BaseappmgrInterface)
-	// Ä³app×¢²á×Ô¼ºµÄ½Ó¿ÚµØÖ·µ½±¾app
+	// Ä³app×¢ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ä½Ó¿Úµï¿½Ö·ï¿½ï¿½ï¿½ï¿½app
 	BASEAPPMGR_MESSAGE_DECLARE_ARGS11(onRegisterNewApp,									NETWORK_VARIABLE_MESSAGE,
 									int32,												uid, 
 									std::string,										username,
@@ -61,53 +61,53 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappmgrInterface)
 									uint16,												extport,
 									std::string,										extaddrEx)
 
-	// Ä³appÖ÷¶¯ÇëÇólook¡£
+	// Ä³appï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½lookï¿½ï¿½
 	BASEAPPMGR_MESSAGE_DECLARE_ARGS0(lookApp,											NETWORK_FIXED_MESSAGE)
 
-	// Ä³¸öappÇëÇó²é¿´¸Ãapp¸ºÔØ×´Ì¬¡£
+	// Ä³ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½é¿´ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½
 	BASEAPPMGR_MESSAGE_DECLARE_ARGS0(queryLoad,											NETWORK_FIXED_MESSAGE)
 
-	// Ä³¸öappÏò±¾app¸æÖª´¦ÓÚ»î¶¯×´Ì¬¡£
+	// Ä³ï¿½ï¿½appï¿½ï¿½appï¿½ï¿½Öªï¿½ï¿½ï¿½Ú»î¶¯×´Ì¬ï¿½ï¿½
 	BASEAPPMGR_MESSAGE_DECLARE_ARGS2(onAppActiveTick,									NETWORK_FIXED_MESSAGE,
 									COMPONENT_TYPE,										componentType, 
 									COMPONENT_ID,										componentID)
 
-	// baseEntityÇëÇó´´½¨ÔÚÒ»¸öÐÂµÄspaceÖÐ¡£
+	// baseEntityï¿½ï¿½ï¿½ó´´½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½spaceï¿½Ð¡ï¿½
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(reqCreateEntityAnywhere,							NETWORK_VARIABLE_MESSAGE)
 
-	// baseEntityÇëÇó´´½¨ÔÚÒ»¸öÐÂµÄspaceÖÐ¡£
+	// baseEntityï¿½ï¿½ï¿½ó´´½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½spaceï¿½Ð¡ï¿½
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(reqCreateEntityRemotely,							NETWORK_VARIABLE_MESSAGE)
 
-	// baseEntityÇëÇó´´½¨ÔÚÒ»¸öÐÂµÄspaceÖÐ£¬²éÑ¯µ±Ç°×îºÃµÄ×é¼þID
+	// baseEntityï¿½ï¿½ï¿½ó´´½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½spaceï¿½Ð£ï¿½ï¿½ï¿½Ñ¯ï¿½ï¿½Ç°ï¿½ï¿½Ãµï¿½ï¿½ï¿½ï¿½ID
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(reqCreateEntityAnywhereFromDBIDQueryBestBaseappID,NETWORK_VARIABLE_MESSAGE)
 
-	// baseEntityÇëÇó´´½¨ÔÚÒ»¸öÐÂµÄspaceÖÐ¡£
+	// baseEntityï¿½ï¿½ï¿½ó´´½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½spaceï¿½Ð¡ï¿½
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(reqCreateEntityAnywhereFromDBID,					NETWORK_VARIABLE_MESSAGE)
 
-	// baseEntityÇëÇó´´½¨ÔÚÒ»¸öÐÂµÄspaceÖÐ¡£
+	// baseEntityï¿½ï¿½ï¿½ó´´½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½spaceï¿½Ð¡ï¿½
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(reqCreateEntityRemotelyFromDBID,					NETWORK_VARIABLE_MESSAGE)
 	
-	// ÏûÏ¢×ª·¢£¬ ÓÉÄ³¸öappÏëÍ¨¹ý±¾app½«ÏûÏ¢×ª·¢¸øÄ³¸öapp¡£	
+	// ï¿½ï¿½Ï¢×ªï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä³ï¿½ï¿½appï¿½ï¿½Í¨ï¿½ï¿½ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½Ï¢×ªï¿½ï¿½ï¿½ï¿½Ä³ï¿½ï¿½appï¿½ï¿½	
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(forwardMessage,									NETWORK_VARIABLE_MESSAGE)
 
-	// Ä³¸öappÏò±¾app¸æÖª´¦ÓÚ»î¶¯×´Ì¬¡£
+	// Ä³ï¿½ï¿½appï¿½ï¿½appï¿½ï¿½Öªï¿½ï¿½ï¿½Ú»î¶¯×´Ì¬ï¿½ï¿½
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(registerPendingAccountToBaseapp,					NETWORK_VARIABLE_MESSAGE)
 
-	// »ñÈ¡µ½baseappµÄµØÖ·¡£
+	// ï¿½ï¿½È¡ï¿½ï¿½baseappï¿½Äµï¿½Ö·ï¿½ï¿½
 	BASEAPPMGR_MESSAGE_DECLARE_ARGS4(onPendingAccountGetBaseappAddr,					NETWORK_VARIABLE_MESSAGE,
 									std::string,										loginName, 
 									std::string,										accountName,
 									std::string,										addr,
 									uint16,												port)
 									
-	// Ò»¸öÐÂµÇÂ¼µÄÕËºÅ»ñµÃºÏ·¨µÇÈëbaseappµÄÈ¨Àû£¬ ÏÖÔÚÐèÒª½«ÕËºÅ×¢²á¸øÖ¸¶¨µÄbaseapp
-	// Ê¹ÆäÔÊÐíÔÚ´ËbaseappÉÏµÇÂ¼¡£
+	// Ò»ï¿½ï¿½ï¿½Âµï¿½Â¼ï¿½ï¿½ï¿½ËºÅ»ï¿½ÃºÏ·ï¿½ï¿½ï¿½ï¿½ï¿½baseappï¿½ï¿½È¨ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½Ëºï¿½×¢ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½baseapp
+	// Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú´ï¿½baseappï¿½Ïµï¿½Â¼ï¿½ï¿½
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(registerPendingAccountToBaseappAddr,				NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇó¹Ø±Õ·þÎñÆ÷
+	// ï¿½ï¿½ï¿½ï¿½Ø±Õ·ï¿½ï¿½ï¿½ï¿½ï¿½
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(reqCloseServer,									NETWORK_VARIABLE_MESSAGE)
 
-	// ¸üÐÂbaseappÐÅÏ¢¡£
+	// ï¿½ï¿½ï¿½ï¿½baseappï¿½ï¿½Ï¢ï¿½ï¿½
 	BASEAPPMGR_MESSAGE_DECLARE_ARGS5(updateBaseapp,										NETWORK_FIXED_MESSAGE,
 									COMPONENT_ID,										componentID,
 									ENTITY_ID,											numBases,
@@ -115,24 +115,24 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappmgrInterface)
 									float,												load,
 									uint32,												flags)
 
-	// ÇëÇó²éÑ¯watcherÊý¾Ý
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¯watcherï¿½ï¿½ï¿½ï¿½
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(queryWatcher,										NETWORK_VARIABLE_MESSAGE)
 
-	// baseappÍ¬²½×Ô¼ºµÄ³õÊ¼»¯ÐÅÏ¢
+	// baseappÍ¬ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ä³ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ï¢
 	BASEAPPMGR_MESSAGE_DECLARE_ARGS2(onBaseappInitProgress,								NETWORK_FIXED_MESSAGE,
 									COMPONENT_ID,										cid,
 									float,												progress)
 
-	// ¿ªÊ¼profile
+	// ï¿½ï¿½Ê¼profile
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(startProfile,										NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇóÇ¿ÖÆÉ±ËÀµ±Ç°app
+	// ï¿½ï¿½ï¿½ï¿½Ç¿ï¿½ï¿½É±ï¿½ï¿½ï¿½ï¿½Ç°app
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(reqKillServer,									NETWORK_VARIABLE_MESSAGE)
 
-	// ²éÑ¯ËùÓÐÏà¹Ø½ø³Ì¸ºÔØÐÅÏ¢
+	// ï¿½ï¿½Ñ¯ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø½ï¿½ï¿½Ì¸ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(queryAppsLoads,									NETWORK_VARIABLE_MESSAGE)
 
-	// baseappÇëÇó°ó¶¨email£¨·µ»ØÊ±ÐèÒªÕÒµ½loginappµÄµØÖ·£©
+	// baseappï¿½ï¿½ï¿½ï¿½ï¿½emailï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½Òªï¿½Òµï¿½loginappï¿½Äµï¿½Ö·ï¿½ï¿½
 	BASEAPPMGR_MESSAGE_DECLARE_ARGS6(reqAccountBindEmailAllocCallbackLoginapp,			NETWORK_VARIABLE_MESSAGE,
 									COMPONENT_ID,										reqBaseappID,
 									ENTITY_ID,											entityID,
@@ -141,7 +141,7 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappmgrInterface)
 									SERVER_ERROR_CODE,									failedcode,
 									std::string,										code)
 
-	// baseappÇëÇó°ó¶¨email£¨·µ»ØÊ±ÐèÒªÕÒµ½loginappµÄµØÖ·£©
+	// baseappï¿½ï¿½ï¿½ï¿½ï¿½emailï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½Òªï¿½Òµï¿½loginappï¿½Äµï¿½Ö·ï¿½ï¿½
 	BASEAPPMGR_MESSAGE_DECLARE_ARGS8(onReqAccountBindEmailCBFromLoginapp,				NETWORK_VARIABLE_MESSAGE,
 									COMPONENT_ID,										reqBaseappID,
 									ENTITY_ID,											entityID,

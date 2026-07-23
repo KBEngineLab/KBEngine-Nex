@@ -153,7 +153,7 @@ Reason BlowfishFilter::recv(Channel * pChannel, PacketReceiver & receiver, Packe
 
 		if(packetLen_ <= 0)
 		{
-			// Èç¹ûÂú×ãÒ»¸ö×îÐ¡°üÔò³¢ÊÔ½â°ü, ·ñÔò»º´æÕâ¸ö°ü´ýÓëÏÂÒ»¸ö°üºÏ²¢È»ºó½â°ü
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Ð¡ï¿½ï¿½ï¿½ï¿½ï¿½Ô½ï¿½ï¿½, ï¿½ï¿½ï¿½ò»º´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ï²ï¿½È»ï¿½ï¿½ï¿½ï¿½
 			if(pPacket->length() >= (PACKET_LENGTH_SIZE + 1 + BLOCK_SIZE))
 			{
 				(*pPacket) >> packetLen_;
@@ -161,7 +161,7 @@ Reason BlowfishFilter::recv(Channel * pChannel, PacketReceiver & receiver, Packe
 				
 				packetLen_ -= 1;
 
-				// Èç¹û°üÊÇÍêÕûµÄÏÂÃæÁ÷³Ì»á½âÃÜ£¬ Èç¹ûÓÐ¶àÓàµÄÄÚÈÝÐèÒª½«Æä¼ô²Ã³öÀ´´ýÓëÏÂÒ»¸ö°üºÏ²¢
+				// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì»ï¿½ï¿½ï¿½Ü£ï¿½ ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ï²ï¿½
 				if(pPacket->length() > packetLen_)
 				{
 					MALLOC_PACKET(pPacket_, pPacket->isTCPPacket());
@@ -192,8 +192,8 @@ Reason BlowfishFilter::recv(Channel * pChannel, PacketReceiver & receiver, Packe
 		}
 		else
 		{
-			// Èç¹ûÉÏÒ»´ÎÓÐ×ö¹ý½â°üÐÐÎªµ«°ü»¹Ã»ÓÐÍêÕûÔò¼ÌÐø´¦Àí
-			// Èç¹û°üÊÇÍêÕûµÄÏÂÃæÁ÷³Ì»á½âÃÜ£¬ Èç¹ûÓÐ¶àÓàµÄÄÚÈÝÐèÒª½«Æä¼ô²Ã³öÀ´´ýÓëÏÂÒ»¸ö°üºÏ²¢
+			// ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì»ï¿½ï¿½ï¿½Ü£ï¿½ ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ï²ï¿½
 			if(pPacket->length() > packetLen_)
 			{
 				MALLOC_PACKET(pPacket_, pPacket->isTCPPacket());
@@ -242,8 +242,8 @@ Reason BlowfishFilter::recv(Channel * pChannel, PacketReceiver & receiver, Packe
 		
 		decrypt(pPacket, pPacket);
 
-		// ÉÏÃæµÄÁ÷³ÌÄÜ±£Ö¤wposÖ®ºó²»»áÓÐ¶àÓàµÄ°ü
-		// Èç¹ûÓÐ¶àÓàµÄ°üÊý¾Ý»á·ÅÔÚpPacket_
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü±ï¿½Ö¤wposÖ®ï¿½ó²»»ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½Ä°ï¿½
+		// ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½Ä°ï¿½ï¿½ï¿½ï¿½Ý»ï¿½ï¿½ï¿½ï¿½pPacket_
 		pPacket->wpos((int)(pPacket->wpos() - padSize_));
 
 		packetLen_ = 0;
@@ -270,19 +270,19 @@ Reason BlowfishFilter::recv(Channel * pChannel, PacketReceiver & receiver, Packe
 //-------------------------------------------------------------------------------------
 void BlowfishFilter::encrypt(Packet * pInPacket, Packet * pOutPacket)
 {
-	// BlowFish Ã¿´ÎÖ»ÄÜ¼ÓÃÜºÍ½âÃÜ8×Ö½ÚÊý¾Ý
-	// ²»×ã8×Ö½ÚÔòÌî³ä0
+	// BlowFish Ã¿ï¿½ï¿½Ö»ï¿½Ü¼ï¿½ï¿½ÜºÍ½ï¿½ï¿½ï¿½8ï¿½Ö½ï¿½ï¿½ï¿½ï¿½ï¿½
+	// ï¿½ï¿½ï¿½ï¿½8ï¿½Ö½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½0
 	uint8 padSize = 0;
 
 	if (pInPacket->length() % BLOCK_SIZE != 0)
 	{
-		// µÃµ½²»×ã´óÐ¡
+		// ï¿½Ãµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¡
 		padSize = BLOCK_SIZE - (pInPacket->length() % BLOCK_SIZE);
 
-		// ÏòpPacketÖÐÌî³äÕâÃ´¶à
+		// ï¿½ï¿½pPacketï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã´ï¿½ï¿½
 		pInPacket->data_resize(pInPacket->size() + padSize);
 
-		// Ìî³ä0
+		// ï¿½ï¿½ï¿½0
 		memset(pInPacket->data() + pInPacket->wpos(), 0, padSize);
 
 		pInPacket->wpos((int)(pInPacket->wpos() + padSize));

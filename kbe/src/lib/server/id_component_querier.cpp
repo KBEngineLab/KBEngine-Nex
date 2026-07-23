@@ -125,7 +125,7 @@ COMPONENT_ID IDComponentQuerier::query(COMPONENT_TYPE componentType, int32 uid)
 
 		hasContinue = true;
 
-		// 如果是未知类型则继续一次
+		// 锟斤拷锟斤拷锟轿粗拷锟斤拷锟斤拷锟斤拷锟斤拷一锟斤拷
 		if (args.componentType == UNKNOWN_COMPONENT_TYPE)
 			continue;
 

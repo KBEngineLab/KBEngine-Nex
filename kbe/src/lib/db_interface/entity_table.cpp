@@ -64,7 +64,7 @@ DBID EntityTable::writeTable(DBInterface* pdbi, DBID dbid, int8 shouldAutoLoad, 
 
 		if(!pTableItem->writeItem(pdbi, dbid, s, pModule))
 		{
-			// ÉèÖÃÊµÌåÊÇ·ñ×Ô¶¯¼ÓÔØ
+			// ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½Ç·ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½
 			if(shouldAutoLoad > -1)
 				entityShouldAutoLoad(pdbi, dbid, shouldAutoLoad > 0);
 
@@ -72,7 +72,7 @@ DBID EntityTable::writeTable(DBInterface* pdbi, DBID dbid, int8 shouldAutoLoad, 
 		}
 	};
 
-	// ÉèÖÃÊµÌåÊÇ·ñ×Ô¶¯¼ÓÔØ
+	// ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½Ç·ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½
 	if(shouldAutoLoad > -1)
 		entityShouldAutoLoad(pdbi, dbid, shouldAutoLoad > 0);
 
@@ -187,7 +187,7 @@ bool EntityTables::syncToDB(DBInterface* pdbi)
 	int num = 0;
 	try
 	{
-		// ¿ªÊ¼Í¬²½ËùÓÐ±í
+		// ï¿½ï¿½Ê¼Í¬ï¿½ï¿½ï¿½ï¿½ï¿½Ð±ï¿½
 		EntityTables::TABLES_MAP::iterator kiter = kbe_tables_.begin();
 		for(; kiter != kbe_tables_.end(); ++kiter)
 		{
@@ -221,7 +221,7 @@ bool EntityTables::syncToDB(DBInterface* pdbi)
 		std::vector<std::string> dbTableNames;
 		pdbi->getTableNames(dbTableNames, "");
 
-		// ¼ì²éÊÇ·ñÓÐÐèÒªÉ¾³ýµÄ±í
+		// ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ÒªÉ¾ï¿½ï¿½ï¿½Ä±ï¿½
 		std::vector<std::string>::iterator iter0 = dbTableNames.begin();
 		for(; iter0 != dbTableNames.end(); ++iter0)
 		{

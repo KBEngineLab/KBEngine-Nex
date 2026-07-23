@@ -82,7 +82,7 @@ bool Spaces::destroySpace(SPACE_ID spaceID, ENTITY_ID entityID)
 		return false;
 	}
 
-	// 延时一段时间再销毁
+	// 锟斤拷时一锟斤拷时锟斤拷锟斤拷锟斤拷锟斤拷
 	//spaces_.erase(spaceID);
 	return true;
 }

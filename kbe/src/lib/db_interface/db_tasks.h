@@ -33,7 +33,7 @@ class EntityTable;
 class EntityTables;
 
 /*
-	Êý¾Ý¿âÏß³ÌÈÎÎñ»ù´¡Àà
+	ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ß³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 */
 
 class DBTaskBase : public thread::TPTask
@@ -61,7 +61,7 @@ protected:
 };
 
 /**
-	Ö´ÐÐÒ»ÌõsqlÓï¾ä
+	Ö´ï¿½ï¿½Ò»ï¿½ï¿½sqlï¿½ï¿½ï¿½
 */
 class DBTaskSyncTable : public DBTaskBase
 {

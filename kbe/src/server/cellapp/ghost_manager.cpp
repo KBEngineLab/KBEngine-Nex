@@ -62,7 +62,7 @@ Network::Bundle* GhostManager::createSendBundle(COMPONENT_ID componentID)
 			Network::Bundle* pBundle = iter->second.back();
 			if (pBundle->packetHaveSpace())
 			{
-				// ÏÈ´Ó¶ÓÁÐÉ¾³ý
+				// ï¿½È´Ó¶ï¿½ï¿½ï¿½É¾ï¿½ï¿½
 				iter->second.pop_back();
 				pBundle->pChannel(NULL);
 				pBundle->pCurrMsgHandler(NULL);
@@ -175,7 +175,7 @@ void GhostManager::syncMessages()
 
 		for(; iter1 != iter->second.end(); ++iter1)
 		{
-			// ½«ÏûÏ¢Í¬²½µ½ghost
+			// ï¿½ï¿½ï¿½ï¿½Ï¢Í¬ï¿½ï¿½ï¿½ï¿½ghost
 			cinfos->pChannel->send((*iter1));
 		}
 			
@@ -194,7 +194,7 @@ void GhostManager::syncGhosts()
 		COMPONENT_ID ghostCell = iter->second->ghostCell();
 		if(ghostCell > 0)
 		{
-			// ½«Î»ÖÃµÈÐÅÏ¢Í¬²½µ½ghost
+			// ï¿½ï¿½Î»ï¿½Ãµï¿½ï¿½ï¿½Ï¢Í¬ï¿½ï¿½ï¿½ï¿½ghost
 			Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(ghostCell);
 			if(cinfos == NULL || cinfos->pChannel == NULL)
 			{

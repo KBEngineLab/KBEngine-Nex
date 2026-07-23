@@ -100,7 +100,7 @@ bool TCPPacketReceiver::processRecv(bool expectingPacket)
 	EventPoller* pPoller = this->dispatcher().pPoller();
 	if (pPoller != NULL && pPoller->supportsCompletion())
 	{
-		// Íê³ÉÄ£ÐÍÒÑ¾­°Ñ×Ö½Ú¸´ÖÆµ½×Ô¼ºµÄÉúÃüÖÜÆÚ¶ÓÁÐ£¬ÉÏ²ã²»ÄÜÔÙ´Îµ÷ÓÃ recv¡£
+		// ï¿½ï¿½ï¿½Ä£ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½Ö½Ú¸ï¿½ï¿½Æµï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú¶ï¿½ï¿½Ð£ï¿½ï¿½Ï²ã²»ï¿½ï¿½ï¿½Ù´Îµï¿½ï¿½ï¿½ recvï¿½ï¿½
 		// A completion backend has already copied bytes into its lifetime-managed queue, so the upper layer must not call recv again.
 		std::vector<char> data;
 		bool disconnected = false;
@@ -111,7 +111,7 @@ bool TCPPacketReceiver::processRecv(bool expectingPacket)
 			return false;
 		}
 
-		// Í³Ò»¸´ÓÃ¾É´íÎóÂ·¾¶£¬ÈÃÒì²½´íÎóÈÔÈ»¾­¹ýÔ­ÓÐ channel ¹Ø±ÕºÍÈÕÖ¾Âß¼­¡£
+		// Í³Ò»ï¿½ï¿½ï¿½Ã¾É´ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ì²½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È»ï¿½ï¿½ï¿½ï¿½Ô­ï¿½ï¿½ channel ï¿½Ø±Õºï¿½ï¿½ï¿½Ö¾ï¿½ß¼ï¿½ï¿½ï¿½
 		// Reuse the legacy error path so asynchronous failures keep the original channel shutdown and logging behavior.
 		if (errorCode != 0)
 		{
@@ -144,7 +144,7 @@ bool TCPPacketReceiver::processRecv(bool expectingPacket)
 			return false;
 		}
 
-		// append »á°´ MemoryStream ¹æÔò¼ì²éÈÝÁ¿£¬±ÜÃâ completion »º³åÇøÖ±½Ó¸²¸Ç Packet ÄÚ´æ¡£
+		// append ï¿½á°´ MemoryStream ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ completion ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö±ï¿½Ó¸ï¿½ï¿½ï¿½ Packet ï¿½Ú´æ¡£
 		// append applies MemoryStream capacity checks and prevents completion buffers from overwriting Packet memory.
 		pReceiveWindow->append(data.data(), data.size());
 		Reason ret = this->processPacket(pChannel, pReceiveWindow);
@@ -170,7 +170,7 @@ bool TCPPacketReceiver::processRecv(bool expectingPacket)
 
 		return rstate == PacketReceiver::RECV_STATE_CONTINUE;
 	}
-	else if(len == 0) // ¿Í»§¶ËÕý³£ÍË³ö
+	else if(len == 0) // ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë³ï¿½
 	{
 		TCPPacket::reclaimPoolObject(pReceiveWindow);
 		onGetError(pChannel, "disconnected");
@@ -197,7 +197,7 @@ void TCPPacketReceiver::onGetError(Channel* pChannel, const std::string& err)
 //-------------------------------------------------------------------------------------
 Reason TCPPacketReceiver::processFilteredPacket(Channel* pChannel, Packet * pPacket)
 {
-	// Èç¹ûÎªNone£¬ Ôò¿ÉÄÜÊÇ±»¹ýÂËÆ÷¹ýÂËµôÁË(¹ýÂËÆ÷ÕýÔÚ°´ÕÕ×Ô¼ºµÄ¹æÔò×é°ü½âÃÜ)
+	// ï¿½ï¿½ï¿½ÎªNoneï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ëµï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú°ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ä¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
 	if(pPacket)
 	{
 		pChannel->addReceiveWindow(pPacket);
@@ -215,9 +215,9 @@ PacketReceiver::RecvState TCPPacketReceiver::checkSocketErrors(int len, bool exp
 
 	if (
 #if KBE_PLATFORM == PLATFORM_WIN32
-		wsaErr == WSAEWOULDBLOCK && !expectingPacket// send³ö´í´ó¸ÅÊÇ»º³åÇøÂúÁË, recv³ö´íÒÑ¾­ÎÞÊý¾Ý¿É¶ÁÁË
+		wsaErr == WSAEWOULDBLOCK && !expectingPacket// sendï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½, recvï¿½ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿É¶ï¿½ï¿½ï¿½
 #else
-		errno == EAGAIN && !expectingPacket			// recv»º³åÇøÒÑ¾­ÎÞÊý¾Ý¿É¶ÁÁË
+		errno == EAGAIN && !expectingPacket			// recvï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿É¶ï¿½ï¿½ï¿½
 #endif
 		)
 	{
@@ -225,9 +225,9 @@ PacketReceiver::RecvState TCPPacketReceiver::checkSocketErrors(int len, bool exp
 	}
 
 #if KBE_PLATFORM == PLATFORM_UNIX
-	if (errno == EAGAIN ||							// ÒÑ¾­ÎÞÊý¾Ý¿É¶ÁÁË
-		errno == ECONNREFUSED ||					// Á¬½Ó±»·þÎñÆ÷¾Ü¾ø
-		errno == EHOSTUNREACH)						// Ä¿µÄµØÖ·²»¿Éµ½´ï
+	if (errno == EAGAIN ||							// ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿É¶ï¿½ï¿½ï¿½
+		errno == ECONNREFUSED ||					// ï¿½ï¿½ï¿½Ó±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü¾ï¿½
+		errno == EHOSTUNREACH)						// Ä¿ï¿½Äµï¿½Ö·ï¿½ï¿½ï¿½Éµï¿½ï¿½ï¿½
 	{
 		this->dispatcher().errorReporter().reportException(
 				REASON_NO_SUCH_PORT);
@@ -236,10 +236,10 @@ PacketReceiver::RecvState TCPPacketReceiver::checkSocketErrors(int len, bool exp
 	}
 #else
 	/*
-	´æÔÚµÄÁ¬½Ó±»Ô¶³ÌÖ÷»úÇ¿ÖÆ¹Ø±Õ¡£Í¨³£Ô­ÒòÎª£ºÔ¶³ÌÖ÷»úÉÏ¶ÔµÈ·½Ó¦ÓÃ³ÌÐòÍ»È»Í£Ö¹ÔËÐÐ£¬»òÔ¶³ÌÖ÷»úÖØÐÂÆô¶¯£¬
-	»òÔ¶³ÌÖ÷»úÔÚÔ¶³Ì·½Ì×½Ó×ÖÉÏÊ¹ÓÃÁË¡°Ç¿ÖÆ¡±¹Ø±Õ£¨²Î¼ûsetsockopt(SO_LINGER)£©¡£
-	ÁíÍâ£¬ÔÚÒ»¸ö»ò¶à¸ö²Ù×÷ÕýÔÚ½øÐÐÊ±£¬Èç¹ûÁ¬½ÓÒò¡°keep-alive¡±»î¶¯¼ì²âµ½Ò»¸öÊ§°Ü¶øÖÐ¶Ï£¬Ò²¿ÉÄÜµ¼ÖÂ´Ë´íÎó¡£
-	´ËÊ±£¬ÕýÔÚ½øÐÐµÄ²Ù×÷ÒÔ´íÎóÂëWSAENETRESETÊ§°Ü·µ»Ø£¬ºóÐø²Ù×÷½«Ê§°Ü·µ»Ø´íÎóÂëWSAECONNRESET
+	ï¿½ï¿½ï¿½Úµï¿½ï¿½ï¿½ï¿½Ó±ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç¿ï¿½Æ¹Ø±Õ¡ï¿½Í¨ï¿½ï¿½Ô­ï¿½ï¿½Îªï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¶ÔµÈ·ï¿½Ó¦ï¿½Ã³ï¿½ï¿½ï¿½Í»È»Í£Ö¹ï¿½ï¿½ï¿½Ð£ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¶ï¿½Ì·ï¿½ï¿½×½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½Ë¡ï¿½Ç¿ï¿½Æ¡ï¿½ï¿½Ø±Õ£ï¿½ï¿½Î¼ï¿½setsockopt(SO_LINGER)ï¿½ï¿½ï¿½ï¿½
+	ï¿½ï¿½ï¿½â£¬ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½keep-aliveï¿½ï¿½ï¿½î¶¯ï¿½ï¿½âµ½Ò»ï¿½ï¿½Ê§ï¿½Ü¶ï¿½ï¿½Ð¶Ï£ï¿½Ò²ï¿½ï¿½ï¿½Üµï¿½ï¿½Â´Ë´ï¿½ï¿½ï¿½
+	ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½Ú½ï¿½ï¿½ÐµÄ²ï¿½ï¿½ï¿½ï¿½Ô´ï¿½ï¿½ï¿½ï¿½ï¿½WSAENETRESETÊ§ï¿½Ü·ï¿½ï¿½Ø£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê§ï¿½Ü·ï¿½ï¿½Ø´ï¿½ï¿½ï¿½ï¿½ï¿½WSAECONNRESET
 	*/
 	switch(wsaErr)
 	{

@@ -69,7 +69,7 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 	{
 		if(fragmentDatasFlag_ == FRAGMENT_DATA_UNKNOW)
 		{
-			// Èç¹ûÃ»ÓÐIDÐÅÏ¢£¬ÏÈ»ñÈ¡ID
+			// ï¿½ï¿½ï¿½Ã»ï¿½ï¿½IDï¿½ï¿½Ï¢ï¿½ï¿½ï¿½È»ï¿½È¡ID
 			if(currMsgID_ == 0)
 			{
 				if(NETWORK_MESSAGE_ID_SIZE > 1 && pPacket->length() < NETWORK_MESSAGE_ID_SIZE)
@@ -89,7 +89,7 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 				MemoryStream* pPacket1 = pFragmentStream_ != NULL ? pFragmentStream_ : pPacket;
 				TRACE_MESSAGE_PACKET(true, pPacket1, pMsgHandler, pPacket1->length(), pChannel_->c_str(), false);
 				
-				// ÓÃ×÷µ÷ÊÔÊ±±È¶Ô
+				// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½È¶ï¿½
 				uint32 rpos = pPacket1->rpos();
 				pPacket1->rpos(0);
 				TRACE_MESSAGE_PACKET(true, pPacket1, pMsgHandler, pPacket1->length(), pChannel_->c_str(), false);
@@ -104,18 +104,18 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 				break;
 			}
 
-			// Èç¹ûÃ»ÓÐ¿É²Ù×÷µÄÊý¾ÝÁËÔòÍË³öµÈ´ýÏÂÒ»¸ö°ü´¦Àí¡£
-			// ¿ÉÄÜÊÇÒ»¸öÎÞ²ÎÊýÊý¾Ý°ü
+			// ï¿½ï¿½ï¿½Ã»ï¿½Ð¿É²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë³ï¿½ï¿½È´ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Þ²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý°ï¿½
 			//if(pPacket->opsize() == 0)	
 			//	break;
 			
-			// Èç¹û³¤¶ÈÐÅÏ¢Ã»ÓÐ»ñµÃ£¬ÔòµÈ´ý»ñÈ¡³¤¶ÈÐÅÏ¢
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢Ã»ï¿½Ð»ï¿½Ã£ï¿½ï¿½ï¿½È´ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 			if(currMsgLen_ == 0)
 			{
-				// Èç¹û³¤¶ÈÐÅÏ¢ÊÇ¿É±äµÄ»òÕßÅäÖÃÁËÓÀÔ¶°üº¬³¤¶ÈÐÅÏ¢Ñ¡ÏîÊ±£¬´ÓÁ÷ÖÐ·ÖÎö³¤¶ÈÊý¾Ý
+				// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½Ç¿É±ï¿½Ä»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢Ñ¡ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 				if(pMsgHandler->msgLen == NETWORK_VARIABLE_MESSAGE)
 				{
-					// Èç¹û³¤¶ÈÐÅÏ¢²»ÍêÕû£¬ÔòµÈ´ýÏÂÒ»¸ö°ü´¦Àí
+					// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È´ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 					if(pPacket->length() < NETWORK_MESSAGE_LENGTH_SIZE)
 					{
 						writeFragmentMessage(FRAGMENT_DATA_MESSAGE_LENGTH, pPacket, NETWORK_MESSAGE_LENGTH_SIZE);
@@ -123,7 +123,7 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 					}
 					else
 					{
-						// ´Ë´¦»ñµÃÁË³¤¶ÈÐÅÏ¢
+						// ï¿½Ë´ï¿½ï¿½ï¿½ï¿½ï¿½Ë³ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 						Network::MessageLength currlen;
 						(*pPacket) >> currlen;
 						currMsgLen_ = currlen;
@@ -144,18 +144,18 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 				}
 			}
 
-			// Èç¹û³¤¶ÈÕ¼ÂúËµÃ÷Ê¹ÓÃÁËÀ©Õ¹³¤¶È£¬ÎÒÃÇ»¹ÐèÒªµÈ´ýÀ©Õ¹³¤¶ÈÐÅÏ¢
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ¼ï¿½ï¿½Ëµï¿½ï¿½Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ¹ï¿½ï¿½ï¿½È£ï¿½ï¿½ï¿½ï¿½Ç»ï¿½ï¿½ï¿½Òªï¿½È´ï¿½ï¿½ï¿½Õ¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 			if (currMsgLen_ == NETWORK_MESSAGE_MAX_SIZE1)
 			{
 				if (pPacket->length() < NETWORK_MESSAGE_LENGTH1_SIZE)
 				{
-					// Èç¹û³¤¶ÈÐÅÏ¢²»ÍêÕû£¬ÔòµÈ´ýÏÂÒ»¸ö°ü´¦Àí
+					// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È´ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 					writeFragmentMessage(FRAGMENT_DATA_MESSAGE_LENGTH1, pPacket, NETWORK_MESSAGE_LENGTH1_SIZE);
 					break;
 				}
 				else
 				{
-					// ´Ë´¦»ñµÃÁËÀ©Õ¹³¤¶ÈÐÅÏ¢
+					// ï¿½Ë´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 					(*pPacket) >> currMsgLen_;
 
 					NetworkStats::getSingleton().trackMessage(NetworkStats::RECV, *pMsgHandler,
@@ -171,7 +171,7 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 				MemoryStream* pPacket1 = pFragmentStream_ != NULL ? pFragmentStream_ : pPacket;
 				TRACE_MESSAGE_PACKET(true, pPacket1, pMsgHandler, pPacket1->length(), pChannel_->c_str(), false);
 
-				// ÓÃ×÷µ÷ÊÔÊ±±È¶Ô
+				// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½È¶ï¿½
 				uint32 rpos = pPacket1->rpos();
 				pPacket1->rpos(0);
 				TRACE_MESSAGE_PACKET(true, pPacket1, pMsgHandler, pPacket1->length(), pChannel_->c_str(), false);
@@ -200,7 +200,7 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 					break;
 				}
 
-				// ÁÙÊ±ÉèÖÃÓÐÐ§¶ÁÈ¡Î»£¬ ·ÀÖ¹½Ó¿ÚÖÐÒç³ö²Ù×÷
+				// ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½È¡Î»ï¿½ï¿½ ï¿½ï¿½Ö¹ï¿½Ó¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 				size_t wpos = pPacket->wpos();
 				// size_t rpos = pPacket->rpos();
 				size_t frpos = pPacket->rpos() + currMsgLen_;
@@ -209,7 +209,7 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 				TRACE_MESSAGE_PACKET(true, pPacket, pMsgHandler, currMsgLen_, pChannel_->c_str(), true);
 				pMsgHandler->handle(pChannel_, *pPacket);
 
-				// Èç¹ûhandlerÃ»ÓÐ´¦ÀíÍêÊý¾ÝÔòÊä³öÒ»¸ö¾¯¸æ
+				// ï¿½ï¿½ï¿½handlerÃ»ï¿½Ð´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 				if(currMsgLen_ > 0)
 				{
 					if(frpos != pPacket->rpos())
@@ -272,23 +272,23 @@ void PacketReader::mergeFragmentMessage(Packet* pPacket)
 
 		switch(fragmentDatasFlag_)
 		{
-		case FRAGMENT_DATA_MESSAGE_ID:			// ÏûÏ¢IDÐÅÏ¢²»È«
+		case FRAGMENT_DATA_MESSAGE_ID:			// ï¿½ï¿½Ï¢IDï¿½ï¿½Ï¢ï¿½ï¿½È«
 			memcpy(&currMsgID_, pFragmentDatas_, NETWORK_MESSAGE_ID_SIZE);
 			break;
 
-		case FRAGMENT_DATA_MESSAGE_LENGTH:		// ÏûÏ¢³¤¶ÈÐÅÏ¢²»È«
+		case FRAGMENT_DATA_MESSAGE_LENGTH:		// ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½È«
 			memcpy(&currMsgLen_, pFragmentDatas_, NETWORK_MESSAGE_LENGTH_SIZE);
 			if (currMsgLen_ == NETWORK_MESSAGE_MAX_SIZE) 
 				currMsgLen_ = NETWORK_MESSAGE_MAX_SIZE1;
 			break;
 
-		case FRAGMENT_DATA_MESSAGE_LENGTH1:		// ÏûÏ¢³¤¶ÈÐÅÏ¢²»È«
+		case FRAGMENT_DATA_MESSAGE_LENGTH1:		// ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½È«
 			memcpy(&currMsgLen_, pFragmentDatas_, NETWORK_MESSAGE_LENGTH1_SIZE);
 			if (currMsgLen_ == NETWORK_MESSAGE_MAX_SIZE1) 
 				pChannel_->condemn("PacketReader::mergeFragmentMessage: msglen1 exceeds the limit!");
 			break;
 
-		case FRAGMENT_DATA_MESSAGE_BODY:		// ÏûÏ¢ÄÚÈÝÐÅÏ¢²»È«
+		case FRAGMENT_DATA_MESSAGE_BODY:		// ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½È«
 			pFragmentStream_ = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 			pFragmentStream_->append(pFragmentDatas_, currMsgLen_);
 			break;

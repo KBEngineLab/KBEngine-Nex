@@ -24,7 +24,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{ 
 
-/** python map²Ù×÷ËùÐèÒªµÄ·½·¨±í */
+/** python mapï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½Ä·ï¿½ï¿½ï¿½ï¿½ï¿½ */
 PyMappingMethods FixedDict::mappingMethods =
 {
 	(lenfunc)FixedDict::mp_length,					// mp_length
@@ -32,7 +32,7 @@ PyMappingMethods FixedDict::mappingMethods =
 	(objobjargproc)FixedDict::mp_ass_subscript		// mp_ass_subscript
 };
 
-// ²Î¿¼ objects/dictobject.c
+// ï¿½Î¿ï¿½ objects/dictobject.c
 // Hack to implement "key in dict"
 PySequenceMethods FixedDict::mappingSequenceMethods = 
 {
@@ -181,7 +181,7 @@ void FixedDict::initialize(MemoryStream* streamInitData, bool isPersistentsStrea
 			PyObject* val1 = iter->second->dataType->parseDefaultStr("");
 			PyDict_SetItemString(pyDict_, iter->first.c_str(), val1);
 			
-			// ÓÉÓÚPyDict_SetItem»áÔö¼ÓÒýÓÃÒò´ËÐèÒª¼õ
+			// ï¿½ï¿½ï¿½ï¿½PyDict_SetItemï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½
 			Py_DECREF(val1);
 		}
 		else
@@ -203,7 +203,7 @@ void FixedDict::initialize(MemoryStream* streamInitData, bool isPersistentsStrea
 
 			PyDict_SetItemString(pyDict_, iter->first.c_str(), val1);
 			
-			// ÓÉÓÚPyDict_SetItem»áÔö¼ÓÒýÓÃÒò´ËÐèÒª¼õ
+			// ï¿½ï¿½ï¿½ï¿½PyDict_SetItemï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½
 			Py_DECREF(val1);
 		}
 	}
@@ -320,7 +320,7 @@ int FixedDict::mp_ass_subscript(PyObject* self, PyObject* key, PyObject* value)
 
 	int ret = PyDict_SetItem(fixedDict->pyDict_, key, val1);
 	
-	// ÓÉÓÚPyDict_SetItem»áÔö¼ÓÒýÓÃÒò´ËÐèÒª¼õ
+	// ï¿½ï¿½ï¿½ï¿½PyDict_SetItemï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½
 	Py_DECREF(val1);
 
 	return ret;
@@ -393,7 +393,7 @@ PyObject* FixedDict::update(PyObject* args)
 
 			PyDict_SetItemString(pyDict_, iter->first.c_str(), val1);
 			
-			// ÓÉÓÚPyDict_SetItem»áÔö¼ÓÒýÓÃÒò´ËÐèÒª¼õ
+			// ï¿½ï¿½ï¿½ï¿½PyDict_SetItemï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½
 			Py_DECREF(val1);
 		}
 	}

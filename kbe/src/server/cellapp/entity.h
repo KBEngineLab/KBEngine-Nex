@@ -63,7 +63,7 @@ typedef std::vector<EntityPtr> SPACE_ENTITIES;
 
 class Entity : public script::ScriptObject
 {
-	/** ×ÓÀà»¯ ½«Ò»Ð©py²Ù×÷Ìî³ä½øÅÉÉúÀà */
+	/** ï¿½ï¿½ï¿½à»¯ ï¿½ï¿½Ò»Ð©pyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 	BASE_SCRIPT_HREADER(Entity, ScriptObject)	
 	ENTITY_HEADER(Entity)
 
@@ -73,51 +73,51 @@ public:
 	~Entity();
 	
 	/** 
-		Ïú»ÙÕâ¸öentity 
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entity 
 	*/
 	void onDestroy(bool callScript);
 	
 	/**
-		Ïú»Ù³¡¾°
+		ï¿½ï¿½ï¿½Ù³ï¿½ï¿½ï¿½
 	*/
 	DECLARE_PY_MOTHOD_ARG0(pyDestroySpace);
 	void destroySpace(void);
 
 	/** 
-		µ±Ç°ÊµÌåËùÔÚµÄspace½«ÒªÏú»ÙÊ±´¥·¢  
+		ï¿½ï¿½Ç°Êµï¿½ï¿½ï¿½ï¿½ï¿½Úµï¿½spaceï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½  
 	*/
 	void onSpaceGone();
 	
 	/** 
-		ÅÐ¶Ï×ÔÉíÊÇ·ñÊÇÒ»¸örealEntity 
+		ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½Ò»ï¿½ï¿½realEntity 
 	*/
 	INLINE bool isReal(void) const;
 
 	/** 
-		ÅÐ¶Ï×ÔÉíÊÇ·ñÓÐghostEntity 
+		ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ghostEntity 
 	*/
 	INLINE bool hasGhost(void) const;
 
 	/** 
-		ÅÐ¶Ï×ÔÉíÊÇ·ñÊÇÒ»¸örealEntity 
+		ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½Ò»ï¿½ï¿½realEntity 
 	*/
 	INLINE COMPONENT_ID realCell(void) const;
 	INLINE void realCell(COMPONENT_ID cellID);
 
 	/** 
-		ÅÐ¶Ï×ÔÉíÊÇ·ñÓÐghostEntity 
+		ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ghostEntity 
 	*/
 	INLINE COMPONENT_ID ghostCell(void) const;
 	INLINE void ghostCell(COMPONENT_ID cellID);
 
 	/** 
-		¶¨ÒåÊôÐÔÊý¾Ý±»¸Ä±äÁË 
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý±ï¿½ï¿½Ä±ï¿½ï¿½ï¿½ 
 	*/
 	void onDefDataChanged(const PropertyDescription* propertyDescription, 
 			PyObject* pyData);
 	
 	/** 
-		¸ÃentityÍ¨ÐÅÍ¨µÀ
+		ï¿½ï¿½entityÍ¨ï¿½ï¿½Í¨ï¿½ï¿½
 	*/
 	INLINE void pChannel(Network::Channel* pchannel);
 	INLINE Network::Channel* pChannel(void) const ;
@@ -149,7 +149,7 @@ public:
 	INLINE void otherClients(AllClients* clients);
 
 	/**
-		½Å±¾»ñÈ¡controlledByÊôÐÔ
+		ï¿½Å±ï¿½ï¿½ï¿½È¡controlledByï¿½ï¿½ï¿½ï¿½
 	*/
 	INLINE bool isControlledNotSelfClient() const;
 	INLINE EntityCall* controlledBy() const;
@@ -159,28 +159,28 @@ public:
 	void sendControlledByStatusMessage(EntityCall* baseEntityCall, int8 isControlled);
 
 	/** 
-		½Å±¾»ñÈ¡ºÍÉèÖÃentityµÄposition 
+		ï¿½Å±ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½position 
 	*/
 	INLINE Position3D& position();
 	INLINE void position(const Position3D& pos);
 	DECLARE_PY_GETSET_MOTHOD(pyGetPosition, pySetPosition);
 
 	/** 
-		½Å±¾»ñÈ¡ºÍÉèÖÃentityµÄ·½Ïò 
+		ï¿½Å±ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½Ä·ï¿½ï¿½ï¿½ 
 	*/
 	INLINE Direction3D& direction();
 	INLINE void direction(const Direction3D& dir);
 	DECLARE_PY_GETSET_MOTHOD(pyGetDirection, pySetDirection);
 
 	/**
-		ÊÇ·ñÔÚµØÃæÉÏ
+		ï¿½Ç·ï¿½ï¿½Úµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	INLINE void isOnGround(bool v);
 	INLINE bool isOnGround() const;
 	DECLARE_PY_GET_MOTHOD(pyGetIsOnGround);
 
 	/** 
-		ÉèÖÃentity·½ÏòºÍÎ»ÖÃ 
+		ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½ 
 	*/
 	void setPositionAndDirection(const Position3D& pos, 
 		const Direction3D& dir);
@@ -195,28 +195,28 @@ public:
 
 	bool checkMoveForTopSpeed(const Position3D& position);
 
-	/** ÍøÂç½Ó¿Ú
-		¿Í»§¶ËÉèÖÃÐÂÎ»ÖÃ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½
 	*/
 	void setPosition_XZ_int(Network::Channel* pChannel, int32 x, int32 z);
 
-	/** ÍøÂç½Ó¿Ú
-		¿Í»§¶ËÉèÖÃÐÂÎ»ÖÃ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½
 	*/
 	void setPosition_XYZ_int(Network::Channel* pChannel, int32 x, int32 y, int32 z);
 
-	/** ÍøÂç½Ó¿Ú
-		¿Í»§¶ËÉèÖÃÎ»ÖÃ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½
 	*/
 	void setPosition_XZ_float(Network::Channel* pChannel, float x, float z);
 
-	/** ÍøÂç½Ó¿Ú
-		¿Í»§¶ËÉèÖÃÎ»ÖÃ
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½
 	*/
 	void setPosition_XYZ_float(Network::Channel* pChannel, float x, float y, float z);
 
 	/**
-		cellÉÏµÄ´«ËÍ·½·¨
+		cellï¿½ÏµÄ´ï¿½ï¿½Í·ï¿½ï¿½ï¿½
 	*/
 	DECLARE_PY_MOTHOD_ARG3(pyTeleport, PyObject_ptr, PyObject_ptr, PyObject_ptr);
 	void teleport(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& dir);
@@ -226,7 +226,7 @@ public:
 	void onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Direction3D& dir);
 
 	/**
-		´«ËÍ³É¹¦ºÍÊ§°ÜÏà¹Ø»Øµ÷
+		ï¿½ï¿½ï¿½Í³É¹ï¿½ï¿½ï¿½Ê§ï¿½ï¿½ï¿½ï¿½Ø»Øµï¿½
 	*/
 	void onTeleport();
 	void onTeleportFailure();
@@ -235,7 +235,7 @@ public:
 		SPACE_ID destSpaceID, COMPONENT_ID componentID);
 
 	/**
-		½øÈëÀë¿ªcellµÈ»Øµ÷
+		ï¿½ï¿½ï¿½ï¿½ï¿½ë¿ªcellï¿½È»Øµï¿½
 	*/
 	void onEnteredCell();
 	void onEnteringCell();
@@ -243,25 +243,25 @@ public:
 	void onLeftCell();
 	
 	/**
-		½øÈëÀë¿ªspaceµÈ»Øµ÷
+		ï¿½ï¿½ï¿½ï¿½ï¿½ë¿ªspaceï¿½È»Øµï¿½
 	*/
 	void onEnterSpace(Space* pSpace);
 	void onLeaveSpace(Space* pSpace);
 
 	/** 
-		µ±cellappÒâÍâÖÕÖ¹ºó£¬ baseappÈç¹ûÄÜÕÒµ½ºÏÊÊµÄcellappÔò½«Æä»Ö¸´ºó
-		»áµ÷ÓÃ´Ë·½·¨
+		ï¿½ï¿½cellappï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¹ï¿½ï¿½ baseappï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òµï¿½ï¿½ï¿½ï¿½Êµï¿½cellappï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½
+		ï¿½ï¿½ï¿½ï¿½Ã´Ë·ï¿½ï¿½ï¿½
 	*/
 	void onRestore();
 
 	/**
-		½Å±¾µ÷ÊÔview
+		ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½view
 	*/
 	void debugView();
 	DECLARE_PY_MOTHOD_ARG0(pyDebugView);
 
 	/** 
-		µ±Ç°entityÉèÖÃ×ÔÉíµÄView°ë¾¶·¶Î§ 
+		ï¿½ï¿½Ç°entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Viewï¿½ë¾¶ï¿½ï¿½Î§ 
 	*/
 	int32 setViewRadius(float radius, float hyst);
 	float getViewRadius(void) const;
@@ -271,33 +271,33 @@ public:
 	DECLARE_PY_MOTHOD_ARG0(pyGetViewHystArea);
 
 	/**
-		·µ»Ø¹Û²ì¸ÃÊµÌåµÄËùÓÐ¹Û²ìÕß
+		ï¿½ï¿½ï¿½Ø¹Û²ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¹Û²ï¿½ï¿½ï¿½
 	*/
 	DECLARE_PY_MOTHOD_ARG0(pyGetWitnesses);
 
 	/** 
-		µ±Ç°entityÊÇ·ñÎªreal 
+		ï¿½ï¿½Ç°entityï¿½Ç·ï¿½Îªreal 
 	*/
 	DECLARE_PY_MOTHOD_ARG0(pyIsReal);
 	
 	/** 
-		Ïòbaseapp·¢ËÍ±¸·ÝÊý¾Ý
+		ï¿½ï¿½baseappï¿½ï¿½ï¿½Í±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void backupCellData();
 
 	/** 
-		½«Òª±£´æµ½Êý¾Ý¿âÖ®Ç°µÄÍ¨Öª 
+		ï¿½ï¿½Òªï¿½ï¿½ï¿½æµ½ï¿½ï¿½ï¿½Ý¿ï¿½Ö®Ç°ï¿½ï¿½Í¨Öª 
 	*/
 	void onWriteToDB();
 
 	/** 
-		½Å±¾»ñÈ¡ºÍÉèÖÃentityµÄposition 
+		ï¿½Å±ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½position 
 	*/
 	INLINE int8 layer() const;
 	DECLARE_PY_GETSET_MOTHOD(pyGetLayer, pySetLayer);
 
 	/** 
-		entityÒÆ¶¯µ¼º½ 
+		entityï¿½Æ¶ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	bool canNavigate();
 	uint32 navigate(const Position3D& destination, float velocity, float distance,
@@ -310,13 +310,13 @@ public:
 	DECLARE_PY_MOTHOD_ARG8(pyNavigate, PyObject_ptr, float, float, float, float, int8, int8, PyObject_ptr);
 
 	/** 
-		entity»ñµÃËæ»úµã 
+		entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	bool getRandomPoints(std::vector<Position3D>& outPoints, const Position3D& centerPos, float maxRadius, uint32 maxPoints, int8 layer);
 	DECLARE_PY_MOTHOD_ARG4(pyGetRandomPoints, PyObject_ptr, float, uint32, int8);
 
 	/** 
-		entityÒÆ¶¯µ½Ä³¸öµã 
+		entityï¿½Æ¶ï¿½ï¿½ï¿½Ä³ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	uint32 moveToPoint(const Position3D& destination, float velocity, float distance,
 			PyObject* userData, bool faceMovement, bool moveVertically);
@@ -324,7 +324,7 @@ public:
 	DECLARE_PY_MOTHOD_ARG6(pyMoveToPoint, PyObject_ptr, float, float, PyObject_ptr, int32, int32);
 
 	/** 
-		entityÒÆ¶¯µ½Ä³¸öentity 
+		entityï¿½Æ¶ï¿½ï¿½ï¿½Ä³ï¿½ï¿½entity 
 	*/
 	uint32 moveToEntity(ENTITY_ID targetID, float velocity, float distance,
 			PyObject* userData, bool faceMovement, bool moveVertically, const Position3D& offsetPos);
@@ -332,175 +332,175 @@ public:
 	static PyObject* __py_pyMoveToEntity(PyObject* self, PyObject* args);
 
 	/**
-	entityÒÆ¶¯¼ÓËÙ
+	entityï¿½Æ¶ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	float accelerate(const char* type, float acceleration);
 	DECLARE_PY_MOTHOD_ARG2(pyAccelerate, const_charptr, float);
 
 	/** 
-		½Å±¾»ñÈ¡ºÍÉèÖÃentityµÄ×î¸ßxzÒÆ¶¯ËÙ¶È 
+		ï¿½Å±ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½xzï¿½Æ¶ï¿½ï¿½Ù¶ï¿½ 
 	*/
 	float topSpeed() const{ return topSpeed_; }
 	INLINE void topSpeed(float speed);
 	DECLARE_PY_GETSET_MOTHOD(pyGetTopSpeed, pySetTopSpeed);
 	
 	/** 
-		½Å±¾»ñÈ¡ºÍÉèÖÃentityµÄ×î¸ßyÒÆ¶¯ËÙ¶È 
+		ï¿½Å±ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½yï¿½Æ¶ï¿½ï¿½Ù¶ï¿½ 
 	*/
 	INLINE float topSpeedY() const;
 	INLINE void topSpeedY(float speed);
 	DECLARE_PY_GETSET_MOTHOD(pyGetTopSpeedY, pySetTopSpeedY);
 	
 	/** 
-		½Å±¾ÇëÇó»ñµÃÒ»¶¨·¶Î§ÄÚµÄÄ³ÖÖÀàÐÍµÄentities 
+		ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Î§ï¿½Úµï¿½Ä³ï¿½ï¿½ï¿½ï¿½ï¿½Íµï¿½entities 
 	*/
 	static PyObject* __py_pyEntitiesInRange(PyObject* self, PyObject* args);
 
 	/** 
-		½Å±¾ÇëÇó»ñµÃView·¶Î§ÄÚµÄentities 
+		ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Viewï¿½ï¿½Î§ï¿½Úµï¿½entities 
 	*/
 	static PyObject* __py_pyEntitiesInView(PyObject* self, PyObject* args);
 	PyObject* entitiesInView(bool pending);
 
 	/**
-		ÉèÖÃ»ñÈ¡ÊÇ·ñ×Ô¶¯±¸·Ý
+		ï¿½ï¿½ï¿½Ã»ï¿½È¡ï¿½Ç·ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	INLINE int8 shouldAutoBackup() const;
 	INLINE void shouldAutoBackup(int8 v);
 	DECLARE_PY_GETSET_MOTHOD(pyGetShouldAutoBackup, pySetShouldAutoBackup);
 
-	/** ÍøÂç½Ó¿Ú
-		Ô¶³Ìºô½Ð±¾entityµÄ·½·¨ 
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		Ô¶ï¿½Ìºï¿½ï¿½Ð±ï¿½entityï¿½Ä·ï¿½ï¿½ï¿½ 
 	*/
 	void onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s);
 	void onRemoteCallMethodFromClient(Network::Channel* pChannel, ENTITY_ID srcEntityID, MemoryStream& s);
 	void onRemoteMethodCall_(MethodDescription* pMethodDescription, ENTITY_ID srcEntityID, MemoryStream& s);
 
 	/**
-		¹Û²ìÕß
+		ï¿½Û²ï¿½ï¿½ï¿½
 	*/
 	INLINE Witness* pWitness() const;
 	INLINE void pWitness(Witness* w);
 
 	/** 
-		ÊÇ·ñ±»ÈÎºÎproxy¼àÊÓµ½, Èç¹ûÕâ¸öentityÃ»ÓÐ¿Í»§¶Ë£¬ ÔòÕâ¸öÖµÓÐÐ§ 
+		ï¿½Ç·ï¿½ï¿½Îºï¿½proxyï¿½ï¿½ï¿½Óµï¿½, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityÃ»ï¿½Ð¿Í»ï¿½ï¿½Ë£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½Ð§ 
 	*/
 	INLINE bool isWitnessed(void) const;
 	DECLARE_PY_GET_MOTHOD(pyIsWitnessed);
 
 	/** 
-		entityÊÇ·ñÊÇÒ»¸ö¹Û²ìÕß 
+		entityï¿½Ç·ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Û²ï¿½ï¿½ï¿½ 
 	*/
 	INLINE bool hasWitness(void) const;
 	DECLARE_PY_GET_MOTHOD(pyHasWitness);
 
 	/** 
-		×ÔÉí±»Ò»¸ö¹Û²ìÕß¹Û²ìµ½ÁË 
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Û²ï¿½ï¿½ß¹Û²ìµ½ï¿½ï¿½ 
 	*/
 	void addWitnessed(Entity* entity);
 
 	/** 
-		ÒÆ³ýÒ»¸ö¹Û²ì×ÔÉíµÄ¹Û²ìÕß 
+		ï¿½Æ³ï¿½Ò»ï¿½ï¿½ï¿½Û²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¹Û²ï¿½ï¿½ï¿½ 
 	*/
 	void delWitnessed(Entity* entity);
 	void onDelWitnessed();
 
 	/**
-		 Ö¸¶¨µÄentityÊÇ·ñÊÇ¹Û²ì×Ô¼ºµÄÈËÖ®Ò»
+		 Ö¸ï¿½ï¿½ï¿½ï¿½entityï¿½Ç·ï¿½ï¿½Ç¹Û²ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½ï¿½Ö®Ò»
 	*/
 	bool entityInWitnessed(ENTITY_ID entityID);
 
 	INLINE const std::list<ENTITY_ID>&	witnesses();
 	INLINE size_t witnessesSize() const;
 
-	/** ÍøÂç½Ó¿Ú
-		entity°ó¶¨ÁËÒ»¸ö¹Û²ìÕß(¿Í»§¶Ë)
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		entityï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Û²ï¿½ï¿½ï¿½(ï¿½Í»ï¿½ï¿½ï¿½)
 
 	*/
 	void setWitness(Witness* pWitness);
 	void onGetWitnessFromBase(Network::Channel* pChannel);
 	void onGetWitness(bool fromBase = false);
 
-	/** ÍøÂç½Ó¿Ú
-		entity¶ªÊ§ÁËÒ»¸ö¹Û²ìÕß(¿Í»§¶Ë)
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		entityï¿½ï¿½Ê§ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Û²ï¿½ï¿½ï¿½(ï¿½Í»ï¿½ï¿½ï¿½)
 
 	*/
 	void onLoseWitness(Network::Channel* pChannel);
 
 	/** 
-		client¸üÐÂÊý¾Ý
+		clientï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void onUpdateDataFromClient(KBEngine::MemoryStream& s);
 
 	/** 
-		Ìí¼ÓÒ»¸ö·¶Î§´¥·¢Æ÷  
+		ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Î§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½  
 	*/
 	uint32 addProximity(float range_xz, float range_y, int32 userarg);
 	DECLARE_PY_MOTHOD_ARG3(pyAddProximity, float, float, int32);
 
 	/** 
-		µ÷ÓÃ¿Í»§¶ËÊµÌåµÄ·½·¨  
+		ï¿½ï¿½ï¿½Ã¿Í»ï¿½ï¿½ï¿½Êµï¿½ï¿½Ä·ï¿½ï¿½ï¿½  
 	*/
 	DECLARE_PY_MOTHOD_ARG1(pyClientEntity, ENTITY_ID);
 
 	/** 
-		»Ö¸´ËùÓÐµÄ·¶Î§´¥·¢Æ÷ 
-		ÔÚteleportÊ±»á³öÏÖÕâÑùµÄÇé¿ö
+		ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½ÐµÄ·ï¿½Î§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
+		ï¿½ï¿½teleportÊ±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void restoreProximitys();
 
 	/** 
-		É¾³ýÒ»¸ö¿ØÖÆÆ÷ 
+		É¾ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	void cancelController(uint32 id);
 	static PyObject* __py_pyCancelController(PyObject* self, PyObject* args);
 
 	/** 
-		Ò»¸öentity½øÈëÁËÕâ¸öentityµÄÄ³¸ö·¶Î§´¥·¢Æ÷  
+		Ò»ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½Ä³ï¿½ï¿½ï¿½ï¿½Î§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½  
 	*/
 	void onEnterTrap(Entity* entity, float range_xz, float range_y, 
 							uint32 controllerID, int32 userarg);
 
 	/** 
-		Ò»¸öentityÀë¿ªÁËÕâ¸öentityµÄÄ³¸ö·¶Î§´¥·¢Æ÷  
+		Ò»ï¿½ï¿½entityï¿½ë¿ªï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½Ä³ï¿½ï¿½ï¿½ï¿½Î§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½  
 	*/
 	void onLeaveTrap(Entity* entity, float range_xz, float range_y, 
 							uint32 controllerID, int32 userarg);
 
 	/** 
-		µ±entityÌøµ½Ò»¸öÐÂµÄspaceÉÏÈ¥ºó£¬Àë¿ª·¶Î§´¥·¢Æ÷ÊÂ¼þ½«´¥·¢Õâ¸ö½Ó¿Ú 
+		ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½spaceï¿½ï¿½È¥ï¿½ï¿½ï¿½ë¿ªï¿½ï¿½Î§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½ 
 	*/
 	void onLeaveTrapID(ENTITY_ID entityID, 
 							float range_xz, float range_y, 
 							uint32 controllerID, int32 userarg);
 
 	/** 
-		Ò»¸öentity½øÈëÁËViewÇøÓò
+		Ò»ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Viewï¿½ï¿½ï¿½ï¿½
 	*/
 	void onEnteredView(Entity* entity);
 
 	/** 
-		Í£Ö¹ÈÎºÎÒÆ¶¯ÐÐÎª
+		Í£Ö¹ï¿½Îºï¿½ï¿½Æ¶ï¿½ï¿½ï¿½Îª
 	*/
 	bool stopMove();
 
 	/** 
-		entityµÄÒ»´ÎÒÆ¶¯Íê³É 
+		entityï¿½ï¿½Ò»ï¿½ï¿½ï¿½Æ¶ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	void onMove(uint32 controllerId, int layer, const Position3D& oldPos, PyObject* userarg);
 
 	/** 
-		entityµÄÒÆ¶¯Íê³É 
+		entityï¿½ï¿½ï¿½Æ¶ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	void onMoveOver(uint32 controllerId, int layer, const Position3D& oldPos, PyObject* userarg);
 
 	/** 
-		entityÒÆ¶¯Ê§°Ü
+		entityï¿½Æ¶ï¿½Ê§ï¿½ï¿½
 	*/
 	void onMoveFailure(uint32 controllerId, PyObject* userarg);
 
 	/**
-		entity×ª¶¯³¯Ïò
+		entity×ªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	uint32 addYawRotator(float yaw, float velocity,
 		PyObject* userData);
@@ -508,57 +508,57 @@ public:
 	DECLARE_PY_MOTHOD_ARG3(pyAddYawRotator, float, float, PyObject_ptr);
 	
 	/**
-		entity×ªÏòÍê³É
+		entity×ªï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void onTurn(uint32 controllerId, PyObject* userarg);
 	
 	/**
-		»ñÈ¡×ÔÉíÔÚspaceµÄentitiesÖÐµÄÎ»ÖÃ
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½spaceï¿½ï¿½entitiesï¿½Ðµï¿½Î»ï¿½ï¿½
 	*/
 	INLINE SPACE_ENTITIES::size_type spaceEntityIdx() const;
 	INLINE void spaceEntityIdx(SPACE_ENTITIES::size_type idx);
 
 	/**
-		»ñÈ¡entityËùÔÚ½Úµã
+		ï¿½ï¿½È¡entityï¿½ï¿½ï¿½Ú½Úµï¿½
 	*/
 	INLINE EntityCoordinateNode* pEntityCoordinateNode() const;
 	INLINE void pEntityCoordinateNode(EntityCoordinateNode* pNode);
 
 	/**
-		°²×°Ð¶ÔØ½Úµã
+		ï¿½ï¿½×°Ð¶ï¿½Ø½Úµï¿½
 	*/
 	void installCoordinateNodes(CoordinateSystem* pCoordinateSystem);
 	void uninstallCoordinateNodes(CoordinateSystem* pCoordinateSystem);
 	void onCoordinateNodesDestroy(EntityCoordinateNode* pEntityCoordinateNode);
 
 	/**
-		»ñÈ¡entityÎ»ÖÃ³¯ÏòÔÚÄ³Ê±¼äÊÇ·ñ¸Ä±ä¹ý
+		ï¿½ï¿½È¡entityÎ»ï¿½Ã³ï¿½ï¿½ï¿½ï¿½ï¿½Ä³Ê±ï¿½ï¿½ï¿½Ç·ï¿½Ä±ï¿½ï¿½
 	*/
 	INLINE GAME_TIME posChangedTime() const;
 	INLINE GAME_TIME dirChangedTime() const;
 
 	/** 
-		realÇëÇó¸üÐÂÊôÐÔµ½ghost
+		realï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½ghost
 	*/
 	void onUpdateGhostPropertys(KBEngine::MemoryStream& s);
 	
 	/** 
-		ghostÇëÇóµ÷ÓÃdef·½·¨real
+		ghostï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½defï¿½ï¿½ï¿½ï¿½real
 	*/
 	void onRemoteRealMethodCall(KBEngine::MemoryStream& s);
 
 	/** 
-		realÇëÇó¸üÐÂÊôÐÔµ½ghost
+		realï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½ghost
 	*/
 	void onUpdateGhostVolatileData(KBEngine::MemoryStream& s);
 
 	/** 
-		×ª±äÎªghost, ×ÔÉí±ØÐëÎªreal
+		×ªï¿½ï¿½Îªghost, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªreal
 	*/
 	void changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s);
 
 	/** 
-		×ª±äÎªreal, ×ÔÉí±ØÐëÎªghost
+		×ªï¿½ï¿½Îªreal, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªghost
 	*/
 	void changeToReal(COMPONENT_ID ghostCell, KBEngine::MemoryStream& s);
 
@@ -578,12 +578,12 @@ public:
 	void createMovementHandlerFromStream(KBEngine::MemoryStream& s);
 	
 	/** 
-		»ñµÃÊµÌå¿ØÖÆÆ÷¹ÜÀíÆ÷
+		ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	INLINE Controllers*	pControllers() const;
 
 	/** 
-		ÉèÖÃÊµÌå³Ö¾Ã»¯Êý¾ÝÊÇ·ñÒÑÔà£¬ÔàÁË»á×Ô¶¯´æµµ 
+		ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½Ö¾Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½à£¬ï¿½ï¿½ï¿½Ë»ï¿½ï¿½Ô¶ï¿½ï¿½æµµ 
 	*/
 	INLINE void setDirty(uint32* digest = NULL);
 	INLINE bool isDirty() const;
@@ -595,14 +595,14 @@ public:
 	DECLARE_PY_GETSET_MOTHOD(pyGetVolatileinfo, pySetVolatileinfo);
 
 	/**
-		µ÷ÓÃÊµÌåµÄ»Øµ÷º¯Êý£¬ÓÐ¿ÉÄÜ±»»º´æ
+		ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½Ä»Øµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¿ï¿½ï¿½Ü±ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	bool bufferOrExeCallback(const char * funcName, PyObject * funcArgs, bool notFoundIsOK = true);
 	static void bufferCallback(bool enable);
 
 private:
 	/** 
-		·¢ËÍteleport½á¹ûµ½base¶Ë
+		ï¿½ï¿½ï¿½ï¿½teleportï¿½ï¿½ï¿½ï¿½ï¿½baseï¿½ï¿½
 	*/
 	void _sendBaseTeleportResult(ENTITY_ID sourceEntityID, COMPONENT_ID sourceBaseAppID, 
 		SPACE_ID spaceID, SPACE_ID lastSpaceID, bool fromCellTeleport);
@@ -612,7 +612,7 @@ private:
 	{
 		EntityPtr		entityPtr;
 		PyObject *		pyCallable;
-		// ¿ÉÒÔÎªNULL£¬ NULLËµÃ÷Ã»ÓÐ²ÎÊý
+		// ï¿½ï¿½ï¿½ï¿½ÎªNULLï¿½ï¿½ NULLËµï¿½ï¿½Ã»ï¿½Ð²ï¿½ï¿½ï¿½
 		PyObject *		pyFuncArgs;
 	};
 
@@ -622,65 +622,65 @@ private:
 	static int32											_scriptCallbacksBufferCount;
 
 protected:
-	// Õâ¸öentityµÄ¿Í»§¶Ë²¿·ÖµÄentityCall
+	// ï¿½ï¿½ï¿½entityï¿½Ä¿Í»ï¿½ï¿½Ë²ï¿½ï¿½Öµï¿½entityCall
 	EntityCall*												clientEntityCall_;
 
-	// Õâ¸öentityµÄbaseapp²¿·ÖµÄentityCall
+	// ï¿½ï¿½ï¿½entityï¿½ï¿½baseappï¿½ï¿½ï¿½Öµï¿½entityCall
 	EntityCall*												baseEntityCall_;
 
-	/** Õâ¸öentityµÄ×ø±êºÍ³¯Ïòµ±Ç°ÊÜË­µÄ¿Í»§¶Ë¿ØÖÆ
-	    null±íÊ¾Ã»ÓÐ¿Í»§¶ËÔÚ¿ØÖÆ£¨¼´ÏµÍ³¿ØÖÆ£©£¬
-	    ·ñÔòÖ¸Ïò¿ØÖÆÕâ¸öentityµÄ¶ÔÏóµÄbaseEntityCall_£¬
-		Íæ¼Ò×Ô¼º¿ØÖÆ×Ô¼ºÔòEntity.controlledBy = self.base
+	/** ï¿½ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í³ï¿½ï¿½ï¿½Ç°ï¿½ï¿½Ë­ï¿½Ä¿Í»ï¿½ï¿½Ë¿ï¿½ï¿½ï¿½
+	    nullï¿½ï¿½Ê¾Ã»ï¿½Ð¿Í»ï¿½ï¿½ï¿½ï¿½Ú¿ï¿½ï¿½Æ£ï¿½ï¿½ï¿½ÏµÍ³ï¿½ï¿½ï¿½Æ£ï¿½ï¿½ï¿½
+	    ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½Ä¶ï¿½ï¿½ï¿½ï¿½baseEntityCall_ï¿½ï¿½
+		ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½Entity.controlledBy = self.base
 	*/
 	EntityCall *											controlledBy_;
 
-	// Èç¹ûÒ»¸öentityÎªghost£¬ÄÇÃ´entity»á´æÔÚÒ»¸öÔ´cellµÄÖ¸Ïò
+	// ï¿½ï¿½ï¿½Ò»ï¿½ï¿½entityÎªghostï¿½ï¿½ï¿½ï¿½Ã´entityï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½Ô´cellï¿½ï¿½Ö¸ï¿½ï¿½
 	COMPONENT_ID											realCell_;
 
-	// Èç¹ûÒ»¸öentityÎªreal£¬ÄÇÃ´entity¿ÉÄÜ»á´æÔÚÒ»¸öghostµÄÖ¸Ïò
+	// ï¿½ï¿½ï¿½Ò»ï¿½ï¿½entityÎªrealï¿½ï¿½ï¿½ï¿½Ã´entityï¿½ï¿½ï¿½Ü»ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ghostï¿½ï¿½Ö¸ï¿½ï¿½
 	COMPONENT_ID											ghostCell_;	
 
-	// entityµÄµ±Ç°Î»ÖÃ
+	// entityï¿½Äµï¿½Ç°Î»ï¿½ï¿½
 	Position3D												lastpos_;
 	Position3D												position_;
 	script::ScriptVector3*									pPyPosition_;
 
-	// entityµÄµ±Ç°·½Ïò
+	// entityï¿½Äµï¿½Ç°ï¿½ï¿½ï¿½ï¿½
 	Direction3D												direction_;	
 	script::ScriptVector3*									pPyDirection_;
 
-	// entityÎ»ÖÃ³¯ÏòÔÚÄ³Ê±¼äÊÇ·ñ¸Ä±ä¹ý
-	// ´ËÊôÐÔ¿ÉÓÃÓÚÈç:¾ö¶¨ÔÚÄ³ÆÚ¼äÊÇ·ñÒª¸ß¶ÈÍ¬²½¸Ãentity
+	// entityÎ»ï¿½Ã³ï¿½ï¿½ï¿½ï¿½ï¿½Ä³Ê±ï¿½ï¿½ï¿½Ç·ï¿½Ä±ï¿½ï¿½
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ô¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½:ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä³ï¿½Ú¼ï¿½ï¿½Ç·ï¿½Òªï¿½ß¶ï¿½Í¬ï¿½ï¿½ï¿½ï¿½entity
 	GAME_TIME												posChangedTime_;
 	GAME_TIME												dirChangedTime_;
 
-	// ÊÇ·ñÔÚµØÃæÉÏ
+	// ï¿½Ç·ï¿½ï¿½Úµï¿½ï¿½ï¿½ï¿½ï¿½
 	bool													isOnGround_;
 
-	// entity x,zÖá×î¸ßÒÆ¶¯ËÙ¶È
+	// entity x,zï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¶ï¿½ï¿½Ù¶ï¿½
 	float													topSpeed_;
 
-	// entity yÖá×î¸ßÒÆ¶¯ËÙ¶È
+	// entity yï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¶ï¿½ï¿½Ù¶ï¿½
 	float													topSpeedY_;
 
-	// ×ÔÉíÔÚspaceµÄentitiesÖÐµÄÎ»ÖÃ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½spaceï¿½ï¿½entitiesï¿½Ðµï¿½Î»ï¿½ï¿½
 	SPACE_ENTITIES::size_type								spaceEntityIdx_;
 
-	// ÊÇ·ñ±»ÈÎºÎ¹Û²ìÕß¼àÊÓµ½
+	// ï¿½Ç·ï¿½ï¿½ÎºÎ¹Û²ï¿½ï¿½ß¼ï¿½ï¿½Óµï¿½
 	std::list<ENTITY_ID>									witnesses_;
 	size_t													witnesses_count_;
 
-	// ¹Û²ìÕß¶ÔÏó
+	// ï¿½Û²ï¿½ï¿½ß¶ï¿½ï¿½ï¿½
 	Witness*												pWitness_;
 
 	AllClients*												allClients_;
 	AllClients*												otherClients_;
 
-	// entity½Úµã
+	// entityï¿½Úµï¿½
 	EntityCoordinateNode*									pEntityCoordinateNode_;	
 
-	// ¿ØÖÆÆ÷¹ÜÀíÆ÷
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	Controllers*											pControllers_;
 	KBEShared_ptr<Controller>								pMoveController_;
 	KBEShared_ptr<Controller>								pTurnController_;
@@ -688,14 +688,14 @@ protected:
 	script::ScriptVector3::PYVector3ChangedCallback			pyPositionChangedCallback_;
 	script::ScriptVector3::PYVector3ChangedCallback			pyDirectionChangedCallback_;
 	
-	// entity²ã£¬¿ÉÒÔ×öÈÎÒâ±íÊ¾£¬»ùÓÚtileµÄÓÎÏ·¿ÉÒÔ±íÊ¾Îªº£Â½¿ÕµÈ²ã£¬´¿3dÒ²¿ÉÒÔ±íÊ¾¸÷ÖÖ²ã
-	// ÔÚ½Å±¾²ã×öËÑË÷µÄÊ±ºò¿ÉÒÔ°´²ãËÑË÷.
+	// entityï¿½ã£¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½tileï¿½ï¿½ï¿½ï¿½Ï·ï¿½ï¿½ï¿½Ô±ï¿½Ê¾Îªï¿½ï¿½Â½ï¿½ÕµÈ²ã£¬ï¿½ï¿½3dÒ²ï¿½ï¿½ï¿½Ô±ï¿½Ê¾ï¿½ï¿½ï¿½Ö²ï¿½
+	// ï¿½Ú½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½Ô°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½.
 	int8													layer_;
 	
-	// ÐèÒª³Ö¾Ã»¯µÄÊý¾ÝÊÇ·ñ±äÔà£¨ÄÚ´æsha1£©£¬Èç¹ûÃ»ÓÐ±äÔà²»ÐèÒª³Ö¾Ã»¯
+	// ï¿½ï¿½Òªï¿½Ö¾Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½à£¨ï¿½Ú´ï¿½sha1ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½Ð±ï¿½ï¿½à²»ï¿½ï¿½Òªï¿½Ö¾Ã»ï¿½
 	uint32													persistentDigest_[5];
 
-	// Èç¹ûÓÃ»§ÓÐÉèÖÃ¹ýVolatileinfo£¬Ôò´Ë´¦´´½¨Volatileinfo£¬·ñÔòÎªNULLÊ¹ÓÃScriptDefModuleµÄVolatileinfo
+	// ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã¹ï¿½Volatileinfoï¿½ï¿½ï¿½ï¿½Ë´ï¿½ï¿½ï¿½ï¿½ï¿½Volatileinfoï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÎªNULLÊ¹ï¿½ï¿½ScriptDefModuleï¿½ï¿½Volatileinfo
 	VolatileInfo*											pCustomVolatileinfo_;
 };
 

@@ -20,14 +20,14 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 
 /*
-	ÒýÓÃ¼ÆÊýÊµÏÖÀà
+	ï¿½ï¿½ï¿½Ã¼ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½
 
-	Ê¹ÓÃ·½·¨:
+	Ê¹ï¿½Ã·ï¿½ï¿½ï¿½:
 		class AA:public RefCountable
 		{
 		public:
 			AA(){}
-			~AA(){ printf("Îö¹¹"); }
+			~AA(){ printf("ï¿½ï¿½ï¿½ï¿½"); }
 		};
 		
 		--------------------------------------------
@@ -40,8 +40,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 		delete s;
 		delete s1;
 		
-		Ö´ÐÐ½á¹û:
-			Îö¹¹
+		Ö´ï¿½Ð½ï¿½ï¿½:
+			ï¿½ï¿½ï¿½ï¿½
 */
 #ifndef KBE_REFCOUNTABLE_H
 #define KBE_REFCOUNTABLE_H
@@ -64,7 +64,7 @@ public:
 		int currRef = --refCount_;
 		assert(currRef >= 0 && "RefCountable:currRef maybe a error!");
 		if (0 >= currRef)
-			onRefOver();											// ÒýÓÃ½áÊøÁË
+			onRefOver();											// ï¿½ï¿½ï¿½Ã½ï¿½ï¿½ï¿½ï¿½ï¿½
 	}
 
 	virtual void onRefOver(void) const
@@ -111,7 +111,7 @@ public:
 		long currRef =::InterlockedDecrement(&refCount_);
 		assert(currRef >= 0 && "RefCountable:currRef maybe a error!");
 		if (0 >= currRef)
-			onRefOver();											// ÒýÓÃ½áÊøÁË
+			onRefOver();											// ï¿½ï¿½ï¿½Ã½ï¿½ï¿½ï¿½ï¿½ï¿½
 	}
 
 	virtual void onRefOver(void) const
@@ -162,7 +162,7 @@ public:
 		long currRef = intDecRef();
 		assert(currRef >= 0 && "RefCountable:currRef maybe a error!");
 		if (0 >= currRef)
-			onRefOver();											// ÒýÓÃ½áÊøÁË
+			onRefOver();											// ï¿½ï¿½ï¿½Ã½ï¿½ï¿½ï¿½ï¿½ï¿½
 	}
 
 	virtual void onRefOver(void) const

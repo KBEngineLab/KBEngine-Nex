@@ -84,25 +84,25 @@ public:
 	void sendNewLine();
 	void sendBackSpace();
 
-	/** telnetĞ­Òé
-		IAC WILL SUPPRESS GO AHEAD, ÒÖÖÆ¼ÌĞø½øĞĞ
+	/** telnetĞ­ï¿½ï¿½
+		IAC WILL SUPPRESS GO AHEAD, ï¿½ï¿½ï¿½Æ¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void sendWillSuppressGoAhead();
 
 	void sendDOTT();
 
-	/** telnetĞ­Òé
-		IAC DO 24, Í¬ÒâÑ¯ÎÊÖÕ¶ËÀàĞÍ
+	/** telnetĞ­ï¿½ï¿½
+		IAC DO 24, Í¬ï¿½ï¿½Ñ¯ï¿½ï¿½ï¿½Õ¶ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void sendQueryClientTerminalType();
 
-	/** telnetĞ­Òé
-		IAC SB 24 0'v' 't' '1' '0' '0' IAC SE, ·¢ËÍ·şÎñ¶ËµÄÖÕ¶ËÀàĞÍ
+	/** telnetĞ­ï¿½ï¿½
+		IAC SB 24 0'v' 't' '1' '0' '0' IAC SE, ï¿½ï¿½ï¿½Í·ï¿½ï¿½ï¿½Ëµï¿½ï¿½Õ¶ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void sendServerTerminalType();
 
-	/** telnetĞ­Òé
-		IAC WILL ECHO, »ØÏÔ
+	/** telnetĞ­ï¿½ï¿½
+		IAC WILL ECHO, ï¿½ï¿½ï¿½ï¿½
 	*/
 	void sendWillEcho();
 	

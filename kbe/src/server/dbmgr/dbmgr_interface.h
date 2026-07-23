@@ -44,14 +44,14 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 /**
-	DbmgrÏûÏ¢ºê£¬  ²ÎÊýÎªÁ÷£¬ ÐèÒª×Ô¼º½â¿ª
+	Dbmgrï¿½ï¿½Ï¢ï¿½ê£¬  ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Òªï¿½Ô¼ï¿½ï¿½â¿ª
 */
 
 /**
-	DBMGRËùÓÐÏûÏ¢½Ó¿ÚÔÚ´Ë¶¨Òå
+	DBMGRï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½Ó¿ï¿½ï¿½Ú´Ë¶ï¿½ï¿½ï¿½
 */
 NETWORK_INTERFACE_DECLARE_BEGIN(DbmgrInterface)
-	// Ä³app×¢²á×Ô¼ºµÄ½Ó¿ÚµØÖ·µ½±¾app
+	// Ä³app×¢ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½Ä½Ó¿Úµï¿½Ö·ï¿½ï¿½ï¿½ï¿½app
 	DBMGR_MESSAGE_DECLARE_ARGS11(onRegisterNewApp,					NETWORK_VARIABLE_MESSAGE,
 									int32,							uid, 
 									std::string,					username,
@@ -65,34 +65,34 @@ NETWORK_INTERFACE_DECLARE_BEGIN(DbmgrInterface)
 									uint16,							extport,
 									std::string,					extaddrEx)
 
-	// Ä³appÖ÷¶¯ÇëÇólook¡£
+	// Ä³appï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½lookï¿½ï¿½
 	DBMGR_MESSAGE_DECLARE_ARGS0(lookApp,							NETWORK_FIXED_MESSAGE)
 
-	// Ä³¸öappÇëÇó²é¿´¸Ãapp¸ºÔØ×´Ì¬¡£
+	// Ä³ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½é¿´ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½
 	DBMGR_MESSAGE_DECLARE_ARGS0(queryLoad,							NETWORK_FIXED_MESSAGE)
 
-	// Ä³appÇëÇó»ñÈ¡Ò»¸öentityID¶Î 
+	// Ä³appï¿½ï¿½ï¿½ï¿½ï¿½È¡Ò»ï¿½ï¿½entityIDï¿½ï¿½ 
 	DBMGR_MESSAGE_DECLARE_ARGS2(onReqAllocEntityID,					NETWORK_FIXED_MESSAGE,
 								COMPONENT_TYPE,						componentType,
 								COMPONENT_ID,						componentID)
 
-	// globalÊý¾Ý¸Ä±ä
+	// globalï¿½ï¿½ï¿½Ý¸Ä±ï¿½
 	DBMGR_MESSAGE_DECLARE_STREAM(onBroadcastGlobalDataChanged,		NETWORK_VARIABLE_MESSAGE)
 
-	// Ä³¸öappÏò±¾app¸æÖª´¦ÓÚ»î¶¯×´Ì¬¡£
+	// Ä³ï¿½ï¿½appï¿½ï¿½appï¿½ï¿½Öªï¿½ï¿½ï¿½Ú»î¶¯×´Ì¬ï¿½ï¿½
 	DBMGR_MESSAGE_DECLARE_ARGS2(onAppActiveTick,					NETWORK_FIXED_MESSAGE,
 									COMPONENT_TYPE,					componentType, 
 									COMPONENT_ID,					componentID)
 
-	// loginappÇëÇó´´½¨ÕËºÅ¡£
+	// loginappï¿½ï¿½ï¿½ó´´½ï¿½ï¿½ËºÅ¡ï¿½
 	DBMGR_MESSAGE_DECLARE_STREAM(reqCreateAccount,					NETWORK_VARIABLE_MESSAGE)
 	DBMGR_MESSAGE_DECLARE_STREAM(onCreateAccountCBFromInterfaces,	NETWORK_VARIABLE_MESSAGE)
 
-	// µÇÂ½ÕËºÅ¡£
+	// ï¿½ï¿½Â½ï¿½ËºÅ¡ï¿½
 	DBMGR_MESSAGE_DECLARE_STREAM(onAccountLogin,					NETWORK_VARIABLE_MESSAGE)
 	DBMGR_MESSAGE_DECLARE_STREAM(onLoginAccountCBBFromInterfaces,	NETWORK_VARIABLE_MESSAGE)
 
-	// baseapp²éÑ¯ÕËºÅÐÅÏ¢¡£
+	// baseappï¿½ï¿½Ñ¯ï¿½Ëºï¿½ï¿½ï¿½Ï¢ï¿½ï¿½
 	DBMGR_MESSAGE_DECLARE_ARGS8(queryAccount,						NETWORK_VARIABLE_MESSAGE,
 									std::string,					accountName,
 									std::string,					password,
@@ -103,41 +103,41 @@ NETWORK_INTERFACE_DECLARE_BEGIN(DbmgrInterface)
 									uint32,							ip,
 									uint16,							port)
 
-	// baseappÉÏÕËºÅÉÏÏß¡£
+	// baseappï¿½ï¿½ï¿½Ëºï¿½ï¿½ï¿½ï¿½ß¡ï¿½
 	DBMGR_MESSAGE_DECLARE_ARGS3(onAccountOnline,					NETWORK_VARIABLE_MESSAGE,
 									std::string,					accountName,
 									COMPONENT_ID,					componentID,
 									ENTITY_ID,						entityID)
 		
-	// baseappÉÏentityÏÂÏß¡£
+	// baseappï¿½ï¿½entityï¿½ï¿½ï¿½ß¡ï¿½
 	DBMGR_MESSAGE_DECLARE_ARGS3(onEntityOffline,					NETWORK_FIXED_MESSAGE,
 									DBID,							dbid,
 									uint16,							sid,
 									uint16,							dbInterfaceIndex)
 
-	// ÇëÇó²Á³ý¿Í»§¶ËÇëÇóÈÎÎñ¡£
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	DBMGR_MESSAGE_DECLARE_ARGS1(eraseClientReq,						NETWORK_VARIABLE_MESSAGE,
 									std::string,					logkey)
 
-	// Êý¾Ý¿â²éÑ¯
+	// ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½Ñ¯
 	DBMGR_MESSAGE_DECLARE_STREAM(executeRawDatabaseCommand,			NETWORK_VARIABLE_MESSAGE)
 
-	// Ä³¸öentity´æµµ
+	// Ä³ï¿½ï¿½entityï¿½æµµ
 	DBMGR_MESSAGE_DECLARE_STREAM(writeEntity,						NETWORK_VARIABLE_MESSAGE)
 
-	// É¾³ýÄ³¸öentityµÄ´æµµ
+	// É¾ï¿½ï¿½Ä³ï¿½ï¿½entityï¿½Ä´æµµ
 	DBMGR_MESSAGE_DECLARE_STREAM(removeEntity,						NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇó´ÓÊý¾Ý¿âÉ¾³ýÊµÌå
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½É¾ï¿½ï¿½Êµï¿½ï¿½
 	DBMGR_MESSAGE_DECLARE_STREAM(deleteEntityByDBID,				NETWORK_VARIABLE_MESSAGE)
 
-	// Í¨¹ýdbid²éÑ¯Ò»¸öÊµÌåÊÇ·ñ´ÓÊý¾Ý¿â¼ì³ö
+	// Í¨ï¿½ï¿½dbidï¿½ï¿½Ñ¯Ò»ï¿½ï¿½Êµï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 	DBMGR_MESSAGE_DECLARE_STREAM(lookUpEntityByDBID,				NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇó¹Ø±Õ·þÎñÆ÷
+	// ï¿½ï¿½ï¿½ï¿½Ø±Õ·ï¿½ï¿½ï¿½ï¿½ï¿½
 	DBMGR_MESSAGE_DECLARE_STREAM(reqCloseServer,					NETWORK_VARIABLE_MESSAGE)
 
-	// Ä³¸öappÏò±¾app¸æÖª´¦ÓÚ»î¶¯×´Ì¬¡£
+	// Ä³ï¿½ï¿½appï¿½ï¿½appï¿½ï¿½Öªï¿½ï¿½ï¿½Ú»î¶¯×´Ì¬ï¿½ï¿½
 	DBMGR_MESSAGE_DECLARE_ARGS7(queryEntity,						NETWORK_VARIABLE_MESSAGE, 
 									uint16,							dbInterfaceIndex,
 									COMPONENT_ID,					componentID,
@@ -147,58 +147,58 @@ NETWORK_INTERFACE_DECLARE_BEGIN(DbmgrInterface)
 									CALLBACK_ID,					callbackID,
 									ENTITY_ID,						entityID)
 
-	// ÊµÌå×Ô¶¯¼ÓÔØ¹¦ÄÜ
+	// Êµï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½Ø¹ï¿½ï¿½ï¿½
 	DBMGR_MESSAGE_DECLARE_STREAM(entityAutoLoad,					NETWORK_VARIABLE_MESSAGE)
 
-	// Í¬²½entityÁ÷Ä£°å
+	// Í¬ï¿½ï¿½entityï¿½ï¿½Ä£ï¿½ï¿½
 	DBMGR_MESSAGE_DECLARE_STREAM(syncEntityStreamTemplate,			NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇó²éÑ¯watcherÊý¾Ý
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¯watcherï¿½ï¿½ï¿½ï¿½
 	DBMGR_MESSAGE_DECLARE_STREAM(queryWatcher,						NETWORK_VARIABLE_MESSAGE)
 
-	// ³äÖµÇëÇó
+	// ï¿½ï¿½Öµï¿½ï¿½ï¿½ï¿½
 	DBMGR_MESSAGE_DECLARE_STREAM(charge,							NETWORK_VARIABLE_MESSAGE)
 
-	// ³äÖµ»Øµ÷
+	// ï¿½ï¿½Öµï¿½Øµï¿½
 	DBMGR_MESSAGE_DECLARE_STREAM(onChargeCB,						NETWORK_VARIABLE_MESSAGE)
 
-	// ¼¤»î»Øµ÷¡£
+	// ï¿½ï¿½ï¿½ï¿½Øµï¿½ï¿½ï¿½
 	DBMGR_MESSAGE_DECLARE_ARGS1(accountActivate,					NETWORK_VARIABLE_MESSAGE,
 									std::string,					scode)
 
-	// ÕËºÅÇëÇóÖØÖÃÃÜÂë¡£
+	// ï¿½Ëºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ë¡£
 	DBMGR_MESSAGE_DECLARE_ARGS1(accountReqResetPassword,			NETWORK_VARIABLE_MESSAGE,
 									std::string,					accountName)
 
-	// ÕËºÅÍê³ÉÖØÖÃÃÜÂë¡£
+	// ï¿½Ëºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ë¡£
 	DBMGR_MESSAGE_DECLARE_ARGS3(accountResetPassword,				NETWORK_VARIABLE_MESSAGE,
 									std::string,					accountName,
 									std::string,					newpassword,
 									std::string,					code)
 
-	// ÕËºÅÇëÇó°ó¶¨ÓÊÏä¡£
+	// ï¿½Ëºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ä¡£
 	DBMGR_MESSAGE_DECLARE_ARGS4(accountReqBindMail,					NETWORK_VARIABLE_MESSAGE,
 									ENTITY_ID,						entityID,
 									std::string,					accountName,
 									std::string,					password,
 									std::string,					email)
 
-	// ÕËºÅÍê³É°ó¶¨ÓÊÏä¡£
+	// ï¿½Ëºï¿½ï¿½ï¿½É°ï¿½ï¿½ï¿½ï¿½ä¡£
 	DBMGR_MESSAGE_DECLARE_ARGS2(accountBindMail,					NETWORK_VARIABLE_MESSAGE,
 									std::string,					username,
 									std::string,					code)
 
-	// ÕËºÅÐÞ¸ÄÃÜÂë¡£
+	// ï¿½Ëºï¿½ï¿½Þ¸ï¿½ï¿½ï¿½ï¿½ë¡£
 	DBMGR_MESSAGE_DECLARE_ARGS4(accountNewPassword,					NETWORK_VARIABLE_MESSAGE,
 									ENTITY_ID,						entityID,
 									std::string,					accountName,
 									std::string,					password,
 									std::string,					newpassword)
 
-	// ¿ªÊ¼profile
+	// ï¿½ï¿½Ê¼profile
 	DBMGR_MESSAGE_DECLARE_STREAM(startProfile,						NETWORK_VARIABLE_MESSAGE)
 
-	// ÇëÇóÇ¿ÖÆÉ±ËÀµ±Ç°app
+	// ï¿½ï¿½ï¿½ï¿½Ç¿ï¿½ï¿½É±ï¿½ï¿½ï¿½ï¿½Ç°app
 	DBMGR_MESSAGE_DECLARE_STREAM(reqKillServer,						NETWORK_VARIABLE_MESSAGE)
 
 NETWORK_INTERFACE_DECLARE_END()

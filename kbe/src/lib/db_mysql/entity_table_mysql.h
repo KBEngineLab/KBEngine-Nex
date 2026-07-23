@@ -35,7 +35,7 @@ class EntityTableMysql;
 #define MYSQL_ENGINE_TYPE "InnoDB"
 
 /*
-	Î¬»¤entityÔÚÊý¾Ý¿â±íÖÐµÄÒ»¸ö×Ö¶Î
+	Î¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½Ðµï¿½Ò»ï¿½ï¿½ï¿½Ö¶ï¿½
 */
 class EntityTableItemMysqlBase : public EntityTableItem
 {
@@ -44,7 +44,7 @@ public:
 	  EntityTableItem(itemDBType, datalength, flags),
 	  mysqlItemtype_(mysqlItemtype)
 	{
-		// ¼ÇÂ¼ÏÂÎÒÃÇËùÉèÖÃµÄËùÓÐ±ê¼Ç
+		// ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ãµï¿½ï¿½ï¿½ï¿½Ð±ï¿½ï¿½
 		ALL_MYSQL_SET_FLAGS |= flags;
 
 		memset(db_item_name_, 0, MAX_BUF);
@@ -57,33 +57,33 @@ public:
 	uint8 type() const{ return TABLE_ITEM_TYPE_UNKONWN; }
 
 	/**
-		³õÊ¼»¯
+		ï¿½ï¿½Ê¼ï¿½ï¿½
 	*/
 	virtual bool initialize(const PropertyDescription* pPropertyDescription, 
 		const DataType* pDataType, std::string name);
 
 	/**
-		Í¬²½entity±íµ½Êý¾Ý¿âÖÐ
+		Í¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL) = 0;
 
 	/**
-		¸üÐÂÊý¾Ý
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual bool writeItem(DBInterface* pdbi, DBID dbid, MemoryStream* s, ScriptDefModule* pModule){ return true; }
 
 	/**
-		²éÑ¯±í
+		ï¿½ï¿½Ñ¯ï¿½ï¿½
 	*/
 	virtual bool queryTable(DBInterface* pdbi, DBID dbid, MemoryStream* s, ScriptDefModule* pModule){ return true; }
 
 	/**
-		»ñÈ¡Ä³¸ö±íËùÓÐµÄÊý¾Ý·Åµ½Á÷ÖÐ
+		ï¿½ï¿½È¡Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½Ý·Åµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID){};
 
 	/**
-		»ñÈ¡ÐèÒª´æ´¢µÄ±íÃû£¬ ×Ö¶ÎÃûºÍ×ª»»Îªsql´æ´¢Ê±µÄ×Ö·û´®Öµ
+		ï¿½ï¿½È¡ï¿½ï¿½Òªï¿½æ´¢ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Îªsqlï¿½æ´¢Ê±ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½Öµ
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context) = 0;
 	virtual void getReadSqlItem(mysql::DBContext& context) = 0;
@@ -113,17 +113,17 @@ public:
 	uint8 type() const{ return TABLE_ITEM_TYPE_DIGIT; }
 
 	/**
-		Í¬²½entity±íµ½Êý¾Ý¿âÖÐ
+		Í¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		»ñÈ¡Ä³¸ö±íËùÓÐµÄÊý¾Ý·Åµ½Á÷ÖÐ
+		ï¿½ï¿½È¡Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½Ý·Åµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		»ñÈ¡ÐèÒª´æ´¢µÄ±íÃû£¬ ×Ö¶ÎÃûºÍ×ª»»Îªsql´æ´¢Ê±µÄ×Ö·û´®Öµ
+		ï¿½ï¿½È¡ï¿½ï¿½Òªï¿½æ´¢ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Îªsqlï¿½æ´¢Ê±ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½Öµ
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -146,17 +146,17 @@ public:
 	uint8 type() const{ return TABLE_ITEM_TYPE_STRING; }
 
 	/**
-		Í¬²½entity±íµ½Êý¾Ý¿âÖÐ
+		Í¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		»ñÈ¡Ä³¸ö±íËùÓÐµÄÊý¾Ý·Åµ½Á÷ÖÐ
+		ï¿½ï¿½È¡Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½Ý·Åµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		»ñÈ¡ÐèÒª´æ´¢µÄ±íÃû£¬ ×Ö¶ÎÃûºÍ×ª»»Îªsql´æ´¢Ê±µÄ×Ö·û´®Öµ
+		ï¿½ï¿½È¡ï¿½ï¿½Òªï¿½æ´¢ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Îªsqlï¿½æ´¢Ê±ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½Öµ
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -176,17 +176,17 @@ public:
 	uint8 type() const{ return TABLE_ITEM_TYPE_UNICODE; }
 
 	/**
-		Í¬²½entity±íµ½Êý¾Ý¿âÖÐ
+		Í¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		»ñÈ¡Ä³¸ö±íËùÓÐµÄÊý¾Ý·Åµ½Á÷ÖÐ
+		ï¿½ï¿½È¡Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½Ý·Åµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		»ñÈ¡ÐèÒª´æ´¢µÄ±íÃû£¬ ×Ö¶ÎÃûºÍ×ª»»Îªsql´æ´¢Ê±µÄ×Ö·û´®Öµ
+		ï¿½ï¿½È¡ï¿½ï¿½Òªï¿½æ´¢ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Îªsqlï¿½æ´¢Ê±ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½Öµ
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -206,17 +206,17 @@ public:
 	uint8 type() const{ return TABLE_ITEM_TYPE_PYTHON; }
 
 	/**
-		Í¬²½entity±íµ½Êý¾Ý¿âÖÐ
+		Í¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		»ñÈ¡Ä³¸ö±íËùÓÐµÄÊý¾Ý·Åµ½Á÷ÖÐ
+		ï¿½ï¿½È¡Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½Ý·Åµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		»ñÈ¡ÐèÒª´æ´¢µÄ±íÃû£¬ ×Ö¶ÎÃûºÍ×ª»»Îªsql´æ´¢Ê±µÄ×Ö·û´®Öµ
+		ï¿½ï¿½È¡ï¿½ï¿½Òªï¿½æ´¢ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Îªsqlï¿½æ´¢Ê±ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½Öµ
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -236,17 +236,17 @@ public:
 	uint8 type() const{ return TABLE_ITEM_TYPE_BLOB; }
 
 	/**
-		Í¬²½entity±íµ½Êý¾Ý¿âÖÐ
+		Í¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		»ñÈ¡Ä³¸ö±íËùÓÐµÄÊý¾Ý·Åµ½Á÷ÖÐ
+		ï¿½ï¿½È¡Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½Ý·Åµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		»ñÈ¡ÐèÒª´æ´¢µÄ±íÃû£¬ ×Ö¶ÎÃûºÍ×ª»»Îªsql´æ´¢Ê±µÄ×Ö·û´®Öµ
+		ï¿½ï¿½È¡ï¿½ï¿½Òªï¿½æ´¢ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Îªsqlï¿½æ´¢Ê±ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½Öµ
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -268,17 +268,17 @@ public:
 	virtual bool isSameKey(std::string key);
 
 	/**
-		Í¬²½entity±íµ½Êý¾Ý¿âÖÐ
+		Í¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		»ñÈ¡Ä³¸ö±íËùÓÐµÄÊý¾Ý·Åµ½Á÷ÖÐ
+		ï¿½ï¿½È¡Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½Ý·Åµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		»ñÈ¡ÐèÒª´æ´¢µÄ±íÃû£¬ ×Ö¶ÎÃûºÍ×ª»»Îªsql´æ´¢Ê±µÄ×Ö·û´®Öµ
+		ï¿½ï¿½È¡ï¿½ï¿½Òªï¿½æ´¢ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Îªsqlï¿½æ´¢Ê±ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½Öµ
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -309,17 +309,17 @@ public:
 	virtual bool isSameKey(std::string key);
 
 	/**
-		Í¬²½entity±íµ½Êý¾Ý¿âÖÐ
+		Í¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		»ñÈ¡Ä³¸ö±íËùÓÐµÄÊý¾Ý·Åµ½Á÷ÖÐ
+		ï¿½ï¿½È¡Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½Ý·Åµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		»ñÈ¡ÐèÒª´æ´¢µÄ±íÃû£¬ ×Ö¶ÎÃûºÍ×ª»»Îªsql´æ´¢Ê±µÄ×Ö·û´®Öµ
+		ï¿½ï¿½È¡ï¿½ï¿½Òªï¿½æ´¢ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Îªsqlï¿½æ´¢Ê±ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½Öµ
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -350,17 +350,17 @@ public:
 	virtual bool isSameKey(std::string key);
 
 	/**
-		Í¬²½entity±íµ½Êý¾Ý¿âÖÐ
+		Í¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		»ñÈ¡Ä³¸ö±íËùÓÐµÄÊý¾Ý·Åµ½Á÷ÖÐ
+		ï¿½ï¿½È¡Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½Ý·Åµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		»ñÈ¡ÐèÒª´æ´¢µÄ±íÃû£¬ ×Ö¶ÎÃûºÍ×ª»»Îªsql´æ´¢Ê±µÄ×Ö·û´®Öµ
+		ï¿½ï¿½È¡ï¿½ï¿½Òªï¿½æ´¢ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Îªsqlï¿½æ´¢Ê±ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½Öµ
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -389,17 +389,17 @@ public:
 	uint8 type() const{ return TABLE_ITEM_TYPE_ENTITYCALL; }
 
 	/**
-		Í¬²½entity±íµ½Êý¾Ý¿âÖÐ
+		Í¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		»ñÈ¡Ä³¸ö±íËùÓÐµÄÊý¾Ý·Åµ½Á÷ÖÐ
+		ï¿½ï¿½È¡Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½Ý·Åµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		»ñÈ¡ÐèÒª´æ´¢µÄ±íÃû£¬ ×Ö¶ÎÃûºÍ×ª»»Îªsql´æ´¢Ê±µÄ×Ö·û´®Öµ
+		ï¿½ï¿½È¡ï¿½ï¿½Òªï¿½æ´¢ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Îªsqlï¿½æ´¢Ê±ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½Öµ
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -420,7 +420,7 @@ public:
 	virtual bool isSameKey(std::string key);
 
 	/**
-		³õÊ¼»¯
+		ï¿½ï¿½Ê¼ï¿½ï¿½
 	*/
 	virtual bool initialize(const PropertyDescription* pPropertyDescription, 
 		const DataType* pDataType, std::string name);
@@ -428,17 +428,17 @@ public:
 	uint8 type() const{ return TABLE_ITEM_TYPE_FIXEDARRAY; }
 
 	/**
-		Í¬²½entity±íµ½Êý¾Ý¿âÖÐ
+		Í¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		»ñÈ¡Ä³¸ö±íËùÓÐµÄÊý¾Ý·Åµ½Á÷ÖÐ
+		ï¿½ï¿½È¡Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½Ý·Åµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		»ñÈ¡ÐèÒª´æ´¢µÄ±íÃû£¬ ×Ö¶ÎÃûºÍ×ª»»Îªsql´æ´¢Ê±µÄ×Ö·û´®Öµ
+		ï¿½ï¿½È¡ï¿½ï¿½Òªï¿½æ´¢ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Îªsqlï¿½æ´¢Ê±ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½Öµ
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -467,23 +467,23 @@ public:
 	virtual bool isSameKey(std::string key);
 
 	/**
-		³õÊ¼»¯
+		ï¿½ï¿½Ê¼ï¿½ï¿½
 	*/
 	virtual bool initialize(const PropertyDescription* pPropertyDescription, 
 		const DataType* pDataType, std::string name);
 
 	/**
-		Í¬²½entity±íµ½Êý¾Ý¿âÖÐ
+		Í¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
 
 	/**
-		»ñÈ¡Ä³¸ö±íËùÓÐµÄÊý¾Ý·Åµ½Á÷ÖÐ
+		ï¿½ï¿½È¡Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½Ý·Åµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		»ñÈ¡ÐèÒª´æ´¢µÄ±íÃû£¬ ×Ö¶ÎÃûºÍ×ª»»Îªsql´æ´¢Ê±µÄ×Ö·û´®Öµ
+		ï¿½ï¿½È¡ï¿½ï¿½Òªï¿½æ´¢ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Îªsqlï¿½æ´¢Ê±ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½Öµ
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);
@@ -493,12 +493,12 @@ public:
 	uint32 getItemDatabaseLength(const std::string& name);
 
 protected:
-	EntityTableItemMysql_FIXED_DICT::FIXEDDICT_KEYTYPES			keyTypes_;		// Õâ¸ö¹Ì¶¨×ÖµäÀïµÄ¸÷¸ökeyµÄÀàÐÍ
+	EntityTableItemMysql_FIXED_DICT::FIXEDDICT_KEYTYPES			keyTypes_;		// ï¿½ï¿½ï¿½ï¿½Ì¶ï¿½ï¿½Öµï¿½ï¿½ï¿½Ä¸ï¿½ï¿½ï¿½keyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 };
 
 
 /*
-	Î¬»¤entityÔÚÊý¾Ý¿âÖÐµÄ±í
+	Î¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ÐµÄ±ï¿½
 */
 class EntityTableMysql : public EntityTable
 {
@@ -507,55 +507,55 @@ public:
 	virtual ~EntityTableMysql();
 	
 	/**
-		³õÊ¼»¯
+		ï¿½ï¿½Ê¼ï¿½ï¿½
 	*/
 	virtual bool initialize(ScriptDefModule* sm, std::string name);
 
 	/**
-		Í¬²½entity±íµ½Êý¾Ý¿âÖÐ
+		Í¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 	*/
 	virtual bool syncToDB(DBInterface* pdbi);
 
 	/**
-		Í¬²½±íË÷Òý
+		Í¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual bool syncIndexToDB(DBInterface* pdbi);
 
 	/** 
-		´´½¨Ò»¸ö±íitem
+		ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½item
 	*/
 	virtual EntityTableItem* createItem(std::string type, std::string defaultVal);
 
 	DBID writeTable(DBInterface* pdbi, DBID dbid, int8 shouldAutoLoad, MemoryStream* s, ScriptDefModule* pModule);
 
 	/**
-		´ÓÊý¾Ý¿âÉ¾³ýentity
+		ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½É¾ï¿½ï¿½entity
 	*/
 	bool removeEntity(DBInterface* pdbi, DBID dbid, ScriptDefModule* pModule);
 
 	/**
-		»ñÈ¡ËùÓÐµÄÊý¾Ý·Åµ½Á÷ÖÐ
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½Ý·Åµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual bool queryTable(DBInterface* pdbi, DBID dbid, MemoryStream* s, ScriptDefModule* pModule);
 
 	/**
-		ÉèÖÃÊÇ·ñ×Ô¶¯¼ÓÔØ
+		ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual void entityShouldAutoLoad(DBInterface* pdbi, DBID dbid, bool shouldAutoLoad);
 
 	/**
-		²éÑ¯×Ô¶¯¼ÓÔØµÄÊµÌå
+		ï¿½ï¿½Ñ¯ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½Øµï¿½Êµï¿½ï¿½
 	*/
 	virtual void queryAutoLoadEntities(DBInterface* pdbi, ScriptDefModule* pModule, 
 		ENTITY_ID start, ENTITY_ID end, std::vector<DBID>& outs);
 
 	/**
-		»ñÈ¡Ä³¸ö±íËùÓÐµÄÊý¾Ý·Åµ½Á÷ÖÐ
+		ï¿½ï¿½È¡Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½Ý·Åµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
 
 	/**
-		»ñÈ¡ÐèÒª´æ´¢µÄ±íÃû£¬ ×Ö¶ÎÃûºÍ×ª»»Îªsql´æ´¢Ê±µÄ×Ö·û´®Öµ
+		ï¿½ï¿½È¡ï¿½ï¿½Òªï¿½æ´¢ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Îªsqlï¿½æ´¢Ê±ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½Öµ
 	*/
 	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
 	virtual void getReadSqlItem(mysql::DBContext& context);

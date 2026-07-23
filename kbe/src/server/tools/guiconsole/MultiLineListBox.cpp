@@ -332,9 +332,9 @@ void CMultiLineListBox::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBa
 	bool done = false;
 	switch(nSBCode)
 	{
-	case SB_THUMBPOSITION:	//ÍÏ¶¯»¬¿é
-	case SB_LINELEFT:		//µã»÷×ó±ßµÄ¼ýÍ·
-	case SB_LINERIGHT:		//µã»÷ÓÒ±ßµÄ¼ýÍ·
+	case SB_THUMBPOSITION:	//ï¿½Ï¶ï¿½ï¿½ï¿½ï¿½ï¿½
+	case SB_LINELEFT:		//ï¿½ï¿½ï¿½ï¿½ï¿½ßµÄ¼ï¿½Í·
+	case SB_LINERIGHT:		//ï¿½ï¿½ï¿½ï¿½Ò±ßµÄ¼ï¿½Í·
 		done = true;
 		break;
 	} 

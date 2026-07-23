@@ -46,16 +46,16 @@ BOOL CStartServerWindow::OnInitDialog()
 	CDialog::OnInitDialog();
 	
 	DWORD dwStyle = m_list.GetExtendedStyle();
-	dwStyle |= LVS_EX_FULLROWSELECT;					//Ñ¡ÖÐÄ³ÐÐÊ¹ÕûÐÐ¸ßÁÁ£¨Ö»ÊÊÓÃÓëreport·ç¸ñµÄlistctrl£©
-	dwStyle |= LVS_EX_GRIDLINES;						//Íø¸ñÏß£¨Ö»ÊÊÓÃÓëreport·ç¸ñµÄlistctrl£©
+	dwStyle |= LVS_EX_FULLROWSELECT;					//Ñ¡ï¿½ï¿½Ä³ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½Ð¸ï¿½ï¿½ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½reportï¿½ï¿½ï¿½ï¿½listctrlï¿½ï¿½
+	dwStyle |= LVS_EX_GRIDLINES;						//ï¿½ï¿½ï¿½ï¿½ï¿½ß£ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½reportï¿½ï¿½ï¿½ï¿½listctrlï¿½ï¿½
 	//dwStyle |= LVS_EX_ONECLICKACTIVATE;
-	m_list.SetExtendedStyle(dwStyle);					//ÉèÖÃÀ©Õ¹·ç¸ñ
+	m_list.SetExtendedStyle(dwStyle);					//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ¹ï¿½ï¿½ï¿½
 
 	dwStyle = m_list1.GetExtendedStyle();
-	dwStyle |= LVS_EX_FULLROWSELECT;					//Ñ¡ÖÐÄ³ÐÐÊ¹ÕûÐÐ¸ßÁÁ£¨Ö»ÊÊÓÃÓëreport·ç¸ñµÄlistctrl£©
-	dwStyle |= LVS_EX_GRIDLINES;						//Íø¸ñÏß£¨Ö»ÊÊÓÃÓëreport·ç¸ñµÄlistctrl£©
+	dwStyle |= LVS_EX_FULLROWSELECT;					//Ñ¡ï¿½ï¿½Ä³ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½Ð¸ï¿½ï¿½ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½reportï¿½ï¿½ï¿½ï¿½listctrlï¿½ï¿½
+	dwStyle |= LVS_EX_GRIDLINES;						//ï¿½ï¿½ï¿½ï¿½ï¿½ß£ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½reportï¿½ï¿½ï¿½ï¿½listctrlï¿½ï¿½
 	//dwStyle |= LVS_EX_ONECLICKACTIVATE;
-	m_list1.SetExtendedStyle(dwStyle);					//ÉèÖÃÀ©Õ¹·ç¸ñ
+	m_list1.SetExtendedStyle(dwStyle);					//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ¹ï¿½ï¿½ï¿½
 
 	int idx = 0;
 	m_list.InsertColumn(idx++, _T("componentType"),				LVCFMT_CENTER,	150);
@@ -169,7 +169,7 @@ void CStartServerWindow::OnBnClickedButton2()
 		if(selgot == 0)
 		{
 			KBEngine::Network::EndPoint::reclaimPoolObject(endpoint);
-			continue;	// ³¬Ê±¿ÉÄÜ¶Ô·½·±Ã¦
+			continue;	// ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Ü¶Ô·ï¿½ï¿½ï¿½Ã¦
 		}
 		else if(selgot == -1)
 		{
@@ -303,7 +303,7 @@ void CStartServerWindow::OnBnClickedButton3()
 		if(selgot == 0)
 		{
 			KBEngine::Network::EndPoint::reclaimPoolObject(endpoint);
-			continue;	// ³¬Ê±¿ÉÄÜ¶Ô·½·±Ã¦
+			continue;	// ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Ü¶Ô·ï¿½ï¿½ï¿½Ã¦
 		}
 		else if(selgot == -1)
 		{
@@ -395,7 +395,7 @@ void CStartServerWindow::loadLayouts()
 
 void CStartServerWindow::saveLayouts()
 {
-    //´´½¨Ò»¸öXMLµÄÎÄµµ¶ÔÏó¡£
+    //ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½XMLï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½ï¿½ï¿½
     TiXmlDocument *pDocument = new TiXmlDocument();
 
 	int i = 0;

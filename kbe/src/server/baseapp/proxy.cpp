@@ -99,7 +99,7 @@ PyObject* Proxy::pyDisconnect()
 //-------------------------------------------------------------------------------------
 void Proxy::kick()
 {
-	// Èç¹û±»Ïú»ÙÆµµÀÈÔÈ»´æ»îÔò½«Æä¹Ø±Õ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æµï¿½ï¿½ï¿½ï¿½È»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø±ï¿½
 	Network::Channel* pChannel = Baseapp::getSingleton().networkInterface().findChannel(addr_);
 	if(pChannel && !pChannel->isDestroyed())
 	{
@@ -167,7 +167,7 @@ void Proxy::initClientCellPropertys()
 
 	MemoryStream* s = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 
-	// celldata»ñÈ¡¿Í»§¶Ë¸ÐÐËÈ¤µÄÊý¾Ý³õÊ¼»¯¿Í»§¶Ë Èç:ALL_CLIENTS
+	// celldataï¿½ï¿½È¡ï¿½Í»ï¿½ï¿½Ë¸ï¿½ï¿½ï¿½È¤ï¿½ï¿½ï¿½ï¿½ï¿½Ý³ï¿½Ê¼ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½ ï¿½ï¿½:ALL_CLIENTS
 	try
 	{
 		addCellDataToStream(ED_FLAG_ALL_CLIENTS|ED_FLAG_CELL_PUBLIC_AND_OWN|ED_FLAG_OWN_CLIENT, s, true);
@@ -249,7 +249,7 @@ void Proxy::onClientDeath(void)
 //-------------------------------------------------------------------------------------
 void Proxy::onClientGetCell(Network::Channel* pChannel, COMPONENT_ID componentID)
 {	
-	// »Øµ÷¸ø½Å±¾£¬»ñµÃÁËcell
+	// ï¿½Øµï¿½ï¿½ï¿½ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½cell
 	if(cellEntityCall_ == NULL)
 		cellEntityCall_ = new EntityCall(pScriptModule_, NULL, componentID, id_, ENTITYCALL_TYPE_CELL);
 
@@ -301,7 +301,7 @@ PyObject* Proxy::pyGiveClientTo(PyObject* pyOterProxy)
 		return 0;
 	}
 
-	// Èç¹ûÎªNone ÔòÉèÖÃÎªNULL
+	// ï¿½ï¿½ï¿½ÎªNone ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÎªNULL
 	Proxy* oterProxy = NULL;
 	if(pyOterProxy != Py_None)
 		oterProxy = static_cast<Proxy*>(pyOterProxy);
@@ -387,22 +387,22 @@ void Proxy::giveClientTo(Proxy* proxy)
 
 		if(cellEntityCall())
 		{
-			// µ±Ç°Õâ¸öentityÈç¹ûÓÐcell£¬ËµÃ÷ÒÑ¾­°ó¶¨ÁËwitness£¬ ÄÇÃ´¼ÈÈ»ÎÒÃÇ½«¿ØÖÆÈ¨
-			// ½»»»¸øÁËÁíÒ»¸öentity£¬ Õâ¸öentityÐèÒª½â°ó¶¨witness¡£
-			// Í¨Öªcell¶ªÊ§witness
+			// ï¿½ï¿½Ç°ï¿½ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½cellï¿½ï¿½Ëµï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½witnessï¿½ï¿½ ï¿½ï¿½Ã´ï¿½ï¿½È»ï¿½ï¿½ï¿½Ç½ï¿½ï¿½ï¿½ï¿½ï¿½È¨
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½entityï¿½ï¿½ ï¿½ï¿½ï¿½entityï¿½ï¿½Òªï¿½ï¿½ï¿½witnessï¿½ï¿½
+			// Í¨Öªcellï¿½ï¿½Ê§witness
 			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 			(*pBundle).newMessage(CellappInterface::onLoseWitness);
 			(*pBundle) << this->id();
 			sendToCellapp(pBundle);
 		}
 
-		// ¼ÈÈ»¿Í»§¶ËÊ§È¥¶ÔÆäµÄ¿ØÖÆ, ÄÇÃ´Í¨ÖªclientÏú»ÙÕâ¸öentity
+		// ï¿½ï¿½È»ï¿½Í»ï¿½ï¿½ï¿½Ê§È¥ï¿½ï¿½ï¿½ï¿½Ä¿ï¿½ï¿½ï¿½, ï¿½ï¿½Ã´Í¨Öªclientï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entity
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(ClientInterface::onEntityDestroyed);
 		(*pBundle) << this->id();
 		sendToClient(ClientInterface::onEntityDestroyed, pBundle);
 
-		// ½«¿ØÖÆÈ¨½»»»
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¨ï¿½ï¿½ï¿½ï¿½
 		clientEnabled_ = false;
 		clientEntityCall()->addr(Network::Address::NONE);
 		Py_DECREF(clientEntityCall());
@@ -425,8 +425,8 @@ void Proxy::onGiveClientTo(Network::Channel* lpChannel)
 	addr(lpChannel->addr());
 	Baseapp::getSingleton().createClientProxies(this);
 
-	// Èç¹ûÓÐcell, ÐèÒªÍ¨ÖªÆä»ñµÃwitness£¬ ÒòÎªÕâ¸ö¿Í»§¶Ë¸Õ¸Õ°ó¶¨µ½Õâ¸öproxy
-	// ´ËÊ±Õâ¸öentity¼´Ê¹ÓÐcellÕý³£Çé¿ö±ØÐëÊÇÃ»ÓÐwitnessµÄ¡£
+	// ï¿½ï¿½ï¿½ï¿½ï¿½cell, ï¿½ï¿½ÒªÍ¨Öªï¿½ï¿½ï¿½ï¿½witnessï¿½ï¿½ ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½Í»ï¿½ï¿½Ë¸Õ¸Õ°ó¶¨µï¿½ï¿½ï¿½ï¿½proxy
+	// ï¿½ï¿½Ê±ï¿½ï¿½ï¿½entityï¿½ï¿½Ê¹ï¿½ï¿½cellï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½witnessï¿½Ä¡ï¿½
 	onGetWitness();
 }
 
@@ -435,7 +435,7 @@ void Proxy::onGetWitness()
 {
 	if(cellEntityCall())
 	{
-		// Í¨Öªcell»ñµÃ¿Í»§¶Ë
+		// Í¨Öªcellï¿½ï¿½Ã¿Í»ï¿½ï¿½ï¿½
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(CellappInterface::onGetWitnessFromBase);
 		(*pBundle) << this->id();
@@ -778,7 +778,7 @@ bool Proxy::pushBundle(Network::Bundle* pBundle)
 	pChannel->pushBundle(pBundle);
 
 	{
-		// Èç¹ûÊý¾Ý´óÁ¿×èÈû·¢²»³öÈ¥½«»á±¨¾¯
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¥ï¿½ï¿½ï¿½á±¨ï¿½ï¿½
 		//AUTO_SCOPED_PROFILE("pushBundleAndSendToClient");
 		//pChannel->send(pBundle);
 	}
@@ -828,7 +828,7 @@ bool Proxy::sendToClient(bool expectData)
 	}
 
 	{
-		// Èç¹ûÊý¾Ý´óÁ¿×èÈû·¢²»³öÈ¥½«»á±¨¾¯
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¥ï¿½ï¿½ï¿½á±¨ï¿½ï¿½
 		AUTO_SCOPED_PROFILE("sendToClient");
 		pChannel->send();
 	}

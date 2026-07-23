@@ -54,7 +54,7 @@ class ScriptDefModule;
 
 class AllClients : public script::ScriptObject
 {
-	/** ×ÓÀà»¯ ½«Ò»Ð©py²Ù×÷Ìî³ä½øÅÉÉúÀà */
+	/** ï¿½ï¿½ï¿½à»¯ ï¿½ï¿½Ò»Ð©pyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 	INSTANCE_SCRIPT_HREADER(AllClients, ScriptObject)
 public:
 	AllClients(const ScriptDefModule* pScriptModule, 
@@ -64,12 +64,12 @@ public:
 	~AllClients();
 	
 	/** 
-		½Å±¾ÇëÇó»ñÈ¡ÊôÐÔ»òÕß·½·¨ 
+		ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½Ô»ï¿½ï¿½ß·ï¿½ï¿½ï¿½ 
 	*/
 	PyObject* onScriptGetAttribute(PyObject* attr);						
 			
 	/** 
-		»ñµÃ¶ÔÏóµÄÃèÊö 
+		ï¿½ï¿½Ã¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	PyObject* tp_repr();
 	PyObject* tp_str();
@@ -77,7 +77,7 @@ public:
 	void c_str(char* s, size_t size);
 	
 	/** 
-		»ñÈ¡entityID 
+		ï¿½ï¿½È¡entityID 
 	*/
 	ENTITY_ID id() const{ return id_; }
 	void setID(int id){ id_ = id; }
@@ -88,11 +88,11 @@ public:
 	}
 
 protected:
-	const ScriptDefModule*					pScriptModule_;			// ¸ÃentityËùÊ¹ÓÃµÄ½Å±¾Ä£¿é¶ÔÏó
+	const ScriptDefModule*					pScriptModule_;			// ï¿½ï¿½entityï¿½ï¿½Ê¹ï¿½ÃµÄ½Å±ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½
 
 	ENTITY_ID								id_;					// entityID
 
-	bool									otherClients_;			// ÊÇ·ñÖ»ÊÇÆäËû¿Í»§¶Ë£¬ ²»°üÀ¨×Ô¼º
+	bool									otherClients_;			// ï¿½Ç·ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í»ï¿½ï¿½Ë£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½
 };
 
 }

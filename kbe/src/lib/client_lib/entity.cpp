@@ -268,7 +268,7 @@ void Entity::onUpdatePropertys(MemoryStream& s)
 			s >> uid;
 		}
 
-		// Èç¹ûÊÇÎ»ÖÃ»òÕß³¯ÏòÐÅÏ¢Ôò
+		// ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½Ã»ï¿½ï¿½ß³ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½
 		if(uid == posuid)
 		{
 			Position3D pos;
@@ -533,7 +533,7 @@ void Entity::onBecomePlayer()
 
 		if(pyClass == NULL)
 		{
-			// ²»ÔÚÇ¿ÖÆÐèÒªÊµÏÖPlayer**Àà
+			// ï¿½ï¿½ï¿½ï¿½Ç¿ï¿½ï¿½ï¿½ï¿½ÒªÊµï¿½ï¿½Player**ï¿½ï¿½
 			PyErr_Clear();
 		}
 		else
@@ -623,7 +623,7 @@ PyObject* Entity::pyMoveToPoint(PyObject_ptr pyDestination, float velocity, floa
 		return 0;
 	}
 
-	// ½«×ø±êÐÅÏ¢ÌáÈ¡³öÀ´
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½
 	script::ScriptVector3::convertPyObjectToVector3(destination, pyDestination);
 	Py_INCREF(userData);
 
@@ -676,7 +676,7 @@ void Entity::cancelController(uint32 id)
 		return;
 	}
 
-	// ÔÝÊ±Ö»ÓÐ»Øµ÷, Ö÷ÒªÊÇÒòÎªÓÃÔÚÁËÒÆ¶¯ÖÐ£¬µ±Ç°¿ÉÄÜ²»ÊÇ·Ç³£ºÏÊÊ
+	// ï¿½ï¿½Ê±Ö»ï¿½Ð»Øµï¿½, ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¶ï¿½ï¿½Ð£ï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½Ü²ï¿½ï¿½Ç·Ç³ï¿½ï¿½ï¿½ï¿½ï¿½
 	if(id == (uint32)pMoveHandlerID_)
 		this->stopMove();
 }

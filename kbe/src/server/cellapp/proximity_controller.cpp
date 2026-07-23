@@ -72,8 +72,8 @@ void ProximityController::createFromStream(KBEngine::MemoryStream& s)
 //-------------------------------------------------------------------------------------
 bool ProximityController::reinstall(CoordinateNode* pCoordinateNode)
 {
-	// ¿çcellapp³¡¾°Ìø×ªÊ±¿ÉÄÜ³öÏÖÕâÖÖÇé¿ö
-	// ÒòÎªÊ¹ÓÃProximityController::ProximityController(Entity* pEntity)¹¹Ôì
+	// ï¿½ï¿½cellappï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ªÊ±ï¿½ï¿½ï¿½Ü³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	// ï¿½ï¿½ÎªÊ¹ï¿½ï¿½ProximityController::ProximityController(Entity* pEntity)ï¿½ï¿½ï¿½ï¿½
 	if(pTrapTrigger_ == NULL)
 	{
 		pTrapTrigger_ = new TrapTrigger(static_cast<EntityCoordinateNode*>(pCoordinateNode), 

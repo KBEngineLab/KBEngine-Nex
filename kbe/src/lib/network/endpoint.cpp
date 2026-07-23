@@ -275,7 +275,7 @@ int EndPoint::findIndicatedInterface(const char * spec, u_int32_t & address)
 		return -1;
 	}
 
-	// ÊÇ·ñÖ¸¶¨µØÖ·
+	// ï¿½Ç·ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½Ö·
 	if (0 == Address::string2ip(spec, address))
 	{
 		return 0;
@@ -382,7 +382,7 @@ int EndPoint::getInterfaceAddressByMAC(const char * mac, u_int32_t & address)
 		return ret;
 	}
 
-	// macµØÖ·×ª»»
+	// macï¿½ï¿½Ö·×ªï¿½ï¿½
 	unsigned char macAddress[16] = {0};
 	unsigned char macAddressIdx = 0;
 	char szTemp[2] = {0};
@@ -673,11 +673,11 @@ static long ssl_bio_callback(BIO *bio, int cmd, const char *argp, int argi, long
 
 	Packet* pPacket = (Packet*)BIO_get_callback_arg(bio);
 
-	// ÀàËÆrecv£¬ argiÊÇbuffer£¬arglÊÇbuffer³¤¶È£¬ÕâÀïÅÐ¶ÏpPacket´óÓÚ³¤¶È·µ»ØÖ¸¶¨³¤¶È£¬Ð¡ÓÚ³¤¶ÈÔò·µ»Ø¶ÁÈ¡µ½µÄ³¤¶È
+	// ï¿½ï¿½ï¿½ï¿½recvï¿½ï¿½ argiï¿½ï¿½bufferï¿½ï¿½arglï¿½ï¿½bufferï¿½ï¿½ï¿½È£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½pPacketï¿½ï¿½ï¿½Ú³ï¿½ï¿½È·ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½ï¿½È£ï¿½Ð¡ï¿½Ú³ï¿½ï¿½ï¿½ï¿½ò·µ»Ø¶ï¿½È¡ï¿½ï¿½ï¿½Ä³ï¿½ï¿½ï¿½
 	if ((int)pPacket->length() < argi)
 		argi = (int)pPacket->length();
 
-	// ½«ÎÒÃÇµÄbufferÌî³ä½øÈ¥
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Çµï¿½bufferï¿½ï¿½ï¿½ï¿½È¥
 	if ((cmd & BIO_CB_RETURN) > 0)
 	{
 		memcpy((void*)argp, pPacket->data() + pPacket->rpos(), argi);

@@ -58,7 +58,7 @@ protected:
 
 	Network::Address addr_;
 
-	// 当前所查看的space
+	// 锟斤拷前锟斤拷锟介看锟斤拷space
 	SPACE_ID spaceID_;
 };
 

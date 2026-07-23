@@ -28,7 +28,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{ 
 
-// ¼ÇÂ¼KBEËùÉèÖÃ¹ýµÄËùÓÐmysql±ê¼Ç£¬Ìá¹©sync_item_to_dbÊ±¼ì²éÉèÖÃÏî
+// ï¿½ï¿½Â¼KBEï¿½ï¿½ï¿½ï¿½ï¿½Ã¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½mysqlï¿½ï¿½Ç£ï¿½ï¿½á¹©sync_item_to_dbÊ±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 extern uint32 ALL_MYSQL_SET_FLAGS;
 
 }

@@ -94,7 +94,7 @@ ShutdownHandler::CAN_SHUTDOWN_STATE Dbmgr::canShutdown()
 {
 	if (getEntryScript().get() && PyObject_HasAttrString(getEntryScript().get(), "onReadyForShutDown") > 0)
 	{
-		// ËùÓÐ½Å±¾¶¼¼ÓÔØÍê±Ï
+		// ï¿½ï¿½ï¿½Ð½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(),
 			const_cast<char*>("onReadyForShutDown"),
 			const_cast<char*>(""));
@@ -168,7 +168,7 @@ void Dbmgr::onShutdownBegin()
 {
 	PythonApp::onShutdownBegin();
 
-	// Í¨Öª½Å±¾
+	// Í¨Öªï¿½Å±ï¿½
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	SCRIPT_OBJECT_CALL_ARGS0(getEntryScript().get(), const_cast<char*>("onDBMgrShutDown"), false);
 }
@@ -241,7 +241,7 @@ void Dbmgr::handleMainTick()
 //-------------------------------------------------------------------------------------
 void Dbmgr::handleCheckStatusTick()
 {
-	// ¼ì²é¶ªÊ§µÄ×é¼þ½ø³Ì£¬Èç¹ûÔÚÒ»¶ÎÊ±¼äÖ®ÄÚÈÔÈ»ÎÞ·¨·¢ÏÖ£¬ÐèÒªÇåÀíÊý¾Ý¿âÖÐentitylog
+	// ï¿½ï¿½é¶ªÊ§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½Ê±ï¿½ï¿½Ö®ï¿½ï¿½ï¿½ï¿½È»ï¿½Þ·ï¿½ï¿½ï¿½ï¿½Ö£ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½entitylog
 	if (loseBaseappts_.size() > 0)
 	{
 		std::map<COMPONENT_ID, uint64>::iterator iter = loseBaseappts_.begin();
@@ -283,7 +283,7 @@ bool Dbmgr::initializeBegin()
 //-------------------------------------------------------------------------------------
 bool Dbmgr::inInitialize()
 {
-	// ³õÊ¼»¯ËùÓÐÀ©Õ¹Ä£¿é
+	// ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ¹Ä£ï¿½ï¿½
 	// assets/scripts/
 	if (!PythonApp::inInitialize())
 		return false;
@@ -301,14 +301,14 @@ bool Dbmgr::initializeEnd()
 {
 	PythonApp::initializeEnd();
 
-	// Ìí¼ÓÒ»¸ötimer£¬ Ã¿Ãë¼ì²éÒ»Ð©×´Ì¬
+	// ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½timerï¿½ï¿½ Ã¿ï¿½ï¿½ï¿½ï¿½Ò»Ð©×´Ì¬
 	loopCheckTimerHandle_ = this->dispatcher().addTimer(1000000, this,
 							reinterpret_cast<void *>(TIMEOUT_CHECK_STATUS));
 
 	mainProcessTimer_ = this->dispatcher().addTimer(1000000 / 50, this,
 							reinterpret_cast<void *>(TIMEOUT_TICK));
 
-	// Ìí¼ÓglobalData, baseAppData, cellAppDataÖ§³Ö
+	// ï¿½ï¿½ï¿½ï¿½globalData, baseAppData, cellAppDataÖ§ï¿½ï¿½
 	pGlobalData_ = new GlobalDataServer(GlobalDataServer::GLOBAL_DATA);
 	pBaseAppData_ = new GlobalDataServer(GlobalDataServer::BASEAPP_DATA);
 	pCellAppData_ = new GlobalDataServer(GlobalDataServer::CELLAPP_DATA);
@@ -322,7 +322,7 @@ bool Dbmgr::initializeEnd()
 	
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-	// ËùÓÐ½Å±¾¶¼¼ÓÔØÍê±Ï
+	// ï¿½ï¿½ï¿½Ð½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
 										const_cast<char*>("onDBMgrReady"), 
 										const_cast<char*>(""));
@@ -521,7 +521,7 @@ void Dbmgr::onReqAllocEntityID(Network::Channel* pChannel, COMPONENT_ORDER compo
 {
 	KBEngine::COMPONENT_TYPE ct = static_cast<KBEngine::COMPONENT_TYPE>(componentType);
 
-	// »ñÈ¡Ò»¸öid¶Î ²¢´«Êä¸øIDClient
+	// ï¿½ï¿½È¡Ò»ï¿½ï¿½idï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½IDClient
 	std::pair<ENTITY_ID, ENTITY_ID> idRange = idServer_.allocRange();
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 
@@ -560,9 +560,9 @@ void Dbmgr::onRegisterNewApp(Network::Channel* pChannel, int32 uid, std::string&
 	if(pSyncAppDatasHandler_ == NULL)
 		pSyncAppDatasHandler_ = new SyncAppDatasHandler(this->networkInterface());
 
-	// ÏÂÒ»²½:
-	// Èç¹ûÊÇÁ¬½Óµ½dbmgrÔòÐèÒªµÈ´ý½ÓÊÕapp³õÊ¼ÐÅÏ¢
-	// ÀýÈç£º³õÊ¼»á·ÖÅäentityID¶ÎÒÔ¼°Õâ¸öappÆô¶¯µÄË³ÐòÐÅÏ¢£¨ÊÇ·ñµÚÒ»¸öbaseappÆô¶¯£©
+	// ï¿½ï¿½Ò»ï¿½ï¿½:
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Óµï¿½dbmgrï¿½ï¿½ï¿½ï¿½Òªï¿½È´ï¿½ï¿½ï¿½ï¿½ï¿½appï¿½ï¿½Ê¼ï¿½ï¿½Ï¢
+	// ï¿½ï¿½ï¿½ç£ºï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½entityIDï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë³ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½Ç·ï¿½ï¿½Ò»ï¿½ï¿½baseappï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if(tcomponentType == BASEAPP_TYPE || 
 		tcomponentType == CELLAPP_TYPE || 
 		tcomponentType == LOGINAPP_TYPE)
@@ -593,7 +593,7 @@ void Dbmgr::onRegisterNewApp(Network::Channel* pChannel, int32 uid, std::string&
 
 	pSyncAppDatasHandler_->pushApp(componentID, startGroupOrder, startGlobalOrder);
 
-	// Èç¹ûÊÇbaseapp»òÕßcellappÔò½«×Ô¼º×¢²áµ½ËùÓÐÆäËûbaseappºÍcellapp
+	// ï¿½ï¿½ï¿½ï¿½ï¿½baseappï¿½ï¿½ï¿½ï¿½cellappï¿½ï¿½ï¿½Ô¼ï¿½×¢ï¿½áµ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½baseappï¿½ï¿½cellapp
 	if(tcomponentType == BASEAPP_TYPE || 
 		tcomponentType == CELLAPP_TYPE)
 	{
@@ -1254,7 +1254,7 @@ std::string Dbmgr::selectAccountDBInterfaceName(const std::string& name)
 {
 	std::string dbInterfaceName = "default";
 
-	// °ÑÇëÇó½»ÓÉ½Å±¾´¦Àí
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É½Å±ï¿½ï¿½ï¿½ï¿½ï¿½
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(),
 		const_cast<char*>("onSelectAccountDBInterface"),
@@ -1283,7 +1283,7 @@ std::string Dbmgr::selectAccountDBInterfaceName(const std::string& name)
 //-------------------------------------------------------------------------------------
 void Dbmgr::onChannelDeregister(Network::Channel * pChannel)
 {
-	// Èç¹ûÊÇappËÀÍöÁË
+	// ï¿½ï¿½ï¿½ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if (pChannel->isInternal())
 	{
 		Components::ComponentInfos* cinfo = Components::getSingleton().findComponent(pChannel);

@@ -45,7 +45,7 @@ class Entity;
 
 class RealEntityMethod : public script::ScriptObject
 {
-	/** ×ÓÀà»¯ ½«Ò»Ð©py²Ù×÷Ìî³ä½øÅÉÉúÀà */
+	/** ï¿½ï¿½ï¿½à»¯ ï¿½ï¿½Ò»Ð©pyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 	INSTANCE_SCRIPT_HREADER(RealEntityMethod, script::ScriptObject)	
 public:	
 	RealEntityMethod(MethodDescription* methodDescription, 
@@ -69,7 +69,7 @@ public:
 	PyObject* callmethod(PyObject* args, PyObject* kwds);
 
 protected:	
-	MethodDescription*						methodDescription_;					// Õâ¸ö·½·¨µÄÃèÊö
+	MethodDescription*						methodDescription_;					// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
 	ENTITY_ID								ghostEntityID_;						// ghostEntityID_
 	COMPONENT_ID							realCell_;

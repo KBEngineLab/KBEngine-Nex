@@ -36,7 +36,7 @@ namespace KBEngine {
 class ClientObject : public ClientObjectBase
 {
 	/** 
-		×ÓÀà»¯ ½«Ò»Ð©py²Ù×÷Ìî³ä½øÅÉÉúÀà 
+		ï¿½ï¿½ï¿½à»¯ ï¿½ï¿½Ò»Ð©pyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	INSTANCE_SCRIPT_HREADER(ClientObject, ClientObjectBase)	
 
@@ -83,29 +83,29 @@ public:
 		const std::string& scriptVerInfo, const std::string& protocolMD5, 
 		const std::string& entityDefMD5, COMPONENT_TYPE componentType);
 
-	/** ÍøÂç½Ó¿Ú
-		´´½¨ÕËºÅ³É¹¦ºÍÊ§°Ü»Øµ÷
-	   @failedcode: Ê§°Ü·µ»ØÂë NETWORK_ERR_SRV_NO_READY:·þÎñÆ÷Ã»ÓÐ×¼±¸ºÃ, 
-									NETWORK_ERR_ACCOUNT_CREATE:´´½¨Ê§°Ü£¨ÒÑ¾­´æÔÚ£©, 
-									NETWORK_SUCCESS:ÕËºÅ´´½¨³É¹¦
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½ï¿½ËºÅ³É¹ï¿½ï¿½ï¿½Ê§ï¿½Ü»Øµï¿½
+	   @failedcode: Ê§ï¿½Ü·ï¿½ï¿½ï¿½ï¿½ï¿½ NETWORK_ERR_SRV_NO_READY:ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½×¼ï¿½ï¿½ï¿½ï¿½, 
+									NETWORK_ERR_ACCOUNT_CREATE:ï¿½ï¿½ï¿½ï¿½Ê§ï¿½Ü£ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½Ú£ï¿½, 
+									NETWORK_SUCCESS:ï¿½ËºÅ´ï¿½ï¿½ï¿½ï¿½É¹ï¿½
 
 									SERVER_ERROR_CODE failedcode;
-		@¶þ½øÖÆ¸½´øÊý¾Ý:¶þ½øÖÆ¶îÍâÊý¾Ý: uint32³¤¶È + bytearray
+		@ï¿½ï¿½ï¿½ï¿½ï¿½Æ¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½:ï¿½ï¿½ï¿½ï¿½ï¿½Æ¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½: uint32ï¿½ï¿½ï¿½ï¿½ + bytearray
 	*/
 	virtual void onCreateAccountResult(Network::Channel * pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-	   µÇÂ¼Ê§°Ü»Øµ÷
-	   @failedcode: Ê§°Ü·µ»ØÂë NETWORK_ERR_SRV_NO_READY:·þÎñÆ÷Ã»ÓÐ×¼±¸ºÃ, 
-									NETWORK_ERR_SRV_OVERLOAD:·þÎñÆ÷¸ºÔØ¹ýÖØ, 
-									NETWORK_ERR_NAME_PASSWORD:ÓÃ»§Ãû»òÕßÃÜÂë²»ÕýÈ·
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	   ï¿½ï¿½Â¼Ê§ï¿½Ü»Øµï¿½
+	   @failedcode: Ê§ï¿½Ü·ï¿½ï¿½ï¿½ï¿½ï¿½ NETWORK_ERR_SRV_NO_READY:ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½×¼ï¿½ï¿½ï¿½ï¿½, 
+									NETWORK_ERR_SRV_OVERLOAD:ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø¹ï¿½ï¿½ï¿½, 
+									NETWORK_ERR_NAME_PASSWORD:ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ë²»ï¿½ï¿½È·
 	*/
 	virtual void onLoginFailed(Network::Channel * pChannel, MemoryStream& s);
 
-	/** ÍøÂç½Ó¿Ú
-	   µÇÂ¼³É¹¦
-	   @ip: ·þÎñÆ÷ipµØÖ·
-	   @port: ·þÎñÆ÷¶Ë¿Ú
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+	   ï¿½ï¿½Â¼ï¿½É¹ï¿½
+	   @ip: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ipï¿½ï¿½Ö·
+	   @port: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë¿ï¿½
 	*/
 	virtual void onLoginSuccessfully(Network::Channel * pChannel, MemoryStream& s);
 

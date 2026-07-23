@@ -19,10 +19,10 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 /*
-	×Ö½ÚÐò½»»»´¦ÀíÄ£¿é£º
-		 ÓÉÓÚÍøÂçÍ¨ÐÅÒ»°ã²ÉÓÃBIG×Ö½ÚÐò\Ò²½Ð×öÍøÂç×Ö½ÚÐò.
- 		 ÎÒÃÇÊ¹ÓÃµÄPC»ú»òÕßÇ¶ÈëÊ½ÏµÍ³¿ÉÄÜÊ¹ÓÃBIG×Ö½ÚÐòÒ²¿ÉÄÜÊ¹ÓÃLITTEN(Ð¡×Ö½ÚÐò)
- 		 ËùÒÔÎÒÃÇ±ØÐëÔÚ´ËÖ®¼ä×öÒ»¸ö×Ö½ÚÐòµÄ×ª»»¡£
+	ï¿½Ö½ï¿½ï¿½ò½»»ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½é£º
+		 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¨ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½BIGï¿½Ö½ï¿½ï¿½ï¿½\Ò²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö½ï¿½ï¿½ï¿½.
+ 		 ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½Ãµï¿½PCï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç¶ï¿½ï¿½Ê½ÏµÍ³ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½BIGï¿½Ö½ï¿½ï¿½ï¿½Ò²ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½LITTEN(Ð¡ï¿½Ö½ï¿½ï¿½ï¿½)
+ 		 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç±ï¿½ï¿½ï¿½ï¿½Ú´ï¿½Ö®ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ö½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½
 */
 #ifndef KBE_MEMORYSTREAMCONVERTER_H
 #define KBE_MEMORYSTREAMCONVERTER_H
@@ -58,7 +58,7 @@ namespace MemoryStreamConverter
 	}
 }
 
-#if KBENGINE_ENDIAN == KBENGINE_BIG_ENDIAN			// ¿ÉÒÔÊ¹ÓÃsys.isPlatformLittleEndian() ½øÐÐ²âÊÔ
+#if KBENGINE_ENDIAN == KBENGINE_BIG_ENDIAN			// ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½sys.isPlatformLittleEndian() ï¿½ï¿½ï¿½Ð²ï¿½ï¿½ï¿½
 template<typename T> inline void EndianConvert(T& val) { MemoryStreamConverter::apply<T>(&val); }
 template<typename T> inline void EndianConvertReverse(T&) { }
 #else

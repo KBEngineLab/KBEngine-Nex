@@ -30,7 +30,7 @@ namespace KBEngine{
 
 class FixedArray : public script::Sequence
 {		
-	/** ×ÓÀà»¯ ½«Ò»Ð©py²Ù×÷Ìî³ä½øÅÉÉúÀà */
+	/** ï¿½ï¿½ï¿½à»¯ ï¿½ï¿½Ò»Ð©pyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 	INSTANCE_SCRIPT_HREADER(FixedArray, Sequence)
 
 public:	
@@ -40,28 +40,28 @@ public:
 	const DataType* getDataType(void){ return _dataType; }
 	
 	/** 
-		³õÊ¼»¯¹Ì¶¨Êý×é
+		ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½Ì¶ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void initialize(std::string strInitData);
 	void initialize(PyObject* pyObjInitData);
 
 	/** 
-		Ö§³Öpickler ·½·¨ 
+		Ö§ï¿½ï¿½pickler ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static PyObject* __py_reduce_ex__(PyObject* self, PyObject* protocol);
 
 	/** 
-		unpickle·½·¨ 
+		unpickleï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static PyObject* __unpickle__(PyObject* self, PyObject* args);
 	
 	/** 
-		½Å±¾±»°²×°Ê±±»µ÷ÓÃ 
+		ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½×°Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static void onInstallScript(PyObject* mod);
 	
 	/** 
-		Ò»ÏÂÎªÒ»¸ölistËùÐèµÄ²Ù×÷½Ó¿Ú 
+		Ò»ï¿½ï¿½ÎªÒ»ï¿½ï¿½listï¿½ï¿½ï¿½ï¿½Ä²ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½ 
 	*/
 	static PyObject* __py_append(PyObject* self, PyObject* args, PyObject* kwargs);	
 	static PyObject* __py_count(PyObject* self, PyObject* args, PyObject* kwargs);
@@ -78,7 +78,7 @@ public:
 	virtual PyObject* createNewItemFromObj(PyObject* pyItem);
 
 	/** 
-		»ñµÃ¶ÔÏóµÄÃèÊö 
+		ï¿½ï¿½Ã¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	PyObject* tp_repr();
 	PyObject* tp_str();

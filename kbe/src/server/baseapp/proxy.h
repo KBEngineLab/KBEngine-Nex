@@ -45,7 +45,7 @@ class ProxyForwarder;
 
 class Proxy : public Entity
 {
-	/** ×ÓÀà»¯½«Ò»Ð©py²Ù×÷Ìî³ä½øÅÉÉúÀà */
+	/** ï¿½ï¿½ï¿½à»¯ï¿½ï¿½Ò»Ð©pyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 	BASE_SCRIPT_HREADER(Proxy, Entity)
 
 public:
@@ -59,14 +59,14 @@ public:
 	bool pushBundle(Network::Bundle* pBundle);
 
 	/**
-		Ïòwitness¿Í»§¶ËÍÆËÍÒ»ÌõÏûÏ¢
+		ï¿½ï¿½witnessï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Ï¢
 	*/
 	bool sendToClient(const Network::MessageHandler& msgHandler, Network::Bundle* pBundle);
 	bool sendToClient(Network::Bundle* pBundle, bool immediately = false);
 	bool sendToClient(bool expectData = true);
 
 	/** 
-		½Å±¾ÇëÇó»ñÈ¡Á¬½ÓµÄrttÖµ
+		ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½Óµï¿½rttÖµ
 	*/
 	double getRoundTripTime() const;
 	DECLARE_PY_GET_MOTHOD(pyGetRoundTripTime);
@@ -78,67 +78,67 @@ public:
 	DECLARE_PY_GET_MOTHOD(pyGetTimeSinceHeardFromClient);
 
 	/** 
-		½Å±¾ÇëÇó»ñÈ¡ÊÇ·ñÓÐclient°ó¶¨µ½proxyÉÏ
+		ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¡ï¿½Ç·ï¿½ï¿½ï¿½clientï¿½ó¶¨µï¿½proxyï¿½ï¿½
 	*/
 	bool hasClient() const;
 	DECLARE_PY_GET_MOTHOD(pyHasClient);
 
 	/** 
-		½Å±¾ÇëÇó»ñÈ¡clientµØÖ·
+		ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¡clientï¿½ï¿½Ö·
 	*/
 	DECLARE_PY_GET_MOTHOD(pyClientAddr);
 
 	/** 
-		ÊµÌåÊÇ·ñ¿ÉÓÃ
+		Êµï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½
 	*/
 	INLINE bool clientEnabled() const;
 	DECLARE_PY_GET_MOTHOD(pyGetClientEnabled);
 
 	/**
-		Õâ¸öentity±»¼¤»îÁË, ÔÚ¿Í»§¶Ë³õÊ¼»¯ºÃ¶ÔÓ¦µÄentityºó£¬ Õâ¸ö·½·¨±»µ÷ÓÃ
+		ï¿½ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½, ï¿½Ú¿Í»ï¿½ï¿½Ë³ï¿½Ê¼ï¿½ï¿½ï¿½Ã¶ï¿½Ó¦ï¿½ï¿½entityï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void onClientEnabled(void);
 	
 	/**
-		Ò»¸öÊý¾ÝÏÂÔØÈÎÎñÍê³É
+		Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void onStreamComplete(int16 id, bool success);
 
 	/**
-		µÇÂ½³¢ÊÔ£¬ µ±Õý³£µÄµÇÂ½Ê§°ÜÖ®ºó£¬ µ÷ÓÃÕâ¸ö½Ó¿ÚÔÙ½øÐÐ³¢ÊÔ 
+		ï¿½ï¿½Â½ï¿½ï¿½ï¿½Ô£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Äµï¿½Â½Ê§ï¿½ï¿½Ö®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½ï¿½Ù½ï¿½ï¿½Ð³ï¿½ï¿½ï¿½ 
 	*/
 	int32 onLogOnAttempt(const char* addr, uint32 port, const char* password);
 	
 	/**
-		³õÊ¼»¯¿Í»§¶ËproxyµÄÊôÐÔ
+		ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½proxyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	void initClientBasePropertys();
 	void initClientCellPropertys();
 
 	/** 
-		µ±²ì¾õÕâ¸öentity¶ÔÓ¦µÄ¿Í»§¶Ësocket¶Ï¿ªÊ±±»µ÷ÓÃ 
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½Ó¦ï¿½Ä¿Í»ï¿½ï¿½ï¿½socketï¿½Ï¿ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	void onClientDeath(void);
 	
-	/** ÍøÂç½Ó¿Ú
-		µ±¿Í»§¶ËËù¹ØÁªµÄÕâ¸öentityµÄcell±»´´½¨Ê±£¬±»µ÷ÓÃ 
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½cellï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	void onClientGetCell(Network::Channel* pChannel, COMPONENT_ID componentID);
 
 	/**
-		»ñÈ¡Ç°¶ËÀà±ð
+		ï¿½ï¿½È¡Ç°ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	INLINE COMPONENT_CLIENT_TYPE getClientType() const;
 	INLINE void setClientType(COMPONENT_CLIENT_TYPE ctype);
 	DECLARE_PY_MOTHOD_ARG0(pyGetClientType);
 
 	/**
-		¶Ï¿ª¿Í»§¶ËÁ¬½Ó
+		ï¿½Ï¿ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	DECLARE_PY_MOTHOD_ARG0(pyDisconnect);
 
 	/**
-		»ñÈ¡Ç°¶Ë¸½´øÊý¾Ý
+		ï¿½ï¿½È¡Ç°ï¿½Ë¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	INLINE const std::string& getLoginDatas();
 	INLINE void setLoginDatas(const std::string& datas);
@@ -149,13 +149,13 @@ public:
 	DECLARE_PY_MOTHOD_ARG0(pyGetClientDatas);
 
 	/**
-		Ã¿¸öproxy´´½¨Ö®ºó¶¼»áÓÉÏµÍ³²úÉúÒ»¸öuuid£¬ Ìá¹©Ç°¶ËÖØµÇÂ½Ê±ÓÃ×÷Éí·ÝÊ¶±ð
+		Ã¿ï¿½ï¿½proxyï¿½ï¿½ï¿½ï¿½Ö®ï¿½ó¶¼»ï¿½ï¿½ï¿½ÏµÍ³ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½uuidï¿½ï¿½ ï¿½á¹©Ç°ï¿½ï¿½ï¿½Øµï¿½Â½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¶ï¿½ï¿½
 	*/
 	INLINE uint64 rndUUID() const;
 	INLINE void rndUUID(uint64 uid);
 
 	/** 
-		½«Æä×ÔÉíËù¹ØÁªµÄ¿Í»§¶Ë×ª¸øÁíÒ»¸öproxyÈ¥¹ØÁª 
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿Í»ï¿½ï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½proxyÈ¥ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	void giveClientTo(Proxy* proxy);
 	void onGiveClientTo(Network::Channel* lpChannel);
@@ -163,31 +163,31 @@ public:
 	DECLARE_PY_MOTHOD_ARG1(pyGiveClientTo, PyObject_ptr);
 
 	/**
-		ÎÄ¼þÁ÷Êý¾ÝÏÂÔØ
+		ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	static PyObject* __py_pyStreamFileToClient(PyObject* self, PyObject* args);
 	int16 streamFileToClient(PyObjectPtr objptr, 
 		const std::string& descr = "", int16 id = -1);
 
 	/**
-		×Ö·û´®Á÷Êý¾ÝÏÂÔØ
+		ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	static PyObject* __py_pyStreamStringToClient(PyObject* self, PyObject* args);
 	int16 streamStringToClient(PyObjectPtr objptr, 
 		const std::string& descr = "", int16 id = -1);
 
 	/**
-		°ó¶¨ÁËwitness
+		ï¿½ï¿½ï¿½ï¿½witness
 	*/
 	void onGetWitness();
 
 	/**
-		½«¿Í»§¶Ë´Ó·þÎñÆ÷Ìß³ö
+		ï¿½ï¿½ï¿½Í»ï¿½ï¿½Ë´Ó·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß³ï¿½
 	*/
 	void kick();
 
 	/**
-		»ñµÃÕâ¸öproxyµÄ¿Í»§¶ËÁ¬½Ó¶ÔÏó
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½proxyï¿½Ä¿Í»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¶ï¿½ï¿½ï¿½
 	*/
 	Network::Channel* pChannel();
 
@@ -198,20 +198,20 @@ protected:
 
 	bool clientEnabled_;
 
-	// ÏÞÖÆ¿Í»§¶ËÃ¿ÃëËùÄÜÊ¹ÓÃµÄ´ø¿í
+	// ï¿½ï¿½ï¿½Æ¿Í»ï¿½ï¿½ï¿½Ã¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ÃµÄ´ï¿½ï¿½ï¿½
 	int32 bandwidthPerSecond_;
 
-	// Í¨ÐÅ¼ÓÃÜkey Ä¬ÈÏblowfish
+	// Í¨ï¿½Å¼ï¿½ï¿½ï¿½key Ä¬ï¿½ï¿½blowfish
 	std::string encryptionKey;
 
 	ProxyForwarder* pProxyForwarder_;
 
 	COMPONENT_CLIENT_TYPE clientComponentType_;
 
-	// µÇÂ½Ê±¸½´øµÄdatasÊý¾Ý£¨²»´æµµ£©
+	// ï¿½ï¿½Â½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½datasï¿½ï¿½ï¿½Ý£ï¿½ï¿½ï¿½ï¿½æµµï¿½ï¿½
 	std::string loginDatas_;
 
-	// ×¢²áÊ±¸½´øµÄdatasÊý¾Ý£¨ÓÀ¾Ã´æµµ£©
+	// ×¢ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½datasï¿½ï¿½ï¿½Ý£ï¿½ï¿½ï¿½ï¿½Ã´æµµï¿½ï¿½
 	std::string createDatas_;
 };
 

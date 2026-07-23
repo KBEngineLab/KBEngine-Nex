@@ -38,7 +38,7 @@ class Buffered_DBTasks;
 struct ACCOUNT_INFOS;
 
 /*
-	Êı¾İ¿âÏß³ÌÈÎÎñ»ù´¡Àà
+	ï¿½ï¿½ï¿½İ¿ï¿½ï¿½ß³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 */
 
 class DBTask : public DBTaskBase
@@ -116,7 +116,7 @@ private:
 };
 
 /**
-	Ö´ĞĞÒ»ÌõsqlÓï¾ä
+	Ö´ï¿½ï¿½Ò»ï¿½ï¿½sqlï¿½ï¿½ï¿½
 */
 class DBTaskExecuteRawDatabaseCommand : public DBTask
 {
@@ -141,7 +141,7 @@ protected:
 
 
 /**
-	Ö´ĞĞÒ»ÌõsqlÓï¾ä
+	Ö´ï¿½ï¿½Ò»ï¿½ï¿½sqlï¿½ï¿½ï¿½
 */
 class DBTaskExecuteRawDatabaseCommandByEntity : public EntityDBTask
 {
@@ -165,7 +165,7 @@ protected:
 };
 
 /**
-	ÏòÊı¾İ¿âĞ´entity£¬ ±¸·İentityÊ±Ò²ÊÇÕâ¸ö»úÖÆ
+	ï¿½ï¿½ï¿½ï¿½ï¿½İ¿ï¿½Ğ´entityï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½entityÊ±Ò²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 */
 class DBTaskWriteEntity : public EntityDBTask
 {
@@ -192,7 +192,7 @@ protected:
 };
 
 /**
-	´ÓÊı¾İ¿âÖĞÉ¾³ıentity
+	ï¿½ï¿½ï¿½ï¿½ï¿½İ¿ï¿½ï¿½ï¿½É¾ï¿½ï¿½entity
 */
 class DBTaskRemoveEntity : public EntityDBTask
 {
@@ -216,7 +216,7 @@ protected:
 };
 
 /**
-	´ÓÊı¾İ¿âÖĞÉ¾³ıentity
+	ï¿½ï¿½ï¿½ï¿½ï¿½İ¿ï¿½ï¿½ï¿½É¾ï¿½ï¿½entity
 */
 class DBTaskDeleteEntityByDBID : public DBTask
 {
@@ -243,7 +243,7 @@ protected:
 };
 
 /**
-	´ÓÊı¾İ¿âÖĞ×Ô¶¯¼ÓÔØÊµÌå
+	ï¿½ï¿½ï¿½ï¿½ï¿½İ¿ï¿½ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½
 */
 class DBTaskEntityAutoLoad : public DBTask
 {
@@ -268,7 +268,7 @@ protected:
 };
 
 /**
-	Í¨¹ıdbid²éÑ¯Ò»¸öÊµÌåÊÇ·ñ´ÓÊı¾İ¿â¼ì³ö
+	Í¨ï¿½ï¿½dbidï¿½ï¿½Ñ¯Ò»ï¿½ï¿½Êµï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½İ¿ï¿½ï¿½ï¿½
 */
 class DBTaskLookUpEntityByDBID : public DBTask
 {
@@ -296,7 +296,7 @@ protected:
 };
 
 /**
-	´´½¨Ò»¸öÕËºÅµ½Êı¾İ¿â
+	ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ËºÅµï¿½ï¿½ï¿½ï¿½İ¿ï¿½
 */
 class DBTaskCreateAccount : public DBTask
 {
@@ -324,7 +324,7 @@ protected:
 };
 
 /**
-	´´½¨Ò»¸öemailÕËºÅ
+	ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½emailï¿½Ëºï¿½
 */
 class DBTaskCreateMailAccount : public DBTask
 {
@@ -349,7 +349,7 @@ protected:
 };
 
 /**
-	´´½¨Ò»¸öemailÕËºÅ
+	ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½emailï¿½Ëºï¿½
 */
 class DBTaskActivateAccount : public DBTask
 {
@@ -370,7 +370,7 @@ protected:
 };
 
 /**
-	ÇëÇóÖØÖÃÕËºÅ
+	ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ëºï¿½
 */
 class DBTaskReqAccountResetPassword : public DBTask
 {
@@ -393,7 +393,7 @@ protected:
 };
 
 /**
-	Íê³ÉÖØÖÃÕËºÅ
+	ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ëºï¿½
 */
 class DBTaskAccountResetPassword : public DBTask
 {
@@ -417,7 +417,7 @@ protected:
 };
 
 /**
-	ÇëÇó°ó¶¨email
+	ï¿½ï¿½ï¿½ï¿½ï¿½email
 */
 class DBTaskReqAccountBindEmail : public DBTask
 {
@@ -443,7 +443,7 @@ protected:
 };
 
 /**
-	Íê³É°ó¶¨email
+	ï¿½ï¿½É°ï¿½email
 */
 class DBTaskAccountBindEmail : public DBTask
 {
@@ -465,7 +465,7 @@ protected:
 };
 
 /**
-	ÉèÖÃĞÂÃÜÂë
+	ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 */
 class DBTaskAccountNewPassword : public DBTask
 {
@@ -488,7 +488,7 @@ protected:
 };
 
 /**
-	baseappÇëÇó²éÑ¯accountĞÅÏ¢
+	baseappï¿½ï¿½ï¿½ï¿½ï¿½Ñ¯accountï¿½ï¿½Ï¢
 */
 class DBTaskQueryAccount : public EntityDBTask
 {
@@ -523,7 +523,7 @@ protected:
 };
 
 /**
-	ÕËºÅÉÏÏß
+	ï¿½Ëºï¿½ï¿½ï¿½ï¿½ï¿½
 */
 class DBTaskAccountOnline : public EntityDBTask
 {
@@ -545,7 +545,7 @@ protected:
 
 
 /**
-	entityÏÂÏß
+	entityï¿½ï¿½ï¿½ï¿½
 */
 class DBTaskEntityOffline : public EntityDBTask
 {
@@ -565,7 +565,7 @@ protected:
 
 
 /**
-	Ò»¸öĞÂÓÃ»§µÇÂ¼£¬ ĞèÒª¼ì²éºÏ·¨ĞÔ
+	Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ ï¿½ï¿½Òªï¿½ï¿½ï¿½Ï·ï¿½ï¿½ï¿½
 */
 class DBTaskAccountLogin : public DBTask
 {
@@ -598,7 +598,7 @@ protected:
 };
 
 /**
-	baseappÇëÇó²éÑ¯entityĞÅÏ¢
+	baseappï¿½ï¿½ï¿½ï¿½ï¿½Ñ¯entityï¿½ï¿½Ï¢
 */
 class DBTaskQueryEntity : public EntityDBTask
 {
@@ -624,7 +624,7 @@ protected:
 	MemoryStream* s_;
 	ENTITY_ID entityID_;
 
-	// Èç¹ûÊµÌåÒÑ¾­¼¤»î£¬ÔòÕâ¸öÊôĞÔÖ¸ÏòÊµÌåËùÔÚapp
+	// ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½î£¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½app
 	bool wasActive_;
 	COMPONENT_ID wasActiveCID_;
 	ENTITY_ID wasActiveEntityID_;
@@ -633,7 +633,7 @@ protected:
 };
 
 /**
-	Ğ´·şÎñÆ÷ÈÕÖ¾
+	Ğ´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾
 */
 class DBTaskServerLog : public DBTask
 {
@@ -651,7 +651,7 @@ protected:
 };
 
 /**
-	²Á³ıÄ³¸öbaseapp¼ÇÂ¼µÄentitylog
+	ï¿½ï¿½ï¿½ï¿½Ä³ï¿½ï¿½baseappï¿½ï¿½Â¼ï¿½ï¿½entitylog
 */
 class DBTaskEraseBaseappEntityLog : public DBTask
 {

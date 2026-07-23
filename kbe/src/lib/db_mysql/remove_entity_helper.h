@@ -167,14 +167,14 @@ public:
 				}
 		}
 	
-		// É¾³ý·ÏÆúµÄÊý¾ÝÏî
+		// É¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		KBEUnordered_map< std::string, std::vector<DBID> >::iterator tabiter = childTableDBIDs.begin();
 		for(; tabiter != childTableDBIDs.end(); ++tabiter)
 		{
 			if(tabiter->second.size() == 0)
 				continue;
 
-			// ÏÈÉ¾³ýÊý¾Ý¿âÖÐµÄ¼ÇÂ¼
+			// ï¿½ï¿½É¾ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ÐµÄ¼ï¿½Â¼
 			std::string sqlstr = "delete from " ENTITY_TABLE_PERFIX "_";
 			sqlstr += tabiter->first;
 			sqlstr += " where " TABLE_ID_CONST_STR " in (";

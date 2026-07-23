@@ -97,7 +97,7 @@ void SpaceViewers::handleTimeout(TimerHandle handle, void * arg)
 	std::map< Network::Address, SpaceViewer>::iterator iter = spaceViews_.begin();
 	for (; iter != spaceViews_.end(); )
 	{
-		// Èç¹û¸ÃviewerµØÖ·ÕÒ²»µ½ÁËÔò½«Æä²Á³ý
+		// ï¿½ï¿½ï¿½ï¿½ï¿½viewerï¿½ï¿½Ö·ï¿½Ò²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		Network::Channel* pChannel = Cellapp::getSingleton().networkInterface().findChannel(iter->second.addr());
 		if (pChannel == NULL)
 		{
@@ -167,10 +167,10 @@ void SpaceViewer::timeout()
 {
 	switch (updateType_)
 	{
-	case 0: // ³õÊ¼»¯
+	case 0: // ï¿½ï¿½Ê¼ï¿½ï¿½
 		initClient();
 		break;
-	default: // ¸üÐÂÊµÌå
+	default: // ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½
 		updateClient();
 	};
 }
@@ -204,7 +204,7 @@ void SpaceViewer::initClient()
 {
 	MemoryStream s;
 
-	// ÏÈÏÂ·¢½Å±¾ID¶ÔÓ¦½Å±¾Ä£¿éµÄÃû³Æ£¬±ãÓÚ½µµÍºóÃæÊµÌåÍ¬²½Á¿£¬ÊµÌåÖ»Í¬²½id¹ýÈ¥
+	// ï¿½ï¿½ï¿½Â·ï¿½ï¿½Å±ï¿½IDï¿½ï¿½Ó¦ï¿½Å±ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ£ï¿½ï¿½ï¿½ï¿½Ú½ï¿½ï¿½Íºï¿½ï¿½ï¿½Êµï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½Ö»Í¬ï¿½ï¿½idï¿½ï¿½È¥
 	const EntityDef::SCRIPT_MODULES& scriptModules = EntityDef::getScriptModules();
 	s << (uint32)scriptModules.size();
 
@@ -217,7 +217,7 @@ void SpaceViewer::initClient()
 
 	sendStream(&s, updateType_);
 
-	// ¸Ä±äÎª¸üÐÂÊµÌå
+	// ï¿½Ä±ï¿½Îªï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½
 	updateType_ = 1;
 
 	lastUpdateVersion_ = 0;
@@ -235,18 +235,18 @@ void SpaceViewer::updateClient()
 		return;
 	}
 
-	// ×î¶àÃ¿´Î¸üÐÂ500¸öÊµÌå
+	// ï¿½ï¿½ï¿½Ã¿ï¿½Î¸ï¿½ï¿½ï¿½500ï¿½ï¿½Êµï¿½ï¿½
 	const int MAX_UPDATE_COUNT = 100;
 	int updateCount = 0;
 
-	// »ñÈ¡±¾´ÎÓëÉÏ´Î½á¹ûµÄ²îÖµ£¬½«²îÖµ·ÅÈëstreamÖÐ¸üÐÂµ½¿Í»§¶Ë
-	// ²îÖµ°üÀ¨ÐÂÔöµÄÊµÌå£¬ÒÔ¼°ÒÑ¾­ÓÐµÄÊµÌåµÄÎ»ÖÃ±ä»¯
+	// ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï´Î½ï¿½ï¿½ï¿½Ä²ï¿½Öµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½ï¿½ï¿½streamï¿½Ð¸ï¿½ï¿½Âµï¿½ï¿½Í»ï¿½ï¿½ï¿½
+	// ï¿½ï¿½Öµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½å£¬ï¿½Ô¼ï¿½ï¿½Ñ¾ï¿½ï¿½Ðµï¿½Êµï¿½ï¿½ï¿½Î»ï¿½Ã±ä»¯
 	MemoryStream s;
 
 	Entities<Entity>* pEntities = Cellapp::getSingleton().pEntities();
 	Entities<Entity>::ENTITYS_MAP& entitiesMap = pEntities->getEntities();
 
-	// ÏÈ¼ì²éÒÑ¾­¼àÊÓµÄÊµÌå£¬¶ÔÓÚ°æ±¾ºÅ½ÏµÍµÄÓÅÏÈ¸üÐÂ
+	// ï¿½È¼ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½Óµï¿½Êµï¿½å£¬ï¿½ï¿½ï¿½Ú°æ±¾ï¿½Å½ÏµÍµï¿½ï¿½ï¿½ï¿½È¸ï¿½ï¿½ï¿½
 	if (updateCount < MAX_UPDATE_COUNT)
 	{
 		std::map< ENTITY_ID, ViewEntity >::iterator viewerIter = viewedEntities.begin();
@@ -264,14 +264,14 @@ void SpaceViewer::updateClient()
 
 			Entities<Entity>::ENTITYS_MAP::iterator iter = entitiesMap.find(viewerIter->first);
 
-			// ÕÒ²»µ½ÊµÌå£¬ ËµÃ÷ÒÑ¾­Ïú»Ù»òÕßÅÜµ½ÆäËû½ø³ÌÁË
-			// Èç¹ûÔÚÆäËû½ø³Ì£¬ ÆäËû½ø³Ì»á½«Æä¸üÐÂµ½¿Í»§¶Ë
+			// ï¿½Ò²ï¿½ï¿½ï¿½Êµï¿½å£¬ Ëµï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½Ù»ï¿½ï¿½ï¿½ï¿½Üµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì£ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì»á½«ï¿½ï¿½ï¿½ï¿½Âµï¿½ï¿½Í»ï¿½ï¿½ï¿½
 			if (iter == entitiesMap.end())
 			{
 				s << viewerIter->first;
-				s << false; // trueÎª¸üÐÂ£¬ falseÎªÏú»Ù
+				s << false; // trueÎªï¿½ï¿½ï¿½Â£ï¿½ falseÎªï¿½ï¿½ï¿½ï¿½
 
-				// ½«Æä´ÓviewedEntitiesÉ¾³ý
+				// ï¿½ï¿½ï¿½ï¿½ï¿½viewedEntitiesÉ¾ï¿½ï¿½
 				viewedEntities.erase(viewerIter++);
 			}
 			else
@@ -279,7 +279,7 @@ void SpaceViewer::updateClient()
 				Entity* pEntity = static_cast<Entity*>(iter->second.get());
 				if (pEntity->spaceID() != spaceID_)
 				{
-					// ½«Æä´ÓviewedEntitiesÉ¾³ý
+					// ï¿½ï¿½ï¿½ï¿½ï¿½viewedEntitiesÉ¾ï¿½ï¿½
 					viewedEntities.erase(viewerIter++);
 					continue;
 				}
@@ -287,14 +287,14 @@ void SpaceViewer::updateClient()
 				/*
 				if (pEntity->cellID() != cellID_)
 				{
-					// ½«Æä´ÓviewedEntitiesÉ¾³ý
+					// ï¿½ï¿½ï¿½ï¿½ï¿½viewedEntitiesÉ¾ï¿½ï¿½
 					viewedEntities.erase(viewerIter++);
 					continue;
 				}
 				*/
 
-				// ÓÐÐÂÔöµÄÊµÌå»òÕßÒÑ¾­¹Û²ìµ½µÄÊµÌå£¬¼ì²éÎ»ÖÃ±ä»¯
-				// Èç¹ûÃ»ÓÐ±ä»¯Ôòpass
+				// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½Û²ìµ½ï¿½ï¿½Êµï¿½å£¬ï¿½ï¿½ï¿½Î»ï¿½Ã±ä»¯
+				// ï¿½ï¿½ï¿½Ã»ï¿½Ð±ä»¯ï¿½ï¿½pass
 				if ((viewEntity.position - pEntity->position()).length() <= 0.0004f &&
 					(viewEntity.direction.dir - pEntity->direction().dir).length() <= 0.0004f)
 				{
@@ -308,7 +308,7 @@ void SpaceViewer::updateClient()
 				++viewEntity.updateVersion;
 
 				s << viewEntity.entityID;
-				s << true; // trueÎª¸üÐÂ£¬ falseÎªÏú»Ù
+				s << true; // trueÎªï¿½ï¿½ï¿½Â£ï¿½ falseÎªï¿½ï¿½ï¿½ï¿½
 				s << pEntity->pScriptModule()->getUType();
 				s << viewEntity.position.x << viewEntity.position.y << viewEntity.position.z;
 				s << viewEntity.direction.roll() << viewEntity.direction.pitch() << viewEntity.direction.yaw();
@@ -319,7 +319,7 @@ void SpaceViewer::updateClient()
 		}
 	}
 
-	// ÔÙ¼ì²éÊÇ·ñÓÐÐÂÔöµÄÊµÌå
+	// ï¿½Ù¼ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½
 	if (updateCount < MAX_UPDATE_COUNT)
 	{
 		Entities<Entity>::ENTITYS_MAP::iterator iter = entitiesMap.begin();
@@ -352,7 +352,7 @@ void SpaceViewer::updateClient()
 			++updateCount;
 
 			s << viewEntity.entityID;
-			s << true; // trueÎª¸üÐÂ£¬ falseÎªÏú»Ù
+			s << true; // trueÎªï¿½ï¿½ï¿½Â£ï¿½ falseÎªï¿½ï¿½ï¿½ï¿½
 			s << pEntity->pScriptModule()->getUType();
 			s << viewEntity.position.x << viewEntity.position.y << viewEntity.position.z;
 			s << viewEntity.direction.roll() << viewEntity.direction.pitch() << viewEntity.direction.yaw();
@@ -361,7 +361,7 @@ void SpaceViewer::updateClient()
 
 	sendStream(&s, updateType_);
 
-	// Èç¹ûÈ«²¿¸üÐÂÍê±Ï£¬¸ü»»°æ±¾ºÅ
+	// ï¿½ï¿½ï¿½È«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½æ±¾ï¿½ï¿½
 	if (updateCount < MAX_UPDATE_COUNT)
 		++lastUpdateVersion_;
 }

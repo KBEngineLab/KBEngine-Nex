@@ -51,9 +51,9 @@ inline CString GetAppPath()
 }
 
 struct ListSortData{
-     CListCtrl *listctrl;               //CListCtrl¿Ø¼þÖ¸Õë
-     int isub;							//lÁÐºÅ
-     int seq;							//1ÎªÉýÐò£¬0Îª½µÐò
+     CListCtrl *listctrl;               //CListCtrlï¿½Ø¼ï¿½Ö¸ï¿½ï¿½
+     int isub;							//lï¿½Ðºï¿½
+     int seq;							//1Îªï¿½ï¿½ï¿½ï¿½0Îªï¿½ï¿½ï¿½ï¿½
 };
 
 int CALLBACK CompareFunc(LPARAM lParam1,LPARAM lParam2,LPARAM lParamSort);

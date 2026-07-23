@@ -86,7 +86,7 @@ void Machine::onBroadcastInterface(Network::Channel* pChannel, int32 uid, std::s
 									float cpu, float mem, uint32 usedmem, int8 state, uint32 machineID, uint64 extradata,
 									uint64 extradata1, uint64 extradata2, uint64 extradata3, uint32 backRecvAddr, uint16 backRecvPort)
 {
-	// ÏÈ²éÑ¯Ò»ÏÂÊÇ·ñ´æÔÚÏàÍ¬Éí·Ý£¬Èç¹ûÊÇÏàÍ¬Éí·ÝÇÒ²»ÊÇÒ»¸ö½ø³ÌÎÒÃÇÐèÒª¸æÖª¶Ô·½Æô¶¯·Ç·¨
+	// ï¿½È²ï¿½Ñ¯Ò»ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½ï¿½Ý£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½ï¿½Ò²ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½Öªï¿½Ô·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½
 	Components::ComponentInfos* pinfos = Components::getSingleton().findComponent(componentID);
 	if(pinfos && isGameServerComponentType((COMPONENT_TYPE)componentType) && checkComponentUsable(pinfos, false, true))
 	{
@@ -124,7 +124,7 @@ void Machine::onBroadcastInterface(Network::Channel* pChannel, int32 uid, std::s
 		}
 	}
 
-	// Ö»¼ÇÂ¼±¾»úÆô¶¯µÄ½ø³Ì
+	// Ö»ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä½ï¿½ï¿½ï¿½
 	if(this->networkInterface().intaddr().ip == intaddr ||
 				this->networkInterface().extaddr().ip == intaddr)
 	{
@@ -142,7 +142,7 @@ void Machine::onBroadcastInterface(Network::Channel* pChannel, int32 uid, std::s
 			}
 		}
 
-		// Ò»Ì¨Ó²¼þÉÏÖ»ÄÜ´æÔÚÒ»¸ömachine
+		// Ò»Ì¨Ó²ï¿½ï¿½ï¿½ï¿½Ö»ï¿½Ü´ï¿½ï¿½ï¿½Ò»ï¿½ï¿½machine
 		if(componentType == MACHINE_TYPE)
 		{
 			ERROR_MSG("Machine::onBroadcastInterface: A single computer cannot run multiple \"machine\" process!\n");
@@ -184,7 +184,7 @@ void Machine::onFindInterfaceAddr(Network::Channel* pChannel, int32 uid, std::st
 	KBEngine::COMPONENT_TYPE tfindComponentType = (KBEngine::COMPONENT_TYPE)findComponentType;
 	KBEngine::COMPONENT_TYPE tComponentType = (KBEngine::COMPONENT_TYPE)componentType;
 
-	// Èç¹û²»ÊÇguiconsole·¢³öµÄ, uidÒ²²»µÈÓÚµ±Ç°·þÎñÆ÷µÄuidÔò²»Àí»á¡£
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½guiconsoleï¿½ï¿½ï¿½ï¿½ï¿½ï¿½, uidÒ²ï¿½ï¿½ï¿½ï¿½ï¿½Úµï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½uidï¿½ï¿½ï¿½ï¿½ï¿½á¡£
 	if(tComponentType != CONSOLE_TYPE)
 	{
 		std::vector<int32>::iterator iter = std::find(localuids_.begin(), localuids_.end(), uid);
@@ -260,8 +260,8 @@ void Machine::onFindInterfaceAddr(Network::Channel* pChannel, int32 uid, std::st
 
 	if(!found)
 	{
-		// Èç¹ûÊÇ¿ØÖÆÌ¨£¬ ÇÒuid²»ÊÇÒ»ÖÂµÄÔòÎÞÐè·µ»ØÕÒ²»µ½ÏûÏ¢
-		// ¿ØÖÆÌ¨¿ÉÄÜ¹ã²¥µ½ÆäËû×éÈ¥ÁË
+		// ï¿½ï¿½ï¿½ï¿½Ç¿ï¿½ï¿½ï¿½Ì¨ï¿½ï¿½ ï¿½ï¿½uidï¿½ï¿½ï¿½ï¿½Ò»ï¿½Âµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½è·µï¿½ï¿½ï¿½Ò²ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
+		// ï¿½ï¿½ï¿½ï¿½Ì¨ï¿½ï¿½ï¿½Ü¹ã²¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¥ï¿½ï¿½
 		if(tComponentType == CONSOLE_TYPE)
 		{
 			std::vector<int32>::iterator iter = std::find(localuids_.begin(), localuids_.end(), uid);
@@ -298,7 +298,7 @@ bool Machine::checkComponentUsable(const Components::ComponentInfos* info, bool 
 	else
 		ret = Components::getSingleton().updateComponentInfos(info);
 
-	// Èç¹ûÒÑ¾­²»¿ÉÓÃÇÒÔÊÐí×Ô¶¯²Á³ýÔò²Á³ýËü
+	// ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if(!ret && autoerase)
 		Components::getSingleton().delComponent(info->uid, info->componentType, info->cid);
 
@@ -572,7 +572,7 @@ void Machine::onQueryAllInterfaceInfos(Network::Channel* pChannel, int32 uid, st
 		}
 	}
 
-	// uid²»µÈÓÚµ±Ç°·þÎñÆ÷µÄuidÔò²»Àí»á¡£
+	// uidï¿½ï¿½ï¿½ï¿½ï¿½Úµï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½uidï¿½ï¿½ï¿½ï¿½ï¿½á¡£
 	if (uid > 0)
 	{
 		std::vector<int32>::iterator iter = std::find(localuids_.begin(), localuids_.end(), uid);
@@ -850,7 +850,7 @@ bool Machine::inInitialize()
 //-------------------------------------------------------------------------------------
 bool Machine::initializeEnd()
 {
-	pActiveTimerHandle_->cancel(); // machine²»ÐèÒªÓëÆäËû×é¼þ±£³Ö»î¶¯×´Ì¬¹ØÏµ
+	pActiveTimerHandle_->cancel(); // machineï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö»î¶¯×´Ì¬ï¿½ï¿½Ïµ
 	return true;
 }
 
@@ -944,7 +944,7 @@ void Machine::stopserver(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 	s >> uid;
 	s >> componentType;
 	
-	// Èç¹û×é¼þID´óÓÚ0Ôò½öÍ£Ö¹Ö¸¶¨IDµÄ×é¼þ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½IDï¿½ï¿½ï¿½ï¿½0ï¿½ï¿½ï¿½Í£Ö¹Ö¸ï¿½ï¿½IDï¿½ï¿½ï¿½ï¿½ï¿½
 	s >> componentID;
 	
 	if(s.length() > 0)
@@ -1051,7 +1051,7 @@ void Machine::stopserver(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 			int selgot = select(ep1+1, &fds, NULL, NULL, &tv);
 			if(selgot == 0)
 			{
-				// ³¬Ê±, ¿ÉÄÜ¶Ô·½·±Ã¦
+				// ï¿½ï¿½Ê±, ï¿½ï¿½ï¿½Ü¶Ô·ï¿½ï¿½ï¿½Ã¦
 				ERROR_MSG(fmt::format("--> stop {}({}), addr={}, timeout!\n", 
 					(*iter).cid, COMPONENT_NAME[componentType], (cinfos->pIntAddr != NULL ? 
 					cinfos->pIntAddr->c_str() : "unknown")));
@@ -1134,7 +1134,7 @@ void Machine::killserver(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 	s >> uid;
 	s >> componentType;
 
-	// Èç¹û×é¼þID´óÓÚ0Ôò½öÍ£Ö¹Ö¸¶¨IDµÄ×é¼þ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½IDï¿½ï¿½ï¿½ï¿½0ï¿½ï¿½ï¿½Í£Ö¹Ö¸ï¿½ï¿½IDï¿½ï¿½ï¿½ï¿½ï¿½
 	s >> componentID;
 
 	if (s.length() > 0)
@@ -1189,7 +1189,7 @@ void Machine::killserver(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 
 			while (killtry++ < 10)
 			{
-				// É±ËÀ½ø³Ì
+				// É±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 				std::string killcmd;
 
 #if KBE_PLATFORM == PLATFORM_WIN32
@@ -1322,7 +1322,7 @@ uint16 Machine::startLinuxProcess(int32 uid, COMPONENT_TYPE componentType, uint6
 
 		std::string cmdLine = bin_path + COMPONENT_NAME_EX(componentType);
 
-		// ¸Ä±äµ±Ç°Ä¿Â¼£¬ÒÔÈÃ³öÎÊÌâµÄÊ±ºòcoreÄÜÔÚ´Ë´¦Éú³É
+		// ï¿½Ä±äµ±Ç°Ä¿Â¼ï¿½ï¿½ï¿½ï¿½ï¿½Ã³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½coreï¿½ï¿½ï¿½Ú´Ë´ï¿½ï¿½ï¿½ï¿½ï¿½
 		//chdir(bin_path.c_str());
 
 		const char *argv[6];
@@ -1335,7 +1335,7 @@ uint16 Machine::startLinuxProcess(int32 uid, COMPONENT_TYPE componentType, uint6
 		*pArgv++ = sgus.c_str();
 		*pArgv = NULL;
 
-		// ¹Ø±Õ¸¸ÀàµÄsocket
+		// ï¿½Ø±Õ¸ï¿½ï¿½ï¿½ï¿½socket
 		ep_.close();
 		epBroadcast_.close();
 		epLocal_.close();
@@ -1371,17 +1371,17 @@ DWORD Machine::startWindowsProcess(int32 uid, COMPONENT_TYPE componentType, uint
 	str += COMPONENT_NAME_EX(componentType);
 	str += ".exe";
 
-	// ÓÃË«ÒýºÅ°ÑÃüÁîÐÐÀ¨ÆðÀ´£¬ÒÔ±ÜÃâÂ·¾¶ÖÐ´æÔÚ¿Õ¸ñ£¬´Ó¶øÖ´ÐÐ´íÎó
+	// ï¿½ï¿½Ë«ï¿½ï¿½ï¿½Å°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô±ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½Ð´ï¿½ï¿½Ú¿Õ¸ñ£¬´Ó¶ï¿½Ö´ï¿½Ð´ï¿½ï¿½ï¿½
 	str = "\"" + str + "\"";
 
-	// ‰ˆ¼Ó²ÎÊý
+	// ï¿½ï¿½ï¿½Ó²ï¿½ï¿½ï¿½
 	str += fmt::format(" --cid={}", cid);
 	str += fmt::format(" --gus={}", gus);
 
 	wchar_t* szCmdline = KBEngine::strutil::char2wchar(str.c_str());
 
-	// Ê¹ÓÃmachineµ±Ç°µÄ¹¤×÷Ä¿Â¼×÷ÎªÐÂ½ø³ÌµÄ¹¤×÷Ä¿Â¼£¬
-	// ÎªÒ»Ð©ÓëÏà¶ÔÄ¿Â¼µÄÎÄ¼þ²Ù×÷²Ù×÷Ò»ÖÂµÄ¹¤×÷Ä¿Â¼£¨ÈçÈÕÖ¾£©
+	// Ê¹ï¿½ï¿½machineï¿½ï¿½Ç°ï¿½Ä¹ï¿½ï¿½ï¿½Ä¿Â¼ï¿½ï¿½Îªï¿½Â½ï¿½ï¿½ÌµÄ¹ï¿½ï¿½ï¿½Ä¿Â¼ï¿½ï¿½
+	// ÎªÒ»Ð©ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿Â¼ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ÂµÄ¹ï¿½ï¿½ï¿½Ä¿Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½
 	wchar_t currdir[1024];
 	GetCurrentDirectory(sizeof(currdir), currdir);
 

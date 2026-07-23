@@ -48,11 +48,11 @@ public:
 	}
 
 	/**
-		´Ó±íÖĞ²éÑ¯Êı¾İ
+		ï¿½Ó±ï¿½ï¿½Ğ²ï¿½Ñ¯ï¿½ï¿½ï¿½ï¿½
 	*/
 	static bool queryDB(DBInterface* pdbi, mysql::DBContext& context)
 	{
-		// ¸ù¾İÄ³¸ödbid»ñµÃÒ»ÕÅ±íÉÏµÄÏà¹ØÊı¾İ
+		// ï¿½ï¿½ï¿½ï¿½Ä³ï¿½ï¿½dbidï¿½ï¿½ï¿½Ò»ï¿½Å±ï¿½ï¿½Ïµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		SqlStatement* pSqlcmd = new SqlStatementQuery(pdbi, context.tableName, 
 			context.dbids[context.dbid], 
 			context.dbid, context.items);
@@ -64,7 +64,7 @@ public:
 		if(!ret)
 			return ret;
 
-		// ½«²éÑ¯µ½µÄ½á¹ûĞ´ÈëÉÏÏÂÎÄ
+		// ï¿½ï¿½ï¿½ï¿½Ñ¯ï¿½ï¿½ï¿½Ä½ï¿½ï¿½Ğ´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		MYSQL_RES * pResult = mysql_store_result(static_cast<DBInterfaceMysql*>(pdbi)->mysql());
 
 		if(pResult)
@@ -79,18 +79,18 @@ public:
 
 				unsigned long *lengths = mysql_fetch_lengths(pResult);
 
-				// ²éÑ¯ÃüÁî±£Ö¤ÁË²éÑ¯µ½µÄÃ¿Ìõ¼ÇÂ¼¶¼»áÓĞdbid
+				// ï¿½ï¿½Ñ¯ï¿½ï¿½ï¿½î±£Ö¤ï¿½Ë²ï¿½Ñ¯ï¿½ï¿½ï¿½ï¿½Ã¿ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½dbid
 				std::stringstream sval;
 				sval << arow[0];
 
 				DBID item_dbid;
 				sval >> item_dbid;
 
-				// ½«dbid¼ÇÂ¼µ½ÁĞ±íÖĞ£¬Èç¹ûµ±Ç°±í»¹´æÔÚ×Ó±íÒıÓÃÔò»áÈ¥×Ó±í²éÃ¿Ò»ÌõÓë´ËdbidÏà¹ØµÄ¼ÇÂ¼
+				// ï¿½ï¿½dbidï¿½ï¿½Â¼ï¿½ï¿½ï¿½Ğ±ï¿½ï¿½Ğ£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¥ï¿½Ó±ï¿½ï¿½ï¿½Ã¿Ò»ï¿½ï¿½ï¿½ï¿½ï¿½dbidï¿½ï¿½ØµÄ¼ï¿½Â¼
 				std::vector<DBID>& itemDBIDs = context.dbids[context.dbid];
 				int fidx = -100;
 
-				// Èç¹ûµ±Ç°Õâ¸öitemµÄdbidĞ¡ÓÚ¸Ã±íÏÂ×îºóÒ»¸ö¼ÇÂ¼µÄdbid´óĞ¡£¬ÄÇÃ´ĞèÒªÔÚitemDBIDsÖĞÖ¸¶¨µÄÎ»ÖÃ²åÈëÕâ¸ödbid£¬ÒÔ±£Ö¤´ÓĞ¡µ½´óµÄË³Ğò
+				// ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½itemï¿½ï¿½dbidĞ¡ï¿½Ú¸Ã±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½dbidï¿½ï¿½Ğ¡ï¿½ï¿½ï¿½ï¿½Ã´ï¿½ï¿½Òªï¿½ï¿½itemDBIDsï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½Î»ï¿½Ã²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½dbidï¿½ï¿½ï¿½Ô±ï¿½Ö¤ï¿½ï¿½Ğ¡ï¿½ï¿½ï¿½ï¿½ï¿½Ë³ï¿½ï¿½
 				if (itemDBIDs.size() > 0 && itemDBIDs[itemDBIDs.size() - 1] > item_dbid)
 				{
 					for (fidx = itemDBIDs.size() - 1; fidx > 0; --fidx)
@@ -106,7 +106,7 @@ public:
 					itemDBIDs.push_back(item_dbid);
 				}
 
-				// Èç¹ûÕâÌõ¼ÇÂ¼³ıÁËdbidÒÔÍâ»¹´æÔÚÆäËûÊı¾İ£¬Ôò½«Êı¾İÌî³äµ½½á¹û¼¯ÖĞ
+				// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½dbidï¿½ï¿½ï¿½â»¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½İ£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½äµ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 				if(nfields > 1)
 				{
 					std::vector<std::string>& itemResults = context.results[item_dbid].second;
@@ -120,7 +120,7 @@ public:
 						std::string data;
 						data.assign(arow[i], lengths[i]);
 
-						// Èç¹ûÉÏÃæ¼ÆËã¼ÓÈëdbidÊ±ÊÇ²åÈë·½Ê½£¬ÄÇÃ´½á¹û¼¯ÖĞÒ²ĞèÒª²åÈëµ½¶ÔÓ¦µÄÎ»ÖÃ
+						// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½dbidÊ±ï¿½Ç²ï¿½ï¿½ë·½Ê½ï¿½ï¿½ï¿½ï¿½Ã´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò²ï¿½ï¿½Òªï¿½ï¿½ï¿½ëµ½ï¿½ï¿½Ó¦ï¿½ï¿½Î»ï¿½ï¿½
 						if (fidx != -100)
 							itemResults.insert(itemResults.begin() + fidx++, data);
 						else
@@ -134,13 +134,13 @@ public:
 		
 		std::vector<DBID>& dbids = context.dbids[context.dbid];
 
-		// Èç¹ûÃ»ÓĞÊı¾İÔò²éÑ¯Íê±ÏÁË
+		// ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¯ï¿½ï¿½ï¿½ï¿½ï¿½
 		if(dbids.size() == 0)
 			return true;
 
-		// Èç¹ûµ±Ç°±í´æÔÚ×Ó±íÒıÓÃÔòĞèÒª¼ÌĞø²éÑ¯×Ó±í
-		// Ã¿Ò»¸ödbid¶¼ĞèÒª»ñµÃ×Ó±íÉÏµÄÊı¾İ
-		// ÔÚÕâÀïÎÒÃÇÈÃ×Ó±íÒ»´Î²éÑ¯³öËùÓĞµÄdbidsÊı¾İÈ»ºóÌî³äµ½½á¹û¼¯
+		// ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¯ï¿½Ó±ï¿½
+		// Ã¿Ò»ï¿½ï¿½dbidï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½Ó±ï¿½ï¿½Ïµï¿½ï¿½ï¿½ï¿½ï¿½
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó±ï¿½Ò»ï¿½Î²ï¿½Ñ¯ï¿½ï¿½ï¿½ï¿½ï¿½Ğµï¿½dbidsï¿½ï¿½ï¿½ï¿½È»ï¿½ï¿½ï¿½ï¿½äµ½ï¿½ï¿½ï¿½ï¿½ï¿½
 
 		mysql::DBContext::DB_RW_CONTEXTS::iterator iter1 = context.optable.begin();
 		for(; iter1 != context.optable.end(); ++iter1)
@@ -155,11 +155,11 @@ public:
 
 
 	/**
-		´Ó×Ó±íÖĞ²éÑ¯Êı¾İ
+		ï¿½ï¿½ï¿½Ó±ï¿½ï¿½Ğ²ï¿½Ñ¯ï¿½ï¿½ï¿½ï¿½
 	*/
 	static bool queryChildDB(DBInterface* pdbi, mysql::DBContext& context, std::vector<DBID>& parentTableDBIDs)
 	{
-		// ¸ù¾İÄ³¸ödbid»ñµÃÒ»ÕÅ±íÉÏµÄÏà¹ØÊı¾İ
+		// ï¿½ï¿½ï¿½ï¿½Ä³ï¿½ï¿½dbidï¿½ï¿½ï¿½Ò»ï¿½Å±ï¿½ï¿½Ïµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		SqlStatement* pSqlcmd = new SqlStatementQuery(pdbi, context.tableName, 
 			parentTableDBIDs, 
 			context.dbid, context.items);
@@ -173,7 +173,7 @@ public:
 
 		std::vector<DBID> t_parentTableDBIDs;
 
-		// ½«²éÑ¯µ½µÄ½á¹ûĞ´ÈëÉÏÏÂÎÄ
+		// ï¿½ï¿½ï¿½ï¿½Ñ¯ï¿½ï¿½ï¿½Ä½ï¿½ï¿½Ğ´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		MYSQL_RES * pResult = mysql_store_result(static_cast<DBInterfaceMysql*>(pdbi)->mysql());
 
 		if(pResult)
@@ -188,7 +188,7 @@ public:
 
 				unsigned long *lengths = mysql_fetch_lengths(pResult);
 
-				// ²éÑ¯ÃüÁî±£Ö¤ÁË²éÑ¯µ½µÄÃ¿Ìõ¼ÇÂ¼¶¼»áÓĞdbid
+				// ï¿½ï¿½Ñ¯ï¿½ï¿½ï¿½î±£Ö¤ï¿½Ë²ï¿½Ñ¯ï¿½ï¿½ï¿½ï¿½Ã¿ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½dbid
 				std::stringstream sval;
 				sval << arow[0];
 
@@ -201,11 +201,11 @@ public:
 				DBID parentID;
 				sval >> parentID;
 
-				// ½«dbid¼ÇÂ¼µ½ÁĞ±íÖĞ£¬Èç¹ûµ±Ç°±í»¹´æÔÚ×Ó±íÒıÓÃÔò»áÈ¥×Ó±í²éÃ¿Ò»ÌõÓë´ËdbidÏà¹ØµÄ¼ÇÂ¼
+				// ï¿½ï¿½dbidï¿½ï¿½Â¼ï¿½ï¿½ï¿½Ğ±ï¿½ï¿½Ğ£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¥ï¿½Ó±ï¿½ï¿½ï¿½Ã¿Ò»ï¿½ï¿½ï¿½ï¿½ï¿½dbidï¿½ï¿½ØµÄ¼ï¿½Â¼
 				std::vector<DBID>& itemDBIDs = context.dbids[parentID];
 				int fidx = -100;
 
-				// Èç¹ûµ±Ç°Õâ¸öitemµÄdbidĞ¡ÓÚ¸Ã±íÏÂ×îºóÒ»¸ö¼ÇÂ¼µÄdbid´óĞ¡£¬ÄÇÃ´ĞèÒªÔÚitemDBIDsÖĞÖ¸¶¨µÄÎ»ÖÃ²åÈëÕâ¸ödbid£¬ÒÔ±£Ö¤´ÓĞ¡µ½´óµÄË³Ğò
+				// ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½itemï¿½ï¿½dbidĞ¡ï¿½Ú¸Ã±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½dbidï¿½ï¿½Ğ¡ï¿½ï¿½ï¿½ï¿½Ã´ï¿½ï¿½Òªï¿½ï¿½itemDBIDsï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½Î»ï¿½Ã²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½dbidï¿½ï¿½ï¿½Ô±ï¿½Ö¤ï¿½ï¿½Ğ¡ï¿½ï¿½ï¿½ï¿½ï¿½Ë³ï¿½ï¿½
 				if (itemDBIDs.size() > 0 && itemDBIDs[itemDBIDs.size() - 1] > item_dbid)
 				{
 					for (fidx = itemDBIDs.size() - 1; fidx > 0; --fidx)
@@ -223,7 +223,7 @@ public:
 					t_parentTableDBIDs.push_back(item_dbid);
 				}
 
-				// Èç¹ûÕâÌõ¼ÇÂ¼³ıÁËdbidÒÔÍâ»¹´æÔÚÆäËûÊı¾İ£¬Ôò½«Êı¾İÌî³äµ½½á¹û¼¯ÖĞ
+				// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½dbidï¿½ï¿½ï¿½â»¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½İ£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½äµ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 				const uint32 const_fields = 2; // id, parentID
 				if(nfields > const_fields)
 				{
@@ -238,7 +238,7 @@ public:
 						std::string data;
 						data.assign(arow[i], lengths[i]);
 
-						// Èç¹ûµ±Ç°Õâ¸öitemµÄdbid´óÓÚ¸Ã±íÏÂËùÓĞ¼ÇÂ¼¼¯µÄdbid´óĞ¡£¬ÄÇÃ´ĞèÒªÔÚitemDBIDsÖĞÖ¸¶¨µÄÎ»ÖÃ²åÈëÕâ¸ödbid£¬ÒÔ±£Ö¤´ÓĞ¡µ½´óµÄË³Ğò
+						// ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½itemï¿½ï¿½dbidï¿½ï¿½ï¿½Ú¸Ã±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğ¼ï¿½Â¼ï¿½ï¿½ï¿½ï¿½dbidï¿½ï¿½Ğ¡ï¿½ï¿½ï¿½ï¿½Ã´ï¿½ï¿½Òªï¿½ï¿½itemDBIDsï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½Î»ï¿½Ã²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½dbidï¿½ï¿½ï¿½Ô±ï¿½Ö¤ï¿½ï¿½Ğ¡ï¿½ï¿½ï¿½ï¿½ï¿½Ë³ï¿½ï¿½
 						if (fidx != -100)
 							itemResults.insert(itemResults.begin() + fidx++, data);
 						else
@@ -250,13 +250,13 @@ public:
 			mysql_free_result(pResult);
 		}
 
-		// Èç¹ûÃ»ÓĞÊı¾İÔò²éÑ¯Íê±ÏÁË
+		// ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¯ï¿½ï¿½ï¿½ï¿½ï¿½
 		if(t_parentTableDBIDs.size() == 0)
 			return true;
 
-		// Èç¹ûµ±Ç°±í´æÔÚ×Ó±íÒıÓÃÔòĞèÒª¼ÌĞø²éÑ¯×Ó±í
-		// Ã¿Ò»¸ödbid¶¼ĞèÒª»ñµÃ×Ó±íÉÏµÄÊı¾İ
-		// ÔÚÕâÀïÎÒÃÇÈÃ×Ó±íÒ»´Î²éÑ¯³öËùÓĞµÄdbidsÊı¾İÈ»ºóÌî³äµ½½á¹û¼¯
+		// ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¯ï¿½Ó±ï¿½
+		// Ã¿Ò»ï¿½ï¿½dbidï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½Ó±ï¿½ï¿½Ïµï¿½ï¿½ï¿½ï¿½ï¿½
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó±ï¿½Ò»ï¿½Î²ï¿½Ñ¯ï¿½ï¿½ï¿½ï¿½ï¿½Ğµï¿½dbidsï¿½ï¿½ï¿½ï¿½È»ï¿½ï¿½ï¿½ï¿½äµ½ï¿½ï¿½ï¿½ï¿½ï¿½
 		mysql::DBContext::DB_RW_CONTEXTS::iterator iter1 = context.optable.begin();
 		for(; iter1 != context.optable.end(); ++iter1)
 		{

@@ -45,7 +45,7 @@ bool WebSocketProtocol::isWebSocketProtocol(MemoryStream* s)
 {
 	KBE_ASSERT(s != NULL);
 
-	// ×Ö·û´®¼ÓÉÏ½áÊø·ûÖÁÉÙ³¤¶ÈÐèÒª´óÓÚ2£¬·ñÔò·µ»ØÒÔÃâMemoryStream²úÉúÒì³£
+	// ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ù³ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½2ï¿½ï¿½ï¿½ï¿½ï¿½ò·µ»ï¿½ï¿½ï¿½ï¿½ï¿½MemoryStreamï¿½ï¿½ï¿½ï¿½ï¿½ì³£
 	if(s->length() < 2)
 		return false;
 
@@ -86,7 +86,7 @@ bool WebSocketProtocol::handshake(Network::Channel* pChannel, MemoryStream* s)
 {
 	KBE_ASSERT(s != NULL);
 	
-	// ×Ö·û´®¼ÓÉÏ½áÊø·ûÖÁÉÙ³¤¶ÈÐèÒª´óÓÚ2£¬·ñÔò·µ»ØÒÔÃâMemoryStream²úÉúÒì³£
+	// ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ù³ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½2ï¿½ï¿½ï¿½ï¿½ï¿½ò·µ»ï¿½ï¿½ï¿½ï¿½ï¿½MemoryStreamï¿½ï¿½ï¿½ï¿½ï¿½ì³£
 	if(s->length() < 2)
 		return false;
 	
@@ -134,7 +134,7 @@ bool WebSocketProtocol::handshake(Network::Channel* pChannel, MemoryStream* s)
 		findIter = headers.find("Origin");
 		if(findIter == headers.end())
 		{
-			//ÓÐÐ©app¼¶¿Í»§¶Ë¿ÉÄÜÃ»ÓÐÕâ¸ö×Ö¶Î
+			//ï¿½ï¿½Ð©appï¿½ï¿½ï¿½Í»ï¿½ï¿½Ë¿ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¶ï¿½
 			//s->rpos(rpos);
 			//s->wpos(wpos);
 			//return false;
@@ -203,7 +203,7 @@ int WebSocketProtocol::makeFrame(WebSocketProtocol::FrameType frame_type,
 {
 	uint64 size = pInPacket->length(); 
 
-	// Ð´ÈëframeÀàÐÍ
+	// Ð´ï¿½ï¿½frameï¿½ï¿½ï¿½ï¿½
 	(*pOutPacket) << ((uint8)frame_type); 
 
 	if(size <= 125)
@@ -255,7 +255,7 @@ int WebSocketProtocol::getFrame(Packet * pPacket, uint8& msg_opcode, uint8& msg_
 		+---------------------------------------------------------------+
 	*/
 
-	// ²»×ã3×Ö½Ú£¬ÐèÒª¼ÌÐøµÈ´ý
+	// ï¿½ï¿½ï¿½ï¿½3ï¿½Ö½Ú£ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½È´ï¿½
 	int remainSize = 3 - pPacket->length();
 	if(remainSize > 0) 
 	{
@@ -263,31 +263,31 @@ int WebSocketProtocol::getFrame(Packet * pPacket, uint8& msg_opcode, uint8& msg_
 		return remainSize;
 	}
 	
-	// µÚÒ»¸ö×Ö½Ú, ×î¸ßÎ»ÓÃÓÚÃèÊöÏûÏ¢ÊÇ·ñ½áÊø, ×îµÍ4Î»ÓÃÓÚÃèÊöÏûÏ¢ÀàÐÍ
+	// ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ö½ï¿½, ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½Ç·ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½ï¿½4Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½
 	uint8 bytedata;
 	(*pPacket) >> bytedata;
 
 	msg_opcode = bytedata & 0x0F;
 	msg_fin = (bytedata >> 7) & 0x01;
 
-	// µÚ¶þ¸ö×Ö½Ú, ÏûÏ¢µÄµÚ¶þ¸ö×Ö½ÚÖ÷ÒªÓÃÓÚÃèÊöÑÚÂëºÍÏûÏ¢³¤¶È, ×î¸ßÎ»ÓÃ0»ò1À´ÃèÊöÊÇ·ñÓÐÑÚÂë´¦Àí
+	// ï¿½Ú¶ï¿½ï¿½ï¿½ï¿½Ö½ï¿½, ï¿½ï¿½Ï¢ï¿½ÄµÚ¶ï¿½ï¿½ï¿½ï¿½Ö½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½ï¿½Î»ï¿½ï¿½0ï¿½ï¿½1ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ë´¦ï¿½ï¿½
 	(*pPacket) >> bytedata;
 	msg_masked = (bytedata >> 7) & 0x01;
 
-	// ÏûÏ¢½âÂë
+	// ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½
 	msg_length_field = bytedata & (~0x80);
 
-	// Ê£ÏÂµÄºóÃæ7Î»ÓÃÀ´ÃèÊöÏûÏ¢³¤¶È, ÓÉÓÚ7Î»×î¶àÖ»ÄÜÃèÊö127ËùÒÔÕâ¸öÖµ»á´ú±íÈýÖÖÇé¿ö
-	// Ò»ÖÖÊÇÏûÏ¢ÄÚÈÝÉÙÓÚ126´æ´¢ÏûÏ¢³¤¶È, Èç¹ûÏûÏ¢³¤¶ÈÉÙÓÚUINT16µÄÇé¿ö´ËÖµÎª126
-	// µ±ÏûÏ¢³¤¶È´óÓÚUINT16µÄÇé¿öÏÂ´ËÖµÎª127;
-	// ÕâÁ½ÖÖÇé¿öµÄÏûÏ¢³¤¶È´æ´¢µ½½ôËæºóÃæµÄbyte[], ·Ö±ðÊÇUINT16(2Î»byte)ºÍUINT64(4Î»byte)
+	// Ê£ï¿½ÂµÄºï¿½ï¿½ï¿½7Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½7Î»ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½127ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	// Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½126ï¿½æ´¢ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½UINT16ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÖµÎª126
+	// ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½È´ï¿½ï¿½ï¿½UINT16ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â´ï¿½ÖµÎª127;
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½È´æ´¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½byte[], ï¿½Ö±ï¿½ï¿½ï¿½UINT16(2Î»byte)ï¿½ï¿½UINT64(4Î»byte)
 	if(msg_length_field <= 125) 
 	{
 		msg_payload_length = msg_length_field;
 	}
 	else if(msg_length_field == 126) 
 	{ 
-		// ²»×ã2×Ö½Ú£¬ÐèÒª¼ÌÐøµÈ´ý
+		// ï¿½ï¿½ï¿½ï¿½2ï¿½Ö½Ú£ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½È´ï¿½
 		remainSize = 2 - pPacket->length();
 		if(remainSize > 0) 
 		{
@@ -301,7 +301,7 @@ int WebSocketProtocol::getFrame(Packet * pPacket, uint8& msg_opcode, uint8& msg_
 	}
 	else if(msg_length_field == 127) 
 	{
-		// ²»×ã8×Ö½Ú£¬ÐèÒª¼ÌÐøµÈ´ý
+		// ï¿½ï¿½ï¿½ï¿½8ï¿½Ö½Ú£ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½È´ï¿½
 		remainSize = 8 - pPacket->length();
 		if(remainSize > 0) 
 		{
@@ -324,18 +324,18 @@ int WebSocketProtocol::getFrame(Packet * pPacket, uint8& msg_opcode, uint8& msg_
 		pPacket->read_skip(8);
 	}
 
-	// »º³å¿É¶Á³¤¶È²»¹»
-	/* ÕâÀï²»×ö¼ì²é£¬Ö»½âÎöÐ­ÒéÍ·
+	// ï¿½ï¿½ï¿½ï¿½É¶ï¿½ï¿½ï¿½ï¿½È²ï¿½ï¿½ï¿½
+	/* ï¿½ï¿½ï¿½ï²»ï¿½ï¿½ï¿½ï¿½é£¬Ö»ï¿½ï¿½ï¿½ï¿½Ð­ï¿½ï¿½Í·
 	if(pPacket->length() < (size_t)msg_payload_length) {
 		frameType = INCOMPLETE_FRAME;
 		return (size_t)msg_payload_length - pPacket->length();
 	}
 	*/
 
-	// Èç¹û´æÔÚÑÚÂëµÄÇé¿öÏÂ»ñÈ¡4×Ö½ÚÑÚÂëÖµ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â»ï¿½È¡4ï¿½Ö½ï¿½ï¿½ï¿½ï¿½ï¿½Öµ
 	if(msg_masked) 
 	{
-		// ²»×ã4×Ö½Ú£¬ÐèÒª¼ÌÐøµÈ´ý
+		// ï¿½ï¿½ï¿½ï¿½4ï¿½Ö½Ú£ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½È´ï¿½
 		remainSize = 4 - pPacket->length();
 		if(remainSize > 0) 
 		{
@@ -369,7 +369,7 @@ int WebSocketProtocol::getFrame(Packet * pPacket, uint8& msg_opcode, uint8& msg_
 //-------------------------------------------------------------------------------------
 bool WebSocketProtocol::decodingDatas(Packet* pPacket, uint8 msg_masked, uint32 msg_mask)
 {
-	// ½âÂëÄÚÈÝ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if(msg_masked) 
 	{
 		uint8* c = pPacket->data() + pPacket->rpos();

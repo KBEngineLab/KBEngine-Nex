@@ -37,8 +37,8 @@ public:
 	void pInitProgressHandler(InitProgressHandler* p)
 		{ pInitProgressHandler_ = p; }
 
-	/** ÍøÂç½Ó¿Ú
-		Êý¾Ý¿âÖÐ²éÑ¯µÄ×Ô¶¯entity¼ÓÔØÐÅÏ¢·µ»Ø
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½Ð²ï¿½Ñ¯ï¿½ï¿½ï¿½Ô¶ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½
 	*/
 	void onEntityAutoLoadCBFromDBMgr(Network::Channel* pChannel, MemoryStream& s);
 
@@ -48,7 +48,7 @@ private:
 
 	std::vector< std::vector<ENTITY_SCRIPT_UID> > entityTypes_;
 
-	// Ã¿´ÎÈ¡²éÑ¯½á¹û¼¯µÄÇø¶Î
+	// Ã¿ï¿½ï¿½È¡ï¿½ï¿½Ñ¯ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	ENTITY_ID start_;
 	ENTITY_ID end_;
 

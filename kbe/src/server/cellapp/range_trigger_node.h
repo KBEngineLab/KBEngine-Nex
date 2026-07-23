@@ -43,8 +43,8 @@ public:
 	INLINE void pRangeTrigger(RangeTrigger* pRangeTrigger);
 
 	/**
-		(À©Õ¹×ø±ê)
-		x && zÓÉ²»Í¬µÄÓ¦ÓÃÊµÏÖ(´Ó²»Í¬´¦»ñÈ¡)
+		(ï¿½ï¿½Õ¹ï¿½ï¿½ï¿½ï¿½)
+		x && zï¿½É²ï¿½Í¬ï¿½ï¿½Ó¦ï¿½ï¿½Êµï¿½ï¿½(ï¿½Ó²ï¿½Í¬ï¿½ï¿½ï¿½ï¿½È¡)
 	*/
 	virtual float xx() const;
 	virtual float yy() const;
@@ -66,7 +66,7 @@ public:
 	}
 
 	/**
-		¸¸½ÚµãÉ¾³ý
+		ï¿½ï¿½ï¿½Úµï¿½É¾ï¿½ï¿½
 	*/
 	virtual void onParentRemove(CoordinateNode* pParentNode);
 
@@ -75,8 +75,8 @@ public:
 	void onTriggerUninstall();
 
 	/**
-		Ä³¸ö½Úµã±ä¶¯¾­¹ýÁË±¾½Úµã
-		@isfront: ÏòÇ°ÒÆ¶¯»¹ÊÇÏòºóÒÆ¶¯
+		Ä³ï¿½ï¿½ï¿½Úµï¿½ä¶¯ï¿½ï¿½ï¿½ï¿½ï¿½Ë±ï¿½ï¿½Úµï¿½
+		@isfront: ï¿½ï¿½Ç°ï¿½Æ¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¶ï¿½
 	*/
 	virtual void onNodePassX(CoordinateNode* pNode, bool isfront);
 	virtual void onNodePassY(CoordinateNode* pNode, bool isfront);

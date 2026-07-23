@@ -43,7 +43,7 @@ class AppForwardItem : public ForwardItem
 public:
 	virtual bool isOK()
 	{
-		// ±ØÐë´æÔÚÒ»¸ö×¼±¸ºÃµÄ½ø³Ì
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½×¼ï¿½ï¿½ï¿½ÃµÄ½ï¿½ï¿½ï¿½
 		Components::COMPONENTS& cts = Components::getSingleton().getComponents(CELLAPP_TYPE);
 		Components::COMPONENTS::iterator ctiter = cts.begin();
 		for (; ctiter != cts.end(); ++ctiter)
@@ -140,7 +140,7 @@ Cellapp& Cellappmgr::getCellapp(COMPONENT_ID cid)
 		return iter->second;
 	}
 
-	// Ìí¼ÓÁËÒ»¸öÐÂµÄcellapp
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½cellapp
 	Cellapp& cellapp = cellapps_[cid];
 
 	INFO_MSG(fmt::format("Cellappmgr::getCellapp: added new cellapp({0}).\n",
@@ -167,7 +167,7 @@ void Cellappmgr::handleTimeout(TimerHandle handle, void * arg)
 //-------------------------------------------------------------------------------------
 void Cellappmgr::onChannelDeregister(Network::Channel * pChannel)
 {
-	// Èç¹ûÊÇappËÀÍöÁË
+	// ï¿½ï¿½ï¿½ï¿½ï¿½appï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if(pChannel->isInternal())
 	{
 		Components::ComponentInfos* cinfo = Components::getSingleton().findComponent(pChannel);
@@ -258,14 +258,14 @@ COMPONENT_ID Cellappmgr::findFreeCellapp(void)
 		if ((iter->second.flags() & APP_FLAGS_NOT_PARTCIPATING_LOAD_BALANCING) > 0)
 			continue;
 		
-		// Ê×ÏÈ½ø³Ì±ØÐë»î×ÅÇÒ³õÊ¼»¯Íê±Ï
+		// ï¿½ï¿½ï¿½È½ï¿½ï¿½Ì±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò³ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½
 		if(!iter->second.isDestroyed() && iter->second.initProgress() > 1.f)
 		{
-			// Èç¹ûÃ»ÓÐÈÎºÎÊµÌåÔòÎÞÌõ¼þ·ÖÅä
+			// ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½Îºï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 			if(iter->second.numEntities() == 0)
 				return iter->first;
 
-			// ±È½Ï²¢¼ÇÂ¼¸ºÔØ×îÐ¡µÄ½ø³Ì×îÖÕ±»·ÖÅä
+			// ï¿½È½Ï²ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¡ï¿½Ä½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ±ï¿½ï¿½ï¿½ï¿½ï¿½
 			if(minload > iter->second.load() || 
 				(minload == iter->second.load() && numEntities > iter->second.numEntities()))
 			{
@@ -332,9 +332,9 @@ void Cellappmgr::reqCreateCellEntityInNewSpace(Network::Channel* pChannel, Memor
 	COMPONENT_ID componentID;
 	bool hasClient;
 
-	// Èç¹ûcellappIndexÎª0£¬Ôò´ú±í²»Ç¿ÖÆÖ¸¶¨cellapp
-	// ·Ç0µÄÇé¿öÏÂ£¬Ñ¡ÔñµÄcellapp¿ÉÒÔÓÃ1,2,3,4À´´úÌæ
-	// ¼ÙÈçÔ¤ÆÚÓÐ4¸öcellapp£¬ ¼ÙÈç²»¹»4¸ö£¬ Ö»ÓÐ3¸ö£¬ ÄÇÃ´4´ú±í1
+	// ï¿½ï¿½ï¿½cellappIndexÎª0ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç¿ï¿½ï¿½Ö¸ï¿½ï¿½cellapp
+	// ï¿½ï¿½0ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â£ï¿½Ñ¡ï¿½ï¿½ï¿½cellappï¿½ï¿½ï¿½ï¿½ï¿½ï¿½1,2,3,4ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	// ï¿½ï¿½ï¿½ï¿½Ô¤ï¿½ï¿½ï¿½ï¿½4ï¿½ï¿½cellappï¿½ï¿½ ï¿½ï¿½ï¿½ç²»ï¿½ï¿½4ï¿½ï¿½ï¿½ï¿½ Ö»ï¿½ï¿½3ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã´4ï¿½ï¿½ï¿½ï¿½1
 	uint32 cellappIndex = 0;
 
 	s >> entityType;
@@ -362,7 +362,7 @@ void Cellappmgr::reqCreateCellEntityInNewSpace(Network::Channel* pChannel, Memor
 	{
 		updateBestCellapp();
 
-		// Ñ¡ÔñÌØ¶¨µÄcellapp´´½¨space
+		// Ñ¡ï¿½ï¿½ï¿½Ø¶ï¿½ï¿½ï¿½cellappï¿½ï¿½ï¿½ï¿½space
 		if (cellappIndex > 0)
 		{
 			uint32 index = (cellappIndex - 1) % cellappSize;
@@ -401,7 +401,7 @@ void Cellappmgr::reqCreateCellEntityInNewSpace(Network::Channel* pChannel, Memor
 
 	std::map< COMPONENT_ID, Cellapp >::iterator cellapp_iter = cellapps_.find(bestCellappID_);
 
-	// Ô¤ÏÈ½«ÊµÌåÊýÁ¿Ôö¼Ó
+	// Ô¤ï¿½È½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	if (cellapp_iter != cellapps_.end())
 	{
 		DEBUG_MSG(fmt::format("Cellappmgr::reqCreateCellEntityInNewSpace: entityType={}, entityID={}, componentID={}, cellapp(cid={}, load={}, numEntities={}).\n",
@@ -460,7 +460,7 @@ void Cellappmgr::reqRestoreSpaceInCell(Network::Channel* pChannel, MemoryStream&
 		cinfos->pChannel->send(pBundle);
 	}
 
-	// Ô¤ÏÈ½«ÊµÌåÊýÁ¿Ôö¼Ó
+	// Ô¤ï¿½È½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	std::map< COMPONENT_ID, Cellapp >::iterator cellapp_iter = cellapps_.find(bestCellappID_);
 	if (cellapp_iter != cellapps_.end())
 	{
@@ -532,7 +532,7 @@ void Cellappmgr::addCellappComponentID(COMPONENT_ID cid)
 	if (!isInserted)
 		cellapp_cids_.push_back(cid);
 
-	// Êä³öÈÕÖ¾£¬Èç¹ûÒªÐ£Ñécellapp²åÈëµÄË³ÐòÊÇ·ñÕýÈ·£¬¿ÉÒÔ´ò¿ªÏÂÃæµÄ×¢ÊÍ½øÐÐ²âÊÔ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½ï¿½ï¿½ï¿½ÒªÐ£ï¿½ï¿½cellappï¿½ï¿½ï¿½ï¿½ï¿½Ë³ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½ï¿½Ô´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×¢ï¿½Í½ï¿½ï¿½Ð²ï¿½ï¿½ï¿½
 	/*
 	{
 		std::string sCID = "";
@@ -591,7 +591,7 @@ void Cellappmgr::querySpaces(Network::Channel* pChannel, MemoryStream& s)
 
 		(*pBundle) << iter1->first;
 		
-		// Èç¹û²»Ç¿ÖÆ£¬ÔòÔÚwin64ÏÂ£¬ËüÊÇ8×Ö½Ú£¬¶øwin32ÏÂÊÇ4×Ö½Ú
+		// ï¿½ï¿½ï¿½ï¿½ï¿½Ç¿ï¿½Æ£ï¿½ï¿½ï¿½ï¿½ï¿½win64ï¿½Â£ï¿½ï¿½ï¿½ï¿½ï¿½8ï¿½Ö½Ú£ï¿½ï¿½ï¿½win32ï¿½ï¿½ï¿½ï¿½4ï¿½Ö½ï¿½
 		(*pBundle) << (uint32)spaces.size(); 
 
 		std::map<SPACE_ID, Space>& allSpaces = spaces.spaces();
@@ -612,8 +612,8 @@ void Cellappmgr::querySpaces(Network::Channel* pChannel, MemoryStream& s)
 			{
 				(*pBundle) << iter3->first;
 
-				// ÆäËûÐÅÏ¢´ý·Ö¸î¹¦ÄÜÊµÏÖºóÍê³É
-				// ÀýÈçcell´óÐ¡ÐÎ×´µÈÐÅÏ¢
+				// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½Ö¸î¹¦ï¿½ï¿½Êµï¿½Öºï¿½ï¿½ï¿½ï¿½
+				// ï¿½ï¿½ï¿½ï¿½cellï¿½ï¿½Ð¡ï¿½ï¿½×´ï¿½ï¿½ï¿½ï¿½Ï¢
 			}
 		}
 	}

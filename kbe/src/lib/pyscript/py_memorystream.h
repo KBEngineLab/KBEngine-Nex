@@ -31,7 +31,7 @@ namespace KBEngine{ namespace script{
 
 class PyMemoryStream : public ScriptObject
 {		
-	/** ×ÓÀà»¯ ½«Ò»Ð©py²Ù×÷Ìî³ä½øÅÉÉúÀà */
+	/** ï¿½ï¿½ï¿½à»¯ ï¿½ï¿½Ò»Ð©pyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 	INSTANCE_SCRIPT_HREADER(PyMemoryStream, ScriptObject)
 public:	
 	static PySequenceMethods seqMethods;
@@ -46,24 +46,24 @@ public:
 
 
 	/**
-	Ö§³Öpickler ·½·¨
+	Ö§ï¿½ï¿½pickler ï¿½ï¿½ï¿½ï¿½
 	*/
 	static PyObject* __py_reduce_ex__(PyObject* self, PyObject* protocol);
 
 	/**
-	unpickle·½·¨
+	unpickleï¿½ï¿½ï¿½ï¿½
 	*/
 	static PyObject* __unpickle__(PyObject* self, PyObject* args);
 
 	/**
-	½Å±¾±»°²×°Ê±±»µ÷ÓÃ
+	ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½×°Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	static void onInstallScript(PyObject* mod);
 
 	static PyObject* py_new();
 
 	/**
-	³õÊ¼»¯¹Ì¶¨×Öµä
+	ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½Ì¶ï¿½ï¿½Öµï¿½
 	*/
 	void initialize(std::string strDictInitData);
 	void initialize(PyObject* pyDictInitData);
@@ -80,7 +80,7 @@ public:
 	void createFromStream(MemoryStream* mstream);
 
 	/** 
-		»ñµÃ¶ÔÏóµÄÃèÊö 
+		ï¿½ï¿½Ã¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	PyObject* tp_repr();
 	PyObject* tp_str();

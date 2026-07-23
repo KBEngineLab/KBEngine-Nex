@@ -48,10 +48,10 @@ void Archiver::tick()
 		this->createArchiveTable();
 	}
 
-	// Ëã·¨ÈçÏÂ:
-	// baseEntityµÄÊýÁ¿ * idx / tickÖÜÆÚ = Ã¿´ÎÔÚvectorÖÐÒÆ¶¯µÄÒ»¸öÇø¶Î
-	// Õâ¸öÇø¶ÎÔÚÃ¿¸ögametick½øÐÐ´¦Àí, ¸ÕºÃÆ½»¬µÄÔÚperiodInTicksÖÐ´¦ÀíÍêÈÎÎñ
-	// Èç¹ûarchiveIndex_ >= periodInTicksÔòÖØÐÂ²úÉúÒ»´ÎËæ»úÐòÁÐ
+	// ï¿½ã·¨ï¿½ï¿½ï¿½ï¿½:
+	// baseEntityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ * idx / tickï¿½ï¿½ï¿½ï¿½ = Ã¿ï¿½ï¿½ï¿½ï¿½vectorï¿½ï¿½ï¿½Æ¶ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã¿ï¿½ï¿½gametickï¿½ï¿½ï¿½Ð´ï¿½ï¿½ï¿½, ï¿½Õºï¿½Æ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½periodInTicksï¿½Ð´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	// ï¿½ï¿½ï¿½archiveIndex_ >= periodInTicksï¿½ï¿½ï¿½ï¿½ï¿½Â²ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	int size = (int)arEntityIDs_.size();
 	int startIndex = size * archiveIndex_ / periodInTicks;
 
@@ -97,7 +97,7 @@ void Archiver::createArchiveTable()
 		}
 	}
 
-	// Ëæ»úÒ»ÏÂÐòÁÐ
+	// ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	std::random_shuffle(arEntityIDs_.begin(), arEntityIDs_.end());
 }
 

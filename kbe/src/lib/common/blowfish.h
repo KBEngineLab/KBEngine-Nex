@@ -31,14 +31,14 @@ namespace KBEngine {
 class KBEBlowfish
 {
 public:
-	// Ã¿¿é´óÐ¡
+	// Ã¿ï¿½ï¿½ï¿½Ð¡
 	static const int BLOCK_SIZE = 64 / 8;
 
-	// keyµÄ×îÐ¡ºÍ×î´ó´óÐ¡
+	// keyï¿½ï¿½ï¿½ï¿½Ð¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¡
 	static const int MIN_KEY_SIZE = 32 / 8;
 	static const int MAX_KEY_SIZE = 448 / 8;
 
-	// Ä¬ÈÏkeyµÄ´óÐ¡
+	// Ä¬ï¿½ï¿½keyï¿½Ä´ï¿½Ð¡
 	static const int DEFAULT_KEY_SIZE = 128 / 8;
 
 	typedef std::string Key;

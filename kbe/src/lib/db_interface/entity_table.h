@@ -61,7 +61,7 @@ class MemoryStream;
 #define TABLE_AUTOLOAD_CONST_STR				"autoLoad"
 
 /**
-	db±í²Ù×÷
+	dbï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 */
 enum DB_TABLE_OP
 {
@@ -90,7 +90,7 @@ struct ACCOUNT_INFOS
 };
 
 /**
-	Î¬»¤entityÔÚÊý¾Ý¿âÖÐµÄ±íÖÐµÄÒ»¸ö×Ö¶Î
+	Î¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ÐµÄ±ï¿½ï¿½Ðµï¿½Ò»ï¿½ï¿½ï¿½Ö¶ï¿½
 */
 class EntityTableItem
 {
@@ -143,7 +143,7 @@ public:
 	const PropertyDescription* pPropertyDescription() const { return pPropertyDescription_; }
 
 	/**
-		³õÊ¼»¯
+		ï¿½ï¿½Ê¼ï¿½ï¿½
 	*/
 	virtual bool initialize(const PropertyDescription* pPropertyDescription, 
 		const DataType* pDataType, std::string itemName) = 0;
@@ -152,22 +152,22 @@ public:
 	const char* tableName() { return tableName_.c_str(); }
 
 	/**
-		Í¬²½entity±íµ½Êý¾Ý¿âÖÐ
+		Í¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 	*/
 	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL) = 0;
 
 	/**
-		¸üÐÂÊý¾Ý
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual bool writeItem(DBInterface* pdbi, DBID dbid, MemoryStream* s, ScriptDefModule* pModule) = 0;
 
 	/**
-		»ñÈ¡ËùÓÐµÄÊý¾Ý·Åµ½Á÷ÖÐ
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½Ý·Åµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual bool queryTable(DBInterface* pdbi, DBID dbid, MemoryStream* s, ScriptDefModule* pModule) = 0;
 
 protected:
-	// ×Ö¶ÎÃû³Æ
+	// ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½
 	std::string itemName_;
 	std::string tableName_;
 	int32/*ENTITY_PROPERTY_UID*/ utype_;
@@ -186,7 +186,7 @@ protected:
 };
 
 /*
-	Î¬»¤entityÔÚÊý¾Ý¿âÖÐµÄ±í
+	Î¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ÐµÄ±ï¿½
 */
 class EntityTable
 {
@@ -209,27 +209,27 @@ public:
 	const char* tableName(){ return tableName_.c_str(); }
 
 	/**
-		³õÊ¼»¯
+		ï¿½ï¿½Ê¼ï¿½ï¿½
 	*/
 	virtual bool initialize(ScriptDefModule* sm, std::string name) = 0;
 
 	/**
-		Í¬²½entity±íµ½Êý¾Ý¿âÖÐ
+		Í¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 	*/
 	virtual bool syncToDB(DBInterface* pdbi) = 0;
 
 	/**
-		Í¬²½entity±íË÷Òýµ½Êý¾Ý¿âÖÐ
+		Í¬ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½
 	*/
 	virtual bool syncIndexToDB(DBInterface* pdbi) = 0;
 
 	/** 
-		´´½¨Ò»¸ö±íitem
+		ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½item
 	*/
 	virtual EntityTableItem* createItem(std::string type, std::string defaultVal) = 0;
 
 	/** 
-		»ñµÃËùÓÐ±í×Ö¶Î
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð±ï¿½ï¿½Ö¶ï¿½
 	*/
 	const EntityTable::TABLEITEM_MAP& tableItems() const { return tableItems_; }
 	const std::vector<EntityTableItem*>& tableFixedOrderItems() const{ return tableFixedOrderItems_; }
@@ -242,29 +242,29 @@ public:
 	EntityTableItem* findItem(int32/*ENTITY_PROPERTY_UID*/ utype);
 
 	/**
-		¸üÐÂ±í
+		ï¿½ï¿½ï¿½Â±ï¿½
 	*/
 	virtual DBID writeTable(DBInterface* pdbi, DBID dbid, int8 shouldAutoLoad, MemoryStream* s, ScriptDefModule* pModule);
 
 	/**
-		´ÓÊý¾Ý¿âÉ¾³ýentity
+		ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½É¾ï¿½ï¿½entity
 	*/
 	virtual bool removeEntity(DBInterface* pdbi, DBID dbid, ScriptDefModule* pModule);
 
 	/**
-		»ñÈ¡ËùÓÐµÄÊý¾Ý·Åµ½Á÷ÖÐ
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½Ý·Åµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual bool queryTable(DBInterface* pdbi, DBID dbid, MemoryStream* s, ScriptDefModule* pModule);
 
 	/**
-		ÉèÖÃÊÇ·ñ×Ô¶¯¼ÓÔØ
+		ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	virtual void entityShouldAutoLoad(DBInterface* pdbi, DBID dbid, bool shouldAutoLoad){};
 
 	bool hasSync() const { return sync_; }
 
 	/**
-		²éÑ¯×Ô¶¯¼ÓÔØµÄÊµÌå
+		ï¿½ï¿½Ñ¯ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½Øµï¿½Êµï¿½ï¿½
 	*/
 	virtual void queryAutoLoadEntities(DBInterface* pdbi, ScriptDefModule* pModule, 
 		ENTITY_ID start, ENTITY_ID end, std::vector<DBID>& outs){}
@@ -274,16 +274,16 @@ public:
 
 protected:
 
-	// ±íÃû³Æ
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	std::string tableName_;
 
-	// ËùÓÐµÄ×Ö¶Î
+	// ï¿½ï¿½ï¿½Ðµï¿½ï¿½Ö¶ï¿½
 	TABLEITEM_MAP tableItems_;
 
-	// ºÍScriptDefModuleÖÐ±£³ÖÒ»ÖÂÖÈÐòµÄitemÒýÓÃ
+	// ï¿½ï¿½ScriptDefModuleï¿½Ð±ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½itemï¿½ï¿½ï¿½ï¿½
 	std::vector<EntityTableItem*> tableFixedOrderItems_; 
 
-	// ÊÇ·ñÎª×Ó±í
+	// ï¿½Ç·ï¿½Îªï¿½Ó±ï¿½
 	bool isChild_; 
 
 	bool sync_;
@@ -329,7 +329,7 @@ public:
 	}
 
 	/** 
-		»ñµÃËùÓÐ±í
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð±ï¿½
 	*/
 	const EntityTables::TABLES_MAP& tables() const { return tables_; }
 
@@ -342,30 +342,30 @@ public:
 	EntityTable* findKBETable(std::string name);
 
 	/**
-		Ð´entityµ½Êý¾Ý¿â
+		Ð´entityï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½
 	*/
 	DBID writeEntity(DBInterface* pdbi, DBID dbid, int8 shouldAutoLoad, MemoryStream* s, ScriptDefModule* pModule);
 
 	/**
-		´ÓÊý¾Ý¿âÉ¾³ýentity
+		ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½É¾ï¿½ï¿½entity
 	*/
 	bool removeEntity(DBInterface* pdbi, DBID dbid, ScriptDefModule* pModule);
 
 	/**
-		»ñÈ¡Ä³¸ö±íËùÓÐµÄÊý¾Ý·Åµ½Á÷ÖÐ
+		ï¿½ï¿½È¡Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½Ý·Åµï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	bool queryEntity(DBInterface* pdbi, DBID dbid, MemoryStream* s, ScriptDefModule* pModule);
 
 	void onTableSyncSuccessfully(KBEShared_ptr<EntityTable> pEntityTable, bool error);
 
 	/**
-		²éÑ¯×Ô¶¯¼ÓÔØµÄÊµÌå
+		ï¿½ï¿½Ñ¯ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½Øµï¿½Êµï¿½ï¿½
 	*/
 	void queryAutoLoadEntities(DBInterface* pdbi, ScriptDefModule* pModule, 
 		ENTITY_ID start, ENTITY_ID end, std::vector<DBID>& outs);
 
 protected:
-	// ËùÓÐµÄ±í
+	// ï¿½ï¿½ï¿½ÐµÄ±ï¿½
 	TABLES_MAP tables_;
 	TABLES_MAP kbe_tables_;
 

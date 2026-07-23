@@ -73,7 +73,7 @@ public:
 	}
 
 	/**
-		╫╚йЩ╬щ╦Эпб╣╫╠Мжп
+		О©╫О©╫О©╫О©╫О©╫щ╦О©╫О©╫б╣О©╫О©╫О©╫О©╫О©╫
 	*/
 	static bool writeDB(DB_TABLE_OP optype, DBInterface* pdbi, mysql::DBContext& context)
 	{
@@ -92,24 +92,24 @@ public:
 
 		if(optype == TABLE_OP_INSERT)
 		{
-			// ©╙й╪╦ЭпбкЫсп╣двс╠М
+			// О©╫О©╫й╪О©╫О©╫О©╫О©╫О©╫О©╫О©╫п╣О©╫О©╫с╠О©╫
 			mysql::DBContext::DB_RW_CONTEXTS::iterator iter1 = context.optable.begin();
 			for(; iter1 != context.optable.end(); ++iter1)
 			{
 				mysql::DBContext& wbox = *iter1->second.get();
 				
-				// ╟С╤╗╠М╧ьо╣
+				// О©╫С╤╗╠О©╫О©╫О©╫о╣
 				wbox.parentTableDBID = context.dbid;
 
-				// ╦Эпбвс╠М
+				// О©╫О©╫О©╫О©╫О©╫с╠О©╫
 				writeDB(optype, pdbi, wbox);
 			}
 		}
 		else
 		{
-			// хГ╧Шсп╦╦IDйвох╣ц╣╫╦цйТптйЩ╬щ©Бжпм╛╦╦id╣дйЩ╬щсп╤ЮиылУд©ё╛ ╡╒х║ЁЖц©лУйЩ╬щ╣дid
-			// х╩╨С╫╚дз╢Фжп╣дйЩ╬щкЁпР╦ЭпбжайЩ╬щ©Бё╛ хГ╧ШйЩ╬щ©Бжпсп╢Фтз╣длУд©тРкЁпР╦╡╦г╦Эпбрясп╣длУд©ё╛ хГ╧ШйЩ╬щйЩа©
-			// ╢СсзйЩ╬щ©Бжпрясп╣длУд©тР╡ЕхКйёсЮ╣дйЩ╬щё╛ хГ╧ШйЩ╬щиысзйЩ╬щ©Бжп╣длУд©тРи╬ЁЩйЩ╬щ©Бжп╣длУд©
+			// О©╫О©╫О©╫О©╫п╦О©╫IDО©╫О©╫О©╫х╣ц╣О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫щ©О©╫О©╫О©╫м╛О©╫О©╫idО©╫О©╫О©╫О©╫О©╫О©╫О©╫п╤О©╫О©╫О©╫О©╫О©╫д©О©╫О©╫ О©╫О©╫х║О©╫О©╫ц©О©╫О©╫О©╫О©╫О©╫щ╣О©╫id
+			// х╩О©╫О©╫О©╫з╢О©╫О©╫п╣О©╫О©╫О©╫О©╫О©╫кЁО©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫щ©Бё╛ О©╫О©╫О©╫О©╫О©╫О©╫щ©О©╫О©╫О©╫О©╫п╢О©╫О©╫з╣О©╫О©╫О©╫д©О©╫О©╫кЁО©╫Р╦╡╦г╦О©╫О©╫О©╫О©╫О©╫О©╫п╣О©╫О©╫О©╫д©О©╫О©╫ О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
+			// О©╫О©╫О©╫О©╫О©╫О©╫О©╫щ©О©╫О©╫О©╫О©╫О©╫О©╫п╣О©╫О©╫О©╫д©О©╫О©╫О©╫О©╫О©╫йёО©╫О©╫О©╫О©╫О©╫О©╫щёО©╫ О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫щ©О©╫О©╫п╣О©╫О©╫О©╫д©О©╫О©╫и╬О©╫О©╫О©╫О©╫О©╫щ©О©╫О©╫п╣О©╫О©╫О©╫д©
 			// select id from tbl_SpawnPoint_xxx_values where parentID = 7;
 			KBEUnordered_map< std::string, std::vector<DBID> > childTableDBIDs;
 
@@ -210,10 +210,10 @@ public:
 				}
 			}
 
-			// хГ╧Шйгр╙гЕ©у╢к╠Мё╛ тРя╜╩╥N╢нря╬╜ур╣╫╣дdbidё╛ й╧фДвс╠Мжп╣двс╠Мр╡дэспп╖и╬ЁЩ
+			// О©╫О©╫О©╫О©╫О©╫р╙О©╫О©╫у╢к╠О©╫О©╫О©╫ О©╫О©╫я╜О©╫О©╫NО©╫О©╫О©╫я╬О©╫О©╫р╣О©╫О©╫О©╫dbidО©╫О©╫ й╧О©╫О©╫О©╫с╠О©╫О©╫п╣О©╫О©╫с╠О©╫р╡О©╫О©╫О©╫О©╫п╖и╬О©╫О©╫
 			if(!context.isEmpty)
 			{
-				// ©╙й╪╦ЭпбкЫсп╣двс╠М
+				// О©╫О©╫й╪О©╫О©╫О©╫О©╫О©╫О©╫О©╫п╣О©╫О©╫с╠О©╫
 				mysql::DBContext::DB_RW_CONTEXTS::iterator iter1 = context.optable.begin();
 				for(; iter1 != context.optable.end(); ++iter1)
 				{
@@ -222,7 +222,7 @@ public:
 					if(wbox.isEmpty)
 						continue;
 
-					// ╟С╤╗╠М╧ьо╣
+					// О©╫С╤╗╠О©╫О©╫О©╫о╣
 					wbox.parentTableDBID = context.dbid;
 
 					KBEUnordered_map<std::string, std::vector<DBID> >::iterator iter = 
@@ -242,19 +242,19 @@ public:
 						}
 					}
 
-					// ╦Эпбвс╠М
+					// О©╫О©╫О©╫О©╫О©╫с╠О©╫
 					writeDB(optype, pdbi, wbox);
 				}
 			}
 			
-			// и╬ЁЩ╥офЗ╣дйЩ╬щоН
+			// и╬О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
 			KBEUnordered_map< std::string, std::vector<DBID> >::iterator tabiter = childTableDBIDs.begin();
 			for(; tabiter != childTableDBIDs.end(); ++tabiter)
 			{
 				if(tabiter->second.size() == 0)
 					continue;
 
-				// охи╬ЁЩйЩ╬щ©Бжп╣д╪гб╪
+				// О©╫О©╫и╬О©╫О©╫О©╫О©╫О©╫щ©О©╫О©╫п╣д╪О©╫б╪
 				std::string sqlstr = "delete from " ENTITY_TABLE_PERFIX "_";
 				sqlstr += tabiter->first;
 				sqlstr += " where " TABLE_ID_CONST_STR " in (";
@@ -290,7 +290,7 @@ public:
 							wbox.dbid = dbid;
 							wbox.isEmpty = true;
 
-							// ╦Эпбвс╠М
+							// О©╫О©╫О©╫О©╫О©╫с╠О©╫
 							writeDB(optype, pdbi, wbox);
 						}
 					}

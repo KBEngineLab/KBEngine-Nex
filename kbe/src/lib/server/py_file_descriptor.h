@@ -35,7 +35,7 @@ public:
 	virtual ~PyFileDescriptor();
 	
 	/** 
-		½Å±¾ÇëÇó(×¢²á/×¢Ïú)ÎÄ¼þÃèÊö·û(¶ÁºÍÐ´)
+		ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½(×¢ï¿½ï¿½/×¢ï¿½ï¿½)ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½ï¿½Ð´)
 	*/
 	static PyObject* __py_registerReadFileDescriptor(PyObject* self, PyObject* args);
 	static PyObject* __py_registerWriteFileDescriptor(PyObject* self, PyObject* args);

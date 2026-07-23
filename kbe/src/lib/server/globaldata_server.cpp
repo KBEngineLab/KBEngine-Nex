@@ -41,7 +41,7 @@ GlobalDataServer::~GlobalDataServer()
 bool GlobalDataServer::write(Network::Channel* pChannel, COMPONENT_TYPE componentType, 
 	const std::string& key, const std::string& value)
 {
-	// ¹ã²¥Ëù×öµÄ¸Ä±ä
+	// ï¿½ã²¥ï¿½ï¿½ï¿½ï¿½ï¿½Ä¸Ä±ï¿½
 	broadcastDataChanged(pChannel, componentType, key, value);
 
 	DATA_MAP_KEY iter = dict_.find(key);

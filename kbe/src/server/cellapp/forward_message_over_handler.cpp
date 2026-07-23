@@ -64,7 +64,7 @@ void FMH_Baseapp_onEntityGetCellFrom_onCreateCellEntityInNewSpaceFromBaseapp::pr
 	Py_XDECREF(_params);
 	_params = NULL;
 
-	// Ìí¼Óµ½space
+	// ï¿½ï¿½ï¿½Óµï¿½space
 	space->addEntityToNode(_e);
 
 	if (_e->clientEntityCall())

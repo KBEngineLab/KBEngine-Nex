@@ -54,7 +54,7 @@ public:
 	{
 		TIMEOUT_GAME_TICK = TIMEOUT_SERVERAPP_MAX + 1,
 
-		// Õâ¸ö±ØÐë·ÅÔÚ×îºóÃæ£¬±íÊ¾µ±Ç°×î´óµÄÃ¶¾ÙÖµÊÇ¶àÉÙ
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½æ£¬ï¿½ï¿½Ê¾ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½Ã¶ï¿½ï¿½Öµï¿½Ç¶ï¿½ï¿½ï¿½
 		TIMEOUT_PYTHONAPP_MAX = TIMEOUT_GAME_TICK
 	};
 
@@ -85,58 +85,58 @@ public:
 
 	virtual void handleTimeout(TimerHandle, void * arg);
 
-	/** ÍøÂç½Ó¿Ú
-		ÇëÇóÖ´ÐÐÒ»¶ÎpythonÖ¸Áî
+	/** ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+		ï¿½ï¿½ï¿½ï¿½Ö´ï¿½ï¿½Ò»ï¿½ï¿½pythonÖ¸ï¿½ï¿½
 	*/
 	void onExecScriptCommand(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
 	/** 
-		consoleÇëÇó¿ªÊ¼profile
+		consoleï¿½ï¿½ï¿½ï¿½Ê¼profile
 	*/
 	virtual void startProfile_(Network::Channel* pChannel, std::string profileName, int8 profileType, uint32 timelen);
 
 	/**
-		»ñÈ¡apps·¢²¼×´Ì¬, ¿ÉÔÚ½Å±¾ÖÐ»ñÈ¡¸ÃÖµ
+		ï¿½ï¿½È¡appsï¿½ï¿½ï¿½ï¿½×´Ì¬, ï¿½ï¿½ï¿½Ú½Å±ï¿½ï¿½Ð»ï¿½È¡ï¿½ï¿½Öµ
 	*/
 	static PyObject* __py_getAppPublish(PyObject* self, PyObject* args);
 
 	/**
-		ÉèÖÃ½Å±¾Êä³öÀàÐÍÇ°×º
+		ï¿½ï¿½ï¿½Ã½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç°×º
 	*/
 	static PyObject* __py_setScriptLogType(PyObject* self, PyObject* args);
 
 	/**
-		ÖØÐÂµ¼ÈëËùÓÐµÄ½Å±¾
+		ï¿½ï¿½ï¿½Âµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÐµÄ½Å±ï¿½
 	*/
 	virtual void reloadScript(bool fullReload);
 	virtual void onReloadScript(bool fullReload);
 
 	/**
-		Í¨¹ýÏà¶ÔÂ·¾¶»ñÈ¡×ÊÔ´µÄÈ«Â·¾¶
+		Í¨ï¿½ï¿½ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½ï¿½È¡ï¿½ï¿½Ô´ï¿½ï¿½È«Â·ï¿½ï¿½
 	*/
 	static PyObject* __py_getResFullPath(PyObject* self, PyObject* args);
 
 	/**
-		Í¨¹ýÏà¶ÔÂ·¾¶ÅÐ¶Ï×ÊÔ´ÊÇ·ñ´æÔÚ
+		Í¨ï¿½ï¿½ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½Ô´ï¿½Ç·ï¿½ï¿½ï¿½ï¿½
 	*/
 	static PyObject* __py_hasRes(PyObject* self, PyObject* args);
 
 	/**
-		openÎÄ¼þ
+		openï¿½Ä¼ï¿½
 	*/
 	static PyObject* __py_kbeOpen(PyObject* self, PyObject* args);
 
 	/**
-		ÁÐ³öÄ¿Â¼ÏÂËùÓÐÎÄ¼þ
+		ï¿½Ð³ï¿½Ä¿Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½
 	*/
 	static PyObject* __py_listPathRes(PyObject* self, PyObject* args);
 
 	/**
-		Æ¥ÅäÏà¶ÔÂ·¾¶»ñµÃÈ«Â·¾¶ 
+		Æ¥ï¿½ï¿½ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½ï¿½ï¿½È«Â·ï¿½ï¿½ 
 	*/
 	static PyObject* __py_matchPath(PyObject* self, PyObject* args);
 
-	/** Timer²Ù×÷
+	/** Timerï¿½ï¿½ï¿½ï¿½
 	*/
 	static PyObject* __py_addTimer(PyObject* self, PyObject* args);
 	static PyObject* __py_delTimer(PyObject* self, PyObject* args);

@@ -37,7 +37,7 @@ bool PyUrl::initialize(Script* pScript)
 	
 	isInit = true;
 
-	// ×¢²á²úÉúuuid·½·¨µ½py
+	// ×¢ï¿½ï¿½ï¿½ï¿½ï¿½uuidï¿½ï¿½ï¿½ï¿½ï¿½ï¿½py
 	APPEND_SCRIPT_MODULE_METHOD(pScript->getModule(),	urlopen,	__py_urlopen,	METH_VARARGS,	0);
 	return isInit;
 }
@@ -103,7 +103,7 @@ PyObject* PyUrl::__py_urlopen(PyObject* self, PyObject* args)
 		PyObject* pyobj = NULL;
 		ret = PyArg_ParseTuple(args, "s|O|O", &surl, &pyCallback, &pyobj);
 
-		// ¼ì²éÊÇheaders»¹ÊÇpost data
+		// ï¿½ï¿½ï¿½ï¿½ï¿½headersï¿½ï¿½ï¿½ï¿½post data
 		if (PyDict_Check(pyobj))
 		{
 			PyObject *key, *value;
@@ -142,7 +142,7 @@ PyObject* PyUrl::__py_urlopen(PyObject* self, PyObject* args)
 		PyObject* pyheaders = NULL;
 		ret = PyArg_ParseTuple(args, "s|O|O|O", &surl, &pyCallback, &pypost, &pyheaders);
 
-		// ¼ì²éÊÇheaders»¹ÊÇpost data
+		// ï¿½ï¿½ï¿½ï¿½ï¿½headersï¿½ï¿½ï¿½ï¿½post data
 		if (PyDict_Check(pyheaders))
 		{
 			PyObject *key, *value;

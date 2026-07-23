@@ -30,7 +30,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{ namespace thread{
 
 /*
-	Ïß³Ì³ØµÄÏß³Ì»ùÀà
+	ï¿½ß³Ì³Øµï¿½ï¿½ß³Ì»ï¿½ï¿½ï¿½
 */
 
 class TPTask : public Task
@@ -38,18 +38,18 @@ class TPTask : public Task
 public:
 	enum TPTaskState
 	{
-		/// Ò»¸öÈÎÎñÒÑ¾­Íê³É
+		/// Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½
 		TPTASK_STATE_COMPLETED = 0,
 
-		/// ¼ÌÐøÔÚÖ÷Ïß³ÌÖ´ÐÐ
+		/// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß³ï¿½Ö´ï¿½ï¿½
 		TPTASK_STATE_CONTINUE_MAINTHREAD = 1,
 
-		// ¼ÌÐøÔÚ×ÓÏß³ÌÖ´ÐÐ
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß³ï¿½Ö´ï¿½ï¿½
 		TPTASK_STATE_CONTINUE_CHILDTHREAD = 2,
 	};
 
 	/**
-		·µ»ØÖµ£º thread::TPTask::TPTaskState£¬ Çë²Î¿´TPTaskState
+		ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½ thread::TPTask::TPTaskStateï¿½ï¿½ ï¿½ï¿½Î¿ï¿½TPTaskState
 	*/
 	virtual thread::TPTask::TPTaskState presentMainThread(){ 
 		return thread::TPTask::TPTASK_STATE_COMPLETED; 

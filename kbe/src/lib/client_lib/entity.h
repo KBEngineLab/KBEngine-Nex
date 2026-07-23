@@ -49,7 +49,7 @@ namespace client
 
 class Entity : public script::ScriptObject
 {
-	/** ×ÓÀà»¯ ½«Ò»Ð©py²Ù×÷Ìî³ä½øÅÉÉúÀà */
+	/** ï¿½ï¿½ï¿½à»¯ ï¿½ï¿½Ò»Ð©pyï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 	BASE_SCRIPT_HREADER(Entity, ScriptObject)	
 	ENTITY_HEADER(Entity)
 		
@@ -58,7 +58,7 @@ public:
 	~Entity();
 	
 	/** 
-		¶¨ÒåÊôÐÔÊý¾Ý±»¸Ä±äÁË 
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý±ï¿½ï¿½Ä±ï¿½ï¿½ï¿½ 
 	*/
 	void onDefDataChanged(const PropertyDescription* propertyDescription, 
 			PyObject* pyData);
@@ -75,7 +75,7 @@ public:
 	INLINE void cellEntityCall(EntityCall* entitycall);
 
 	/** 
-		½Å±¾»ñÈ¡ºÍÉèÖÃentityµÄposition 
+		ï¿½Å±ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½position 
 	*/
 	INLINE Position3D& position();
 	INLINE Position3D& serverPosition();
@@ -85,7 +85,7 @@ public:
 	DECLARE_PY_GETSET_MOTHOD(pyGetPosition, pySetPosition);
 
 	/** 
-		½Å±¾»ñÈ¡ºÍÉèÖÃentityµÄ·½Ïò 
+		ï¿½Å±ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½Ä·ï¿½ï¿½ï¿½ 
 	*/
 	INLINE Direction3D& direction();
 	INLINE void direction(const Direction3D& dir);
@@ -93,7 +93,7 @@ public:
 	DECLARE_PY_GETSET_MOTHOD(pyGetDirection, pySetDirection);
 	
 	/**
-		ÊµÌå¿Í»§¶ËµÄÎ»ÖÃºÍ³¯Ïò
+		Êµï¿½ï¿½Í»ï¿½ï¿½Ëµï¿½Î»ï¿½ÃºÍ³ï¿½ï¿½ï¿½
 	*/
 	INLINE Position3D& clientPos();
 	INLINE void clientPos(const Position3D& pos);
@@ -104,7 +104,7 @@ public:
 	INLINE void clientDir(float roll, float pitch, float yaw);
 
 	/**
-		ÒÆ¶¯ËÙ¶È
+		ï¿½Æ¶ï¿½ï¿½Ù¶ï¿½
 	*/
 	INLINE void moveSpeed(float speed);
 	INLINE float moveSpeed() const;
@@ -121,7 +121,7 @@ public:
 	const EntityAspect* getAspect() const{ return &aspect_; }
 
 	/** 
-		entityÒÆ¶¯µ½Ä³¸öµã 
+		entityï¿½Æ¶ï¿½ï¿½ï¿½Ä³ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	uint32 moveToPoint(const Position3D& destination, float velocity, float distance,
 			PyObject* userData, bool faceMovement, bool moveVertically);
@@ -129,33 +129,33 @@ public:
 	DECLARE_PY_MOTHOD_ARG6(pyMoveToPoint, PyObject_ptr, float, float, PyObject_ptr, int32, int32);
 
 	/** 
-		Í£Ö¹ÈÎºÎÒÆ¶¯ÐÐÎª
+		Í£Ö¹ï¿½Îºï¿½ï¿½Æ¶ï¿½ï¿½ï¿½Îª
 	*/
 	bool stopMove();
 
 	/** 
-		entityµÄÒ»´ÎÒÆ¶¯Íê³É 
+		entityï¿½ï¿½Ò»ï¿½ï¿½ï¿½Æ¶ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	void onMove(uint32 controllerId, int layer, const Position3D& oldPos, PyObject* userarg);
 
 	/** 
-		entityµÄÒÆ¶¯Íê³É 
+		entityï¿½ï¿½ï¿½Æ¶ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	void onMoveOver(uint32 controllerId, int layer, const Position3D& oldPos, PyObject* userarg);
 
 	/** 
-		entityÒÆ¶¯Ê§°Ü
+		entityï¿½Æ¶ï¿½Ê§ï¿½ï¿½
 	*/
 	void onMoveFailure(uint32 controllerId, PyObject* userarg);
 
 	/** 
-		É¾³ýÒ»¸ö¿ØÖÆÆ÷  
+		É¾ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½  
 	*/
 	void cancelController(uint32 id);
 	static PyObject* __py_pyCancelController(PyObject* self, PyObject* args);
 
 	/** 
-		Ïú»ÙÕâ¸öentity 
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entity 
 	*/
 	void onDestroy(bool callScript){};
 
@@ -166,17 +166,17 @@ public:
 	void onLeaveSpace();
 
 	/**
-		Ô¶³Ìºô½Ð±¾entityµÄ·½·¨ 
+		Ô¶ï¿½Ìºï¿½ï¿½Ð±ï¿½entityï¿½Ä·ï¿½ï¿½ï¿½ 
 	*/
 	void onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s);
 
 	/**
-		·þÎñÆ÷¸üÐÂentityÊôÐÔ
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½entityï¿½ï¿½ï¿½ï¿½
 	*/
 	void onUpdatePropertys(MemoryStream& s);
 	
 	/**
-	    ÓÃÓÚEntityµÄÊý¾ÝµÚÒ»´ÎÉèÖÃÊ±£¬¾ö¶¨ÊÇ·ñÒª»Øµ÷½Å±¾²ãµÄset_*·½·¨
+	    ï¿½ï¿½ï¿½ï¿½Entityï¿½ï¿½ï¿½ï¿½ï¿½Ýµï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½Òªï¿½Øµï¿½ï¿½Å±ï¿½ï¿½ï¿½ï¿½set_*ï¿½ï¿½ï¿½ï¿½
 	*/
 	void callPropertysSetMethods();
 
@@ -198,14 +198,14 @@ public:
 	DECLARE_PY_MOTHOD_ARG0(pyIsPlayer);
 
 protected:
-	EntityCall*								cellEntityCall_;					// Õâ¸öentityµÄcell-entitycall
-	EntityCall*								baseEntityCall_;					// Õâ¸öentityµÄbase-entitycall
+	EntityCall*								cellEntityCall_;					// ï¿½ï¿½ï¿½entityï¿½ï¿½cell-entitycall
+	EntityCall*								baseEntityCall_;					// ï¿½ï¿½ï¿½entityï¿½ï¿½base-entitycall
 
-	Position3D								position_, serverPosition_;			// entityµÄµ±Ç°Î»ÖÃ
-	Direction3D								direction_;							// entityµÄµ±Ç°·½Ïò
+	Position3D								position_, serverPosition_;			// entityï¿½Äµï¿½Ç°Î»ï¿½ï¿½
+	Direction3D								direction_;							// entityï¿½Äµï¿½Ç°ï¿½ï¿½ï¿½ï¿½
 
-	Position3D								clientPos_;							// ¿Í»§¶ËÎ»ÖÃ£¬Èç¹ûÊµÌå±»¿Í»§¶Ë¿ØÖÆÓÃÓÚÏò·þÎñÆ÷Í¬²½Î»ÖÃ
-	Direction3D								clientDir_;							// ¿Í»§¶Ë³¯Ïò£¬Èç¹ûÊµÌå±»¿Í»§¶Ë¿ØÖÆÓÃÓÚÏò·þÎñÆ÷Í¬²½³¯Ïò
+	Position3D								clientPos_;							// ï¿½Í»ï¿½ï¿½ï¿½Î»ï¿½Ã£ï¿½ï¿½ï¿½ï¿½Êµï¿½å±»ï¿½Í»ï¿½ï¿½Ë¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½Î»ï¿½ï¿½
+	Direction3D								clientDir_;							// ï¿½Í»ï¿½ï¿½Ë³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½å±»ï¿½Í»ï¿½ï¿½Ë¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
 	ClientObjectBase*						pClientApp_;
 
@@ -213,15 +213,15 @@ protected:
 
 	float									velocity_;
 
-	bool									enterworld_;						// ÊÇ·ñÒÑ¾­enterworldÁË£¬ restoreÊ±ÓÐÓÃ
+	bool									enterworld_;						// ï¿½Ç·ï¿½ï¿½Ñ¾ï¿½enterworldï¿½Ë£ï¿½ restoreÊ±ï¿½ï¿½ï¿½ï¿½
 	
 	bool									isOnGround_;
 
 	ScriptID								pMoveHandlerID_;
 	
-	bool									inited_;							// __init__µ÷ÓÃÖ®ºóÉèÖÃÎªtrue
+	bool									inited_;							// __init__ï¿½ï¿½ï¿½ï¿½Ö®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªtrue
 
-    bool                                    isControlled_;                      // ÊÇ·ñ±»¿ØÖÆ
+    bool                                    isControlled_;                      // ï¿½Ç·ñ±»¿ï¿½ï¿½ï¿½
 };																										
 
 }

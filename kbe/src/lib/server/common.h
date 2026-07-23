@@ -28,33 +28,33 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine { 
 
-// ÏûÏ¢×ª·¢µ½Ä³¸ö×é¼þ
+// ï¿½ï¿½Ï¢×ªï¿½ï¿½ï¿½ï¿½Ä³ï¿½ï¿½ï¿½ï¿½ï¿½
 #define NETWORK_MESSAGE_FORWARD(SEND_INTERFACE, SENDBUNDLE, FORWARDBUNDLE, MYCOMPONENT_ID, FORWARD_COMPONENT_ID)						\
 	SENDBUNDLE.newMessage(SEND_INTERFACE::forwardMessage);																				\
 	SENDBUNDLE << MYCOMPONENT_ID << FORWARD_COMPONENT_ID;																				\
 	FORWARDBUNDLE.finiMessage(true);																									\
 	SENDBUNDLE.append(FORWARDBUNDLE);																									\
 
-// cellapp×ª·¢ÏûÏ¢¸ø¿Í»§¶Ë
+// cellapp×ªï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½
 #define NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT(ENTITYID, SENDBUNDLE, FORWARDBUNDLE)														\
 	SENDBUNDLE.newMessage(BaseappInterface::forwardMessageToClientFromCellapp);															\
 	SENDBUNDLE << ENTITYID;																												\
 	FORWARDBUNDLE.finiMessage(true);																									\
 	SENDBUNDLE.append(FORWARDBUNDLE);																									\
 
-// cellapp×ª·¢ÏûÏ¢¸øcellapp
+// cellapp×ªï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½cellapp
 #define NETWORK_ENTITY_MESSAGE_FORWARD_CELLAPP(ENTITYID, SENDBUNDLE, FORWARDBUNDLE)														\
 	SENDBUNDLE.newMessage(BaseappInterface::forwardMessageToCellappFromCellapp);														\
 	SENDBUNDLE << ENTITYID;																												\
 	FORWARDBUNDLE.finiMessage(true);																									\
 	SENDBUNDLE.append(FORWARDBUNDLE);	
 
-// cellapp×ª·¢ÏûÏ¢¸ø¿Í»§¶Ë¿ªÊ¼
+// cellapp×ªï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½Í»ï¿½ï¿½Ë¿ï¿½Ê¼
 #define NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(ENTITYID, SENDBUNDLE)																\
 	SENDBUNDLE.newMessage(BaseappInterface::forwardMessageToClientFromCellapp);															\
 	SENDBUNDLE << ENTITYID;																												\
 
-// cellapp×ª·¢ÏûÏ¢¸ø¿Í»§¶ËÏûÏ¢°ü×·¼ÓÏûÏ¢
+// cellapp×ªï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½×·ï¿½ï¿½ï¿½ï¿½Ï¢
 #define NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_APPEND(SENDBUNDLE, FORWARDBUNDLE)															\
 	FORWARDBUNDLE.finiMessage(true);																									\
 	SENDBUNDLE.append(FORWARDBUNDLE);																									\
@@ -99,7 +99,7 @@ namespace KBEngine {
 }																																		\
 
 
-// cellapp×ª·¢ÏûÏ¢¸ø¿Í»§¶ËÏûÏ¢°ü×·¼ÓÏûÏ¢(Ö±½ÓÔÚSENDBUNDLE×·¼Ó)
+// cellapp×ªï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½×·ï¿½ï¿½ï¿½ï¿½Ï¢(Ö±ï¿½ï¿½ï¿½ï¿½SENDBUNDLE×·ï¿½ï¿½)
 #define ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(SENDBUNDLE, MESSAGEHANDLE, ACTIONNAME)														\
 	(*SENDBUNDLE) << MESSAGEHANDLE.msgID;																								\
 	size_t currMsgLengthPos_##ACTIONNAME = 0;																							\
@@ -121,7 +121,7 @@ namespace KBEngine {
 	size_t messageLength_last_##ACTIONNAME = SENDBUNDLE->currMsgLength();																\
 
 
-// ¹«¹²ÏûÏ¢
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 #define COMMON_NETWORK_MESSAGE(COMPONENTTYPE, BUNDLE, MESSAGENAME)											\
 		switch(COMPONENTTYPE)																				\
 		{																									\
@@ -194,13 +194,13 @@ namespace KBEngine {
 		};																									\
 
 /**
-½«Ãë×ª»»Îªtick
-@lowerBound: ×îÉÙ²»µÍÓÚNtick
+ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Îªtick
+@lowerBound: ï¿½ï¿½ï¿½Ù²ï¿½ï¿½ï¿½ï¿½ï¿½Ntick
 */
 int32 secondsToTicks(float seconds, int lowerBound);
 
 /**
-	½«ÃëÎªµ¥Î»µÄÊ±¼ä×ª»»ÎªÃ¿ÃëËùºÄµÄstamps
+	ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½Î»ï¿½ï¿½Ê±ï¿½ï¿½×ªï¿½ï¿½ÎªÃ¿ï¿½ï¿½ï¿½ï¿½ï¿½Äµï¿½stamps
 */
 inline uint64 secondsToStamps(float seconds)
 {
@@ -210,22 +210,22 @@ inline uint64 secondsToStamps(float seconds)
 void autoFixUserDigestUID();
 
 /*
- ÕËºÅºÍÃÜÂë×î´ó³¤¶È
+ ï¿½ËºÅºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ó³¤¶ï¿½
 */
 #define ACCOUNT_NAME_MAX_LENGTH						128
 #define ACCOUNT_PASSWD_MAX_LENGTH					255
 
-// µÇÂ¼×¢²áÊ±¸½´øµÄÐÅÏ¢×î´ó³¤¶È
+// ï¿½ï¿½Â¼×¢ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ó³¤¶ï¿½
 #define ACCOUNT_DATA_MAX_LENGTH						1024
 
-// ±»ÓÃÀ´ÃèÊöÈÎºÎÖ»×öÒ»´Îºó×Ô¶¯ÉèÖÃÎª²»×öµÄÑ¡Ïî
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îºï¿½Ö»ï¿½ï¿½Ò»ï¿½Îºï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¡ï¿½ï¿½
 #define KBE_NEXT_ONLY								2
 
-/** c/c++Êý¾ÝÀà±ð×ª»»³ÉKBEDataTypeID */
+/** c/c++ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½KBEDataTypeID */
 #define KBE_DATATYPE2ID_MAX							21
 uint16 datatype2id(std::string datatype);
 
-/** c/c++Êý¾ÝÀà±ð×ª»»³ÉÔ­ÉúÀà±ðUINT16 ... */
+/** c/c++ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½Ô­ï¿½ï¿½ï¿½ï¿½ï¿½UINT16 ... */
 std::string datatype2nativetype(std::string datatype);
 std::string datatype2nativetype(uint16 datatype);
 

@@ -56,82 +56,82 @@ public:
 	virtual ~PropertyDescription();
 	
 	/** 
-		»ñÈ¡Õâ¸öÊôĞÔµÄdetailLevel 
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½detailLevel 
 	*/
 	INLINE int8 getDetailLevel(void) const;
 	
 	/** 
-		ÊÇ·ñÊÇÒ»¸ö±£´æµ½Êı¾İ¿âÖĞµÄÊôĞÔ 
+		ï¿½Ç·ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½æµ½ï¿½ï¿½ï¿½İ¿ï¿½ï¿½Ğµï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	INLINE bool isPersistent(void) const;
 	
 	/** 
-		»ñÈ¡Õâ¸öÊôĞÔµÄÊı¾İÀà±ğ 
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	INLINE DataType* getDataType(void) const;
 	
 	/** 
-		»ñÈ¡ÊôĞÔµÄ±êÖ¾ cell_publicµÈ 
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½ÔµÄ±ï¿½Ö¾ cell_publicï¿½ï¿½ 
 	*/
 	INLINE uint32 getFlags(void) const;
 	
 	/** 
-		»ñÈ¡ÊôĞÔÃû³Æ 
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	INLINE const char* getName(void) const;
 	
 	/** 
-		»ñÈ¡×Ö·û´®Êı¾İÀà±ğÃû UINT32, BAG..
+		ï¿½ï¿½È¡ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ UINT32, BAG..
 	*/
 	INLINE const char* getDataTypeName(void) const;
 	
 	/** 
-		»ñÈ¡³õÊ¼Öµ×Ö·û´®
+		ï¿½ï¿½È¡ï¿½ï¿½Ê¼Öµï¿½Ö·ï¿½ï¿½ï¿½
 	*/
 	INLINE const char* getDefaultValStr(void) const;
 
 	/** 
-		ÊôĞÔµÄÊı×ÖÀà±ğ£¬ ÓÃÓÚÍøÂçÉÏ´«ÊäÊ¶±ğ 
+		ï¿½ï¿½ï¿½Ôµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ï¿½ï¿½Ê¶ï¿½ï¿½ 
 	*/
 	INLINE ENTITY_PROPERTY_UID getUType(void) const;
 	
 	/** 
-		»ñÈ¡ÊôĞÔË÷ÒıÀà±ğ
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	INLINE const char* indexType(void) const;
 
 	/** 
-		±ğÃûid£¬ µ±±©Â¶µÄ·½·¨»òÕß¹ã²¥µÄÊôĞÔ×Ü¸öÊıĞ¡ÓÚ255Ê±
-		ÎÒÃÇ²»Ê¹ÓÃutype¶øÊ¹ÓÃ1×Ö½ÚµÄaliasIDÀ´´«Êä
+		ï¿½ï¿½ï¿½ï¿½idï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Â¶ï¿½Ä·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß¹ã²¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü¸ï¿½ï¿½ï¿½Ğ¡ï¿½ï¿½255Ê±
+		ï¿½ï¿½ï¿½Ç²ï¿½Ê¹ï¿½ï¿½utypeï¿½ï¿½Ê¹ï¿½ï¿½1ï¿½Ö½Úµï¿½aliasIDï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	*/
 	INLINE int16 aliasID() const;
 	INLINE uint8 aliasIDAsUint8() const;
 	INLINE void aliasID(int16 v);
 
 	/** 
-		ÉèÖÃÕâ¸öÊôĞÔÎªË÷Òı¼ü 
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	INLINE void setIdentifier(bool isIdentifier);
 	
 	/** 
-		ÉèÖÃÕâ¸öÊôĞÔÔÚÊı¾İ¿âÖĞµÄ³¤¶È 
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½İ¿ï¿½ï¿½ĞµÄ³ï¿½ï¿½ï¿½ 
 	*/
 	INLINE void setDatabaseLength(uint32 databaseLength);
 	INLINE uint32 getDatabaseLength() const;
 
 	/** 
-		»ñÈ¡Õâ¸öÊôĞÔÃèÊöÔÚdefÎÄ¼şÖĞ±»¶¨ÒåµÄÄ¬ÈÏÖµ 
+		ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½defï¿½Ä¼ï¿½ï¿½Ğ±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¬ï¿½ï¿½Öµ 
 	*/
 	PyObject* newDefaultVal(void);
 	
 	/** 
-		»ñµÃÊôĞÔÃèÊöµÄ×ÜÊıÁ¿ 
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	*/
 	static uint32 getDescriptionCount(void){ return propertyDescriptionCount_; }
 	static void resetDescriptionCount(void){ propertyDescriptionCount_ = 0; }
 
 	/** 
-		¸ù¾İÀàĞÍ²úÉúÒ»¸öÃèÊöÊµÀı 
+		ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í²ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ 
 	*/
 	static PropertyDescription* createDescription(ENTITY_PROPERTY_UID utype, 
 		std::string& dataTypeName, 
@@ -146,7 +146,7 @@ public:
 		DETAIL_TYPE detailLevel);
 	
 	/** 
-		½Å±¾ÇëÇóÉèÖÃÕâ¸öÊôĞÔµÄÖµ 
+		ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½Öµ 
 	*/
 	virtual PyObject* onSetValue(PyObject* parentObj, PyObject* value);	
 
@@ -162,19 +162,19 @@ public:
 	INLINE bool hasClient(void) const;
 	
 protected:	
-	static uint32				propertyDescriptionCount_;						// ËùÓĞµÄÊôĞÔÃèÊöµÄÊıÁ¿	
-	std::string					name_;											// Õâ¸öÊôĞÔµÄÃû³Æ
-	std::string					dataTypeName_;									// Õâ¸öÊôĞÔµÄ×Ö·û´®Êı¾İÀà±ğÃû
-	uint32						flags_;											// Õâ¸öÊôĞÔµÄÒ»Ğ©±êÖ¾  ±ÈÈç cell_public
-	bool						isPersistent_;									// ÊÇ·ñÊÇÒ»¸ö´æ´¢µ½Êı¾İ¿âµÄÊôĞÔ
-	DataType*					dataType_;										// Õâ¸öÊôĞÔµÄÊı¾İÀà±ğ
-	bool						isIdentifier_;									// ÊÇ·ñÊÇÒ»¸öË÷Òı¼ü
-	uint32						databaseLength_;								// Õâ¸öÊôĞÔÔÚÊı¾İ¿âÖĞµÄ³¤¶È
-	ENTITY_PROPERTY_UID			utype_;											// Õâ¸öÊôĞÔµÄÊı×ÖÀà±ğ£¬ ÓÃÓÚÍøÂçÉÏ´«ÊäÊ¶±ğ
-	std::string					defaultValStr_;									// Õâ¸öÊôĞÔµÄÄ¬ÈÏÖµ
-	DETAIL_TYPE					detailLevel_;									// Õâ¸öÊôĞÔµÄlodÏêÇé¼¶±ğ ¿´commonÖĞµÄ:ÊôĞÔµÄlod¹ã²¥¼¶±ğ·¶Î§µÄ¶¨Òå
-	int16						aliasID_;										// ±ğÃûid£¬ µ±±©Â¶µÄ·½·¨»òÕß¹ã²¥µÄÊôĞÔ×Ü¸öÊıĞ¡ÓÚ255Ê±£¬ ÎÒÃÇ²»Ê¹ÓÃutype¶øÊ¹ÓÃ1×Ö½ÚµÄaliasIDÀ´´«Êä
-	std::string					indexType_;										// ÊôĞÔµÄË÷ÒıÀà±ğ£¬UNIQUE, INDEX£¬·Ö±ğ¶ÔÓ¦ÎŞÉèÖÃ¡¢Î¨Ò»Ë÷Òı¡¢ÆÕÍ¨Ë÷Òı
+	static uint32				propertyDescriptionCount_;						// ï¿½ï¿½ï¿½Ğµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½	
+	std::string					name_;											// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½ï¿½ï¿½ï¿½ï¿½
+	std::string					dataTypeName_;									// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	uint32						flags_;											// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½Ò»Ğ©ï¿½ï¿½Ö¾  ï¿½ï¿½ï¿½ï¿½ cell_public
+	bool						isPersistent_;									// ï¿½Ç·ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½æ´¢ï¿½ï¿½ï¿½ï¿½ï¿½İ¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	DataType*					dataType_;										// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	bool						isIdentifier_;									// ï¿½Ç·ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	uint32						databaseLength_;								// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½İ¿ï¿½ï¿½ĞµÄ³ï¿½ï¿½ï¿½
+	ENTITY_PROPERTY_UID			utype_;											// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ï¿½ï¿½Ê¶ï¿½ï¿½
+	std::string					defaultValStr_;									// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½Ä¬ï¿½ï¿½Öµ
+	DETAIL_TYPE					detailLevel_;									// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½lodï¿½ï¿½ï¿½é¼¶ï¿½ï¿½ ï¿½ï¿½commonï¿½Ğµï¿½:ï¿½ï¿½ï¿½Ôµï¿½lodï¿½ã²¥ï¿½ï¿½ï¿½ï¿½Î§ï¿½Ä¶ï¿½ï¿½ï¿½
+	int16						aliasID_;										// ï¿½ï¿½ï¿½ï¿½idï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Â¶ï¿½Ä·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß¹ã²¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü¸ï¿½ï¿½ï¿½Ğ¡ï¿½ï¿½255Ê±ï¿½ï¿½ ï¿½ï¿½ï¿½Ç²ï¿½Ê¹ï¿½ï¿½utypeï¿½ï¿½Ê¹ï¿½ï¿½1ï¿½Ö½Úµï¿½aliasIDï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	std::string					indexType_;										// ï¿½ï¿½ï¿½Ôµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½UNIQUE, INDEXï¿½ï¿½ï¿½Ö±ï¿½ï¿½Ó¦ï¿½ï¿½ï¿½ï¿½ï¿½Ã¡ï¿½Î¨Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¨ï¿½ï¿½ï¿½ï¿½
 };
 
 class FixedDictDescription : public PropertyDescription
@@ -195,7 +195,7 @@ public:
 	virtual ~FixedDictDescription();
 	
 	/** 
-		½Å±¾ÇëÇóÉèÖÃÕâ¸öÊôĞÔµÄÖµ 
+		ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½Öµ 
 	*/
 	PyObject* onSetValue(PyObject* parentObj, PyObject* value);	
 
@@ -226,7 +226,7 @@ public:
 	virtual ~ArrayDescription();
 	
 	/** 
-		½Å±¾ÇëÇóÉèÖÃÕâ¸öÊôĞÔµÄÖµ 
+		ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½Öµ 
 	*/
 	PyObject* onSetValue(PyObject* parentObj, PyObject* value);
 
@@ -255,7 +255,7 @@ public:
 	virtual ~VectorDescription();
 	
 	/** 
-		½Å±¾ÇëÇóÉèÖÃÕâ¸öÊôĞÔµÄÖµ 
+		ï¿½Å±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôµï¿½Öµ 
 	*/
 	PyObject* onSetValue(PyObject* parentObj, PyObject* value);
 	

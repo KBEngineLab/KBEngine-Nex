@@ -29,7 +29,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{ 
 /*---------------------------------------------------------------------------------
-	¿çÆ½Ì¨½Ó¿Ú¶¨Òå
+	ï¿½ï¿½Æ½Ì¨ï¿½Ó¿Ú¶ï¿½ï¿½ï¿½
 ---------------------------------------------------------------------------------*/
 #if defined( __WIN32__ ) || defined( WIN32 ) || defined( _WIN32 )
 
@@ -81,7 +81,7 @@ namespace strutil {
 	std::string toUpper(const std::string& str);
 
 	/*
-	 ×ª»»Îª´óÐ´
+	 ×ªï¿½ï¿½Îªï¿½ï¿½Ð´
 	*/
 	inline char* str_toupper(char* s)
 	{
@@ -97,7 +97,7 @@ namespace strutil {
 	}
 
 	/*
-	 ×ª»»ÎªÐ¡Ð´
+	 ×ªï¿½ï¿½ÎªÐ¡Ð´
 	*/
 	inline char* str_tolower(char* s)
 	{
@@ -147,7 +147,7 @@ namespace strutil {
 }
 
 namespace strutil {
-	// vector<string>Ö®ÀàµÄÈÝÒ×Ê¹ÓÃ std::find_if À´²éÕÒÊÇ·ñ´æÔÚÄ³¸ö×Ö·û´®
+	// vector<string>Ö®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½ std::find_if ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½Ä³ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½
 	template<typename T>
 	class find_vec_string_exist_handle
 	{
