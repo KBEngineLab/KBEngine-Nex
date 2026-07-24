@@ -253,7 +253,61 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 	SmartPointer<XML> xml(new XML());
 	if(!xml->openSection(entitiesFile.c_str()))
 		return false;
-	
+
+	// 插件和宿主实体共用同一套 utype、定义解析和 MD5 累积流程；插件先加载以固定协议顺序。
+	// Plugins and host entities share one utype, definition parser, and MD5 accumulation flow; plugins load first for a stable protocol order.
+	auto loadEntityDefinition = [&](const std::string& moduleName, const std::string& entityDefPath,
+		const std::string& entityDefDirectory) -> bool
+	{
+		if (__scriptTypeMappingUType.find(moduleName) != __scriptTypeMappingUType.end())
+		{
+			ERROR_MSG(fmt::format("EntityDef::initialize: duplicate entity module [{}], definition [{}].\n",
+				moduleName, entityDefPath));
+			return false;
+		}
+
+		__scriptTypeMappingUType[moduleName] = utype;
+		ScriptDefModule* pScriptModule = new ScriptDefModule(moduleName, utype++);
+		EntityDef::__scriptModules.push_back(pScriptModule);
+		pScriptModule->setDefSourceFile(entityDefPath);
+
+		SmartPointer<XML> defxml(new XML());
+		if(!defxml->openSection(entityDefPath.c_str()))
+			return false;
+
+		TiXmlNode* defNode = defxml->getRootNode();
+		if(defNode == NULL)
+			return true;
+
+		if(!loadDefInfo(entityDefDirectory, moduleName, defxml.get(), defNode, pScriptModule))
+		{
+			ERROR_MSG(fmt::format("EntityDef::initialize: failed to load entity({}) module from [{}].\n",
+				moduleName, entityDefPath));
+			return false;
+		}
+
+		if(!loadDetailLevelInfo(entityDefDirectory, moduleName, defxml.get(), defNode, pScriptModule))
+		{
+			ERROR_MSG(fmt::format("EntityDef::initialize: failed to load entity({}) DetailLevelInfo from [{}].\n",
+				moduleName, entityDefPath));
+			return false;
+		}
+
+		pScriptModule->onLoaded();
+		return true;
+	};
+
+	// 插件实体定义使用插件自己的 entity_defs 目录解析 interfaces/components 相对路径。
+	// Plugin entity definitions resolve interfaces/components relative to the plugin's own entity_defs directory.
+	const std::vector<PluginEntityDescriptor>& pluginEntities = PluginManager::instance().entities();
+	for (std::vector<PluginEntityDescriptor>::const_iterator pluginIter = pluginEntities.begin();
+		pluginIter != pluginEntities.end(); ++pluginIter)
+	{
+		std::string pluginEntityDirectory = pluginIter->pluginRootPath + "/entity_defs/";
+		if (!loadEntityDefinition(pluginIter->name, pluginIter->defFullPath, pluginEntityDirectory))
+			return false;
+	}
+
 	// 获得entities.xml根节点, 如果没有定义一个entity那么直接返回true
 	TiXmlNode* node = xml->getRootNode();
 	if(node == NULL)
@@ -263,43 +317,9 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 	XML_FOR_BEGIN(node)
 	{
 		std::string moduleName = xml.get()->getKey(node);
-		__scriptTypeMappingUType[moduleName] = utype;
-		ScriptDefModule* pScriptModule = new ScriptDefModule(moduleName, utype++);
-		EntityDef::__scriptModules.push_back(pScriptModule);
-
 		std::string deffile = defFilePath + moduleName + ".def";
-		pScriptModule->setDefSourceFile(deffile);
-		SmartPointer<XML> defxml(new XML());
-
-		if(!defxml->openSection(deffile.c_str()))
+		if (!loadEntityDefinition(moduleName, deffile, defFilePath))
 			return false;
-
-		TiXmlNode* defNode = defxml->getRootNode();
-		if(defNode == NULL)
-		{
-			// root节点下没有子节点了
-			continue;
-		}
-
-		// 加载def文件中的定义
-		if(!loadDefInfo(defFilePath, moduleName, defxml.get(), defNode, pScriptModule))
-		{
-			ERROR_MSG(fmt::format("EntityDef::initialize: failed to load entity({}) module!\n",
-				moduleName.c_str()));
-
-			return false;
-		}
-		
-		// 尝试在主entity文件中加载detailLevel数据
-		if(!loadDetailLevelInfo(defFilePath, moduleName, defxml.get(), defNode, pScriptModule))
-		{
-			ERROR_MSG(fmt::format("EntityDef::initialize: failed to load entity({}) DetailLevelInfo!\n",
-				moduleName.c_str()));
-
-			return false;
-		}
-
-		pScriptModule->onLoaded();
 	}
 	XML_FOR_END(node);
 
