@@ -112,10 +112,7 @@ KBE_INCLUDES += -I $(KBE_ROOT)/kbe/src
 KBE_INCLUDES += -I $(KBE_ROOT)/kbe/src/lib
 KBE_INCLUDES += -I $(KBE_ROOT)/kbe/src/server
 KBE_INCLUDES += -I $(KBE_ROOT)/kbe/src/lib/dependencies
-KBE_INCLUDES += -I $(KBE_ROOT)/kbe/src/lib/dependencies/zlib
 KBE_INCLUDES += -I $(KBE_ROOT)/kbe/src/lib/dependencies/tinyxml
-KBE_INCLUDES += -I $(KBE_ROOT)/kbe/src/lib/dependencies/fmt/include
-KBE_INCLUDES += -I $(KBE_ROOT)/kbe/src/lib/dependencies/curl/include
 
 # Preprocessor output only (useful when debugging macros)
 # CPPFLAGS += -E
@@ -150,7 +147,6 @@ endif # USE_MYSQL
 ifdef USE_REDIS
 LDLIBS += -lhiredis
 CPPFLAGS += -DUSE_REDIS
-KBE_INCLUDES += -I $(KBE_ROOT)/kbe/src/lib/dependencies/hiredis
 endif # USE_REDIS
 
 # everyone needs pthread if LDLINUX_TLS_IS_BROKEN
@@ -161,31 +157,16 @@ endif
 
 LDFLAGS += -export-dynamic
 
-# The OpenSSL redist is used for all builds as common/md5.[ch]pp depends
-# on the OpenSSL MD5 implementation.
-
-KBE_INCLUDES += -I $(KBE_ROOT)/kbe/src/lib/dependencies/log4cxx/src/main/include
 ifeq ($(NO_USE_LOG4CXX),0)
 LDLIBS += -llog4cxx -lapr-1 -laprutil-1 -lexpat
 else
 CPPFLAGS += -DNO_USE_LOG4CXX
 endif
 
-ifneq ("$(wildcard /usr/lib/x86_64-linux-gnu/libssl.a)", "")
-USE_SELF_OPENSSL=0
-OPENSSL_DIR=/usr
-OPENSSL_DEP_TMP = /usr/lib/x86_64-linux-gnu/libssl.a /usr/lib/x86_64-linux-gnu/libcrypto.a
-$(info, "use system openssl.")
-else
-USE_SELF_OPENSSL=1
-OPENSSL_DIR = $(KBE_ROOT)/kbe/src/lib/dependencies/openssl
-OPENSSL_DEP_TMP = $(LIBDIR)/libssl.a $(LIBDIR)/libcrypto.a
-endif
-
-KBE_INCLUDES += -I$(OPENSSL_DIR)/include
-
 ifeq ($(USE_OPENSSL),1)
-OPENSSL_DEP = $(OPENSSL_DEP_TMP)
+# OpenSSL由系统或vcpkg工具链提供，目标依赖不再绑定仓库内静态库文件。
+# OpenSSL is supplied by the system or vcpkg toolchain, so target prerequisites no longer bind repository-local archives.
+OPENSSL_DEP =
 LDLIBS += -lssl -lcrypto -ldl
 CPPFLAGS += -DUSE_OPENSSL
 else
@@ -228,8 +209,6 @@ LDLIBS += -ltmxparser
 CPPFLAGS += -DUSE_TMXPARSER
 endif
 
-JEMALLOC_DIR = $(KBE_ROOT)/kbe/src/lib/dependencies/jemalloc
-KBE_INCLUDES += -I$(JEMALLOC_DIR)/include
 #ifeq ($(USE_JEMALLOC),1)
 LDLIBS += -ljemalloc -lrt -ldl
 CPPFLAGS += -DUSE_JEMALLOC

@@ -30,27 +30,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "db_interface/db_interface.h"
 
 #include "mysql/mysql.h"
-#if KBE_PLATFORM == PLATFORM_WIN32
-#ifdef X64
-// added for VS2015
-#if _MSC_VER >= 1900
-#pragma comment (lib, "libmysql64_vs140.lib")
-#pragma comment (lib, "mysqlclient64_vs140.lib")
-#else
-#pragma comment (lib, "libmysql64.lib")
-#pragma comment (lib, "mysqlclient64.lib")
-#endif
-#else
-// added for VS2015
-#if _MSC_VER >= 1900
-#pragma comment (lib, "libmysql32_vs140.lib")
-#pragma comment (lib, "mysqlclient32_vs140.lib")
-#else
-#pragma comment (lib, "libmysql32.lib")
-#pragma comment (lib, "mysqlclient32.lib")
-#endif
-#endif
-#endif
+// Windows构建由vcpkg的libmariadb端口提供头文件和自动链接信息，避免再次绑定仓库内的旧VS140库。
+// Windows builds obtain headers and auto-link metadata from the vcpkg libmariadb port to avoid rebinding the legacy VS140 libraries.
 
 namespace KBEngine { 
 

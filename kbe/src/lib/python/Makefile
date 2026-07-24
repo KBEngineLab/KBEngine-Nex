@@ -4,11 +4,9 @@ all:: config.status
 CONFIG_ARGS =
 
 
-ifneq ("$(wildcard /usr/lib/x86_64-linux-gnu/libssl.a)", "")
-	CONFIG_SSL =
-else
-	CONFIG_SSL = --with-openssl=$(KBE_ROOT)/kbe/src/lib/dependencies/openssl
-endif
+# Python默认探测系统或vcpkg工具链中的OpenSSL，调用者仍可通过CONFIG_SSL指定非标准前缀。
+# Python detects OpenSSL from the system or vcpkg toolchain by default; callers may still set CONFIG_SSL for a non-standard prefix.
+CONFIG_SSL ?=
 
 ifeq ($(pythonbuild), release)
 	CONFIG_ARGS += --enable-optimizations 
@@ -39,5 +37,5 @@ clean::
 
 # 4: setup.py
 #       system_lib_dirs = ['/lib64', '/usr/lib64', '/lib', '/usr/lib', '$(KBE_ROOT)/kbe/src/libs']
-#       system_include_dirs = ['/usr/include', '$(KBE_ROOT)/kbe/src/lib/dependencies/zlib']
+#       system_include_dirs = ['/usr/include']
 
