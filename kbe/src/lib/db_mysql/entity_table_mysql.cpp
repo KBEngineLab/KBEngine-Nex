@@ -25,6 +25,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "remove_entity_helper.h"
 #include "entitydef/scriptdef_module.h"
 #include "entitydef/property.h"
+#include "entitydef/entitydef.h"
 #include "db_interface/db_interface.h"
 #include "db_interface/entity_table.h"
 #include "network/fixed_messages.h"
@@ -748,6 +749,10 @@ EntityTableItem* EntityTableMysql::createItem(std::string type, std::string defa
 	{
 		return new EntityTableItemMysql_ENTITYCALL("blob", 0, BINARY_FLAG | BLOB_FLAG, FIELD_TYPE_BLOB);
 	}
+	else if(type == "ENTITY_COMPONENT")
+	{
+		return new EntityTableItemMysql_Component("blob", 0, BINARY_FLAG | BLOB_FLAG, FIELD_TYPE_BLOB);
+	}
 
 	KBE_ASSERT(false && "not found type.\n");
 	return new EntityTableItemMysql_STRING("", 0, 0, FIELD_TYPE_STRING);
@@ -778,12 +783,16 @@ DBID EntityTableMysql::writeTable(DBInterface* pdbi, DBID dbid, int8 shouldAutoL
 	while(s->length() > 0)
 	{
 		ENTITY_PROPERTY_UID pid;
-		(*s) >> pid;
+		ENTITY_PROPERTY_UID child_pid;
+
+		// 每条顶层记录固定包含父属性 UID 和实际表项 UID；普通属性的父 UID 为零。
+		// Every top-level record carries a parent UID and the actual table-item UID; normal properties use zero as the parent UID.
+		(*s) >> pid >> child_pid;
 		
-		EntityTableItem* pTableItem = this->findItem(pid);
+		EntityTableItem* pTableItem = this->findItem(child_pid);
 		if(pTableItem == NULL)
 		{
-			ERROR_MSG(fmt::format("EntityTable::writeTable: not found item[{}].\n", pid));
+			ERROR_MSG(fmt::format("EntityTable::writeTable: not found item[{}], parent item[{}].\n", child_pid, pid));
 			return dbid;
 		}
 		
@@ -1485,6 +1494,129 @@ void EntityTableItemMysql_FIXED_DICT::init_db_item_name(const char* exstrFlag)
 
 		static_cast<EntityTableItemMysqlBase*>(fditer->second.get())->init_db_item_name(new_exstrFlag.c_str());
 	}
+}
+
+//-------------------------------------------------------------------------------------
+bool EntityTableItemMysql_Component::isSameKey(std::string key)
+{
+	// 组件自身没有主表列，键比较由组件子表中的实际字段完成。
+	// A component has no main-table column; its concrete child-table fields perform key matching.
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
+bool EntityTableItemMysql_Component::initialize(const PropertyDescription* pPropertyDescription,
+	const DataType* pDataType, std::string name)
+{
+	if (!EntityTableItemMysqlBase::initialize(pPropertyDescription, pDataType, name))
+		return false;
+
+	EntityComponentType* pEntityComponentType = const_cast<EntityComponentType*>(
+		static_cast<const EntityComponentType*>(pDataType));
+	ScriptDefModule* pComponentModule = pEntityComponentType->pScriptDefModule();
+	EntityTableMysql* pParentTable = static_cast<EntityTableMysql*>(this->pParentTable());
+	EntityTableMysql* pTable = new EntityTableMysql(pParentTable->pEntityTables());
+
+	// 子表名同时包含宿主实体表和组件属性名，使同一组件类型可在实体中安全复用。
+	// The child-table name includes both the owning entity table and component property, allowing safe reuse of one component type.
+	pTable->tableName(std::string(pParentTable->tableName()) + "_" + name);
+	pTable->isChild(true);
+
+	ScriptDefModule* pOwnerModule = EntityDef::findScriptModule(pParentTable->tableName());
+	ScriptDefModule::PROPERTYDESCRIPTION_MAP& propertyDescriptions =
+		pComponentModule->getPersistentPropertyDescriptions();
+
+	for (ScriptDefModule::PROPERTYDESCRIPTION_MAP::const_iterator iter = propertyDescriptions.begin();
+		iter != propertyDescriptions.end(); ++iter)
+	{
+		PropertyDescription* pDescription = iter->second;
+
+		// 无 Cell 部分的宿主不会产生纯 Cell 组件数据，建表时必须采用与写流相同的过滤规则。
+		// An owner without a Cell part cannot produce Cell-only component data, so schema creation must mirror stream filtering.
+		if (!pOwnerModule->hasCell() && pDescription->hasCell() && !pDescription->hasBase())
+			continue;
+
+		EntityTableItem* pItem = pParentTable->createItem(
+			pDescription->getDataType()->getName(), pDescription->getDefaultValStr());
+		pItem->pParentTable(pParentTable);
+		pItem->utype(pDescription->getUType());
+		pItem->tableName(pTable->tableName());
+		pItem->pParentTableItem(this);
+
+		if (!pItem->initialize(pDescription, pDescription->getDataType(), pDescription->getName()))
+		{
+			delete pItem;
+			delete pTable;
+			return false;
+		}
+
+		pTable->addItem(pItem);
+	}
+
+	pChildTable_ = pTable;
+	pTable->pEntityTables()->addTable(pTable);
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
+bool EntityTableItemMysql_Component::syncToDB(DBInterface* pdbi, void* pData)
+{
+	// EntityTables 统一同步主表与全部子表，这里不能重复执行 DDL。
+	// EntityTables synchronizes the main table and every child table, so this item must not issue duplicate DDL.
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
+void EntityTableItemMysql_Component::addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID)
+{
+	if (!pChildTable_)
+		return;
+
+	for (mysql::DBContext::DB_RW_CONTEXTS::iterator iter = context.optable.begin();
+		iter != context.optable.end(); ++iter)
+	{
+		if (pChildTable_->tableName() != iter->first)
+			continue;
+
+		std::vector<DBID>& dbids = iter->second->dbids[resultDBID];
+
+		// 旧实体可能早于组件定义而已存档；显式存在位让加载端能够改用组件默认值。
+		// An archived entity may predate the component definition; the explicit presence bit lets the loader use component defaults.
+		bool foundData = !dbids.empty();
+		(*s) << foundData;
+
+		if (foundData)
+		{
+			// 一个实体组件属性在其子表中只能对应一行。
+			// One entity component property may correspond to only one row in its child table.
+			KBE_ASSERT(dbids.size() == 1);
+			static_cast<EntityTableMysql*>(pChildTable_)->addToStream(s, *iter->second.get(), dbids[0]);
+		}
+
+		return;
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void EntityTableItemMysql_Component::getWriteSqlItem(DBInterface* pdbi, MemoryStream* s,
+	mysql::DBContext& context)
+{
+	if (pChildTable_)
+		static_cast<EntityTableMysql*>(pChildTable_)->getWriteSqlItem(pdbi, s, context);
+}
+
+//-------------------------------------------------------------------------------------
+void EntityTableItemMysql_Component::getReadSqlItem(mysql::DBContext& context)
+{
+	if (pChildTable_)
+		static_cast<EntityTableMysql*>(pChildTable_)->getReadSqlItem(context);
+}
+
+//-------------------------------------------------------------------------------------
+void EntityTableItemMysql_Component::init_db_item_name(const char* exstrFlag)
+{
+	if (pChildTable_)
+		static_cast<EntityTableMysql*>(pChildTable_)->init_db_item_name();
 }
 
 //-------------------------------------------------------------------------------------

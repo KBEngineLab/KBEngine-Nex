@@ -496,6 +496,38 @@ protected:
 	EntityTableItemMysql_FIXED_DICT::FIXEDDICT_KEYTYPES			keyTypes_;		// 这个固定字典里的各个key的类型
 };
 
+/**
+	实体组件使用独立子表保存持久化字段，避免把组件编码为不可查询的单一二进制列。
+	Entity components persist their fields in a dedicated child table instead of an opaque binary column.
+*/
+class EntityTableItemMysql_Component : public EntityTableItemMysqlBase
+{
+public:
+	EntityTableItemMysql_Component(std::string itemDBType,
+		uint32 datalength, uint32 flags, enum_field_types mysqlItemtype) :
+		EntityTableItemMysqlBase(itemDBType, datalength, flags, mysqlItemtype),
+		pChildTable_(NULL)
+	{
+	}
+
+	virtual ~EntityTableItemMysql_Component() {}
+
+	virtual bool isSameKey(std::string key);
+	virtual bool initialize(const PropertyDescription* pPropertyDescription,
+		const DataType* pDataType, std::string name);
+
+	uint8 type() const { return TABLE_ITEM_TYPE_COMPONENT; }
+
+	virtual bool syncToDB(DBInterface* pdbi, void* pData = NULL);
+	void addToStream(MemoryStream* s, mysql::DBContext& context, DBID resultDBID);
+	virtual void getWriteSqlItem(DBInterface* pdbi, MemoryStream* s, mysql::DBContext& context);
+	virtual void getReadSqlItem(mysql::DBContext& context);
+	virtual void init_db_item_name(const char* exstrFlag = "");
+
+protected:
+	EntityTable* pChildTable_;
+};
+
 
 /*
 	维护entity在数据库中的表

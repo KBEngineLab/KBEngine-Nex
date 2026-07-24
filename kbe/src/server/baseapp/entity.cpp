@@ -353,7 +353,9 @@ void Entity::addPersistentsDataToStream(uint32 flags, MemoryStream* s)
 
 	if(pScriptModule_->hasCell())
 	{
-		addPositionAndDirectionToStream(*s);
+		// 数据库顶层记录使用父 UID 与属性 UID 的双 UID 帧，坐标字段也必须遵循该格式。
+		// Database top-level records use a parent/property UID pair, and position fields must follow the same frame.
+		addPositionAndDirectionToStream(*s, false, true);
 	}
 
 	for(; iter != propertyDescrs.end(); ++iter)
@@ -368,9 +370,12 @@ void Entity::addPersistentsDataToStream(uint32 flags, MemoryStream* s)
 		const char* attrname = propertyDescription->getName();
 		if(propertyDescription->isPersistent() && (flags & propertyDescription->getFlags()) > 0)
 		{
+			bool isComponent = propertyDescription->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT;
 			PyObject *key = PyUnicode_FromString(attrname);
 
-			if(cellDataDict_ != NULL && PyDict_Contains(cellDataDict_, key) > 0)
+			// 组件的 Base 部分是完整持久化对象的首选入口，不能被同名 Cell 字典片段提前截获。
+			// The component's Base part is the preferred entry to the complete persistent object and must not be shadowed by its Cell dictionary fragment.
+			if(!isComponent && cellDataDict_ != NULL && PyDict_Contains(cellDataDict_, key) > 0)
 			{
 				PyObject* pyVal = PyDict_GetItemString(cellDataDict_, attrname);
 				if(!propertyDescription->getDataType()->isSameType(pyVal))
@@ -380,7 +385,9 @@ void Entity::addPersistentsDataToStream(uint32 flags, MemoryStream* s)
 				}
 				else
 				{
-					(*s) << propertyDescription->getUType();
+					// 零父 UID 保持普通属性与组件属性使用同一顶层帧格式。
+					// A zero parent UID keeps normal and component properties on one top-level frame format.
+					(*s) << (ENTITY_PROPERTY_UID)0 << propertyDescription->getUType();
 					log.push_back(propertyDescription->getUType());
 					propertyDescription->addPersistentToStream(s, pyVal);
 					DEBUG_PERSISTENT_PROPERTY("addCellPersistentsDataToStream", attrname);
@@ -389,14 +396,18 @@ void Entity::addPersistentsDataToStream(uint32 flags, MemoryStream* s)
 			else if(PyDict_Contains(pydict, key) > 0)
 			{
 				PyObject* pyVal = PyDict_GetItem(pydict, key);
-				if(!propertyDescription->getDataType()->isSameType(pyVal))
+				bool isSamePersistentType = isComponent ?
+					static_cast<EntityComponentType*>(propertyDescription->getDataType())->isSamePersistentType(pyVal) :
+					propertyDescription->getDataType()->isSameType(pyVal);
+
+				if(!isSamePersistentType)
 				{
 					CRITICAL_MSG(fmt::format("{}::addPersistentsDataToStream: {} persistent({}) type(curr_py: {} != {}) error.\n",
 						this->scriptName(), this->id(), attrname, (pyVal ? pyVal->ob_type->tp_name : "unknown"), propertyDescription->getDataType()->getName()));
 				}
 				else
 				{
-	    			(*s) << propertyDescription->getUType();
+					(*s) << (ENTITY_PROPERTY_UID)0 << propertyDescription->getUType();
 					log.push_back(propertyDescription->getUType());
 	    			propertyDescription->addPersistentToStream(s, pyVal);
 					DEBUG_PERSISTENT_PROPERTY("addBasePersistentsDataToStream", attrname);
@@ -404,12 +415,40 @@ void Entity::addPersistentsDataToStream(uint32 flags, MemoryStream* s)
 			}
 			else
 			{
-				WARNING_MSG(fmt::format("{}::addPersistentsDataToStream: {} not found Persistent({}), use default values!\n",
-					this->scriptName(), this->id(), attrname));
+				if (!isComponent)
+				{
+					WARNING_MSG(fmt::format("{}::addPersistentsDataToStream: {} not found Persistent({}), use default values!\n",
+						this->scriptName(), this->id(), attrname));
 
-				(*s) << propertyDescription->getUType();
-				log.push_back(propertyDescription->getUType());
-				propertyDescription->addPersistentToStream(s, NULL);
+					(*s) << (ENTITY_PROPERTY_UID)0 << propertyDescription->getUType();
+					log.push_back(propertyDescription->getUType());
+					propertyDescription->addPersistentToStream(s, NULL);
+				}
+				else if (cellDataDict_)
+				{
+					// 无 Base 实例时仅持久化实际存在的 Cell 组件；没有 Cell 字段的组件无需生成空子表记录。
+					// Without a Base instance, persist only an existing Cell component; a component without Cell fields needs no empty child row.
+					EntityComponentType* pEntityComponentType = static_cast<EntityComponentType*>(propertyDescription->getDataType());
+					if (pEntityComponentType->pScriptDefModule()->getCellPropertyDescriptions().size() == 0)
+					{
+						Py_DECREF(key);
+						continue;
+					}
+
+					PyObject* pyVal = PyDict_GetItemString(cellDataDict_, attrname);
+					if (!static_cast<EntityComponentType*>(propertyDescription->getDataType())->isSamePersistentType(pyVal))
+					{
+						CRITICAL_MSG(fmt::format("{}::addPersistentsDataToStream: {} persistent({}) type(curr_py: {} != {}) error.\n",
+							this->scriptName(), this->id(), attrname, (pyVal ? pyVal->ob_type->tp_name : "unknown"), propertyDescription->getDataType()->getName()));
+					}
+					else
+					{
+						(*s) << (ENTITY_PROPERTY_UID)0 << propertyDescription->getUType();
+						log.push_back(propertyDescription->getUType());
+						propertyDescription->addPersistentToStream(s, pyVal);
+						DEBUG_PERSISTENT_PROPERTY("addCellPersistentsDataToStream", attrname);
+					}
+				}
 			}
 
 			Py_DECREF(key);

@@ -82,12 +82,63 @@ PyObject* createDictDataFromPersistentStream(MemoryStream& s, const char* entity
 		for (; iter != propertyDescrs.end(); ++iter)
 		{
 			PropertyDescription* propertyDescription = iter->second;
-
 			const char* attrname = propertyDescription->getName();
+			PyObject* pyVal = NULL;
 
-			PyObject* pyVal = propertyDescription->createFromPersistentStream(&s);
+			if (propertyDescription->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)
+			{
+				EntityComponentType* pComponentType =
+					static_cast<EntityComponentType*>(propertyDescription->getDataType());
 
-			if (!propertyDescription->getDataType()->isSameType(pyVal))
+				// 无 Cell 的宿主不会产生纯 Cell 组件数据，加载字段集合必须与建表和写流保持一致。
+				// An owner without a Cell part cannot produce Cell-only component data, so loading must match schema and write filtering.
+				if (!pScriptModule->hasCell() && !propertyDescription->hasBase())
+					continue;
+
+				// 空组件没有数据库字段，MySQL 子表不会向流中写入存在位。
+				// A component without persistent fields has no database columns, so its MySQL child table emits no presence bit.
+				if (pComponentType->pScriptDefModule()->getPersistentPropertyDescriptions().empty())
+					continue;
+
+				bool hasComponentData = false;
+				s >> hasComponentData;
+
+				if (hasComponentData)
+				{
+					// 纯 Cell 组件恢复为 cellData 字典；含 Base 的组件恢复为脚本组件对象。
+					// A Cell-only component restores into a cellData dictionary, while a Base component restores into its script object.
+					if (!propertyDescription->hasBase())
+					{
+						pyVal = pComponentType->createCellDataFromPersistentStream(&s);
+					}
+					else
+					{
+						pyVal = pComponentType->createFromPersistentStream(pScriptModule, &s);
+					}
+				}
+				else
+				{
+					// 组件定义晚于实体存档时，构造当前定义的默认值，保持旧数据可加载。
+					// When the component definition postdates the archived entity, construct current defaults so legacy rows remain loadable.
+					if (!propertyDescription->hasBase())
+						pyVal = pComponentType->createCellDataFromPersistentStream(NULL);
+					else
+						pyVal = propertyDescription->getDataType()->parseDefaultStr("");
+				}
+			}
+			else
+			{
+				pyVal = propertyDescription->createFromPersistentStream(&s);
+			}
+
+			// 纯 Cell 组件以字典承载，必须使用持久化类型校验；Base 组件仍使用严格的组件对象校验。
+			// A Cell-only component is represented by a dictionary and needs persistent-type validation; a Base component keeps strict object validation.
+			bool isSameType = propertyDescription->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT &&
+				!propertyDescription->hasBase() ?
+				static_cast<EntityComponentType*>(propertyDescription->getDataType())->isSamePersistentType(pyVal) :
+				propertyDescription->getDataType()->isSameType(pyVal);
+
+			if (!isSameType)
 			{
 				if (pyVal)
 				{
@@ -97,7 +148,18 @@ PyObject* createDictDataFromPersistentStream(MemoryStream& s, const char* entity
 				ERROR_MSG(fmt::format("Baseapp::createDictDataFromPersistentStream: {}.{} error, set to default!\n",
 					entityType, attrname));
 
-				pyVal = propertyDescription->getDataType()->parseDefaultStr("");
+				// 失败回退必须保留运行域所需的对象形态，Cell-only 组件不能替换为 Base 组件对象。
+				// Failure fallback must preserve the runtime-domain representation; a Cell-only component cannot become a Base component object.
+				if (propertyDescription->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT &&
+					!propertyDescription->hasBase())
+				{
+					pyVal = static_cast<EntityComponentType*>(propertyDescription->getDataType())->
+						createCellDataFromPersistentStream(NULL);
+				}
+				else
+				{
+					pyVal = propertyDescription->getDataType()->parseDefaultStr("");
+				}
 			}
 
 			PyDict_SetItemString(pyDict, attrname, pyVal);

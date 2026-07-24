@@ -57,8 +57,28 @@ networkInterface_(networkInterface)
 		for(; iter != propertyDescrs.end(); ++iter)
 		{
 			PropertyDescription* propertyDescription = iter->second;
-			accountDefMemoryStream << propertyDescription->getUType();
-			propertyDescription->addPersistentToStream(&accountDefMemoryStream, NULL);
+			// 无 Cell 的实体不能持久化纯 Cell 组件，模板必须与运行时写流采用相同字段集合。
+			// An entity without a Cell part cannot persist a Cell-only component, so its template must use the runtime field set.
+			if (!pScriptModule->hasCell() &&
+				propertyDescription->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT &&
+				!propertyDescription->hasBase())
+			{
+				continue;
+			}
+
+			accountDefMemoryStream << (ENTITY_PROPERTY_UID)0 << propertyDescription->getUType();
+
+			// 组件模板只写宿主实际拥有的 Base/Cell 字段，顺序必须与 MySQL 组件子表一致。
+			// A component template writes only the Base/Cell fields owned by its host, in the same order as the MySQL child table.
+			if (propertyDescription->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)
+			{
+				static_cast<EntityComponentType*>(propertyDescription->getDataType())->addPersistentToStreamTemplates(
+					pScriptModule, &accountDefMemoryStream);
+			}
+			else
+			{
+				propertyDescription->addPersistentToStream(&accountDefMemoryStream, NULL);
+			}
 		}
 	}
 }
@@ -111,8 +131,26 @@ bool SyncEntityStreamTemplateHandler::process()
 	for(; iter != propertyDescrs.end(); ++iter)
 	{
 		PropertyDescription* propertyDescription = iter->second;
-		accountDefMemoryStream << propertyDescription->getUType();
-		propertyDescription->addPersistentToStream(&accountDefMemoryStream, NULL);
+		// 无 Cell 的实体不能持久化纯 Cell 组件，模板必须与运行时写流采用相同字段集合。
+		// An entity without a Cell part cannot persist a Cell-only component, so its template must use the runtime field set.
+		if (!pScriptModule->hasCell() &&
+			propertyDescription->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT &&
+			!propertyDescription->hasBase())
+		{
+			continue;
+		}
+
+		accountDefMemoryStream << (ENTITY_PROPERTY_UID)0 << propertyDescription->getUType();
+
+		if (propertyDescription->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)
+		{
+			static_cast<EntityComponentType*>(propertyDescription->getDataType())->addPersistentToStreamTemplates(
+				pScriptModule, &accountDefMemoryStream);
+		}
+		else
+		{
+			propertyDescription->addPersistentToStream(&accountDefMemoryStream, NULL);
+		}
 	}
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);

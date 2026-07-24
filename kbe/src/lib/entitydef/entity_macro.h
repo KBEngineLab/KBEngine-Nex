@@ -89,6 +89,18 @@ namespace KBEngine{
 		s << diruid << x << y << z;																			\
 
 
+	// 持久化记录为每个坐标字段补充父 UID，网络流仍保持原格式。
+	// Persistent records add a parent UID for each transform field while network streams retain their existing format.
+	#define ADD_POS_DIR_TO_PERSISTENT_STREAM(s, pos, dir)											\
+		int32 persistentX = (int32)pos.x;															\
+		int32 persistentY = (int32)pos.y;															\
+		int32 persistentZ = (int32)pos.z;															\
+		s << (ENTITY_PROPERTY_UID)0 << posuid << persistentX << persistentY << persistentZ;		\
+		persistentX = (int32)dir.x;																\
+		persistentY = (int32)dir.y;																\
+		persistentZ = (int32)dir.z;																\
+		s << (ENTITY_PROPERTY_UID)0 << diruid << persistentX << persistentY << persistentZ;		\
+
 	#define ADD_POS_DIR_TO_STREAM_ALIASID(s, pos, dir)														\
 		int32 x = (int32)pos.x;																				\
 		int32 y = (int32)pos.y;																				\
@@ -129,6 +141,12 @@ namespace KBEngine{
 	#define ADD_POS_DIR_TO_STREAM(s, pos, dir)																\
 		s << posuid << pos.x << pos.y << pos.z;																\
 		s << diruid << dir.x << dir.y << dir.z;																\
+
+	// 持久化记录为每个坐标字段补充父 UID，网络流仍保持原格式。
+	// Persistent records add a parent UID for each transform field while network streams retain their existing format.
+	#define ADD_POS_DIR_TO_PERSISTENT_STREAM(s, pos, dir)											\
+		s << (ENTITY_PROPERTY_UID)0 << posuid << pos.x << pos.y << pos.z;						\
+		s << (ENTITY_PROPERTY_UID)0 << diruid << dir.x << dir.y << dir.z;						\
 
 
 	#define ADD_POS_DIR_TO_STREAM_ALIASID(s, pos, dir)														\
@@ -508,7 +526,7 @@ public:																										\
 		Py_XDECREF(pydict);																					\
 	}																										\
 																											\
-	void addPositionAndDirectionToStream(MemoryStream& s, bool useAliasID = false);							\
+	void addPositionAndDirectionToStream(MemoryStream& s, bool useAliasID = false, bool persistentFrame = false);\
 																											\
 	static PyObject* __py_reduce_ex__(PyObject* self, PyObject* protocol)									\
 	{																										\
@@ -1030,7 +1048,7 @@ public:																										\
 		return PyUnicode_FromString(scriptName());															\
 	}																										\
 																											\
-	void CLASS::addPositionAndDirectionToStream(MemoryStream& s, bool useAliasID)							\
+	void CLASS::addPositionAndDirectionToStream(MemoryStream& s, bool useAliasID, bool persistentFrame)		\
 	{																										\
 		ENTITY_PROPERTY_UID posuid = ENTITY_BASE_PROPERTY_UTYPE_POSITION_XYZ;								\
 		ENTITY_PROPERTY_UID diruid = ENTITY_BASE_PROPERTY_UTYPE_DIRECTION_ROLL_PITCH_YAW;					\
@@ -1090,6 +1108,10 @@ public:																										\
 		if(pScriptModule()->usePropertyDescrAlias() && useAliasID)											\
 		{																									\
 			ADD_POS_DIR_TO_STREAM_ALIASID(s, pos, dir)														\
+		}																									\
+		else if(persistentFrame)																				\
+		{																									\
+			ADD_POS_DIR_TO_PERSISTENT_STREAM(s, pos, dir)												\
 		}																									\
 		else																								\
 		{																									\
