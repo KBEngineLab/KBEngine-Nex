@@ -43,6 +43,7 @@ std::map<std::string, ENTITY_SCRIPT_UID> EntityDef::__oldScriptTypeMappingUType;
 COMPONENT_TYPE EntityDef::__loadComponentType;
 std::vector<PyTypeObject*> EntityDef::__scriptBaseTypes;
 std::string EntityDef::__entitiesPath;
+EntityDef::Context EntityDef::__context;
 
 KBE_MD5 EntityDef::__md5;
 bool EntityDef::_isInit = false;
@@ -58,6 +59,50 @@ std::vector<ENTITY_METHOD_UID> g_methodCusUtypes;
 ENTITY_PROPERTY_UID g_propertyUtypeAuto = 1;
 std::vector<ENTITY_PROPERTY_UID> g_propertyUtypes;
 
+// Property UIDs are allocated through one path so component fields and ordinary fields share the same collision rules.
+// 属性 UID 通过同一路径分配，使组件字段与普通字段遵守相同的冲突规则。
+static bool reservePropertyUType(const std::string& moduleName,
+	const std::string& propertyName,
+	int requestedUType,
+	ScriptDefModule* pScriptModule,
+	ENTITY_PROPERTY_UID& outUType)
+{
+	if (requestedUType > 0)
+	{
+		ENTITY_PROPERTY_UID utype = static_cast<ENTITY_PROPERTY_UID>(requestedUType);
+		if (requestedUType != static_cast<int>(utype))
+		{
+			ERROR_MSG(fmt::format("EntityDef::reservePropertyUType: Utype {} overflow in {}.{}.\n",
+				requestedUType, moduleName, propertyName));
+			return false;
+		}
+
+		if (pScriptModule->findPropertyDescription(utype, BASEAPP_TYPE) != NULL ||
+			pScriptModule->findPropertyDescription(utype, CELLAPP_TYPE) != NULL ||
+			pScriptModule->findPropertyDescription(utype, CLIENT_TYPE) != NULL)
+		{
+			ERROR_MSG(fmt::format("EntityDef::reservePropertyUType: Utype {} conflicts in {}.{}.\n",
+				requestedUType, moduleName, propertyName));
+			return false;
+		}
+
+		g_propertyUtypes.push_back(utype);
+		outUType = utype;
+		return true;
+	}
+
+	while (true)
+	{
+		ENTITY_PROPERTY_UID utype = g_propertyUtypeAuto++;
+		if (std::find(g_propertyUtypes.begin(), g_propertyUtypes.end(), utype) == g_propertyUtypes.end())
+		{
+			g_propertyUtypes.push_back(utype);
+			outUType = utype;
+			return true;
+		}
+	}
+}
+
 //-------------------------------------------------------------------------------------
 EntityDef::EntityDef()
 {
@@ -67,6 +112,13 @@ EntityDef::EntityDef()
 EntityDef::~EntityDef()
 {
 	EntityDef::finalise();
+}
+
+// Entity lookup is centralized in EntityCall so component ownership follows the existing 1.x hook.
+// 实体查找统一委托给 EntityCall，组件所有权因此复用现有 1.x 钩子。
+PyObject* EntityDef::tryGetEntity(COMPONENT_ID componentID, ENTITY_ID entityID)
+{
+	return EntityCall::tryGetEntity(componentID, entityID);
 }
 
 //-------------------------------------------------------------------------------------
@@ -562,6 +614,25 @@ bool EntityDef::loadComponents(const std::string& defFilePath,
 			return false;
 		}
 
+		ENTITY_PROPERTY_UID componentPropertyUType = 0;
+		TiXmlNode* utypeNode = defxml->enterNode(componentNode, "Utype");
+		int requestedUType = utypeNode ? defxml->getValInt(utypeNode) : -1;
+		if (!reservePropertyUType(moduleName, componentName, requestedUType,
+			pScriptModule, componentPropertyUType))
+		{
+			return false;
+		}
+
+		bool isPersistent = true;
+		TiXmlNode* persistentNode = defxml->enterNode(componentNode, "Persistent");
+		if (persistentNode != NULL)
+		{
+			std::string persistentValue = defxml->getValStr(persistentNode);
+			std::transform(persistentValue.begin(), persistentValue.end(),
+				persistentValue.begin(), tolower);
+			isPersistent = persistentValue != "false";
+		}
+
 		ScriptDefModule* componentModule = NULL;
 		SCRIPT_MODULE_UID_MAP::iterator moduleIter = __scriptTypeMappingUType.find(componentTypeName);
 		if (moduleIter != __scriptTypeMappingUType.end())
@@ -599,6 +670,62 @@ bool EntityDef::loadComponents(const std::string& defFilePath,
 
 			componentModule->autoMatchCompOwn();
 			componentModule->onLoaded();
+		}
+
+		// Component flags are derived from the loaded component domains, matching the 2.8 wire visibility rules.
+		// 组件标志从已加载的组件域推导，与 2.8 线协议的可见性规则保持一致。
+		uint32 flags = ED_FLAG_UNKOWN;
+		if (componentModule->hasBase())
+			flags |= ED_FLAG_BASE;
+		if (componentModule->hasCell())
+			flags |= ED_FLAG_CELL_PUBLIC;
+		if (componentModule->hasClient())
+		{
+			if (componentModule->hasBase())
+				flags |= ED_FLAG_BASE_AND_CLIENT;
+			if (componentModule->hasCell())
+				flags |= ED_FLAG_ALL_CLIENTS | ED_FLAG_CELL_PUBLIC_AND_OWN |
+					ED_FLAG_OTHER_CLIENTS | ED_FLAG_OWN_CLIENT;
+		}
+
+		if (flags == ED_FLAG_UNKOWN)
+		{
+			ERROR_MSG(fmt::format("EntityDef::loadComponents: component {} has no runtime domain.\n",
+				componentTypeName));
+			return false;
+		}
+
+		if (pScriptModule->hasName(componentName))
+		{
+			ERROR_MSG(fmt::format("EntityDef::loadComponents: component name {} conflicts in module {}.\n",
+				componentName, moduleName));
+			return false;
+		}
+
+		DataType* componentDataType = new EntityComponentType(componentModule);
+		std::string componentDataTypeName = "EntityComponent";
+		std::string defaultValue;
+		PropertyDescription* componentProperty = PropertyDescription::createDescription(
+			componentPropertyUType, componentDataTypeName, componentName, flags,
+			isPersistent, componentDataType, false, std::string(), 0,
+			defaultValue, DETAIL_LEVEL_FAR);
+
+		bool propertyRegistered = true;
+		if ((flags & ENTITY_CELL_DATA_FLAGS) > 0)
+			propertyRegistered = pScriptModule->addPropertyDescription(
+				componentName.c_str(), componentProperty, CELLAPP_TYPE) && propertyRegistered;
+		if ((flags & ENTITY_BASE_DATA_FLAGS) > 0)
+			propertyRegistered = pScriptModule->addPropertyDescription(
+				componentName.c_str(), componentProperty, BASEAPP_TYPE) && propertyRegistered;
+		if ((flags & ENTITY_CLIENT_DATA_FLAGS) > 0)
+			propertyRegistered = pScriptModule->addPropertyDescription(
+				componentName.c_str(), componentProperty, CLIENT_TYPE) && propertyRegistered;
+
+		if (!propertyRegistered)
+		{
+			ERROR_MSG(fmt::format("EntityDef::loadComponents: failed to register component property {}.{}.\n",
+				moduleName, componentName));
+			return false;
 		}
 
 		if (!pScriptModule->addComponentDescription(componentName.c_str(), componentModule))

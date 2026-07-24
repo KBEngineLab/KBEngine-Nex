@@ -39,6 +39,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 class ScriptDefModule;
+class PropertyDescription;
 
 #define OUT_TYPE_ERROR(T)								\
 {														\
@@ -98,21 +99,30 @@ protected:
 	std::string aliasName_;
 };
 
-/*
-组件数据类型描述只保存组件模块的引用，具体的对象编解码会在运行时组件迁移阶段接入。
-The component data type currently stores the component module descriptor only; runtime object
-serialization is added in the later component lifecycle step so the 1.x ABI remains stable.
-*/
 class EntityComponentType : public DataType
 {
 public:
-	EntityComponentType(ScriptDefModule* pScriptDefModule, DATATYPE_UID did = 0) :
-		DataType(did), pScriptDefModule_(pScriptDefModule) {}
-	~EntityComponentType() override {}
+	EntityComponentType(ScriptDefModule* pScriptDefModule, DATATYPE_UID did = 0);
+	virtual ~EntityComponentType();
 
 	bool isSameType(PyObject* pyValue) override;
+	bool isSamePersistentType(PyObject* pyValue);
+	bool isSameCellDataType(PyObject* pyValue);
+
 	void addToStream(MemoryStream* mstream, PyObject* pyValue) override;
+	void addPersistentToStream(MemoryStream* mstream, PyObject* pyValue);
+	void addPersistentToStream(MemoryStream* mstream);
+	void addPersistentToStreamTemplates(ScriptDefModule* pScriptModule, MemoryStream* mstream);
+	void addCellDataToStream(MemoryStream* mstream, uint32 flags, PyObject* pyValue,
+		ENTITY_ID ownerID, PropertyDescription* parentPropertyDescription,
+		COMPONENT_TYPE sendtoComponentType, bool checkValue);
+
 	PyObject* createFromStream(MemoryStream* mstream) override;
+	PyObject* createFromPersistentStream(ScriptDefModule* pScriptModule, MemoryStream* mstream);
+	PyObject* createCellData();
+	PyObject* createCellDataFromPersistentStream(MemoryStream* mstream);
+	PyObject* createCellDataFromStream(MemoryStream* mstream);
+
 	PyObject* parseDefaultStr(std::string defaultVal) override;
 	const char* getName(void) const override { return "ENTITY_COMPONENT"; }
 	DATATYPE type() const override { return DATA_TYPE_ENTITY_COMPONENT; }

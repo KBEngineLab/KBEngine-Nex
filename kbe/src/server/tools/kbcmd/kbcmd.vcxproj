@@ -130,6 +130,7 @@
     <ClCompile Include="client_sdk_cxx.cpp" />
     <ClCompile Include="client_sdk_gdscript.cpp" />
     <ClCompile Include="client_sdk_typescript.cpp" />
+    <ClCompile Include="entity_component.cpp" />
     <ClCompile Include="kbcmd.cpp" />
     <ClCompile Include="kbcmd_interface.cpp" />
     <ClCompile Include="main.cpp" />

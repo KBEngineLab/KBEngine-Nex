@@ -61,6 +61,22 @@ public:
 
 	static void reload(bool fullReload);
 
+	/**
+		通过组件和实体 ID 查找当前进程中的实体实例。
+		Resolve an entity instance through the component and entity identifiers.
+	*/
+	static PyObject* tryGetEntity(COMPONENT_ID componentID, ENTITY_ID entityID);
+
+	struct Context
+	{
+		Context() : currEntityID(0), currComponentType(UNKNOWN_COMPONENT_TYPE), currClientappID(0) {}
+		ENTITY_ID currEntityID;
+		COMPONENT_TYPE currComponentType;
+		int32 currClientappID;
+	};
+
+	static Context& context() { return __context; }
+
 	/** 
 		加载相关描述
 	*/
@@ -204,6 +220,7 @@ private:
 	static COMPONENT_TYPE __loadComponentType;									// 所需关系的组件类别的相关数据		
 	static std::vector<PyTypeObject*> __scriptBaseTypes;
 	static std::string __entitiesPath;
+	static Context __context;
 
 	static KBE_MD5 __md5;														// defs-md5
 
