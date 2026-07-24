@@ -56,7 +56,7 @@ bool sync_item_to_db(DBInterface* pdbi,
 			MYSQL_TABLE_FIELD& tf = iter->second;
 			if (tf.type == sqlitemtype && ((tf.flags & ALL_MYSQL_SET_FLAGS) == itemflags))
 			{
-				if ((length == 0) || (sqlitemtype == FIELD_TYPE_VAR_STRING ? (int32)length == tf.length / SYSTEM_CHARSET_MBMAXLEN/*Mysql将length放大了N倍*/ : 
+				if ((length == 0) || (sqlitemtype == FIELD_TYPE_VAR_STRING ? (int32)length == tf.char_length :
 					(int32)length == tf.length))
 					return true;
 			}

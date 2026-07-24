@@ -33,9 +33,6 @@
     <ClCompile Include="..\..\..\lib\python\Modules\getbuildinfo.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\lib\dependencies\vsopenssl\include\openssl\applink.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="client_sdk.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

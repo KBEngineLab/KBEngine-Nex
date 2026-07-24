@@ -44,6 +44,12 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup>
     <TargetExt>.pyd</TargetExt>
+    <!--
+      _elementtree 同样直接编译 Python 3.7 内置 Expat，必须保持源码、头文件和链接输入来自同一版本。
+      _elementtree also compiles Python 3.7's bundled Expat and must keep sources, headers, and link inputs on the same version.
+    -->
+    <VcpkgAutoLink>false</VcpkgAutoLink>
+    <KbePreferBundledDependencies>true</KbePreferBundledDependencies>
   </PropertyGroup>
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>

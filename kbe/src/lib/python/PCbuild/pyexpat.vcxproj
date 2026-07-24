@@ -45,6 +45,16 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup>
     <TargetExt>.pyd</TargetExt>
+    <!--
+      Python 3.7 的 pyexpat 直接编译同版本内置 Expat，禁止再通配链接 vcpkg Expat 以避免重复符号。
+      Python 3.7 builds its matching bundled Expat sources directly, so wildcard vcpkg linking must be disabled to avoid duplicate symbols.
+    -->
+    <VcpkgAutoLink>false</VcpkgAutoLink>
+    <!--
+      本工程的源码与头文件必须来自同一份内置 Expat，防止 vcpkg 同名头文件改变符号命名约定。
+      This project must compile against its matching bundled Expat headers so vcpkg headers cannot change symbol naming conventions.
+    -->
+    <KbePreferBundledDependencies>true</KbePreferBundledDependencies>
   </PropertyGroup>
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>

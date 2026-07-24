@@ -36,6 +36,9 @@
     <ClCompile Include="entity_aspect.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="entity_component.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="event.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

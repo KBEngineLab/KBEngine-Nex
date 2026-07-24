@@ -655,7 +655,7 @@ PyObject* Entity::onScriptGetAttribute(PyObject* attr)
 		
 		if(pMethodDescription)
 		{
-			return new RealEntityMethod(pMethodDescription, this);
+			return new RealEntityMethod(NULL, pMethodDescription, this);
 		}
 	}
 	else

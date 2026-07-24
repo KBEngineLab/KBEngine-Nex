@@ -40,7 +40,6 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef NO_USE_LOG4CXX
 #include "log4cxx/logger.h"
 #include "log4cxx/logmanager.h"
-#include "log4cxx/net/socketappender.h"
 #include "log4cxx/fileappender.h"
 #include "log4cxx/helpers/inetaddress.h"
 #include "log4cxx/propertyconfigurator.h"

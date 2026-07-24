@@ -4451,7 +4451,7 @@ void Baseapp::onEntityCall(Network::Channel* pChannel, KBEngine::MemoryStream& s
 		default:
 			{
 				ERROR_MSG(fmt::format("Baseapp::onEntityCall: entityCallType {} error! must a baseType. entityID={}.\n",
-					calltype, eid));
+					static_cast<int>(calltype), eid));
 			}
 	};
 

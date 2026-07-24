@@ -530,7 +530,7 @@ bool Loginapp::_createAccount(Network::Channel* pChannel, std::string& accountNa
     }
 
 	DEBUG_MSG(fmt::format("Loginapp::_createAccount: accountName={}, passwordsize={}, type={}, oldType={}.\n",
-		accountName.c_str(), password.size(), type, oldType));
+		accountName.c_str(), password.size(), static_cast<int>(type), static_cast<int>(oldType)));
 
 	ptinfos = new PendingLoginMgr::PLInfos;
 	ptinfos->accountName = accountName;

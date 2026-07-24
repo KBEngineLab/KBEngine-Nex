@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <!--
+    旧 vcxproj 在项目内部再次声明依赖路径，会把 Directory.Build.props 中的 vcpkg 路径挤到末尾。
+    Legacy vcxproj files redeclare dependency paths inside each project and push the vcpkg paths from Directory.Build.props to the end.
+
+    Directory.Build.targets 在项目定义之后生效，这里重新前置路径，确保同名头文件和库始终来自同一个 vcpkg triplet。
+    Directory.Build.targets is evaluated after project definitions, so paths are prepended here to keep same-named headers and libraries on one vcpkg triplet.
+  -->
+  <ItemDefinitionGroup Condition="('$(Platform)' == 'x64' Or '$(Platform)' == 'Win64') And Exists('$(KbeVcpkgIncludeDir)')">
+    <ClCompile Condition="'$(KbePreferBundledDependencies)' != 'true'">
+      <AdditionalIncludeDirectories>$(KbeVcpkgIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Lib>
+      <AdditionalLibraryDirectories>$(KbeVcpkgLibraryDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Lib>
+    <Link>
+      <AdditionalLibraryDirectories>$(KbeVcpkgLibraryDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>

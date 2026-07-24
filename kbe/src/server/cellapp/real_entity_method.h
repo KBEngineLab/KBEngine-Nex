@@ -42,14 +42,15 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 class Entity;
+class PropertyDescription;
 
 class RealEntityMethod : public script::ScriptObject
 {
 	/** 子类化 将一些py操作填充进派生类 */
 	INSTANCE_SCRIPT_HREADER(RealEntityMethod, script::ScriptObject)	
 public:	
-	RealEntityMethod(MethodDescription* methodDescription, 
-		Entity* ghostEntity);
+	RealEntityMethod(PropertyDescription* pComponentPropertyDescription,
+		MethodDescription* methodDescription, Entity* ghostEntity);
 	
 	virtual ~RealEntityMethod();
 
@@ -69,6 +70,9 @@ public:
 	PyObject* callmethod(PyObject* args, PyObject* kwds);
 
 protected:	
+	// 非空时表示方法属于实体组件，转发协议必须携带组件属性UID。
+	// A non-null value identifies a component method whose forwarding payload must include the component property UID.
+	PropertyDescription*					pComponentPropertyDescription_;
 	MethodDescription*						methodDescription_;					// 这个方法的描述
 
 	ENTITY_ID								ghostEntityID_;						// ghostEntityID_

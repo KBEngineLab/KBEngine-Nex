@@ -690,6 +690,13 @@ void DBInterfaceMysql::getFields(TABLE_FIELDS& outs, const char* tableName)
 		info.maxlength = fields[i].max_length;
 		info.flags = fields[i].flags;
 		info.type = fields[i].type;
+
+		// Connector/C 不再公开 SYSTEM_CHARSET_MBMAXLEN，使用当前连接字符集的最大字节宽度计算声明字符数。
+		// Connector/C no longer exports SYSTEM_CHARSET_MBMAXLEN, so derive the declared character count from the active connection charset width.
+		MY_CHARSET_INFO charsetInfo;
+		mysql_get_character_set_info(mysql(), &charsetInfo);
+		const unsigned int maxBytesPerCharacter = charsetInfo.mbmaxlen > 0 ? charsetInfo.mbmaxlen : 1;
+		info.char_length = static_cast<int32>(fields[i].length / maxBytesPerCharacter);
 	}
 
 	mysql_free_result(result);

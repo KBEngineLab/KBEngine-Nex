@@ -28,7 +28,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "helper/debug_helper.h"
 #include "db_interface/db_interface.h"
 
-#include "hiredis.h"
+#include "hiredis/hiredis.h"
 #if KBE_PLATFORM == PLATFORM_WIN32
 #ifdef _DEBUG
 #pragma comment (lib, "hiredis_d.lib")

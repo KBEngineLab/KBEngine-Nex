@@ -19,6 +19,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "cellapp.h"
+#include "entity.h"
 #include "real_entity_method.h"
 #include "entitydef/method.h"
 #include "network/bundle.h"
@@ -39,9 +40,10 @@ SCRIPT_GETSET_DECLARE_END()
 SCRIPT_INIT(RealEntityMethod, tp_call, 0, 0, 0, 0)	
 
 //-------------------------------------------------------------------------------------
-RealEntityMethod::RealEntityMethod(MethodDescription* methodDescription, 
-		Entity* ghostEntity):
+RealEntityMethod::RealEntityMethod(PropertyDescription* pComponentPropertyDescription,
+	MethodDescription* methodDescription, Entity* ghostEntity):
 script::ScriptObject(getScriptType(), false),
+pComponentPropertyDescription_(pComponentPropertyDescription),
 methodDescription_(methodDescription),
 ghostEntityID_(ghostEntity->id()),
 realCell_(ghostEntity->realCell()),
@@ -76,6 +78,17 @@ PyObject* RealEntityMethod::callmethod(PyObject* args, PyObject* kwds)
 	{
 		MemoryStream* mstream = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 
+		// 组件方法先写组件属性UID，普通实体方法写0，real端据此选择正确的方法表。
+		// Component calls prepend their property UID while ordinary entity calls write zero so the real side selects the correct method table.
+		if (pComponentPropertyDescription_)
+		{
+			(*mstream) << pComponentPropertyDescription_->getUType();
+		}
+		else
+		{
+			(*mstream) << static_cast<ENTITY_PROPERTY_UID>(0);
+		}
+
 		try
 		{
 			methodDescription->addToStream(mstream, args);
@@ -95,7 +108,7 @@ PyObject* RealEntityMethod::callmethod(PyObject* args, PyObject* kwds)
 		(*pForwardBundle) << ghostEntityID_;
 
 		if(mstream->wpos() > 0)
-			(*pForwardBundle).append(mstream->data(), mstream->wpos());
+			(*pForwardBundle).append(mstream->data(), static_cast<int>(mstream->wpos()));
 
 		if(Network::g_trace_packet > 0)
 		{

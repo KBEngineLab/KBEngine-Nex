@@ -23,6 +23,11 @@
     <VcpkgUseStatic>true</VcpkgUseStatic>
     <VcpkgTriplet>x64-windows-static</VcpkgTriplet>
     <VcpkgConfiguration Condition="'$(Configuration)' == 'Debug'">Debug</VcpkgConfiguration>
+	<!--
+	  VS 的 vcpkg targets 会在 VcpkgInstalledDir 后追加 triplet；这里只能提供安装根目录。
+	  The VS vcpkg targets append the triplet to VcpkgInstalledDir, so this property must name only the install root.
+	-->
+	<VcpkgInstalledDir>$(MSBuildThisFileDirectory)vcpkg_installed</VcpkgInstalledDir>
     <KbeVcpkgInstalledDir>$(MSBuildThisFileDirectory)vcpkg_installed\$(VcpkgTriplet)</KbeVcpkgInstalledDir>
     <KbeVcpkgIncludeDir>$(KbeVcpkgInstalledDir)\include</KbeVcpkgIncludeDir>
     <KbeVcpkgLibraryDir Condition="'$(Configuration)' == 'Debug'">$(KbeVcpkgInstalledDir)\debug\lib</KbeVcpkgLibraryDir>

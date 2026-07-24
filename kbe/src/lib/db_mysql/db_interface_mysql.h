@@ -58,6 +58,9 @@ struct MYSQL_TABLE_FIELD
 {
 	std::string name;
 	int32 length;
+	// 字符字段的声明长度独立于字节长度，避免 utf8mb4 下按固定倍率反推。
+	// The declared character length is stored separately from byte length so utf8mb4 never relies on a fixed multiplier.
+	int32 char_length;
 	uint64 maxlength;
 	unsigned int flags;
 	enum_field_types type;

@@ -21,7 +21,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef KBE_REDIS_TRANSACTION_HELPER_H
 #define KBE_REDIS_TRANSACTION_HELPER_H
 
-#include "hiredis.h"
+#include "hiredis/hiredis.h"
 
 namespace KBEngine { 
 class DBInterface;

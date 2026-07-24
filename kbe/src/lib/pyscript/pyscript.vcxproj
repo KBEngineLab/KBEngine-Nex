@@ -59,7 +59,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>../python/PC;../python/Include;../;../../common;../../lib/dependencies/g3dlite;../../lib/dependencies/log4cxx/src/main/include;../../lib/dependencies;../../lib/dependencies/fmt/include;../../lib/dependencies/vsopenssl/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../python/PC;../python/Include;../;../../common;../../lib/dependencies/g3dlite;../../lib/dependencies;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>ENABLE_WATCHERS;WIN32;_DEBUG;_LIB;CODE_INLINE;KBE_USE_ASSERTS;LOG4CXX_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -80,7 +80,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>../python/PC;../python/Include;../;../../common;../../lib/dependencies/g3dlite;../../lib/dependencies/log4cxx/src/main/include;../../lib/dependencies;../../lib/dependencies/fmt/include;../../lib/dependencies/vsopenssl/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../python/PC;../python/Include;../;../../common;../../lib/dependencies/g3dlite;../../lib/dependencies;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>ENABLE_WATCHERS;WIN32;NDEBUG;_LIB;CODE_INLINE;KBE_USE_ASSERTS;LOG4CXX_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -164,12 +164,6 @@
     <None Include="sequence.inl" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\dependencies\vsopenssl\vcbuild\libeay32\libeay32.vcxproj">
-      <Project>{26195a87-700c-42d6-a271-20b6cacc6249}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\dependencies\vsopenssl\vcbuild\ssleay32\ssleay32.vcxproj">
-      <Project>{678e55f0-e0f7-4e52-82e4-9ad50f0753b8}</Project>
-    </ProjectReference>
     <ProjectReference Include="..\python\PCbuild\pythoncore.vcxproj">
       <Project>{cf7ac3d1-e2df-41d2-bea6-1e2556cdea26}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>

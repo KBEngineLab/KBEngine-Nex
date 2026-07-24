@@ -66,10 +66,10 @@
     <ClCompile Include="entity_autoloader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\lib\dependencies\vsopenssl\include\openssl\applink.c">
+    <ClCompile Include="entity.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="entity.cpp">
+    <ClCompile Include="entity_component.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="entity_messages_forward_handler.cpp">
