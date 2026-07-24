@@ -1828,7 +1828,7 @@ void EntityDef::setScriptModuleHasComponentEntity(ScriptDefModule* pScriptModule
 }
 
 //-------------------------------------------------------------------------------------
-bool EntityDef::loadAllScriptModules(std::string entitiesPath, 
+bool EntityDef::loadAllScriptModules(std::string entitiesPath,
 									std::vector<PyTypeObject*>& scriptBaseTypes)
 {
 	std::string entitiesFile = entitiesPath + "entities.xml";
@@ -1837,16 +1837,18 @@ bool EntityDef::loadAllScriptModules(std::string entitiesPath,
 	if(!xml->openSection(entitiesFile.c_str()))
 		return false;
 
-	TiXmlNode* node = xml->getRootNode();
-	if(node == NULL)
-		return true;
-
-	XML_FOR_BEGIN(node)
+	// 插件实体和宿主实体共享同一套 Python 类型校验，插件先处理以匹配实体定义的 utype 顺序。
+	// Plugin and host entities share the same Python type validation, with plugins processed first to match entity-definition utype order.
+	auto loadScriptModule = [&](const std::string& moduleName) -> bool
 	{
-		std::string moduleName = xml.get()->getKey(node);
 		ScriptDefModule* pScriptModule = findScriptModule(moduleName.c_str());
+		if (pScriptModule == NULL)
+		{
+			ERROR_MSG(fmt::format("EntityDef::loadAllScriptModules: module [{}] has no definition.\n", moduleName));
+			return false;
+		}
 
-		PyObject* pyModule = 
+		PyObject* pyModule =
 			PyImport_ImportModule(const_cast<char*>(moduleName.c_str()));
 
 		if (g_isReload && pyModule)
@@ -1864,7 +1866,8 @@ bool EntityDef::loadAllScriptModules(std::string entitiesPath,
 			if (fileobj)
 				pyModulePath = PyUnicode_AsUTF8(fileobj);
 
-			Py_DECREF(fileobj);
+			if (fileobj)
+				Py_DECREF(fileobj);
 
 			strutil::kbe_replace(userScriptsPath, "/", "");
 			strutil::kbe_replace(userScriptsPath, "\\", "");
@@ -1876,6 +1879,7 @@ bool EntityDef::loadAllScriptModules(std::string entitiesPath,
 				WARNING_MSG(fmt::format("EntityDef::initialize: The script module name[{}] and system module name conflict!\n",
 					moduleName.c_str()));
 
+				S_RELEASE(pyModule);
 				pyModule = NULL;
 			}
 		}
@@ -1896,7 +1900,7 @@ bool EntityDef::loadAllScriptModules(std::string entitiesPath,
 
 			// 必须在这里才设置， 在这之前设置会导致isLoadScriptModule失效，从而没有错误输出
 			setScriptModuleHasComponentEntity(pScriptModule, false);
-			continue;
+			return true;
 		}
 
 		setScriptModuleHasComponentEntity(pScriptModule, true);
@@ -1961,6 +1965,25 @@ bool EntityDef::loadAllScriptModules(std::string entitiesPath,
 
 		pScriptModule->setScriptType((PyTypeObject *)pyClass);
 		S_RELEASE(pyModule);
+		return true;
+	};
+
+	const std::vector<PluginEntityDescriptor>& pluginEntities = PluginManager::instance().entities();
+	for (std::vector<PluginEntityDescriptor>::const_iterator pluginIter = pluginEntities.begin();
+		pluginIter != pluginEntities.end(); ++pluginIter)
+	{
+		if (!loadScriptModule(pluginIter->name))
+			return false;
+	}
+
+	TiXmlNode* node = xml->getRootNode();
+	if(node == NULL)
+		return true;
+
+	XML_FOR_BEGIN(node)
+	{
+		if (!loadScriptModule(xml.get()->getKey(node)))
+			return false;
 	}
 	XML_FOR_END(node);
 
