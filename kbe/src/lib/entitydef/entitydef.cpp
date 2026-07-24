@@ -43,6 +43,7 @@ std::map<std::string, ENTITY_SCRIPT_UID> EntityDef::__oldScriptTypeMappingUType;
 COMPONENT_TYPE EntityDef::__loadComponentType;
 std::vector<PyTypeObject*> EntityDef::__scriptBaseTypes;
 std::string EntityDef::__entitiesPath;
+EntityDef::Context EntityDef::__context;
 
 KBE_MD5 EntityDef::__md5;
 bool EntityDef::_isInit = false;
@@ -58,6 +59,50 @@ std::vector<ENTITY_METHOD_UID> g_methodCusUtypes;
 ENTITY_PROPERTY_UID g_propertyUtypeAuto = 1;
 std::vector<ENTITY_PROPERTY_UID> g_propertyUtypes;
 
+// Property UIDs are allocated through one path so component fields and ordinary fields share the same collision rules.
+// 属性 UID 通过同一路径分配，使组件字段与普通字段遵守相同的冲突规则。
+static bool reservePropertyUType(const std::string& moduleName,
+	const std::string& propertyName,
+	int requestedUType,
+	ScriptDefModule* pScriptModule,
+	ENTITY_PROPERTY_UID& outUType)
+{
+	if (requestedUType > 0)
+	{
+		ENTITY_PROPERTY_UID utype = static_cast<ENTITY_PROPERTY_UID>(requestedUType);
+		if (requestedUType != static_cast<int>(utype))
+		{
+			ERROR_MSG(fmt::format("EntityDef::reservePropertyUType: Utype {} overflow in {}.{}.\n",
+				requestedUType, moduleName, propertyName));
+			return false;
+		}
+
+		if (pScriptModule->findPropertyDescription(utype, BASEAPP_TYPE) != NULL ||
+			pScriptModule->findPropertyDescription(utype, CELLAPP_TYPE) != NULL ||
+			pScriptModule->findPropertyDescription(utype, CLIENT_TYPE) != NULL)
+		{
+			ERROR_MSG(fmt::format("EntityDef::reservePropertyUType: Utype {} conflicts in {}.{}.\n",
+				requestedUType, moduleName, propertyName));
+			return false;
+		}
+
+		g_propertyUtypes.push_back(utype);
+		outUType = utype;
+		return true;
+	}
+
+	while (true)
+	{
+		ENTITY_PROPERTY_UID utype = g_propertyUtypeAuto++;
+		if (std::find(g_propertyUtypes.begin(), g_propertyUtypes.end(), utype) == g_propertyUtypes.end())
+		{
+			g_propertyUtypes.push_back(utype);
+			outUType = utype;
+			return true;
+		}
+	}
+}
+
 //-------------------------------------------------------------------------------------
 EntityDef::EntityDef()
 {
@@ -67,6 +112,13 @@ EntityDef::EntityDef()
 EntityDef::~EntityDef()
 {
 	EntityDef::finalise();
+}
+
+// Entity lookup is centralized in EntityCall so component ownership follows the existing 1.x hook.
+// 实体查找统一委托给 EntityCall，组件所有权因此复用现有 1.x 钩子。
+PyObject* EntityDef::tryGetEntity(COMPONENT_ID componentID, ENTITY_ID entityID)
+{
+	return EntityCall::tryGetEntity(componentID, entityID);
 }
 
 //-------------------------------------------------------------------------------------
@@ -190,6 +242,7 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 		EntityDef::__scriptModules.push_back(pScriptModule);
 
 		std::string deffile = defFilePath + moduleName + ".def";
+		pScriptModule->setDefSourceFile(deffile);
 		SmartPointer<XML> defxml(new XML());
 
 		if(!defxml->openSection(deffile.c_str()))
@@ -255,7 +308,15 @@ bool EntityDef::loadDefInfo(const std::string& defFilePath,
 
 		return false;
 	}
-	
+
+	if(!loadComponents(defFilePath, moduleName, defxml, defNode, pScriptModule))
+	{
+		ERROR_MSG(fmt::format("EntityDef::loadDefInfo: failed to load entity:{} component.\n",
+			moduleName.c_str()));
+
+		return false;
+	}
+
 	// 加载父类所有的内容
 	if(!loadParentClass(defFilePath, moduleName, defxml, defNode, pScriptModule))
 	{
@@ -436,7 +497,7 @@ bool EntityDef::loadVolatileInfo(const std::string& defFilePath,
 }
 
 //-------------------------------------------------------------------------------------
-bool EntityDef::loadInterfaces(const std::string& defFilePath, 
+bool EntityDef::loadInterfaces(const std::string& defFilePath,
 							   const std::string& moduleName, 
 							   XML* defxml, 
 							   TiXmlNode* defNode, 
@@ -515,8 +576,172 @@ bool EntityDef::loadInterfaces(const std::string& defFilePath,
 	return true;
 }
 
+// 读取实体定义中的组件声明，并把组件定义展开为宿主实体的组件描述索引。
+// Load component declarations and index each component definition on its host entity.
+bool EntityDef::loadComponents(const std::string& defFilePath,
+	const std::string& moduleName,
+	XML* defxml,
+	TiXmlNode* defNode,
+	ScriptDefModule* pScriptModule)
+{
+	TiXmlNode* componentsNode = defxml->enterNode(defNode, "Components");
+	if (componentsNode == NULL)
+		return true;
+
+	XML_FOR_BEGIN(componentsNode)
+	{
+		std::string componentName = defxml->getKey(componentsNode);
+		if (componentName.empty() || !validDefPropertyName(componentName))
+		{
+			ERROR_MSG(fmt::format("EntityDef::loadComponents: invalid component name '{}' in module {}.\n",
+				componentName, moduleName));
+			return false;
+		}
+
+		TiXmlNode* componentNode = defxml->enterNode(componentsNode, componentName.c_str());
+		if (componentNode == NULL)
+			continue;
+
+		TiXmlNode* typeNode = defxml->enterNode(componentNode, "Type");
+		if (typeNode == NULL)
+			typeNode = defxml->enterNode(componentNode, "type");
+
+		std::string componentTypeName = typeNode ? defxml->getKey(typeNode) : std::string();
+		if (componentTypeName.empty())
+		{
+			ERROR_MSG(fmt::format("EntityDef::loadComponents: component '{}' has no Type in module {}.\n",
+				componentName, moduleName));
+			return false;
+		}
+
+		ENTITY_PROPERTY_UID componentPropertyUType = 0;
+		TiXmlNode* utypeNode = defxml->enterNode(componentNode, "Utype");
+		int requestedUType = utypeNode ? defxml->getValInt(utypeNode) : -1;
+		if (!reservePropertyUType(moduleName, componentName, requestedUType,
+			pScriptModule, componentPropertyUType))
+		{
+			return false;
+		}
+
+		bool isPersistent = true;
+		TiXmlNode* persistentNode = defxml->enterNode(componentNode, "Persistent");
+		if (persistentNode != NULL)
+		{
+			std::string persistentValue = defxml->getValStr(persistentNode);
+			std::transform(persistentValue.begin(), persistentValue.end(),
+				persistentValue.begin(), tolower);
+			isPersistent = persistentValue != "false";
+		}
+
+		ScriptDefModule* componentModule = NULL;
+		SCRIPT_MODULE_UID_MAP::iterator moduleIter = __scriptTypeMappingUType.find(componentTypeName);
+		if (moduleIter != __scriptTypeMappingUType.end())
+			componentModule = findScriptModule(moduleIter->second);
+
+		if (componentModule == NULL)
+		{
+			ENTITY_SCRIPT_UID componentUType = static_cast<ENTITY_SCRIPT_UID>(__scriptModules.size() + 1);
+			componentModule = new ScriptDefModule(componentTypeName, componentUType);
+			componentModule->isComponentModule(true);
+			__scriptTypeMappingUType[componentTypeName] = componentUType;
+			__scriptModules.push_back(componentModule);
+
+			std::string componentFile = defFilePath + "components/" + componentTypeName + ".def";
+			componentModule->setDefSourceFile(componentFile);
+			SmartPointer<XML> componentXml(new XML());
+			if (!componentXml->openSection(componentFile.c_str()))
+			{
+				ERROR_MSG(fmt::format("EntityDef::loadComponents: cannot open component definition {}.\n",
+					componentFile));
+				return false;
+			}
+
+			TiXmlNode* componentRootNode = componentXml->getRootNode();
+			if (componentRootNode != NULL &&
+				(!loadAllDefDescriptions(componentTypeName, componentXml.get(), componentRootNode, componentModule) ||
+				 !loadInterfaces(defFilePath + "components/", componentTypeName, componentXml.get(), componentRootNode, componentModule) ||
+				 !loadParentClass(defFilePath + "components/", componentTypeName, componentXml.get(), componentRootNode, componentModule) ||
+				 !loadDetailLevelInfo(defFilePath + "components/", componentTypeName, componentXml.get(), componentRootNode, componentModule)))
+			{
+				ERROR_MSG(fmt::format("EntityDef::loadComponents: failed to load component definition {}.\n",
+					componentTypeName));
+				return false;
+			}
+
+			componentModule->autoMatchCompOwn();
+			componentModule->onLoaded();
+		}
+
+		// Component flags are derived from the loaded component domains, matching the 2.8 wire visibility rules.
+		// 组件标志从已加载的组件域推导，与 2.8 线协议的可见性规则保持一致。
+		uint32 flags = ED_FLAG_UNKOWN;
+		if (componentModule->hasBase())
+			flags |= ED_FLAG_BASE;
+		if (componentModule->hasCell())
+			flags |= ED_FLAG_CELL_PUBLIC;
+		if (componentModule->hasClient())
+		{
+			if (componentModule->hasBase())
+				flags |= ED_FLAG_BASE_AND_CLIENT;
+			if (componentModule->hasCell())
+				flags |= ED_FLAG_ALL_CLIENTS | ED_FLAG_CELL_PUBLIC_AND_OWN |
+					ED_FLAG_OTHER_CLIENTS | ED_FLAG_OWN_CLIENT;
+		}
+
+		if (flags == ED_FLAG_UNKOWN)
+		{
+			ERROR_MSG(fmt::format("EntityDef::loadComponents: component {} has no runtime domain.\n",
+				componentTypeName));
+			return false;
+		}
+
+		if (pScriptModule->hasName(componentName))
+		{
+			ERROR_MSG(fmt::format("EntityDef::loadComponents: component name {} conflicts in module {}.\n",
+				componentName, moduleName));
+			return false;
+		}
+
+		DataType* componentDataType = new EntityComponentType(componentModule);
+		std::string componentDataTypeName = "EntityComponent";
+		std::string defaultValue;
+		PropertyDescription* componentProperty = PropertyDescription::createDescription(
+			componentPropertyUType, componentDataTypeName, componentName, flags,
+			isPersistent, componentDataType, false, std::string(), 0,
+			defaultValue, DETAIL_LEVEL_FAR);
+
+		bool propertyRegistered = true;
+		if ((flags & ENTITY_CELL_DATA_FLAGS) > 0)
+			propertyRegistered = pScriptModule->addPropertyDescription(
+				componentName.c_str(), componentProperty, CELLAPP_TYPE) && propertyRegistered;
+		if ((flags & ENTITY_BASE_DATA_FLAGS) > 0)
+			propertyRegistered = pScriptModule->addPropertyDescription(
+				componentName.c_str(), componentProperty, BASEAPP_TYPE) && propertyRegistered;
+		if ((flags & ENTITY_CLIENT_DATA_FLAGS) > 0)
+			propertyRegistered = pScriptModule->addPropertyDescription(
+				componentName.c_str(), componentProperty, CLIENT_TYPE) && propertyRegistered;
+
+		if (!propertyRegistered)
+		{
+			ERROR_MSG(fmt::format("EntityDef::loadComponents: failed to register component property {}.{}.\n",
+				moduleName, componentName));
+			return false;
+		}
+
+		if (!pScriptModule->addComponentDescription(componentName.c_str(), componentModule))
+		{
+			ERROR_MSG(fmt::format("EntityDef::loadComponents: failed to register {}.{} component.\n",
+				moduleName, componentName));
+			return false;
+		}
+	}
+	XML_FOR_END(componentsNode);
+
+	return true;
+}
+
 //-------------------------------------------------------------------------------------
-bool EntityDef::loadParentClass(const std::string& defFilePath, 
+bool EntityDef::loadParentClass(const std::string& defFilePath,
 								const std::string& moduleName, 
 								XML* defxml, 
 								TiXmlNode* defNode, 

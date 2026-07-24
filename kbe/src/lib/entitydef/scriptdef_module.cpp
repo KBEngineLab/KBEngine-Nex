@@ -296,6 +296,40 @@ PyObject* ScriptDefModule::getInitDict(void)
 //-------------------------------------------------------------------------------------
 void ScriptDefModule::autoMatchCompOwn()
 {
+	const std::string scriptsPrefix = Resmgr::getSingleton().isKBEngineNexAssets() ? "" : "scripts/";
+
+	if (isComponentModule())
+	{
+		// 组件脚本位于各运行时目录的 components 子目录中，不能复用实体模块的直接路径规则。
+		// Component scripts live below each runtime folder's components directory, so they need a dedicated path rule.
+		std::string fmodule = scriptsPrefix + "base/components/" + name_ + ".py";
+		std::string fmodule_pyc = fmodule + "c";
+		if (Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
+			Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)
+		{
+			setBase(true);
+		}
+
+		fmodule = scriptsPrefix + "cell/components/" + name_ + ".py";
+		fmodule_pyc = fmodule + "c";
+		if (Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
+			Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)
+		{
+			setCell(true);
+		}
+
+		// 服务器暴露的方法需要客户端模块，即使组件没有单独的 client 脚本也必须生成客户端描述。
+		// Exposed server methods require a client module, even when the component has no separate client script.
+		if (!hasClient() &&
+			((hasBase() && !getBaseExposedMethodDescriptions().empty()) ||
+			 (hasCell() && !getCellExposedMethodDescriptions().empty())))
+		{
+			setClient(true);
+		}
+
+		return;
+	}
+
 	/*
 		entity存在某部分(cell, base, client)的判定规则
 
@@ -363,7 +397,7 @@ void ScriptDefModule::autoMatchCompOwn()
 	}
 	XML_FOR_END(node);
 
-	std::string fmodule = "scripts/client/" + name_ + ".py";
+	std::string fmodule = scriptsPrefix + "client/" + name_ + ".py";
 	std::string fmodule_pyc = fmodule + "c";
 	if(Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
 		Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)
@@ -406,7 +440,7 @@ void ScriptDefModule::autoMatchCompOwn()
 		return;
 	}
 
-	fmodule = "scripts/base/" + name_ + ".py";
+	fmodule = scriptsPrefix + "base/" + name_ + ".py";
 	fmodule_pyc = fmodule + "c";
 	if(Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
 		Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)
@@ -442,7 +476,7 @@ void ScriptDefModule::autoMatchCompOwn()
 		}
 	}
 
-	fmodule = "scripts/cell/" + name_ + ".py";
+	fmodule = scriptsPrefix + "cell/" + name_ + ".py";
 	fmodule_pyc = fmodule + "c";
 	if(Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
 		Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)
@@ -487,7 +521,7 @@ bool ScriptDefModule::addPropertyDescription(const char* attrName,
 	if(hasMethodName(attrName))
 	{
 		ERROR_MSG(fmt::format("ScriptDefModule::addPropertyDescription: There is a method[{}] name conflict! componentType={}.\n",
-			attrName, componentType));
+			attrName, static_cast<int>(componentType)));
 		
 		return false;
 	}
@@ -527,7 +561,7 @@ bool ScriptDefModule::addPropertyDescription(const char* attrName,
 	if(f_propertyDescription)
 	{
 		ERROR_MSG(fmt::format("ScriptDefModule::addPropertyDescription: [{}] is exist! componentType={}.\n",
-			attrName, componentType));
+			attrName, static_cast<int>(componentType)));
 
 		return false;
 	}
@@ -981,7 +1015,10 @@ bool ScriptDefModule::hasName(const std::string& name)
 bool ScriptDefModule::addComponentDescription(const char* compName,
 	ScriptDefModule* compDescription)
 {
-	if (compName == NULL || compDescription == NULL || hasName(compName))
+	// 组件属性会在调用本函数前以同名属性注册，因此属性名本身不是冲突；方法和已有组件名仍然禁止复用。
+	// The component property is registered under the same name before this call, so a property match is valid; methods and existing components remain conflicts.
+	if (compName == NULL || compDescription == NULL ||
+		hasMethodName(compName) || hasComponentName(compName))
 		return false;
 
 	componentDescr_[compName] = compDescription;

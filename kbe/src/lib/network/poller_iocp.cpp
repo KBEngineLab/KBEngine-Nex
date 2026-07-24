@@ -22,7 +22,6 @@ const size_t IOCP_TCP_SEND_BATCH_BYTES = 64 * 1024;
 // Keep a bounded completion batch until the 1.x watcher configuration exposes runtime budgets.
 // 在 1.x watcher 配置提供运行时预算前，先使用有界完成批次。
 // 预算告警只是诊断“主循环被 completion 回调拖太久”，不是限流开关。
-// 真正的处理上限来自配置里的 g_maxCompletionsPerTick / g_maxCompletionProcessingTimeMS。
 const uint64 COMPLETION_BUDGET_WARNING_INTERVAL = 10 * stampsPerSecond();
 const uint32 COMPLETION_BUDGET_WARNING_MULTIPLIER = 10;
 
@@ -833,12 +832,14 @@ int IocpPoller::processPendingEvents(double maxWait)
 		// 如果一次 tick 无限制 drain IOCP，断线或启动 burst 会把 timer、
 		// app 心跳和其他 channel 处理饿住。预算到达后保留剩余 completion
 		// 在下一轮 tick 继续取，IOCP 队列本身保证完成事件不会丢。
-		const uint64 completionProcessingBudget = 0;
+		const uint64 completionProcessingBudget =
+			COMPLETION_MAX_PROCESSING_TIME_MS > 0 ?
+			(uint64(COMPLETION_MAX_PROCESSING_TIME_MS) * stampsPerSecond() / 1000) : 0;
 
 		++readyCount;
 		handleCompletion(completionKey, overlapped, bytesTransferred, ok == TRUE, errorCode);
 
-		while (readyCount < 256 &&
+		while (readyCount < static_cast<int>(COMPLETION_MAX_COMPLETIONS_PER_TICK) &&
 			(completionProcessingBudget == 0 || timestamp() - completionProcessingStart < completionProcessingBudget))
 		{
 			bytesTransferred = 0;
@@ -857,7 +858,7 @@ int IocpPoller::processPendingEvents(double maxWait)
 		}
 
 		const uint64 completionProcessingElapsed = timestamp() - completionProcessingStart;
-		const bool countBudgetExhausted = readyCount >= 256;
+		const bool countBudgetExhausted = readyCount >= static_cast<int>(COMPLETION_MAX_COMPLETIONS_PER_TICK);
 		const bool timeBudgetExceeded = completionProcessingBudget > 0 &&
 			completionProcessingElapsed >= completionProcessingBudget;
 		const bool timeBudgetWarningExceeded = completionProcessingBudget > 0 &&
@@ -875,8 +876,9 @@ int IocpPoller::processPendingEvents(double maxWait)
 			{
 				lastCompletionBudgetWarningTime_ = now;
 				WARNING_MSG(fmt::format("IocpPoller::processPendingEvents: completion processing took too long, count={}, countBudget={}, timeBudget={}, maxCount={}, maxTimeMS={}, elapsedMS={}\n",
-					readyCount, countBudgetExhausted, timeBudgetExceeded, 256,
-					0,
+					readyCount, countBudgetExhausted, timeBudgetExceeded,
+					COMPLETION_MAX_COMPLETIONS_PER_TICK,
+					COMPLETION_MAX_PROCESSING_TIME_MS,
 					completionProcessingElapsed * 1000 / stampsPerSecond()));
 			}
 		}

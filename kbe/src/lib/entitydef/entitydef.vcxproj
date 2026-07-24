@@ -59,7 +59,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>../python/PC;../python/Include;../;../../common;../../lib;../../lib/dependencies/g3dlite;../../lib/dependencies/log4cxx/src/main/include;../../lib/dependencies;../../lib/dependencies/fmt/include;../../lib/dependencies/vsopenssl/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../vcpkg_installed/x64-windows-static/include;../python/PC;../python/Include;../;../../common;../../lib;../../lib/dependencies/g3dlite;../../lib/dependencies/log4cxx/src/main/include;../../lib/dependencies;../../lib/dependencies/fmt/include;../../lib/dependencies/vsopenssl/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>ENABLE_WATCHERS;WIN32;_DEBUG;_LIB;CODE_INLINE;KBE_USE_ASSERTS;LOG4CXX_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -79,7 +79,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>../python/PC;../python/Include;../;../../common;../../lib;../../lib/dependencies/g3dlite;../../lib/dependencies/log4cxx/src/main/include;../../lib/dependencies;../../lib/dependencies/fmt/include;../../lib/dependencies/vsopenssl/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../vcpkg_installed/x64-windows-static/include;../python/PC;../python/Include;../;../../common;../../lib;../../lib/dependencies/g3dlite;../../lib/dependencies/log4cxx/src/main/include;../../lib/dependencies;../../lib/dependencies/fmt/include;../../lib/dependencies/vsopenssl/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>ENABLE_WATCHERS;WIN32;NDEBUG;_LIB;CODE_INLINE;KBE_USE_ASSERTS;LOG4CXX_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -100,6 +100,8 @@
     <ClCompile Include="datatype.cpp" />
     <ClCompile Include="datatypes.cpp" />
     <ClCompile Include="detaillevel.cpp" />
+    <ClCompile Include="entity_component.cpp" />
+    <ClCompile Include="entity_component_call.cpp" />
     <ClCompile Include="entity_call.cpp" />
     <ClCompile Include="entitydef.cpp" />
     <ClCompile Include="entitycallabstract.cpp" />
@@ -117,6 +119,8 @@
     <ClInclude Include="datatypes.h" />
     <ClInclude Include="detaillevel.h" />
     <ClInclude Include="entities.h" />
+    <ClInclude Include="entity_component.h" />
+    <ClInclude Include="entity_component_call.h" />
     <ClInclude Include="entity_garbages.h" />
     <ClInclude Include="entity_macro.h" />
     <ClInclude Include="entity_call.h" />
@@ -132,6 +136,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="datatype.inl" />
+    <None Include="entity_component.inl" />
+    <None Include="entity_component_call.inl" />
     <None Include="entitydef.inl" />
     <None Include="entitycallabstract.inl" />
     <None Include="method.inl" />

@@ -108,6 +108,13 @@ enum COMPONENT_TYPE
 	COMPONENT_END_TYPE		= 15,
 };
 
+// 将组件枚举映射为整数，兼容 fmt v12 对未注册枚举类型的严格格式化检查。
+// Map the component enum to an integer so fmt v12 can format it without a custom formatter.
+inline constexpr int format_as(COMPONENT_TYPE componentType) noexcept
+{
+	return static_cast<int>(componentType);
+}
+
 /** 当前服务器组件类别和ID */
 extern COMPONENT_TYPE g_componentType;
 extern COMPONENT_ID g_componentID;

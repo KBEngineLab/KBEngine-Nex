@@ -115,6 +115,12 @@ public:
 	std::string getPyUserScriptsPath();
 
 	/**
+		判断用户资源是否采用 Nex 原生布局。
+		Detect whether user resources use the native Nex layout.
+	*/
+	bool isKBEngineNexAssets();
+
+	/**
 		获得用户级进程脚本目录
 		assets\\scripts\\cell、base、client
 	*/

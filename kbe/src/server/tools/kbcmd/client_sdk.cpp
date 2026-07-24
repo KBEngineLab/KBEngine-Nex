@@ -20,8 +20,6 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "kbcmd.h"
 #include "client_sdk.h"
-#include "client_sdk_unity.h"	
-#include "client_sdk_ue4.h"
 #include "client_sdk_csharp.h"
 #include "client_sdk_cxx.h"
 #include "client_sdk_typescript.h"
@@ -71,15 +69,7 @@ ClientSDK* ClientSDK::createClientSDK(const std::string& type)
 	std::string lowerType = type;
 	std::transform(lowerType.begin(), lowerType.end(), lowerType.begin(), tolower);
 
-	if (lowerType == "unity")
-	{
-		return new ClientSDKUnity();
-	}
-	else if(lowerType == "ue4")
-	{
-		return new ClientSDKUE4();
-	}
-	else if (lowerType == "csharp")
+	if (lowerType == "csharp")
 	{
 		return new ClientSDKCSharp();
 	}

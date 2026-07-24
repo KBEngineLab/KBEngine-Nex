@@ -30,6 +30,12 @@
     <ClCompile Include="detaillevel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="entity_component.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="entity_component_call.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="entitydef.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -77,6 +83,12 @@
     <ClInclude Include="entities.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="entity_component.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="entity_component_call.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="entity_macro.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -117,6 +129,12 @@
   <ItemGroup>
     <None Include="ReadMe.txt" />
     <None Include="datatype.inl">
+      <Filter>Inline Files</Filter>
+    </None>
+    <None Include="entity_component.inl">
+      <Filter>Inline Files</Filter>
+    </None>
+    <None Include="entity_component_call.inl">
       <Filter>Inline Files</Filter>
     </None>
     <None Include="entitydef.inl">
