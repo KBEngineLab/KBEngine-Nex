@@ -23,6 +23,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "telnet_handler.h"
 #include "network/bundle.h"
 #include "network/endpoint.h"
+#include "network/event_poller.h"
 #include "network/network_interface.h"
 
 #ifndef CODE_INLINE
@@ -150,12 +151,8 @@ void TelnetServer::closeHandler(int fd, TelnetHandler* pTelnetHandler)
 
 	pDispatcher_->deregisterReadFileDescriptor(fd);
 	handlers_.erase(iter);
-
-#if KBE_PLATFORM == PLATFORM_UNIX
-	::close(fd);
-#else
-	::closesocket(fd);
-#endif
+	// TelnetHandler 析构会关闭并回收其 endpoint，避免这里先关闭裸 fd 后对象池再次关闭已被复用的描述符。
+	// TelnetHandler destruction closes and reclaims its endpoint, avoiding a second close on a descriptor that may already have been reused.
 }
 
 //-------------------------------------------------------------------------------------
@@ -167,7 +164,42 @@ int	TelnetServer::handleInputNotification(int fd)
 
 	while(tickcount ++ < 1024)
 	{
-		Network::EndPoint* pNewEndPoint = listener_.accept();
+		Network::EndPoint* pNewEndPoint = NULL;
+		Network::EventPoller* pPoller = pDispatcher_->pPoller();
+		if(pPoller != NULL && pPoller->supportsCompletion())
+		{
+			// 完成后端已经执行 accept，此处只取得已完成 socket，不能再次调用同步 accept。
+			// A completion backend has already performed accept, so consume its completed socket instead of calling synchronous accept again.
+#if KBE_PLATFORM == PLATFORM_WIN32
+			KBESOCKET acceptedSocket = INVALID_SOCKET;
+#else
+			KBESOCKET acceptedSocket = -1;
+#endif
+			if(!pPoller->takeAcceptedSocket(fd, acceptedSocket))
+				break;
+
+			pNewEndPoint = Network::EndPoint::createPoolObject(OBJECTPOOL_POINT);
+			pNewEndPoint->setFileDescriptor(acceptedSocket);
+			pNewEndPoint->setnonblocking(true);
+			pNewEndPoint->setnodelay(true);
+
+			u_int16_t networkPort = 0;
+			u_int32_t networkAddr = 0;
+			if(pNewEndPoint->getremoteaddress(&networkPort, &networkAddr) == 0)
+			{
+				pNewEndPoint->addr(networkPort, networkAddr);
+			}
+			else
+			{
+				WARNING_MSG(fmt::format("TelnetServer::handleInputNotification: getremoteaddress({}) failed: {}\n",
+					fd, kbe_strerror()));
+			}
+		}
+		else
+		{
+			pNewEndPoint = listener_.accept();
+		}
+
 		if(pNewEndPoint == NULL){
 
 			if(tickcount == 1)

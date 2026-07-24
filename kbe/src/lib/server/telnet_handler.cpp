@@ -24,6 +24,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/bundle.h"
 #include "network/endpoint.h"
 #include "network/network_interface.h"
+#include "network/event_poller.h"
 #include "pyscript/script.h"
 
 #ifndef CODE_INLINE
@@ -155,6 +156,14 @@ TelnetHandler::~TelnetHandler(void)
 		pProfileHandler_->destroy();
 		pProfileHandler_ = NULL;
 	}
+
+	if(pEndPoint_)
+	{
+		// handler 独占已接受的 endpoint，由析构统一关闭并归还对象池，确保主动退出和远端断开使用相同的资源释放路径。
+		// The handler exclusively owns the accepted endpoint; reclaim it here so active quit and remote disconnect share one release path.
+		Network::EndPoint::reclaimPoolObject(pEndPoint_);
+		pEndPoint_ = NULL;
+	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -278,6 +287,46 @@ int	TelnetHandler::handleInputNotification(int fd)
 	KBE_ASSERT((*pEndPoint_) == fd);
 
 	char data[1024] = {0};
+	Network::EventPoller* pPoller = pNetworkInterface_->dispatcher().pPoller();
+	if(pPoller != NULL && pPoller->supportsCompletion())
+	{
+		// completion poller 已经拥有 recv 生命周期，handler 只能消费 handoff 队列。
+		// The completion poller owns the recv lifecycle, so the handler must consume only its handoff queue.
+		while(true)
+		{
+			std::vector<char> recvData;
+			bool disconnected = false;
+			int errorCode = 0;
+			if(!pPoller->takeTcpReceivedData(fd, recvData, disconnected, errorCode))
+				break;
+
+			if(errorCode != 0 || disconnected)
+			{
+				pTelnetServer_->onTelnetHandlerClosed(fd, this);
+				return 0;
+			}
+
+			if(recvData.empty() || state_ == TELNET_STATE_READONLY)
+				continue;
+
+			// 单个 completion 可能大于命令解析缓冲区，分块输入但保持原始字节顺序。
+			// One completion may exceed the command parser buffer, so feed it in ordered chunks.
+			size_t offset = 0;
+			while(offset < recvData.size())
+			{
+				memset(data, 0, sizeof(data));
+				const size_t chunkSize = std::min(sizeof(data), recvData.size() - offset);
+				memcpy(data, recvData.data() + offset, chunkSize);
+				if(!onRecvInput(data, static_cast<int>(chunkSize)))
+					return 0;
+
+				offset += chunkSize;
+			}
+		}
+
+		return 0;
+	}
+
 	int recvsize = pEndPoint_->recv(data, sizeof(data));
 
 	if(recvsize == -1)
@@ -302,7 +351,7 @@ int	TelnetHandler::handleInputNotification(int fd)
 }
 
 //-------------------------------------------------------------------------------------
-void TelnetHandler::onRecvInput(const char *buffer, int size)
+bool TelnetHandler::onRecvInput(const char *buffer, int size)
 {
 	int idx = 0;
 	while (idx < size)
@@ -331,7 +380,7 @@ void TelnetHandler::onRecvInput(const char *buffer, int size)
 
 			if (isEnter && !processCommand())
 			{
-				return;
+				return false;
 			}
 
 			break;
@@ -429,6 +478,8 @@ void TelnetHandler::onRecvInput(const char *buffer, int size)
 			}
 		};
 	}
+
+	return true;
 }
 
 //-------------------------------------------------------------------------------------
