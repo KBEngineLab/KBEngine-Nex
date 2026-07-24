@@ -21,6 +21,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "common.h"
 #include "resmgr/resmgr.h"
+#include "resmgr/plugins/plugin_manager.h"
 
 namespace KBEngine{
 
@@ -132,6 +133,23 @@ std::pair<std::wstring, std::wstring> getComponentPythonPaths(COMPONENT_TYPE com
 		pyPaths += user_scripts_path + L"client/components;";
 		break;
 	};
+
+	// 插件路径追加在用户脚本路径之后，保持宿主 assets 的导入优先级并允许插件提供独立模块。
+	// Plugin paths are appended after host asset paths, preserving host import precedence while exposing plugin modules.
+	if (PluginManager::instance().initialize())
+	{
+		std::vector<std::string> pluginPaths = PluginManager::instance().getComponentPythonPaths(componentType);
+		for (std::vector<std::string>::const_iterator iter = pluginPaths.begin(); iter != pluginPaths.end(); ++iter)
+		{
+			wchar_t* pluginPath = KBEngine::strutil::char2wchar(const_cast<char*>(iter->c_str()));
+			if (pluginPath != NULL)
+			{
+				pyPaths += pluginPath;
+				pyPaths += L";";
+				free(pluginPath);
+			}
+		}
+	}
 
 	std::string kbe_res_path = Resmgr::getSingleton().getPySysResPath();
 	kbe_res_path += "scripts/common";

@@ -98,10 +98,15 @@
   <ItemGroup>
     <ClCompile Include="resmgr.cpp" />
     <ClCompile Include="resourceobject.cpp" />
+    <ClCompile Include="plugins\plugin_manifest.cpp" />
+    <ClCompile Include="plugins\plugin_manager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resmgr.h" />
     <ClInclude Include="resourceobject.h" />
+    <ClInclude Include="plugins\plugin_descriptor.h" />
+    <ClInclude Include="plugins\plugin_manifest.h" />
+    <ClInclude Include="plugins\plugin_manager.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ReadMe.txt" />
