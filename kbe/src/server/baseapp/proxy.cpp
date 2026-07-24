@@ -170,7 +170,7 @@ void Proxy::initClientCellPropertys()
 	// celldata获取客户端感兴趣的数据初始化客户端 如:ALL_CLIENTS
 	try
 	{
-		addCellDataToStream(ED_FLAG_ALL_CLIENTS|ED_FLAG_CELL_PUBLIC_AND_OWN|ED_FLAG_OWN_CLIENT, s, true);
+		addCellDataToStream(CLIENT_TYPE, ED_FLAG_ALL_CLIENTS|ED_FLAG_CELL_PUBLIC_AND_OWN|ED_FLAG_OWN_CLIENT, s, true);
 	}
 	catch (MemoryStreamWriteOverflow & err)
 	{

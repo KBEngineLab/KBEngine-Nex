@@ -188,6 +188,13 @@ Entity::~Entity()
 }	
 
 //-------------------------------------------------------------------------------------
+void Entity::onInitializeScript()
+{
+	// Cell 实体当前无需额外初始化；该钩子保证组件完成 owner 绑定后再扩展空间逻辑。
+	// Cell entities currently need no extra work; this hook allows space logic to extend only after component owners are bound.
+}
+
+//-------------------------------------------------------------------------------------
 void Entity::installCoordinateNodes(CoordinateSystem* pCoordinateSystem)
 {
 	if(g_kbeSrvConfig.getCellApp().use_coordinate_system)
@@ -945,6 +952,9 @@ void Entity::onRemoteMethodCall_(MethodDescription* pMethodDescription, ENTITY_I
 	}
 
 	pMethodDescription->currCallerID(srcEntityID);
+	// 组件 RPC 参数必须关联真实调用方实体，避免流解码产生无 owner 的组件对象。
+	// Component RPC arguments must bind to the real caller entity to avoid ownerless objects during stream decoding.
+	EntityDef::context().currEntityID = srcEntityID;
 
 	PyObject* pyFunc = PyObject_GetAttrString(this, const_cast<char*>
 						(pMethodDescription->getName()));
@@ -980,8 +990,12 @@ void Entity::onRemoteMethodCall_(MethodDescription* pMethodDescription, ENTITY_I
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::addCellDataToStream(uint32 flags, MemoryStream* mstream, bool useAliasID)
+void Entity::addCellDataToStream(COMPONENT_TYPE sendTo, uint32 flags, MemoryStream* mstream, bool useAliasID)
 {
+	// Cell 实体属性流中的组件必须保留 Cell 域，sendTo 仅描述本次流的接收方。
+	// Components in a Cell entity stream remain in the Cell domain; sendTo only identifies this stream's recipient.
+	EntityDef::context().currComponentType = g_componentType;
+
 	addPositionAndDirectionToStream(*mstream, useAliasID);
 	PyObject* cellData = PyObject_GetAttrString(this, "__dict__");
 
@@ -995,15 +1009,24 @@ void Entity::addCellDataToStream(uint32 flags, MemoryStream* mstream, bool useAl
 		PropertyDescription* propertyDescription = iter->second;
 		if((flags & propertyDescription->getFlags()) > 0)
 		{
+			if(propertyDescription->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)
+			{
+				EntityComponentType* pComponentType = static_cast<EntityComponentType*>(propertyDescription->getDataType());
+				if(pComponentType->pScriptDefModule()->getPropertyDescrs().empty())
+					continue;
+			}
+
 			// DEBUG_MSG(fmt::format("Entity::addCellDataToStream: {}.\n", propertyDescription->getName()));
 			PyObject* pyVal = PyDict_GetItemString(cellData, propertyDescription->getName());
 
 			if(useAliasID && pScriptModule_->usePropertyDescrAlias())
 			{
+				(*mstream) << static_cast<uint8>(0);
 				(*mstream) << propertyDescription->aliasIDAsUint8();
 			}
 			else
 			{
+				(*mstream) << static_cast<ENTITY_PROPERTY_UID>(0);
 				(*mstream) << propertyDescription->getUType();
 			}
 
@@ -1012,13 +1035,13 @@ void Entity::addCellDataToStream(uint32 flags, MemoryStream* mstream, bool useAl
 				ERROR_MSG(fmt::format("{}::addCellDataToStream: {}({}) not is ({})!\n", this->scriptName(), 
 					propertyDescription->getName(), (pyVal ? pyVal->ob_type->tp_name : "unknown"), propertyDescription->getDataType()->getName()));
 				
-				PyObject* pydefval = propertyDescription->getDataType()->parseDefaultStr("");
-				propertyDescription->getDataType()->addToStream(mstream, pydefval);
+				PyObject* pydefval = propertyDescription->parseDefaultStr("");
+				propertyDescription->addToStream(mstream, pydefval);
 				Py_DECREF(pydefval);
 			}
 			else
 			{
-				propertyDescription->getDataType()->addToStream(mstream, pyVal);
+				propertyDescription->addToStream(mstream, pyVal);
 			}
 
 			if (PyErr_Occurred())
@@ -1045,7 +1068,7 @@ void Entity::backupCellData()
 
 		try
 		{
-			addCellDataToStream(ENTITY_CELL_DATA_FLAGS, s);
+			addCellDataToStream(BASEAPP_TYPE, ENTITY_CELL_DATA_FLAGS, s);
 		}
 		catch (MemoryStreamWriteOverflow & err)
 		{
@@ -3848,7 +3871,7 @@ void Entity::addToStream(KBEngine::MemoryStream& s)
 	if (pCustomVolatileinfo_)
 		pCustomVolatileinfo_->addToStream(s);
 
-	addCellDataToStream(ENTITY_CELL_DATA_FLAGS, &s);
+	addCellDataToStream(CELLAPP_TYPE, ENTITY_CELL_DATA_FLAGS, &s);
 	
 	addMovementHandlerToStream(s);
 	addControllersToStream(s);

@@ -32,6 +32,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "entitydef/entitydef.h"	
 #include "entitydef/scriptdef_module.h"
 #include "entitydef/entity_macro.h"	
+#include "entitydef/entity_component.h"
 #include "server/script_timers.h"		
 	
 namespace KBEngine{

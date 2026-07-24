@@ -319,6 +319,12 @@ client::Entity* ClientObjectBase::createEntity(const char* entityType, PyObject*
 {
 	KBE_ASSERT(eid > 0);
 
+	// 客户端实体构造期间的组件默认值依赖完整运行上下文。
+	// Component defaults created with a client entity require the complete runtime context.
+	EntityDef::context().currClientappID = appID();
+	EntityDef::context().currEntityID = eid;
+	EntityDef::context().currComponentType = CLIENT_TYPE;
+
 	ScriptDefModule* sm = EntityDef::findScriptModule(entityType);
 	if(sm == NULL)
 	{

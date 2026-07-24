@@ -1376,6 +1376,11 @@ void Baseapp::onCreateEntityFromDBIDCallback(Network::Channel* pChannel, KBEngin
 		return;
 	}
 
+	// 持久化流可能直接构造组件对象，解析前必须恢复目标实体和 Base 域上下文。
+	// Persistent streams may construct components directly, so restore the target entity and Base domain before parsing.
+	KBE_ASSERT(entityID > 0);
+	EntityDef::context().currEntityID = entityID;
+	EntityDef::context().currComponentType = BASEAPP_TYPE;
 	PyObject* pyDict = createDictDataFromPersistentStream(s, entityType.c_str());
 	PyObject* e = Baseapp::getSingleton().createEntity(entityType.c_str(), pyDict, false, entityID);
 	if(e)
@@ -1818,6 +1823,9 @@ void Baseapp::createEntityAnywhereFromDBIDOtherBaseapp(Network::Channel* pChanne
 		KBE_ASSERT(false);
 	}
 
+	KBE_ASSERT(entityID > 0);
+	EntityDef::context().currEntityID = entityID;
+	EntityDef::context().currComponentType = BASEAPP_TYPE;
 	PyObject* pyDict = createDictDataFromPersistentStream(s, entityType.c_str());
 	PyObject* e = Baseapp::getSingleton().createEntity(entityType.c_str(), pyDict, false, entityID);
 	if(e)
@@ -2297,6 +2305,9 @@ void Baseapp::createEntityRemotelyFromDBIDOtherBaseapp(Network::Channel* pChanne
 		KBE_ASSERT(false);
 	}
 
+	KBE_ASSERT(entityID > 0);
+	EntityDef::context().currEntityID = entityID;
+	EntityDef::context().currComponentType = BASEAPP_TYPE;
 	PyObject* pyDict = createDictDataFromPersistentStream(s, entityType.c_str());
 	PyObject* e = Baseapp::getSingleton().createEntity(entityType.c_str(), pyDict, false, entityID);
 	if(e)
@@ -2462,7 +2473,7 @@ void Baseapp::createCellEntityInNewSpace(Entity* pEntity, PyObject* pyCellappInd
 
 	try
 	{
-		pEntity->addCellDataToStream(ED_FLAG_ALL, s);
+		pEntity->addCellDataToStream(CELLAPP_TYPE, ED_FLAG_ALL, s);
 	}
 	catch (MemoryStreamWriteOverflow & err)
 	{
@@ -2520,7 +2531,7 @@ void Baseapp::restoreSpaceInCell(Entity* pEntity)
 
 	try
 	{
-		pEntity->addCellDataToStream(ED_FLAG_ALL, s);
+		pEntity->addCellDataToStream(CELLAPP_TYPE, ED_FLAG_ALL, s);
 	}
 	catch (MemoryStreamWriteOverflow & err)
 	{
@@ -3050,7 +3061,7 @@ void Baseapp::createCellEntity(EntityCallAbstract* createToCellEntityCall, Entit
 
 	try
 	{
-		pEntity->addCellDataToStream(ED_FLAG_ALL, s);
+		pEntity->addCellDataToStream(CELLAPP_TYPE, ED_FLAG_ALL, s);
 	}
 	catch (MemoryStreamWriteOverflow & err)
 	{
@@ -4128,6 +4139,9 @@ void Baseapp::onQueryAccountCBFromDbmgr(Network::Channel* pChannel, KBEngine::Me
 	pEntity->setLoginDatas(ptinfos->datas);
 	pEntity->setCreateDatas(bindatas);
 
+	KBE_ASSERT(entityID > 0);
+	EntityDef::context().currEntityID = entityID;
+	EntityDef::context().currComponentType = BASEAPP_TYPE;
 	PyObject* pyDict = createDictDataFromPersistentStream(s, g_serverConfig.getDBMgr().dbAccountEntityScriptType);
 
 	PyObject* py__ACCOUNT_NAME__ = PyUnicode_FromString(accountName.c_str());

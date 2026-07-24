@@ -157,6 +157,13 @@ PyObject* Entity::onScriptGetAttribute(PyObject* attr)
 }	
 
 //-------------------------------------------------------------------------------------
+void Entity::onInitializeScript()
+{
+	// 客户端实体当前无需额外初始化；统一钩子确保组件脚本与 owner 均已就绪。
+	// Client entities currently need no extra work; the shared hook runs only after component scripts and owners are ready.
+}
+
+//-------------------------------------------------------------------------------------
 void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, PyObject* pyData)
 {
 }
@@ -226,6 +233,12 @@ void Entity::onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s)
 //-------------------------------------------------------------------------------------
 void Entity::onUpdatePropertys(MemoryStream& s)
 {
+	// 客户端属性更新可能创建组件实例，先提供 app、entity 和 Client 域上下文。
+	// Client property updates may construct component instances, so provide app, entity, and Client-domain context first.
+	EntityDef::context().currClientappID = pClientApp_->appID();
+	EntityDef::context().currEntityID = id();
+	EntityDef::context().currComponentType = CLIENT_TYPE;
+
 	ENTITY_PROPERTY_UID posuid = ENTITY_BASE_PROPERTY_UTYPE_POSITION_XYZ;
 	ENTITY_PROPERTY_UID diruid = ENTITY_BASE_PROPERTY_UTYPE_DIRECTION_ROLL_PITCH_YAW;
 	ENTITY_PROPERTY_UID spaceuid = ENTITY_BASE_PROPERTY_UTYPE_SPACEID;
@@ -509,7 +522,7 @@ PyObject* Entity::__py_pyDestroyEntity(PyObject* self, PyObject* args, PyObject 
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::addCellDataToStream(uint32 flags, MemoryStream* mstream, bool useAliasID)
+void Entity::addCellDataToStream(COMPONENT_TYPE sendTo, uint32 flags, MemoryStream* mstream, bool useAliasID)
 {
 }
 

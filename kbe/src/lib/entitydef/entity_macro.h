@@ -80,17 +80,17 @@ namespace KBEngine{
 		int32 y = (int32)pos.y;																				\
 		int32 z = (int32)pos.z;																				\
 																											\
-		s << posuid << x << y << z;																			\
+		s << (ENTITY_PROPERTY_UID)0 << posuid << x << y << z;																			\
 																											\
 		x = (int32)dir.x;																					\
 		y = (int32)dir.y;																					\
 		z = (int32)dir.z;																					\
 																											\
-		s << diruid << x << y << z;																			\
+		s << (ENTITY_PROPERTY_UID)0 << diruid << x << y << z;																			\
 
 
-	// 持久化记录为每个坐标字段补充父 UID，网络流仍保持原格式。
-	// Persistent records add a parent UID for each transform field while network streams retain their existing format.
+	// 位置与方向统一使用父 UID + 属性 UID，持久化和 Nex 2.8 网络流共享同一帧结构。
+	// Position and direction consistently use parent plus property UIDs across persistence and Nex 2.8 network streams.
 	#define ADD_POS_DIR_TO_PERSISTENT_STREAM(s, pos, dir)											\
 		int32 persistentX = (int32)pos.x;															\
 		int32 persistentY = (int32)pos.y;															\
@@ -107,14 +107,14 @@ namespace KBEngine{
 		int32 z = (int32)pos.z;																				\
 																											\
 		uint8 aliasID = ENTITY_BASE_PROPERTY_ALIASID_POSITION_XYZ;											\
-		s << aliasID << x << y << z;																		\
+		s << (uint8)0 << aliasID << x << y << z;																		\
 																											\
 		x = (int32)dir.x;																					\
 		y = (int32)dir.y;																					\
 		z = (int32)dir.z;																					\
 																											\
 		aliasID = ENTITY_BASE_PROPERTY_ALIASID_DIRECTION_ROLL_PITCH_YAW;									\
-		s << aliasID << x << y << z;																		\
+		s << (uint8)0 << aliasID << x << y << z;																		\
 
 
 	#define STREAM_TO_POS_DIR(s, pos, dir)																	\
@@ -122,15 +122,19 @@ namespace KBEngine{
 		int32 x = 0;																						\
 		int32 y = 0;																						\
 		int32 z = 0;																						\
+		/* Cell 创建流采用父 UID + 属性 UID，组件解码还依赖当前实体上下文。 */							\
+		/* Cell creation streams use parent UID plus property UID, and component decoding needs entity context. */		\
+		EntityDef::context().currComponentType = CELLAPP_TYPE;											\
+		EntityDef::context().currEntityID = id();														\
 		ENTITY_PROPERTY_UID uid;																			\
 																											\
-		s >> uid >> x >> y >> z;																			\
+		s >> uid >> uid >> x >> y >> z;																			\
 																											\
 		pos.x = float(x);																					\
 		pos.y = float(y);																					\
 		pos.z = float(z);																					\
 																											\
-		s >> uid >> x >> y >> z;																			\
+		s >> uid >> uid >> x >> y >> z;																			\
 		dir.x = float(x);																					\
 		dir.y = float(y);																					\
 		dir.z = float(z);																					\
@@ -139,11 +143,11 @@ namespace KBEngine{
 
 #else																									
 	#define ADD_POS_DIR_TO_STREAM(s, pos, dir)																\
-		s << posuid << pos.x << pos.y << pos.z;																\
-		s << diruid << dir.x << dir.y << dir.z;																\
+		s << (ENTITY_PROPERTY_UID)0 << posuid << pos.x << pos.y << pos.z;																\
+		s << (ENTITY_PROPERTY_UID)0 << diruid << dir.x << dir.y << dir.z;																\
 
-	// 持久化记录为每个坐标字段补充父 UID，网络流仍保持原格式。
-	// Persistent records add a parent UID for each transform field while network streams retain their existing format.
+	// 位置与方向统一使用父 UID + 属性 UID，持久化和 Nex 2.8 网络流共享同一帧结构。
+	// Position and direction consistently use parent plus property UIDs across persistence and Nex 2.8 network streams.
 	#define ADD_POS_DIR_TO_PERSISTENT_STREAM(s, pos, dir)											\
 		s << (ENTITY_PROPERTY_UID)0 << posuid << pos.x << pos.y << pos.z;						\
 		s << (ENTITY_PROPERTY_UID)0 << diruid << dir.x << dir.y << dir.z;						\
@@ -151,16 +155,16 @@ namespace KBEngine{
 
 	#define ADD_POS_DIR_TO_STREAM_ALIASID(s, pos, dir)														\
 		uint8 aliasID = ENTITY_BASE_PROPERTY_ALIASID_POSITION_XYZ;											\
-		s << aliasID << pos.x << pos.y << pos.z;															\
+		s << (uint8)0 << aliasID << pos.x << pos.y << pos.z;															\
 		aliasID = ENTITY_BASE_PROPERTY_ALIASID_DIRECTION_ROLL_PITCH_YAW;									\
-		s << aliasID << dir.x << dir.y << dir.z;															\
+		s << (uint8)0 << aliasID << dir.x << dir.y << dir.z;															\
 	
 
 	#define STREAM_TO_POS_DIR(s, pos, dir)																	\
 	{																										\
 		ENTITY_PROPERTY_UID uid;																			\
-		s >> uid >> pos.x >> pos.y >> pos.z;																\
-		s >> uid >> dir.x >> dir.y >> dir.z;																\
+		s >> uid >> uid >> pos.x >> pos.y >> pos.z;																\
+		s >> uid >> uid >> dir.x >> dir.y >> dir.z;																\
 	}																										\
 
 
@@ -307,24 +311,85 @@ protected:																									\
 public:																										\
 	bool initing() const{ return hasFlags(ENTITY_FLAGS_INITING); }											\
 																											\
+	void onInitializeScript();																				\
 	void initializeScript()																					\
 	{																										\
 		removeFlags(ENTITY_FLAGS_INITING);																	\
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);																	\
+																											\
+		const ScriptDefModule::COMPONENTDESCRIPTION_MAP* pComponentDescrs =									\
+			&pScriptModule_->getComponentDescrs();															\
+																											\
+		ScriptDefModule::COMPONENTDESCRIPTION_MAP::const_iterator iter1 = pComponentDescrs->begin();		\
+		for (; iter1 != pComponentDescrs->end(); ++iter1)													\
+		{																									\
+			PyObject* pComponentProperty = PyObject_GetAttrString(this, iter1->first.c_str());				\
+			if(pComponentProperty)																			\
+			{																								\
+				if(PyObject_TypeCheck(pComponentProperty, EntityComponent::getScriptType()))				\
+				{																							\
+					EntityComponent* pEntityComponent = static_cast<EntityComponent*>(pComponentProperty);	\
+					pEntityComponent->initializeScript();													\
+				}																							\
+				else																						\
+				{																							\
+					PyErr_Format(PyExc_AssertionError, "%s.%s is not property of EntityComponent!",			\
+						scriptName(), iter1->first.c_str());												\
+					PyErr_PrintEx(0);																		\
+				}																							\
+																											\
+				Py_DECREF(pComponentProperty);																\
+			}																								\
+			else																							\
+			{																								\
+				PyErr_Clear();																				\
+			}																								\
+		}																									\
+																											\
 		if(PyObject_HasAttrString(this, "__init__"))														\
 		{																									\
 			PyObject* pyResult = PyObject_CallMethod(this, const_cast<char*>("__init__"),					\
 											const_cast<char*>(""));											\
-			if(pyResult != NULL)																			\
+			if(pyResult != NULL){																			\
 				Py_DECREF(pyResult);																		\
+			}																								\
 			else																							\
 				SCRIPT_ERROR_CHECK();																		\
 		}																									\
+																											\
+		iter1 = pComponentDescrs->begin();																	\
+		for (; iter1 != pComponentDescrs->end(); ++iter1)													\
+		{																									\
+			PyObject* pComponentProperty = PyObject_GetAttrString(this, iter1->first.c_str());				\
+			if(pComponentProperty)																			\
+			{																								\
+				if(PyObject_TypeCheck(pComponentProperty, EntityComponent::getScriptType()))				\
+				{																							\
+					EntityComponent* pEntityComponent = static_cast<EntityComponent*>(pComponentProperty);	\
+					pEntityComponent->updateOwner(id(), this);												\
+					pEntityComponent->onAttached();															\
+				}																							\
+				else																						\
+				{																							\
+					PyErr_Format(PyExc_AssertionError, "%s.%s is not property of EntityComponent!",			\
+						scriptName(), iter1->first.c_str());												\
+					PyErr_PrintEx(0);																		\
+				}																							\
+																											\
+				Py_DECREF(pComponentProperty);																\
+			}																								\
+			else																							\
+			{																								\
+				PyErr_Clear();																				\
+			}																								\
+		}																									\
+																											\
+		onInitializeScript();																				\
 	}																										\
 																											\
-	void initializeEntity(PyObject* dictData)																\
+	void initializeEntity(PyObject* dictData, bool persistentData = false)									\
 	{																										\
-		createNamespace(dictData);																			\
+		createNamespace(dictData, persistentData);															\
 		initializeScript();																					\
 	}																										\
 																											\
@@ -347,11 +412,15 @@ public:																										\
 			return false;																					\
 		}																									\
 																											\
-		initProperty(true);																					\
+		/* 普通 reloadScript(False) 只更新脚本行为层，不能重新初始化属性，						\
+		   否则在线实体数据会被默认值覆盖；只有 fullReload 才做属性差异补齐。 */					\
+		/* A normal reloadScript(False) must preserve live values; only a full reload fills property differences. */\
+		if(fullReload)																						\
+			initProperty(true);																				\
 		return _reload(fullReload);																			\
 	}																										\
 																											\
-	void createNamespace(PyObject* dictData)																\
+	void createNamespace(PyObject* dictData, bool persistentData = false)									\
 	{																										\
 		if(dictData == NULL)																				\
 			return;																							\
@@ -363,13 +432,17 @@ public:																										\
 			return;																							\
 		}																									\
 																											\
+		EntityDef::context().currComponentType = g_componentType;											\
+		EntityDef::context().currEntityID = id();															\
+																											\
 		Py_ssize_t pos = 0;																					\
 		PyObject *key, *value;																				\
-																											\
 		PyObject* cellDataDict = PyObject_GetAttrString(this, "cellData");									\
+																											\
 		if(cellDataDict == NULL)																			\
 		{																									\
 			PyErr_Clear();																					\
+			EntityComponent::convertDictDataToEntityComponent(id(), this, pScriptModule_, dictData, persistentData); \
 		}																									\
 		else																								\
 		{																									\
@@ -400,24 +473,86 @@ public:																										\
 			DEBUG_CREATE_ENTITY_NAMESPACE																	\
 			if(PyObject_HasAttr(this, key) > 0)																\
 			{																								\
-				PyObject_SetAttr(this, key, value);															\
+				const char* ccattr = PyUnicode_AsUTF8AndSize(key, NULL);									\
+																											\
+				PropertyDescription* pCompPropertyDescription =												\
+					pScriptModule_->findComponentPropertyDescription(ccattr);								\
+																											\
+				if (pCompPropertyDescription)																\
+				{																							\
+					/* 持久化流可能已生成组件对象，只有字典值需要按字段更新现有组件。 */\
+					/* Persistent streams may already contain component objects; only dictionary values update the existing component by field. */\
+					if(PyDict_Check(value))			\
+					{																						\
+						EntityComponent* pEntityComponent = (EntityComponent*)PyObject_GetAttr(this, key);	\
+						pEntityComponent->updateFromDict(this, value);										\
+						Py_DECREF(pEntityComponent);														\
+					}																						\
+					else																					\
+					{																						\
+						PyObject_SetAttr(this, key, value);													\
+					}																						\
+				}																							\
+				else																						\
+				{																							\
+					PyObject_SetAttr(this, key, value);														\
+				}																							\
+																											\
 				continue;																					\
 			}																								\
 																											\
 			if(cellDataDict != NULL && PyDict_Contains(cellDataDict, key) > 0)								\
-    			PyDict_SetItem(cellDataDict, key, value);													\
+			{																								\
+				PyObject* pyVal = PyDict_GetItem(cellDataDict, key);										\
+				if (PyDict_Check(pyVal))																	\
+				{																							\
+					/* CellData 中的组件占位字典必须原位合并，保持后续组件转换所依赖的对象身份。 */\
+					/* Component placeholder dictionaries in CellData must be merged in place to preserve identity for later conversion. */\
+					if (0 != PyDict_Update(pyVal, value))					\
+					{																						\
+						SCRIPT_ERROR_CHECK();																\
+						KBE_ASSERT(false);																	\
+					}																						\
+				}																							\
+				else																						\
+				{																							\
+					PyDict_SetItem(cellDataDict, key, value);												\
+				}																							\
+			}																								\
 			else																							\
+			{																								\
+				const char* ccattr = PyUnicode_AsUTF8AndSize(key, NULL);									\
+																											\
+				PropertyDescription* pCompPropertyDescription =												\
+					pScriptModule_->findComponentPropertyDescription(ccattr);								\
+																											\
+																											\
+				if (pCompPropertyDescription)																\
+				{																							\
+					/* 一般在base上可能放在cellData中是字典，而没有cell的实体需要pass这个设置 */					\
+					/* Base may keep component dictionaries in CellData; components without Cell data must not overwrite entity attributes. */\
+					if(PyDict_Check(value))																	\
+						continue;																			\
+				}																							\
+																											\
 				PyObject_SetAttr(this, key, value);															\
+			}																								\
 		}																									\
 																											\
 		SCRIPT_ERROR_CHECK();																				\
+																											\
 		Py_XDECREF(cellDataDict);																			\
 	}																										\
 																											\
-	void addCellDataToStream(uint32 flags, MemoryStream* mstream, bool useAliasID = false);					\
+	void addCellDataToStream(COMPONENT_TYPE sendTo, uint32 flags, MemoryStream* mstream, bool useAliasID = false);\
 																											\
 	PyObject* createCellDataFromStream(MemoryStream* mstream)												\
 	{																										\
+		/* 组件默认值解析依赖当前实体和 Cell 域，必须在读取任何属性前建立上下文。 */						\
+		/* Component default parsing depends on the current entity and Cell domain, so bind the context before reading properties. */\
+		EntityDef::context().currComponentType = CELLAPP_TYPE;												\
+		EntityDef::context().currEntityID = id();															\
+																															\
 		PyObject* cellData = PyDict_New();																	\
 		ENTITY_PROPERTY_UID uid;																			\
 		Vector3 pos, dir;																					\
@@ -427,11 +562,30 @@ public:																										\
 		ScriptDefModule::PROPERTYDESCRIPTION_UIDMAP& propertyDescrs =										\
 								pScriptModule_->getCellPropertyDescriptions_uidmap();						\
 																											\
-		size_t count = 0;																					\
+		size_t count = propertyDescrs.size();															\
 																											\
-		while(mstream->length() > 0 && count < propertyDescrs.size())										\
+		{																												\
+			ScriptDefModule::PROPERTYDESCRIPTION_UIDMAP::iterator iter = propertyDescrs.begin();			\
+			for(; iter != propertyDescrs.end(); ++iter)													\
+			{																											\
+				/* 没有 Cell 属性的组件不会写入创建流，因此不能把它计入待读取数量。 */					\
+				/* Components without Cell properties are not serialized, so exclude them from the expected item count. */\
+				if (iter->second->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)						\
+				{																										\
+					EntityComponentType* pEntityComponentType = (EntityComponentType*)iter->second->getDataType();\
+					if (pEntityComponentType->pScriptDefModule()->getCellPropertyDescriptions().size() == 0)\
+					{																								\
+						--count;																				\
+					}																							\
+				}																								\
+			}																									\
+		}																										\
+																															\
+		while(mstream->length() > 0 && count-- > 0)													\
 		{																									\
-			(*mstream) >> uid;																				\
+			/* 创建流为每项写入父 UID 和实际属性 UID；当前层只按后者查找属性。 */					\
+			/* Each creation-stream item contains a parent UID and an effective property UID; this level resolves the latter. */\
+			(*mstream) >> uid >> uid;																	\
 			ScriptDefModule::PROPERTYDESCRIPTION_UIDMAP::iterator iter = propertyDescrs.find(uid);			\
 			if(iter == propertyDescrs.end())																\
 			{																								\
@@ -439,7 +593,15 @@ public:																										\
 				break;																						\
 			}																								\
 																											\
-			PyObject* pyobj = iter->second->createFromStream(mstream);										\
+			PyObject* pyobj = NULL;																			\
+			if (iter->second->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)						\
+			{																											\
+				pyobj = ((EntityComponentType*)iter->second->getDataType())->createCellDataFromStream(mstream);\
+			}																									\
+			else																								\
+			{																											\
+				pyobj = iter->second->createFromStream(mstream);									\
+			}																									\
 																											\
 			if(pyobj == NULL)																				\
 			{																								\
@@ -454,7 +616,6 @@ public:																										\
 				Py_DECREF(pyobj);																			\
 			}																								\
 																											\
-			++count;																						\
 		}																									\
 																											\
 		return cellData;																					\

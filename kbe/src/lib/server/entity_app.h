@@ -610,11 +610,20 @@ E* EntityApp<E>::createEntity(const char* entityType, PyObject* params,
 	ENTITY_ID id = eid;
 	if(id <= 0)
 		id = idClient_.alloc();
+
+	// 组件默认值会在实体构造期间读取当前实体 ID，必须先建立上下文再执行 placement new。
+	// Component defaults read the current entity ID during construction, so establish the context before placement new.
+	EntityDef::context().currEntityID = id;
 	
 	E* entity = onCreateEntity(obj, sm, id);
 
 	if(initProperty)
+	{
+		// 实体构造可能暂时切到 Cell 域，初始化 Base/Cell 自身属性前恢复应用所属域。
+		// Entity construction may temporarily select Cell; restore the application's own domain before initializing its properties.
+		EntityDef::context().currComponentType = componentType_;
 		entity->initProperty();
+	}
 
 	// 将entity加入entities
 	pEntities_->add(id, entity); 

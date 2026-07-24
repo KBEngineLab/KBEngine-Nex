@@ -103,7 +103,14 @@ Entity::~Entity()
 }	
 
 //-------------------------------------------------------------------------------------
-void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, 
+void Entity::onInitializeScript()
+{
+	// Base 实体当前无需额外初始化；保留钩子以统一组件挂接后的生命周期扩展点。
+	// Base entities currently need no extra work; keep the hook as the lifecycle extension point after component attachment.
+}
+
+//-------------------------------------------------------------------------------------
+void Entity::onDefDataChanged(const PropertyDescription* propertyDescription,
 		PyObject* pyData)
 {
 	if(initing())
@@ -245,7 +252,11 @@ void Entity::createCellData(void)
 
 		return;
 	}
-	
+
+	// BaseApp 构造的是发往 Cell 的组件默认值，设置域后组件实例才能选择正确属性集合。
+	// BaseApp constructs component defaults for Cell, so set the domain before selecting component properties.
+	EntityDef::context().currComponentType = CELLAPP_TYPE;
+
 	ScriptDefModule::PROPERTYDESCRIPTION_MAP& propertyDescrs = pScriptModule_->getCellPropertyDescriptions();
 	ScriptDefModule::PROPERTYDESCRIPTION_MAP::const_iterator iter = propertyDescrs.begin();
 	for(; iter != propertyDescrs.end(); ++iter)
@@ -289,12 +300,16 @@ void Entity::createCellData(void)
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::addCellDataToStream(uint32 flags, MemoryStream* s, bool useAliasID)
+void Entity::addCellDataToStream(COMPONENT_TYPE sendTo, uint32 flags, MemoryStream* s, bool useAliasID)
 {
 	addPositionAndDirectionToStream(*s, useAliasID);
 
 	if (!cellDataDict_)
 		return;
+
+	// 同一份 cellData 会发往 CellApp 或客户端，组件子属性过滤和别名编码取决于目标域。
+	// The same cellData targets CellApp or clients; component filtering and alias encoding depend on that destination.
+	EntityDef::context().currComponentType = sendTo == CLIENT_TYPE ? CLIENT_TYPE : CELLAPP_TYPE;
 
 	ScriptDefModule::PROPERTYDESCRIPTION_MAP& propertyDescrs = pScriptModule_->getCellPropertyDescriptions();
 	ScriptDefModule::PROPERTYDESCRIPTION_MAP::const_iterator iter = propertyDescrs.begin();
@@ -306,27 +321,51 @@ void Entity::addCellDataToStream(uint32 flags, MemoryStream* s, bool useAliasID)
 		{
 			PyObject* pyVal = PyDict_GetItemString(cellDataDict_, propertyDescription->getName());
 
-			if(useAliasID && pScriptModule_->usePropertyDescrAlias())
+			if(propertyDescription->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)
 			{
-				(*s) << propertyDescription->aliasIDAsUint8();
-			}
-			else
-			{
-				(*s) << propertyDescription->getUType();
-			}
+				EntityComponentType* pComponentType = static_cast<EntityComponentType*>(propertyDescription->getDataType());
+				if(pComponentType->pScriptDefModule()->getCellPropertyDescriptions().empty())
+					continue;
 
-			if(!propertyDescription->getDataType()->isSameType(pyVal))
-			{
-				ERROR_MSG(fmt::format("{}::addCellDataToStream: {}({}) not is ({})!\n", this->scriptName(), 
-					propertyDescription->getName(), (pyVal ? pyVal->ob_type->tp_name : "unknown"), propertyDescription->getDataType()->getName()));
-				
-				PyObject* pydefval = propertyDescription->getDataType()->parseDefaultStr("");
-				propertyDescription->getDataType()->addToStream(s, pydefval);
-				Py_DECREF(pydefval);
+				if(useAliasID && pScriptModule_->usePropertyDescrAlias())
+				{
+					(*s) << static_cast<uint8>(0);
+					(*s) << propertyDescription->aliasIDAsUint8();
+				}
+				else
+				{
+					(*s) << static_cast<ENTITY_PROPERTY_UID>(0);
+					(*s) << propertyDescription->getUType();
+				}
+
+				pComponentType->addCellDataToStream(s, flags, pyVal, id(), propertyDescription, sendTo, true);
 			}
 			else
 			{
-				propertyDescription->getDataType()->addToStream(s, pyVal);
+				if(useAliasID && pScriptModule_->usePropertyDescrAlias())
+				{
+					(*s) << static_cast<uint8>(0);
+					(*s) << propertyDescription->aliasIDAsUint8();
+				}
+				else
+				{
+					(*s) << static_cast<ENTITY_PROPERTY_UID>(0);
+					(*s) << propertyDescription->getUType();
+				}
+
+				if(!propertyDescription->getDataType()->isSameType(pyVal))
+				{
+					ERROR_MSG(fmt::format("{}::addCellDataToStream: {}({}) not is ({})!\n", this->scriptName(),
+						propertyDescription->getName(), (pyVal ? pyVal->ob_type->tp_name : "unknown"), propertyDescription->getDataType()->getName()));
+
+					PyObject* pydefval = propertyDescription->parseDefaultStr("");
+					propertyDescription->addToStream(s, pydefval);
+					Py_DECREF(pydefval);
+				}
+				else
+				{
+					propertyDescription->addToStream(s, pyVal);
+				}
 			}
 
 			if (PyErr_Occurred())
@@ -894,6 +933,9 @@ void Entity::onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s)
 	}
 
 	pMethodDescription->currCallerID(this->id());
+	// RPC 参数可能包含组件值，反序列化前绑定当前实体以保证组件 owner 正确。
+	// RPC arguments may contain component values; bind the current entity before deserialization to preserve ownership.
+	EntityDef::context().currEntityID = this->id();
 	PyObject* pyFunc = PyObject_GetAttrString(this, const_cast<char*>
 						(pMethodDescription->getName()));
 
