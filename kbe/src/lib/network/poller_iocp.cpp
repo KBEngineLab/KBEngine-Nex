@@ -399,13 +399,36 @@ bool IocpPoller::ensureReadArmed(int fd, SocketState& state)
 		return true;
 	}
 
-	if (!ensureAssociated(state, fd))
+	SocketKind detectedKind = SOCKET_KIND_UNKNOWN;
+	if (!tryDetermineSocketKind(state.socket, detectedKind))
 	{
 		return false;
 	}
 
-	SocketKind detectedKind = SOCKET_KIND_UNKNOWN;
-	if (!tryDetermineSocketKind(state.socket, detectedKind))
+	if (detectedKind == SOCKET_KIND_TCP)
+	{
+		sockaddr_storage peerAddress;
+		int peerAddressLength = sizeof(peerAddress);
+		memset(&peerAddress, 0, sizeof(peerAddress));
+
+		if (getpeername(state.socket, reinterpret_cast<sockaddr*>(&peerAddress), &peerAddressLength) == SOCKET_ERROR)
+		{
+			int errorCode = WSAGetLastError();
+
+			// 1.x 会在 connect 或 listen 之前登记读 handler；此时先保留登记，等 socket 就绪后再关联 IOCP。
+			// 1.x registers read handlers before connect or listen; retain the registration and defer IOCP association until the socket is ready.
+			if (errorCode == WSAENOTCONN || errorCode == WSAEINVAL || errorCode == WSAEWOULDBLOCK)
+				return true;
+
+			ERROR_MSG(fmt::format("IocpPoller::ensureReadArmed: getpeername failed for fd {}: {}\n",
+				fd, kbe_strerror(errorCode)));
+			return false;
+		}
+	}
+
+	// 只有可立即投递 OVERLAPPED 操作的 socket 才进行永久 IOCP 关联，避免失败后丢失关联状态。
+	// Associate with IOCP only when an OVERLAPPED operation can be submitted immediately, avoiding lost association state after an arm failure.
+	if (!ensureAssociated(state, fd))
 	{
 		return false;
 	}
@@ -441,13 +464,9 @@ bool IocpPoller::doRegisterForRead(int fd)
 	state.socket = static_cast<KBESOCKET>(fd);
 	state.registeredRead = true;
 
-	// fd 重新注册且没有任何 outstanding IO 时，视为一个新的 socket 生命周期。
-	// 清理旧的 completion 队列并递增 generation，防止 Windows 复用 fd 后，
-	// 旧连接迟到的 completion 被新连接消费。
-	if (isNewState ||
-		(state.pPendingReadContext == NULL && state.pPendingWriteContext == NULL &&
-			state.pendingTcpSends.empty() && state.pendingTcpSendBytes == 0 &&
-			state.pendingUdpSends.empty() && state.pendingUdpSendBytes == 0))
+	// 只有新建状态才代表新的 socket 生命周期；发送路径预先创建的状态仍属于同一 socket，不能遗忘其永久 IOCP 关联。
+	// Only a newly created state starts a socket lifecycle; a state created by the send path is the same socket and must retain its permanent IOCP association.
+	if (isNewState)
 	{
 		clearReceivedData(fd);
 		state.kind = SOCKET_KIND_UNKNOWN;
