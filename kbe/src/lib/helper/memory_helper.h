@@ -26,29 +26,13 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "common/kbemalloc.h"
 #include "helper/debug_helper.h"
 
-#if KBE_PLATFORM == PLATFORM_WIN32
-#ifdef _DEBUG
-//#include "vld/vld.h"
-
 namespace KBEngine{
+	// VLD从未在当前运行时启用；保留空钩子以维持现有组件启动调用的API兼容性。
+	// VLD was never enabled by the current runtime; retain the no-op hook to preserve the component startup API.
 	inline void startLeakDetection(COMPONENT_TYPE type, COMPONENT_ID id)
 	{
-		//std::wstring leak_filename = fmt::format(L".\\{}_{}.leaks", COMPONENT_NAME_EX(type), 
-		//	id);
-
-		//VLDSetReportOptions (VLD_OPT_REPORT_TO_DEBUGGER | VLD_OPT_REPORT_TO_FILE, leak_filename.c_str());
 	}
 }
-#else
-namespace KBEngine{
-	inline void startLeakDetection(COMPONENT_TYPE type, COMPONENT_ID id){}
-}
-#endif
-#else
-namespace KBEngine{
-	inline void startLeakDetection(COMPONENT_TYPE type, COMPONENT_ID id){}
-}
-#endif
 
 namespace KBEngine{
 

@@ -77,7 +77,7 @@
 /ignore:4217 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalDependencies>secur32.lib;Rpcrt4.lib;crypt32.lib;tmxparser_d.lib;navigation_d.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr_d.lib;python37_d.lib;server_d.lib;pyscript_d.lib;entitydef_d.lib;xml_d.lib;common_d.lib;helper_d.lib;math_d.lib;network_d.lib;thread_d.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
-      <AdditionalLibraryDirectories>../../libs;../../lib/dependencies/vld;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>../../libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
