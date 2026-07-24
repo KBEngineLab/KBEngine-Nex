@@ -22,8 +22,22 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "python_app.h"
 #include "pyscript/py_memorystream.h"
 #include "server/py_file_descriptor.h"
+#include "server/plugin_runtime.h"
+#include "resmgr/plugins/plugin_manager.h"
 
 namespace KBEngine{
+
+namespace {
+
+// 这些组件直接使用 PythonApp 启动脚本环境，并共享同一套插件生命周期入口。
+// These components install their script environment through PythonApp and share one plugin lifecycle entry point.
+bool usesPythonAppPluginRuntime(COMPONENT_TYPE componentType)
+{
+	return componentType == DBMGR_TYPE || componentType == LOGINAPP_TYPE ||
+		componentType == INTERFACES_TYPE || componentType == LOGGER_TYPE;
+}
+
+}
 
 KBEngine::ScriptTimers KBEngine::PythonApp::scriptTimers_;
 
@@ -103,7 +117,11 @@ bool PythonApp::initializeEnd()
 {
 	gameTickTimerHandle_ = this->dispatcher().addTimer(1000000 / g_kbeSrvConfig.gameUpdateHertz(), this,
 		reinterpret_cast<void *>(TIMEOUT_GAME_TICK));
-	
+
+	if (usesPythonAppPluginRuntime(componentType_) &&
+		!PluginRuntime::instance().initialize(componentType_, false))
+		return false;
+
 	return true;
 }
 
@@ -122,6 +140,9 @@ void PythonApp::onShutdownEnd()
 //-------------------------------------------------------------------------------------
 void PythonApp::finalise(void)
 {
+	if (usesPythonAppPluginRuntime(componentType_))
+		PluginRuntime::instance().finalise();
+
 	gameTickTimerHandle_.cancel();
 	scriptTimers_.cancelAll();
 	ScriptTimers::finalise(*this);
@@ -183,7 +204,10 @@ bool PythonApp::installPyScript()
 		return false;
 	}
 
-	std::wstring pyPaths = user_scripts_path + L"common;";
+	// 用户脚本根目录使 plugins.<name> 包名可以稳定导入，同时仍保持宿主资源路径优先。
+	// The user script root makes plugins.<name> package imports stable while preserving host-resource precedence.
+	std::wstring pyPaths = user_scripts_path + L";";
+	pyPaths += user_scripts_path + L"common;";
 	pyPaths += user_scripts_path + L"data;";
 	pyPaths += user_scripts_path + L"user_type;";
 
@@ -223,6 +247,23 @@ bool PythonApp::installPyScript()
 		pyPaths += user_scripts_path + L"client/components;";
 		break;
 	};
+
+	if (!PluginManager::instance().initialize())
+		return false;
+
+	// manifest 中的脚本路径按 plugins.xml 顺序追加，保证插件覆盖关系在各组件中一致。
+	// Manifest script paths follow plugins.xml order so plugin precedence stays consistent across components.
+	std::vector<std::string> pluginPaths = PluginManager::instance().getComponentPythonPaths(componentType_);
+	for (std::vector<std::string>::const_iterator iter = pluginPaths.begin(); iter != pluginPaths.end(); ++iter)
+	{
+		tbuf = KBEngine::strutil::char2wchar(const_cast<char*>(iter->c_str()));
+		if (tbuf != NULL)
+		{
+			pyPaths += tbuf;
+			pyPaths += L";";
+			free(tbuf);
+		}
+	}
 	
 	std::string kbe_res_path = Resmgr::getSingleton().getPySysResPath();
 	kbe_res_path += "scripts/common";
@@ -719,6 +760,9 @@ void PythonApp::onReloadScript(bool fullReload)
 //-------------------------------------------------------------------------------------
 void PythonApp::reloadScript(bool fullReload)
 {
+	if (usesPythonAppPluginRuntime(componentType_))
+		PluginRuntime::instance().finalise();
+
 	onReloadScript(fullReload);
 
 	// SCOPED_PROFILE(SCRIPTCALL_PROFILE);
@@ -733,6 +777,12 @@ void PythonApp::reloadScript(bool fullReload)
 		Py_DECREF(pyResult);
 	else
 		SCRIPT_ERROR_CHECK();
+
+	if (usesPythonAppPluginRuntime(componentType_) &&
+		!PluginRuntime::instance().initialize(componentType_, true))
+	{
+		ERROR_MSG("PythonApp::reloadScript: plugin lifecycle reload failed.\n");
+	}
 }
 
 //-------------------------------------------------------------------------------------

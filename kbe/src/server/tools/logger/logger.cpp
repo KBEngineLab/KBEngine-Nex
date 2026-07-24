@@ -28,6 +28,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/bundle_broadcast.h"
 #include "thread/threadpool.h"
 #include "server/components.h"
+#include "server/plugin_runtime.h"
 #include <sstream>
 #include "server/telnet_server.h"
 #include "profile.h"	
@@ -133,7 +134,8 @@ bool Logger::inInitialize()
 //-------------------------------------------------------------------------------------
 bool Logger::initializeEnd()
 {
-	PythonApp::initializeEnd();
+	if (!PythonApp::initializeEnd())
+		return false;
 
 	// 由于logger接收其他app的log，如果跟踪包输出将会非常卡。
 	Network::g_trace_packet = 0;
@@ -164,7 +166,10 @@ bool Logger::initializeEnd()
 		g_kbeSrvConfig.getLogger().telnet_port);
 
 	Components::getSingleton().extraData4(pTelnetServer_->port());
-	return ret;
+	if (!ret)
+		return false;
+
+	return PluginRuntime::instance().onComponentReady(true);
 }
 
 //-------------------------------------------------------------------------------------

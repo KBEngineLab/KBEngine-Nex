@@ -32,6 +32,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "thread/threadpool.h"
 #include "common/kbeversion.h"
 #include "server/components.h"
+#include "server/plugin_runtime.h"
 #include "server/telnet_server.h"
 #include "server/sendmail_threadtasks.h"
 #include "client_lib/client_interface.h"
@@ -180,7 +181,8 @@ bool Loginapp::inInitialize()
 //-------------------------------------------------------------------------------------
 bool Loginapp::initializeEnd()
 {
-	PythonApp::initializeEnd();
+	if (!PythonApp::initializeEnd())
+		return false;
 
 	// 添加一个timer， 每秒检查一些状态
 	mainProcessTimer_ = this->dispatcher().addTimer(1000000 / 50, this,
@@ -206,7 +208,10 @@ bool Loginapp::initializeEnd()
 		g_kbeSrvConfig.getLoginApp().telnet_port);
 
 	Components::getSingleton().extraData4(pTelnetServer_->port());
-	return ret;
+	if (!ret)
+		return false;
+
+	return PluginRuntime::instance().onComponentReady(true);
 }
 
 //-------------------------------------------------------------------------------------		

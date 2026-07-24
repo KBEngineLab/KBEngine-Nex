@@ -29,6 +29,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/message_handler.h"
 #include "thread/threadpool.h"
 #include "server/components.h"
+#include "server/plugin_runtime.h"
 #include "server/telnet_server.h"
 
 #include "baseapp/baseapp_interface.h"
@@ -154,7 +155,8 @@ bool Interfaces::inInitialize()
 //-------------------------------------------------------------------------------------
 bool Interfaces::initializeEnd()
 {
-	PythonApp::initializeEnd();
+	if (!PythonApp::initializeEnd())
+		return false;
 
 	mainProcessTimer_ = this->dispatcher().addTimer(1000000 / g_kbeSrvConfig.gameUpdateHertz(), this,
 							reinterpret_cast<void *>(TIMEOUT_TICK));
@@ -185,7 +187,10 @@ bool Interfaces::initializeEnd()
 		g_kbeSrvConfig.getInterfaces().telnet_port);
 
 	Components::getSingleton().extraData4(pTelnetServer_->port());
-	return ret;
+	if (!ret)
+		return false;
+
+	return PluginRuntime::instance().onComponentReady(true);
 }
 
 //-------------------------------------------------------------------------------------		

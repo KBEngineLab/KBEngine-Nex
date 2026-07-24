@@ -33,6 +33,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/message_handler.h"
 #include "thread/threadpool.h"
 #include "server/components.h"
+#include "server/plugin_runtime.h"
 #include "server/telnet_server.h"
 #include "db_interface/db_interface.h"
 #include "db_mysql/db_interface_mysql.h"
@@ -299,7 +300,8 @@ bool Dbmgr::inInitialize()
 //-------------------------------------------------------------------------------------
 bool Dbmgr::initializeEnd()
 {
-	PythonApp::initializeEnd();
+	if (!PythonApp::initializeEnd())
+		return false;
 
 	// 添加一个timer， 每秒检查一些状态
 	loopCheckTimerHandle_ = this->dispatcher().addTimer(1000000, this,
@@ -341,7 +343,10 @@ bool Dbmgr::initializeEnd()
 
 	Components::getSingleton().extraData4(pTelnetServer_->port());
 	
-	return ret && initInterfacesHandler() && initDB();
+	if (!ret || !initInterfacesHandler() || !initDB())
+		return false;
+
+	return PluginRuntime::instance().onComponentReady(true);
 }
 
 //-------------------------------------------------------------------------------------
