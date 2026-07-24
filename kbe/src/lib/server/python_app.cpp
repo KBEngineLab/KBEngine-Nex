@@ -391,6 +391,13 @@ bool PythonApp::installPyModules()
 	APPEND_SCRIPT_MODULE_METHOD(module,		registerWriteFileDescriptor,	PyFileDescriptor::__py_registerWriteFileDescriptor,		METH_VARARGS,	0);
 	APPEND_SCRIPT_MODULE_METHOD(module,		deregisterReadFileDescriptor,	PyFileDescriptor::__py_deregisterReadFileDescriptor,	METH_VARARGS,	0);
 	APPEND_SCRIPT_MODULE_METHOD(module,		deregisterWriteFileDescriptor,	PyFileDescriptor::__py_deregisterWriteFileDescriptor,	METH_VARARGS,	0);
+	// 完成式文件描述符接口供 Nex 2.8 脚本使用；上方旧名称仅保留为带迁移提示的报错入口。
+	// Completion file-descriptor APIs serve Nex 2.8 scripts; legacy names above remain only as error entries with migration guidance.
+	APPEND_SCRIPT_MODULE_METHOD(module,		registerReadDataFileDescriptor,	PyFileDescriptor::__py_registerReadDataFileDescriptor,	METH_VARARGS,	0);
+	APPEND_SCRIPT_MODULE_METHOD(module,		deregisterReadDataFileDescriptor,	PyFileDescriptor::__py_deregisterReadDataFileDescriptor,	METH_VARARGS,	0);
+	APPEND_SCRIPT_MODULE_METHOD(module,		registerAcceptFileDescriptor,	PyFileDescriptor::__py_registerAcceptFileDescriptor,	METH_VARARGS,	0);
+	APPEND_SCRIPT_MODULE_METHOD(module,		deregisterAcceptFileDescriptor,	PyFileDescriptor::__py_deregisterAcceptFileDescriptor,	METH_VARARGS,	0);
+	APPEND_SCRIPT_MODULE_METHOD(module,		writeFileDescriptor,			PyFileDescriptor::__py_writeFileDescriptor,			METH_VARARGS,	0);
 
 	onInstallPyModules();
 
