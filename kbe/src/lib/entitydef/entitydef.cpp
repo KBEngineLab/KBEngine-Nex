@@ -156,6 +156,9 @@ bool EntityDef::finalise(bool isReload)
 	EntityDef::__scriptModules.clear();
 	EntityDef::__scriptTypeMappingUType.clear();
 	g_methodCusUtypes.clear();
+	// EntityDef 重建协议表时同步清空插件发现缓存，热重载才能重新读取 plugins.xml 和 manifest。
+	// Clear plugin discovery state together with the EntityDef protocol table so reloads reread plugins.xml and manifests.
+	PluginManager::instance().finalise();
 	DataType::finalise();
 	DataTypes::finalise();
 	return true;
