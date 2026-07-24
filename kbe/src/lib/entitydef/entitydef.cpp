@@ -220,7 +220,6 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 
 	std::string entitiesFile = __entitiesPath + "entities.xml";
 	std::string defFilePath = __entitiesPath + "entity_defs/";
-	ENTITY_SCRIPT_UID utype = 1;
 	
 	// 插件类型按 plugins.xml 顺序先于宿主 assets 类型加载，确保宿主 .def 可以引用插件别名。
 	// Plugin types load in plugins.xml order before host asset types so host .def files can reference plugin aliases.
@@ -269,8 +268,11 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 			return false;
 		}
 
-		__scriptTypeMappingUType[moduleName] = utype;
-		ScriptDefModule* pScriptModule = new ScriptDefModule(moduleName, utype++);
+		// 实体和解析期间插入的组件共享模块表，因此编号必须从模块表当前位置分配；独立计数器会在组件插入后复用编号。
+		// Entities and components inserted during parsing share one module table, so IDs must follow its current size; a separate counter reuses IDs after component insertion.
+		ENTITY_SCRIPT_UID moduleUType = static_cast<ENTITY_SCRIPT_UID>(__scriptModules.size() + 1);
+		__scriptTypeMappingUType[moduleName] = moduleUType;
+		ScriptDefModule* pScriptModule = new ScriptDefModule(moduleName, moduleUType);
 		EntityDef::__scriptModules.push_back(pScriptModule);
 		pScriptModule->setDefSourceFile(entityDefPath);
 
