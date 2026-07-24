@@ -21,6 +21,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "entitydef.h"
 #include "scriptdef_module.h"
+#include "resmgr/plugins/plugin_manager.h"
 #include "datatypes.h"
 #include "common.h"
 #include "pyscript/py_memorystream.h"
@@ -218,9 +219,34 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 	std::string defFilePath = __entitiesPath + "entity_defs/";
 	ENTITY_SCRIPT_UID utype = 1;
 	
-	// 初始化数据类别
-	// assets/scripts/entity_defs/types.xml
-	if(!DataTypes::initialize(defFilePath + "types.xml"))
+	// 插件类型按 plugins.xml 顺序先于宿主 assets 类型加载，确保宿主 .def 可以引用插件别名。
+	// Plugin types load in plugins.xml order before host asset types so host .def files can reference plugin aliases.
+	std::vector<PluginTypeFileDescriptor> pluginTypeFiles;
+	if (!PluginManager::instance().initialize())
+		return false;
+
+	pluginTypeFiles = PluginManager::instance().getTypeFileDescriptors();
+	bool dataTypesInitialized = false;
+	for (std::vector<PluginTypeFileDescriptor>::const_iterator iter = pluginTypeFiles.begin();
+		iter != pluginTypeFiles.end(); ++iter)
+	{
+		if (!dataTypesInitialized)
+		{
+			if (!DataTypes::initialize(iter->file, iter->pluginPrefix, iter->manifestFile))
+				return false;
+			dataTypesInitialized = true;
+		}
+		else if (!DataTypes::loadTypes(iter->file, iter->pluginPrefix, iter->manifestFile))
+		{
+			return false;
+		}
+	}
+
+	// 初始化宿主 assets 类型；没有插件类型时保持原有 1.x 初始化路径。
+	// Initialize host asset types; when no plugin types exist this preserves the original 1.x path.
+	if (!dataTypesInitialized && !DataTypes::initialize(defFilePath + "types.xml"))
+		return false;
+	if (dataTypesInitialized && !DataTypes::loadTypes(defFilePath + "types.xml", "", defFilePath + "types.xml"))
 		return false;
 
 	// 打开这个entities.xml文件

@@ -26,6 +26,7 @@ namespace KBEngine{
 
 DataTypes::DATATYPE_MAP DataTypes::dataTypes_;
 DataTypes::DATATYPE_MAP DataTypes::dataTypesLowerName_;
+std::map<std::string, std::string> DataTypes::dataTypeSourceLowerName_;
 DataTypes::UID_DATATYPE_MAP DataTypes::uid_dataTypes_;
 DataTypes::DATATYPE_ORDERS DataTypes::dataTypesOrders_;
 
@@ -51,6 +52,7 @@ void DataTypes::finalise(void)
 
 	uid_dataTypes_.clear();
 	dataTypesLowerName_.clear();
+	dataTypeSourceLowerName_.clear();
 	dataTypes_.clear();
 	dataTypesOrders_.clear();
 
@@ -67,8 +69,27 @@ bool DataTypes::validTypeName(const std::string& typeName)
 	return true;
 }
 
+// 插件类型必须以插件前缀开头并使用大写或下划线分隔，避免污染全局类型命名空间。
+// Plugin types must start with the plugin prefix and use an uppercase or underscore boundary to avoid global name collisions.
+bool DataTypes::validTypeNameWithPrefix(const std::string& typeName, const std::string& prefix)
+{
+	if (typeName.size() <= prefix.size() || typeName.compare(0, prefix.size(), prefix) != 0)
+		return false;
+
+	char boundary = typeName[prefix.size()];
+	return boundary == '_' || (boundary >= 'A' && boundary <= 'Z');
+}
+
 //-------------------------------------------------------------------------------------
 bool DataTypes::initialize(std::string file)
+{
+	return initialize(file, "", "");
+}
+
+// 使用可选前缀加载类型，普通 1.x assets 继续走空前缀兼容路径。
+// Load types with an optional prefix while keeping ordinary 1.x assets on the empty-prefix path.
+bool DataTypes::initialize(const std::string& file, const std::string& requiredPrefix,
+	const std::string& sourceName)
 {
 	// 初始化一些基础类别
 	addDataType("UINT8",		new IntType<uint8>);
@@ -97,7 +118,7 @@ bool DataTypes::initialize(std::string file)
 	addDataType("VECTOR4",		new Vector4Type);
 
 	_g_baseTypeEndIndex = dataTypesOrders_.size();
-	return loadTypes(file);
+	return loadTypes(file, requiredPrefix, sourceName);
 }
 
 //-------------------------------------------------------------------------------------
@@ -111,12 +132,26 @@ std::vector< std::string > DataTypes::getBaseTypeNames()
 //-------------------------------------------------------------------------------------
 bool DataTypes::loadTypes(std::string& file)
 {
+	return loadTypes(file, "", "");
+}
+
+//-------------------------------------------------------------------------------------
+bool DataTypes::loadTypes(const std::string& file, const std::string& requiredPrefix,
+	const std::string& sourceName)
+{
 	SmartPointer<XML> xml(new XML(Resmgr::getSingleton().matchRes(file).c_str()));
-	return loadTypes(xml);
+	return loadTypes(xml, requiredPrefix, sourceName.empty() ? file : sourceName);
 }
 
 //-------------------------------------------------------------------------------------
 bool DataTypes::loadTypes(SmartPointer<XML>& xml)
+{
+	return loadTypes(xml, "", "");
+}
+
+//-------------------------------------------------------------------------------------
+bool DataTypes::loadTypes(SmartPointer<XML>& xml, const std::string& requiredPrefix,
+	const std::string& sourceName)
 {
 	if (xml == NULL || !xml->isGood())
 		return false;
@@ -143,6 +178,13 @@ bool DataTypes::loadTypes(SmartPointer<XML>& xml)
 			return false;
 		}
 
+		if (!requiredPrefix.empty() && !DataTypes::validTypeNameWithPrefix(aliasName, requiredPrefix))
+		{
+			ERROR_MSG(fmt::format("DataTypes::loadTypes: plugin type alias [{}] must use prefix [{}], file [{}].\n",
+				aliasName, requiredPrefix, sourceName));
+			return false;
+		}
+
 		if(childNode != NULL)
 		{
 			type = xml->getValStr(childNode);
@@ -152,7 +194,11 @@ bool DataTypes::loadTypes(SmartPointer<XML>& xml)
 				
 				if(fixedDict->initialize(xml.get(), childNode, aliasName))
 				{
-					addDataType(aliasName, fixedDict);
+					if (!addDataType(aliasName, fixedDict, sourceName))
+					{
+						delete fixedDict;
+						return false;
+					}
 				}
 				else
 				{
@@ -169,7 +215,11 @@ bool DataTypes::loadTypes(SmartPointer<XML>& xml)
 				
 				if(fixedArray->initialize(xml.get(), childNode, aliasName))
 				{
-					addDataType(aliasName, fixedArray);
+					if (!addDataType(aliasName, fixedArray, sourceName))
+					{
+						delete fixedArray;
+						return false;
+					}
 				}
 				else
 				{
@@ -191,7 +241,8 @@ bool DataTypes::loadTypes(SmartPointer<XML>& xml)
 					return false;
 				}
 
-				addDataType(aliasName, dataType);
+				if (!addDataType(aliasName, dataType, sourceName))
+					return false;
 			}
 		}
 	}
@@ -203,29 +254,37 @@ bool DataTypes::loadTypes(SmartPointer<XML>& xml)
 //-------------------------------------------------------------------------------------
 bool DataTypes::addDataType(std::string name, DataType* dataType)
 {
-	dataTypesOrders_.push_back(name);
+	return addDataType(name, dataType, "");
+}
 
-	dataType->aliasName(name);
+// 注册类型别名时记录来源并在重复名称时原子失败，避免插件 schema 污染后继续生成协议。
+// Record the type source and fail atomically on duplicate aliases so plugin schemas cannot continue with a corrupted protocol table.
+bool DataTypes::addDataType(std::string name, DataType* dataType, const std::string& sourceName)
+{
 	std::string lowername = name;
 	std::transform(lowername.begin(), lowername.end(), lowername.begin(), tolower);	
 
 	DATATYPE_MAP::iterator iter = dataTypesLowerName_.find(lowername);
 	if (iter != dataTypesLowerName_.end())
 	{ 
-		ERROR_MSG(fmt::format("DataTypes::addDataType(name): name {} exist.\n", name.c_str()));
+		ERROR_MSG(fmt::format("DataTypes::addDataType(name): type [{}] already exists, source=[{}].\n",
+			name, sourceName.empty() ? "unknown" : sourceName));
 		return false;
 	}
 
+	dataTypesOrders_.push_back(name);
+	dataType->aliasName(name);
 	dataTypes_[name] = dataType;
 	dataTypesLowerName_[lowername] = dataType;
+	dataTypeSourceLowerName_[lowername] = sourceName;
 	uid_dataTypes_[dataType->id()] = dataType;
 
 	//dataType->incRef();
 
 	if(g_debugEntity)
 	{
-		DEBUG_MSG(fmt::format("DataTypes::addDataType(name): {:p} name={}, aliasName={}, uid={}.\n", 
-			(void*)dataType, name, dataType->aliasName(), dataType->id()));
+		DEBUG_MSG(fmt::format("DataTypes::addDataType(name): {:p} name={}, aliasName={}, uid={}, source={}.\n",
+			(void*)dataType, name, dataType->aliasName(), dataType->id(), sourceName));
 	}
 
 	return true;
@@ -269,28 +328,31 @@ void DataTypes::delDataType(std::string name)
 		std::string lowername = name;
 		std::transform(lowername.begin(), lowername.end(), lowername.begin(), tolower);
 		dataTypesLowerName_.erase(lowername);
+		dataTypeSourceLowerName_.erase(lowername);
 	}
 }
 
 //-------------------------------------------------------------------------------------
-DataType* DataTypes::getDataType(std::string name)
+DataType* DataTypes::getDataType(std::string name, bool notFoundOutError)
 {
 	DATATYPE_MAP::iterator iter = dataTypes_.find(name);
 	if (iter != dataTypes_.end()) 
 		return iter->second.get();
 
-	ERROR_MSG(fmt::format("DataTypes::getDataType:not found type {}.\n", name.c_str()));
+	if (notFoundOutError)
+		ERROR_MSG(fmt::format("DataTypes::getDataType:not found type {}.\n", name.c_str()));
 	return NULL;
 }
 
 //-------------------------------------------------------------------------------------
-DataType* DataTypes::getDataType(const char* name)
+DataType* DataTypes::getDataType(const char* name, bool notFoundOutError)
 {
 	DATATYPE_MAP::iterator iter = dataTypes_.find(name);
 	if (iter != dataTypes_.end()) 
 		return iter->second.get();
 
-	ERROR_MSG(fmt::format("DataTypes::getDataType:not found type {}.\n", name));
+	if (notFoundOutError)
+		ERROR_MSG(fmt::format("DataTypes::getDataType:not found type {}.\n", name));
 	return NULL;
 }
 
