@@ -296,11 +296,13 @@ PyObject* ScriptDefModule::getInitDict(void)
 //-------------------------------------------------------------------------------------
 void ScriptDefModule::autoMatchCompOwn()
 {
+	const std::string scriptsPrefix = Resmgr::getSingleton().isKBEngineNexAssets() ? "" : "scripts/";
+
 	if (isComponentModule())
 	{
 		// 组件脚本位于各运行时目录的 components 子目录中，不能复用实体模块的直接路径规则。
 		// Component scripts live below each runtime folder's components directory, so they need a dedicated path rule.
-		std::string fmodule = "scripts/base/components/" + name_ + ".py";
+		std::string fmodule = scriptsPrefix + "base/components/" + name_ + ".py";
 		std::string fmodule_pyc = fmodule + "c";
 		if (Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
 			Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)
@@ -308,7 +310,7 @@ void ScriptDefModule::autoMatchCompOwn()
 			setBase(true);
 		}
 
-		fmodule = "scripts/cell/components/" + name_ + ".py";
+		fmodule = scriptsPrefix + "cell/components/" + name_ + ".py";
 		fmodule_pyc = fmodule + "c";
 		if (Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
 			Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)
@@ -395,7 +397,7 @@ void ScriptDefModule::autoMatchCompOwn()
 	}
 	XML_FOR_END(node);
 
-	std::string fmodule = "scripts/client/" + name_ + ".py";
+	std::string fmodule = scriptsPrefix + "client/" + name_ + ".py";
 	std::string fmodule_pyc = fmodule + "c";
 	if(Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
 		Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)
@@ -438,7 +440,7 @@ void ScriptDefModule::autoMatchCompOwn()
 		return;
 	}
 
-	fmodule = "scripts/base/" + name_ + ".py";
+	fmodule = scriptsPrefix + "base/" + name_ + ".py";
 	fmodule_pyc = fmodule + "c";
 	if(Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
 		Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)
@@ -474,7 +476,7 @@ void ScriptDefModule::autoMatchCompOwn()
 		}
 	}
 
-	fmodule = "scripts/cell/" + name_ + ".py";
+	fmodule = scriptsPrefix + "cell/" + name_ + ".py";
 	fmodule_pyc = fmodule + "c";
 	if(Resmgr::getSingleton().matchRes(fmodule) != fmodule ||
 		Resmgr::getSingleton().matchRes(fmodule_pyc) != fmodule_pyc)

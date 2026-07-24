@@ -22,6 +22,9 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "helper/watcher.h"
 #include "thread/threadguard.h"
 
+#include <algorithm>
+#include <cctype>
+
 #if KBE_PLATFORM != PLATFORM_WIN32
 #include <unistd.h>
 #include <fcntl.h>
@@ -514,7 +517,8 @@ std::string Resmgr::getPyUserScriptsPath()
 
 		std::string::size_type pos = path.rfind("res");
 		path.erase(pos, path.size() - pos);
-		path += "scripts/";
+		if (!isKBEngineNexAssets())
+			path += "scripts/";
 	}
 
 	return path;
@@ -584,6 +588,28 @@ std::string Resmgr::getPyUserAssetsPath()
 	}
 
 	return path;
+}
+
+// Nex 资源把 entities.xml 和 entity_defs 直接放在资源根目录，1.x 资源则放在 scripts 子目录。
+// Nex resources place entities.xml and entity_defs at the asset root, while 1.x resources keep them below scripts.
+bool Resmgr::isKBEngineNexAssets()
+{
+	std::string entityPath = matchRes("entities.xml");
+	if (entityPath == "entities.xml")
+		return false;
+
+	std::transform(entityPath.begin(), entityPath.end(), entityPath.begin(),
+		[](unsigned char value) { return static_cast<char>(std::tolower(value)); });
+
+	const std::string legacySuffix = "scripts/entities.xml";
+	if (entityPath.size() >= legacySuffix.size() &&
+		entityPath.compare(entityPath.size() - legacySuffix.size(),
+			legacySuffix.size(), legacySuffix) == 0)
+	{
+		return false;
+	}
+
+	return true;
 }
 
 //-------------------------------------------------------------------------------------
