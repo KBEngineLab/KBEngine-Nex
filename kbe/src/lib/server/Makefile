@@ -10,6 +10,7 @@ SRCS =				\
 	globaldata_server	\
 	idallocate		\
 	pendingLoginmgr		\
+	plugin_runtime		\
 	py_file_descriptor	\
 	python_app		\
 	script_timers		\

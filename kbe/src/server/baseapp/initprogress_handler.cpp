@@ -21,6 +21,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "baseapp.h"
 #include "initprogress_handler.h"
 #include "entity_autoloader.h"
+#include "server/plugin_runtime.h"
 #include "network/bundle.h"
 #include "network/channel.h"
 
@@ -209,6 +210,9 @@ bool InitProgressHandler::process()
 			Py_DECREF(pyResult);
 		else
 			SCRIPT_ERROR_CHECK();
+
+		if (!PluginRuntime::instance().onComponentReady(g_componentGroupOrder == 1))
+			return false;
 
 		return true;
 	}

@@ -36,6 +36,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "helper/profile.h"
 #include "server/kbemain.h"	
 #include "server/script_timers.h"
+#include "server/plugin_runtime.h"
 #include "server/idallocate.h"
 #include "server/serverconfig.h"
 #include "server/globaldata_client.h"
@@ -301,7 +302,10 @@ bool EntityApp<E>::inInitialize()
 	if(!installPyModules())
 		return false;
 	
-	return installEntityDef();
+	if (!installEntityDef())
+		return false;
+
+	return PluginRuntime::instance().initialize(componentType_, false);
 }
 
 template<class E>
@@ -334,6 +338,8 @@ void EntityApp<E>::finalise(void)
 	
 	pyCallbackMgr_.finalise();
 	ScriptTimers::finalise(*this);
+
+	PluginRuntime::instance().finalise();
 
 	if(pEntities_)
 		pEntities_->finalise();
@@ -1460,8 +1466,14 @@ void EntityApp<E>::onReloadScript(bool fullReload)
 template<class E>
 void EntityApp<E>::reloadScript(bool fullReload)
 {
+	PluginRuntime::instance().finalise();
 	EntityDef::reload(fullReload);
 	onReloadScript(fullReload);
+	if (!PluginRuntime::instance().initialize(componentType_, true))
+	{
+		ERROR_MSG("EntityApp::reloadScript: plugin lifecycle reload failed.\n");
+		return;
+	}
 
 	// SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 

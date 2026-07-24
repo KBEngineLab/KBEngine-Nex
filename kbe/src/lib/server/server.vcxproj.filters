@@ -48,6 +48,9 @@
     <ClCompile Include="pendingLoginmgr.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="plugin_runtime.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="script_timers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -117,6 +120,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="pendingLoginmgr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="plugin_runtime.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="script_timers.h">
