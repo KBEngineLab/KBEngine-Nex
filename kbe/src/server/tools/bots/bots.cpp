@@ -23,6 +23,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "clientobject.h"
 #include "server/telnet_server.h"
 #include "server/components.h"
+#include "server/plugin_runtime.h"
 #include "client_lib/entity.h"
 #include "clientobject.h"
 #include "bots_interface.h"
@@ -127,6 +128,14 @@ bool Bots::initializeEnd()
 		return false;
 	}
 
+	// Bots 在 EntityDef 和宿主入口就绪后启动插件，避免插件访问尚未注册的客户端实体类型。
+	// Bots starts plugins after EntityDef and the host entry are ready, preventing access to unregistered client entity types.
+	if (!PluginRuntime::instance().initialize(BOTS_TYPE, false))
+		return false;
+
+	if (!PluginRuntime::instance().onComponentReady(true))
+		return false;
+
 	return true;
 }
 
@@ -146,6 +155,10 @@ void Bots::finalise()
 	{
 		SCRIPT_ERROR_CHECK();
 	}
+
+	// 插件先于机器人客户端和 Python 类型释放，以便 onFini 安全注销回调与共享状态。
+	// Plugins stop before bot clients and Python types so onFini can safely unregister callbacks and shared state.
+	PluginRuntime::instance().finalise();
 
 	CLIENTS::iterator iter = clients_.begin();
 	for(; iter != clients_.end(); ++iter)

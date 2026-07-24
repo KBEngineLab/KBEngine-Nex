@@ -31,6 +31,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "server/serverconfig.h"
 #include "pyscript/py_gc.h"
 #include "resmgr/resmgr.h"
+#include "resmgr/plugins/plugin_manager.h"
 #include "client_lib/config.h"
 
 namespace KBEngine{
@@ -107,9 +108,29 @@ inline bool installPyScript(KBEngine::script::Script& script, COMPONENT_TYPE com
 	}
 	else
 	{
+		// Bots 插件使用 plugins.<name> 包名导入，因此解释器必须能看到用户脚本根目录。
+		// Bots plugins import through plugins.<name>, so the interpreter must see the user script root.
+		pyPaths += user_scripts_path + L";";
 		pyPaths += user_scripts_path + L"bots;";
 		pyPaths += user_scripts_path + L"bots/interfaces;";
 		pyPaths += user_scripts_path + L"bots/components;";
+
+		if (!PluginManager::instance().initialize())
+			return false;
+
+		// 插件路径保持 plugins.xml 的声明顺序，使 Bots 与服务端组件拥有相同的模块优先级。
+		// Plugin paths retain plugins.xml declaration order so Bots and server components share module precedence.
+		std::vector<std::string> pluginPaths = PluginManager::instance().getComponentPythonPaths(BOTS_TYPE);
+		for (std::vector<std::string>::const_iterator iter = pluginPaths.begin(); iter != pluginPaths.end(); ++iter)
+		{
+			wchar_t* pluginPath = KBEngine::strutil::char2wchar(const_cast<char*>(iter->c_str()));
+			if (pluginPath != NULL)
+			{
+				pyPaths += pluginPath;
+				pyPaths += L";";
+				free(pluginPath);
+			}
+		}
 	}
 
 	std::string kbe_res_path = Resmgr::getSingleton().getPySysResPath();
