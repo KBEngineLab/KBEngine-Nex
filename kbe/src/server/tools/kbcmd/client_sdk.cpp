@@ -31,6 +31,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "entitydef/datatypes.h"
 #include "entitydef/datatype.h"
 #include "resmgr/resmgr.h"
+#include "resmgr/plugins/plugin_manager.h"
 #include "server/common.h"
 #include "server/serverconfig.h"
 #include "common/kbeversion.h"
@@ -205,6 +206,23 @@ bool ClientSDK::create(const std::string& path)
 
 	if (basepath_[basepath_.size() - 1] != '\\' && basepath_[basepath_.size() - 1] != '/')
 		basepath_ += "/";
+
+	// SDK 生成前确认所有插件实体已经进入统一协议表，防止输出缺少插件模块的半成品。
+	// Verify that every plugin entity is present in the unified protocol table before generation, preventing incomplete SDK output.
+	if (!PluginManager::instance().initialize())
+		return false;
+
+	const std::vector<PluginEntityDescriptor>& pluginEntities = PluginManager::instance().entities();
+	for (std::vector<PluginEntityDescriptor>::const_iterator pluginIter = pluginEntities.begin();
+		pluginIter != pluginEntities.end(); ++pluginIter)
+	{
+		if (EntityDef::findScriptModule(pluginIter->name.c_str()) == NULL)
+		{
+			ERROR_MSG(fmt::format("ClientSDK::create(): plugin entity [{}] is missing from EntityDef protocol table.\n",
+				pluginIter->name));
+			return false;
+		}
+	}
 
 	currHeaderPath_ = currSourcePath_ = basepath_;
 
