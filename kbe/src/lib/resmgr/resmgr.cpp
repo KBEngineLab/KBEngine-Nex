@@ -513,12 +513,37 @@ std::string Resmgr::getPyUserScriptsPath()
 
 	if (path == "")
 	{
-		path = getPyUserResPath();
+		if (isKBEngineNexAssets())
+		{
+			// Nex 脚本根目录以实际命中的 entities.xml 为准，避免依赖 KBE_RES_PATH 中 res 目录的排列顺序。
+			// Resolve the Nex script root from the matched entities.xml so it does not depend on res-directory ordering in KBE_RES_PATH.
+			path = matchRes("entities.xml");
+			strutil::kbe_replace(path, "\\", "/");
+			std::string::size_type separator = path.rfind('/');
+			path = separator == std::string::npos ? "" : path.substr(0, separator + 1);
+		}
+		else
+		{
+			// 1.x 资源从用户 res 目录回到 assets 根目录，再进入 scripts；找不到标准 res 后缀时保留兼容回退。
+			// Legacy 1.x assets step from the user res directory to the asset root and then scripts, with a compatibility fallback for nonstandard paths.
+			path = getPyUserResPath();
+			strutil::kbe_replace(path, "\\", "/");
+			while (!path.empty() && path[path.size() - 1] == '/')
+				path.erase(path.size() - 1);
 
-		std::string::size_type pos = path.rfind("res");
-		path.erase(pos, path.size() - pos);
-		if (!isKBEngineNexAssets())
+			const std::string resSuffix = "/res";
+			if (path.size() >= resSuffix.size() &&
+				path.compare(path.size() - resSuffix.size(), resSuffix.size(), resSuffix) == 0)
+			{
+				path.erase(path.size() - resSuffix.size() + 1);
+			}
+			else if (!path.empty())
+			{
+				path += "/";
+			}
+
 			path += "scripts/";
+		}
 	}
 
 	return path;
