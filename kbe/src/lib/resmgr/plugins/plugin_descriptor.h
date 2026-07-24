@@ -91,4 +91,3 @@ inline COMPONENT_TYPE getComponentTypeFromFolder(const std::string& folder)
 }
 
 #endif // KBE_PLUGIN_DESCRIPTOR_H
-
