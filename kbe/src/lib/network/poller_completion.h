@@ -12,6 +12,14 @@ namespace KBEngine {
 namespace Network
 {
 
+// Completion processing is bounded per tick so a burst cannot starve timers and application work.
+// 每个 tick 限制 completion 处理量，避免网络突发饿死定时器和应用逻辑。
+static const uint32 COMPLETION_MAX_COMPLETIONS_PER_TICK = 256;
+
+// Zero keeps the time budget disabled until a runtime watcher/configuration is added.
+// 零值表示暂不启用时间预算，待运行时 watcher/配置接入后再开放动态调节。
+static const uint32 COMPLETION_MAX_PROCESSING_TIME_MS = 0;
+
 class CompletionPoller : public EventPoller
 {
 public:
