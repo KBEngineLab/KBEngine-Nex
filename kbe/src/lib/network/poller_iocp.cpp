@@ -667,6 +667,25 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 		return;
 	}
 
+	// GetQueuedCompletionStatus 返回 Win32 系统错误，例如断线是 ERROR_NETNAME_DELETED(64)；
+	// 旧网络层按 Winsock 错误分类，因此必须从 OVERLAPPED 结果取得 WSAECONNRESET 等规范错误。
+	// GetQueuedCompletionStatus returns Win32 errors such as ERROR_NETNAME_DELETED(64) for disconnects;
+	// the legacy network layer classifies Winsock errors, so retrieve canonical values such as WSAECONNRESET from the OVERLAPPED result.
+	int socketErrorCode = static_cast<int>(errorCode);
+	if (!success)
+	{
+		DWORD transferred = bytesTransferred;
+		DWORD flags = pContext->flags;
+		if (!WSAGetOverlappedResult(pContext->socket, &pContext->overlapped, &transferred, FALSE, &flags))
+		{
+			const int overlappedError = WSAGetLastError();
+			if (overlappedError != 0)
+			{
+				socketErrorCode = overlappedError;
+			}
+		}
+	}
+
 	if (pContext->operation == OP_ACCEPT)
 	{
 		if (success && pContext->acceptSocket != INVALID_SOCKET)
@@ -685,8 +704,8 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 		}
 		else if (!success)
 		{
-			WARNING_MSG(fmt::format("IocpPoller::handleCompletion: AcceptEx failed on fd {}: {}\n",
-				fd, kbe_strerror(errorCode)));
+			WARNING_MSG(fmt::format("IocpPoller::handleCompletion: AcceptEx failed on fd {}, completionError={}, socketError={}: {}\n",
+				fd, errorCode, socketErrorCode, kbe_strerror(socketErrorCode)));
 		}
 	}
 		else if (pContext->operation == OP_TCP_RECV)
@@ -704,8 +723,8 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 
 			if (!success && errorCode != 0)
 			{
-				WARNING_MSG(fmt::format("IocpPoller::handleCompletion: read completion failed on fd {}: {}\n",
-					fd, kbe_strerror(errorCode)));
+				WARNING_MSG(fmt::format("IocpPoller::handleCompletion: read completion failed on fd {}, completionError={}, socketError={}: {}\n",
+					fd, errorCode, socketErrorCode, kbe_strerror(socketErrorCode)));
 			}
 
 			const bool terminal = !success || bytesTransferred == 0;
@@ -718,7 +737,7 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 				pState->registeredRead = false;
 			}
 
-			const bool queued = pushTcpReceivedData(fd, data, success && bytesTransferred == 0, success ? 0 : static_cast<int>(errorCode));
+			const bool queued = pushTcpReceivedData(fd, data, success && bytesTransferred == 0, success ? 0 : socketErrorCode);
 			if (queued)
 			{
 				this->triggerRead(fd);
@@ -737,8 +756,8 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 	{
 		if (!success && errorCode != 0 && !isUdpPortUnreachable)
 		{
-			WARNING_MSG(fmt::format("IocpPoller::handleCompletion: udp recv completion failed on fd {}: {}\n",
-				fd, kbe_strerror(errorCode)));
+			WARNING_MSG(fmt::format("IocpPoller::handleCompletion: udp recv completion failed on fd {}, completionError={}, socketError={}: {}\n",
+				fd, errorCode, socketErrorCode, kbe_strerror(socketErrorCode)));
 		}
 
 		if (success && bytesTransferred > 0)
@@ -761,13 +780,13 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 	{
 		if (!success && errorCode != 0)
 		{
-			WARNING_MSG(fmt::format("IocpPoller::handleCompletion: send completion failed on fd {}: {}\n",
-				fd, kbe_strerror(errorCode)));
+			WARNING_MSG(fmt::format("IocpPoller::handleCompletion: send completion failed on fd {}, completionError={}, socketError={}: {}\n",
+				fd, errorCode, socketErrorCode, kbe_strerror(socketErrorCode)));
 
 			// 发送失败仍然转成读侧错误 completion，让 Channel 销毁路径和旧同步 send
 			// 保持一致，避免写侧直接销毁打断 buffered receive 遍历。
 			std::vector<char> data;
-			if (pushTcpReceivedData(fd, data, false, static_cast<int>(errorCode)))
+			if (pushTcpReceivedData(fd, data, false, socketErrorCode))
 			{
 				this->triggerRead(fd);
 			}
@@ -800,8 +819,8 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 	{
 		if (!success && errorCode != 0 && !isUdpPortUnreachable)
 		{
-			WARNING_MSG(fmt::format("IocpPoller::handleCompletion: udp send completion failed on fd {}: {}\n",
-				fd, kbe_strerror(errorCode)));
+			WARNING_MSG(fmt::format("IocpPoller::handleCompletion: udp send completion failed on fd {}, completionError={}, socketError={}: {}\n",
+				fd, errorCode, socketErrorCode, kbe_strerror(socketErrorCode)));
 		}
 
 		if (!pState->pendingUdpSends.empty())
