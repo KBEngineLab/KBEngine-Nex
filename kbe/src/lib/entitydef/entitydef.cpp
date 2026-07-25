@@ -1973,6 +1973,18 @@ bool EntityDef::loadAllScriptModules(std::string entitiesPath,
 		return true;
 	};
 
+	// 组件属性初始化会通过 ScriptDefModule::createObject 直接分配对应脚本类，因此必须先绑定所有组件类型。
+	// Component-property initialization allocates its script class through ScriptDefModule::createObject, so every component type must be bound first.
+	// 直接遍历统一模块表同时覆盖宿主与插件组件，并保持定义阶段确定的模块编号顺序。
+	// Iterating the unified module table covers host and plugin components while preserving the module-ID order fixed during definition loading.
+	for (SCRIPT_MODULES::const_iterator moduleIter = __scriptModules.begin();
+		moduleIter != __scriptModules.end(); ++moduleIter)
+	{
+		ScriptDefModule* pScriptModule = moduleIter->get();
+		if (pScriptModule->isComponentModule() && !loadScriptModule(pScriptModule->getName()))
+			return false;
+	}
+
 	const std::vector<PluginEntityDescriptor>& pluginEntities = PluginManager::instance().entities();
 	for (std::vector<PluginEntityDescriptor>::const_iterator pluginIter = pluginEntities.begin();
 		pluginIter != pluginEntities.end(); ++pluginIter)

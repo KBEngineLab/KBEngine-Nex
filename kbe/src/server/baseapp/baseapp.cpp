@@ -427,11 +427,15 @@ bool Baseapp::installPyModules()
 	Entity::installScript(getScript().getModule());
 	Proxy::installScript(getScript().getModule());
 	Space::installScript(getScript().getModule());
+	EntityComponent::installScript(getScript().getModule());
 	GlobalDataClient::installScript(getScript().getModule());
 
 	registerScript(Entity::getScriptType());
 	registerScript(Proxy::getScriptType());
 	registerScript(Space::getScriptType());
+	// 组件脚本必须在实体定义加载前继承已注册的 Base 侧类型，否则组件模块无法绑定可实例化的 Python 类型。
+	// Component scripts must inherit the registered base-side type before entity definitions load, or their modules cannot bind an instantiable Python type.
+	registerScript(EntityComponent::getScriptType());
 
 	// 将app标记注册到脚本
 	std::map<uint32, std::string> flagsmaps = createAppFlagsMaps();
@@ -520,6 +524,7 @@ bool Baseapp::uninstallPyModules()
 	Entity::uninstallScript();
 	Proxy::uninstallScript();
 	Space::uninstallScript();
+	EntityComponent::uninstallScript();
 	GlobalDataClient::uninstallScript();
 	return EntityApp<Entity>::uninstallPyModules();
 }

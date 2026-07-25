@@ -1289,6 +1289,11 @@ public:																										\
 																											\
 	void CLASS::initProperty(bool isReload)																	\
 	{																										\
+		/* 组件默认值会根据当前运行侧选择子属性集合，同时需要实体 ID 建立所有权。 */							\
+		/* Component defaults select child properties by the active runtime side and need the entity ID for ownership. */		\
+		EntityDef::context().currComponentType = g_componentType;											\
+		EntityDef::context().currEntityID = id();														\
+																									\
 		ScriptDefModule::PROPERTYDESCRIPTION_MAP* oldpropers = NULL;										\
 		if(isReload)																						\
 		{																									\
@@ -1327,6 +1332,11 @@ public:																										\
 			if(dataType)																					\
 			{																								\
 				PyObject* defObj = propertyDescription->newDefaultVal();									\
+				/* 赋值会先触发组件类型校验，而校验可能读取 owner，因此必须在赋值前绑定所有者。 */				\
+				/* Assignment validates the component type first, and validation may read owner, so bind it before assignment. */	\
+				if(dataType->type() == DATA_TYPE_ENTITY_COMPONENT)										\
+					((EntityComponent*)defObj)->updateOwner(id(), this);									\
+																							\
 				PyObject_SetAttrString(static_cast<PyObject*>(this),										\
 							propertyDescription->getName(), defObj);										\
 				Py_DECREF(defObj);																			\

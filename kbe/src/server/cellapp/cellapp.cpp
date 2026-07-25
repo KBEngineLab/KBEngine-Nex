@@ -169,10 +169,14 @@ bool Cellapp::installPyModules()
 {
 	Entity::installScript(getScript().getModule());
 	SpaceEntity::installScript(getScript().getModule(), "Space");
+	EntityComponent::installScript(getScript().getModule());
 	GlobalDataClient::installScript(getScript().getModule());
 
 	registerScript(Entity::getScriptType());
 	registerScript(SpaceEntity::getScriptType());
+	// 组件默认值会在 Cell 实体属性初始化期间直接构造，必须先注册组件基类并纳入类型校验。
+	// Component defaults are constructed during cell-entity property initialization, so the component base must be registered and included in type validation first.
+	registerScript(EntityComponent::getScriptType());
 	
 	// 将app标记注册到脚本
 	std::map<uint32, std::string> flagsmaps = createAppFlagsMaps();
@@ -241,6 +245,7 @@ bool Cellapp::uninstallPyModules()
 
 	Entity::uninstallScript();
 	SpaceEntity::uninstallScript();
+	EntityComponent::uninstallScript();
 	GlobalDataClient::uninstallScript();
 	return EntityApp<Entity>::uninstallPyModules();
 }
