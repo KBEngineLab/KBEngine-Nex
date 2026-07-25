@@ -172,9 +172,31 @@ bool CompletionPoller::takeUdpReceivedData(int fd, std::vector<char>& data, Addr
 bool CompletionPoller::queueTcpSend(int fd, const void* data, int len)
 {
 	// 上层交来的 TCP 数据只入队，真正发送由具体 poller arm/write 完成。
+	// The upper layer only queues TCP data here; the concrete poller performs the actual arm/write.
 	if (len <= 0)
 	{
 		return true;
+	}
+
+	// 仅在首次建立状态时验证 socket，既能拦住注销后仍使用的已关闭 fd，又避免每个包调用 getsockopt。
+	// Validate only when creating state so a closed fd reused after deregistration is rejected without a getsockopt call per packet.
+	if (socketStates_.find(fd) == socketStates_.end())
+	{
+		SocketKind detectedKind = SOCKET_KIND_UNKNOWN;
+		if (!tryDetermineSocketKind(static_cast<KBESOCKET>(fd), detectedKind))
+		{
+			return false;
+		}
+
+		if (detectedKind != SOCKET_KIND_TCP)
+		{
+#if KBE_PLATFORM == PLATFORM_WIN32
+			WSASetLastError(WSAESOCKTNOSUPPORT);
+#else
+			errno = EPROTOTYPE;
+#endif
+			return false;
+		}
 	}
 
 	SocketState& state = socketStateForFd(fd);

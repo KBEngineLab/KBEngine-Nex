@@ -225,7 +225,9 @@ Reason TCPPacketSender::processFilterPacket(Channel* pChannel, Packet * pPacket)
 		const int remaining = pPacket->length() - pPacket->sentSize;
 		if (!pPoller->queueTcpSend(static_cast<int>(*pEndpoint), pPacket->data() + pPacket->sentSize, remaining))
 		{
-			return REASON_RESOURCE_UNAVAILABLE;
+			// 队列上限会设置 would-block 并保持可重试；无效或已关闭 socket 必须沿用同步发送的错误分类并关闭 Channel。
+			// Queue backpressure sets would-block and remains retryable; an invalid or closed socket follows synchronous-send error mapping and closes the Channel.
+			return checkSocketErrors(pEndpoint);
 		}
 
 		pPacket->sentSize += remaining;

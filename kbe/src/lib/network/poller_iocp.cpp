@@ -113,13 +113,48 @@ IocpPoller::~IocpPoller()
 //-------------------------------------------------------------------------------------
 bool IocpPoller::queueTcpSend(int fd, const void* data, int len)
 {
-	// 共享基类只负责排队；IOCP 需要尽快投递 WSASend，让调用方能感知立即失败。
+	if (len <= 0)
+	{
+		return true;
+	}
+
+	// IOCP 关联必须在复制数据之前成功，否则失败数据会留在 pending 队列并在每个 Tick 永久重试。
+	// IOCP association must succeed before copying data, or failed bytes remain pending and retry forever on every tick.
+	auto iter = socketStates_.find(fd);
+	if (iter == socketStates_.end())
+	{
+		SocketKind detectedKind = SOCKET_KIND_UNKNOWN;
+		if (!tryDetermineSocketKind(static_cast<KBESOCKET>(fd), detectedKind))
+		{
+			return false;
+		}
+
+		if (detectedKind != SOCKET_KIND_TCP)
+		{
+			WSASetLastError(WSAESOCKTNOSUPPORT);
+			return false;
+		}
+	}
+
+	SocketState& state = socketStateForFd(fd);
+	if (state.kind == SOCKET_KIND_UNKNOWN)
+	{
+		state.kind = SOCKET_KIND_TCP;
+	}
+
+	if (!ensureAssociated(state, fd))
+	{
+		cleanupStateIfUnused(fd);
+		return false;
+	}
+
+	// 关联成功后共享基类才接管数据所有权，随后首次 WSASend 失败也由 completion 生命周期处理。
+	// The shared queue takes ownership only after association; completion lifecycle then handles a failed first WSASend attempt.
 	if (!CompletionPoller::queueTcpSend(fd, data, len))
 	{
 		return false;
 	}
 
-	SocketState& state = socketStateForFd(fd);
 	// Once the shared queue accepts bytes, ownership has moved to the poller even if the first WSASend attempt fails.
 	// 共享队列接受字节后，数据所有权已经转移给 poller，即使首次 WSASend 投递失败也由后端继续重试。
 	armTcpSend(fd, state);
@@ -153,8 +188,13 @@ bool IocpPoller::ensureAssociated(SocketState& state, int fd)
 	HANDLE handle = CreateIoCompletionPort(reinterpret_cast<HANDLE>(state.socket), completionPort_, static_cast<ULONG_PTR>(fd), 0);
 	if (handle == NULL)
 	{
-		ERROR_MSG(fmt::format("IocpPoller::ensureAssociated: CreateIoCompletionPort failed for fd {}: {}\n",
-			fd, kbe_strerror(GetLastError())));
+		const DWORD errorCode = GetLastError();
+		ERROR_MSG(fmt::format("IocpPoller::ensureAssociated: CreateIoCompletionPort failed for fd {}, socket={}, kind={}, registeredRead={}, tcpPendingBytes={}, udpPendingBytes={}: {}\n",
+			fd, static_cast<uint64>(state.socket), static_cast<int>(state.kind), state.registeredRead,
+			state.pendingTcpSendBytes, state.pendingUdpSendBytes, kbe_strerror(errorCode)));
+		// 日志转发可能执行其他 Winsock 调用；恢复原错误码，确保发送器能正确区分背压和失效连接。
+		// Log forwarding may execute other Winsock calls; restore the original code so the sender can classify backpressure versus failure.
+		WSASetLastError(static_cast<int>(errorCode));
 		return false;
 	}
 
