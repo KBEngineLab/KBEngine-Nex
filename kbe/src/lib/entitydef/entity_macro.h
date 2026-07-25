@@ -1049,9 +1049,15 @@ public:																										\
 		{																									\
 			isDestroyed_ = true;																			\
 			addFlags(ENTITY_FLAGS_DESTROYING);																\
+			/* 组件先执行 onDetached，但必须暂时保留 owner，保证实体 onDestroy 期间组件仍可访问所属实体。 */ \
+			/* Components run onDetached first while retaining owner access throughout the entity onDestroy callback. */ \
+			EntityComponent::onEntityDestroy(this, pScriptModule_, callScript, true); \
 			onDestroy(callScript);																			\
 			scriptTimers_.cancelAll();																		\
 			removeFlags(ENTITY_FLAGS_DESTROYING);															\
+			/* 实体回调结束后组件释放 owner 强引用，打破 Entity 与 EntityComponent 的 Python 引用环。 */ \
+			/* After entity callbacks finish, components release strong owner references to break the Python reference cycle. */ \
+			EntityComponent::onEntityDestroy(this, pScriptModule_, callScript, false); \
 			Py_DECREF(this);																				\
 		}																									\
 	}																										\
