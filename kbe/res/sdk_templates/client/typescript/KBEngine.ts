@@ -43,9 +43,9 @@ const KBE_FLT_MAX: number = 3.402823466e+38;
 
 export class KBEngineApp {
     private args: KBEngineArgs;
-    private idInterval: number;
-    private updatePlayerToServerInterval: number;
-    private kbEventInterval: number;
+    private idInterval: ReturnType<typeof setInterval>;
+    private updatePlayerToServerInterval: ReturnType<typeof setInterval>;
+    private kbEventInterval: ReturnType<typeof setInterval>;
 
     private userName: string = "test";
     private password: string = "123456";
@@ -966,17 +966,23 @@ export class KBEngineApp {
             {
                 this.entities[eid] = entity;
 
+                // 进入世界回调必须看到服务端创建消息中的完整属性，组件也必须在属性反序列化后再附着。
+                // Enter-world callbacks must observe the complete create-message state, and components must attach after property deserialization.
+                this.Client_onUpdatePropertys(entityStream);
+                delete this.bufferedCreateEntityMessage[eid];
+
                 entity.isOnGround = isOnGround > 0;
+                entity.onDirectionChanged(entity.direction);
+                entity.onPositionChanged(entity.position);
 
                 entity.__init__();
+                entity.attachComponents();
+                entity.inited = true;
                 entity.inWorld = true;
                 entity.EnterWorld();
 
                 if (this.args.isOnInitCallPropertysSetMethods)
                     entity.CallPropertysSetMethods();
-
-                this.Client_onUpdatePropertys(entityStream);
-                delete this.bufferedCreateEntityMessage[eid];
             }
             catch(e)
             {

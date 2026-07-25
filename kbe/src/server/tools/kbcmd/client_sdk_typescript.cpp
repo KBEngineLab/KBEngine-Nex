@@ -962,6 +962,7 @@ bool ClientSDKTypeScript::writeEngineMessagesModuleBegin()
 	
 	sourcefileBody_ += R"delimiter(
 import { KBEngineApp ,MemoryStream , DataTypes } from "./KBEngine";
+import KBELog from "./KBELog";
 
 
 export class Message {
