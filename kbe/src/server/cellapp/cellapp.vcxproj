@@ -130,6 +130,7 @@
     <ClCompile Include="entity_component.cpp" />
     <ClCompile Include="entity_coordinate_node.cpp" />
     <ClCompile Include="entity_remotemethod.cpp" />
+    <ClCompile Include="space_entity.cpp" />
     <ClCompile Include="entityref.cpp" />
     <ClCompile Include="forward_message_over_handler.cpp" />
     <ClCompile Include="..\..\lib\python\Modules\getbuildinfo.c" />
@@ -178,6 +179,7 @@
     <ClInclude Include="entity_coordinate_node.h" />
     <ClInclude Include="entity_interface_macros.h" />
     <ClInclude Include="entity_remotemethod.h" />
+    <ClInclude Include="space_entity.h" />
     <ClInclude Include="entityref.h" />
     <ClInclude Include="forward_message_over_handler.h" />
     <ClInclude Include="ghost_manager.h" />

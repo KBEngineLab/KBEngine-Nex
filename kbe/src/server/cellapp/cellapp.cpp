@@ -21,6 +21,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "cellapp.h"
 #include "space.h"
+#include "space_entity.h"
 #include "profile.h"
 #include "witness.h"
 #include "coordinate_node.h"
@@ -167,9 +168,11 @@ bool Cellapp::initializeWatcher()
 bool Cellapp::installPyModules()
 {
 	Entity::installScript(getScript().getModule());
+	SpaceEntity::installScript(getScript().getModule(), "Space");
 	GlobalDataClient::installScript(getScript().getModule());
 
 	registerScript(Entity::getScriptType());
+	registerScript(SpaceEntity::getScriptType());
 	
 	// 将app标记注册到脚本
 	std::map<uint32, std::string> flagsmaps = createAppFlagsMaps();
@@ -237,8 +240,19 @@ bool Cellapp::uninstallPyModules()
 	S_RELEASE(pCellAppData_); 
 
 	Entity::uninstallScript();
+	SpaceEntity::uninstallScript();
 	GlobalDataClient::uninstallScript();
 	return EntityApp<Entity>::uninstallPyModules();
+}
+
+// 空间脚本必须构造专用实体子类，才能让 Python 的继承关系和 C++ 对象类型保持一致。
+// Space scripts must construct the dedicated entity subtype so Python inheritance and C++ object layout stay aligned.
+Entity* Cellapp::onCreateEntity(PyObject* pyEntity, ScriptDefModule* sm, ENTITY_ID eid)
+{
+	if (PyType_IsSubtype(sm->getScriptType(), SpaceEntity::getScriptType()))
+		return new(pyEntity) SpaceEntity(eid, sm);
+
+	return EntityApp<Entity>::onCreateEntity(pyEntity, sm, eid);
 }
 
 //-------------------------------------------------------------------------------------

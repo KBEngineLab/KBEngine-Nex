@@ -22,6 +22,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "baseapp.h"
 #include "proxy.h"
 #include "entity.h"
+#include "space.h"
 #include "baseapp_interface.h"
 #include "entity_remotemethod.h"
 #include "archiver.h"
@@ -425,10 +426,12 @@ bool Baseapp::installPyModules()
 {
 	Entity::installScript(getScript().getModule());
 	Proxy::installScript(getScript().getModule());
+	Space::installScript(getScript().getModule());
 	GlobalDataClient::installScript(getScript().getModule());
 
 	registerScript(Entity::getScriptType());
 	registerScript(Proxy::getScriptType());
+	registerScript(Space::getScriptType());
 
 	// 将app标记注册到脚本
 	std::map<uint32, std::string> flagsmaps = createAppFlagsMaps();
@@ -516,6 +519,7 @@ bool Baseapp::uninstallPyModules()
 
 	Entity::uninstallScript();
 	Proxy::uninstallScript();
+	Space::uninstallScript();
 	GlobalDataClient::uninstallScript();
 	return EntityApp<Entity>::uninstallPyModules();
 }
@@ -966,6 +970,10 @@ Entity* Baseapp::onCreateEntity(PyObject* pyEntity, ScriptDefModule* sm, ENTITY_
 	if(PyType_IsSubtype(sm->getScriptType(), Proxy::getScriptType()))
 	{
 		return new(pyEntity) Proxy(eid, sm);
+	}
+	else if (PyType_IsSubtype(sm->getScriptType(), Space::getScriptType()))
+	{
+		return new(pyEntity) Space(eid, sm);
 	}
 
 	return EntityApp<Entity>::onCreateEntity(pyEntity, sm, eid);

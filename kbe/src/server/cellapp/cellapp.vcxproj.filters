@@ -66,6 +66,9 @@
     <ClCompile Include="entity_remotemethod.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="space_entity.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="entityref.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -204,6 +207,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="entity_remotemethod.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="space_entity.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="entityref.h">

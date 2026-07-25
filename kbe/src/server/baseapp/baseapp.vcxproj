@@ -121,6 +121,7 @@
     <ClCompile Include="entity_component.cpp" />
     <ClCompile Include="entity_messages_forward_handler.cpp" />
     <ClCompile Include="entity_remotemethod.cpp" />
+    <ClCompile Include="space.cpp" />
     <ClCompile Include="baseapp.cpp" />
     <ClCompile Include="baseapp_interface.cpp" />
     <ClCompile Include="data_download.cpp" />
@@ -143,6 +144,7 @@
     <ClInclude Include="entity_interface_macros.h" />
     <ClInclude Include="entity_messages_forward_handler.h" />
     <ClInclude Include="entity_remotemethod.h" />
+    <ClInclude Include="space.h" />
     <ClInclude Include="baseapp.h" />
     <ClInclude Include="baseapp_interface.h" />
     <ClInclude Include="baseapp_interface_macros.h" />

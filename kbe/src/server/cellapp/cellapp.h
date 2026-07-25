@@ -55,6 +55,7 @@ public:
 	virtual bool installPyModules();
 	virtual void onInstallPyModules();
 	virtual bool uninstallPyModules();
+	virtual Entity* onCreateEntity(PyObject* pyEntity, ScriptDefModule* sm, ENTITY_ID eid);
 	
 	bool run();
 	
