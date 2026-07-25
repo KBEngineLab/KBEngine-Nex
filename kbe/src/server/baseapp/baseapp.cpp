@@ -3742,6 +3742,9 @@ void Baseapp::registerPendingLogin(Network::Channel* pChannel, KBEngine::MemoryS
 	}
 
 	(*pBundle) << this->networkInterface().extaddr().port;
+	// 当前 1.x 网络接口尚未提供独立 UDP 外部端点，零端口明确表示 KCP 暂不可用，同时保持 Nex 2.8 登录协议字段完整。
+	// The current 1.x network interface has no separate external UDP endpoint; port zero explicitly marks KCP unavailable while preserving the Nex 2.8 login layout.
+	(*pBundle) << uint16(0);
 	pChannel->send(pBundle);
 
 	PendingLoginMgr::PLInfos* ptinfos = new PendingLoginMgr::PLInfos;

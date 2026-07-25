@@ -257,6 +257,13 @@ public:
 	virtual bool writeEntityPropertys(ScriptDefModule* pEntityScriptDefModule,
 		ScriptDefModule* pCurrScriptDefModule);
 
+	// 组件属性需要由各语言生成器写出强类型组件成员，不能进入普通数据类型名称分派。
+	// Component properties require each language generator to emit a strongly typed component member instead of using ordinary type-name dispatch.
+	virtual bool writeEntityPropertyComponent(ScriptDefModule* pEntityScriptDefModule,
+		ScriptDefModule* pCurrScriptDefModule, PropertyDescription* pPropertyDescription) {
+		return false;
+	}
+
 	virtual bool writeEntityProperty(ScriptDefModule* pEntityScriptDefModule,
 		ScriptDefModule* pCurrScriptDefModule, PropertyDescription* pPropertyDescription);
 

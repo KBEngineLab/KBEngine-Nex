@@ -1487,8 +1487,19 @@ bool ClientSDK::writeEntityPropertys(ScriptDefModule* pEntityScriptDefModule,
 	for (; propIter != clientPropertys.end(); ++propIter)
 	{
 		PropertyDescription* pPropertyDescription = propIter->second;
-		if (!writeEntityProperty(pEntityScriptDefModule, pCurrScriptDefModule, pPropertyDescription))
-			return false;
+
+		// 组件描述携带目标脚本模块，具体语言生成器必须据此生成组件类成员。
+		// A component descriptor carries its target script module, which the language generator needs to emit the component class member.
+		if (pPropertyDescription->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)
+		{
+			if (!writeEntityPropertyComponent(pEntityScriptDefModule, pCurrScriptDefModule, pPropertyDescription))
+				return false;
+		}
+		else
+		{
+			if (!writeEntityProperty(pEntityScriptDefModule, pCurrScriptDefModule, pPropertyDescription))
+				return false;
+		}
 	}
 
 	return true;

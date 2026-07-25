@@ -1323,8 +1323,8 @@ void Loginapp::onLoginAccountQueryResultFromDbmgr(Network::Channel* pChannel, Me
 }
 
 //-------------------------------------------------------------------------------------
-void Loginapp::onLoginAccountQueryBaseappAddrFromBaseappmgr(Network::Channel* pChannel, std::string& loginName, 
-															std::string& accountName, std::string& addr, uint16 port)
+void Loginapp::onLoginAccountQueryBaseappAddrFromBaseappmgr(Network::Channel* pChannel, std::string& loginName,
+													std::string& accountName, std::string& addr, uint16 tcp_port, uint16 udp_port)
 {
 	if(pChannel->isExternal())
 		return;
@@ -1338,7 +1338,7 @@ void Loginapp::onLoginAccountQueryBaseappAddrFromBaseappmgr(Network::Channel* pC
 		_loginFailed(NULL, loginName, SERVER_ERR_SRV_NO_READY, datas);
 	}
 
-	Network::Address address(addr, ntohs(port));
+	Network::Address address(addr, ntohs(tcp_port));
 
 	DEBUG_MSG(fmt::format("Loginapp::onLoginAccountQueryBaseappAddrFromBaseappmgr:accountName={0}, addr={1}.\n", 
 		loginName, address.c_str()));
@@ -1359,10 +1359,14 @@ void Loginapp::onLoginAccountQueryBaseappAddrFromBaseappmgr(Network::Channel* pC
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(ClientInterface::onLoginSuccessfully);
-	uint16 fport = ntohs(port);
+	uint16 f_tcp_port = ntohs(tcp_port);
+	uint16 f_udp_port = ntohs(udp_port);
 	(*pBundle) << accountName;
 	(*pBundle) << addr;
-	(*pBundle) << fport;
+	// Nex 2.8 SDK始终按TCP端口、UDP端口、BLOB的顺序解码，两个端口字段都必须存在才能保持后续流边界正确。
+	// The Nex 2.8 SDK always decodes TCP port, UDP port, then BLOB; both port fields are required to preserve the remaining stream boundary.
+	(*pBundle) << f_tcp_port;
+	(*pBundle) << f_udp_port;
 	(*pBundle).appendBlob(infos->datas);
 	pClientChannel->send(pBundle);
 
