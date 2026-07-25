@@ -532,10 +532,27 @@ void Machine::removeComponentID(COMPONENT_TYPE componentType, COMPONENT_ID compo
 void Machine::onQueryAllInterfaceInfos(Network::Channel* pChannel, int32 uid, std::string& username, 
 	uint16 finderRecvPort)
 {
+	const TimeStamp now = timestamp();
+	const TimeStamp duplicateWindow = 5 * stampsPerSecond();
+
+	// 同一 UDP 广播可能经多个本机接口抵达；重复请求仍需回包，但不应再次同步探测所有组件。
+	// The same UDP broadcast may arrive through multiple local interfaces; duplicates still receive replies but must not synchronously probe every component again.
+	for (std::map<QueryRequestKey, TimeStamp>::iterator iter = recentQueryRequests_.begin();
+		iter != recentQueryRequests_.end();)
+	{
+		if (now - iter->second > duplicateWindow)
+			iter = recentQueryRequests_.erase(iter);
+		else
+			++iter;
+	}
+
+	const QueryRequestKey requestKey(pChannel->addr().ip, uid, finderRecvPort);
+	const bool refreshComponentData = recentQueryRequests_.find(requestKey) == recentQueryRequests_.end();
+
 	INFO_MSG(fmt::format("Machine::onQueryAllInterfaceInfos[{}]: uid:{}, username:{}, "
-			"finderRecvPort:{}.\n",
+			"finderRecvPort:{}, refresh:{}.\n",
 		pChannel->c_str(), uid, username.c_str(),
-		ntohs(finderRecvPort)));
+		ntohs(finderRecvPort), refreshComponentData));
 
 	Network::EndPoint ep;
 	ep.socket(SOCK_DGRAM);
@@ -601,7 +618,9 @@ void Machine::onQueryAllInterfaceInfos(Network::Channel* pChannel, int32 uid, st
 			bool islocal = this->networkInterface().intaddr().ip == pinfos->pIntAddr->ip ||
 					this->networkInterface().extaddr().ip == pinfos->pIntAddr->ip;
 
-			bool usable = checkComponentUsable(pinfos, true, false);
+			// 首个请求刷新进程和运行时数据；重复包使用刚完成的缓存，避免每个组件最多两次 300ms 同步等待。
+			// The first request refreshes process and runtime data; duplicates use the just-completed cache to avoid up to two 300 ms synchronous waits per component.
+			bool usable = refreshComponentData ? checkComponentUsable(pinfos, true, false) : true;
 
 			if(usable)
 			{
@@ -644,6 +663,9 @@ void Machine::onQueryAllInterfaceInfos(Network::Channel* pChannel, int32 uid, st
 			}
 		}
 	}
+
+	if (refreshComponentData)
+		recentQueryRequests_[requestKey] = timestamp();
 }
 
 //-------------------------------------------------------------------------------------

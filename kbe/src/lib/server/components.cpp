@@ -1084,14 +1084,14 @@ bool Components::findLogger()
 	}
 	
 	int i = 0;
-	
-	while(i++ < 1/*如果Logger与其他游戏进程同时启动，这里设定的查找次数越多，
-		找到Logger的概率越大，当前只设定查找一次，假定用户已经提前好启动Logger服务*/)
+
+	// Logger 与其他组件同时启动时可增加查找次数；当前保持一次以延续既有启动策略。
+	// More attempts can help when Logger starts concurrently; keep one attempt to preserve the existing startup policy.
+	while(i++ < 1)
 	{
-		srand(KBEngine::getSystemTime());
-		uint16 nport = KBE_PORT_START + (rand() % 1000);
-			
-		Network::BundleBroadcast bhandler(*pNetworkInterface(), nport);
+		// 临时发现 socket 使用系统分配端口，避免并发组件争用固定随机端口池。
+		// Temporary discovery sockets use OS-assigned ports to avoid contention in the fixed random-port range.
+		Network::BundleBroadcast bhandler(*pNetworkInterface(), 0);
 		if(!bhandler.good())
 		{
 			continue;
@@ -1210,9 +1210,6 @@ bool Components::findComponents()
 {
 	if(state_ == 1)
 	{
-		srand(KBEngine::getSystemTime());
-		uint16 nport = KBE_PORT_START + (rand() % 1000);
-
 		while(findComponentTypes_[findIdx_] != UNKNOWN_COMPONENT_TYPE)
 		{
 			if(dispatcher().hasBreakProcessing() || dispatcher().waitingBreakProcessing())
@@ -1244,7 +1241,9 @@ bool Components::findComponents()
 #endif
 			}
 
-			Network::BundleBroadcast bhandler(*pNetworkInterface(), nport);
+			// 每轮请求独占系统临时端口，Machine 按消息中的实际端口回包。
+			// Each request owns an OS-assigned ephemeral port, and Machine replies to the actual port carried by the message.
+			Network::BundleBroadcast bhandler(*pNetworkInterface(), 0);
 			if(!bhandler.good())
 			{
 				//ERROR_MSG("Components::findComponents: bhandler error!\n");
@@ -1273,7 +1272,9 @@ bool Components::findComponents()
 			}
 		
 			int32 timeout = 1500000;
-			bool showerr = true;
+			// 启动期间 Machine 可能正在处理集群状态查询；短暂超时属于正常重试，持续失败才升级为错误。
+			// Machine may be servicing a cluster-status query during startup; transient timeouts are normal retries, while persistent failures escalate.
+			bool showerr = count > 3;
 			MachineInterface::onBroadcastInterfaceArgs25 args;
 
 RESTART_RECV:
@@ -1455,11 +1456,9 @@ void Components::broadcastSelf()
 		if (dispatcher().hasBreakProcessing() || dispatcher().waitingBreakProcessing())
 			return;
 
-		srand(KBEngine::getSystemTime());
-		uint16 nport = KBE_PORT_START + (rand() % 1000);
-
 		// 向局域网内广播UDP包，提交自己的身份
-		Network::BundleBroadcast bhandler(*pNetworkInterface(), nport);
+		// Broadcast the component identity over UDP to the local network.
+		Network::BundleBroadcast bhandler(*pNetworkInterface(), 0);
 
 		if (!bhandler.good())
 		{
@@ -1523,11 +1522,9 @@ bool Components::process()
 			if(dispatcher().hasBreakProcessing() || dispatcher().waitingBreakProcessing())
 				return false;
 
-			srand(KBEngine::getSystemTime());
-			uint16 nport = KBE_PORT_START + (rand() % 1000);
-
 			// 向局域网内广播UDP包，提交自己的身份
-			Network::BundleBroadcast bhandler(*pNetworkInterface(), nport);
+			// Broadcast the component identity over UDP to the local network.
+			Network::BundleBroadcast bhandler(*pNetworkInterface(), 0);
 
 			if (!bhandler.good())
 			{

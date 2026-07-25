@@ -57,6 +57,7 @@ BundleBroadcast::BundleBroadcast(NetworkInterface & networkInterface,
 	else
 	{
 		int count = 0;
+		bool bound = false;
 
 		while(true)
 		{
@@ -76,11 +77,26 @@ BundleBroadcast::BundleBroadcast(NetworkInterface & networkInterface,
 			}
 			else
 			{
-				epListen_.addr(htons(bindPort), htonl(INADDR_ANY));
-				good_ = true;
-
-				// DEBUG_MSG(fmt::format("BundleBroadcast::BundleBroadcast: epListen {}\n", epListen_.c_str()));
+				bound = true;
 				break;
+			}
+		}
+
+		if (bound)
+		{
+			// 端口 0 的实际端口只能在绑定后查询；协议消息必须携带这个网络字节序端口。
+			// The actual port for port zero is known only after bind; protocol messages must carry this network-order port.
+			u_int16_t localPort = 0;
+			u_int32_t localAddr = htonl(INADDR_ANY);
+			if (epListen_.getlocaladdress(&localPort, &localAddr) == 0)
+			{
+				epListen_.addr(localPort, localAddr);
+				good_ = true;
+			}
+			else
+			{
+				ERROR_MSG(fmt::format("BundleBroadcast::BundleBroadcast: Cannot query the bound address, {}\n",
+					kbe_strerror()));
 			}
 		}
 	}

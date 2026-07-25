@@ -34,6 +34,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 //#define NDEBUG
 #include <map>	
+#include <tuple>
 // windows include	
 #if KBE_PLATFORM == PLATFORM_WIN32
 #else
@@ -167,6 +168,11 @@ protected:
 
 	std::map<int32, CID_MAP>		cidMap_;
 	std::map<std::string, COMPONENT_ID>		pidMD5Map_;
+
+	// 记录最近完成的集群查询，使重复广播包复用缓存数据而不再次阻塞事件线程。
+	// Track recently completed cluster queries so duplicate broadcasts reuse cached data without blocking the event thread again.
+	typedef std::tuple<uint32, int32, uint16> QueryRequestKey;
+	std::map<QueryRequestKey, TimeStamp> recentQueryRequests_;
 };
 
 }
