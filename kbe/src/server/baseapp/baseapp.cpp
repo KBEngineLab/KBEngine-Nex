@@ -4507,7 +4507,7 @@ void Baseapp::onEntityCall(Network::Channel* pChannel, KBEngine::MemoryStream& s
 				if (pChannel)
 				{
 					Network::Bundle* pBundle = pChannel->createSendBundle();
-					entitycall->newCall(*pBundle);
+					entitycall->newCall_(*pBundle);
 					pBundle->append(s);
 					pChannel->send(pBundle);
 				}
@@ -4530,7 +4530,7 @@ void Baseapp::onEntityCall(Network::Channel* pChannel, KBEngine::MemoryStream& s
 				if (pChannel)
 				{
 					Network::Bundle* pBundle = pChannel->createSendBundle();
-					entitycall->newCall(*pBundle);
+					entitycall->newCall_(*pBundle);
 					pBundle->append(s);
 
 					if(Network::g_trace_packet > 0 && s.length() >= sizeof(ENTITY_METHOD_UID))

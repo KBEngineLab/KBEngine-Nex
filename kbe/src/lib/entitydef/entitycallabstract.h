@@ -92,6 +92,12 @@ public:
 	virtual bool sendCall(Network::Bundle* pBundle);
 
 	virtual void newCall(Network::Bundle& bundle);
+
+	// 新虚函数追加在既有槽位之后，避免增量构建时改变旧 newCall 的虚表索引。
+	// Appending the new virtual after existing slots preserves newCall's vtable index during incremental builds.
+	// 仅构造目标消息和实体寻址头，供已经携带父组件 UID 的转发数据使用。
+	// Builds only the destination message and entity address header for forwarded data that already carries a parent component UID.
+	virtual void newCall_(Network::Bundle& bundle);
 	
 	const Network::Address& addr() const{ return addr_; }
 	void addr(const Network::Address& saddr){ addr_ = saddr; }

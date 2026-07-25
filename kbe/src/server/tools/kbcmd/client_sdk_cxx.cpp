@@ -2622,14 +2622,37 @@ bool ClientSDKCXX::writeEntityProcessMessagesMethod(ScriptDefModule* pEntityScri
 		fileBody() += fmt::format("\nvoid {}::onRemoteMethodCall(uint16 methodUtype, MemoryStream& stream)\n{{\n", newModuleName);
 
 	ScriptDefModule::METHODDESCRIPTION_MAP& clientMethods = pEntityScriptDefModule->getClientMethodDescriptions();
-	if (clientMethods.size() > 0)
+	ScriptDefModule::PROPERTYDESCRIPTION_MAP remoteClientPropertys = pEntityScriptDefModule->getClientPropertyDescriptions();
+	bool hasClientRemoteMethods = clientMethods.size() > 0;
+
+	// 实体自身可以没有客户端方法，但客户端可见组件的方法仍由实体入口接收并分派。
+	// An entity may have no client methods of its own, while its client-visible components still rely on the entity entry point for dispatch.
+	if (!pEntityScriptDefModule->isComponentModule() && !hasClientRemoteMethods)
+	{
+		ScriptDefModule::PROPERTYDESCRIPTION_MAP::const_iterator propIter = remoteClientPropertys.begin();
+		for (; propIter != remoteClientPropertys.end(); ++propIter)
+		{
+			PropertyDescription* pPropertyDescription = propIter->second;
+
+			if (pPropertyDescription->getDataType()->type() != DATA_TYPE_ENTITY_COMPONENT)
+				continue;
+
+			EntityComponentType* pEntityComponentType = (EntityComponentType*)pPropertyDescription->getDataType();
+			if (pEntityComponentType->pScriptDefModule()->getClientMethodDescriptions().size() > 0)
+			{
+				hasClientRemoteMethods = true;
+				break;
+			}
+		}
+	}
+
+	if (hasClientRemoteMethods)
 	{
 		fileBody() += fmt::format("\tScriptModule* sm = *EntityDef::moduledefs.Find(\"{}\");\n", pEntityScriptDefModule->getName());
 		
 		int entityComponentSize = 0;
-		ScriptDefModule::PROPERTYDESCRIPTION_MAP clientPropertys = pEntityScriptDefModule->getClientPropertyDescriptions();
-		ScriptDefModule::PROPERTYDESCRIPTION_MAP::const_iterator propIter = clientPropertys.begin();
-		for (; propIter != clientPropertys.end(); ++propIter)
+		ScriptDefModule::PROPERTYDESCRIPTION_MAP::const_iterator propIter = remoteClientPropertys.begin();
+		for (; propIter != remoteClientPropertys.end(); ++propIter)
 		{
 			PropertyDescription* pPropertyDescription = propIter->second;
 

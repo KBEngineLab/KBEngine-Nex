@@ -77,6 +77,7 @@ ehthumbs.db
 /kbe/bin/server/*.iobj
 /kbe/bin/server/*.ipdb
 /kbe/bin/server/*.log
+/kbe/bin/server/CrashDumps/
 /kbe/src/libs/*.lib
 /kbe/tools/server/guiconsole/*.lib
 /kbe/tools/server/guiconsole/*.dll

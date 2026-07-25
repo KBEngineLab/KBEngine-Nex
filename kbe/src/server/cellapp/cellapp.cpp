@@ -1400,7 +1400,7 @@ void Cellapp::onEntityCall(Network::Channel* pChannel, KBEngine::MemoryStream& s
 				if (pChannel)
 				{
 					Network::Bundle* pBundle = pChannel->createSendBundle();
-					entitycall->newCall(*pBundle);
+					entitycall->newCall_(*pBundle);
 					pBundle->append(s);
 					pChannel->send(pBundle);
 				}
@@ -1423,7 +1423,7 @@ void Cellapp::onEntityCall(Network::Channel* pChannel, KBEngine::MemoryStream& s
 				if (pChannel)
 				{
 					Network::Bundle* pBundle = pChannel->createSendBundle();
-					entitycall->newCall(*pBundle);
+					entitycall->newCall_(*pBundle);
 					pBundle->append(s);
 					pChannel->send(pBundle);
 				}

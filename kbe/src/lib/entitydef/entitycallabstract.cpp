@@ -75,6 +75,12 @@ EntityCallAbstract::~EntityCallAbstract()
 //-------------------------------------------------------------------------------------
 void EntityCallAbstract::newCall(Network::Bundle& bundle)
 {
+	newCall_(bundle);
+}
+
+//-------------------------------------------------------------------------------------
+void EntityCallAbstract::newCall_(Network::Bundle& bundle)
+{
 	// 如果是server端的entitycall
 	if(g_componentType != CLIENT_TYPE && g_componentType != BOTS_TYPE)
 	{
@@ -101,7 +107,7 @@ void EntityCallAbstract::newCall(Network::Bundle& bundle)
 			}
 			else
 			{
-				ERROR_MSG(fmt::format("EntityCallAbstract::newCall: not found component({}), entityID({})!\n",
+				ERROR_MSG(fmt::format("EntityCallAbstract::newCall_: not found component({}), entityID({})!\n",
 					componentID_, id_));
 			}
 		}

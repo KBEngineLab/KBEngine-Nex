@@ -166,9 +166,9 @@ ScriptDefModule* EntityComponentCall::pComponentScriptDefModule()
 //-------------------------------------------------------------------------------------
 void EntityComponentCall::newCall(Network::Bundle& bundle)
 {
-	// Build the ordinary entity-call header first, then append the component property ID.
-	// 先构造普通实体调用头，再追加组件属性 ID，以保持 2.8 调用包格式。
-	EntityCallAbstract::newCall(bundle);
+	// 先构造不含父 UID 的寻址头，再追加唯一的组件属性 ID，避免转发路径重复写入。
+	// Build the address header without a parent UID, then append the sole component property ID to prevent duplicates during forwarding.
+	newCall_(bundle);
 
 	ScriptDefModule* pScriptDefModule = pComponentScriptDefModule();
 	if (isClient() && pScriptDefModule->usePropertyDescrAlias())

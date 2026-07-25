@@ -21,6 +21,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "witness.h"
 #include "cellapp.h"
 #include "entitydef/method.h"
+#include "entitydef/property.h"
+#include "entitydef/scriptdef_module.h"
 #include "clients_remote_entity_method.h"
 #include "network/bundle.h"
 #include "network/network_stats.h"
@@ -42,10 +44,14 @@ SCRIPT_GETSET_DECLARE_END()
 SCRIPT_INIT(ClientsRemoteEntityMethod, tp_call, 0, 0, 0, 0)	
 
 //-------------------------------------------------------------------------------------
-ClientsRemoteEntityMethod::ClientsRemoteEntityMethod(MethodDescription* methodDescription,
+ClientsRemoteEntityMethod::ClientsRemoteEntityMethod(PropertyDescription* pComponentPropertyDescription,
+													 const ScriptDefModule* pScriptModule,
+													 MethodDescription* methodDescription,
 													 bool otherClients,
 													 ENTITY_ID id):
 script::ScriptObject(getScriptType(), false),
+pComponentPropertyDescription_(pComponentPropertyDescription),
+pScriptModule_(pScriptModule),
 methodDescription_(methodDescription),
 otherClients_(otherClients),
 id_(id)
@@ -95,6 +101,23 @@ PyObject* ClientsRemoteEntityMethod::callmethod(PyObject* args, PyObject* kwds)
 	{
 		MemoryStream* mstream = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 
+		// 客户端 RPC 数据始终以父组件属性 UID 开头；实体方法使用 0，组件方法使用其真实 UID/alias。
+		// Client RPC data always starts with the parent component-property UID; entity methods use zero and component methods use their real UID/alias.
+		if (pComponentPropertyDescription_ != NULL)
+		{
+			if (pScriptModule_->usePropertyDescrAlias())
+				(*mstream) << pComponentPropertyDescription_->aliasIDAsUint8();
+			else
+				(*mstream) << pComponentPropertyDescription_->getUType();
+		}
+		else
+		{
+			if (pScriptModule_->usePropertyDescrAlias())
+				(*mstream) << static_cast<uint8>(0);
+			else
+				(*mstream) << static_cast<ENTITY_PROPERTY_UID>(0);
+		}
+
 		try
 		{
 			methodDescription->addToStream(mstream, args);
@@ -118,7 +141,7 @@ PyObject* ClientsRemoteEntityMethod::callmethod(PyObject* args, PyObject* kwds)
 			else
 				pSendBundle = pChannel->createSendBundle();
 
-			pEntity->clientEntityCall()->newCall((*pSendBundle));
+			pEntity->clientEntityCall()->newCall_((*pSendBundle));
 
 			if(mstream->wpos() > 0)
 				(*pSendBundle).append(mstream->data(), (int)mstream->wpos());

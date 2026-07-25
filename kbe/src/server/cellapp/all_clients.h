@@ -50,7 +50,30 @@ class Channel;
 class Bundle;
 }
 
+class AllClients;
 class ScriptDefModule;
+class PropertyDescription;
+
+class AllClientsComponent : public script::ScriptObject
+{
+	INSTANCE_SCRIPT_HREADER(AllClientsComponent, ScriptObject)
+public:
+	AllClientsComponent(PropertyDescription* pComponentPropertyDescription, AllClients* pAllClients);
+	~AllClientsComponent();
+
+	PyObject* onScriptGetAttribute(PyObject* attr);
+	PyObject* tp_repr();
+	PyObject* tp_str();
+	void c_str(char* s, size_t size);
+
+	ScriptDefModule* pComponentScriptDefModule();
+
+protected:
+	// 保留父广播代理可确保实体 ID 与 allClients/otherClients 语义在延迟调用期间保持一致。
+	// Retaining the parent broadcast proxy keeps the entity ID and allClients/otherClients semantics stable during deferred calls.
+	AllClients* pAllClients_;
+	PropertyDescription* pComponentPropertyDescription_;
+};
 
 class AllClients : public script::ScriptObject
 {
@@ -86,6 +109,8 @@ public:
 	void setScriptModule(const ScriptDefModule*	pScriptModule){ 
 		pScriptModule_ = pScriptModule; 
 	}
+
+	bool isOtherClients() const { return otherClients_; }
 
 protected:
 	const ScriptDefModule*					pScriptModule_;			// 该entity所使用的脚本模块对象
