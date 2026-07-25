@@ -164,8 +164,12 @@ void Entity::onInitializeScript()
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, PyObject* pyData)
+void Entity::onDefDataChanged(EntityComponent* pEntityComponent,
+	const PropertyDescription* propertyDescription, PyObject* pyData)
 {
+	(void)pEntityComponent;
+	(void)propertyDescription;
+	(void)pyData;
 }
 
 //-------------------------------------------------------------------------------------
@@ -269,85 +273,136 @@ void Entity::onUpdatePropertys(MemoryStream& s)
 	while(s.length() > 0)
 	{
 		ENTITY_PROPERTY_UID uid;
+		ENTITY_PROPERTY_UID childUID;
 		uint8 aliasID = 0;
+		uint8 childAliasID = 0;
+		PropertyDescription* pPropertyDescription = NULL;
+		PyObject* setToObj = this;
 
 		if(pScriptModule_->usePropertyDescrAlias())
 		{
 			s >> aliasID;
+			s >> childAliasID;
 			uid = aliasID;
+			childUID = childAliasID;
 		}
 		else
 		{
 			s >> uid;
+			s >> childUID;
 		}
 
-		// 如果是位置或者朝向信息则
-		if(uid == posuid)
+		// 父属性为零表示普通实体属性；非零表示组件属性，随后由子 ID 定位组件内部字段。
+		// A zero parent identifies a direct entity property; a nonzero parent selects a component before its child property.
+		if(uid == 0)
 		{
-			Position3D pos;
+			if(childUID == posuid)
+			{
+				Position3D pos;
 
 #ifdef CLIENT_NO_FLOAT		
-			int32 x, y, z;
-			s >> x >> y >> z;
+				int32 x, y, z;
+				s >> x >> y >> z;
 
-			pos.x = (float)x;
-			pos.y = (float)y;
-			pos.z = (float)z;
+				pos.x = (float)x;
+				pos.y = (float)y;
+				pos.z = (float)z;
 #else
-			s >> pos.x >> pos.y >> pos.z;
+				s >> pos.x >> pos.y >> pos.z;
 #endif
-			position(pos);
-            clientPos(pos);
-			continue;
-		}
-		else if(uid == diruid)
-		{
-			Direction3D dir;
+				position(pos);
+				clientPos(pos);
+				continue;
+			}
+			else if(childUID == diruid)
+			{
+				Direction3D dir;
 
 #ifdef CLIENT_NO_FLOAT		
-			int32 x, y, z;
-			s >> x >> y >> z;
+				int32 x, y, z;
+				s >> x >> y >> z;
 
-			dir.roll((float)x);
-			dir.pitch((float)y);
-			dir.yaw((float)z);
+				dir.roll((float)x);
+				dir.pitch((float)y);
+				dir.yaw((float)z);
 #else
-			float yaw, pitch, roll;
-			s >> roll >> pitch >> yaw;
-			dir.yaw(yaw);
-			dir.pitch(pitch);
-			dir.roll(roll);
+				float yaw, pitch, roll;
+				s >> roll >> pitch >> yaw;
+				dir.yaw(yaw);
+				dir.pitch(pitch);
+				dir.roll(roll);
 #endif
 
-			direction(dir);
-            clientDir(dir);
-			continue;
-		}
-		else if(uid == spaceuid)
-		{
-			SPACE_ID ispaceID;
-			s >> ispaceID;
-			spaceID(ispaceID);
-			continue;
-		}
+				direction(dir);
+				clientDir(dir);
+				continue;
+			}
+			else if(childUID == spaceuid)
+			{
+				SPACE_ID ispaceID;
+				s >> ispaceID;
+				spaceID(ispaceID);
+				continue;
+			}
 
-		PropertyDescription* pPropertyDescription = NULL;
-		
-		if(pScriptModule_->usePropertyDescrAlias())
-			pPropertyDescription = pScriptModule()->findAliasPropertyDescription(aliasID);
+			if(pScriptModule_->usePropertyDescrAlias())
+				pPropertyDescription = pScriptModule()->findAliasPropertyDescription(childAliasID);
+			else
+				pPropertyDescription = pScriptModule()->findClientPropertyDescription(childUID);
+		}
 		else
-			pPropertyDescription = pScriptModule()->findClientPropertyDescription(uid);
+		{
+			if(pScriptModule_->usePropertyDescrAlias())
+				pPropertyDescription = pScriptModule()->findAliasPropertyDescription(aliasID);
+			else
+				pPropertyDescription = pScriptModule()->findClientPropertyDescription(uid);
+
+			if(!pPropertyDescription || pPropertyDescription->getDataType()->type() != DATA_TYPE_ENTITY_COMPONENT)
+			{
+				ERROR_MSG(fmt::format("{}::onUpdatePropertys: component parent not found, uid={}, aliasID={}!\n",
+					pScriptModule_->getName(), uid, aliasID));
+				return;
+			}
+
+			setToObj = PyObject_GetAttrString(this, pPropertyDescription->getName());
+			if(!setToObj || !PyObject_TypeCheck(setToObj, EntityComponent::getScriptType()))
+			{
+				Py_XDECREF(setToObj);
+				SCRIPT_ERROR_CHECK();
+				ERROR_MSG(fmt::format("{}::onUpdatePropertys: component {} is unavailable!\n",
+					pScriptModule_->getName(), pPropertyDescription->getName()));
+				return;
+			}
+
+			pPropertyDescription = static_cast<EntityComponent*>(setToObj)->getProperty(childUID);
+		}
 
 		if(pPropertyDescription == NULL)
 		{
-			ERROR_MSG(fmt::format("Entity::onUpdatePropertys: not found {}\n", uid));
+			ERROR_MSG(fmt::format("Entity::onUpdatePropertys: property not found, parent={}, child={}\n", uid, childUID));
+			if(setToObj != static_cast<PyObject*>(this))
+				Py_DECREF(setToObj);
 			return;
 		}
 
 		PyObject* pyobj = pPropertyDescription->createFromStream(&s);
+		if(!pyobj)
+		{
+			if(setToObj != static_cast<PyObject*>(this))
+				Py_DECREF(setToObj);
+			SCRIPT_ERROR_CHECK();
+			return;
+		}
 
-		PyObject* pyOld = PyObject_GetAttrString(this, pPropertyDescription->getName());
-		PyObject_SetAttrString(this, pPropertyDescription->getName(), pyobj);
+		PyObject* pyOld = PyObject_GetAttrString(setToObj, pPropertyDescription->getName());
+		if(!pyOld)
+		{
+			SCRIPT_ERROR_CHECK();
+			pyOld = Py_None;
+			Py_INCREF(pyOld);
+		}
+
+		PyObject_SetAttrString(setToObj, pPropertyDescription->getName(), pyobj);
 
 		bool willCallScript = pPropertyDescription->hasBase() ? inited_ : enterworld_;
 		if (willCallScript)
@@ -355,12 +410,14 @@ void Entity::onUpdatePropertys(MemoryStream& s)
 			std::string setname = "set_";
 			setname += pPropertyDescription->getName();
 
-			SCRIPT_OBJECT_CALL_ARGS1(this, const_cast<char*>(setname.c_str()),
+			SCRIPT_OBJECT_CALL_ARGS1(setToObj, const_cast<char*>(setname.c_str()),
 				const_cast<char*>("O"), pyOld, false);
 		}
 
 		Py_DECREF(pyobj);
 		Py_DECREF(pyOld);
+		if(setToObj != static_cast<PyObject*>(this))
+			Py_DECREF(setToObj);
 		SCRIPT_ERROR_CHECK();
 	}
 }

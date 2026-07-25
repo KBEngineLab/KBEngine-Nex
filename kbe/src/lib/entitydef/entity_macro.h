@@ -31,6 +31,7 @@ namespace KBEngine{
 	ENTITY_CPP_IMPL(APP, CLASS)																				\
 	SCRIPT_METHOD_DECLARE_BEGIN(CLASS)																		\
 	SCRIPT_METHOD_DECLARE("__reduce_ex__",	reduce_ex__,					METH_VARARGS,				0)	\
+	SCRIPT_METHOD_DECLARE("__getDEP__",		pyGetDatachangeEventPtr,			METH_VARARGS,				0)	\
 	SCRIPT_METHOD_DECLARE("addTimer",		pyAddTimer,						METH_VARARGS,				0)	\
 	SCRIPT_METHOD_DECLARE("delTimer",		pyDelTimer,						METH_VARARGS,				0)	\
 	SCRIPT_METHOD_DECLARE("writeToDB",		pyWriteToDB,					METH_VARARGS,				0)	\
@@ -56,6 +57,7 @@ namespace KBEngine{
 	ENTITY_CPP_IMPL(APP, CLASS)																				\
 	SCRIPT_METHOD_DECLARE_BEGIN(CLASS)																		\
 	SCRIPT_METHOD_DECLARE("__reduce_ex__",	reduce_ex__,					METH_VARARGS,			0)		\
+	SCRIPT_METHOD_DECLARE("__getDEP__",		pyGetDatachangeEventPtr,			METH_VARARGS,			0)		\
 
 	
 #define CLIENT_ENTITY_METHOD_DECLARE_END()																	\
@@ -651,6 +653,13 @@ public:																										\
 																											\
 	void addClientDataToStream(MemoryStream* s, bool otherClient = false)									\
 	{																										\
+		/* 初始客户端属性流可能包含整组件，必须固定为 Client 域并在完成后恢复共享上下文，避免影响同一 Tick 的后续序列化。 */ \
+		/* Initial client property streams may contain whole components, so pin them to the Client domain and restore shared context afterward. */ \
+		COMPONENT_TYPE previousComponentType = EntityDef::context().currComponentType;						\
+		ENTITY_ID previousEntityID = EntityDef::context().currEntityID;									\
+		EntityDef::context().currComponentType = CLIENT_TYPE;											\
+		EntityDef::context().currEntityID = id();													\
+																											\
 		PyObject* pydict = PyObject_GetAttrString(this, "__dict__");										\
 																											\
 		ScriptDefModule::PROPERTYDESCRIPTION_MAP& propertyDescrs =											\
@@ -671,10 +680,12 @@ public:																										\
 			{																								\
 				if(pScriptModule()->usePropertyDescrAlias())												\
 				{																							\
+					(*s) << (uint8)0;																	\
 	    			(*s) << propertyDescription->aliasIDAsUint8();											\
 				}																							\
 				else																						\
 				{																							\
+					(*s) << (ENTITY_PROPERTY_UID)0;														\
 	    			(*s) << propertyDescription->getUType();												\
 				}																							\
 																											\
@@ -685,6 +696,8 @@ public:																										\
 		}																									\
 																											\
 		Py_XDECREF(pydict);																					\
+		EntityDef::context().currComponentType = previousComponentType;								\
+		EntityDef::context().currEntityID = previousEntityID;										\
 	}																										\
 																											\
 	void addPositionAndDirectionToStream(MemoryStream& s, bool useAliasID = false, bool persistentFrame = false);\
@@ -845,7 +858,7 @@ public:																										\
 					/* 如果def属性数据有改变， 那么可能需要广播 */												\
 					if(pySetObj != NULL)																	\
 					{																						\
-						onDefDataChanged(propertyDescription, pySetObj);									\
+						onDefDataChanged(NULL, propertyDescription, pySetObj);								\
 						if(pySetObj == value && pySetObj->ob_refcnt - ob_refcnt > 1)						\
 							Py_DECREF(pySetObj);															\
 					}																						\
@@ -1073,6 +1086,18 @@ public:																										\
 	DECLARE_PY_GET_MOTHOD(pyGetClassName);																	\
 																											\
 	void initProperty(bool isReload = false);																\
+																													\
+	static PyObject* __py_pyGetDatachangeEventPtr(PyObject* self, PyObject* args)							\
+	{																											\
+		(void)args;																								\
+		CLASS* pobj = static_cast<CLASS*>(self);															\
+		/* 静态槽位为内部 ABI 提供稳定地址；组件会立即复制回调，不持有槽位或改变实体生命周期。 */ \
+		/* The static slot gives the internal ABI a stable address; components copy the callback immediately without retaining it. */ \
+		static EntityComponent::OnDataChangedEvent dataChangedEvent;									\
+		dataChangedEvent = std::bind(&CLASS::onDefDataChanged, pobj,									\
+			std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);					\
+		return PyLong_FromVoidPtr(static_cast<void*>(&dataChangedEvent));								\
+	}																											\
 
 
 #define ENTITY_CPP_IMPL(APP, CLASS)																			\

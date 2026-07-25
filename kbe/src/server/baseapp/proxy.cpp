@@ -158,11 +158,11 @@ void Proxy::initClientCellPropertys()
 	if(pScriptModule()->usePropertyDescrAlias())
 	{
 		uint8 aliasID = ENTITY_BASE_PROPERTY_ALIASID_SPACEID;
-		(*pBundle) << aliasID << this->spaceID();
+		(*pBundle) << (uint8)0 << aliasID << this->spaceID();
 	}
 	else
 	{
-		(*pBundle) << spaceuid << this->spaceID();
+		(*pBundle) << (ENTITY_PROPERTY_UID)0 << spaceuid << this->spaceID();
 	}
 
 	MemoryStream* s = MemoryStream::createPoolObject(OBJECTPOOL_POINT);

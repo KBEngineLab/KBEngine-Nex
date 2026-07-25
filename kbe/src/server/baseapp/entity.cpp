@@ -110,8 +110,8 @@ void Entity::onInitializeScript()
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::onDefDataChanged(const PropertyDescription* propertyDescription,
-		PyObject* pyData)
+void Entity::onDefDataChanged(EntityComponent* pEntityComponent,
+		const PropertyDescription* propertyDescription, PyObject* pyData)
 {
 	if(initing())
 		return;
@@ -120,6 +120,24 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription,
 		setDirty();
 	
 	uint32 flags = propertyDescription->getFlags();
+	ENTITY_PROPERTY_UID componentPropertyUID = 0;
+	int8 componentPropertyAliasID = 0;
+
+	if(pEntityComponent)
+	{
+		PropertyDescription* pComponentPropertyDescription = pEntityComponent->pPropertyDescription();
+		if(!pComponentPropertyDescription)
+		{
+			ERROR_MSG(fmt::format("{}::onDefDataChanged: EntityComponent({}) has no parent property description!\n",
+				pScriptModule_->getName(), pEntityComponent->pComponentScriptDefModuleDescrs()->getName()));
+			return;
+		}
+
+		// 2.8 属性更新协议用父属性标识组件，普通实体属性的父标识保持为零。
+		// The 2.8 property-update protocol identifies components by their parent property; direct entity properties keep parent zero.
+		componentPropertyUID = pComponentPropertyDescription->getUType();
+		componentPropertyAliasID = pComponentPropertyDescription->aliasIDAsUint8();
+	}
 
 	if((flags & ED_FLAG_BASE_AND_CLIENT) <= 0 || clientEntityCall_ == NULL)
 		return;
@@ -127,16 +145,27 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription,
 	// 创建一个需要广播的模板流
 	MemoryStream* mstream = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 
+	// 组件整体更新写给客户端时只序列化 Client 域，并在写入后恢复调用方上下文。
+	// Whole-component updates serialize only the Client domain and restore the caller's context immediately afterward.
+	COMPONENT_TYPE previousComponentType = EntityDef::context().currComponentType;
+	EntityDef::context().currComponentType = CLIENT_TYPE;
 	propertyDescription->getDataType()->addToStream(mstream, pyData);
+	EntityDef::context().currComponentType = previousComponentType;
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(ClientInterface::onUpdatePropertys);
 	(*pBundle) << id();
 
 	if(pScriptModule_->usePropertyDescrAlias())
+	{
+		(*pBundle) << componentPropertyAliasID;
 		(*pBundle) << propertyDescription->aliasIDAsUint8();
+	}
 	else
+	{
+		(*pBundle) << componentPropertyUID;
 		(*pBundle) << propertyDescription->getUType();
+	}
 
 	pBundle->append(*mstream);
 	

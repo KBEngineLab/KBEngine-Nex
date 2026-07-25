@@ -673,7 +673,8 @@ PyObject* Entity::onScriptGetAttribute(PyObject* attr)
 }	
 
 //-------------------------------------------------------------------------------------
-void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, PyObject* pyData)
+void Entity::onDefDataChanged(EntityComponent* pEntityComponent,
+	const PropertyDescription* propertyDescription, PyObject* pyData)
 {
 	// 如果不是一个realEntity或者在初始化则不理会
 	if(!isReal() || initing())
@@ -681,13 +682,36 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 
 	if(propertyDescription->isPersistent())
 		setDirty();
-	
+
+	ENTITY_PROPERTY_UID componentPropertyUID = 0;
+	int8 componentPropertyAliasID = 0;
+	if(pEntityComponent)
+	{
+		PropertyDescription* pComponentPropertyDescription = pEntityComponent->pPropertyDescription();
+		if(!pComponentPropertyDescription)
+		{
+			ERROR_MSG(fmt::format("{}::onDefDataChanged: EntityComponent({}) has no parent property description!\n",
+				pScriptModule_->getName(), pEntityComponent->pComponentScriptDefModuleDescrs()->getName()));
+			return;
+		}
+
+		// 2.8 属性更新协议用父属性标识组件，普通实体属性的父标识保持为零。
+		// The 2.8 property-update protocol identifies components by their parent property; direct entity properties keep parent zero.
+		componentPropertyUID = pComponentPropertyDescription->getUType();
+		componentPropertyAliasID = pComponentPropertyDescription->aliasIDAsUint8();
+	}
+
 	uint32 flags = propertyDescription->getFlags();
 
 	// 首先创建一个需要广播的模板流
 	MemoryStream* mstream = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 
+	// 面向客户端的组件流只能包含 Client 域字段，避免把服务端私有数据写入网络包。
+	// Component streams sent to clients must contain only Client-domain fields, never server-private data.
+	COMPONENT_TYPE previousComponentType = EntityDef::context().currComponentType;
+	EntityDef::context().currComponentType = CLIENT_TYPE;
 	propertyDescription->getDataType()->addToStream(mstream, pyData);
+	EntityDef::context().currComponentType = previousComponentType;
 
 	// 判断是否需要广播给其他的cellapp, 这还需一个前提是entity必须拥有ghost实体
 	// 只有在cell边界一定范围内的entity才拥有ghost实体, 或者在跳转space时也会短暂的置为ghost状态
@@ -699,9 +723,24 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 			Network::Bundle* pForwardBundle = gm->createSendBundle(ghostCell());
 			(*pForwardBundle).newMessage(CellappInterface::onUpdateGhostPropertys);
 			(*pForwardBundle) << id();
+			(*pForwardBundle) << componentPropertyUID;
 			(*pForwardBundle) << propertyDescription->getUType();
 
-			pForwardBundle->append(*mstream);
+			if(propertyDescription->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)
+			{
+				// Ghost 需要服务器域的完整组件数据，不能复用上面的 Client 域序列化结果。
+				// Ghosts require complete server-domain component data and cannot reuse the Client-domain stream above.
+				MemoryStream* serverStream = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
+				EntityDef::context().currComponentType = g_componentType;
+				propertyDescription->getDataType()->addToStream(serverStream, pyData);
+				EntityDef::context().currComponentType = previousComponentType;
+				pForwardBundle->append(*serverStream);
+				MemoryStream::reclaimPoolObject(serverStream);
+			}
+			else
+			{
+				pForwardBundle->append(*mstream);
+			}
 
 			// 记录这个事件产生的数据量大小
 			g_publicCellEventHistoryStats.trackEvent(scriptName(), 
@@ -763,9 +802,15 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 				}
 				
 				if(pScriptModule_->usePropertyDescrAlias())
+				{
+					(*pSendBundle) << componentPropertyAliasID;
 					(*pSendBundle) << propertyDescription->aliasIDAsUint8();
+				}
 				else
+				{
+					(*pSendBundle) << componentPropertyUID;
 					(*pSendBundle) << propertyDescription->getUType();
+				}
 
 				pSendBundle->append(*mstream);
 				
@@ -853,9 +898,15 @@ void Entity::onDefDataChanged(const PropertyDescription* propertyDescription, Py
 		(*pSendBundle) << id();
 
 		if(pScriptModule_->usePropertyDescrAlias())
+		{
+			(*pSendBundle) << componentPropertyAliasID;
 			(*pSendBundle) << propertyDescription->aliasIDAsUint8();
+		}
 		else
+		{
+			(*pSendBundle) << componentPropertyUID;
 			(*pSendBundle) << propertyDescription->getUType();
+		}
 
 		pSendBundle->append(*mstream);
 		
@@ -1666,7 +1717,7 @@ int Entity::pySetPosition(PyObject *value)
 	if(pScriptModule_->usePropertyDescrAlias() && positionDescription.aliasID() == -1)
 		positionDescription.aliasID(ENTITY_BASE_PROPERTY_ALIASID_POSITION_XYZ);
 
-	onDefDataChanged(&positionDescription, value);
+	onDefDataChanged(NULL, &positionDescription, value);
 	return 0;
 }
 
@@ -1793,7 +1844,7 @@ int Entity::pySetDirection(PyObject *value)
 	if(pScriptModule_->usePropertyDescrAlias() && directionDescription.aliasID() == -1)
 		directionDescription.aliasID(ENTITY_BASE_PROPERTY_ALIASID_DIRECTION_ROLL_PITCH_YAW);
 
-	onDefDataChanged(&directionDescription, value);
+	onDefDataChanged(NULL, &directionDescription, value);
 
 	return 0;
 }
@@ -1838,7 +1889,7 @@ void Entity::onPyPositionChanged()
 	if(pScriptModule_->usePropertyDescrAlias() && positionDescription.aliasID() == -1)
 		positionDescription.aliasID(ENTITY_BASE_PROPERTY_ALIASID_POSITION_XYZ);
 
-	onDefDataChanged(&positionDescription, pPyPosition_);
+	onDefDataChanged(NULL, &positionDescription, pPyPosition_);
 
 	if (this->pEntityCoordinateNode())
 	{
@@ -1894,7 +1945,7 @@ void Entity::onPyDirectionChanged()
 	if(pScriptModule_->usePropertyDescrAlias() && directionDescription.aliasID() == -1)
 		directionDescription.aliasID(ENTITY_BASE_PROPERTY_ALIASID_DIRECTION_ROLL_PITCH_YAW);
 
-	onDefDataChanged(&directionDescription, pPyDirection_);
+	onDefDataChanged(NULL, &directionDescription, pPyDirection_);
 }
 
 //-------------------------------------------------------------------------------------
@@ -1973,11 +2024,11 @@ void Entity::onGetWitness(bool fromBase)
 		if (pScriptModule()->usePropertyDescrAlias())
 		{
 			uint8 aliasID = ENTITY_BASE_PROPERTY_ALIASID_SPACEID;
-			(*s1) << aliasID << this->spaceID();
+			(*s1) << (uint8)0 << aliasID << this->spaceID();
 		}
 		else
 		{
-			(*s1) << spaceuid << this->spaceID();
+			(*s1) << (ENTITY_PROPERTY_UID)0 << spaceuid << this->spaceID();
 		}
 
 		addClientDataToStream(s1);
@@ -3727,36 +3778,66 @@ bool Entity::_reload(bool fullReload)
 //-------------------------------------------------------------------------------------
 void Entity::onUpdateGhostPropertys(KBEngine::MemoryStream& s)
 {
-	ENTITY_PROPERTY_UID utype;
-	s >> utype;
+	ENTITY_PROPERTY_UID componentPropertyUID = 0;
+	ENTITY_PROPERTY_UID propertyUID = 0;
+	s >> componentPropertyUID >> propertyUID;
 
-	PropertyDescription* pPropertyDescription = pScriptModule()->findCellPropertyDescription(utype);
+	// Ghost 更新与客户端 2.8 更新统一采用父/子属性 ID；父 ID 为零时直接更新实体属性。
+	// Ghost and 2.8 client updates share parent/child property IDs; a zero parent updates the entity directly.
+	EntityDef::context().currComponentType = g_componentType;
+	PropertyDescription* pPropertyDescription = NULL;
+	PyObject* setToObj = this;
+
+	if(componentPropertyUID == 0)
+	{
+		pPropertyDescription = pScriptModule()->findCellPropertyDescription(propertyUID);
+	}
+	else
+	{
+		PropertyDescription* pComponentPropertyDescription =
+			pScriptModule()->findCellPropertyDescription(componentPropertyUID);
+
+		if(pComponentPropertyDescription &&
+			pComponentPropertyDescription->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)
+		{
+			setToObj = PyObject_GetAttrString(this, pComponentPropertyDescription->getName());
+			if(setToObj && PyObject_TypeCheck(setToObj, EntityComponent::getScriptType()))
+				pPropertyDescription = static_cast<EntityComponent*>(setToObj)->getProperty(propertyUID);
+		}
+	}
+
 	if(pPropertyDescription == NULL)
 	{
-		ERROR_MSG(fmt::format("{}::onUpdateGhostPropertys: not found propertyID({}), entityID({})\n", 
-			scriptName(), utype, id()));
+		Py_XDECREF(setToObj == static_cast<PyObject*>(this) ? NULL : setToObj);
+		ERROR_MSG(fmt::format("{}::onUpdateGhostPropertys: property not found, parent={}, child={}, entityID={}\n",
+			scriptName(), componentPropertyUID, propertyUID, id()));
 
 		s.done();
 		return;
 	}
 
-	DEBUG_MSG(fmt::format("{}::onUpdateGhostPropertys: property({}), entityID({})\n", 
-		scriptName(), pPropertyDescription->getName(), id()));
+	DEBUG_MSG(fmt::format("{}::onUpdateGhostPropertys: property({}), parent={}, entityID({})\n",
+		scriptName(), pPropertyDescription->getName(), componentPropertyUID, id()));
 
 	PyObject* pyVal = pPropertyDescription->createFromStream(&s);
 	if(pyVal == NULL)
 	{
-		ERROR_MSG(fmt::format("{}::onUpdateGhostPropertys: entityID={}, create({}) error!\n", 
+		if(setToObj != static_cast<PyObject*>(this))
+			Py_DECREF(setToObj);
+
+		ERROR_MSG(fmt::format("{}::onUpdateGhostPropertys: entityID={}, create({}) error!\n",
 			scriptName(), id(), pPropertyDescription->getName()));
 
 		s.done();
 		return;
 	}
 
-	PyObject_SetAttrString(static_cast<PyObject*>(this),
+	PyObject_SetAttrString(setToObj,
 				pPropertyDescription->getName(), pyVal);
 
 	Py_DECREF(pyVal);
+	if(setToObj != static_cast<PyObject*>(this))
+		Py_DECREF(setToObj);
 }
 
 //-------------------------------------------------------------------------------------

@@ -273,10 +273,11 @@ public:
 	INLINE bool isDirty() const;
 	
 protected:
-	/** 
-		定义属性数据被改变了 
+	/**
+		定义属性数据被改变，组件属性通过 pEntityComponent 标识所属父属性。
+		A def property changed; pEntityComponent identifies the parent for component properties.
 	*/
-	void onDefDataChanged(const PropertyDescription* propertyDescription, 
+	void onDefDataChanged(EntityComponent* pEntityComponent, const PropertyDescription* propertyDescription,
 			PyObject* pyData);
 
 	/**
