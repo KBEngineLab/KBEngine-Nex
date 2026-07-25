@@ -74,6 +74,10 @@ public:
 	*/
 	bool destroy(ENTITY_ID entityID, bool ignoreGhost = true);
 
+	// 关服终结必须释放所有ghost引用，避免Space因外部共享引用延迟到实体注册表卸载后才析构。
+	// Shutdown finalization must release every ghost reference so external shared owners cannot defer Space destruction past entity-registry teardown.
+	void finalise(bool notifyCellappmgr = false);
+
 	/**
 		这个space的cell
 	*/

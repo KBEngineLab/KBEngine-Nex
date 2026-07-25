@@ -34,7 +34,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "../../server/cellapp/cellapp_interface.h"
 #include "../../server/dbmgr/dbmgr_interface.h"
 
-namespace KBEngine{	
+namespace KBEngine{
 
 //-------------------------------------------------------------------------------------
 Space::Space(SPACE_ID spaceID, const std::string& scriptModuleName) :
@@ -67,7 +67,10 @@ destroyTime_(0)
 //-------------------------------------------------------------------------------------
 Space::~Space()
 {
-	_clearGhosts();
+	// Entity destruction belongs to destroy(), finalise(), and update(), where Cellapp and its Python entity registry are alive.
+	// A destructor can run from CRT static cleanup after those dependencies have already been released, so it must only drop Space-owned references.
+	// 实体销毁由 destroy()、finalise() 和 update() 负责，这些入口能够保证 Cellapp 与 Python 实体注册表仍然存活。
+	// 析构函数可能在上述依赖已经释放后的 CRT 静态清理阶段执行，因此这里只释放 Space 自己持有的引用。
 	entities_.clear();
 	
 	this->coordinateSystem_.releaseNodes();
@@ -75,21 +78,6 @@ Space::~Space()
 	pNavHandle_.clear();
 
 	SAFE_RELEASE(pCell_);	
-
-	Network::Channel* pChannel = Components::getSingleton().getCellappmgrChannel();
-	if (pChannel != NULL)
-	{
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-		(*pBundle).newMessage(CellappmgrInterface::updateSpaceData);
-
-		(*pBundle) << g_componentID;
-		(*pBundle) << id_;
-		(*pBundle) << scriptModuleName_;
-		(*pBundle) << true;
-		(*pBundle) << "";
-
-		pChannel->send(pBundle);
-	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -553,6 +541,31 @@ bool Space::destroy(ENTITY_ID entityID, bool ignoreGhost)
 		_clearGhosts();
 
 	return true;
+}
+
+//-------------------------------------------------------------------------------------
+void Space::finalise(bool notifyCellappmgr)
+{
+	_clearGhosts();
+	if (!notifyCellappmgr)
+		return;
+
+	// Only runtime removal may notify CellAppMgr. kbemain finalizes Components before Cellapp, so shutdown finalization cannot use that registry.
+	// 只有运行期移除可以通知 CellAppMgr；kbemain 会先终结 Components 再终结 Cellapp，因此关服清理不能使用该注册表。
+	Network::Channel* pChannel = Components::getSingleton().getCellappmgrChannel();
+	if (pChannel != NULL)
+	{
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		(*pBundle).newMessage(CellappmgrInterface::updateSpaceData);
+
+		(*pBundle) << g_componentID;
+		(*pBundle) << id_;
+		(*pBundle) << scriptModuleName_;
+		(*pBundle) << true;
+		(*pBundle) << "";
+
+		pChannel->send(pBundle);
+	}
 }
 
 //-------------------------------------------------------------------------------------

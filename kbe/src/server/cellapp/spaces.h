@@ -59,10 +59,10 @@ public:
 	*/
 	static void update();
 
-	static size_t size(){ return spaces_.size(); }
+	static size_t size(){ return spaces().size(); }
 
 protected:
-	static SPACES spaces_;
+	static SPACES& spaces();
 };
 
 }

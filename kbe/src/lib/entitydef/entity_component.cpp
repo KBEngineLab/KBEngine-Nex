@@ -479,18 +479,35 @@ int EntityComponent::onScriptSetAttribute(PyObject* attr, PyObject* value)
 								if (owner_)
 								{
 									PyObject* pyDatachangePtr = PyObject_CallMethod(owner_, const_cast<char*>("__getDEP__"), const_cast<char*>(""));
-
-									void* ptr = PyLong_AsVoidPtr(pyDatachangePtr);
-									Py_DECREF(pyDatachangePtr);
-
-									if (!ptr)
+									// Script lookup may fail while an entity/component is still binding. Never pass NULL across the Python C API boundary.
+									// 实体或组件仍在绑定时，脚本查询可能失败；绝不能把 NULL 继续传入 Python C API。
+									if (pyDatachangePtr == NULL)
 									{
+										SCRIPT_ERROR_CHECK();
+									}
+									else if (!PyLong_Check(pyDatachangePtr))
+									{
+										// __getDEP__ is an internal ABI and must return the encoded callback pointer as an integer.
+										// __getDEP__ 属于内部 ABI，必须用整数返回编码后的回调指针。
+										PyErr_Format(PyExc_TypeError, "%s.__getDEP__() must return int, got %s",
+											scriptName(), pyDatachangePtr->ob_type->tp_name);
+										Py_DECREF(pyDatachangePtr);
 										SCRIPT_ERROR_CHECK();
 									}
 									else
 									{
-										onDataChangedEvent_ = (*static_cast<EntityComponent::OnDataChangedEvent*>(ptr));
-										onDataChangedEvent_(this, propertyDescription, pySetObj);
+										void* ptr = PyLong_AsVoidPtr(pyDatachangePtr);
+										Py_DECREF(pyDatachangePtr);
+
+										if (ptr == NULL)
+										{
+											SCRIPT_ERROR_CHECK();
+										}
+										else
+										{
+											onDataChangedEvent_ = (*static_cast<EntityComponent::OnDataChangedEvent*>(ptr));
+											onDataChangedEvent_(this, propertyDescription, pySetObj);
+										}
 									}
 								}
 								else

@@ -262,8 +262,16 @@ bool Channel::finalise()
 	SAFE_RELEASE(pPacketReader_);
 	SAFE_RELEASE(pPacketSender_);
 
-	Network::EndPoint::reclaimPoolObject(pEndPoint_);
-	pEndPoint_ = NULL;
+	if (pEndPoint_)
+	{
+		// Channel与EndPoint对象池位于不同编译单元，进程退出时二者的静态析构顺序没有保证。
+		// Channel and EndPoint pools live in different translation units, so their static destruction order is unspecified during process shutdown.
+		// 空闲Channel早已释放端点；跳过空指针回收可避免析构阶段再次访问已销毁的EndPoint对象池。
+		// An idle Channel has already released its endpoint; skipping a null reclaim avoids touching a destroyed EndPoint pool during static teardown.
+		EndPoint* pEndPoint = pEndPoint_;
+		pEndPoint_ = NULL;
+		Network::EndPoint::reclaimPoolObject(pEndPoint);
+	}
 
 	return true;
 }
