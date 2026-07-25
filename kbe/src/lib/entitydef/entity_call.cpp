@@ -291,6 +291,19 @@ Network::Channel* EntityCall::getChannel(void)
 }
 
 //-------------------------------------------------------------------------------------
+void EntityCall::newCall(Network::Bundle& bundle)
+{
+	EntityCallAbstract::newCall(bundle);
+
+	// 客户端别名模式必须与生成 SDK 的一字节父 ID 对齐，其他链路保留完整 UID。
+	// Client alias mode must match the generated SDK's one-byte parent ID; other paths retain the full UID.
+	if (isClient() && pScriptModule_->usePropertyDescrAlias())
+		bundle << static_cast<uint8>(0);
+	else
+		bundle << static_cast<ENTITY_PROPERTY_UID>(0);
+}
+
+//-------------------------------------------------------------------------------------
 void EntityCall::reload()
 {
 	pScriptModule_ = EntityDef::findScriptModule(scriptModuleName_.c_str());

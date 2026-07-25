@@ -919,15 +919,50 @@ void Entity::onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s)
 		return;																							
 	}
 
+	// Nex 2.8 客户端 RPC 帧先携带父组件属性 UID；普通实体方法固定为 0。
+	// Nex 2.8 client RPC frames lead with the parent component-property UID; regular entity methods use zero.
+	ENTITY_PROPERTY_UID componentPropertyUID = 0;
+	s >> componentPropertyUID;
+
 	ENTITY_METHOD_UID utype = 0;
 	s >> utype;
-	
-	MethodDescription* pMethodDescription = pScriptModule_->findBaseMethodDescription(utype);
+
+	ScriptDefModule* pCallScriptModule = pScriptModule_;
+	PyObject* pyCallObject = this;
+	PropertyDescription* pComponentPropertyDescription = NULL;
+
+	if (componentPropertyUID > 0)
+	{
+		pComponentPropertyDescription = pScriptModule_->findBasePropertyDescription(componentPropertyUID);
+		if (pComponentPropertyDescription == NULL ||
+			pComponentPropertyDescription->getDataType()->type() != DATA_TYPE_ENTITY_COMPONENT)
+		{
+			ERROR_MSG(fmt::format("{}::onRemoteMethodCall: can't find EntityComponent({}), methodUID={}, callerID={}.\n",
+				this->scriptName(), componentPropertyUID, utype, id_));
+			s.done();
+			return;
+		}
+
+		pCallScriptModule = static_cast<EntityComponentType*>(
+			pComponentPropertyDescription->getDataType())->pScriptDefModule();
+		pyCallObject = PyObject_GetAttrString(this, pComponentPropertyDescription->getName());
+		if (pyCallObject == NULL)
+		{
+			SCRIPT_ERROR_CHECK();
+			s.done();
+			return;
+		}
+	}
+
+	MethodDescription* pMethodDescription = pCallScriptModule->findBaseMethodDescription(utype);
 	if(pMethodDescription == NULL)
 	{
-		ERROR_MSG(fmt::format("{2}::onRemoteMethodCall: can't found method. utype={0}, methodName=unknown, callerID:{1}.\n", 
-			utype, id_, this->scriptName()));
-		
+		ERROR_MSG(fmt::format("{}::onRemoteMethodCall: can't find {}method, methodUID={}, callerID={}.\n",
+			this->scriptName(), pComponentPropertyDescription ? "component " : "", utype, id_));
+
+		if (pyCallObject != static_cast<PyObject*>(this))
+			Py_DECREF(pyCallObject);
+
 		s.done();
 		return;
 	}
@@ -938,8 +973,11 @@ void Entity::onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s)
 		ENTITY_ID srcEntityID = pChannel->proxyID();
 		if (srcEntityID <= 0 || srcEntityID != this->id())
 		{
-			WARNING_MSG(fmt::format("{2}::onRemoteMethodCall({3}): srcEntityID:{0} != thisEntityID:{1}.\n",
-				srcEntityID, this->id(), this->scriptName(), pMethodDescription->getName()));
+			WARNING_MSG(fmt::format("{}::onRemoteMethodCall({}): srcEntityID={} != thisEntityID={}.\n",
+				this->scriptName(), pMethodDescription->getName(), srcEntityID, this->id()));
+
+			if (pyCallObject != static_cast<PyObject*>(this))
+				Py_DECREF(pyCallObject);
 
 			s.done();
 			return;
@@ -947,8 +985,11 @@ void Entity::onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s)
 
 		if(!pMethodDescription->isExposed())
 		{
-			ERROR_MSG(fmt::format("{2}::onRemoteMethodCall: {0} not is exposed, call is illegal! srcEntityID:{1}.\n",
-				pMethodDescription->getName(), srcEntityID, this->scriptName()));
+			ERROR_MSG(fmt::format("{}::onRemoteMethodCall: {} is not exposed, srcEntityID={}.\n",
+				this->scriptName(), pMethodDescription->getName(), srcEntityID));
+
+			if (pyCallObject != static_cast<PyObject*>(this))
+				Py_DECREF(pyCallObject);
 
 			s.done();
 			return;
@@ -957,15 +998,16 @@ void Entity::onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s)
 
 	if(g_debugEntity)
 	{
-		DEBUG_MSG(fmt::format("{3}::onRemoteMethodCall: {0}, {3}::{1}(utype={2}).\n", 
-			id_, (pMethodDescription ? pMethodDescription->getName() : "unknown"), utype, this->scriptName()));
+		DEBUG_MSG(fmt::format("{}::onRemoteMethodCall: entityID={}, {}{}{}(utype={}).\n",
+			this->scriptName(), id_, pComponentPropertyDescription ? pCallScriptModule->getName() : "",
+			pComponentPropertyDescription ? "::" : "", pMethodDescription->getName(), utype));
 	}
 
 	pMethodDescription->currCallerID(this->id());
 	// RPC 参数可能包含组件值，反序列化前绑定当前实体以保证组件 owner 正确。
 	// RPC arguments may contain component values; bind the current entity before deserialization to preserve ownership.
 	EntityDef::context().currEntityID = this->id();
-	PyObject* pyFunc = PyObject_GetAttrString(this, const_cast<char*>
+	PyObject* pyFunc = PyObject_GetAttrString(pyCallObject, const_cast<char*>
 						(pMethodDescription->getName()));
 
 	if(pMethodDescription != NULL)
@@ -990,6 +1032,9 @@ void Entity::onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s)
 	}
 	
 	Py_XDECREF(pyFunc);
+
+	if (pyCallObject != static_cast<PyObject*>(this))
+		Py_DECREF(pyCallObject);
 }
 
 //-------------------------------------------------------------------------------------

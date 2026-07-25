@@ -929,35 +929,80 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent,
 //-------------------------------------------------------------------------------------
 void Entity::onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s)
 {
+	// Nex 2.8 的 Cell RPC 与 Base RPC 使用同一双 UID 帧，避免实体方法与组件方法发生歧义。
+	// Nex 2.8 Cell and Base RPCs share the same two-UID frame to disambiguate entity and component methods.
+	ENTITY_PROPERTY_UID componentPropertyUID = 0;
+	s >> componentPropertyUID;
+
 	ENTITY_METHOD_UID utype = 0;
 	s >> utype;
 
-	MethodDescription* pMethodDescription = pScriptModule_->findCellMethodDescription(utype);
+	ScriptDefModule* pCallScriptModule = pScriptModule_;
+	PropertyDescription* pComponentPropertyDescription = NULL;
+	if (componentPropertyUID > 0)
+	{
+		pComponentPropertyDescription = pScriptModule_->findCellPropertyDescription(componentPropertyUID);
+		if (pComponentPropertyDescription == NULL ||
+			pComponentPropertyDescription->getDataType()->type() != DATA_TYPE_ENTITY_COMPONENT)
+		{
+			ERROR_MSG(fmt::format("{}::onRemoteMethodCall: can't find EntityComponent({}), methodUID={}, callerID={}.\n",
+				this->scriptName(), componentPropertyUID, utype, id_));
+			s.done();
+			return;
+		}
+
+		pCallScriptModule = static_cast<EntityComponentType*>(
+			pComponentPropertyDescription->getDataType())->pScriptDefModule();
+	}
+
+	MethodDescription* pMethodDescription = pCallScriptModule->findCellMethodDescription(utype);
 
 	if(pMethodDescription == NULL)
 	{
-		ERROR_MSG(fmt::format("{2}::onRemoteMethodCall: can't found method. utype={0}, methodName=unknown, callerID:{1}.\n"
-			, utype, id_, this->scriptName()));
+		ERROR_MSG(fmt::format("{}::onRemoteMethodCall: can't find {}method, methodUID={}, callerID={}.\n",
+			this->scriptName(), pComponentPropertyDescription ? "component " : "", utype, id_));
 
+		s.done();
 		return;
 	}
 
-	onRemoteMethodCall_(pMethodDescription, id(), s);
+	onRemoteMethodCall_(pComponentPropertyDescription, pMethodDescription, id(), s);
 }
 
 //-------------------------------------------------------------------------------------
 void Entity::onRemoteCallMethodFromClient(Network::Channel* pChannel, ENTITY_ID srcEntityID, MemoryStream& s)
 {
+	ENTITY_PROPERTY_UID componentPropertyUID = 0;
+	s >> componentPropertyUID;
+
 	ENTITY_METHOD_UID utype = 0;
 	s >> utype;
 
-	MethodDescription* pMethodDescription = pScriptModule_->findCellMethodDescription(utype);
+	ScriptDefModule* pCallScriptModule = pScriptModule_;
+	PropertyDescription* pComponentPropertyDescription = NULL;
+	if (componentPropertyUID > 0)
+	{
+		pComponentPropertyDescription = pScriptModule_->findCellPropertyDescription(componentPropertyUID);
+		if (pComponentPropertyDescription == NULL ||
+			pComponentPropertyDescription->getDataType()->type() != DATA_TYPE_ENTITY_COMPONENT)
+		{
+			ERROR_MSG(fmt::format("{}::onRemoteCallMethodFromClient: can't find EntityComponent({}), methodUID={}, callerID={}.\n",
+				this->scriptName(), componentPropertyUID, utype, srcEntityID));
+			s.done();
+			return;
+		}
+
+		pCallScriptModule = static_cast<EntityComponentType*>(
+			pComponentPropertyDescription->getDataType())->pScriptDefModule();
+	}
+
+	MethodDescription* pMethodDescription = pCallScriptModule->findCellMethodDescription(utype);
 	if(pMethodDescription)
 	{
 		if(!pMethodDescription->isExposed())
 		{
-			ERROR_MSG(fmt::format("{2}::onRemoteCallMethodFromClient: {0} not is exposed, call is illegal! entityID:{1}.\n",
-				pMethodDescription->getName(), this->id(), this->scriptName()));
+			ERROR_MSG(fmt::format("{}::onRemoteCallMethodFromClient: {} is not exposed, entityID={}.\n",
+				this->scriptName(), pMethodDescription->getName(), this->id()));
 
 			s.done();
 			return;
@@ -965,17 +1010,19 @@ void Entity::onRemoteCallMethodFromClient(Network::Channel* pChannel, ENTITY_ID 
 	}
 	else
 	{
-		ERROR_MSG(fmt::format("{2}::onRemoteCallMethodFromClient: can't found method. utype={0}, methodName=unknown, callerID:{1}.\n",
-			utype, id_, this->scriptName()));
+		ERROR_MSG(fmt::format("{}::onRemoteCallMethodFromClient: can't find {}method, methodUID={}, callerID={}.\n",
+			this->scriptName(), pComponentPropertyDescription ? "component " : "", utype, id_));
 
+		s.done();
 		return;
 	}
 
-	onRemoteMethodCall_(pMethodDescription, srcEntityID, s);
+	onRemoteMethodCall_(pComponentPropertyDescription, pMethodDescription, srcEntityID, s);
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::onRemoteMethodCall_(MethodDescription* pMethodDescription, ENTITY_ID srcEntityID, MemoryStream& s)
+void Entity::onRemoteMethodCall_(PropertyDescription* pComponentPropertyDescription,
+	MethodDescription* pMethodDescription, ENTITY_ID srcEntityID, MemoryStream& s)
 {
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
@@ -998,8 +1045,9 @@ void Entity::onRemoteMethodCall_(MethodDescription* pMethodDescription, ENTITY_I
 
 	if(g_debugEntity)
 	{
-		DEBUG_MSG(fmt::format("Entity::onRemoteMethodCall: {0}, {3}::{1}(utype={2}).\n",
-			id_, pMethodDescription->getName(), pMethodDescription->getUType(), this->scriptName()));
+		DEBUG_MSG(fmt::format("Entity::onRemoteMethodCall: {}, {}::{}{}(utype={}).\n",
+			id_, this->scriptName(), pComponentPropertyDescription ? "component::" : "",
+			pMethodDescription->getName(), pMethodDescription->getUType()));
 	}
 
 	pMethodDescription->currCallerID(srcEntityID);
@@ -1007,7 +1055,19 @@ void Entity::onRemoteMethodCall_(MethodDescription* pMethodDescription, ENTITY_I
 	// Component RPC arguments must bind to the real caller entity to avoid ownerless objects during stream decoding.
 	EntityDef::context().currEntityID = srcEntityID;
 
-	PyObject* pyFunc = PyObject_GetAttrString(this, const_cast<char*>
+	PyObject* pyCallObject = this;
+	if (pComponentPropertyDescription)
+	{
+		pyCallObject = PyObject_GetAttrString(this, pComponentPropertyDescription->getName());
+		if (pyCallObject == NULL)
+		{
+			SCRIPT_ERROR_CHECK();
+			s.done();
+			return;
+		}
+	}
+
+	PyObject* pyFunc = PyObject_GetAttrString(pyCallObject, const_cast<char*>
 						(pMethodDescription->getName()));
 
 	if(pMethodDescription != NULL)
@@ -1037,6 +1097,9 @@ void Entity::onRemoteMethodCall_(MethodDescription* pMethodDescription, ENTITY_I
 	}
 
 	Py_XDECREF(pyFunc);
+	if (pyCallObject != static_cast<PyObject*>(this))
+		Py_DECREF(pyCallObject);
+
 	SCRIPT_ERROR_CHECK();
 }
 
@@ -3843,20 +3906,41 @@ void Entity::onUpdateGhostPropertys(KBEngine::MemoryStream& s)
 //-------------------------------------------------------------------------------------
 void Entity::onRemoteRealMethodCall(KBEngine::MemoryStream& s)
 {
-	ENTITY_METHOD_UID utype;
+	ENTITY_PROPERTY_UID componentPropertyUID = 0;
+	s >> componentPropertyUID;
+
+	ENTITY_METHOD_UID utype = 0;
 	s >> utype;
 
-	MethodDescription* pMethodDescription = pScriptModule()->findCellMethodDescription(utype);
+	ScriptDefModule* pCallScriptModule = pScriptModule();
+	PropertyDescription* pComponentPropertyDescription = NULL;
+	if (componentPropertyUID > 0)
+	{
+		pComponentPropertyDescription = pCallScriptModule->findCellPropertyDescription(componentPropertyUID);
+		if (pComponentPropertyDescription == NULL ||
+			pComponentPropertyDescription->getDataType()->type() != DATA_TYPE_ENTITY_COMPONENT)
+		{
+			ERROR_MSG(fmt::format("{}::onRemoteRealMethodCall: can't find EntityComponent({}), methodUID={}, entityID={}.\n",
+				scriptName(), componentPropertyUID, utype, id()));
+			s.done();
+			return;
+		}
+
+		pCallScriptModule = static_cast<EntityComponentType*>(
+			pComponentPropertyDescription->getDataType())->pScriptDefModule();
+	}
+
+	MethodDescription* pMethodDescription = pCallScriptModule->findCellMethodDescription(utype);
 	if(pMethodDescription == NULL)
 	{
-		ERROR_MSG(fmt::format("{}::onRemoteRealMethodCall: not found method({}), entityID({})\n", 
-			scriptName(), utype, id()));
+		ERROR_MSG(fmt::format("{}::onRemoteRealMethodCall: can't find {}method({}), entityID({}).\n",
+			scriptName(), pComponentPropertyDescription ? "component " : "", utype, id()));
 
 		s.done();
 		return;
 	}
 
-	onRemoteMethodCall_(pMethodDescription, id(), s);
+	onRemoteMethodCall_(pComponentPropertyDescription, pMethodDescription, id(), s);
 }
 
 //-------------------------------------------------------------------------------------

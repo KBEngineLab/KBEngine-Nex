@@ -80,6 +80,12 @@ public:
 	*/
 	static void onInstallScript(PyObject* mod);
 
+	/**
+		构造 2.8 EntityCall 帧，并为普通实体方法写入零父组件属性 UID。
+		Build a 2.8 EntityCall frame and write a zero parent component-property UID for regular entity methods.
+	*/
+	virtual void newCall(Network::Bundle& bundle);
+
 	/** 
 		通过entity的ID尝试寻找它的实例
 	*/

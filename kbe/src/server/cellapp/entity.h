@@ -376,7 +376,8 @@ public:
 	*/
 	void onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s);
 	void onRemoteCallMethodFromClient(Network::Channel* pChannel, ENTITY_ID srcEntityID, MemoryStream& s);
-	void onRemoteMethodCall_(MethodDescription* pMethodDescription, ENTITY_ID srcEntityID, MemoryStream& s);
+	void onRemoteMethodCall_(PropertyDescription* pComponentPropertyDescription,
+		MethodDescription* pMethodDescription, ENTITY_ID srcEntityID, MemoryStream& s);
 
 	/**
 		观察者
