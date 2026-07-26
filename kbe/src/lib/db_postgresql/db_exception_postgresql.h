@@ -52,6 +52,9 @@ private:
 	DBInterfacePostgresql* pdbi_;
 	std::string errStr_;
 	std::string sqlState_;
+	// SQLSTATE 可能在物理断线时缺失，因此构造异常时同时快照 libpq 连接状态。
+	// SQLSTATE can be absent on a physical disconnect, so snapshot the libpq connection state when constructing the exception.
+	bool connectionLost_;
 };
 
 }

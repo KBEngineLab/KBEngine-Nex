@@ -37,6 +37,10 @@ public:
 	bool shouldRetry() const;
 	bool isLostConnection() const;
 
+	// 暴露 Connector/C 错误码用于结构化诊断，不允许调用方修改异常状态。
+	// Expose the Connector/C error code for structured diagnostics without allowing callers to mutate exception state.
+	unsigned int errorNumber() const { return errNum_; }
+
 	void setError(const std::string& errStr, unsigned int errNum)
 	{
 		errStr_ = errStr;

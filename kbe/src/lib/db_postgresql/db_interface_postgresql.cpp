@@ -640,13 +640,26 @@ int DBInterfacePostgresql::getlasterror()
 // Begin a PostgreSQL transaction and track local ownership.
 bool DBInterfacePostgresql::lock()
 {
-	if (query("BEGIN"))
+	while (true)
 	{
-		inTransaction(true);
-		return true;
-	}
+		try
+		{
+			if (query("BEGIN"))
+			{
+				inTransaction(true);
+				return true;
+			}
 
-	return false;
+			return false;
+		}
+		catch (std::exception& e)
+		{
+			// BEGIN 尚未执行用户数据操作，可以在连接恢复后安全地重新开始事务。
+			// BEGIN has not executed user data, so starting a fresh transaction after reconnect is safe.
+			if (!processException(e))
+				return false;
+		}
+	}
 }
 
 // 提交事务。
@@ -668,15 +681,40 @@ bool DBInterfacePostgresql::processException(std::exception& e)
 {
 	DBExceptionPostgresql* pException = dynamic_cast<DBExceptionPostgresql*>(&e);
 	if (!pException)
+	{
+		ERROR_MSG(fmt::format("DBInterfacePostgresql::processException: non-database exception: {}\n", e.what()));
 		return false;
+	}
 
 	if (pException->isLostConnection())
 	{
-		WARNING_MSG(fmt::format("DBInterfacePostgresql::processException: lost connection, retry attach. lastquery={}\n", lastquery_));
-		return reattach();
+		WARNING_MSG(fmt::format("DBInterfacePostgresql::processException: lost connection, SQLSTATE={}, error={}, lastquery={}. Attempting to reconnect.\n",
+			lastSqlState_.empty() ? "<none>" : lastSqlState_, pException->what(), lastquery_));
+
+		int attempts = 1;
+		while (!reattach())
+		{
+			ERROR_MSG(fmt::format("DBInterfacePostgresql::processException: reconnect({}) attempt {} failed({}).\n",
+				db_name_, attempts, getstrerror()));
+			KBEngine::sleep(30);
+			++attempts;
+		}
+
+		INFO_MSG(fmt::format("DBInterfacePostgresql::processException: reconnected({}). Attempts = {}\n",
+			db_name_, attempts));
+		return true;
 	}
 
-	return pException->shouldRetry();
+	if (pException->shouldRetry())
+	{
+		WARNING_MSG(fmt::format("DBInterfacePostgresql::processException: retryable SQLSTATE={}, error={}, lastquery={}\n",
+			lastSqlState_, pException->what(), lastquery_));
+		return true;
+	}
+
+	WARNING_MSG(fmt::format("DBInterfacePostgresql::processException: SQLSTATE={}, error={}, lastquery={}\n",
+		lastSqlState_.empty() ? "<none>" : lastSqlState_, pException->what(), lastquery_));
+	return false;
 }
 
 //-------------------------------------------------------------------------------------

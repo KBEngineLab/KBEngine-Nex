@@ -48,8 +48,22 @@ bool DBException::shouldRetry() const
 //-------------------------------------------------------------------------------------
 bool DBException::isLostConnection() const
 {
-	return (errNum_ == CR_SERVER_GONE_ERROR) ||
-			(errNum_ == CR_SERVER_LOST);
+	// Connector/C 在已有连接失效后可能从传输层或 TLS 重协商返回不同 CR_* 错误；这些错误都需要重建连接。
+	// Connector/C can report transport or TLS CR_* errors after an established session dies; all require rebuilding the connection.
+	switch (errNum_)
+	{
+	case CR_CONNECTION_ERROR:
+	case CR_CONN_HOST_ERROR:
+	case CR_IPSOCK_ERROR:
+	case CR_SERVER_GONE_ERROR:
+	case CR_TCP_CONNECTION:
+	case CR_SERVER_LOST:
+	case CR_SSL_CONNECTION_ERROR:
+	case CR_SERVER_LOST_EXTENDED:
+		return true;
+	default:
+		return false;
+	}
 }
 
 //-------------------------------------------------------------------------------------

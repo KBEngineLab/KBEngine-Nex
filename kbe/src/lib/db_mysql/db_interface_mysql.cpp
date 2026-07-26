@@ -740,15 +740,24 @@ void DBInterfaceMysql::throwError(DBException* pDBException)
 //-------------------------------------------------------------------------------------
 bool DBInterfaceMysql::processException(std::exception & e)
 {
-	DBException* dbe = static_cast<DBException*>(&e);
+	// DB 工作线程也可能传播非数据库异常，先验证动态类型以避免未定义行为。
+	// DB workers can also propagate non-database exceptions, so validate the dynamic type to avoid undefined behavior.
+	DBException* dbe = dynamic_cast<DBException*>(&e);
+	if (!dbe)
+	{
+		ERROR_MSG(fmt::format("DBInterfaceMysql::processException: non-database exception: {}\n", e.what()));
+		return false;
+	}
+
 	bool retry = false;
 
 	if (dbe->isLostConnection())
 	{
 		ERROR_MSG(fmt::format("DBInterfaceMysql::processException: "
-				"Thread {:p} lost connection to database. Exception: {}. "
+				"Thread {:p} lost connection to database. Code: {}, exception: {}. "
 				"Attempting to reconnect.\n",
 			(void*)this,
+			dbe->errorNumber(),
 			dbe->what()));
 
 		int attempts = 1;
@@ -776,16 +785,16 @@ bool DBInterfaceMysql::processException(std::exception & e)
 	}
 	else if (dbe->shouldRetry())
 	{
-		WARNING_MSG(fmt::format("DBInterfaceMysql::processException(db={}): Retrying {:p}\nException:{}\nnlastquery={}\n",
-			db_name_, (void*)this, dbe->what(), lastquery_));
+		WARNING_MSG(fmt::format("DBInterfaceMysql::processException(db={}): Retrying {:p}\nCode:{}\nException:{}\nlastquery={}\n",
+			db_name_, (void*)this, dbe->errorNumber(), dbe->what(), lastquery_));
 
 		retry = true;
 	}
 	else
 	{
 		WARNING_MSG(fmt::format("DBInterfaceMysql::processException(db={}): "
-				"Exception: {}\nlastquery={}\n",
-			db_name_, dbe->what(), lastquery_));
+				"Code: {}, exception: {}\nlastquery={}\n",
+			db_name_, dbe->errorNumber(), dbe->what(), lastquery_));
 	}
 
 	return retry;
