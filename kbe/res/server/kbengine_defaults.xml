@@ -316,6 +316,10 @@
 				<auth>  
 					<username> kbe </username>									<!-- Type: String -->
 					<password> pwd123456 </password>							<!-- Type: String -->
+
+					<!-- MongoDB 可在此指定独立认证数据库（例如 admin）；留空时使用 databaseName。
+						 MongoDB can use a separate authentication database here (for example, admin); empty uses databaseName. -->
+					<authSource>  </authSource>								<!-- Type: String -->
 					
 					<!-- 为true则表示password是加密(rsa)的, 可防止明文配置 
 						(is true, password is RSA)

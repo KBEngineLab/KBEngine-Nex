@@ -111,6 +111,7 @@ struct DBInterfaceInfo
 		memset(db_ip, 0, sizeof(db_ip));
 		memset(db_username, 0, sizeof(db_username));
 		memset(db_password, 0, sizeof(db_password));
+		memset(db_authSource, 0, sizeof(db_authSource));
 		memset(db_name, 0, sizeof(db_name));
 	}
 
@@ -122,6 +123,9 @@ struct DBInterfaceInfo
 	char db_ip[MAX_BUF];									// 数据库的ip地址
 	char db_username[MAX_NAME];								// 数据库的用户名
 	char db_password[MAX_BUF * 10];							// 数据库的密码
+	// MongoDB 认证数据库；为空时使用业务数据库以保持现有配置兼容。
+	// MongoDB authentication database; an empty value uses the application database for backward compatibility.
+	char db_authSource[MAX_NAME];
 	bool db_passwordEncrypt;								// db密码是否是加密的
 	char db_name[MAX_NAME];									// 数据库名
 	uint16 db_numConnections;								// 数据库最大连接

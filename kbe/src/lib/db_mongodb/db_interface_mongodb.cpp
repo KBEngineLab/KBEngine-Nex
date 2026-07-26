@@ -201,8 +201,11 @@ namespace KBEngine {
 		bool uriOK = mongoc_uri_set_database(uri, db_name_) && mongoc_uri_set_appname(uri, "KBEngine-dbmgr");
 		if (db_username_[0] != '\0')
 		{
+			// 显式认证数据库适配集中管理的 root@admin；空值继续认证业务库，兼容原有部署。
+			// An explicit authentication database supports centrally managed root@admin users; an empty value preserves application-database authentication.
+			const char* authSource = db_authSource_[0] != '\0' ? db_authSource_ : db_name_;
 			uriOK = uriOK && mongoc_uri_set_username(uri, db_username_) &&
-				mongoc_uri_set_password(uri, db_password_) && mongoc_uri_set_auth_source(uri, db_name_);
+				mongoc_uri_set_password(uri, db_password_) && mongoc_uri_set_auth_source(uri, authSource);
 		}
 
 		if (!uriOK)

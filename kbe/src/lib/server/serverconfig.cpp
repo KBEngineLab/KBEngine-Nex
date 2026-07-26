@@ -967,6 +967,14 @@ bool ServerConfig::loadConfig(std::string fileName)
 							missingFields.push_back("auth->username");
 						}
 
+						// authSource 仅供 MongoDB 指定独立认证数据库；省略时由驱动适配层回退到业务数据库。
+						// authSource lets MongoDB use a separate authentication database; omission falls back to the application database in the driver adapter.
+						childnode = xml->enterNode(node, "authSource");
+						if(childnode)
+						{
+							strncpy((char*)&pDBInfo->db_authSource, xml->getValStr(childnode).c_str(), MAX_NAME - 1);
+						}
+
 						childnode = xml->enterNode(node, "encrypt");
 						if(childnode)
 						{
