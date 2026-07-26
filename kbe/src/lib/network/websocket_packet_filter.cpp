@@ -25,6 +25,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/bundle.h"
 #include "network/channel.h"
 #include "network/tcp_packet.h"
+#include "utf8cpp/utf8.h"
 #include "network/network_interface.h"
 #include "network/packet_receiver.h"
 
@@ -241,13 +242,13 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 				TCPPacket::reclaimPoolObject(static_cast<TCPPacket*>(pPacket));
 				return REASON_WEBSOCKET_ERROR;
 			}
-			else if(msg_frameType_ == websocket::WebSocketProtocol::CLOSE_FRAME)
+			else if(msg_frameType_ == websocket::WebSocketProtocol::CLOSE_FRAME && msg_payload_length_ == 0)
 			{
-				this->pChannel_->condemn("");
+				Reason reason = onClose(pChannel, NULL);
 				reset();
 
 				TCPPacket::reclaimPoolObject(static_cast<TCPPacket*>(pPacket));
-				return REASON_SUCCESS;
+				return reason;
 			}
 			else if(msg_frameType_ == websocket::WebSocketProtocol::INCOMPLETE_FRAME)
 			{
@@ -302,7 +303,8 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 
 			Reason reason = REASON_SUCCESS;
 
-			if (msg_frameType_ == websocket::WebSocketProtocol::PING_FRAME)
+			if (msg_frameType_ == websocket::WebSocketProtocol::PING_FRAME ||
+				msg_frameType_ == websocket::WebSocketProtocol::CLOSE_FRAME)
 			{
 				// 继续等剩余的内容到来为止
 				if (pFragmentDatasRemain_ > 0)
@@ -320,7 +322,8 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 					return REASON_WEBSOCKET_ERROR;
 				}
 
-				reason = onPing(pChannel, pTCPPacket_);
+				reason = msg_frameType_ == websocket::WebSocketProtocol::PING_FRAME ?
+					onPing(pChannel, pTCPPacket_) : onClose(pChannel, pTCPPacket_);
 			}
 			else
 			{
@@ -407,6 +410,70 @@ Reason WebSocketPacketFilter::onPing(Channel * pChannel, Packet* pPacket)
 
 	pFragmentDatasRemain_ = 0;
 	fragmentDatasFlag_ = FRAGMENT_MESSAGE_HREAD;
+	return REASON_SUCCESS;
+}
+
+//-------------------------------------------------------------------------------------
+Reason WebSocketPacketFilter::onClose(Channel * pChannel, Packet* pPacket)
+{
+	const size_t length = pPacket ? pPacket->length() : 0;
+	const uint8* payload = pPacket ? pPacket->data() + pPacket->rpos() : NULL;
+	uint16 responseCode = 1000;
+	bool valid = msg_fin_ == 1 && msg_masked_ == 1 && length <= 125 && length != 1;
+
+	if (valid && length >= 2)
+	{
+		const uint16 closeCode = static_cast<uint16>((payload[0] << 8) | payload[1]);
+		// 1016..2999 由协议保留，未协商扩展时不能接受；3000 以上分别供框架和应用使用。
+		// Codes 1016..2999 are protocol-reserved and invalid without an extension; 3000+ are available to frameworks and applications.
+		valid = ((closeCode >= 1000 && closeCode <= 1014) || (closeCode >= 3000 && closeCode <= 4999)) &&
+			closeCode != 1004 && closeCode != 1005 && closeCode != 1006 && closeCode != 1015;
+		responseCode = valid ? closeCode : 1002;
+
+		bool reasonIsValidUtf8 = true;
+		if (valid && length > 2)
+		{
+			// utf8cpp 旧版内部把迭代器差值传给 int；输入最多 123 字节，局部屏蔽不会隐藏本项目的宽度问题。
+			// Old utf8cpp passes iterator differences to int; input is at most 123 bytes, so local suppression cannot hide project width issues.
+#if KBE_PLATFORM == PLATFORM_WIN32
+#pragma warning(push)
+#pragma warning(disable: 4244)
+#endif
+			reasonIsValidUtf8 = utf8::is_valid(payload + 2, payload + length);
+#if KBE_PLATFORM == PLATFORM_WIN32
+#pragma warning(pop)
+#endif
+		}
+
+		if (!reasonIsValidUtf8)
+		{
+			valid = false;
+			responseCode = 1007;
+		}
+	}
+	else if (!valid)
+	{
+		responseCode = 1002;
+	}
+
+	bool started = false;
+	if (valid)
+	{
+		started = pChannel->handleWebSocketClose(payload, length);
+	}
+	else
+	{
+		// 无效 close 不能原样回显；1002 表示协议错误，1007 表示 reason 不是合法 UTF-8。
+		// An invalid close cannot be echoed; 1002 reports protocol error and 1007 reports an invalid UTF-8 reason.
+		started = pChannel->handleWebSocketCloseError(responseCode);
+	}
+
+	if (!started)
+	{
+		pChannel->condemn("WebSocket close response failed");
+		return REASON_GENERAL_NETWORK;
+	}
+
 	return REASON_SUCCESS;
 }
 

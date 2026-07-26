@@ -136,6 +136,9 @@ public:
 	// completion 后端使用内存 BIO 接管 TLS 密文，readiness 后端继续使用原生 socket BIO。
 	// Completion backends use memory BIOs for TLS ciphertext while readiness backends retain the native socket BIO.
 	bool setupSSL(int sslVersion, Packet* pPacket, bool useMemoryBIO = false);
+	// 启动或继续 TLS 双向关闭；内存 BIO 生成的 close_notify 仍由 Channel 交给 completion poller。
+	// Start or continue bidirectional TLS shutdown; Channel still hands memory-BIO close_notify records to the completion poller.
+	bool shutdownSSL();
 	bool destroySSL();
 	// 将 completion 收到的密文喂给 OpenSSL，并返回当前可用的应用层明文。
 	// Feed ciphertext delivered by a completion backend into OpenSSL and return currently available application plaintext.

@@ -91,7 +91,7 @@ bool TCPPacketReceiver::processRecv(bool expectingPacket)
 	Channel* pChannel = getChannel();
 	KBE_ASSERT(pChannel != NULL);
 
-	if(pChannel->condemn() > 0)
+	if(pChannel->condemn() > 0 && !pChannel->isGracefulClosing())
 	{
 		return false;
 	}
@@ -144,13 +144,13 @@ bool TCPPacketReceiver::processRecv(bool expectingPacket)
 			return false;
 		}
 
+		bool tlsPeerClosed = false;
 		if (pEndpoint_->usesSSLMemoryBIO())
 		{
 			// IOCP 已经消费 socket 中的 TLS record；必须先经内存 BIO 解密，不能把密文交给 KBE/WebSocket 解析器。
 			// IOCP has consumed TLS records from the socket; decrypt through the memory BIO before KBE/WebSocket parsing sees the bytes.
 			std::vector<char> plaintext;
-			bool peerClosed = false;
-			if (!pEndpoint_->consumeSSLNetworkData(data.data(), static_cast<int>(data.size()), plaintext, peerClosed) ||
+			if (!pEndpoint_->consumeSSLNetworkData(data.data(), static_cast<int>(data.size()), plaintext, tlsPeerClosed) ||
 				!pChannel->flushSSLNetworkOutput())
 			{
 				TCPPacket::reclaimPoolObject(pReceiveWindow);
@@ -161,9 +161,9 @@ bool TCPPacketReceiver::processRecv(bool expectingPacket)
 			if (plaintext.empty())
 			{
 				TCPPacket::reclaimPoolObject(pReceiveWindow);
-				if (peerClosed)
+				if (tlsPeerClosed)
 				{
-					onGetError(pChannel, "TLS close_notify");
+					pChannel->handleTLSCloseNotify();
 					return false;
 				}
 
@@ -181,6 +181,9 @@ bool TCPPacketReceiver::processRecv(bool expectingPacket)
 		Reason ret = this->processPacket(pChannel, pReceiveWindow);
 		if (ret != REASON_SUCCESS)
 			this->dispatcher().errorReporter().reportException(ret, pEndpoint_->addr());
+
+		if (tlsPeerClosed && !pChannel->isDestroyed())
+			pChannel->handleTLSCloseNotify();
 
 		return true;
 	}

@@ -257,8 +257,9 @@ int WebSocketProtocol::getFrame(Packet * pPacket, uint8& msg_opcode, uint8& msg_
 		+---------------------------------------------------------------+
 	*/
 
-	// 不足3字节，需要继续等待
-	int remainSize = 3 - pPacket->length();
+	// 基础帧头只有两个字节；额外长度和 mask key 在各自分支继续做精确检查。
+	// The base frame header is two bytes; extended lengths and mask keys are checked precisely in their own branches.
+	int remainSize = 2 - pPacket->length();
 	if(remainSize > 0) 
 	{
 		frameType = INCOMPLETE_FRAME;
@@ -271,6 +272,7 @@ int WebSocketProtocol::getFrame(Packet * pPacket, uint8& msg_opcode, uint8& msg_
 
 	msg_opcode = bytedata & 0x0F;
 	msg_fin = (bytedata >> 7) & 0x01;
+	const bool hasReservedBits = (bytedata & 0x70) != 0;
 
 	// 第二个字节, 消息的第二个字节主要用于描述掩码和消息长度, 最高位用0或1来描述是否有掩码处理
 	(*pPacket) >> bytedata;
@@ -353,6 +355,15 @@ int WebSocketProtocol::getFrame(Packet * pPacket, uint8& msg_opcode, uint8& msg_
 		WARNING_MSG(fmt::format("WebSocketProtocol::getFrame: msglen exceeds the limit! msglen=({}), maxlen={}.\n", 
 			msg_payload_length, NETWORK_MESSAGE_MAX_SIZE));
 
+		frameType = ERROR_FRAME;
+		return 0;
+	}
+
+	// RFC 6455 控制帧不得分片、不得设置 RSV，且 payload 必须使用 7 位长度并限制为 125 字节。
+	// RFC 6455 control frames cannot be fragmented or set RSV bits, and their payload must use the 7-bit length capped at 125 bytes.
+	const bool isControlFrame = msg_opcode >= 0x08;
+	if (hasReservedBits || (isControlFrame && (!msg_fin || msg_length_field > 125 || msg_payload_length > 125)))
+	{
 		frameType = ERROR_FRAME;
 		return 0;
 	}

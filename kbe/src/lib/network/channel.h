@@ -216,6 +216,19 @@ public:
 	// 将 TLS 内存 BIO 的输出密文交给 completion poller，保持 socket IO 的单一所有权。
 	// Hand memory-BIO ciphertext to the completion poller so socket IO keeps a single owner.
 	bool flushSSLNetworkOutput();
+	// 处理一个已经完整解码的客户端 WebSocket close，并回送相同 payload。
+	// Handle a fully decoded client WebSocket close and echo the same payload.
+	bool handleWebSocketClose(const void* payload, size_t length);
+	// 以指定状态码启动服务端协议错误关闭，不回显无效的客户端 payload。
+	// Start a server protocol-error close with the given status code without echoing an invalid client payload.
+	bool handleWebSocketCloseError(uint16 closeCode);
+	// 对端 TLS close_notify 到达后回送本端通知，并进入有界的优雅关闭阶段。
+	// Reply to a peer TLS close_notify and enter the bounded graceful-close phase.
+	void handleTLSCloseNotify();
+	// 推进服务端主动关闭或等待对端关闭响应；返回 true 表示可以销毁 socket。
+	// Advance server-initiated close or wait for peer responses; true means the socket may be destroyed.
+	bool processGracefulClose();
+	bool isGracefulClosing() const { return gracefulCloseStarted_; }
 
 	KBEngine::Network::MessageHandlers* pMsgHandlers() const { return pMsgHandlers_; }
 	void pMsgHandlers(KBEngine::Network::MessageHandlers* pMsgHandlers) { pMsgHandlers_ = pMsgHandlers; }
@@ -301,6 +314,18 @@ private:
 	// 只缓存不足以判定 TLS record header 的前 1-2 字节，避免首个 completion 过短时误判原生协议。
 	// Retain only the first 1-2 bytes needed to classify a TLS record header when the initial completion is too short.
 	std::vector<char>			tlsDetectionPrefix_;
+	bool						gracefulCloseStarted_;
+	bool						webSocketCloseSent_;
+	bool						webSocketCloseReceived_;
+	bool						tlsCloseNotifyReceived_;
+	uint64						gracefulCloseDeadline_;
+
+	// 将已经完成协议封装的数据按当前 TLS/IO 后端发送，不再经过 PacketFilter 二次封装。
+	// Send protocol-framed bytes through the active TLS/IO backend without a second PacketFilter pass.
+	bool sendRawNetworkData(const void* data, int length);
+	bool startGracefulClose(const void* closePayload, size_t closePayloadLength, bool peerWebSocketClose);
+	bool sendWebSocketClose(const void* payload, size_t length);
+	bool hasPendingNetworkSend() const;
 };
 
 }

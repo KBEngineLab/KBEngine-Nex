@@ -1163,6 +1163,32 @@ bool EndPoint::takeSSLNetworkOutput(std::vector<char>& output)
 }
 
 //-------------------------------------------------------------------------------------
+bool EndPoint::shutdownSSL()
+{
+	if (!sslHandle_)
+		return true;
+
+	// SSL_shutdown 可在非阻塞 socket 上返回 WANT_READ/WANT_WRITE；状态必须保留，后续 tick 可以继续推进。
+	// SSL_shutdown may return WANT_READ/WANT_WRITE on a nonblocking socket; preserve state so a later tick can continue it.
+	ERR_clear_error();
+	const int result = SSL_shutdown(sslHandle_);
+	if (sslUsesMemoryBIO_ && !drainSSLNetworkOutput())
+		return false;
+
+	if (result >= 0)
+		return true;
+
+	const int sslError = SSL_get_error(sslHandle_, result);
+	if (sslError == SSL_ERROR_WANT_READ || sslError == SSL_ERROR_WANT_WRITE)
+		return true;
+
+	const unsigned long errorCode = ERR_get_error();
+	ERROR_MSG(fmt::format("EndPoint::shutdownSSL: SSL_shutdown failed, sslError={}, error={}.\n",
+		sslError, errorCode ? ERR_error_string(errorCode, NULL) : "none"));
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
 bool EndPoint::destroySSL()
 {
 	if (sslHandle_)

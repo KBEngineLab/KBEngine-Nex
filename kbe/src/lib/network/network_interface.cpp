@@ -446,7 +446,7 @@ void NetworkInterface::processChannels(KBEngine::Network::MessageHandlers* pMsgH
 		{
 			++iter;
 
-			if (pChannel->condemn() == Network::Channel::FLAG_CONDEMN_AND_WAIT_DESTROY && pChannel->sending())
+			if (pChannel->condemn() == Network::Channel::FLAG_CONDEMN_AND_WAIT_DESTROY && !pChannel->processGracefulClose())
 			{
 				pChannel->updateTick(pMsgHandlers);
 			}

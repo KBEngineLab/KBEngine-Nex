@@ -66,8 +66,9 @@ public:
 		PING_FRAME = 0x89,
 		PONG_FRAME = 0x8A,
 
-		// 关闭连接
-		CLOSE_FRAME = 0x08
+		// 关闭连接。
+		// Close the connection.
+		CLOSE_FRAME = 0x88
 	};
 
 	/**

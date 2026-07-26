@@ -45,6 +45,10 @@ namespace KBEngine {
 namespace Network
 {
 
+// 优雅关闭必须有硬上限，防止失联客户端永久占用 Channel、socket 和 completion 状态。
+// Graceful close needs a hard bound so an absent peer cannot retain Channel, socket, and completion state forever.
+static const uint64 GRACEFUL_CLOSE_TIMEOUT_STAMPS = 5 * stampsPerSecond();
+
 //-------------------------------------------------------------------------------------
 static ObjectPool<Channel> _g_objPool("Channel");
 ObjectPool<Channel>& Channel::ObjPool()
@@ -136,7 +140,12 @@ Channel::Channel(NetworkInterface & networkInterface,
 	pMsgHandlers_(NULL),
 	flags_(0),
 	condemnReason_(),
-	tlsDetectionPrefix_()
+	tlsDetectionPrefix_(),
+	gracefulCloseStarted_(false),
+	webSocketCloseSent_(false),
+	webSocketCloseReceived_(false),
+	tlsCloseNotifyReceived_(false),
+	gracefulCloseDeadline_(0)
 {
 	this->clearBundle();
 	initialize(networkInterface, pEndPoint, traits, pt, pFilter, id);
@@ -172,7 +181,12 @@ Channel::Channel():
 	pMsgHandlers_(NULL),
 	flags_(0),
 	condemnReason_(),
-	tlsDetectionPrefix_()
+	tlsDetectionPrefix_(),
+	gracefulCloseStarted_(false),
+	webSocketCloseSent_(false),
+	webSocketCloseReceived_(false),
+	tlsCloseNotifyReceived_(false),
+	gracefulCloseDeadline_(0)
 {
 	this->clearBundle();
 }
@@ -378,6 +392,11 @@ void Channel::clearState( bool warnOnDiscard /*=false*/ )
 	channelType_ = CHANNEL_NORMAL;
 	condemnReason_ = "";
 	tlsDetectionPrefix_.clear();
+	gracefulCloseStarted_ = false;
+	webSocketCloseSent_ = false;
+	webSocketCloseReceived_ = false;
+	tlsCloseNotifyReceived_ = false;
+	gracefulCloseDeadline_ = 0;
 
 	if(pEndPoint_ && protocoltype_ == PROTOCOL_TCP && !this->isDestroyed())
 	{
@@ -744,6 +763,8 @@ void Channel::condemn(const std::string& reason, bool waitSendCompletedDestroy)
 		condemnReason_ = reason;
 
 	flags_ |= (waitSendCompletedDestroy ? FLAG_CONDEMN_AND_WAIT_DESTROY : FLAG_CONDEMN);
+	if (waitSendCompletedDestroy && gracefulCloseDeadline_ == 0)
+		gracefulCloseDeadline_ = timestamp() + GRACEFUL_CLOSE_TIMEOUT_STAMPS;
 }
 
 //-------------------------------------------------------------------------------------
@@ -862,6 +883,172 @@ bool Channel::flushSSLNetworkOutput()
 }
 
 //-------------------------------------------------------------------------------------
+bool Channel::sendRawNetworkData(const void* data, int length)
+{
+	if (!pEndPoint_ || length < 0)
+		return false;
+
+	if (pEndPoint_->usesSSLMemoryBIO())
+		return pEndPoint_->encryptSSLNetworkData(data, length) && flushSSLNetworkOutput();
+
+	EventPoller* pPoller = this->dispatcher().pPoller();
+	if (pPoller && pPoller->supportsCompletion())
+		return pPoller->queueTcpSend(*pEndPoint_, data, length);
+
+	const char* bytes = static_cast<const char*>(data);
+	int sent = 0;
+	while (sent < length)
+	{
+		const int result = pEndPoint_->send(bytes + sent, length - sent);
+		if (result <= 0)
+			return false;
+
+		sent += result;
+	}
+
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
+bool Channel::sendWebSocketClose(const void* payload, size_t length)
+{
+	if (webSocketCloseSent_)
+		return true;
+
+	TCPPacket* pPayload = TCPPacket::createPoolObject(OBJECTPOOL_POINT);
+	TCPPacket* pFrame = TCPPacket::createPoolObject(OBJECTPOOL_POINT);
+	if (length > 0)
+		pPayload->append(static_cast<const uint8*>(payload), length);
+
+	websocket::WebSocketProtocol::makeFrame(websocket::WebSocketProtocol::CLOSE_FRAME, pPayload, pFrame);
+	if (length > 0)
+		pFrame->append(static_cast<const uint8*>(payload), length);
+
+	const bool result = sendRawNetworkData(pFrame->data() + pFrame->rpos(), static_cast<int>(pFrame->length()));
+	TCPPacket::reclaimPoolObject(pFrame);
+	TCPPacket::reclaimPoolObject(pPayload);
+	webSocketCloseSent_ = result;
+	return result;
+}
+
+//-------------------------------------------------------------------------------------
+bool Channel::startGracefulClose(const void* closePayload, size_t closePayloadLength, bool peerWebSocketClose)
+{
+	if (gracefulCloseDeadline_ == 0)
+		gracefulCloseDeadline_ = timestamp() + GRACEFUL_CLOSE_TIMEOUT_STAMPS;
+
+	if (peerWebSocketClose)
+	{
+		webSocketCloseReceived_ = true;
+		// 收到 close 后不能再发送排队的应用数据；已经进入 poller 的字节仍保持在 close 之前完成。
+		// No queued application data may follow a received close; bytes already owned by the poller still finish before the close frame.
+		clearBundle();
+	}
+
+	if (channelType_ == CHANNEL_WEB && !sendWebSocketClose(closePayload, closePayloadLength))
+		return false;
+
+	gracefulCloseStarted_ = true;
+	condemn("graceful protocol close", true);
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
+bool Channel::handleWebSocketClose(const void* payload, size_t length)
+{
+	if (gracefulCloseStarted_ && webSocketCloseSent_)
+	{
+		webSocketCloseReceived_ = true;
+		return true;
+	}
+
+	return startGracefulClose(payload, length, true);
+}
+
+//-------------------------------------------------------------------------------------
+bool Channel::handleWebSocketCloseError(uint16 closeCode)
+{
+	const uint8 payload[2] = {
+		static_cast<uint8>((closeCode >> 8) & 0xFF),
+		static_cast<uint8>(closeCode & 0xFF)
+	};
+	return startGracefulClose(payload, sizeof(payload), false);
+}
+
+//-------------------------------------------------------------------------------------
+void Channel::handleTLSCloseNotify()
+{
+	tlsCloseNotifyReceived_ = true;
+	if (gracefulCloseStarted_)
+		return;
+
+	// TLS 已经禁止继续发送应用数据，此时不能再补 WebSocket frame，只回送 close_notify。
+	// TLS no longer permits application data here, so skip any WebSocket frame and only reply with close_notify.
+	webSocketCloseSent_ = true;
+	webSocketCloseReceived_ = true;
+	clearBundle();
+	gracefulCloseStarted_ = true;
+	condemn("TLS close_notify", true);
+	if (!pEndPoint_->shutdownSSL() || !flushSSLNetworkOutput())
+		condemn("TLS close_notify response failed");
+}
+
+//-------------------------------------------------------------------------------------
+bool Channel::hasPendingNetworkSend() const
+{
+	if (!pEndPoint_)
+		return false;
+
+	EventPoller* pPoller = pNetworkInterface_->dispatcher().pPoller();
+	return sending() || !bundles_.empty() ||
+		(pPoller && pPoller->supportsCompletion() && pPoller->hasPendingSend(*pEndPoint_));
+}
+
+//-------------------------------------------------------------------------------------
+bool Channel::processGracefulClose()
+{
+	if (condemn() != FLAG_CONDEMN_AND_WAIT_DESTROY)
+		return true;
+
+	if (gracefulCloseDeadline_ > 0 && timestamp() >= gracefulCloseDeadline_)
+	{
+		WARNING_MSG(fmt::format("Channel::processGracefulClose: timeout waiting for peer or pending send, channel={}.\n", c_str()));
+		return true;
+	}
+
+	if (!gracefulCloseStarted_)
+	{
+		if (hasPendingNetworkSend())
+			return false;
+
+		const uint8 normalClose[2] = { 0x03, 0xE8 };
+		if (!startGracefulClose(channelType_ == CHANNEL_WEB ? normalClose : NULL,
+			channelType_ == CHANNEL_WEB ? sizeof(normalClose) : 0, false))
+		{
+			return true;
+		}
+	}
+
+	if (channelType_ == CHANNEL_WEB && !webSocketCloseReceived_)
+		return false;
+
+	// WebSocket 关闭帧属于 TLS 应用数据，必须先完成双向 WebSocket 握手才能发送 close_notify。
+	// A WebSocket close frame is TLS application data, so finish the bidirectional WebSocket handshake before sending close_notify.
+	// Readiness TLS 可能在前一 tick 返回 WANT_WRITE，重复推进不会重放 close_notify。
+	// Readiness TLS may have returned WANT_WRITE on the prior tick; advancing again does not replay close_notify.
+	if (pEndPoint_ && pEndPoint_->isSSL() && (!pEndPoint_->shutdownSSL() || !flushSSLNetworkOutput()))
+		return true;
+
+	if (hasPendingNetworkSend())
+		return false;
+
+	if (pEndPoint_ && pEndPoint_->isSSL() && !tlsCloseNotifyReceived_)
+		return false;
+
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
 void Channel::updateTick(KBEngine::Network::MessageHandlers* pMsgHandlers)
 {
 	lastTickBytesReceived_ = 0;
@@ -885,7 +1072,7 @@ void Channel::processPackets(KBEngine::Network::MessageHandlers* pMsgHandlers, P
 		return;
 	}
 
-	if(this->condemn() > 0)
+	if(this->condemn() > 0 && !isGracefulClosing())
 	{
 		ERROR_MSG(fmt::format("Channel::processPackets({}): channel[{:p}] is condemn.\n", 
 			this->c_str(), (void*)this));
