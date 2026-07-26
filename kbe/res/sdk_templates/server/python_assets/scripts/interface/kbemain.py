@@ -28,7 +28,8 @@ interfaces进程主要处理KBEngine服务端与第三方平台的接入接出�
 4: 平台回调
 	要完成此功能应该在脚本层创建一个socket，
 	并将socket挂接到KBEngine中（这样可防止阻塞导致主线程卡），然后监听指定的端口。
-	使用KBE的KBEngine.registerReadFileDescriptor()和KBEngine.registerWriteFileDescriptor()，具体查看API文档与Poller.py。
+	使用 KBEngine.registerAcceptFileDescriptor()、registerReadDataFileDescriptor() 和 writeFileDescriptor()，具体查看 API 文档与 Poller.py。
+	Use KBEngine.registerAcceptFileDescriptor(), registerReadDataFileDescriptor(), and writeFileDescriptor(); see the API documentation and Poller.py.
 """
 
 g_poller = Poller()
