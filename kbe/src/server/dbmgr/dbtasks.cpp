@@ -100,6 +100,14 @@ thread::TPTask::TPTaskState DBTask::presentMainThreadFailed()
 }
 
 //-------------------------------------------------------------------------------------
+std::string DBTask::transactionFailureError() const
+{
+	// 复用原始数据库命令的既有错误字符串通道，避免为事务结果新增不兼容的网络字段。
+	// Reuse the existing raw-command error string so transaction outcomes do not add an incompatible wire field.
+	return fmt::format("database transaction did not commit ({})", dbTransactionResultName(transactionResult()));
+}
+
+//-------------------------------------------------------------------------------------
 DBTask* EntityDBTask::tryGetNextTask()
 {
 	KBE_ASSERT(_pBuffered_DBTasks != NULL);
@@ -123,6 +131,9 @@ error_(),
 pExecret_(NULL)
 {
 	pExecret_ = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
+	(*pDatas_) >> componentID_ >> componentType_;
+	(*pDatas_) >> callbackID_;
+	(*pDatas_).readBlob(sdatas_);
 }
 
 //-------------------------------------------------------------------------------------
@@ -134,10 +145,6 @@ DBTaskExecuteRawDatabaseCommand::~DBTaskExecuteRawDatabaseCommand()
 //-------------------------------------------------------------------------------------
 bool DBTaskExecuteRawDatabaseCommand::db_thread_process()
 {
-	(*pDatas_) >> componentID_ >> componentType_;
-	(*pDatas_) >> callbackID_;
-	(*pDatas_).readBlob(sdatas_);
-
 	try
 	{
 		if (!pdbi_->query(sdatas_.data(), (uint32)sdatas_.size(), false, pExecret_))
@@ -171,6 +178,9 @@ error_(),
 pExecret_(NULL)
 {
 	pExecret_ = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
+	(*pDatas_) >> componentID_ >> componentType_;
+	(*pDatas_) >> callbackID_;
+	(*pDatas_).readBlob(sdatas_);
 }
 
 //-------------------------------------------------------------------------------------
@@ -182,10 +192,6 @@ DBTaskExecuteRawDatabaseCommandByEntity::~DBTaskExecuteRawDatabaseCommandByEntit
 //-------------------------------------------------------------------------------------
 bool DBTaskExecuteRawDatabaseCommandByEntity::db_thread_process()
 {
-	(*pDatas_) >> componentID_ >> componentType_;
-	(*pDatas_) >> callbackID_;
-	(*pDatas_).readBlob(sdatas_);
-
 	try
 	{
 		if (!pdbi_->query(sdatas_.data(), (uint32)sdatas_.size(), false, pExecret_))
@@ -273,6 +279,14 @@ thread::TPTask::TPTaskState DBTaskExecuteRawDatabaseCommandByEntity::presentMain
 }
 
 //-------------------------------------------------------------------------------------
+thread::TPTask::TPTaskState DBTaskExecuteRawDatabaseCommandByEntity::presentMainThreadFailed()
+{
+	error_ = transactionFailureError();
+	pExecret_->clear(false);
+	return presentMainThreadCommitted();
+}
+
+//-------------------------------------------------------------------------------------
 thread::TPTask::TPTaskState DBTaskExecuteRawDatabaseCommand::presentMainThreadCommitted()
 {
 	DEBUG_MSG(fmt::format("Dbmgr::DBTaskExecuteRawDatabaseCommand::presentMainThread: {}.\n", sdatas_.c_str()));
@@ -337,6 +351,14 @@ thread::TPTask::TPTaskState DBTaskExecuteRawDatabaseCommand::presentMainThreadCo
 }
 
 //-------------------------------------------------------------------------------------
+thread::TPTask::TPTaskState DBTaskExecuteRawDatabaseCommand::presentMainThreadFailed()
+{
+	error_ = transactionFailureError();
+	pExecret_->clear(false);
+	return presentMainThreadCommitted();
+}
+
+//-------------------------------------------------------------------------------------
 DBTaskWriteEntity::DBTaskWriteEntity(const Network::Address& addr, 
 									 COMPONENT_ID componentID, ENTITY_ID eid, 
 									 DBID entityDBID, MemoryStream& datas):
@@ -349,6 +371,9 @@ callbackID_(0),
 shouldAutoLoad_(-1),
 success_(false)
 {
+	// 回调路由字段必须在事务开始前解析，BEGIN 失败时才能释放 BaseApp 中等待的回调。
+	// Callback routing fields are parsed before BEGIN so a begin failure can release the waiting BaseApp callback.
+	(*pDatas_) >> sid_ >> callbackID_ >> shouldAutoLoad_;
 }
 
 //-------------------------------------------------------------------------------------
@@ -359,8 +384,6 @@ DBTaskWriteEntity::~DBTaskWriteEntity()
 //-------------------------------------------------------------------------------------
 bool DBTaskWriteEntity::db_thread_process()
 {
-	(*pDatas_) >> sid_ >> callbackID_ >> shouldAutoLoad_;
-
 	ScriptDefModule* pModule = EntityDef::findScriptModule(sid_);
 	bool writeEntityLog = (entityDBID_ == 0);
 
@@ -426,6 +449,16 @@ thread::TPTask::TPTaskState DBTaskWriteEntity::presentMainThreadCommitted()
 	}
 	
 	return EntityDBTask::presentMainThreadCommitted();
+}
+
+//-------------------------------------------------------------------------------------
+thread::TPTask::TPTaskState DBTaskWriteEntity::presentMainThreadFailed()
+{
+	// 新实体的自增 ID 在 UNKNOWN 状态下不可信，失败响应必须阻止 BaseApp 绑定该 ID。
+	// A generated ID is unreliable for UNKNOWN, so the failure response must prevent BaseApp from binding it.
+	success_ = false;
+	entityDBID_ = 0;
+	return presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
@@ -538,6 +571,15 @@ thread::TPTask::TPTaskState DBTaskDeleteEntityByDBID::presentMainThreadCommitted
 	}
 
 	return thread::TPTask::TPTASK_STATE_COMPLETED;
+}
+
+//-------------------------------------------------------------------------------------
+thread::TPTask::TPTaskState DBTaskDeleteEntityByDBID::presentMainThreadFailed()
+{
+	success_ = false;
+	entityID_ = 0;
+	entityInAppID_ = 0;
+	return presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
@@ -683,6 +725,18 @@ thread::TPTask::TPTaskState DBTaskLookUpEntityByDBID::presentMainThreadCommitted
 }
 
 //-------------------------------------------------------------------------------------
+thread::TPTask::TPTaskState DBTaskLookUpEntityByDBID::presentMainThreadFailed()
+{
+	// 提交失败后在线实体日志也不可信，必须返回普通查询失败而不是错误的 EntityCall。
+	// Entity-log data is unreliable after commit failure, so return a plain lookup failure instead of a stale EntityCall.
+	success_ = false;
+	entityID_ = 0;
+	entityInAppID_ = 0;
+	serverGroupID_ = 0;
+	return presentMainThreadCommitted();
+}
+
+//-------------------------------------------------------------------------------------
 DBTaskCreateAccount::DBTaskCreateAccount(const Network::Address& addr, 
 										 std::string& registerName,
 										 std::string& accountName, 
@@ -820,7 +874,7 @@ thread::TPTask::TPTaskState DBTaskCreateAccount::presentMainThreadCommitted()
 	SERVER_ERROR_CODE failedcode = SERVER_SUCCESS;
 
 	if(!success_)
-		failedcode = SERVER_ERR_ACCOUNT_CREATE_FAILED;
+		failedcode = transactionCommitted() ? SERVER_ERR_ACCOUNT_CREATE_FAILED : SERVER_ERR_DB;
 
 	(*pBundle) << failedcode << registerName_ << password_;
 	(*pBundle).appendBlob(getdatas_);
@@ -832,6 +886,14 @@ thread::TPTask::TPTaskState DBTaskCreateAccount::presentMainThreadCommitted()
 	}
 
 	return thread::TPTask::TPTASK_STATE_COMPLETED;
+}
+
+//-------------------------------------------------------------------------------------
+thread::TPTask::TPTaskState DBTaskCreateAccount::presentMainThreadFailed()
+{
+	success_ = false;
+	getdatas_.clear();
+	return presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
@@ -936,7 +998,7 @@ thread::TPTask::TPTaskState DBTaskCreateMailAccount::presentMainThreadCommitted(
 	SERVER_ERROR_CODE failedcode = SERVER_SUCCESS;
 
 	if(!success_)
-		failedcode = SERVER_ERR_ACCOUNT_CREATE_FAILED;
+		failedcode = transactionCommitted() ? SERVER_ERR_ACCOUNT_CREATE_FAILED : SERVER_ERR_DB;
 
 	(*pBundle) << failedcode << registerName_ << password_;
 	(*pBundle).appendBlob(getdatas_);
@@ -948,6 +1010,14 @@ thread::TPTask::TPTaskState DBTaskCreateMailAccount::presentMainThreadCommitted(
 	}
 
 	return thread::TPTask::TPTASK_STATE_COMPLETED;
+}
+
+//-------------------------------------------------------------------------------------
+thread::TPTask::TPTaskState DBTaskCreateMailAccount::presentMainThreadFailed()
+{
+	success_ = false;
+	getdatas_.clear();
+	return presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
@@ -1000,6 +1070,13 @@ thread::TPTask::TPTaskState DBTaskActivateAccount::presentMainThreadCommitted()
 	}
 
 	return thread::TPTask::TPTASK_STATE_COMPLETED;
+}
+
+//-------------------------------------------------------------------------------------
+thread::TPTask::TPTaskState DBTaskActivateAccount::presentMainThreadFailed()
+{
+	success_ = false;
+	return presentMainThreadCommitted();
 }
 
 
@@ -1063,7 +1140,7 @@ thread::TPTask::TPTaskState DBTaskReqAccountResetPassword::presentMainThreadComm
 	SERVER_ERROR_CODE failedcode = SERVER_SUCCESS;
 
 	if(!success_)
-		failedcode = SERVER_ERR_OP_FAILED;
+		failedcode = transactionCommitted() ? SERVER_ERR_OP_FAILED : SERVER_ERR_DB;
 
 	(*pBundle) << accountName_;
 	(*pBundle) << email_;
@@ -1077,6 +1154,15 @@ thread::TPTask::TPTaskState DBTaskReqAccountResetPassword::presentMainThreadComm
 	}
 
 	return thread::TPTask::TPTASK_STATE_COMPLETED;
+}
+
+//-------------------------------------------------------------------------------------
+thread::TPTask::TPTaskState DBTaskReqAccountResetPassword::presentMainThreadFailed()
+{
+	success_ = false;
+	code_.clear();
+	email_.clear();
+	return presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
@@ -1126,6 +1212,13 @@ thread::TPTask::TPTaskState DBTaskAccountResetPassword::presentMainThreadCommitt
 	}
 
 	return thread::TPTask::TPTASK_STATE_COMPLETED;
+}
+
+//-------------------------------------------------------------------------------------
+thread::TPTask::TPTaskState DBTaskAccountResetPassword::presentMainThreadFailed()
+{
+	success_ = false;
+	return presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
@@ -1181,7 +1274,7 @@ thread::TPTask::TPTaskState DBTaskReqAccountBindEmail::presentMainThreadCommitte
 	SERVER_ERROR_CODE failedcode = SERVER_SUCCESS;
 
 	if(!success_)
-		failedcode = SERVER_ERR_OP_FAILED;
+		failedcode = transactionCommitted() ? SERVER_ERR_OP_FAILED : SERVER_ERR_DB;
 
 	(*pBundle) << entityID_; 
 	(*pBundle) << accountName_;
@@ -1196,6 +1289,14 @@ thread::TPTask::TPTaskState DBTaskReqAccountBindEmail::presentMainThreadCommitte
 	}
 
 	return thread::TPTask::TPTASK_STATE_COMPLETED;
+}
+
+//-------------------------------------------------------------------------------------
+thread::TPTask::TPTaskState DBTaskReqAccountBindEmail::presentMainThreadFailed()
+{
+	success_ = false;
+	code_.clear();
+	return presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
@@ -1244,6 +1345,13 @@ thread::TPTask::TPTaskState DBTaskAccountBindEmail::presentMainThreadCommitted()
 	}
 
 	return thread::TPTask::TPTASK_STATE_COMPLETED;
+}
+
+//-------------------------------------------------------------------------------------
+thread::TPTask::TPTaskState DBTaskAccountBindEmail::presentMainThreadFailed()
+{
+	success_ = false;
+	return presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
@@ -1299,7 +1407,7 @@ thread::TPTask::TPTaskState DBTaskAccountNewPassword::presentMainThreadCommitted
 	SERVER_ERROR_CODE failedcode = SERVER_SUCCESS;
 
 	if(!success_)
-		failedcode = SERVER_ERR_OP_FAILED;
+		failedcode = transactionCommitted() ? SERVER_ERR_OP_FAILED : SERVER_ERR_DB;
 
 	(*pBundle) << entityID_;
 	(*pBundle) << accountName_;
@@ -1312,6 +1420,13 @@ thread::TPTask::TPTaskState DBTaskAccountNewPassword::presentMainThreadCommitted
 	}
 
 	return thread::TPTask::TPTASK_STATE_COMPLETED;
+}
+
+//-------------------------------------------------------------------------------------
+thread::TPTask::TPTaskState DBTaskAccountNewPassword::presentMainThreadFailed()
+{
+	success_ = false;
+	return presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
@@ -1468,6 +1583,21 @@ thread::TPTask::TPTaskState DBTaskQueryAccount::presentMainThreadCommitted()
 	}
 
 	return EntityDBTask::presentMainThreadCommitted();
+}
+
+//-------------------------------------------------------------------------------------
+thread::TPTask::TPTaskState DBTaskQueryAccount::presentMainThreadFailed()
+{
+	// BaseApp 依赖失败回调移除 PendingLogin；清空查询数据后复用现有失败分支可避免登录状态泄漏。
+	// BaseApp relies on the failure callback to remove PendingLogin; clearing query data and reusing that branch prevents login-state leaks.
+	success_ = false;
+	s_->clear(false);
+	dbid_ = 0;
+	flags_ = 0;
+	deadline_ = 0;
+	bindatas_.clear();
+	error_ = transactionFailureError();
+	return presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
@@ -1921,6 +2051,18 @@ thread::TPTask::TPTaskState DBTaskQueryEntity::presentMainThreadCommitted()
 	}
 
 	return EntityDBTask::presentMainThreadCommitted();
+}
+
+//-------------------------------------------------------------------------------------
+thread::TPTask::TPTaskState DBTaskQueryEntity::presentMainThreadFailed()
+{
+	success_ = false;
+	s_->clear(false);
+	wasActive_ = false;
+	wasActiveCID_ = 0;
+	wasActiveEntityID_ = 0;
+	serverGroupID_ = 0;
+	return presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
