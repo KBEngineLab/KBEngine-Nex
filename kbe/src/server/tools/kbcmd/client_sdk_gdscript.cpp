@@ -785,11 +785,15 @@ bool ClientSDKGDScript::writeEntityProcessMessagesMethod(ScriptDefModule* pEntit
 		sourcefileBody_ += "\nfunc detachComponents()-> void:\n";
 		if (hasComponents)
 		{
+			// 分离回调必须先观察有效宿主，再解除 RefCounted 双向强引用以保证实体可以确定性释放。
+			// The detach callback must observe a valid owner before breaking the bidirectional RefCounted references for deterministic release.
+			sourcefileBody_ += "\t# 分离回调完成后解除组件对宿主的强引用，避免实体与组件形成无法回收的引用环。\n";
+			sourcefileBody_ += "\t# Break the component's strong owner reference after detachment to avoid an unreclaimable entity-component cycle.\n";
 			for (ScriptDefModule::PROPERTYDESCRIPTION_MAP::iterator it = props.begin(); it != props.end(); ++it)
 			{
 				PropertyDescription* p = it->second;
 				if (p->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)
-					sourcefileBody_ += fmt::format("\t{}.onDetached(self)\n", p->getName());
+					sourcefileBody_ += fmt::format("\t{}.onDetached(self)\n\t{}.owner = null\n", p->getName(), p->getName());
 			}
 		}
 		else
