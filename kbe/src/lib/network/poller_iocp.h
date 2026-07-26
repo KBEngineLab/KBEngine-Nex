@@ -97,11 +97,22 @@ private:
 	bool armAccept(KBESOCKET fd, SocketState& state);
 	// 加载 listener socket 对应的 AcceptEx 函数指针。
 	bool loadAcceptEx(SocketState& state);
+	// 登记已经由 Windows 接管、必定会返回 completion 的上下文。
+	// Track contexts owned by Windows that must eventually return through the completion port.
+	void trackContext(IocpContext& context);
 	// 清理一次完成上下文持有的 pending 指针。
 	void cleanupContext(IocpContext& context);
+	// 从 outstanding 表移除并释放一个已经完成的上下文。
+	// Remove and release a context only after its completion has been dequeued.
+	void releaseContext(IocpContext& context);
+	// 析构前取消并排空所有 outstanding IO，防止内核访问已释放的 OVERLAPPED。
+	// Cancel and drain all outstanding IO before destruction so the kernel cannot access freed OVERLAPPED memory.
+	void cancelAndDrainContexts();
 	// 处理一个 IOCP 返回的 OVERLAPPED 完成结果。
 	void handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapped, DWORD bytesTransferred, bool success, DWORD errorCode);
 
+	typedef std::map<LPOVERLAPPED, IocpContext*> OutstandingContexts;
+	OutstandingContexts outstandingContexts_;
 	HANDLE completionPort_;
 	uint64 lastCompletionBudgetWarningTime_;
 };

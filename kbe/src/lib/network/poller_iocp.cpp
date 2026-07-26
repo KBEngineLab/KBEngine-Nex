@@ -19,6 +19,9 @@ namespace Network
 namespace
 {
 const size_t IOCP_TCP_SEND_BATCH_BYTES = 64 * 1024;
+// 析构排空设置有限等待，避免异常驱动或损坏的 socket 让进程永久卡住；超时对象保留到进程退出以保证内核访问安全。
+// Bound destructor draining so a faulty driver or socket cannot hang shutdown forever; timed-out storage survives until process exit for kernel safety.
+const DWORD IOCP_SHUTDOWN_DRAIN_TIMEOUT_MS = 5000;
 // Keep a bounded completion batch until the 1.x watcher configuration exposes runtime budgets.
 // 在 1.x watcher 配置提供运行时预算前，先使用有界完成批次。
 // 预算告警只是诊断“主循环被 completion 回调拖太久”，不是限流开关。
@@ -68,6 +71,7 @@ IocpPoller::IocpContext::IocpContext(KBESOCKET fdArg, KBESOCKET socketArg, Socke
 //-------------------------------------------------------------------------------------
 IocpPoller::IocpPoller() :
 	CompletionPoller(),
+	outstandingContexts_(),
 	completionPort_(CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0)),
 	lastCompletionBudgetWarningTime_(0)
 {
@@ -81,27 +85,7 @@ IocpPoller::IocpPoller() :
 //-------------------------------------------------------------------------------------
 IocpPoller::~IocpPoller()
 {
-	for (auto& item : socketStates_)
-	{
-		SocketState& state = *item.second;
-		if (state.pPendingReadContext != NULL)
-		{
-			IocpContext* pContext = reinterpret_cast<IocpContext*>(state.pPendingReadContext);
-			CancelIoEx(reinterpret_cast<HANDLE>(state.socket), &pContext->overlapped);
-			cleanupContext(*pContext);
-			delete pContext;
-			state.pPendingReadContext = NULL;
-		}
-
-		if (state.pPendingWriteContext != NULL)
-		{
-			IocpContext* pContext = reinterpret_cast<IocpContext*>(state.pPendingWriteContext);
-			CancelIoEx(reinterpret_cast<HANDLE>(state.socket), &pContext->overlapped);
-			cleanupContext(*pContext);
-			delete pContext;
-			state.pPendingWriteContext = NULL;
-		}
-	}
+	cancelAndDrainContexts();
 
 	if (completionPort_ != NULL)
 	{
@@ -239,6 +223,7 @@ bool IocpPoller::armTcpRead(KBESOCKET fd, SocketState& state)
 	int ret = WSARecv(state.socket, &pContext->buffer, 1, &bytes, &flags, &pContext->overlapped, NULL);
 	if (ret == 0)
 	{
+		trackContext(*pContext);
 		state.pPendingReadContext = pContext;
 		return true;
 	}
@@ -246,6 +231,7 @@ bool IocpPoller::armTcpRead(KBESOCKET fd, SocketState& state)
 	int wsaErr = WSAGetLastError();
 	if (wsaErr == WSA_IO_PENDING)
 	{
+		trackContext(*pContext);
 		state.pPendingReadContext = pContext;
 		return true;
 	}
@@ -270,6 +256,7 @@ bool IocpPoller::armUdpRead(KBESOCKET fd, SocketState& state)
 
 	if (ret == 0)
 	{
+		trackContext(*pContext);
 		state.pPendingReadContext = pContext;
 		return true;
 	}
@@ -277,6 +264,7 @@ bool IocpPoller::armUdpRead(KBESOCKET fd, SocketState& state)
 	int wsaErr = WSAGetLastError();
 	if (wsaErr == WSA_IO_PENDING)
 	{
+		trackContext(*pContext);
 		state.pPendingReadContext = pContext;
 		return true;
 	}
@@ -315,6 +303,7 @@ bool IocpPoller::armTcpSend(KBESOCKET fd, SocketState& state)
 	int ret = WSASend(state.socket, &pContext->buffer, 1, &bytes, 0, &pContext->overlapped, NULL);
 	if (ret == 0)
 	{
+		trackContext(*pContext);
 		state.pPendingWriteContext = pContext;
 		return true;
 	}
@@ -322,6 +311,7 @@ bool IocpPoller::armTcpSend(KBESOCKET fd, SocketState& state)
 	int wsaErr = WSAGetLastError();
 	if (wsaErr == WSA_IO_PENDING)
 	{
+		trackContext(*pContext);
 		state.pPendingWriteContext = pContext;
 		return true;
 	}
@@ -362,6 +352,7 @@ bool IocpPoller::armUdpSend(KBESOCKET fd, SocketState& state)
 		&pContext->overlapped, NULL);
 	if (ret == 0)
 	{
+		trackContext(*pContext);
 		state.pPendingWriteContext = pContext;
 		return true;
 	}
@@ -369,6 +360,7 @@ bool IocpPoller::armUdpSend(KBESOCKET fd, SocketState& state)
 	int wsaErr = WSAGetLastError();
 	if (wsaErr == WSA_IO_PENDING)
 	{
+		trackContext(*pContext);
 		state.pPendingWriteContext = pContext;
 		return true;
 	}
@@ -410,6 +402,7 @@ bool IocpPoller::armAccept(KBESOCKET fd, SocketState& state)
 
 	if (ok)
 	{
+		trackContext(*pContext);
 		state.pPendingReadContext = pContext;
 		return true;
 	}
@@ -417,6 +410,7 @@ bool IocpPoller::armAccept(KBESOCKET fd, SocketState& state)
 	int wsaErr = WSAGetLastError();
 	if (wsaErr == ERROR_IO_PENDING)
 	{
+		trackContext(*pContext);
 		state.pPendingReadContext = pContext;
 		return true;
 	}
@@ -599,12 +593,66 @@ bool IocpPoller::doDeregisterForWrite(KBESOCKET fd)
 }
 
 //-------------------------------------------------------------------------------------
+void IocpPoller::trackContext(IocpContext& context)
+{
+	const std::pair<OutstandingContexts::iterator, bool> inserted =
+		outstandingContexts_.insert(std::make_pair(&context.overlapped, &context));
+	KBE_ASSERT(inserted.second);
+}
+
+//-------------------------------------------------------------------------------------
 void IocpPoller::cleanupContext(IocpContext& context)
 {
 	if (context.acceptSocket != INVALID_SOCKET)
 	{
 		closesocket(context.acceptSocket);
 		context.acceptSocket = INVALID_SOCKET;
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void IocpPoller::releaseContext(IocpContext& context)
+{
+	outstandingContexts_.erase(&context.overlapped);
+	cleanupContext(context);
+	delete &context;
+}
+
+//-------------------------------------------------------------------------------------
+void IocpPoller::cancelAndDrainContexts()
+{
+	if (completionPort_ == NULL || outstandingContexts_.empty())
+		return;
+
+	// CancelIoEx 只发起取消；OVERLAPPED 仍由内核持有，必须等对应完成包出队后才能释放。
+	// CancelIoEx only requests cancellation; the kernel retains each OVERLAPPED until its completion packet is dequeued.
+	for (OutstandingContexts::value_type& item : outstandingContexts_)
+	{
+		IocpContext* pContext = item.second;
+		CancelIoEx(reinterpret_cast<HANDLE>(pContext->socket), &pContext->overlapped);
+	}
+
+	const ULONGLONG deadline = GetTickCount64() + IOCP_SHUTDOWN_DRAIN_TIMEOUT_MS;
+	while (!outstandingContexts_.empty() && GetTickCount64() < deadline)
+	{
+		DWORD bytesTransferred = 0;
+		ULONG_PTR completionKey = 0;
+		LPOVERLAPPED overlapped = NULL;
+		const ULONGLONG now = GetTickCount64();
+		const DWORD waitMilliseconds = static_cast<DWORD>(std::min<ULONGLONG>(50, deadline - now));
+		GetQueuedCompletionStatus(completionPort_, &bytesTransferred, &completionKey, &overlapped, waitMilliseconds);
+
+		OutstandingContexts::iterator iter = outstandingContexts_.find(overlapped);
+		if (iter != outstandingContexts_.end())
+			releaseContext(*iter->second);
+	}
+
+	if (!outstandingContexts_.empty())
+	{
+		// 超时 context 不能释放，否则迟到的内核写入会形成 UAF；进程退出时由操作系统回收。
+		// Timed-out contexts must stay allocated to avoid a late kernel write causing UAF; the operating system reclaims them at process exit.
+		ERROR_MSG(fmt::format("IocpPoller::cancelAndDrainContexts: {} contexts did not complete within {} ms; preserving their OVERLAPPED storage.\n",
+			outstandingContexts_.size(), IOCP_SHUTDOWN_DRAIN_TIMEOUT_MS));
 	}
 }
 
@@ -616,7 +664,14 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 		return;
 	}
 
-	IocpContext* pContext = reinterpret_cast<IocpContext*>(overlapped);
+	OutstandingContexts::iterator outstandingIter = outstandingContexts_.find(overlapped);
+	if (outstandingIter == outstandingContexts_.end())
+	{
+		ERROR_MSG("IocpPoller::handleCompletion: received an untracked OVERLAPPED context.\n");
+		return;
+	}
+
+	IocpContext* pContext = outstandingIter->second;
 	const KBESOCKET fd = pContext->fd;
 
 	auto iter = socketStates_.find(fd);
@@ -649,8 +704,7 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 	// 投递一个完成包回来。
 	if (!success && errorCode == ERROR_OPERATION_ABORTED)
 	{
-		cleanupContext(*pContext);
-		delete pContext;
+		releaseContext(*pContext);
 
 		if (isCurrentContext)
 		{
@@ -664,8 +718,7 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 	{
 		// 迟到的 completion：fd/socket/generation/context 任一不匹配都丢弃。
 		// 这是 IOCP 下避免“旧连接事件打到新连接”的核心保护。
-		cleanupContext(*pContext);
-		delete pContext;
+		releaseContext(*pContext);
 		return;
 	}
 
@@ -793,8 +846,7 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 				this->triggerRead(fd);
 			}
 
-			cleanupContext(*pContext);
-			delete pContext;
+			releaseContext(*pContext);
 			return;
 		}
 
@@ -831,8 +883,7 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 		}
 	}
 
-	cleanupContext(*pContext);
-	delete pContext;
+	releaseContext(*pContext);
 
 	auto currentIter = socketStates_.find(fd);
 	if (currentIter != socketStates_.end())
