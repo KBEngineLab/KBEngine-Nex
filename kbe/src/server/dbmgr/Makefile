@@ -20,13 +20,15 @@ MY_LIBS =		\
 	thread		\
 	db_interface\
 	db_mysql	\
-	db_redis
+	db_redis	\
+	db_postgresql
 
 BUILD_TIME_FILE = main
 USE_PYTHON = 1
 USE_G3DMATH = 1
 USE_MYSQL = 1
 USE_REDIS = 1
+USE_POSTGRESQL = 1
 USE_OPENSSL = 1
 
 
@@ -44,4 +46,3 @@ endif
 
 
 include $(KBE_ROOT)/kbe/src/build/common.mak
-

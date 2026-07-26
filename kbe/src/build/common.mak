@@ -149,6 +149,14 @@ LDLIBS += -lhiredis
 CPPFLAGS += -DUSE_REDIS
 endif # USE_REDIS
 
+ifdef USE_POSTGRESQL
+# 通过 libpq 的 pkg-config 元数据获取多架构头库路径，避免假设发行版固定安装在 /usr/include/postgresql。
+# Use libpq pkg-config metadata for multi-architecture include and library paths instead of assuming /usr/include/postgresql.
+KBE_INCLUDES += $(shell pkg-config --cflags libpq)
+LDLIBS += $(shell pkg-config --libs libpq)
+CPPFLAGS += -DUSE_KBE_POSTGRESQL
+endif # USE_POSTGRESQL
+
 # everyone needs pthread if LDLINUX_TLS_IS_BROKEN
 ifdef LDLINUX_TLS_IS_BROKEN
 CPPFLAGS += -DLDLINUX_TLS_IS_BROKEN

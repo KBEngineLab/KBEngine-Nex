@@ -24,6 +24,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "entity_table.h"
 #include "common/kbekey.h"
 #include "db_mysql/db_interface_mysql.h"
+#include "db_postgresql/db_interface_postgresql.h"
 #include "db_redis/db_interface_redis.h"
 #include "server/serverconfig.h"
 #include "thread/threadpool.h"
@@ -169,6 +170,11 @@ DBInterface* DBUtil::createInterface(const std::string& name, bool showinfo)
 	{
 		dbinterface = new DBInterfaceRedis(name.c_str());
 	}
+	else if (strcmp(pDBInfo->db_type, "postgresql") == 0)
+	{
+		dbinterface = new DBInterfacePostgresql(name.c_str(), pDBInfo->db_unicodeString_characterSet,
+			pDBInfo->db_unicodeString_collation);
+	}
 
 	if(dbinterface == NULL)
 	{
@@ -231,6 +237,10 @@ bool DBUtil::initInterface(DBInterface* pdbi)
 	else if (strcmp(pDBInfo->db_type, "redis") == 0)
 	{
 		DBInterfaceRedis::initInterface(pdbi);
+	}
+	else if (strcmp(pDBInfo->db_type, "postgresql") == 0)
+	{
+		DBInterfacePostgresql::initInterface(pdbi);
 	}
 	
 	thread::ThreadPool* pThreadPool = pThreadPoolMaps_[pdbi->name()];

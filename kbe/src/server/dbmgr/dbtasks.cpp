@@ -28,8 +28,6 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "server/serverconfig.h"
 #include "db_interface/db_interface.h"
 #include "db_interface/kbe_tables.h"
-#include "db_mysql/db_exception.h"
-#include "db_mysql/db_interface_mysql.h"
 #include "entitydef/scriptdef_module.h"
 #include "openssl/md5.h"
 
@@ -122,10 +120,10 @@ bool DBTaskExecuteRawDatabaseCommand::db_thread_process()
 	}
 	catch (std::exception & e)
 	{
-		DBException& dbe = static_cast<DBException&>(e);
-		if(dbe.isLostConnection())
+		// 异常恢复由实际数据库后端处理，避免把 PostgreSQL 或 Redis 异常错误转换为 MySQL 类型。
+		// Exception recovery is delegated to the active backend to avoid casting PostgreSQL or Redis failures to MySQL types.
+		if (pdbi_->processException(e))
 		{
-			static_cast<DBInterfaceMysql*>(pdbi_)->processException(e);
 			return true;
 		}
 
@@ -170,10 +168,10 @@ bool DBTaskExecuteRawDatabaseCommandByEntity::db_thread_process()
 	}
 	catch (std::exception & e)
 	{
-		DBException& dbe = static_cast<DBException&>(e);
-		if(dbe.isLostConnection())
+		// 实体原始命令和普通命令必须使用相同的后端恢复语义，否则非 MySQL 后端会产生未定义行为。
+		// Entity-scoped raw commands use the same backend recovery semantics to prevent undefined behavior outside MySQL.
+		if (pdbi_->processException(e))
 		{
-			static_cast<DBInterfaceMysql*>(pdbi_)->processException(e);
 			return true;
 		}
 
@@ -1784,10 +1782,10 @@ bool DBTaskQueryEntity::db_thread_process()
 		}
 		catch (std::exception & e)
 		{
-			DBException& dbe = static_cast<DBException&>(e);
-			if(dbe.isLostConnection())
+			// 登录记录写入失败时让当前后端决定是否重试，数据库任务队列只负责重新调度。
+			// When login-log writes fail, the backend decides retryability while the DB task queue only reschedules the task.
+			if (pdbi_->processException(e))
 			{
-				static_cast<DBInterfaceMysql*>(pdbi_)->processException(e);
 				return true;
 			}
 			else
@@ -1804,10 +1802,10 @@ bool DBTaskQueryEntity::db_thread_process()
 			}
 			catch (std::exception & e)
 			{
-				DBException& dbe = static_cast<DBException&>(e);
-				if(dbe.isLostConnection())
+				// 查询已有登录记录也通过多态接口恢复连接，保证所有数据库后端遵循同一任务重试协议。
+				// Existing login-log queries also recover through the polymorphic interface so every backend follows one task retry contract.
+				if (pdbi_->processException(e))
 				{
-					static_cast<DBInterfaceMysql*>(pdbi_)->processException(e);
 					return true;
 				}
 				else

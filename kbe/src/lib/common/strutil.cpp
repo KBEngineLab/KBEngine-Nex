@@ -82,25 +82,35 @@ namespace strutil {
 
     std::string toLower(const std::string& str) {
         std::string t = str;
-        std::transform(t.begin(), t.end(), t.begin(), tolower);
+		// C locale 分类函数只接受 EOF 或 unsigned char 范围，先转换可避免 UTF-8 高位字节在 MSVC Debug CRT 中触发断言。
+		// C locale classifiers accept only EOF or unsigned-char values; conversion prevents UTF-8 bytes from asserting in the MSVC Debug CRT.
+		std::transform(t.begin(), t.end(), t.begin(),
+			[](unsigned char value) { return static_cast<char>(std::tolower(value)); });
         return t;
     }
 
     std::string toUpper(const std::string& str) {
         std::string t = str;
-        std::transform(t.begin(), t.end(), t.begin(), toupper);
+		// 保持非 ASCII 字节原样，只让当前 locale 对合法范围内的单字节字符执行大小写转换。
+		// Preserve non-ASCII bytes while allowing the active locale to convert valid single-byte characters.
+		std::transform(t.begin(), t.end(), t.begin(),
+			[](unsigned char value) { return static_cast<char>(std::toupper(value)); });
         return t;
     }
 
 	std::string &kbe_ltrim(std::string &s) 
 	{
-		s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+		// 空白判断同样必须先提升为 unsigned char，否则 UTF-8 路径和 XML 文本可能触发未定义行为。
+		// Whitespace checks require the same unsigned-char promotion to avoid undefined behavior in UTF-8 paths and XML text.
+		s.erase(s.begin(), std::find_if(s.begin(), s.end(),
+			[](unsigned char value) { return std::isspace(value) == 0; }));
 		return s;
 	}
 
 	std::string &kbe_rtrim(std::string &s) 
 	{
-		s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
+		s.erase(std::find_if(s.rbegin(), s.rend(),
+			[](unsigned char value) { return std::isspace(value) == 0; }).base(), s.end());
 		return s;
 	}
 
