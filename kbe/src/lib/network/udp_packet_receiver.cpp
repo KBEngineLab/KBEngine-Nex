@@ -95,7 +95,7 @@ bool UDPPacketReceiver::processRecv(bool expectingPacket)
 		// A completion backend preserves the source address and datagram boundary, so recvfrom must not read the same datagram again.
 		std::vector<char> data;
 		int errorCode = 0;
-		if (!pPoller->takeUdpReceivedData(static_cast<int>(*pEndpoint_), data, srcAddr, errorCode))
+		if (!pPoller->takeUdpReceivedData(*pEndpoint_, data, srcAddr, errorCode))
 		{
 			UDPPacket::reclaimPoolObject(pChannelReceiveWindow);
 			return false;

@@ -74,7 +74,7 @@ Channel* PacketSender::getChannel()
 }
 
 //-------------------------------------------------------------------------------------
-int PacketSender::handleOutputNotification(int fd)
+int PacketSender::handleOutputNotification(KBESOCKET fd)
 {
 	processSend(NULL);
 	return 0;

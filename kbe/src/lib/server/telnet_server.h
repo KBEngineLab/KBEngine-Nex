@@ -43,12 +43,12 @@ public:
     TelnetServer(Network::EventDispatcher* pDispatcher, Network::NetworkInterface* networkInterface);
 	virtual ~TelnetServer(void);
 	
-	typedef std::map<int, KBEShared_ptr< TelnetHandler > >	TelnetHandlers;
+	typedef std::map<KBESOCKET, KBEShared_ptr< TelnetHandler > >	TelnetHandlers;
 
 	bool start(std::string passwd, std::string deflayer, u_int16_t port = 0, u_int32_t ip = INADDR_ANY);
 	bool stop();
 
-	void onTelnetHandlerClosed(int fd, TelnetHandler* pTelnetHandler);
+	void onTelnetHandlerClosed(KBESOCKET fd, TelnetHandler* pTelnetHandler);
 
 	INLINE script::Script* pScript() const;
 	INLINE void pScript(script::Script* p);
@@ -58,12 +58,12 @@ public:
 
 	INLINE Network::NetworkInterface* pNetworkInterface() const;
 
-	void closeHandler(int fd, TelnetHandler* pTelnetHandler);
+	void closeHandler(KBESOCKET fd, TelnetHandler* pTelnetHandler);
 
 	INLINE uint32 port();
 
 private:
-	int	handleInputNotification(int fd);
+	int	handleInputNotification(KBESOCKET fd);
 
 	TelnetHandlers handlers_;
 

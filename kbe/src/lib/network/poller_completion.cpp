@@ -80,7 +80,7 @@ bool CompletionPoller::supportsCompletion() const
 }
 
 //-------------------------------------------------------------------------------------
-bool CompletionPoller::takeAcceptedSocket(int fd, KBESOCKET& acceptedSocket)
+bool CompletionPoller::takeAcceptedSocket(KBESOCKET fd, KBESOCKET& acceptedSocket)
 {
 	// accept completion 由 poller 放入队列，listener 只负责消费。
 	auto iter = acceptedSockets_.find(fd);
@@ -104,7 +104,7 @@ bool CompletionPoller::takeAcceptedSocket(int fd, KBESOCKET& acceptedSocket)
 }
 
 //-------------------------------------------------------------------------------------
-bool CompletionPoller::takeTcpReceivedData(int fd, std::vector<char>& data, bool& disconnected, int& errorCode)
+bool CompletionPoller::takeTcpReceivedData(KBESOCKET fd, std::vector<char>& data, bool& disconnected, int& errorCode)
 {
 	// TCP completion 队列保持到达顺序，PacketReceiver 按旧解析逻辑消费。
 	auto iter = tcpReceived_.find(fd);
@@ -137,7 +137,7 @@ bool CompletionPoller::takeTcpReceivedData(int fd, std::vector<char>& data, bool
 }
 
 //-------------------------------------------------------------------------------------
-bool CompletionPoller::takeUdpReceivedData(int fd, std::vector<char>& data, Address& srcAddr, int& errorCode)
+bool CompletionPoller::takeUdpReceivedData(KBESOCKET fd, std::vector<char>& data, Address& srcAddr, int& errorCode)
 {
 	// UDP completion 队列按 datagram 粒度保存来源地址和数据。
 	auto iter = udpReceived_.find(fd);
@@ -169,7 +169,7 @@ bool CompletionPoller::takeUdpReceivedData(int fd, std::vector<char>& data, Addr
 }
 
 //-------------------------------------------------------------------------------------
-bool CompletionPoller::queueTcpSend(int fd, const void* data, int len)
+bool CompletionPoller::queueTcpSend(KBESOCKET fd, const void* data, int len)
 {
 	// 上层交来的 TCP 数据只入队，真正发送由具体 poller arm/write 完成。
 	// The upper layer only queues TCP data here; the concrete poller performs the actual arm/write.
@@ -222,7 +222,7 @@ bool CompletionPoller::queueTcpSend(int fd, const void* data, int len)
 }
 
 //-------------------------------------------------------------------------------------
-bool CompletionPoller::queueUdpSend(int fd, const void* data, int len, const Address& dstAddr)
+bool CompletionPoller::queueUdpSend(KBESOCKET fd, const void* data, int len, const Address& dstAddr)
 {
 	// UDP 数据同样入队，具体 poller 保证按队列顺序投递 sendto。
 	if (len <= 0)
@@ -255,7 +255,7 @@ bool CompletionPoller::queueUdpSend(int fd, const void* data, int len, const Add
 }
 
 //-------------------------------------------------------------------------------------
-bool CompletionPoller::hasPendingSend(int fd) const
+bool CompletionPoller::hasPendingSend(KBESOCKET fd) const
 {
 	// writeArmed 表示内核或 adapter 已经持有一次发送请求。
 	auto iter = socketStates_.find(fd);
@@ -270,18 +270,18 @@ bool CompletionPoller::hasPendingSend(int fd) const
 }
 
 //-------------------------------------------------------------------------------------
-CompletionPoller::SocketState& CompletionPoller::socketStateForFd(int fd)
+CompletionPoller::SocketState& CompletionPoller::socketStateForFd(KBESOCKET fd)
 {
 	// fd 可能先由发送路径创建状态，也可能由读注册创建状态。
 	auto iter = socketStates_.find(fd);
 	if (iter == socketStates_.end())
 	{
-		SocketStatePtr state(new SocketState(static_cast<KBESOCKET>(fd)));
+		SocketStatePtr state(new SocketState(fd));
 		iter = socketStates_.insert(std::make_pair(fd, std::move(state))).first;
 	}
 
 	SocketState& state = *iter->second;
-	state.socket = static_cast<KBESOCKET>(fd);
+	state.socket = fd;
 	return state;
 }
 
@@ -330,7 +330,7 @@ bool CompletionPoller::tryDetermineSocketKind(KBESOCKET socket, SocketKind& kind
 }
 
 //-------------------------------------------------------------------------------------
-bool CompletionPoller::pushAcceptedSocket(int fd, KBESOCKET acceptedSocket)
+bool CompletionPoller::pushAcceptedSocket(KBESOCKET fd, KBESOCKET acceptedSocket)
 {
 	// accept socket 必须等 listener 消费后才会被包装成 EndPoint。
 	if (!canQueueAcceptedSocket(fd))
@@ -348,7 +348,7 @@ bool CompletionPoller::pushAcceptedSocket(int fd, KBESOCKET acceptedSocket)
 }
 
 //-------------------------------------------------------------------------------------
-bool CompletionPoller::pushTcpReceivedData(int fd, std::vector<char>& data, bool disconnected, int errorCode)
+bool CompletionPoller::pushTcpReceivedData(KBESOCKET fd, std::vector<char>& data, bool disconnected, int errorCode)
 {
 	// data 用 swap 转移所有权，避免大包复制。
 	SocketState& state = socketStateForFd(fd);
@@ -405,7 +405,7 @@ bool CompletionPoller::isTcpTerminalCompletion(const std::vector<char>& data, bo
 }
 
 //-------------------------------------------------------------------------------------
-bool CompletionPoller::pushUdpReceivedData(int fd, std::vector<char>& data, const sockaddr_in& srcAddr, int errorCode)
+bool CompletionPoller::pushUdpReceivedData(KBESOCKET fd, std::vector<char>& data, const sockaddr_in& srcAddr, int errorCode)
 {
 	// UDP completion 保留源地址，避免上层再调用 recvfrom。
 	SocketState& state = socketStateForFd(fd);
@@ -428,7 +428,7 @@ bool CompletionPoller::pushUdpReceivedData(int fd, std::vector<char>& data, cons
 }
 
 //-------------------------------------------------------------------------------------
-bool CompletionPoller::canQueueTcpReceivedData(int fd, size_t len) const
+bool CompletionPoller::canQueueTcpReceivedData(KBESOCKET fd, size_t len) const
 {
 	// TCP 接收队列必须同时按 bytes 和 item 数有界：
 	// 1) bytes 限制大包/流量 burst；
@@ -447,7 +447,7 @@ bool CompletionPoller::canQueueTcpReceivedData(int fd, size_t len) const
 }
 
 //-------------------------------------------------------------------------------------
-bool CompletionPoller::canQueueUdpReceivedData(int fd, size_t len) const
+bool CompletionPoller::canQueueUdpReceivedData(KBESOCKET fd, size_t len) const
 {
 	// UDP/KCP datagram 天然按包入队，小包数量可能比总 bytes 更早成为问题。
 	// 因此和 TCP 一样使用 bytes + items 双上限。
@@ -526,13 +526,13 @@ void CompletionPoller::pushTcpSendFront(SocketState& state, std::vector<char>& d
 }
 
 //-------------------------------------------------------------------------------------
-bool CompletionPoller::canQueueAcceptedSocket(int fd) const
+bool CompletionPoller::canQueueAcceptedSocket(KBESOCKET fd) const
 {
 	return acceptedSocketCount(fd) < COMPLETION_ACCEPT_BACKLOG_ITEMS;
 }
 
 //-------------------------------------------------------------------------------------
-bool CompletionPoller::canArmTcpReceive(int fd) const
+bool CompletionPoller::canArmTcpReceive(KBESOCKET fd) const
 {
 	// 只给 kqueue readiness adapter 使用。
 	// IOCP/io_uring 不用这个水位判断阻止 recv/accept 投递，避免 completion 后端
@@ -541,13 +541,13 @@ bool CompletionPoller::canArmTcpReceive(int fd) const
 }
 
 //-------------------------------------------------------------------------------------
-bool CompletionPoller::canArmUdpReceive(int fd) const
+bool CompletionPoller::canArmUdpReceive(KBESOCKET fd) const
 {
 	return canQueueUdpReceivedData(fd, PACKET_MAX_SIZE_UDP);
 }
 
 //-------------------------------------------------------------------------------------
-bool CompletionPoller::shouldResumeTcpReceive(int fd) const
+bool CompletionPoller::shouldResumeTcpReceive(KBESOCKET fd) const
 {
 	// kqueue 使用此低水位判断恢复 EVFILT_READ。
 	// io_uring/IOCP 不需要显式 resume 标记，因为它们每轮都会在没有 outstanding read
@@ -563,7 +563,7 @@ bool CompletionPoller::shouldResumeTcpReceive(int fd) const
 }
 
 //-------------------------------------------------------------------------------------
-bool CompletionPoller::shouldResumeUdpReceive(int fd) const
+bool CompletionPoller::shouldResumeUdpReceive(KBESOCKET fd) const
 {
 	auto iter = socketStates_.find(fd);
 	if (iter == socketStates_.end())
@@ -576,7 +576,7 @@ bool CompletionPoller::shouldResumeUdpReceive(int fd) const
 }
 
 //-------------------------------------------------------------------------------------
-void CompletionPoller::clearReceivedData(int fd)
+void CompletionPoller::clearReceivedData(KBESOCKET fd)
 {
 	// 读侧注销或 fd 生命周期重置时，旧的接收 completion 不应继续被新 channel 消费。
 	// 这里只清 recv/udp 队列，不清 acceptedSockets_：accepted socket 是 listener 生命周期的
@@ -595,21 +595,21 @@ void CompletionPoller::clearReceivedData(int fd)
 }
 
 //-------------------------------------------------------------------------------------
-size_t CompletionPoller::acceptedSocketCount(int fd) const
+size_t CompletionPoller::acceptedSocketCount(KBESOCKET fd) const
 {
 	auto iter = acceptedSockets_.find(fd);
 	return iter != acceptedSockets_.end() ? iter->second.size() : 0;
 }
 
 //-------------------------------------------------------------------------------------
-size_t CompletionPoller::tcpReceivedItemCount(int fd) const
+size_t CompletionPoller::tcpReceivedItemCount(KBESOCKET fd) const
 {
 	auto iter = tcpReceived_.find(fd);
 	return iter != tcpReceived_.end() ? iter->second.size() : 0;
 }
 
 //-------------------------------------------------------------------------------------
-size_t CompletionPoller::udpReceivedItemCount(int fd) const
+size_t CompletionPoller::udpReceivedItemCount(KBESOCKET fd) const
 {
 	auto iter = udpReceived_.find(fd);
 	return iter != udpReceived_.end() ? iter->second.size() : 0;
@@ -653,7 +653,7 @@ KBESOCKET CompletionPoller::invalidSocket() const
 }
 
 //-------------------------------------------------------------------------------------
-void CompletionPoller::cleanupStateIfUnused(int fd)
+void CompletionPoller::cleanupStateIfUnused(KBESOCKET fd)
 {
 	// 只有 fd 完全没有注册、pending IO、发送积压和接收队列时才移除状态。
 	// 特别注意：不能只看 pendingTcpReceiveBytes/pendingUdpReceiveBytes，

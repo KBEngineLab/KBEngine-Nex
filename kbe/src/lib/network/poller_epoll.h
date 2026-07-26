@@ -41,21 +41,21 @@ public:
 	int getFileDescriptor() const { return epfd_; }
 
 protected:
-	virtual bool doRegisterForRead(int fd)
+	virtual bool doRegisterForRead(KBESOCKET fd)
 		{ return this->doRegister(fd, true, true); }
 
-	virtual bool doRegisterForWrite(int fd)
+	virtual bool doRegisterForWrite(KBESOCKET fd)
 		{ return this->doRegister(fd, false, true); }
 
-	virtual bool doDeregisterForRead(int fd)
+	virtual bool doDeregisterForRead(KBESOCKET fd)
 		{ return this->doRegister(fd, true, false); }
 
-	virtual bool doDeregisterForWrite(int fd)
+	virtual bool doDeregisterForWrite(KBESOCKET fd)
 		{ return this->doRegister(fd, false, false); }
 
 	virtual int processPendingEvents(double maxWait);
 
-	bool doRegister(int fd, bool isRead, bool isRegister);
+	bool doRegister(KBESOCKET fd, bool isRead, bool isRegister);
 
 private:
 

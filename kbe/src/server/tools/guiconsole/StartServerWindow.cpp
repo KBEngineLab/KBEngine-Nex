@@ -163,9 +163,13 @@ void CStartServerWindow::OnBnClickedButton2()
 		struct timeval tv = { 0, 1000000 }; // 1000ms
 
 		FD_ZERO( &fds );
-		FD_SET((int)(*endpoint), &fds);
+		FD_SET(*endpoint, &fds);
 		
-		int selgot = select((*endpoint)+1, &fds, NULL, NULL, &tv);
+#if KBE_PLATFORM == PLATFORM_WIN32
+		int selgot = select(0, &fds, NULL, NULL, &tv);
+#else
+		int selgot = select((*endpoint) + 1, &fds, NULL, NULL, &tv);
+#endif
 		if(selgot == 0)
 		{
 			KBEngine::Network::EndPoint::reclaimPoolObject(endpoint);
@@ -297,9 +301,13 @@ void CStartServerWindow::OnBnClickedButton3()
 		struct timeval tv = { 0, 1000000 }; // 1000ms
 
 		FD_ZERO( &fds );
-		FD_SET((int)(*endpoint), &fds);
+		FD_SET(*endpoint, &fds);
 		
-		int selgot = select((*endpoint)+1, &fds, NULL, NULL, &tv);
+#if KBE_PLATFORM == PLATFORM_WIN32
+		int selgot = select(0, &fds, NULL, NULL, &tv);
+#else
+		int selgot = select((*endpoint) + 1, &fds, NULL, NULL, &tv);
+#endif
 		if(selgot == 0)
 		{
 			KBEngine::Network::EndPoint::reclaimPoolObject(endpoint);

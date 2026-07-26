@@ -88,7 +88,7 @@ HTTPCBHandler::~HTTPCBHandler()
 }
 
 //-------------------------------------------------------------------------------------
-int HTTPCBHandler::handleInputNotification(int fd)
+int HTTPCBHandler::handleInputNotification(KBESOCKET fd)
 {
 	if(fd == *pEndPoint_)
 	{
@@ -114,7 +114,7 @@ int HTTPCBHandler::handleInputNotification(int fd)
 	}
 	else
 	{
-		std::map< int, CLIENT >::iterator iter = clients_.find(fd);
+		std::map<KBESOCKET, CLIENT>::iterator iter = clients_.find(fd);
 		if(iter == clients_.end())
 		{
 			ERROR_MSG(fmt::format("HTTPCBHandler:handleInputNotification: fd({}) not found!\n",
@@ -361,7 +361,7 @@ int HTTPCBHandler::handleInputNotification(int fd)
 //-------------------------------------------------------------------------------------
 void HTTPCBHandler::onAccountActivated(std::string& code, bool success)
 {
-	std::map< int, CLIENT >::iterator iter = clients_.begin();
+	std::map<KBESOCKET, CLIENT>::iterator iter = clients_.begin();
 	for(; iter != clients_.end(); ++iter)
 	{
 		if(iter->second.code == code)
@@ -387,7 +387,7 @@ void HTTPCBHandler::onAccountActivated(std::string& code, bool success)
 //-------------------------------------------------------------------------------------
 void HTTPCBHandler::onAccountBindedEmail(std::string& code, bool success)
 {
-	std::map< int, CLIENT >::iterator iter = clients_.begin();
+	std::map<KBESOCKET, CLIENT>::iterator iter = clients_.begin();
 	for(; iter != clients_.end(); ++iter)
 	{
 		if(iter->second.code == code)
@@ -413,7 +413,7 @@ void HTTPCBHandler::onAccountBindedEmail(std::string& code, bool success)
 //-------------------------------------------------------------------------------------
 void HTTPCBHandler::onAccountResetPassword(std::string& code, bool success)
 {
-	std::map< int, CLIENT >::iterator iter = clients_.begin();
+	std::map<KBESOCKET, CLIENT>::iterator iter = clients_.begin();
 	for(; iter != clients_.end(); ++iter)
 	{
 		if(iter->second.code == code)

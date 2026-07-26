@@ -25,7 +25,9 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 
 #include "resmgr/resmgr.h"
+#include <openssl/bio.h>
 #include <openssl/err.h>
+#include <new>
 
 #include "network/bundle.h"
 #include "network/tcp_packet_receiver.h"
@@ -72,6 +74,131 @@ namespace Network
 #endif	// not unix
 
 static bool g_networkInitted = false;
+
+#if KBE_PLATFORM == PLATFORM_WIN32
+// OpenSSL 的标准 socket BIO 使用 int 保存描述符，会在 Win64 上截断 UINT_PTR 类型的 SOCKET。
+// OpenSSL's standard socket BIO stores descriptors as int, which truncates Win64 UINT_PTR SOCKET values.
+static KBESOCKET windowsSocketBIODescriptor(BIO* bio)
+{
+	KBESOCKET* pSocket = static_cast<KBESOCKET*>(BIO_get_data(bio));
+	return pSocket ? *pSocket : INVALID_SOCKET;
+}
+
+// BIO 不拥有 socket；EndPoint 统一管理句柄生命周期，避免 SSL_free 与 EndPoint::close 重复关闭。
+// The BIO does not own the socket; EndPoint retains lifecycle ownership to prevent SSL_free and EndPoint::close from closing it twice.
+static int windowsSocketBIOCreate(BIO* bio)
+{
+	BIO_set_init(bio, 1);
+	BIO_set_shutdown(bio, 0);
+	BIO_set_data(bio, NULL);
+	return 1;
+}
+
+static int windowsSocketBIODestroy(BIO* bio)
+{
+	if (!bio)
+		return 0;
+
+	delete static_cast<KBESOCKET*>(BIO_get_data(bio));
+	BIO_set_data(bio, NULL);
+	BIO_set_init(bio, 0);
+	return 1;
+}
+
+static int windowsSocketBIORead(BIO* bio, char* buffer, int length)
+{
+	BIO_clear_retry_flags(bio);
+	int result = ::recv(windowsSocketBIODescriptor(bio), buffer, length, 0);
+	if (result == SOCKET_ERROR)
+	{
+		int error = WSAGetLastError();
+		if (error == WSAEWOULDBLOCK || error == WSAEINTR)
+			BIO_set_retry_read(bio);
+	}
+
+	return result;
+}
+
+static int windowsSocketBIOWrite(BIO* bio, const char* buffer, int length)
+{
+	BIO_clear_retry_flags(bio);
+	int result = ::send(windowsSocketBIODescriptor(bio), buffer, length, 0);
+	if (result == SOCKET_ERROR)
+	{
+		int error = WSAGetLastError();
+		if (error == WSAEWOULDBLOCK || error == WSAEINTR)
+			BIO_set_retry_write(bio);
+	}
+
+	return result;
+}
+
+static int windowsSocketBIOPuts(BIO* bio, const char* value)
+{
+	return windowsSocketBIOWrite(bio, value, static_cast<int>(strlen(value)));
+}
+
+static long windowsSocketBIOControl(BIO* bio, int command, long argument, void*)
+{
+	switch (command)
+	{
+	case BIO_CTRL_FLUSH:
+		return 1;
+	case BIO_CTRL_GET_CLOSE:
+		return BIO_get_shutdown(bio);
+	case BIO_CTRL_SET_CLOSE:
+		BIO_set_shutdown(bio, static_cast<int>(argument));
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+static BIO_METHOD* windowsSocketBIOMethod()
+{
+	static BIO_METHOD* method = []() -> BIO_METHOD*
+	{
+		BIO_METHOD* value = BIO_meth_new(BIO_TYPE_SOCKET, "KBEngine Win64 socket");
+		if (!value ||
+			BIO_meth_set_create(value, windowsSocketBIOCreate) != 1 ||
+			BIO_meth_set_destroy(value, windowsSocketBIODestroy) != 1 ||
+			BIO_meth_set_read(value, windowsSocketBIORead) != 1 ||
+			BIO_meth_set_write(value, windowsSocketBIOWrite) != 1 ||
+			BIO_meth_set_puts(value, windowsSocketBIOPuts) != 1 ||
+			BIO_meth_set_ctrl(value, windowsSocketBIOControl) != 1)
+		{
+			if (value)
+				BIO_meth_free(value);
+			return NULL;
+		}
+
+		return value;
+	}();
+
+	return method;
+}
+
+static BIO* createWindowsSocketBIO(KBESOCKET socket)
+{
+	BIO_METHOD* method = windowsSocketBIOMethod();
+	if (!method)
+		return NULL;
+
+	BIO* bio = BIO_new(method);
+	if (!bio)
+		return NULL;
+
+	KBESOCKET* pSocket = new (std::nothrow) KBESOCKET(socket);
+	if (!pSocket)
+	{
+		BIO_free(bio);
+		return NULL;
+	}
+
+	BIO_set_data(bio, pSocket);
+	return bio;
+}
+#endif
 
 //-------------------------------------------------------------------------------------
 static ObjectPool<EndPoint> _g_objPool("EndPoint");
@@ -648,7 +775,11 @@ bool EndPoint::waitSend()
 	FD_ZERO( &fds );
 	FD_SET(socket_, &fds);
 
-	return select(socket_+1, NULL, &fds, NULL, &tv) > 0;
+#if KBE_PLATFORM == PLATFORM_WIN32
+	return select(0, NULL, &fds, NULL, &tv) > 0;
+#else
+	return select(socket_ + 1, NULL, &fds, NULL, &tv) > 0;
+#endif
 }
 
 //-------------------------------------------------------------------------------------
@@ -775,7 +906,19 @@ bool EndPoint::setupSSL(int sslVersion, Packet* pPacket)
 		return false;
 	}
 
+#if KBE_PLATFORM == PLATFORM_WIN32
+	BIO* socketBIO = createWindowsSocketBIO(*this);
+	if (!socketBIO)
+	{
+		ERROR_MSG(fmt::format("EndPoint::setupSSL: createWindowsSocketBIO(): {}!\n", ERR_error_string(ERR_get_error(), NULL)));
+		destroySSL();
+		return false;
+	}
+
+	SSL_set_bio(sslHandle_, socketBIO, socketBIO);
+#else
 	SSL_set_fd(sslHandle_, *this);
+#endif
 
 	BIO_set_callback(SSL_get_rbio(sslHandle_), ssl_bio_callback);
 	BIO_set_callback_arg(SSL_get_rbio(sslHandle_), (char*)pPacket);
@@ -792,7 +935,11 @@ bool EndPoint::setupSSL(int sslVersion, Packet* pPacket)
 		{
 		case SSL_ERROR_WANT_READ:
 		{
+#if KBE_PLATFORM == PLATFORM_WIN32
+			int selgot = select(0, &fds, NULL, NULL, &tv);
+#else
 			int selgot = select((*this) + 1, &fds, NULL, NULL, &tv);
+#endif
 			if (selgot <= 0)
 			{
 				ERROR_MSG(fmt::format("EndPoint::setupSSL: SSL_accept(SSL_ERROR_WANT_READ): {}!\n", ERR_error_string(SSL_get_error(sslHandle_, -1), NULL)));
@@ -804,7 +951,11 @@ bool EndPoint::setupSSL(int sslVersion, Packet* pPacket)
 		}
 		case SSL_ERROR_WANT_WRITE:
 		{
+#if KBE_PLATFORM == PLATFORM_WIN32
+			int selgot = select(0, NULL, &fds, NULL, &tv);
+#else
 			int selgot = select((*this) + 1, NULL, &fds, NULL, &tv);
+#endif
 			if (selgot <= 0)
 			{
 				ERROR_MSG(fmt::format("EndPoint::setupSSL: SSL_accept(SSL_ERROR_WANT_WRITE): {}!\n", ERR_error_string(SSL_get_error(sslHandle_, -1), NULL)));

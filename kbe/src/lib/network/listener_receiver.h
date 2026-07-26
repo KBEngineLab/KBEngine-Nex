@@ -44,7 +44,7 @@ public:
 	~ListenerReceiver();
 
 private:
-	virtual int handleInputNotification(int fd);
+	virtual int handleInputNotification(KBESOCKET fd);
 	EventDispatcher & dispatcher();
 
 private:

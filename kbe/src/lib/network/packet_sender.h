@@ -62,7 +62,7 @@ public:
 		return pEndpoint_; 
 	}
 
-	virtual int handleOutputNotification(int fd);
+	virtual int handleOutputNotification(KBESOCKET fd);
 
 	virtual Reason processPacket(Channel* pChannel, Packet * pPacket);
 	virtual Reason processFilterPacket(Channel* pChannel, Packet * pPacket) = 0;

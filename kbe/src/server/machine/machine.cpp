@@ -1068,9 +1068,13 @@ void Machine::stopserver(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 			struct timeval tv = { 0, 1000000 }; // 1000ms
 
 			FD_ZERO( &fds );
-			FD_SET((int)ep1, &fds);
+			FD_SET(ep1, &fds);
 
-			int selgot = select(ep1+1, &fds, NULL, NULL, &tv);
+#if KBE_PLATFORM == PLATFORM_WIN32
+			int selgot = select(0, &fds, NULL, NULL, &tv);
+#else
+			int selgot = select(ep1 + 1, &fds, NULL, NULL, &tv);
+#endif
 			if(selgot == 0)
 			{
 				// 超时, 可能对方繁忙

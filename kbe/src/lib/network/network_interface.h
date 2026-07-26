@@ -65,7 +65,7 @@ public:
 	bool deregisterChannel(Channel* pChannel);
 	bool deregisterAllChannels();
 	Channel * findChannel(const Address & addr);
-	Channel * findChannel(int fd);
+	Channel * findChannel(KBESOCKET fd);
 
 	ChannelTimeOutHandler * pChannelTimeOutHandler() const
 		{ return pChannelTimeOutHandler_; }

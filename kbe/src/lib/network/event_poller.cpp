@@ -44,7 +44,7 @@ EventPoller::~EventPoller()
 }
 
 //-------------------------------------------------------------------------------------
-bool EventPoller::registerForRead(int fd,
+bool EventPoller::registerForRead(KBESOCKET fd,
 		InputNotificationHandler * handler)
 {
 	if (!this->doRegisterForRead(fd))
@@ -58,7 +58,7 @@ bool EventPoller::registerForRead(int fd,
 }
 
 //-------------------------------------------------------------------------------------
-bool EventPoller::registerForWrite(int fd,
+bool EventPoller::registerForWrite(KBESOCKET fd,
 		OutputNotificationHandler * handler)
 {
 	if (!this->doRegisterForWrite(fd))
@@ -72,7 +72,7 @@ bool EventPoller::registerForWrite(int fd,
 }
 
 //-------------------------------------------------------------------------------------
-bool EventPoller::deregisterForRead(int fd)
+bool EventPoller::deregisterForRead(KBESOCKET fd)
 {
 	fdReadHandlers_.erase(fd);
 
@@ -80,7 +80,7 @@ bool EventPoller::deregisterForRead(int fd)
 }
 
 //-------------------------------------------------------------------------------------
-bool EventPoller::deregisterForWrite(int fd)
+bool EventPoller::deregisterForWrite(KBESOCKET fd)
 {
 	fdWriteHandlers_.erase(fd);
 
@@ -88,7 +88,7 @@ bool EventPoller::deregisterForWrite(int fd)
 }
 
 //-------------------------------------------------------------------------------------
-bool EventPoller::triggerRead(int fd)	
+bool EventPoller::triggerRead(KBESOCKET fd)
 {
 	FDReadHandlers::iterator iter = fdReadHandlers_.find(fd);
 
@@ -103,7 +103,7 @@ bool EventPoller::triggerRead(int fd)
 }
 
 //-------------------------------------------------------------------------------------
-bool EventPoller::triggerWrite(int fd)	
+bool EventPoller::triggerWrite(KBESOCKET fd)
 {
 	FDWriteHandlers::iterator iter = fdWriteHandlers_.find(fd);
 
@@ -118,7 +118,7 @@ bool EventPoller::triggerWrite(int fd)
 }
 
 //-------------------------------------------------------------------------------------
-bool EventPoller::triggerError(int fd)
+bool EventPoller::triggerError(KBESOCKET fd)
 {
 	if (!this->triggerRead(fd))
 	{
@@ -129,14 +129,14 @@ bool EventPoller::triggerError(int fd)
 }
 
 //-------------------------------------------------------------------------------------
-bool EventPoller::isRegistered(int fd, bool isForRead) const
+bool EventPoller::isRegistered(KBESOCKET fd, bool isForRead) const
 {
 	return isForRead ? (fdReadHandlers_.find(fd) != fdReadHandlers_.end()) : 
 		(fdWriteHandlers_.find(fd) != fdWriteHandlers_.end());
 }
 
 //-------------------------------------------------------------------------------------
-InputNotificationHandler* EventPoller::findForRead(int fd)
+InputNotificationHandler* EventPoller::findForRead(KBESOCKET fd)
 {
 	FDReadHandlers::iterator iter = fdReadHandlers_.find(fd);
 	
@@ -147,7 +147,7 @@ InputNotificationHandler* EventPoller::findForRead(int fd)
 }
 
 //-------------------------------------------------------------------------------------
-OutputNotificationHandler* EventPoller::findForWrite(int fd)
+OutputNotificationHandler* EventPoller::findForWrite(KBESOCKET fd)
 {
 	FDWriteHandlers::iterator iter = fdWriteHandlers_.find(fd);
 	
@@ -179,7 +179,7 @@ bool EventPoller::supportsCompletion() const
 // These default implementations are intentionally no-ops so legacy select/epoll backends keep compiling and running while completion support is introduced.
 
 //-------------------------------------------------------------------------------------
-bool EventPoller::takeAcceptedSocket(int fd, KBESOCKET& acceptedSocket)
+bool EventPoller::takeAcceptedSocket(KBESOCKET fd, KBESOCKET& acceptedSocket)
 {
 	(void)fd;
 	(void)acceptedSocket;
@@ -187,7 +187,7 @@ bool EventPoller::takeAcceptedSocket(int fd, KBESOCKET& acceptedSocket)
 }
 
 //-------------------------------------------------------------------------------------
-bool EventPoller::takeTcpReceivedData(int fd, std::vector<char>& data, bool& disconnected, int& errorCode)
+bool EventPoller::takeTcpReceivedData(KBESOCKET fd, std::vector<char>& data, bool& disconnected, int& errorCode)
 {
 	(void)fd;
 	(void)data;
@@ -197,7 +197,7 @@ bool EventPoller::takeTcpReceivedData(int fd, std::vector<char>& data, bool& dis
 }
 
 //-------------------------------------------------------------------------------------
-bool EventPoller::takeUdpReceivedData(int fd, std::vector<char>& data, Address& srcAddr, int& errorCode)
+bool EventPoller::takeUdpReceivedData(KBESOCKET fd, std::vector<char>& data, Address& srcAddr, int& errorCode)
 {
 	(void)fd;
 	(void)data;
@@ -207,7 +207,7 @@ bool EventPoller::takeUdpReceivedData(int fd, std::vector<char>& data, Address& 
 }
 
 //-------------------------------------------------------------------------------------
-bool EventPoller::queueTcpSend(int fd, const void* data, int len)
+bool EventPoller::queueTcpSend(KBESOCKET fd, const void* data, int len)
 {
 	(void)fd;
 	(void)data;
@@ -216,7 +216,7 @@ bool EventPoller::queueTcpSend(int fd, const void* data, int len)
 }
 
 //-------------------------------------------------------------------------------------
-bool EventPoller::queueUdpSend(int fd, const void* data, int len, const Address& dstAddr)
+bool EventPoller::queueUdpSend(KBESOCKET fd, const void* data, int len, const Address& dstAddr)
 {
 	(void)fd;
 	(void)data;
@@ -226,7 +226,7 @@ bool EventPoller::queueUdpSend(int fd, const void* data, int len, const Address&
 }
 
 //-------------------------------------------------------------------------------------
-bool EventPoller::hasPendingSend(int fd) const
+bool EventPoller::hasPendingSend(KBESOCKET fd) const
 {
 	(void)fd;
 	return false;
@@ -249,9 +249,9 @@ const char* EventPoller::defaultIOModelName()
 }
 
 //-------------------------------------------------------------------------------------
-int EventPoller::maxFD() const
+KBESOCKET EventPoller::maxFD() const
 {
-	int readMaxFD = -1;
+	KBESOCKET readMaxFD = 0;
 
 	FDReadHandlers::const_iterator iFDReadHandler = fdReadHandlers_.begin();
 	while (iFDReadHandler != fdReadHandlers_.end())
@@ -264,7 +264,7 @@ int EventPoller::maxFD() const
 		++iFDReadHandler;
 	}
 
-	int writeMaxFD = -1;
+	KBESOCKET writeMaxFD = 0;
 
 	FDWriteHandlers::const_iterator iFDWriteHandler = fdWriteHandlers_.begin();
 	while (iFDWriteHandler != fdWriteHandlers_.end())

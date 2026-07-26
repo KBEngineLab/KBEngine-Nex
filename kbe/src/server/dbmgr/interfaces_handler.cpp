@@ -502,19 +502,23 @@ bool InterfacesHandler_Interfaces::reconnect()
 		fd_set frds, fwds;
 		FD_ZERO( &frds );
 		FD_ZERO( &fwds );
-		FD_SET((int)(*pInterfacesChannel->pEndPoint()), &frds);
-		FD_SET((int)(*pInterfacesChannel->pEndPoint()), &fwds);
+		FD_SET(*pInterfacesChannel->pEndPoint(), &frds);
+		FD_SET(*pInterfacesChannel->pEndPoint(), &fwds);
 		
 		bool connected = false;
-		int selgot = select((*pInterfacesChannel->pEndPoint())+1, &frds, &fwds, NULL, &tv);
+#if KBE_PLATFORM == PLATFORM_WIN32
+		int selgot = select(0, &frds, &fwds, NULL, &tv);
+#else
+		int selgot = select((*pInterfacesChannel->pEndPoint()) + 1, &frds, &fwds, NULL, &tv);
+#endif
 		if(selgot > 0)
 		{
 			int error;
 			socklen_t len = sizeof(error);
 #if KBE_PLATFORM == PLATFORM_WIN32
-			getsockopt(int(*pInterfacesChannel->pEndPoint()), SOL_SOCKET, SO_ERROR, (char*)&error, &len);
+			getsockopt(*pInterfacesChannel->pEndPoint(), SOL_SOCKET, SO_ERROR, (char*)&error, &len);
 #else
-			getsockopt(int(*pInterfacesChannel->pEndPoint()), SOL_SOCKET, SO_ERROR, &error, &len);
+			getsockopt(*pInterfacesChannel->pEndPoint(), SOL_SOCKET, SO_ERROR, &error, &len);
 #endif
 			if(0 == error)
 				connected = true;

@@ -390,7 +390,7 @@ const char * reasonToString(Reason reason)
 	}																										\
 
 
-bool kbe_poll(int fd);
+bool kbe_poll(KBESOCKET fd);
 
 void destroyObjPool();
 

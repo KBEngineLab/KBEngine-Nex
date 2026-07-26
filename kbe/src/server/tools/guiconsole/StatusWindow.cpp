@@ -66,12 +66,16 @@ public:
 
 		FD_ZERO( &frds );
 		FD_ZERO( &fwds );
-		FD_SET((int)epListen, &frds);
-		FD_SET((int)epListen, &fwds);
+		FD_SET(epListen, &frds);
+		FD_SET(epListen, &fwds);
 
 		if(epListen.connect(_port, _ip) == -1)
 		{
-			int selgot = select(epListen+1, &frds, &fwds, NULL, &tv);
+#if KBE_PLATFORM == PLATFORM_WIN32
+			int selgot = select(0, &frds, &fwds, NULL, &tv);
+#else
+			int selgot = select(epListen + 1, &frds, &fwds, NULL, &tv);
+#endif
 			if(selgot <= 0)
 			{
 				ERROR_MSG(fmt::format("LookAppTask::process: couldn't connect to:{}\n", 
@@ -102,9 +106,13 @@ public:
 			struct timeval tv = { 0, 300000 }; // 100ms
 
 			FD_ZERO( &fds );
-			FD_SET((int)epListen, &fds);
+			FD_SET(epListen, &fds);
 
-			int selgot = select(epListen+1, &fds, NULL, NULL, &tv);
+#if KBE_PLATFORM == PLATFORM_WIN32
+			int selgot = select(0, &fds, NULL, NULL, &tv);
+#else
+			int selgot = select(epListen + 1, &fds, NULL, NULL, &tv);
+#endif
 			if(selgot == 0)
 			{
 				// 超时, 可能对方繁忙

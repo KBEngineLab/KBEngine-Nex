@@ -21,6 +21,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef KBE_NETWORK_INTERFACES_H
 #define KBE_NETWORK_INTERFACES_H
 
+#include "common/platform.h"
+
 namespace KBEngine { 
 namespace Network
 {
@@ -33,7 +35,7 @@ class InputNotificationHandler
 {
 public:
 	virtual ~InputNotificationHandler() {};
-	virtual int handleInputNotification(int fd) = 0;
+	virtual int handleInputNotification(KBESOCKET fd) = 0;
 };
 
 /** 此类接口用于接收普通的Network输出消息
@@ -42,7 +44,7 @@ class OutputNotificationHandler
 {
 public:
 	virtual ~OutputNotificationHandler() {};
-	virtual int handleOutputNotification(int fd) = 0;
+	virtual int handleOutputNotification(KBESOCKET fd) = 0;
 };
 
 /** 此类接口用于接收一个网络通道超时消息

@@ -52,7 +52,7 @@ ListenerReceiver::~ListenerReceiver()
 }
 
 //-------------------------------------------------------------------------------------
-int ListenerReceiver::handleInputNotification(int fd)
+int ListenerReceiver::handleInputNotification(KBESOCKET fd)
 {
 	int tickcount = 0;
 	EventPoller* pPoller = this->dispatcher().pPoller();

@@ -30,12 +30,34 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #else
 #include <errno.h>
 #endif
+#include <limits>
 
 namespace KBEngine{
 
-std::map<int, PyFileDescriptor*> PyFileDescriptor::readDataDescriptors_;
-std::map<int, PyFileDescriptor*> PyFileDescriptor::acceptDescriptors_;
-std::map<int, PyFileDescriptor*> PyFileDescriptor::writeCompletionDescriptors_;
+namespace
+{
+// Python 的 K 格式会按无符号掩码转换负数，因此必须使用带溢出检查的 API 拒绝负值和平台无效句柄。
+// Python's K format masks negative values into unsigned integers, so use the checked API to reject negatives and platform-invalid handles.
+bool parseFileDescriptor(PyObject* value, KBESOCKET& fd)
+{
+	if(!PyLong_Check(value))
+		return false;
+
+	unsigned long long rawFD = PyLong_AsUnsignedLongLong(value);
+	if(PyErr_Occurred() || rawFD == 0 ||
+		rawFD > static_cast<unsigned long long>(std::numeric_limits<KBESOCKET>::max()))
+	{
+		return false;
+	}
+
+	fd = static_cast<KBESOCKET>(rawFD);
+	return fd != static_cast<KBESOCKET>(-1);
+}
+}
+
+std::map<KBESOCKET, PyFileDescriptor*> PyFileDescriptor::readDataDescriptors_;
+std::map<KBESOCKET, PyFileDescriptor*> PyFileDescriptor::acceptDescriptors_;
+std::map<KBESOCKET, PyFileDescriptor*> PyFileDescriptor::writeCompletionDescriptors_;
 
 //-------------------------------------------------------------------------------------
 PyFileDescriptor::WriteRequest::WriteRequest(int bytesArg, PyObject* pyCallbackArg) :
@@ -45,7 +67,7 @@ PyFileDescriptor::WriteRequest::WriteRequest(int bytesArg, PyObject* pyCallbackA
 }
 
 //-------------------------------------------------------------------------------------
-PyFileDescriptor::PyFileDescriptor(int fd, PyObject* pyCallback, bool write) : 
+PyFileDescriptor::PyFileDescriptor(KBESOCKET fd, PyObject* pyCallback, bool write) :
 	fd_(fd),
 	pyCallback_(pyCallback),
 	write_(write),
@@ -59,7 +81,7 @@ PyFileDescriptor::PyFileDescriptor(int fd, PyObject* pyCallback, bool write) :
 }
 
 //-------------------------------------------------------------------------------------
-PyFileDescriptor::PyFileDescriptor(int fd, PyObject* pyCallback, bool accept, int reserved) :
+PyFileDescriptor::PyFileDescriptor(KBESOCKET fd, PyObject* pyCallback, bool accept, int reserved) :
 	fd_(fd),
 	pyCallback_(pyCallback),
 	write_(false),
@@ -85,7 +107,7 @@ PyFileDescriptor::~PyFileDescriptor()
 	// Remove the script-side index before deregistering the poller so late events cannot find an object being destroyed.
 	if(mode_ == MODE_WRITE_COMPLETION)
 	{
-		std::map<int, PyFileDescriptor*>::iterator iter = writeCompletionDescriptors_.find(fd_);
+		std::map<KBESOCKET, PyFileDescriptor*>::iterator iter = writeCompletionDescriptors_.find(fd_);
 		if(iter != writeCompletionDescriptors_.end() && iter->second == this)
 			writeCompletionDescriptors_.erase(iter);
 
@@ -93,7 +115,7 @@ PyFileDescriptor::~PyFileDescriptor()
 	}
 	else if(mode_ == MODE_READ_DATA)
 	{
-		std::map<int, PyFileDescriptor*>::iterator iter = readDataDescriptors_.find(fd_);
+		std::map<KBESOCKET, PyFileDescriptor*>::iterator iter = readDataDescriptors_.find(fd_);
 		if(iter != readDataDescriptors_.end() && iter->second == this)
 			readDataDescriptors_.erase(iter);
 
@@ -101,7 +123,7 @@ PyFileDescriptor::~PyFileDescriptor()
 	}
 	else if(mode_ == MODE_ACCEPT)
 	{
-		std::map<int, PyFileDescriptor*>::iterator iter = acceptDescriptors_.find(fd_);
+		std::map<KBESOCKET, PyFileDescriptor*>::iterator iter = acceptDescriptors_.find(fd_);
 		if(iter != acceptDescriptors_.end() && iter->second == this)
 			acceptDescriptors_.erase(iter);
 
@@ -145,22 +167,23 @@ PyObject* PyFileDescriptor::__py_registerReadDataFileDescriptor(PyObject* self, 
 		return NULL;
 	}
 
+	PyObject* pyFD = NULL;
 	PyObject* pycallback = NULL;
-	int fd = 0;
-	if(!PyArg_ParseTuple(args, "iO", &fd, &pycallback))
+	if(!PyArg_ParseTuple(args, "OO", &pyFD, &pycallback))
 	{
 		PyErr_Format(PyExc_TypeError, "KBEngine::registerReadDataFileDescriptor: args error!");
 		PyErr_PrintEx(0);
 		return NULL;
 	}
 
-	if(fd <= 0)
+	KBESOCKET fd = 0;
+	if(!parseFileDescriptor(pyFD, fd))
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::registerReadDataFileDescriptor: fd <= 0!");
+		PyErr_Clear();
+		PyErr_Format(PyExc_TypeError, "KBEngine::registerReadDataFileDescriptor: invalid file descriptor!");
 		PyErr_PrintEx(0);
 		return NULL;
 	}
-
 	if(!PyCallable_Check(pycallback))
 	{
 		PyErr_Format(PyExc_TypeError, "KBEngine::registerReadDataFileDescriptor: invalid pycallback!");
@@ -201,22 +224,23 @@ PyObject* PyFileDescriptor::__py_deregisterReadDataFileDescriptor(PyObject* self
 		return NULL;
 	}
 
-	int fd = 0;
-	if(!PyArg_ParseTuple(args, "i", &fd))
+	PyObject* pyFD = NULL;
+	if(!PyArg_ParseTuple(args, "O", &pyFD))
 	{
 		PyErr_Format(PyExc_TypeError, "KBEngine::deregisterReadDataFileDescriptor: args error!");
 		PyErr_PrintEx(0);
 		return NULL;
 	}
 
-	if(fd <= 0)
+	KBESOCKET fd = 0;
+	if(!parseFileDescriptor(pyFD, fd))
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::deregisterReadDataFileDescriptor: fd <= 0!");
+		PyErr_Clear();
+		PyErr_Format(PyExc_TypeError, "KBEngine::deregisterReadDataFileDescriptor: invalid file descriptor!");
 		PyErr_PrintEx(0);
 		return NULL;
 	}
-
-	std::map<int, PyFileDescriptor*>::iterator iter = readDataDescriptors_.find(fd);
+	std::map<KBESOCKET, PyFileDescriptor*>::iterator iter = readDataDescriptors_.find(fd);
 	if(iter != readDataDescriptors_.end())
 		delete iter->second;
 
@@ -233,22 +257,23 @@ PyObject* PyFileDescriptor::__py_registerAcceptFileDescriptor(PyObject* self, Py
 		return NULL;
 	}
 
+	PyObject* pyFD = NULL;
 	PyObject* pycallback = NULL;
-	int fd = 0;
-	if(!PyArg_ParseTuple(args, "iO", &fd, &pycallback))
+	if(!PyArg_ParseTuple(args, "OO", &pyFD, &pycallback))
 	{
 		PyErr_Format(PyExc_TypeError, "KBEngine::registerAcceptFileDescriptor: args error!");
 		PyErr_PrintEx(0);
 		return NULL;
 	}
 
-	if(fd <= 0)
+	KBESOCKET fd = 0;
+	if(!parseFileDescriptor(pyFD, fd))
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::registerAcceptFileDescriptor: fd <= 0!");
+		PyErr_Clear();
+		PyErr_Format(PyExc_TypeError, "KBEngine::registerAcceptFileDescriptor: invalid file descriptor!");
 		PyErr_PrintEx(0);
 		return NULL;
 	}
-
 	if(!PyCallable_Check(pycallback))
 	{
 		PyErr_Format(PyExc_TypeError, "KBEngine::registerAcceptFileDescriptor: invalid pycallback!");
@@ -287,22 +312,23 @@ PyObject* PyFileDescriptor::__py_deregisterAcceptFileDescriptor(PyObject* self, 
 		return NULL;
 	}
 
-	int fd = 0;
-	if(!PyArg_ParseTuple(args, "i", &fd))
+	PyObject* pyFD = NULL;
+	if(!PyArg_ParseTuple(args, "O", &pyFD))
 	{
 		PyErr_Format(PyExc_TypeError, "KBEngine::deregisterAcceptFileDescriptor: args error!");
 		PyErr_PrintEx(0);
 		return NULL;
 	}
 
-	if(fd <= 0)
+	KBESOCKET fd = 0;
+	if(!parseFileDescriptor(pyFD, fd))
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::deregisterAcceptFileDescriptor: fd <= 0!");
+		PyErr_Clear();
+		PyErr_Format(PyExc_TypeError, "KBEngine::deregisterAcceptFileDescriptor: invalid file descriptor!");
 		PyErr_PrintEx(0);
 		return NULL;
 	}
-
-	std::map<int, PyFileDescriptor*>::iterator iter = acceptDescriptors_.find(fd);
+	std::map<KBESOCKET, PyFileDescriptor*>::iterator iter = acceptDescriptors_.find(fd);
 	if(iter != acceptDescriptors_.end())
 		delete iter->second;
 
@@ -341,23 +367,24 @@ PyObject* PyFileDescriptor::__py_writeFileDescriptor(PyObject* self, PyObject* a
 		return NULL;
 	}
 
-	int fd = 0;
+	PyObject* pyFD = NULL;
 	PyObject* pydata = NULL;
 	PyObject* pycallback = NULL;
-	if(!PyArg_ParseTuple(args, "iOO", &fd, &pydata, &pycallback))
+	if(!PyArg_ParseTuple(args, "OOO", &pyFD, &pydata, &pycallback))
 	{
 		PyErr_Format(PyExc_TypeError, "KBEngine::writeFileDescriptor: args error!");
 		PyErr_PrintEx(0);
 		return NULL;
 	}
 
-	if(fd <= 0)
+	KBESOCKET fd = 0;
+	if(!parseFileDescriptor(pyFD, fd))
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::writeFileDescriptor: fd <= 0!");
+		PyErr_Clear();
+		PyErr_Format(PyExc_TypeError, "KBEngine::writeFileDescriptor: invalid file descriptor!");
 		PyErr_PrintEx(0);
 		return NULL;
 	}
-
 	if(!PyBytes_Check(pydata))
 	{
 		PyErr_Format(PyExc_TypeError, "KBEngine::writeFileDescriptor: data must be bytes!");
@@ -381,7 +408,7 @@ PyObject* PyFileDescriptor::__py_writeFileDescriptor(PyObject* self, PyObject* a
 	}
 
 	PyFileDescriptor* pPyFileDescriptor = NULL;
-	std::map<int, PyFileDescriptor*>::iterator iter = writeCompletionDescriptors_.find(fd);
+	std::map<KBESOCKET, PyFileDescriptor*>::iterator iter = writeCompletionDescriptors_.find(fd);
 	if(iter != writeCompletionDescriptors_.end())
 	{
 		pPyFileDescriptor = iter->second;
@@ -421,7 +448,7 @@ PyObject* PyFileDescriptor::__py_writeFileDescriptor(PyObject* self, PyObject* a
 }
 
 //-------------------------------------------------------------------------------------
-int PyFileDescriptor::handleInputNotification(int fd)
+int PyFileDescriptor::handleInputNotification(KBESOCKET fd)
 {
 	//INFO_MSG(fmt::format("PyFileDescriptor:handleInputNotification: fd = {}\n",
 	//			fd));
@@ -437,7 +464,7 @@ int PyFileDescriptor::handleInputNotification(int fd)
 }
 
 //-------------------------------------------------------------------------------------
-int PyFileDescriptor::handleOutputNotification( int fd )
+int PyFileDescriptor::handleOutputNotification(KBESOCKET fd)
 {
 	//INFO_MSG(fmt::format("PyFileDescriptor:handleOutputNotification: fd = {}\n",
 	//			fd));
@@ -472,8 +499,8 @@ void PyFileDescriptor::callback()
 	if(pyCallback_ != NULL)
 	{
 		PyObject* pyResult = PyObject_CallFunction(pyCallback_.get(), 
-											const_cast<char*>("i"), 
-											fd_);
+											const_cast<char*>("K"),
+											static_cast<unsigned long long>(fd_));
 
 		if(pyResult != NULL)
 			Py_DECREF(pyResult);
@@ -501,9 +528,9 @@ void PyFileDescriptor::callbackAccept()
 		if(pyCallback_ != NULL)
 		{
 			PyObject* pyResult = PyObject_CallFunction(pyCallback_.get(),
-											const_cast<char*>("iii"),
-											fd_,
-											static_cast<int>(acceptedSocket),
+											const_cast<char*>("KKi"),
+											static_cast<unsigned long long>(fd_),
+											static_cast<unsigned long long>(acceptedSocket),
 											0);
 
 			if(pyResult != NULL)
@@ -536,8 +563,8 @@ void PyFileDescriptor::callbackReadData()
 		{
 			PyObject* pyData = PyBytes_FromStringAndSize(data.empty() ? "" : data.data(), data.size());
 			PyObject* pyResult = PyObject_CallFunction(pyCallback_.get(),
-											const_cast<char*>("iOi"),
-											fd_,
+											const_cast<char*>("KOi"),
+											static_cast<unsigned long long>(fd_),
 											pyData,
 											errorCode);
 			Py_XDECREF(pyData);
@@ -565,8 +592,8 @@ void PyFileDescriptor::callbackWriteComplete(int bytesWritten, int errorCode)
 	if(pyCallback_ != NULL)
 	{
 		PyObject* pyResult = PyObject_CallFunction(pyCallback_.get(),
-										const_cast<char*>("iii"),
-										fd_,
+										const_cast<char*>("Kii"),
+										static_cast<unsigned long long>(fd_),
 										bytesWritten,
 										errorCode);
 

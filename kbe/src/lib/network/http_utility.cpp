@@ -641,14 +641,14 @@ public:
 
 	}
 
-	virtual int handleInputNotification(int fd)
+	virtual int handleInputNotification(KBESOCKET fd)
 	{
 		KBE_ASSERT(sockfd == fd);
 
 		Requests* tRequests = pRequests;
 		CURLMcode rc;
 
-		rc = curl_multi_socket_action((CURLM*)tRequests->pContext(), fd, CURL_POLL_IN, &tRequests->still_running);
+		rc = curl_multi_socket_action((CURLM*)tRequests->pContext(), static_cast<curl_socket_t>(fd), CURL_POLL_IN, &tRequests->still_running);
 
 		mcode_or_die("handleInputNotification: curl_multi_socket_action", rc);
 
@@ -663,14 +663,14 @@ public:
 		return 0;
 	}
 
-	virtual int handleOutputNotification(int fd)
+	virtual int handleOutputNotification(KBESOCKET fd)
 	{
 		KBE_ASSERT(sockfd == fd);
 
 		Requests* tRequests = pRequests;
 		CURLMcode rc;
 
-		rc = curl_multi_socket_action((CURLM*)tRequests->pContext(), fd, CURL_POLL_OUT, &tRequests->still_running);
+		rc = curl_multi_socket_action((CURLM*)tRequests->pContext(), static_cast<curl_socket_t>(fd), CURL_POLL_OUT, &tRequests->still_running);
 
 		mcode_or_die("handleOutputNotification: curl_multi_socket_action", rc);
 

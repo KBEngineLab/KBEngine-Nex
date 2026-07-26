@@ -62,10 +62,10 @@ public:
 	INLINE double maxWait() const;
 	INLINE void maxWait(double seconds);
 
-	bool registerReadFileDescriptor(int fd, InputNotificationHandler * handler);
-	bool deregisterReadFileDescriptor(int fd);
-	bool registerWriteFileDescriptor(int fd, OutputNotificationHandler * handler);
-	bool deregisterWriteFileDescriptor(int fd);
+	bool registerReadFileDescriptor(KBESOCKET fd, InputNotificationHandler * handler);
+	bool deregisterReadFileDescriptor(KBESOCKET fd);
+	bool registerWriteFileDescriptor(KBESOCKET fd, OutputNotificationHandler * handler);
+	bool deregisterWriteFileDescriptor(KBESOCKET fd);
 
 	INLINE TimerHandle addTimer(int64 microseconds,
 					TimerHandler * handler, void* arg = NULL);

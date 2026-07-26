@@ -52,7 +52,7 @@ EpollPoller::~EpollPoller()
 }
 
 //-------------------------------------------------------------------------------------
-bool EpollPoller::doRegister(int fd, bool isRead, bool isRegister)
+bool EpollPoller::doRegister(KBESOCKET fd, bool isRead, bool isRegister)
 {
 	struct epoll_event ev;
 	memset(&ev, 0, sizeof(ev)); // stop valgrind warning

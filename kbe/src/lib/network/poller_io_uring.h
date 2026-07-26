@@ -31,21 +31,21 @@ public:
 	int processPendingEvents(double maxWait) override;
 
 	// 发送入队后立即尝试投递 SQE，减少必须等下一轮 tick 才开始发送的延迟。
-	bool queueTcpSend(int fd, const void* data, int len) override;
-	bool queueUdpSend(int fd, const void* data, int len, const Address& dstAddr) override;
+	bool queueTcpSend(KBESOCKET fd, const void* data, int len) override;
+	bool queueUdpSend(KBESOCKET fd, const void* data, int len, const Address& dstAddr) override;
 
 protected:
 	// 注册读侧时投递 accept/recv/recvmsg completion。
-	bool doRegisterForRead(int fd) override;
+	bool doRegisterForRead(KBESOCKET fd) override;
 
 	// 注册写侧只保存 handler，真实发送由 queueTcpSend/queueUdpSend 驱动。
-	bool doRegisterForWrite(int fd) override;
+	bool doRegisterForWrite(KBESOCKET fd) override;
 
 	// 注销读侧时让迟到 completion 通过 generation 自动丢弃。
-	bool doDeregisterForRead(int fd) override;
+	bool doDeregisterForRead(KBESOCKET fd) override;
 
 	// 注销写侧时清空发送队列并让迟到 send completion 自动丢弃。
-	bool doDeregisterForWrite(int fd) override;
+	bool doDeregisterForWrite(KBESOCKET fd) override;
 
 private:
 	enum Operation
@@ -60,9 +60,9 @@ private:
 	struct IoUringContext
 	{
 		// 每个 SQE 绑定一个 context，CQE 回来前所有缓冲和 msghdr 必须保持有效。
-		IoUringContext(int fdArg, KBESOCKET socketArg, SocketKind kindArg, Operation operationArg, uint64 generationArg);
+		IoUringContext(KBESOCKET fdArg, KBESOCKET socketArg, SocketKind kindArg, Operation operationArg, uint64 generationArg);
 
-		int fd;
+		KBESOCKET fd;
 		KBESOCKET socket;
 		SocketKind kind;
 		Operation operation;
@@ -116,22 +116,22 @@ private:
 	bool submitSqes();
 
 	// 投递指定 fd 的读侧请求。
-	bool ensureReadArmed(int fd, SocketState& state);
+	bool ensureReadArmed(KBESOCKET fd, SocketState& state);
 
 	// 投递 accept completion。
-	bool armAccept(int fd, SocketState& state);
+	bool armAccept(KBESOCKET fd, SocketState& state);
 
 	// 投递 TCP recv completion。
-	bool armTcpRead(int fd, SocketState& state);
+	bool armTcpRead(KBESOCKET fd, SocketState& state);
 
 	// 投递 UDP recvmsg completion。
-	bool armUdpRead(int fd, SocketState& state);
+	bool armUdpRead(KBESOCKET fd, SocketState& state);
 
 	// 投递 TCP send completion。
-	bool armTcpSend(int fd, SocketState& state);
+	bool armTcpSend(KBESOCKET fd, SocketState& state);
 
 	// 投递 UDP sendmsg completion。
-	bool armUdpSend(int fd, SocketState& state);
+	bool armUdpSend(KBESOCKET fd, SocketState& state);
 
 	// 处理一个 CQE 并触发对应上层通知。
 	void handleCompletion(IoUringContext& context, int result);

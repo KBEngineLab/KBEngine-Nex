@@ -33,10 +33,10 @@ typedef SmartPointer<PyObject> PyObjectPtr;
 class PyFileDescriptor : public Network::InputNotificationHandler, public Network::OutputNotificationHandler
 {
 public:
-	PyFileDescriptor(int fd, PyObject* pyCallback, bool write);
+	PyFileDescriptor(KBESOCKET fd, PyObject* pyCallback, bool write);
 	// 完成式读路径使用独立构造函数，避免改变旧就绪通知对象的行为。
 	// Completion-based read paths use a separate constructor so legacy readiness objects retain their behavior.
-	PyFileDescriptor(int fd, PyObject* pyCallback, bool accept, int reserved);
+	PyFileDescriptor(KBESOCKET fd, PyObject* pyCallback, bool accept, int reserved);
 	virtual ~PyFileDescriptor();
 	
 	/**
@@ -54,8 +54,8 @@ public:
 	static PyObject* __py_writeFileDescriptor(PyObject* self, PyObject* args);
 protected:
 
-	virtual int handleInputNotification( int fd );
-	virtual int handleOutputNotification( int fd );
+	virtual int handleInputNotification(KBESOCKET fd);
+	virtual int handleOutputNotification(KBESOCKET fd);
 
 	void callback();
 	void callbackAccept();
@@ -83,7 +83,7 @@ protected:
 		PyObjectPtr pyCallback;
 	};
 
-	int fd_;
+	KBESOCKET fd_;
 	PyObjectPtr pyCallback_;
 
 	bool write_;
@@ -92,9 +92,9 @@ protected:
 
 	// 不同完成语义分别维护所有权，允许同一连接同时注册读数据并提交写请求。
 	// Separate ownership maps allow one connection to receive data while independently submitting writes.
-	static std::map<int, PyFileDescriptor*> readDataDescriptors_;
-	static std::map<int, PyFileDescriptor*> acceptDescriptors_;
-	static std::map<int, PyFileDescriptor*> writeCompletionDescriptors_;
+	static std::map<KBESOCKET, PyFileDescriptor*> readDataDescriptors_;
+	static std::map<KBESOCKET, PyFileDescriptor*> acceptDescriptors_;
+	static std::map<KBESOCKET, PyFileDescriptor*> writeCompletionDescriptors_;
 };
 
 }

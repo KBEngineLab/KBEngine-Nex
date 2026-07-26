@@ -413,12 +413,16 @@ int Components::connectComponent(COMPONENT_TYPE componentType, int32 uid, COMPON
 
 		FD_ZERO(&frds);
 		FD_ZERO(&fwds);
-		FD_SET((int)(*pEndpoint), &frds);
-		FD_SET((int)(*pEndpoint), &fwds);
+		FD_SET(*pEndpoint, &frds);
+		FD_SET(*pEndpoint, &fwds);
 
 		if (pEndpoint->connect(pComponentInfos->pIntAddr->port, pComponentInfos->pIntAddr->ip) == -1)
 		{
+#if KBE_PLATFORM == PLATFORM_WIN32
+			int selgot = select(0, &frds, &fwds, NULL, &tv);
+#else
 			int selgot = select((*pEndpoint) + 1, &frds, &fwds, NULL, &tv);
+#endif
 			if (selgot > 0)
 			{
 				if (FD_ISSET((*pEndpoint), &frds) || FD_ISSET((*pEndpoint), &fwds))
@@ -797,12 +801,16 @@ bool Components::updateComponentInfos(const Components::ComponentInfos* info)
 
 		FD_ZERO( &frds );
 		FD_ZERO( &fwds );
-		FD_SET((int)epListen, &frds);
-		FD_SET((int)epListen, &fwds);
+		FD_SET(epListen, &frds);
+		FD_SET(epListen, &fwds);
 
 		if(epListen.connect(info->pIntAddr->port, info->pIntAddr->ip) == -1)
 		{
-			int selgot = select(epListen+1, &frds, &fwds, NULL, &tv);
+#if KBE_PLATFORM == PLATFORM_WIN32
+			int selgot = select(0, &frds, &fwds, NULL, &tv);
+#else
+			int selgot = select(epListen + 1, &frds, &fwds, NULL, &tv);
+#endif
 			if(selgot > 0)
 			{
 				break;
@@ -840,9 +848,13 @@ bool Components::updateComponentInfos(const Components::ComponentInfos* info)
 	struct timeval tv = { 0, 300000 }; // 100ms
 
 	FD_ZERO( &fds );
-	FD_SET((int)epListen, &fds);
+	FD_SET(epListen, &fds);
 
-	int selgot = select(epListen+1, &fds, NULL, NULL, &tv);
+#if KBE_PLATFORM == PLATFORM_WIN32
+	int selgot = select(0, &fds, NULL, NULL, &tv);
+#else
+	int selgot = select(epListen + 1, &fds, NULL, NULL, &tv);
+#endif
 	if(selgot == 0)
 	{
 		// 超时, 可能对方繁忙

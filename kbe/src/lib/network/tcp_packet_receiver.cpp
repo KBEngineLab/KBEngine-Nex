@@ -105,7 +105,7 @@ bool TCPPacketReceiver::processRecv(bool expectingPacket)
 		std::vector<char> data;
 		bool disconnected = false;
 		int errorCode = 0;
-		if (!pPoller->takeTcpReceivedData(static_cast<int>(*pEndpoint_), data, disconnected, errorCode))
+		if (!pPoller->takeTcpReceivedData(*pEndpoint_, data, disconnected, errorCode))
 		{
 			TCPPacket::reclaimPoolObject(pReceiveWindow);
 			return false;

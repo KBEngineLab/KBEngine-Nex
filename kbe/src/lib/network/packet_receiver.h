@@ -84,7 +84,7 @@ public:
 		return pEndpoint_; 
 	}
 
-	virtual int handleInputNotification(int fd);
+	virtual int handleInputNotification(KBESOCKET fd);
 
 	virtual Channel* getChannel();
 

@@ -36,8 +36,10 @@ namespace Network
 	
 class InputNotificationHandler;
 class Address;
-typedef std::map<int, InputNotificationHandler *> FDReadHandlers;
-typedef std::map<int, OutputNotificationHandler *> FDWriteHandlers;
+// 事件表必须以原生 socket 宽度为键，Windows x64 不能把 SOCKET 截断成 int。
+// Event tables must use native socket-width keys because Windows x64 SOCKET values cannot be truncated to int.
+typedef std::map<KBESOCKET, InputNotificationHandler *> FDReadHandlers;
+typedef std::map<KBESOCKET, OutputNotificationHandler *> FDWriteHandlers;
 
 struct TcpCompletionData
 {
@@ -65,11 +67,11 @@ public:
 	EventPoller();
 	virtual ~EventPoller();
 
-	bool registerForRead(int fd, InputNotificationHandler * handler);
-	bool registerForWrite(int fd, OutputNotificationHandler * handler);
+	bool registerForRead(KBESOCKET fd, InputNotificationHandler * handler);
+	bool registerForWrite(KBESOCKET fd, OutputNotificationHandler * handler);
 
-	bool deregisterForRead(int fd);
-	bool deregisterForWrite(int fd);
+	bool deregisterForRead(KBESOCKET fd);
+	bool deregisterForWrite(KBESOCKET fd);
 
 
 	virtual int processPendingEvents(double maxWait) = 0;
@@ -85,27 +87,27 @@ public:
 
 	// 从完成队列取出一个已经完成的 accept；readiness 后端保持 false，避免改变旧调用链。
 	// Take one completed accept from the completion queue; readiness backends return false to preserve the old call path.
-	virtual bool takeAcceptedSocket(int fd, KBESOCKET& acceptedSocket);
+	virtual bool takeAcceptedSocket(KBESOCKET fd, KBESOCKET& acceptedSocket);
 
 	// 从完成队列取出一段 TCP 数据或终止状态；数据所有权在调用方接收后转移。
 	// Take TCP data or a terminal state from the completion queue; ownership transfers to the caller on success.
-	virtual bool takeTcpReceivedData(int fd, std::vector<char>& data, bool& disconnected, int& errorCode);
+	virtual bool takeTcpReceivedData(KBESOCKET fd, std::vector<char>& data, bool& disconnected, int& errorCode);
 
 	// 从完成队列取出一个 UDP 数据报及其来源地址。
 	// Take one UDP datagram and its source address from the completion queue.
-	virtual bool takeUdpReceivedData(int fd, std::vector<char>& data, Address& srcAddr, int& errorCode);
+	virtual bool takeUdpReceivedData(KBESOCKET fd, std::vector<char>& data, Address& srcAddr, int& errorCode);
 
 	// 将 TCP 数据交给完成后端排队；旧后端返回 false，继续使用原有 PacketSender 发送路径。
 	// Queue TCP data in a completion backend; legacy backends return false and keep the original PacketSender path.
-	virtual bool queueTcpSend(int fd, const void* data, int len);
+	virtual bool queueTcpSend(KBESOCKET fd, const void* data, int len);
 
 	// 将 UDP 数据报交给完成后端排队；旧后端返回 false，保持原有 UDP 发送语义。
 	// Queue a UDP datagram in a completion backend; legacy backends return false and preserve existing UDP send semantics.
-	virtual bool queueUdpSend(int fd, const void* data, int len, const Address& dstAddr);
+	virtual bool queueUdpSend(KBESOCKET fd, const void* data, int len, const Address& dstAddr);
 
 	// 查询指定 socket 是否仍有完成后端待发送数据，用于避免重复注册写事件。
 	// Report whether a socket still has pending completion-backend sends to avoid duplicate write registration.
-	virtual bool hasPendingSend(int fd) const;
+	virtual bool hasPendingSend(KBESOCKET fd) const;
 
 	void clearSpareTime()		{spareTime_ = 0;}
 	uint64 spareTime() const	{return spareTime_;}
@@ -116,23 +118,23 @@ public:
 	// Return the 1.x baseline backend name for the build platform without changing backend selection logic.
 	static const char* defaultIOModelName();
 
-	InputNotificationHandler* findForRead(int fd);
-	OutputNotificationHandler* findForWrite(int fd);
+	InputNotificationHandler* findForRead(KBESOCKET fd);
+	OutputNotificationHandler* findForWrite(KBESOCKET fd);
 
 protected:
-	virtual bool doRegisterForRead(int fd) = 0;
-	virtual bool doRegisterForWrite(int fd) = 0;
+	virtual bool doRegisterForRead(KBESOCKET fd) = 0;
+	virtual bool doRegisterForWrite(KBESOCKET fd) = 0;
 
-	virtual bool doDeregisterForRead(int fd) = 0;
-	virtual bool doDeregisterForWrite(int fd) = 0;
+	virtual bool doDeregisterForRead(KBESOCKET fd) = 0;
+	virtual bool doDeregisterForWrite(KBESOCKET fd) = 0;
 
-	bool triggerRead(int fd);
-	bool triggerWrite(int fd);
-	bool triggerError(int fd);
+	bool triggerRead(KBESOCKET fd);
+	bool triggerWrite(KBESOCKET fd);
+	bool triggerError(KBESOCKET fd);
 	
-	bool isRegistered(int fd, bool isForRead) const;
+	bool isRegistered(KBESOCKET fd, bool isForRead) const;
 
-	int maxFD() const;
+	KBESOCKET maxFD() const;
 
 private:
 	FDReadHandlers fdReadHandlers_;

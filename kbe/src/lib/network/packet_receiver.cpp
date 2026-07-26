@@ -58,7 +58,7 @@ PacketReceiver::~PacketReceiver()
 }
 
 //-------------------------------------------------------------------------------------
-int PacketReceiver::handleInputNotification(int fd)
+int PacketReceiver::handleInputNotification(KBESOCKET fd)
 {
 	if (this->processRecv(true))
 	{

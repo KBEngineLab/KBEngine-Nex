@@ -33,22 +33,22 @@ public:
 	bool supportsCompletion() const override;
 
 	// 从共享 accept 队列取出一个完成的连接。
-	bool takeAcceptedSocket(int fd, KBESOCKET& acceptedSocket) override;
+	bool takeAcceptedSocket(KBESOCKET fd, KBESOCKET& acceptedSocket) override;
 
 	// 从共享 TCP 队列取出一段完成的接收数据或错误。
-	bool takeTcpReceivedData(int fd, std::vector<char>& data, bool& disconnected, int& errorCode) override;
+	bool takeTcpReceivedData(KBESOCKET fd, std::vector<char>& data, bool& disconnected, int& errorCode) override;
 
 	// 从共享 UDP 队列取出一个完成的 datagram。
-	bool takeUdpReceivedData(int fd, std::vector<char>& data, Address& srcAddr, int& errorCode) override;
+	bool takeUdpReceivedData(KBESOCKET fd, std::vector<char>& data, Address& srcAddr, int& errorCode) override;
 
 	// 将 TCP 发送数据排入 completion poller 的发送队列。
-	bool queueTcpSend(int fd, const void* data, int len) override;
+	bool queueTcpSend(KBESOCKET fd, const void* data, int len) override;
 
 	// 将 UDP 发送数据排入 completion poller 的发送队列。
-	bool queueUdpSend(int fd, const void* data, int len, const Address& dstAddr) override;
+	bool queueUdpSend(KBESOCKET fd, const void* data, int len, const Address& dstAddr) override;
 
 	// 查询指定 fd 是否还有未完成或待投递的发送数据。
-	bool hasPendingSend(int fd) const override;
+	bool hasPendingSend(KBESOCKET fd) const override;
 
 protected:
 	enum SocketKind
@@ -109,25 +109,25 @@ protected:
 	};
 
 	typedef std::unique_ptr<SocketState> SocketStatePtr;
-	typedef std::map<int, SocketStatePtr> SocketStates;
+	typedef std::map<KBESOCKET, SocketStatePtr> SocketStates;
 	typedef std::deque<KBESOCKET> AcceptedSockets;
-	typedef std::map<int, AcceptedSockets> AcceptedSocketMap;
+	typedef std::map<KBESOCKET, AcceptedSockets> AcceptedSocketMap;
 	typedef std::deque<TcpCompletionData> TcpReceivedQueue;
-	typedef std::map<int, TcpReceivedQueue> TcpReceivedMap;
+	typedef std::map<KBESOCKET, TcpReceivedQueue> TcpReceivedMap;
 	typedef std::deque<UdpCompletionData> UdpReceivedQueue;
-	typedef std::map<int, UdpReceivedQueue> UdpReceivedMap;
+	typedef std::map<KBESOCKET, UdpReceivedQueue> UdpReceivedMap;
 
 	// 获取或创建 fd 对应的共享 socket 状态。
-	SocketState& socketStateForFd(int fd);
+	SocketState& socketStateForFd(KBESOCKET fd);
 
 	// 尝试根据 socket 选项识别 TCP/UDP/listener 类型。
 	bool tryDetermineSocketKind(KBESOCKET socket, SocketKind& kind) const;
 
 	// completion 到达后将 accepted socket 放入共享队列。
-	bool pushAcceptedSocket(int fd, KBESOCKET acceptedSocket);
+	bool pushAcceptedSocket(KBESOCKET fd, KBESOCKET acceptedSocket);
 
 	// completion 到达后将 TCP 数据或错误放入共享队列。
-	bool pushTcpReceivedData(int fd, std::vector<char>& data, bool disconnected, int errorCode);
+	bool pushTcpReceivedData(KBESOCKET fd, std::vector<char>& data, bool disconnected, int errorCode);
 
 	// 判断一次 TCP completion 是否表示读侧生命周期结束。
 	// EOF、ECONNRESET、发送失败转读侧错误都应该只交给上层一次；
@@ -135,13 +135,13 @@ protected:
 	bool isTcpTerminalCompletion(const std::vector<char>& data, bool disconnected, int errorCode) const;
 
 	// completion 到达后将 UDP datagram 放入共享队列。
-	bool pushUdpReceivedData(int fd, std::vector<char>& data, const sockaddr_in& srcAddr, int errorCode);
+	bool pushUdpReceivedData(KBESOCKET fd, std::vector<char>& data, const sockaddr_in& srcAddr, int errorCode);
 
 	// 判断 TCP 接收 completion 队列是否仍允许继续缓存数据。
-	bool canQueueTcpReceivedData(int fd, size_t len) const;
+	bool canQueueTcpReceivedData(KBESOCKET fd, size_t len) const;
 
 	// 判断 UDP 接收 completion 队列是否仍允许继续缓存数据。
-	bool canQueueUdpReceivedData(int fd, size_t len) const;
+	bool canQueueUdpReceivedData(KBESOCKET fd, size_t len) const;
 
 	// 清空一个 fd 的 TCP/UDP 发送队列，并同步归零 backlog 字节数。
 	// 读注销、写注销和 fd 生命周期重置都会走到这类清理路径；集中到基类后，
@@ -164,23 +164,23 @@ protected:
 	// 用户态 handoff 队列，再伪装成 completion 交给上层，因此必须能暂停 drain。
 	// io_uring/IOCP 本身就是 completion，只使用队列作为 triggerRead 前后的短暂交接，
 	// 不用这些 canArm* 水位去停止内核 read 投递。
-	bool canQueueAcceptedSocket(int fd) const;
-	bool canArmTcpReceive(int fd) const;
-	bool canArmUdpReceive(int fd) const;
+	bool canQueueAcceptedSocket(KBESOCKET fd) const;
+	bool canArmTcpReceive(KBESOCKET fd) const;
+	bool canArmUdpReceive(KBESOCKET fd) const;
 
 	// 低水位恢复判断。
 	// 暂停读之后不应刚消费 1 个 item 就立刻恢复，否则会在高水位附近来回 enable/disable；
 	// 这里用 1/2 队列水位作为滞回区间，让恢复更平滑。
-	bool shouldResumeTcpReceive(int fd) const;
-	bool shouldResumeUdpReceive(int fd) const;
+	bool shouldResumeTcpReceive(KBESOCKET fd) const;
+	bool shouldResumeUdpReceive(KBESOCKET fd) const;
 
 	// 清理接收 completion 队列和对应计数。
-	void clearReceivedData(int fd);
+	void clearReceivedData(KBESOCKET fd);
 
 	// 查询队列 item，避免空错误/断开 completion 绕过 bytes 计数。
-	size_t acceptedSocketCount(int fd) const;
-	size_t tcpReceivedItemCount(int fd) const;
-	size_t udpReceivedItemCount(int fd) const;
+	size_t acceptedSocketCount(KBESOCKET fd) const;
+	size_t tcpReceivedItemCount(KBESOCKET fd) const;
+	size_t udpReceivedItemCount(KBESOCKET fd) const;
 
 	// 关闭 accept 队列中尚未被上层接走的 socket。
 	void closeAcceptedSockets(AcceptedSockets& acceptedSockets);
@@ -192,7 +192,7 @@ protected:
 	KBESOCKET invalidSocket() const;
 
 	// 清理一个不再有注册、pending IO 和排队数据的 fd 状态。
-	void cleanupStateIfUnused(int fd);
+	void cleanupStateIfUnused(KBESOCKET fd);
 
 	SocketStates socketStates_;
 	AcceptedSocketMap acceptedSockets_;

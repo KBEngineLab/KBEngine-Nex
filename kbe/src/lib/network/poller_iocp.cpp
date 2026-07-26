@@ -44,7 +44,7 @@ inline DWORD toTimeoutMilliseconds(double maxWait)
 }
 }
 
-IocpPoller::IocpContext::IocpContext(int fdArg, KBESOCKET socketArg, SocketKind kindArg, Operation operationArg, uint64 generationArg) :
+IocpPoller::IocpContext::IocpContext(KBESOCKET fdArg, KBESOCKET socketArg, SocketKind kindArg, Operation operationArg, uint64 generationArg) :
 	overlapped(),
 	fd(fdArg),
 	socket(socketArg),
@@ -111,7 +111,7 @@ IocpPoller::~IocpPoller()
 }
 
 //-------------------------------------------------------------------------------------
-bool IocpPoller::queueTcpSend(int fd, const void* data, int len)
+bool IocpPoller::queueTcpSend(KBESOCKET fd, const void* data, int len)
 {
 	if (len <= 0)
 	{
@@ -124,7 +124,7 @@ bool IocpPoller::queueTcpSend(int fd, const void* data, int len)
 	if (iter == socketStates_.end())
 	{
 		SocketKind detectedKind = SOCKET_KIND_UNKNOWN;
-		if (!tryDetermineSocketKind(static_cast<KBESOCKET>(fd), detectedKind))
+		if (!tryDetermineSocketKind(fd, detectedKind))
 		{
 			return false;
 		}
@@ -162,7 +162,7 @@ bool IocpPoller::queueTcpSend(int fd, const void* data, int len)
 }
 
 //-------------------------------------------------------------------------------------
-bool IocpPoller::queueUdpSend(int fd, const void* data, int len, const Address& dstAddr)
+bool IocpPoller::queueUdpSend(KBESOCKET fd, const void* data, int len, const Address& dstAddr)
 {
 	// UDP/KCP 也保持入队后立即投递，避免等待下一次主循环才开始发送。
 	if (!CompletionPoller::queueUdpSend(fd, data, len, dstAddr))
@@ -178,7 +178,7 @@ bool IocpPoller::queueUdpSend(int fd, const void* data, int len, const Address& 
 }
 
 //-------------------------------------------------------------------------------------
-bool IocpPoller::ensureAssociated(SocketState& state, int fd)
+bool IocpPoller::ensureAssociated(SocketState& state, KBESOCKET fd)
 {
 	if (state.associated)
 	{
@@ -227,7 +227,7 @@ bool IocpPoller::loadAcceptEx(SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
-bool IocpPoller::armTcpRead(int fd, SocketState& state)
+bool IocpPoller::armTcpRead(KBESOCKET fd, SocketState& state)
 {
 	IocpContext* pContext = new IocpContext(fd, state.socket, SOCKET_KIND_TCP, OP_TCP_RECV, state.generation);
 	pContext->data.resize(PACKET_MAX_SIZE_TCP);
@@ -255,7 +255,7 @@ bool IocpPoller::armTcpRead(int fd, SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
-bool IocpPoller::armUdpRead(int fd, SocketState& state)
+bool IocpPoller::armUdpRead(KBESOCKET fd, SocketState& state)
 {
 	IocpContext* pContext = new IocpContext(fd, state.socket, SOCKET_KIND_UDP, OP_UDP_RECV, state.generation);
 	pContext->flags = 0;
@@ -286,7 +286,7 @@ bool IocpPoller::armUdpRead(int fd, SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
-bool IocpPoller::armTcpSend(int fd, SocketState& state)
+bool IocpPoller::armTcpSend(KBESOCKET fd, SocketState& state)
 {
 	if (state.pPendingWriteContext != NULL || state.pendingTcpSends.empty())
 	{
@@ -334,7 +334,7 @@ bool IocpPoller::armTcpSend(int fd, SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
-bool IocpPoller::armUdpSend(int fd, SocketState& state)
+bool IocpPoller::armUdpSend(KBESOCKET fd, SocketState& state)
 {
 	if (state.pPendingWriteContext != NULL || state.pendingUdpSends.empty())
 	{
@@ -383,7 +383,7 @@ bool IocpPoller::armUdpSend(int fd, SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
-bool IocpPoller::armAccept(int fd, SocketState& state)
+bool IocpPoller::armAccept(KBESOCKET fd, SocketState& state)
 {
 	if (!loadAcceptEx(state))
 	{
@@ -429,7 +429,7 @@ bool IocpPoller::armAccept(int fd, SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
-bool IocpPoller::ensureReadArmed(int fd, SocketState& state)
+bool IocpPoller::ensureReadArmed(KBESOCKET fd, SocketState& state)
 {
 	// IOCP 本身就是 completion 模型，每个 fd 同时只保留一个读侧 OVERLAPPED。
 	// 这里不使用用户态队列水位暂停 WSARecv/AcceptEx；completion 到达后立即
@@ -489,19 +489,19 @@ bool IocpPoller::ensureReadArmed(int fd, SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
-bool IocpPoller::doRegisterForRead(int fd)
+bool IocpPoller::doRegisterForRead(KBESOCKET fd)
 {
 	auto iter = socketStates_.find(fd);
 	bool isNewState = false;
 	if (iter == socketStates_.end())
 	{
-		SocketStatePtr state(new SocketState(static_cast<KBESOCKET>(fd)));
+		SocketStatePtr state(new SocketState(fd));
 		iter = socketStates_.insert(std::make_pair(fd, std::move(state))).first;
 		isNewState = true;
 	}
 
 	SocketState& state = *iter->second;
-	state.socket = static_cast<KBESOCKET>(fd);
+	state.socket = fd;
 	state.registeredRead = true;
 
 	// 只有新建状态才代表新的 socket 生命周期；发送路径预先创建的状态仍属于同一 socket，不能遗忘其永久 IOCP 关联。
@@ -528,14 +528,14 @@ bool IocpPoller::doRegisterForRead(int fd)
 }
 
 //-------------------------------------------------------------------------------------
-bool IocpPoller::doRegisterForWrite(int fd)
+bool IocpPoller::doRegisterForWrite(KBESOCKET fd)
 {
 	(void)fd;
 	return true;
 }
 
 //-------------------------------------------------------------------------------------
-bool IocpPoller::doDeregisterForRead(int fd)
+bool IocpPoller::doDeregisterForRead(KBESOCKET fd)
 {
 	auto iter = socketStates_.find(fd);
 	if (iter == socketStates_.end())
@@ -573,7 +573,7 @@ bool IocpPoller::doDeregisterForRead(int fd)
 }
 
 //-------------------------------------------------------------------------------------
-bool IocpPoller::doDeregisterForWrite(int fd)
+bool IocpPoller::doDeregisterForWrite(KBESOCKET fd)
 {
 	auto iter = socketStates_.find(fd);
 	if (iter == socketStates_.end())
@@ -616,9 +616,8 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 		return;
 	}
 
-	(void)completionKey;
 	IocpContext* pContext = reinterpret_cast<IocpContext*>(overlapped);
-	const int fd = pContext->fd;
+	const KBESOCKET fd = pContext->fd;
 
 	auto iter = socketStates_.find(fd);
 	const bool hasState = (iter != socketStates_.end());
@@ -630,7 +629,10 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 			&pState->pPendingWriteContext : &pState->pPendingReadContext;
 	}
 
+	// completion key、context 和当前状态必须指向同一个完整宽度句柄，任一不匹配都表示迟到或错误投递。
+	// Completion key, context, and current state must identify the same full-width handle; any mismatch is stale or misrouted work.
 	const bool isCurrentContext = (pState != NULL &&
+		completionKey == static_cast<ULONG_PTR>(fd) &&
 		pState->socket == pContext->socket &&
 		pState->generation == pContext->generation &&
 		ppCurrentContext != NULL &&

@@ -183,8 +183,12 @@ bool IDComponentQuerier::receive(Network::MessageArgs* recvArgs, sockaddr_in* ps
 	while (1)
 	{
 		FD_ZERO(&fds);
-		FD_SET((int)epListen_, &fds);
+		FD_SET(epListen_, &fds);
+#if KBE_PLATFORM == PLATFORM_WIN32
+		int selgot = select(0, &fds, NULL, NULL, &tv);
+#else
 		int selgot = select(epListen_ + 1, &fds, NULL, NULL, &tv);
+#endif
 
 		if (selgot == 0)
 		{

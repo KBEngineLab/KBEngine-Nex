@@ -26,23 +26,23 @@ public:
 	int processPendingEvents(double maxWait) override;
 
 	// IOCP 入队后立即尝试投递 WSASend，保留发送失败的同步反馈语义。
-	bool queueTcpSend(int fd, const void* data, int len) override;
+	bool queueTcpSend(KBESOCKET fd, const void* data, int len) override;
 
 	// IOCP 入队后立即尝试投递 WSASendTo，避免 UDP/KCP 发送只滞留在队列里。
-	bool queueUdpSend(int fd, const void* data, int len, const Address& dstAddr) override;
+	bool queueUdpSend(KBESOCKET fd, const void* data, int len, const Address& dstAddr) override;
 
 protected:
 	// 将 fd 绑定到 IOCP 并投递读侧 completion。
-	bool doRegisterForRead(int fd) override;
+	bool doRegisterForRead(KBESOCKET fd) override;
 
 	// 写侧注册只保存 handler，真实发送由发送队列驱动。
-	bool doRegisterForWrite(int fd) override;
+	bool doRegisterForWrite(KBESOCKET fd) override;
 
 	// 注销读侧并取消 outstanding read/accept 操作。
-	bool doDeregisterForRead(int fd) override;
+	bool doDeregisterForRead(KBESOCKET fd) override;
 
 	// 注销写侧并取消 outstanding send 操作。
-	bool doDeregisterForWrite(int fd) override;
+	bool doDeregisterForWrite(KBESOCKET fd) override;
 
 private:
 	enum Operation
@@ -59,12 +59,12 @@ private:
 
 	struct IocpContext
 	{
-		IocpContext(int fdArg, KBESOCKET socketArg, SocketKind kindArg, Operation operationArg, uint64 generationArg);
+		IocpContext(KBESOCKET fdArg, KBESOCKET socketArg, SocketKind kindArg, Operation operationArg, uint64 generationArg);
 
 		// 每一次异步调用都拥有独立的 OVERLAPPED 和数据缓冲。
 		// 完成回调回来前，buffer 必须一直有效，所以不能使用栈内存。
 		OVERLAPPED overlapped;
-		int fd;
+		KBESOCKET fd;
 		KBESOCKET socket;
 		SocketKind kind;
 		Operation operation;
@@ -82,19 +82,19 @@ private:
 	};
 
 	// 确保 fd 已关联到 IOCP completion port。
-	bool ensureAssociated(SocketState& state, int fd);
+	bool ensureAssociated(SocketState& state, KBESOCKET fd);
 	// 根据 socket 类型投递 accept/recv/recvfrom。
-	bool ensureReadArmed(int fd, SocketState& state);
+	bool ensureReadArmed(KBESOCKET fd, SocketState& state);
 	// 投递一次 TCP WSARecv。
-	bool armTcpRead(int fd, SocketState& state);
+	bool armTcpRead(KBESOCKET fd, SocketState& state);
 	// 投递一次 UDP WSARecvFrom。
-	bool armUdpRead(int fd, SocketState& state);
+	bool armUdpRead(KBESOCKET fd, SocketState& state);
 	// 投递一次 TCP WSASend。
-	bool armTcpSend(int fd, SocketState& state);
+	bool armTcpSend(KBESOCKET fd, SocketState& state);
 	// 投递一次 UDP WSASendTo。
-	bool armUdpSend(int fd, SocketState& state);
+	bool armUdpSend(KBESOCKET fd, SocketState& state);
 	// 投递一次 AcceptEx。
-	bool armAccept(int fd, SocketState& state);
+	bool armAccept(KBESOCKET fd, SocketState& state);
 	// 加载 listener socket 对应的 AcceptEx 函数指针。
 	bool loadAcceptEx(SocketState& state);
 	// 清理一次完成上下文持有的 pending 指针。

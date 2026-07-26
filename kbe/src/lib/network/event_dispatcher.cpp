@@ -82,27 +82,27 @@ EventPoller* EventDispatcher::createPoller()
 }
 
 //-------------------------------------------------------------------------------------
-bool EventDispatcher::registerReadFileDescriptor(int fd,
+bool EventDispatcher::registerReadFileDescriptor(KBESOCKET fd,
 	InputNotificationHandler * handler)
 {
 	return pPoller_->registerForRead(fd, handler);
 }
 
 //-------------------------------------------------------------------------------------
-bool EventDispatcher::registerWriteFileDescriptor(int fd,
+bool EventDispatcher::registerWriteFileDescriptor(KBESOCKET fd,
 	OutputNotificationHandler * handler)
 {
 	return pPoller_->registerForWrite(fd, handler);
 }
 
 //-------------------------------------------------------------------------------------
-bool EventDispatcher::deregisterReadFileDescriptor(int fd)
+bool EventDispatcher::deregisterReadFileDescriptor(KBESOCKET fd)
 {
 	return pPoller_->deregisterForRead(fd);
 }
 
 //-------------------------------------------------------------------------------------
-bool EventDispatcher::deregisterWriteFileDescriptor(int fd)
+bool EventDispatcher::deregisterWriteFileDescriptor(KBESOCKET fd)
 {
 	return pPoller_->deregisterForWrite(fd);
 }

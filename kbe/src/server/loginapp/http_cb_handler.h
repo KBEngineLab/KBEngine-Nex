@@ -49,11 +49,11 @@ protected:
 		std::string code;
 	};
 
-	virtual int handleInputNotification( int fd );
+	virtual int handleInputNotification(KBESOCKET fd);
 
 	Network::EndPoint* pEndPoint_;
 
-	std::map< int, CLIENT > clients_;
+	std::map<KBESOCKET, CLIENT> clients_;
 };
 
 }

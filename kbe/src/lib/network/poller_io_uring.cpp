@@ -42,7 +42,7 @@ inline int ioUringEnter(int ringFd, unsigned toSubmit, unsigned minComplete, uns
 }
 
 //-------------------------------------------------------------------------------------
-IoUringPoller::IoUringContext::IoUringContext(int fdArg, KBESOCKET socketArg, SocketKind kindArg, Operation operationArg, uint64 generationArg) :
+IoUringPoller::IoUringContext::IoUringContext(KBESOCKET fdArg, KBESOCKET socketArg, SocketKind kindArg, Operation operationArg, uint64 generationArg) :
 	fd(fdArg),
 	socket(socketArg),
 	kind(kindArg),
@@ -261,7 +261,7 @@ bool IoUringPoller::submitSqes()
 }
 
 //-------------------------------------------------------------------------------------
-bool IoUringPoller::doRegisterForRead(int fd)
+bool IoUringPoller::doRegisterForRead(KBESOCKET fd)
 {
 	// io_uring 不可用时注册失败，让上层能在启动阶段暴露平台能力问题。
 	if (ringFd_ < 0)
@@ -286,7 +286,7 @@ bool IoUringPoller::doRegisterForRead(int fd)
 }
 
 //-------------------------------------------------------------------------------------
-bool IoUringPoller::queueTcpSend(int fd, const void* data, int len)
+bool IoUringPoller::queueTcpSend(KBESOCKET fd, const void* data, int len)
 {
 	// 基类负责有界排队；io_uring 这里额外做一次“就近投递”。
 	// 如果 SQ ring 暂时满了，数据仍留在 pendingTcpSends 中，后续 processPendingEvents
@@ -312,7 +312,7 @@ bool IoUringPoller::queueTcpSend(int fd, const void* data, int len)
 }
 
 //-------------------------------------------------------------------------------------
-bool IoUringPoller::queueUdpSend(int fd, const void* data, int len, const Address& dstAddr)
+bool IoUringPoller::queueUdpSend(KBESOCKET fd, const void* data, int len, const Address& dstAddr)
 {
 	// UDP/KCP 的发送路径同样尽量在入队时投递，减少高频小包多等一轮 tick 的尾延迟。
 	// SQ 满时保留 pending 队列，由主循环后续重试，保持和原有异步语义一致。
@@ -337,7 +337,7 @@ bool IoUringPoller::queueUdpSend(int fd, const void* data, int len, const Addres
 }
 
 //-------------------------------------------------------------------------------------
-bool IoUringPoller::doRegisterForWrite(int fd)
+bool IoUringPoller::doRegisterForWrite(KBESOCKET fd)
 {
 	// io_uring 不可用时写注册失败，保持与读侧一致的错误反馈。
 	if (ringFd_ < 0)
@@ -351,7 +351,7 @@ bool IoUringPoller::doRegisterForWrite(int fd)
 }
 
 //-------------------------------------------------------------------------------------
-bool IoUringPoller::doDeregisterForRead(int fd)
+bool IoUringPoller::doDeregisterForRead(KBESOCKET fd)
 {
 	// 不强制 cancel：通过 generation 丢弃迟到 CQE，避免 fd 复用误投递。
 	auto iter = socketStates_.find(fd);
@@ -371,7 +371,7 @@ bool IoUringPoller::doDeregisterForRead(int fd)
 }
 
 //-------------------------------------------------------------------------------------
-bool IoUringPoller::doDeregisterForWrite(int fd)
+bool IoUringPoller::doDeregisterForWrite(KBESOCKET fd)
 {
 	// 写注销清空未投递队列，已经在内核里的 CQE 由 generation/状态检查处理。
 	auto iter = socketStates_.find(fd);
@@ -389,7 +389,7 @@ bool IoUringPoller::doDeregisterForWrite(int fd)
 }
 
 //-------------------------------------------------------------------------------------
-bool IoUringPoller::ensureReadArmed(int fd, SocketState& state)
+bool IoUringPoller::ensureReadArmed(KBESOCKET fd, SocketState& state)
 {
 	// 每个 fd 同时只挂一个读类请求，保持上层 PacketReceiver 的串行消费语义。
 	// io_uring 本身就是 completion 模型，不需要像 kqueue adapter 那样用用户态
@@ -418,7 +418,7 @@ bool IoUringPoller::ensureReadArmed(int fd, SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
-bool IoUringPoller::armAccept(int fd, SocketState& state)
+bool IoUringPoller::armAccept(KBESOCKET fd, SocketState& state)
 {
 	// IORING_OP_ACCEPT 完成后 listener 只消费 completion 队列。
 	io_uring_sqe* sqe = getSqe();
@@ -441,7 +441,7 @@ bool IoUringPoller::armAccept(int fd, SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
-bool IoUringPoller::armTcpRead(int fd, SocketState& state)
+bool IoUringPoller::armTcpRead(KBESOCKET fd, SocketState& state)
 {
 	// TCP recv completion 直接把字节流送入 tcpReceived_。
 	io_uring_sqe* sqe = getSqe();
@@ -464,7 +464,7 @@ bool IoUringPoller::armTcpRead(int fd, SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
-bool IoUringPoller::armUdpRead(int fd, SocketState& state)
+bool IoUringPoller::armUdpRead(KBESOCKET fd, SocketState& state)
 {
 	// UDP 使用 recvmsg，这样 CQE 回来时能同时拿到来源地址。
 	io_uring_sqe* sqe = getSqe();
@@ -490,7 +490,7 @@ bool IoUringPoller::armUdpRead(int fd, SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
-bool IoUringPoller::armTcpSend(int fd, SocketState& state)
+bool IoUringPoller::armTcpSend(KBESOCKET fd, SocketState& state)
 {
 	// 合并小包后投递一次 send，降低 CQE 数量。
 	if (state.writeArmed || state.pendingTcpSends.empty())
@@ -524,7 +524,7 @@ bool IoUringPoller::armTcpSend(int fd, SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
-bool IoUringPoller::armUdpSend(int fd, SocketState& state)
+bool IoUringPoller::armUdpSend(KBESOCKET fd, SocketState& state)
 {
 	// UDP 使用 sendmsg，避免上层直接 sendto。
 	if (state.writeArmed || state.pendingUdpSends.empty())
@@ -566,7 +566,7 @@ bool IoUringPoller::armUdpSend(int fd, SocketState& state)
 void IoUringPoller::handleCompletion(IoUringContext& context, int result)
 {
 	// 先校验 fd/generation，防止旧 CQE 打到复用后的新连接。
-	const int fd = context.fd;
+	const KBESOCKET fd = context.fd;
 	auto iter = socketStates_.find(fd);
 	SocketState* state = iter != socketStates_.end() ? iter->second.get() : NULL;
 	void** ppCurrentContext = NULL;

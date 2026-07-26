@@ -46,7 +46,7 @@ KqueuePoller::~KqueuePoller()
 }
 
 //-------------------------------------------------------------------------------------
-bool KqueuePoller::queueTcpSend(int fd, const void* data, int len)
+bool KqueuePoller::queueTcpSend(KBESOCKET fd, const void* data, int len)
 {
 	// 发送入队后启用 EVFILT_WRITE，真正 send 只在 kqueue 报可写时执行。
 	if (!CompletionPoller::queueTcpSend(fd, data, len))
@@ -58,7 +58,7 @@ bool KqueuePoller::queueTcpSend(int fd, const void* data, int len)
 }
 
 //-------------------------------------------------------------------------------------
-bool KqueuePoller::queueUdpSend(int fd, const void* data, int len, const Address& dstAddr)
+bool KqueuePoller::queueUdpSend(KBESOCKET fd, const void* data, int len, const Address& dstAddr)
 {
 	// UDP/KCP 发送同样由写唤醒驱动，避免 processPendingEvents 主动全局 flush。
 	if (!CompletionPoller::queueUdpSend(fd, data, len, dstAddr))
@@ -70,7 +70,7 @@ bool KqueuePoller::queueUdpSend(int fd, const void* data, int len, const Address
 }
 
 //-------------------------------------------------------------------------------------
-bool KqueuePoller::takeAcceptedSocket(int fd, KBESOCKET& acceptedSocket)
+bool KqueuePoller::takeAcceptedSocket(KBESOCKET fd, KBESOCKET& acceptedSocket)
 {
 	// listener 消费掉 accepted socket 后，accept 队列可能从高水位回落。
 	// kqueue 的背压是通过 EV_DISABLE 停读实现的，所以消费路径必须负责尝试恢复读事件。
@@ -85,7 +85,7 @@ bool KqueuePoller::takeAcceptedSocket(int fd, KBESOCKET& acceptedSocket)
 }
 
 //-------------------------------------------------------------------------------------
-bool KqueuePoller::takeTcpReceivedData(int fd, std::vector<char>& data, bool& disconnected, int& errorCode)
+bool KqueuePoller::takeTcpReceivedData(KBESOCKET fd, std::vector<char>& data, bool& disconnected, int& errorCode)
 {
 	// TCPPacketReceiver 每次 take 都会释放一段 completion 队列容量。
 	// 如果之前因为队列满暂停了 EVFILT_READ，这里按低水位决定是否重新打开。
@@ -100,7 +100,7 @@ bool KqueuePoller::takeTcpReceivedData(int fd, std::vector<char>& data, bool& di
 }
 
 //-------------------------------------------------------------------------------------
-bool KqueuePoller::takeUdpReceivedData(int fd, std::vector<char>& data, Address& srcAddr, int& errorCode)
+bool KqueuePoller::takeUdpReceivedData(KBESOCKET fd, std::vector<char>& data, Address& srcAddr, int& errorCode)
 {
 	// UDP/KCP 小包 burst 更容易触发 item 上限；消费后也要及时恢复 read filter。
 	bool ret = CompletionPoller::takeUdpReceivedData(fd, data, srcAddr, errorCode);
@@ -114,7 +114,7 @@ bool KqueuePoller::takeUdpReceivedData(int fd, std::vector<char>& data, Address&
 }
 
 //-------------------------------------------------------------------------------------
-bool KqueuePoller::doRegister(int fd, bool isRead, bool isRegister)
+bool KqueuePoller::doRegister(KBESOCKET fd, bool isRead, bool isRegister)
 {
 	struct kevent change;
 	EV_SET(&change,
@@ -159,7 +159,7 @@ bool KqueuePoller::doRegister(int fd, bool isRead, bool isRegister)
 }
 
 //-------------------------------------------------------------------------------------
-bool KqueuePoller::setReadEnabled(int fd, SocketState& state, bool enabled)
+bool KqueuePoller::setReadEnabled(KBESOCKET fd, SocketState& state, bool enabled)
 {
 	// kqueue 是 readiness，不是真正的内核 completion。
 	// 当用户态 completion 队列已满时，如果继续保持 EVFILT_READ enabled，
@@ -203,7 +203,7 @@ bool KqueuePoller::setReadEnabled(int fd, SocketState& state, bool enabled)
 }
 
 //-------------------------------------------------------------------------------------
-void KqueuePoller::updateReadBackpressure(int fd, SocketState& state)
+void KqueuePoller::updateReadBackpressure(KBESOCKET fd, SocketState& state)
 {
 	// 根据不同 socket 类型选择对应队列水位：
 	// listener 看 accepted socket 数，TCP/UDP 看 recv bytes + item。
@@ -261,7 +261,7 @@ void KqueuePoller::updateReadBackpressure(int fd, SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
-bool KqueuePoller::refreshSocketKind(int fd, SocketState& state)
+bool KqueuePoller::refreshSocketKind(KBESOCKET fd, SocketState& state)
 {
 	// kqueue event 只给 fd/filter，不告诉我们它是 listener、TCP stream 还是 UDP。
 	// fd 复用或 listen 状态刚建立时，kind 可能还没识别；这里集中刷新，避免各分支
@@ -276,7 +276,7 @@ bool KqueuePoller::refreshSocketKind(int fd, SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
-bool KqueuePoller::isReadEventCurrent(int fd, SocketState& state)
+bool KqueuePoller::isReadEventCurrent(KBESOCKET fd, SocketState& state)
 {
 	// kevent 返回的是一次快照。处理这一批事件的过程中，上层 handler 可能已经注销 fd、
 	// 销毁 channel，甚至 fd 被系统复用。任何读侧 drain/错误转换前都要确认：
@@ -286,7 +286,7 @@ bool KqueuePoller::isReadEventCurrent(int fd, SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
-bool KqueuePoller::doRegisterForRead(int fd)
+bool KqueuePoller::doRegisterForRead(KBESOCKET fd)
 {
 	// 读注册挂 EVFILT_READ，唤醒后 adapter 只执行一次 accept/recv completion。
 	SocketState& state = socketStateForFd(fd);
@@ -305,14 +305,14 @@ bool KqueuePoller::doRegisterForRead(int fd)
 }
 
 //-------------------------------------------------------------------------------------
-bool KqueuePoller::doRegisterForWrite(int fd)
+bool KqueuePoller::doRegisterForWrite(KBESOCKET fd)
 {
 	// 写注册挂 EVFILT_WRITE，等待内核确认 socket 可写后再发送队列数据。
 	return doRegister(fd, false, true);
 }
 
 //-------------------------------------------------------------------------------------
-bool KqueuePoller::doDeregisterForRead(int fd)
+bool KqueuePoller::doDeregisterForRead(KBESOCKET fd)
 {
 	// 删除读事件并丢弃还没消费的接收 completion。
 	auto iter = socketStates_.find(fd);
@@ -331,7 +331,7 @@ bool KqueuePoller::doDeregisterForRead(int fd)
 }
 
 //-------------------------------------------------------------------------------------
-bool KqueuePoller::doDeregisterForWrite(int fd)
+bool KqueuePoller::doDeregisterForWrite(KBESOCKET fd)
 {
 	// 写注销只清理发送队列，不能清掉接收 completion。
 	auto iter = socketStates_.find(fd);
@@ -349,7 +349,7 @@ bool KqueuePoller::doDeregisterForWrite(int fd)
 }
 
 //-------------------------------------------------------------------------------------
-bool KqueuePoller::ensureReadArmed(int fd, SocketState& state)
+bool KqueuePoller::ensureReadArmed(KBESOCKET fd, SocketState& state)
 {
 	// kqueue adapter 没有真正 outstanding read，armed 表示等待下一次 kqueue 唤醒。
 	if (!state.registeredRead || state.readBackpressured)
@@ -368,7 +368,7 @@ bool KqueuePoller::ensureReadArmed(int fd, SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
-int KqueuePoller::drainAccept(int fd, SocketState& state)
+int KqueuePoller::drainAccept(KBESOCKET fd, SocketState& state)
 {
 	// 一次唤醒只接受有界数量的连接，避免 readiness burst 在 poller 内堆积大量 completion。
 	// triggerRead 会同步进入 ListenerTcpReceiver，并可能注销 listener 或改变 socketStates_。
@@ -420,7 +420,7 @@ int KqueuePoller::drainAccept(int fd, SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
-int KqueuePoller::drainTcpRead(int fd, SocketState& state)
+int KqueuePoller::drainTcpRead(KBESOCKET fd, SocketState& state)
 {
 	// TCP 一次唤醒读取有界小批量数据，随后只触发一次上层消费。
 	// 这里是 readiness -> completion 的转换点：recv 出来的数据必须先进入
@@ -520,7 +520,7 @@ int KqueuePoller::drainTcpRead(int fd, SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
-int KqueuePoller::drainUdpRead(int fd, SocketState& state)
+int KqueuePoller::drainUdpRead(KBESOCKET fd, SocketState& state)
 {
 	// UDP 一次唤醒读取有界数量 datagram，防止内部组件启动 burst 放大内存。
 	// UDP 每个 datagram 都是独立 completion，item 上限通常比 bytes 上限更敏感。
@@ -574,7 +574,7 @@ int KqueuePoller::drainUdpRead(int fd, SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
-int KqueuePoller::flushPendingSends(int fd, SocketState& state)
+int KqueuePoller::flushPendingSends(KBESOCKET fd, SocketState& state)
 {
 	// adapter 发送队列完成后再触发写通知，保持 Channel::onSendCompleted 时序。
 	// kqueue 写侧仍然使用 EVFILT_WRITE readiness 驱动真实 send/sendto，
@@ -697,7 +697,7 @@ int KqueuePoller::processPendingEvents(double maxWait)
 	int readyCount = 0;
 	for (int i = 0; i < nfds; ++i)
 	{
-		int fd = static_cast<int>(events[i].ident);
+		KBESOCKET fd = static_cast<KBESOCKET>(events[i].ident);
 		if ((events[i].flags & EV_ERROR) || (events[i].flags & EV_EOF))
 		{
 			// EV_ERROR/EV_EOF 不能无条件转成 TCP completion。

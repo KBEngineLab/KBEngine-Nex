@@ -331,7 +331,7 @@ Channel * NetworkInterface::findChannel(const Address & addr)
 }
 
 //-------------------------------------------------------------------------------------
-Channel * NetworkInterface::findChannel(int fd)
+Channel * NetworkInterface::findChannel(KBESOCKET fd)
 {
 	ChannelMap::iterator iter = channelMap_.begin();
 	for(; iter != channelMap_.end(); ++iter)

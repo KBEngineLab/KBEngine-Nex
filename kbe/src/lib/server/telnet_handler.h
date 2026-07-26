@@ -115,7 +115,7 @@ private:
 
 	void checkAfterStr();
 
-	int	handleInputNotification(int fd);
+	int	handleInputNotification(KBESOCKET fd);
 	bool onRecvInput(const char *buffer, int size);
 	bool processCommand();
 	void processPythonCommand(std::string command);

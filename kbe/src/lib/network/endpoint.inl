@@ -93,29 +93,23 @@ INLINE KBESOCKET EndPoint::socket() const
 	return socket_;
 }
 
-INLINE void EndPoint::setFileDescriptor(int fd)
-{
-	socket_ = fd;
-}
-#if KBE_PLATFORM == PLATFORM_WIN32
 INLINE void EndPoint::setFileDescriptor(KBESOCKET fd)
 {
-	// Preserve the complete native socket value when accepting IOCP results.
-	// 接收 IOCP 结果时保留完整的原生 socket 值。
+	// 所有平台统一保留原生 socket 宽度，Windows x64 句柄不会在入口处被截断。
+	// Preserve native socket width on every platform so Windows x64 handles are not truncated at the entry point.
 	socket_ = fd;
 }
-#endif
 
 
 INLINE void EndPoint::socket(int type)
 {
-	this->setFileDescriptor((int)::socket(AF_INET, type, 0));
+	this->setFileDescriptor(static_cast<KBESOCKET>(::socket(AF_INET, type, 0)));
 
 #if KBE_PLATFORM == PLATFORM_WIN32
 	if ((socket_ == INVALID_SOCKET) && (WSAGetLastError() == WSANOTINITIALISED))
 	{
 		EndPoint::initNetwork();
-		this->setFileDescriptor((int)::socket(AF_INET, type, 0));
+		this->setFileDescriptor(static_cast<KBESOCKET>(::socket(AF_INET, type, 0)));
 		KBE_ASSERT((socket_ != INVALID_SOCKET) && (WSAGetLastError() != WSANOTINITIALISED) && \
 				"EndPoint::socket: create socket error!");
 	}
@@ -404,7 +398,7 @@ INLINE EndPoint * EndPoint::accept(u_int16_t * networkPort, u_int32_t * networkA
 {
 	sockaddr_in		sin;
 	socklen_t		sinLen = sizeof(sin);
-	int ret = (int)::accept(socket_, (sockaddr*)&sin, &sinLen);
+	KBESOCKET ret = static_cast<KBESOCKET>(::accept(socket_, (sockaddr*)&sin, &sinLen));
 
 #if KBE_PLATFORM == PLATFORM_UNIX
 	if (ret < 0) return NULL;

@@ -123,7 +123,7 @@ void finalise(void)
 
 #if KBE_PLATFORM != PLATFORM_WIN32		
 #include <sys/poll.h>
-bool kbe_poll(int fd)
+bool kbe_poll(KBESOCKET fd)
 {
 	int32 timeout = 100000;
 	int maxi = 0;
@@ -159,7 +159,7 @@ bool kbe_poll(int fd)
 	}
 }
 #else
-bool kbe_poll(int fd)
+bool kbe_poll(KBESOCKET fd)
 {
 	fd_set	frds;
 	struct timeval tv = { 0, 1000000 }; // 1s
@@ -167,7 +167,9 @@ bool kbe_poll(int fd)
 	FD_ZERO(&frds);
 	FD_SET(fd, &frds);
 
-	int selgot = select(fd + 1, &frds, NULL, NULL, &tv);
+	// Winsock 忽略 nfds，传零可避免把完整宽度 SOCKET 再缩窄为 select 的 int 参数。
+	// Winsock ignores nfds, so zero avoids narrowing a full-width SOCKET back to select's int parameter.
+	int selgot = select(0, &frds, NULL, NULL, &tv);
 	if (selgot <= 0)
 		return false;
 	else

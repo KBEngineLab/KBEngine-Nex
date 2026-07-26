@@ -282,7 +282,7 @@ Network::Reason TelnetHandler::checkLastErrors()
 }
 
 //-------------------------------------------------------------------------------------
-int	TelnetHandler::handleInputNotification(int fd)
+int	TelnetHandler::handleInputNotification(KBESOCKET fd)
 {
 	KBE_ASSERT((*pEndPoint_) == fd);
 

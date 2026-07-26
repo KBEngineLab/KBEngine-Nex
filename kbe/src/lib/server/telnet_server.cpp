@@ -121,7 +121,7 @@ bool TelnetServer::start(std::string passwd, std::string deflayer, u_int16_t por
 }
 
 //-------------------------------------------------------------------------------------
-void TelnetServer::onTelnetHandlerClosed(int fd, TelnetHandler* pTelnetHandler)
+void TelnetServer::onTelnetHandlerClosed(KBESOCKET fd, TelnetHandler* pTelnetHandler)
 {
 	INFO_MSG(fmt::format("TelnetServer::onTelnetHandlerClosed: del handler({})!\n",
 		pTelnetHandler->pEndPoint()->c_str()));
@@ -140,7 +140,7 @@ bool TelnetServer::stop()
 }
 
 //-------------------------------------------------------------------------------------
-void TelnetServer::closeHandler(int fd, TelnetHandler* pTelnetHandler)
+void TelnetServer::closeHandler(KBESOCKET fd, TelnetHandler* pTelnetHandler)
 {
 	TelnetHandlers::iterator iter = handlers_.find(fd);
 	if(iter == handlers_.end() || iter->second.get() != pTelnetHandler)
@@ -156,7 +156,7 @@ void TelnetServer::closeHandler(int fd, TelnetHandler* pTelnetHandler)
 }
 
 //-------------------------------------------------------------------------------------
-int	TelnetServer::handleInputNotification(int fd)
+int	TelnetServer::handleInputNotification(KBESOCKET fd)
 {
 	KBE_ASSERT(listener_ == fd);
 
