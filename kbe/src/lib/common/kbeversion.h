@@ -25,9 +25,11 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{
 	
-#define KBE_VERSION_MAJOR 1
-#define KBE_VERSION_MINOR 3
-#define KBE_VERSION_PATCH 13
+// 公开握手版本与目标 Nex SDK 保持一致，确保原生 2.8 客户端无需修改版本字符串即可连接。
+// Keep the public handshake version aligned with the target Nex SDK so stock 2.8 clients connect without version-string patches.
+#define KBE_VERSION_MAJOR 2
+#define KBE_VERSION_MINOR 8
+#define KBE_VERSION_PATCH 2
 
 
 namespace KBEVersion
