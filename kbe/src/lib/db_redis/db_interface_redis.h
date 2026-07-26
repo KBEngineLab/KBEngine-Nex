@@ -29,13 +29,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "db_interface/db_interface.h"
 
 #include "hiredis/hiredis.h"
-#if KBE_PLATFORM == PLATFORM_WIN32
-#ifdef _DEBUG
-#pragma comment (lib, "hiredis_d.lib")
-#else
-#pragma comment (lib, "hiredis.lib")
-#endif
-#endif
+// Windows 最终链接由集中式 vcpkg MSBuild 配置选择当前构建类型的 hiredis 库，避免头文件固化端口的库文件命名规则。
+// The centralized vcpkg MSBuild integration selects the hiredis library for the active Windows configuration, keeping port-specific library names out of public headers.
 
 namespace KBEngine { 
 

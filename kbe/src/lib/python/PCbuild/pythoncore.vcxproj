@@ -79,8 +79,11 @@
       <PreprocessorDefinitions Condition="$(IncludeExternals)">_Py_HAVE_ZLIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <AdditionalDependencies Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">zlib_d.lib;version.lib;shlwapi.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalDependencies Condition="'$(Configuration)|$(Platform)'=='Release|x64'">zlib.lib;version.lib;shlwapi.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <!--
+        zlib 由项目级 vcpkg MSBuild 集成按当前配置自动选择，避免在 Python 工程中绑定端口的 Debug/Release 库文件名。
+        The project-wide vcpkg MSBuild integration selects zlib for the active configuration, avoiding port-specific Debug/Release library names in the Python project.
+      -->
+      <AdditionalDependencies>version.lib;shlwapi.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ImportLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../../libs/$(TargetName).lib</ImportLibrary>
       <ImportLibrary Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../../../libs/$(TargetName).lib</ImportLibrary>
       <AdditionalLibraryDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../../libs;$(OutDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
