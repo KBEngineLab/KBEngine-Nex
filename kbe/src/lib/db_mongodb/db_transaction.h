@@ -20,6 +20,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include "db_interface/db_transaction_result.h"
+
 namespace KBEngine {
 	class DBInterface;
 	namespace mongodb {
@@ -33,7 +35,7 @@ namespace KBEngine {
 			bool start();
 			void end();
 
-			bool commit();
+			DBTransactionResult commit();
 
 			bool shouldRetry() const;
 			bool active() const { return active_; }

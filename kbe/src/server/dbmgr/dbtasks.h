@@ -64,6 +64,12 @@ public:
 
 	bool send(Network::Bundle* pBundle);
 
+	// 所有业务回调必须先经过提交状态门禁，派生任务只能实现已提交路径。
+	// Every business callback must pass the commit-state gate; derived tasks implement only the committed path.
+	virtual thread::TPTask::TPTaskState presentMainThread() final;
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
+	virtual thread::TPTask::TPTaskState presentMainThreadFailed();
+
 	virtual std::string name() const {
 		return "DBTask";
 	}
@@ -101,7 +107,7 @@ public:
 	DBID EntityDBTask_entityDBID() const { return _entityDBID; }
 	
 	void pBuffered_DBTasks(Buffered_DBTasks* v){ _pBuffered_DBTasks = v; }
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	DBTask* tryGetNextTask();
 
@@ -124,7 +130,7 @@ public:
 	DBTaskExecuteRawDatabaseCommand(const Network::Address& addr, MemoryStream& datas);
 	virtual ~DBTaskExecuteRawDatabaseCommand();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskExecuteRawDatabaseCommand";
@@ -149,7 +155,7 @@ public:
 	DBTaskExecuteRawDatabaseCommandByEntity(const Network::Address& addr, MemoryStream& datas, ENTITY_ID entityID);
 	virtual ~DBTaskExecuteRawDatabaseCommandByEntity();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskExecuteRawDatabaseCommandByEntity";
@@ -175,7 +181,7 @@ public:
 
 	virtual ~DBTaskWriteEntity();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskWriteEntity";
@@ -202,7 +208,7 @@ public:
 
 	virtual ~DBTaskRemoveEntity();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskRemoveEntity";
@@ -226,7 +232,7 @@ public:
 
 	virtual ~DBTaskDeleteEntityByDBID();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskDeleteEntityByDBID";
@@ -253,7 +259,7 @@ public:
 
 	virtual ~DBTaskEntityAutoLoad();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskEntityAutoLoad";
@@ -278,7 +284,7 @@ public:
 
 	virtual ~DBTaskLookUpEntityByDBID();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskLookUpEntityByDBID";
@@ -305,7 +311,7 @@ public:
 		std::string& password, std::string& postdatas, std::string& getdatas);
 	virtual ~DBTaskCreateAccount();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	static bool writeAccount(DBInterface* pdbi, const std::string& accountName, 
 		const std::string& passwd, const std::string& datas, ACCOUNT_INFOS& info);
@@ -333,7 +339,7 @@ public:
 		std::string& password, std::string& postdatas, std::string& getdatas);
 	virtual ~DBTaskCreateMailAccount();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskCreateMailAccount";
@@ -357,7 +363,7 @@ public:
 	DBTaskActivateAccount(const Network::Address& addr, std::string& code);
 	virtual ~DBTaskActivateAccount();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskActivateAccount";
@@ -378,7 +384,7 @@ public:
 	DBTaskReqAccountResetPassword(const Network::Address& addr, std::string& accountName);
 	virtual ~DBTaskReqAccountResetPassword();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskReqAccountResetPassword";
@@ -402,7 +408,7 @@ public:
 		std::string& newpassword, std::string& code);
 	virtual ~DBTaskAccountResetPassword();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskAccountResetPassword";
@@ -426,7 +432,7 @@ public:
 		std::string password,std::string& email);
 	virtual ~DBTaskReqAccountBindEmail();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskReqAccountBindEmail";
@@ -452,7 +458,7 @@ public:
 		std::string& code);
 	virtual ~DBTaskAccountBindEmail();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskAccountBindEmail";
@@ -474,7 +480,7 @@ public:
 		std::string& oldpassword_, std::string& newpassword);
 	virtual ~DBTaskAccountNewPassword();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskAccountNewPassword";
@@ -497,7 +503,7 @@ public:
 		COMPONENT_ID componentID, ENTITY_ID entityID, DBID entityDBID, uint32 ip, uint16 port);
 	virtual ~DBTaskQueryAccount();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskQueryAccount";
@@ -532,7 +538,7 @@ public:
 		COMPONENT_ID componentID, ENTITY_ID entityID);
 	virtual ~DBTaskAccountOnline();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskAccountOnline";
@@ -553,7 +559,7 @@ public:
 	DBTaskEntityOffline(const Network::Address& addr, DBID dbid, ENTITY_SCRIPT_UID sid);
 	virtual ~DBTaskEntityOffline();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskEntityOffline";
@@ -576,7 +582,8 @@ public:
 
 	virtual ~DBTaskAccountLogin();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
+	virtual thread::TPTask::TPTaskState presentMainThreadFailed();
 
 	virtual std::string name() const {
 		return "DBTaskAccountLogin";
@@ -608,7 +615,7 @@ public:
 
 	virtual ~DBTaskQueryEntity();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskQueryEntity";
@@ -641,7 +648,7 @@ public:
 	DBTaskServerLog();
 	virtual ~DBTaskServerLog();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskServerLog";
@@ -659,7 +666,7 @@ public:
 	DBTaskEraseBaseappEntityLog(COMPONENT_ID componentID);
 	virtual ~DBTaskEraseBaseappEntityLog();
 	virtual bool db_thread_process();
-	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 
 	virtual std::string name() const {
 		return "DBTaskEraseBaseappEntityLog";

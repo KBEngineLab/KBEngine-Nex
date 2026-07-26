@@ -21,6 +21,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef KBE_MYSQL_TRANSACTION_HELPER_H
 #define KBE_MYSQL_TRANSACTION_HELPER_H
 
+#include "db_interface/db_transaction_result.h"
+
 namespace KBEngine { 
 class DBInterface;
 namespace mysql {
@@ -36,7 +38,7 @@ public:
 	void start();
 	void end();
 
-	void commit();
+	DBTransactionResult commit();
 
 	bool shouldRetry() const;
 

@@ -71,7 +71,8 @@ public:
 	virtual int getlasterror();
 
 	virtual bool lock();
-	virtual bool unlock();
+	virtual DBTransactionResult unlock();
+	virtual bool rollback();
 	virtual bool processException(std::exception& e);
 	/**
 		是否为自动增长id

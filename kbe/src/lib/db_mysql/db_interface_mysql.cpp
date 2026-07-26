@@ -710,9 +710,18 @@ bool DBInterfaceMysql::lock()
 }
 
 //-------------------------------------------------------------------------------------
-bool DBInterfaceMysql::unlock()
+DBTransactionResult DBInterfaceMysql::unlock()
 {
-	lock_.commit();
+	DBTransactionResult result = lock_.commit();
+	lock_.end();
+	return result;
+}
+
+//-------------------------------------------------------------------------------------
+bool DBInterfaceMysql::rollback()
+{
+	// DBTransaction::end 在尚未提交且连接仍有效时执行 ROLLBACK，并始终清理本地事务状态。
+	// DBTransaction::end issues ROLLBACK while an uncommitted connection remains valid and always clears local transaction state.
 	lock_.end();
 	return true;
 }

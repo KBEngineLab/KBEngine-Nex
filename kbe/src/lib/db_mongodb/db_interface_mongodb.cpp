@@ -408,25 +408,29 @@ namespace KBEngine {
 		return true;
 	}
 
-	bool DBInterfaceMongodb::commitTransaction()
+	DBTransactionResult DBInterfaceMongodb::commitTransaction()
 	{
 		if (!session_)
-			return true;
+			return DB_TRANSACTION_COMMITTED;
 
 		bson_t reply;
 		bson_error_t error = {};
 		if (!mongoc_client_session_commit_transaction(session_, &reply, &error))
 		{
 			setLastError(error);
+			// 官方驱动通过 error label 标记无法确定的提交；网络错误也必须保守归类为 UNKNOWN。
+			// The official driver marks indeterminate commits with an error label; network failures are also conservatively UNKNOWN.
+			const bool unknown = mongoc_error_has_label(&reply, "UnknownTransactionCommitResult") ||
+				mongodb::DBException(this).isLostConnection();
 			bson_destroy(&reply);
-			return false;
+			return unknown ? DB_TRANSACTION_UNKNOWN : DB_TRANSACTION_NOT_COMMITTED;
 		}
 
 		bson_destroy(&reply);
 		mongoc_client_session_destroy(session_);
 		session_ = NULL;
 		inTransaction(false);
-		return true;
+		return DB_TRANSACTION_COMMITTED;
 	}
 
 	bool DBInterfaceMongodb::abortTransaction()
@@ -727,14 +731,21 @@ namespace KBEngine {
 	}
 
 	//-------------------------------------------------------------------------------------
-	bool DBInterfaceMongodb::unlock()
+	DBTransactionResult DBInterfaceMongodb::unlock()
 	{
 		if (!lock_.active())
-			return false;
+			return DB_TRANSACTION_NOT_COMMITTED;
 
-		bool result = lock_.commit();
+		DBTransactionResult result = lock_.commit();
 		lock_.end();
 		return result;
+	}
+
+	//-------------------------------------------------------------------------------------
+	bool DBInterfaceMongodb::rollback()
+	{
+		lock_.end();
+		return true;
 	}
 
 	void DBInterfaceMongodb::throwError()

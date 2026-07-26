@@ -23,6 +23,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "common/common.h"
 #include "common/timer.h"
+#include "db_transaction_result.h"
 #include "thread/threadtask.h"
 
 namespace KBEngine{ 
@@ -41,7 +42,8 @@ class DBTaskBase : public thread::TPTask
 public:
 
 	DBTaskBase():
-	initTime_(timestamp())
+	initTime_(timestamp()),
+	transactionResult_(DB_TRANSACTION_NOT_COMMITTED)
 	{
 	}
 
@@ -52,12 +54,18 @@ public:
 	virtual thread::TPTask::TPTaskState presentMainThread();
 
 	virtual void pdbi(DBInterface* ptr){ pdbi_ = ptr; }
+	void transactionResult(DBTransactionResult value){ transactionResult_ = value; }
+	DBTransactionResult transactionResult() const { return transactionResult_; }
+	bool transactionCommitted() const { return transactionResult_ == DB_TRANSACTION_COMMITTED; }
 
 	uint64 initTime() const{ return initTime_; }
 
 protected:
 	DBInterface* pdbi_;
 	uint64 initTime_;
+	// 工作线程在进入主线程回调前写入最终提交状态，回调不得把 UNKNOWN 当作成功或安全重试。
+	// The worker stores the final commit state before main-thread presentation; callbacks must not treat UNKNOWN as success or a safe retry.
+	DBTransactionResult transactionResult_;
 };
 
 /**

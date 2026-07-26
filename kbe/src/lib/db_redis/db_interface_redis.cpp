@@ -552,8 +552,16 @@ bool DBInterfaceRedis::lock()
 }
 
 //-------------------------------------------------------------------------------------
-bool DBInterfaceRedis::unlock()
+DBTransactionResult DBInterfaceRedis::unlock()
 {
+	return DB_TRANSACTION_COMMITTED;
+}
+
+//-------------------------------------------------------------------------------------
+bool DBInterfaceRedis::rollback()
+{
+	// Redis 适配层没有跨命令事务，保留接口级成功语义以兼容现有任务调度。
+	// The Redis adapter has no cross-command transaction, so preserve interface-level success for existing task scheduling.
 	return true;
 }
 

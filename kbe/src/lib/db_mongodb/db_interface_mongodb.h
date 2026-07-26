@@ -148,11 +148,12 @@ namespace KBEngine
 		Begin and end the transaction scope surrounding one DB worker task.
 		*/
 		virtual bool lock();
-		virtual bool unlock();
+		virtual DBTransactionResult unlock();
+		virtual bool rollback();
 
 		void throwError();
 		bool beginTransaction();
-		bool commitTransaction();
+		DBTransactionResult commitTransaction();
 		bool abortTransaction();
 
 		/**

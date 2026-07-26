@@ -73,6 +73,33 @@ bool DBTask::send(Network::Bundle* pBundle)
 }
 
 //-------------------------------------------------------------------------------------
+thread::TPTask::TPTaskState DBTask::presentMainThread()
+{
+	if (!transactionCommitted())
+	{
+		// 未提交与结果未知都不能发送成功响应；UNKNOWN 也不能自动重放，否则可能产生重复写入。
+		// Neither a definite failure nor an unknown outcome may emit success; UNKNOWN also forbids automatic replay because it may duplicate writes.
+		return presentMainThreadFailed();
+	}
+
+	return presentMainThreadCommitted();
+}
+
+//-------------------------------------------------------------------------------------
+thread::TPTask::TPTaskState DBTask::presentMainThreadCommitted()
+{
+	return DBTaskBase::presentMainThread();
+}
+
+//-------------------------------------------------------------------------------------
+thread::TPTask::TPTaskState DBTask::presentMainThreadFailed()
+{
+	// 没有通用的 DBMgr 失败消息，默认只结束任务；需要响应的派生任务必须映射到自身已有协议错误。
+	// DBMgr has no universal failure message, so the default only finishes the task; derived request tasks must map failure to their existing protocol error.
+	return DBTaskBase::presentMainThread();
+}
+
+//-------------------------------------------------------------------------------------
 DBTask* EntityDBTask::tryGetNextTask()
 {
 	KBE_ASSERT(_pBuffered_DBTasks != NULL);
@@ -80,9 +107,9 @@ DBTask* EntityDBTask::tryGetNextTask()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState EntityDBTask::presentMainThread()
+thread::TPTask::TPTaskState EntityDBTask::presentMainThreadCommitted()
 {
-	return DBTask::presentMainThread();
+	return DBTask::presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
@@ -182,13 +209,13 @@ bool DBTaskExecuteRawDatabaseCommandByEntity::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskExecuteRawDatabaseCommandByEntity::presentMainThread()
+thread::TPTask::TPTaskState DBTaskExecuteRawDatabaseCommandByEntity::presentMainThreadCommitted()
 {
 	DEBUG_MSG(fmt::format("Dbmgr::ExecuteRawDatabaseCommandByEntity::presentMainThread: {}.\n", sdatas_.c_str()));
 
 	// 如果不需要回调则结束
 	if(callbackID_ <= 0)
-		return EntityDBTask::presentMainThread();
+		return EntityDBTask::presentMainThreadCommitted();
 
 	if (componentType_ != DBMGR_TYPE)
 	{
@@ -242,11 +269,11 @@ thread::TPTask::TPTaskState DBTaskExecuteRawDatabaseCommandByEntity::presentMain
 		MemoryStream::reclaimPoolObject(pMemoryStream);
 	}
 
-	return EntityDBTask::presentMainThread();
+	return EntityDBTask::presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskExecuteRawDatabaseCommand::presentMainThread()
+thread::TPTask::TPTaskState DBTaskExecuteRawDatabaseCommand::presentMainThreadCommitted()
 {
 	DEBUG_MSG(fmt::format("Dbmgr::DBTaskExecuteRawDatabaseCommand::presentMainThread: {}.\n", sdatas_.c_str()));
 
@@ -380,7 +407,7 @@ bool DBTaskWriteEntity::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskWriteEntity::presentMainThread()
+thread::TPTask::TPTaskState DBTaskWriteEntity::presentMainThreadCommitted()
 {
 	ScriptDefModule* pModule = EntityDef::findScriptModule(sid_);
 	DEBUG_MSG(fmt::format("Dbmgr::writeEntity: {0}({1}).\n", pModule->getName(), entityDBID_));
@@ -398,7 +425,7 @@ thread::TPTask::TPTaskState DBTaskWriteEntity::presentMainThread()
 		Network::Bundle::reclaimPoolObject(pBundle);
 	}
 	
-	return EntityDBTask::presentMainThread();
+	return EntityDBTask::presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
@@ -434,11 +461,11 @@ bool DBTaskRemoveEntity::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskRemoveEntity::presentMainThread()
+thread::TPTask::TPTaskState DBTaskRemoveEntity::presentMainThreadCommitted()
 {
 	ScriptDefModule* pModule = EntityDef::findScriptModule(sid_);
 	DEBUG_MSG(fmt::format("Dbmgr::removeEntity: {}({}).\n", pModule->getName(), entityDBID_));
-	return EntityDBTask::presentMainThread();
+	return EntityDBTask::presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
@@ -492,7 +519,7 @@ bool DBTaskDeleteEntityByDBID::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskDeleteEntityByDBID::presentMainThread()
+thread::TPTask::TPTaskState DBTaskDeleteEntityByDBID::presentMainThreadCommitted()
 {
 	ScriptDefModule* pModule = EntityDef::findScriptModule(sid_);
 
@@ -539,7 +566,7 @@ bool DBTaskEntityAutoLoad::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskEntityAutoLoad::presentMainThread()
+thread::TPTask::TPTaskState DBTaskEntityAutoLoad::presentMainThreadCommitted()
 {
 	int size = (int)outs_.size();
 	ScriptDefModule* pModule = EntityDef::findScriptModule(entityType_);
@@ -628,7 +655,7 @@ bool DBTaskLookUpEntityByDBID::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskLookUpEntityByDBID::presentMainThread()
+thread::TPTask::TPTaskState DBTaskLookUpEntityByDBID::presentMainThreadCommitted()
 {
 	ScriptDefModule* pModule = EntityDef::findScriptModule(sid_);
 	
@@ -784,7 +811,7 @@ bool DBTaskCreateAccount::writeAccount(DBInterface* pdbi, const std::string& acc
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskCreateAccount::presentMainThread()
+thread::TPTask::TPTaskState DBTaskCreateAccount::presentMainThreadCommitted()
 {
 	DEBUG_MSG(fmt::format("Dbmgr::reqCreateAccount: {}, success={}.\n", registerName_.c_str(), success_));
 
@@ -900,7 +927,7 @@ bool DBTaskCreateMailAccount::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskCreateMailAccount::presentMainThread()
+thread::TPTask::TPTaskState DBTaskCreateMailAccount::presentMainThreadCommitted()
 {
 	DEBUG_MSG(fmt::format("Dbmgr::reqCreateMailAccount: {}, success={}.\n", registerName_, success_));
 
@@ -959,7 +986,7 @@ bool DBTaskActivateAccount::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskActivateAccount::presentMainThread()
+thread::TPTask::TPTaskState DBTaskActivateAccount::presentMainThreadCommitted()
 {
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 
@@ -1026,7 +1053,7 @@ bool DBTaskReqAccountResetPassword::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskReqAccountResetPassword::presentMainThread()
+thread::TPTask::TPTaskState DBTaskReqAccountResetPassword::presentMainThreadCommitted()
 {
 	DEBUG_MSG(fmt::format("Dbmgr::DBTaskReqAccountResetPassword: accountName={}, code_={}, success={}.\n",
 		accountName_, code_, success_));
@@ -1081,7 +1108,7 @@ bool DBTaskAccountResetPassword::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskAccountResetPassword::presentMainThread()
+thread::TPTask::TPTaskState DBTaskAccountResetPassword::presentMainThreadCommitted()
 {
 	DEBUG_MSG(fmt::format("Dbmgr::DBTaskAccountResetPassword: code({}), success={}.\n",
 		code_, success_));
@@ -1143,7 +1170,7 @@ bool DBTaskReqAccountBindEmail::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskReqAccountBindEmail::presentMainThread()
+thread::TPTask::TPTaskState DBTaskReqAccountBindEmail::presentMainThreadCommitted()
 {
 	DEBUG_MSG(fmt::format("Dbmgr::DBTaskReqAccountBindEmail: code({}), success={}.\n", 
 		code_, success_));
@@ -1199,7 +1226,7 @@ bool DBTaskAccountBindEmail::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskAccountBindEmail::presentMainThread()
+thread::TPTask::TPTaskState DBTaskAccountBindEmail::presentMainThreadCommitted()
 {
 	DEBUG_MSG(fmt::format("Dbmgr::DBTaskAccountBindEmail: code({}), success={}.\n", 
 		code_, success_));
@@ -1262,7 +1289,7 @@ bool DBTaskAccountNewPassword::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskAccountNewPassword::presentMainThread()
+thread::TPTask::TPTaskState DBTaskAccountNewPassword::presentMainThreadCommitted()
 {
 	DEBUG_MSG(fmt::format("Dbmgr::DBTaskAccountNewPassword: success={}.\n", success_));
 
@@ -1408,7 +1435,7 @@ bool DBTaskQueryAccount::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskQueryAccount::presentMainThread()
+thread::TPTask::TPTaskState DBTaskQueryAccount::presentMainThreadCommitted()
 {
 	DEBUG_MSG(fmt::format("Dbmgr::queryAccount: {}, success={}, flags={}, deadline={}.\n", 
 		 accountName_.c_str(), success_, flags_, deadline_));
@@ -1440,7 +1467,7 @@ thread::TPTask::TPTaskState DBTaskQueryAccount::presentMainThread()
 		Network::Bundle::reclaimPoolObject(pBundle);
 	}
 
-	return EntityDBTask::presentMainThread();
+	return EntityDBTask::presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
@@ -1464,7 +1491,7 @@ bool DBTaskAccountOnline::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskAccountOnline::presentMainThread()
+thread::TPTask::TPTaskState DBTaskAccountOnline::presentMainThreadCommitted()
 {
 	DEBUG_MSG(fmt::format("Dbmgr::onAccountOnline: componentID:{}, entityID:{}.\n", componentID_, EntityDBTask_entityID()));
 
@@ -1486,7 +1513,7 @@ thread::TPTask::TPTaskState DBTaskAccountOnline::presentMainThread()
 	}
 	*/
 
-	return EntityDBTask::presentMainThread();
+	return EntityDBTask::presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
@@ -1514,10 +1541,10 @@ bool DBTaskEntityOffline::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskEntityOffline::presentMainThread()
+thread::TPTask::TPTaskState DBTaskEntityOffline::presentMainThreadCommitted()
 {
 	DEBUG_MSG(fmt::format("Dbmgr::onEntityOffline: {}, entityType={}.\n", EntityDBTask_entityDBID(), sid_));
-	return EntityDBTask::presentMainThread();
+	return EntityDBTask::presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
@@ -1687,7 +1714,7 @@ bool DBTaskAccountLogin::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskAccountLogin::presentMainThread()
+thread::TPTask::TPTaskState DBTaskAccountLogin::presentMainThreadCommitted()
 {
 	DEBUG_MSG(fmt::format("Dbmgr::onAccountLogin:loginName={}, accountName={}, success={}, componentID={}, entityID={}, dbid={}, flags={}, deadline={}.\n", 
 		loginName_,
@@ -1731,7 +1758,22 @@ thread::TPTask::TPTaskState DBTaskAccountLogin::presentMainThread()
 		Network::Bundle::reclaimPoolObject(pBundle);
 	}
 
-	return DBTask::presentMainThread();
+	return DBTask::presentMainThreadCommitted();
+}
+
+//-------------------------------------------------------------------------------------
+thread::TPTask::TPTaskState DBTaskAccountLogin::presentMainThreadFailed()
+{
+	// 提交失败后账号数据和在线记录都不可信，使用既有数据库错误响应并清除实体定位信息。
+	// Account data and online records are unreliable after commit failure, so use the existing database error and clear entity routing data.
+	retcode_ = SERVER_ERR_DB;
+	componentID_ = 0;
+	entityID_ = 0;
+	dbid_ = 0;
+	flags_ = 0;
+	deadline_ = 0;
+	serverGroupID_ = 0;
+	return presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
@@ -1832,7 +1874,7 @@ bool DBTaskQueryEntity::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskQueryEntity::presentMainThread()
+thread::TPTask::TPTaskState DBTaskQueryEntity::presentMainThreadCommitted()
 {
 	DEBUG_MSG(fmt::format("Dbmgr::DBTaskQueryEntity: {}, dbid={}, entityID={}, wasActive={}, queryMode={}, componentID={}, success={}.\n", 
 		entityType_, dbid_, entityID_, wasActive_, ((int)queryMode_), componentID_, success_));
@@ -1878,7 +1920,7 @@ thread::TPTask::TPTaskState DBTaskQueryEntity::presentMainThread()
 		Network::Bundle::reclaimPoolObject(pBundle);
 	}
 
-	return EntityDBTask::presentMainThread();
+	return EntityDBTask::presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
@@ -1904,10 +1946,10 @@ bool DBTaskServerLog::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskServerLog::presentMainThread()
+thread::TPTask::TPTaskState DBTaskServerLog::presentMainThreadCommitted()
 {
 	DEBUG_MSG(fmt::format("Dbmgr::DBTaskServerLog()\n"));
-	return DBTask::presentMainThread();
+	return DBTask::presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------
@@ -1940,12 +1982,12 @@ bool DBTaskEraseBaseappEntityLog::db_thread_process()
 }
 
 //-------------------------------------------------------------------------------------
-thread::TPTask::TPTaskState DBTaskEraseBaseappEntityLog::presentMainThread()
+thread::TPTask::TPTaskState DBTaskEraseBaseappEntityLog::presentMainThreadCommitted()
 {
 	WARNING_MSG(fmt::format("Dbmgr::DBTaskEraseBaseappEntityLog(): erase all baseapp({}) entitylogs! success={}, dbInterface={}\n", 
 		componentID_, success_, pdbi_->name()));
 
-	return DBTask::presentMainThread();
+	return DBTask::presentMainThreadCommitted();
 }
 
 //-------------------------------------------------------------------------------------

@@ -81,33 +81,78 @@ public:
 	virtual void onProcessTaskStart(thread::TPTask* pTask)
 	{
 		static_cast<DBTaskBase*>(pTask)->pdbi(_pDBInterface);
-		_pDBInterface->lock();
+		static_cast<DBTaskBase*>(pTask)->transactionResult(DB_TRANSACTION_NOT_COMMITTED);
 	}
 
 	virtual void processTask(thread::TPTask* pTask)
-	{ 
-		bool retry;
-
-		do
+	{
+		DBTaskBase* pDBTask = static_cast<DBTaskBase*>(pTask);
+		while (true)
 		{
-			retry = false;
-
+			bool transactionStarted = false;
 			try
 			{
+				transactionStarted = _pDBInterface->lock();
+			}
+			catch (std::exception& e)
+			{
+				// BEGIN 之前没有用户数据，连接恢复后可以安全地重新建立事务而不重复写入。
+				// No user data exists before BEGIN, so reconnecting and opening a new transaction cannot duplicate writes.
+				if (_pDBInterface->processException(e))
+					continue;
+			}
+
+			if (!transactionStarted)
+			{
+				ERROR_MSG(fmt::format("DBThread::processTask: failed to begin transaction, task={:p}, error={}.\n",
+					(void*)pTask, _pDBInterface->getstrerror()));
+				pDBTask->transactionResult(DB_TRANSACTION_NOT_COMMITTED);
+				return;
+			}
+
+			bool retry = false;
+			bool failed = false;
+			try
+			{
+				// 历史 DBTask 的布尔返回语义并不统一，保持线程池原行为，仅由异常分类决定是否重试。
+				// Legacy DBTask boolean results are not semantically uniform, so preserve pool behavior and let exception classification alone request retries.
 				thread::TPThread::processTask(pTask);
 			}
 			catch (std::exception & e)
 			{
 				retry = _pDBInterface->processException(e);
+				failed = !retry;
 			}
 
-		} while (retry);
+			if (retry)
+			{
+				// 死锁或连接恢复会使当前事务失效，重放任务前必须建立全新的事务边界。
+				// A deadlock or reconnect invalidates the current transaction, so task replay requires a fresh transaction boundary.
+				_pDBInterface->rollback();
+				continue;
+			}
+
+			if (failed)
+			{
+				_pDBInterface->rollback();
+				pDBTask->transactionResult(DB_TRANSACTION_NOT_COMMITTED);
+				return;
+			}
+
+			DBTransactionResult result = _pDBInterface->unlock();
+			pDBTask->transactionResult(result);
+			if (result != DB_TRANSACTION_COMMITTED)
+			{
+				ERROR_MSG(fmt::format("DBThread::processTask: transaction commit failed, result={}, task={:p}, error={}.\n",
+					dbTransactionResultName(result), (void*)pTask, _pDBInterface->getstrerror()));
+			}
+			return;
+		}
 	}
 
 	virtual void onProcessTaskEnd(thread::TPTask* pTask)
 	{
 		static_cast<DBTaskBase*>(pTask)->pdbi(_pDBInterface);
-		_pDBInterface->unlock();
 	}
 
 private:

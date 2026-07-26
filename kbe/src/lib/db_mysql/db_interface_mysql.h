@@ -167,7 +167,8 @@ public:
 		锁住接口操作
 	*/
 	virtual bool lock();
-	virtual bool unlock();
+	virtual DBTransactionResult unlock();
+	virtual bool rollback();
 
 	/**
 		处理异常

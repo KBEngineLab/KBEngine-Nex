@@ -664,15 +664,58 @@ bool DBInterfacePostgresql::lock()
 
 // 提交事务。
 // Commit the active PostgreSQL transaction and clear local state.
-bool DBInterfacePostgresql::unlock()
+DBTransactionResult DBInterfacePostgresql::unlock()
 {
-	if (query("COMMIT"))
+	try
 	{
-		inTransaction(false);
-		return true;
+		if (query("COMMIT"))
+		{
+			inTransaction(false);
+			return DB_TRANSACTION_COMMITTED;
+		}
+	}
+	catch (std::exception& e)
+	{
+		DBExceptionPostgresql* pException = dynamic_cast<DBExceptionPostgresql*>(&e);
+		const bool lostConnection = pException && pException->isLostConnection();
+		processException(e);
+		if (lostConnection)
+		{
+			if (inTransaction_)
+				inTransaction(false);
+			return DB_TRANSACTION_UNKNOWN;
+		}
+
+		rollback();
+		return DB_TRANSACTION_NOT_COMMITTED;
 	}
 
-	return false;
+	if (inTransaction_)
+		inTransaction(false);
+	return DB_TRANSACTION_NOT_COMMITTED;
+}
+
+// 回滚当前事务；连接已经丢失时服务端会自动回滚，这里只需清理本地状态。
+// Roll back the active transaction; after connection loss the server rolls it back automatically, so only local state needs clearing.
+bool DBInterfacePostgresql::rollback()
+{
+	bool result = true;
+	if (pConn_ != NULL && PQstatus(pConn_) == CONNECTION_OK && inTransaction_)
+	{
+		try
+		{
+			result = query("ROLLBACK");
+		}
+		catch (std::exception& e)
+		{
+			WARNING_MSG(fmt::format("DBInterfacePostgresql::rollback: {}\n", e.what()));
+			result = false;
+		}
+	}
+
+	if (inTransaction_)
+		inTransaction(false);
+	return result;
 }
 
 // 处理 PostgreSQL 异常，断线时重连，可重试错误交回 DB 任务队列重跑。

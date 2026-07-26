@@ -81,7 +81,7 @@ namespace KBEngine {
 			ownsTransaction_ = false;
 		}
 
-		bool DBTransaction::commit()
+		DBTransactionResult DBTransaction::commit()
 		{
 			KBE_ASSERT(active_ && !committed_);
 
@@ -89,12 +89,13 @@ namespace KBEngine {
 			{
 				committed_ = true;
 				active_ = false;
-				return true;
+				return DB_TRANSACTION_COMMITTED;
 			}
 
 			uint64 startTime = timestamp();
-			if (!static_cast<DBInterfaceMongodb*>(pdbi_)->commitTransaction())
-				return false;
+			DBTransactionResult result = static_cast<DBInterfaceMongodb*>(pdbi_)->commitTransaction();
+			if (result != DB_TRANSACTION_COMMITTED)
+				return result;
 
 			uint64 duration = timestamp() - startTime;
 			if (duration > stampsPerSecond() * 0.2f)
@@ -106,7 +107,7 @@ namespace KBEngine {
 			committed_ = true;
 			active_ = false;
 			ownsTransaction_ = false;
-			return true;
+			return DB_TRANSACTION_COMMITTED;
 		}
 
 		bool DBTransaction::shouldRetry() const

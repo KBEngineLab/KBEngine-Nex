@@ -53,6 +53,12 @@ bool DBTaskBase::process()
 //-------------------------------------------------------------------------------------
 thread::TPTask::TPTaskState DBTaskBase::presentMainThread()
 {
+	if (!transactionCommitted())
+	{
+		ERROR_MSG(fmt::format("DBTaskBase::presentMainThread: transaction did not commit, result={}, task={:p}.\n",
+			dbTransactionResultName(transactionResult_), (void*)this));
+	}
+
 	return thread::TPTask::TPTASK_STATE_COMPLETED; 
 }
 
@@ -79,7 +85,7 @@ bool DBTaskSyncTable::db_thread_process()
 //-------------------------------------------------------------------------------------
 thread::TPTask::TPTaskState DBTaskSyncTable::presentMainThread()
 {
-	pEntityTables_->onTableSyncSuccessfully(pEntityTable_, success_);
+	pEntityTables_->onTableSyncSuccessfully(pEntityTable_, success_ && transactionCommitted());
 	return thread::TPTask::TPTASK_STATE_COMPLETED; 
 }
 

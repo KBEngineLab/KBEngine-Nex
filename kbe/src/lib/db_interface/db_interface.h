@@ -25,6 +25,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "common/singleton.h"
 #include "helper/debug_helper.h"
 #include "db_interface/entity_table.h"
+#include "db_interface/db_transaction_result.h"
 #include "server/serverconfig.h"
 
 namespace KBEngine { 
@@ -145,7 +146,8 @@ public:
 		锁住接口操作
 	*/
 	virtual bool lock() = 0;
-	virtual bool unlock() = 0;
+	virtual DBTransactionResult unlock() = 0;
+	virtual bool rollback() = 0;
 
 	/**
 		处理异常

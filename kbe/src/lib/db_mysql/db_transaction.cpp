@@ -102,7 +102,7 @@ bool DBTransaction::shouldRetry() const
 }
 
 //-------------------------------------------------------------------------------------
-void DBTransaction::commit()
+DBTransactionResult DBTransaction::commit()
 {
 	KBE_ASSERT(!committed_);
 
@@ -114,8 +114,11 @@ void DBTransaction::commit()
 	}
 	catch (DBException & e)
 	{
-		bool ret = static_cast<DBInterfaceMysql*>(pdbi_)->processException(e);
-		KBE_ASSERT(ret);
+		// COMMIT 发送后连接丢失时服务端可能已经提交，重连只能恢复会话，不能证明原事务结果。
+		// If the connection dies after COMMIT is sent, the server may have committed; reconnecting restores only the session and cannot prove the outcome.
+		const bool lostConnection = e.isLostConnection();
+		static_cast<DBInterfaceMysql*>(pdbi_)->processException(e);
+		return lostConnection ? DB_TRANSACTION_UNKNOWN : DB_TRANSACTION_NOT_COMMITTED;
 	}
 
 	uint64 duration = timestamp() - startTime;
@@ -126,6 +129,7 @@ void DBTransaction::commit()
 	}
 
 	committed_ = true;
+	return DB_TRANSACTION_COMMITTED;
 }
 
 }

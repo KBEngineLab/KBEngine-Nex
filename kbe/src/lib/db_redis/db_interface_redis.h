@@ -144,7 +144,8 @@ public:
 		锁住接口操作
 	*/
 	virtual bool lock();
-	virtual bool unlock();
+	virtual DBTransactionResult unlock();
+	virtual bool rollback();
 
 	void throwError(DBException* pDBException);
 	
