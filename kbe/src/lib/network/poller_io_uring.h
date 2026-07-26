@@ -87,10 +87,15 @@ private:
 		unsigned* sqDropped;
 		unsigned* sqArray;
 		io_uring_sqe* sqes;
+		// SQE 使用本地游标预留，只有 submitSqes() 才把完整条目发布给内核。
+		// SQEs are reserved with local cursors and published to the kernel only after submitSqes() sees complete entries.
+		unsigned sqeHead;
+		unsigned sqeTail;
 		unsigned* cqHead;
 		unsigned* cqTail;
 		unsigned* cqRingMask;
 		unsigned* cqRingEntries;
+		unsigned* cqOverflow;
 		io_uring_cqe* cqes;
 		void* sqRingPtr;
 		size_t sqRingSize;
@@ -146,6 +151,8 @@ private:
 	Ring ring_;
 	std::set<IoUringContext*> outstandingContexts_;
 	uint64 lastCompletionBudgetWarningTime_;
+	unsigned lastSqDropped_;
+	unsigned lastCqOverflow_;
 };
 
 }

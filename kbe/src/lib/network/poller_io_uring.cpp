@@ -28,6 +28,23 @@ const size_t IO_URING_TCP_SEND_BATCH_BYTES = 64 * 1024;
 const uint64 COMPLETION_BUDGET_WARNING_INTERVAL = 10 * stampsPerSecond();
 const uint32 COMPLETION_BUDGET_WARNING_MULTIPLIER = 10;
 
+// io_uring 的 head/tail 位于内核共享映射中，普通指针访问不足以建立 SQE/CQE 的发布顺序。
+// io_uring head/tail values live in a kernel-shared mapping, so plain pointer access cannot publish SQEs/CQEs with the required ordering.
+inline unsigned loadAcquire(const unsigned* value)
+{
+	return __atomic_load_n(value, __ATOMIC_ACQUIRE);
+}
+
+inline unsigned loadRelaxed(const unsigned* value)
+{
+	return __atomic_load_n(value, __ATOMIC_RELAXED);
+}
+
+inline void storeRelease(unsigned* target, unsigned value)
+{
+	__atomic_store_n(target, value, __ATOMIC_RELEASE);
+}
+
 inline int ioUringSetup(uint32 entries, io_uring_params* params)
 {
 	// 使用 syscall 避免引入 liburing 链接依赖。
@@ -71,10 +88,13 @@ IoUringPoller::Ring::Ring() :
 	sqDropped(NULL),
 	sqArray(NULL),
 	sqes(NULL),
+	sqeHead(0),
+	sqeTail(0),
 	cqHead(NULL),
 	cqTail(NULL),
 	cqRingMask(NULL),
 	cqRingEntries(NULL),
+	cqOverflow(NULL),
 	cqes(NULL),
 	sqRingPtr(MAP_FAILED),
 	sqRingSize(0),
@@ -91,7 +111,9 @@ IoUringPoller::IoUringPoller(uint32 entries) :
 	ringFd_(-1),
 	ring_(),
 	outstandingContexts_(),
-	lastCompletionBudgetWarningTime_(0)
+	lastCompletionBudgetWarningTime_(0),
+	lastSqDropped_(0),
+	lastCqOverflow_(0)
 {
 	if (!setupRing(entries))
 	{
@@ -154,12 +176,38 @@ bool IoUringPoller::setupRing(uint32 entries)
 		return false;
 	}
 
+	// 没有 NODROP 时，CQ 满会永久丢失 CQE，使对应 context、buffer 和 fd 生命周期无法收敛。
+	// Without NODROP, a full CQ can permanently lose CQEs and strand their contexts, buffers, and descriptor lifetimes.
+	if ((params.features & IORING_FEAT_NODROP) == 0)
+	{
+		errno = ENOTSUP;
+		destroyRing();
+		return false;
+	}
+
 	ring_.sqRingSize = params.sq_off.array + params.sq_entries * sizeof(unsigned);
 	ring_.cqRingSize = params.cq_off.cqes + params.cq_entries * sizeof(io_uring_cqe);
 	ring_.sqesSize = params.sq_entries * sizeof(io_uring_sqe);
 
-	ring_.sqRingPtr = mmap(0, ring_.sqRingSize, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, ringFd_, IORING_OFF_SQ_RING);
-	ring_.cqRingPtr = mmap(0, ring_.cqRingSize, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, ringFd_, IORING_OFF_CQ_RING);
+	if ((params.features & IORING_FEAT_SINGLE_MMAP) != 0)
+	{
+		// SINGLE_MMAP 要求 SQ/CQ 共享一次映射，大小必须覆盖两套 ring 元数据。
+		// SINGLE_MMAP requires SQ and CQ to share one mapping sized for both sets of ring metadata.
+		const size_t sharedRingSize = std::max(ring_.sqRingSize, ring_.cqRingSize);
+		ring_.sqRingSize = sharedRingSize;
+		ring_.cqRingSize = sharedRingSize;
+		ring_.sqRingPtr = mmap(0, sharedRingSize, PROT_READ | PROT_WRITE,
+			MAP_SHARED | MAP_POPULATE, ringFd_, IORING_OFF_SQ_RING);
+		ring_.cqRingPtr = ring_.sqRingPtr;
+	}
+	else
+	{
+		ring_.sqRingPtr = mmap(0, ring_.sqRingSize, PROT_READ | PROT_WRITE,
+			MAP_SHARED | MAP_POPULATE, ringFd_, IORING_OFF_SQ_RING);
+		ring_.cqRingPtr = mmap(0, ring_.cqRingSize, PROT_READ | PROT_WRITE,
+			MAP_SHARED | MAP_POPULATE, ringFd_, IORING_OFF_CQ_RING);
+	}
+
 	ring_.sqesPtr = mmap(0, ring_.sqesSize, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, ringFd_, IORING_OFF_SQES);
 
 	if (ring_.sqRingPtr == MAP_FAILED || ring_.cqRingPtr == MAP_FAILED || ring_.sqesPtr == MAP_FAILED)
@@ -182,25 +230,32 @@ bool IoUringPoller::setupRing(uint32 entries)
 	ring_.cqTail = reinterpret_cast<unsigned*>(cqPtr + params.cq_off.tail);
 	ring_.cqRingMask = reinterpret_cast<unsigned*>(cqPtr + params.cq_off.ring_mask);
 	ring_.cqRingEntries = reinterpret_cast<unsigned*>(cqPtr + params.cq_off.ring_entries);
+	ring_.cqOverflow = reinterpret_cast<unsigned*>(cqPtr + params.cq_off.overflow);
 	ring_.cqes = reinterpret_cast<io_uring_cqe*>(cqPtr + params.cq_off.cqes);
+	lastSqDropped_ = loadRelaxed(ring_.sqDropped);
+	lastCqOverflow_ = loadRelaxed(ring_.cqOverflow);
 	return true;
 }
 
 //-------------------------------------------------------------------------------------
 void IoUringPoller::destroyRing()
 {
-	// 按 mmap 的反向顺序释放 ring 资源。
-	if (ring_.sqRingPtr != MAP_FAILED)
+	// SINGLE_MMAP 下 SQ/CQ 指针相同，只能解除一次映射；独立映射则按反向顺序分别释放。
+	// SQ and CQ share one pointer under SINGLE_MMAP and must be unmapped once; separate mappings are released independently in reverse order.
+	void* sqRingPtr = ring_.sqRingPtr;
+	void* cqRingPtr = ring_.cqRingPtr;
+	if (cqRingPtr != MAP_FAILED && cqRingPtr != sqRingPtr)
 	{
-		munmap(ring_.sqRingPtr, ring_.sqRingSize);
-		ring_.sqRingPtr = MAP_FAILED;
+		munmap(cqRingPtr, ring_.cqRingSize);
 	}
 
-	if (ring_.cqRingPtr != MAP_FAILED)
+	if (sqRingPtr != MAP_FAILED)
 	{
-		munmap(ring_.cqRingPtr, ring_.cqRingSize);
-		ring_.cqRingPtr = MAP_FAILED;
+		munmap(sqRingPtr, ring_.sqRingSize);
 	}
+
+	ring_.sqRingPtr = MAP_FAILED;
+	ring_.cqRingPtr = MAP_FAILED;
 
 	if (ring_.sqesPtr != MAP_FAILED)
 	{
@@ -224,19 +279,19 @@ io_uring_sqe* IoUringPoller::getSqe()
 		return NULL;
 	}
 
-	// SQ ring 满时返回 NULL，让调用方下个 tick 再投递。
-	unsigned tail = *ring_.sqTail;
-	unsigned head = *ring_.sqHead;
-	if (tail - head >= *ring_.sqRingEntries)
+	// 本地 head 包含尚未发布的 SQE；与 acquire 读取的内核 head 比较可同时约束已发布和待发布条目。
+	// The local head includes unpublished SQEs; comparing it with the kernel head loaded with acquire bounds both published and pending entries.
+	const unsigned head = ring_.sqeHead;
+	const unsigned kernelHead = loadAcquire(ring_.sqHead);
+	if (head - kernelHead >= loadRelaxed(ring_.sqRingEntries))
 	{
 		return NULL;
 	}
 
-	unsigned index = tail & *ring_.sqRingMask;
+	const unsigned index = head & loadRelaxed(ring_.sqRingMask);
 	io_uring_sqe* sqe = &ring_.sqes[index];
 	memset(sqe, 0, sizeof(*sqe));
-	ring_.sqArray[index] = index;
-	*ring_.sqTail = tail + 1;
+	ring_.sqeHead = head + 1;
 	return sqe;
 }
 
@@ -249,8 +304,22 @@ bool IoUringPoller::submitSqes()
 		return false;
 	}
 
-	// 这里只负责提交 SQE；等待 CQE 交给 poll(ringFd_)，避免额外 timeout SQE。
-	unsigned toSubmit = *ring_.sqTail - *ring_.sqHead;
+	// 先把完整 SQE 的索引写入 submission array，再用 release store 一次性发布 tail。
+	// Write indexes for fully initialized SQEs into the submission array, then publish the tail once with a release store.
+	unsigned kernelTail = loadRelaxed(ring_.sqTail);
+	const unsigned ringMask = loadRelaxed(ring_.sqRingMask);
+	while (ring_.sqeTail != ring_.sqeHead)
+	{
+		const unsigned sqeIndex = ring_.sqeTail & ringMask;
+		ring_.sqArray[kernelTail & ringMask] = sqeIndex;
+		++kernelTail;
+		++ring_.sqeTail;
+	}
+	storeRelease(ring_.sqTail, kernelTail);
+
+	// 已发布但尚未被内核消费的 SQE 也需要在重试时再次调用 io_uring_enter。
+	// Published SQEs not yet consumed by the kernel must be included when io_uring_enter is retried.
+	const unsigned toSubmit = kernelTail - loadAcquire(ring_.sqHead);
 	if (toSubmit == 0)
 	{
 		return true;
@@ -816,7 +885,7 @@ int IoUringPoller::processPendingEvents(double maxWait)
 
 	KBEConcurrency::onStartMainThreadIdling();
 	submitSqes();
-	if (*ring_.cqHead == *ring_.cqTail && timeoutMs > 0)
+	if (loadRelaxed(ring_.cqHead) == loadAcquire(ring_.cqTail) && timeoutMs > 0)
 	{
 		pollfd pfd;
 		memset(&pfd, 0, sizeof(pfd));
@@ -842,22 +911,40 @@ int IoUringPoller::processPendingEvents(double maxWait)
 	while (readyCount < static_cast<int>(COMPLETION_MAX_COMPLETIONS_PER_TICK) &&
 		(completionProcessingBudget == 0 || timestamp() - completionProcessingStart < completionProcessingBudget))
 	{
-		unsigned head = *ring_.cqHead;
-		if (head == *ring_.cqTail)
+		const unsigned head = loadRelaxed(ring_.cqHead);
+		if (head == loadAcquire(ring_.cqTail))
 		{
 			break;
 		}
 
-		io_uring_cqe* cqe = &ring_.cqes[head & *ring_.cqRingMask];
+		io_uring_cqe* cqe = &ring_.cqes[head & loadRelaxed(ring_.cqRingMask)];
 		IoUringContext* context = reinterpret_cast<IoUringContext*>(cqe->user_data);
 		int result = cqe->res;
-		*ring_.cqHead = head + 1;
+		storeRelease(ring_.cqHead, head + 1);
 
 		if (context != NULL)
 		{
 			++readyCount;
 			handleCompletion(*context, result);
 		}
+	}
+
+	// NODROP 会保留 CQ 满时的 completion，但 overflow 增长仍表示单 tick 消费预算不足；SQ dropped 则表示提交条目无效。
+	// NODROP preserves completions while the CQ is full, but overflow growth still signals an insufficient per-tick budget; SQ drops indicate invalid submissions.
+	const unsigned sqDropped = loadAcquire(ring_.sqDropped);
+	if (sqDropped != lastSqDropped_)
+	{
+		ERROR_MSG(fmt::format("IoUringPoller::processPendingEvents: submission queue dropped {} entries, total={}.\n",
+			sqDropped - lastSqDropped_, sqDropped));
+		lastSqDropped_ = sqDropped;
+	}
+
+	const unsigned cqOverflow = loadAcquire(ring_.cqOverflow);
+	if (cqOverflow != lastCqOverflow_)
+	{
+		WARNING_MSG(fmt::format("IoUringPoller::processPendingEvents: completion queue overflowed by {} entries, total={}; NODROP preserved delivery.\n",
+			cqOverflow - lastCqOverflow_, cqOverflow));
+		lastCqOverflow_ = cqOverflow;
 	}
 
 	const uint64 completionProcessingElapsed = timestamp() - completionProcessingStart;
