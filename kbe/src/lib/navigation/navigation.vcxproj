@@ -119,62 +119,16 @@
     </Bscmake>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="DetourAlloc.cpp" />
-    <ClCompile Include="DetourAssert.cpp" />
-    <ClCompile Include="DetourCommon.cpp" />
-    <ClCompile Include="DetourCrowd.cpp" />
-    <ClCompile Include="DetourLocalBoundary.cpp" />
-    <ClCompile Include="DetourNavMesh.cpp" />
-    <ClCompile Include="DetourNavMeshBuilder.cpp" />
-    <ClCompile Include="DetourNavMeshQuery.cpp" />
-    <ClCompile Include="DetourNode.cpp" />
-    <ClCompile Include="DetourObstacleAvoidance.cpp" />
-    <ClCompile Include="DetourPathCorridor.cpp" />
-    <ClCompile Include="DetourPathQueue.cpp" />
-    <ClCompile Include="DetourProximityGrid.cpp" />
-    <ClCompile Include="DetourTileCache.cpp" />
-    <ClCompile Include="DetourTileCacheBuilder.cpp" />
     <ClCompile Include="navigation.cpp" />
     <ClCompile Include="navigation_handle.cpp" />
     <ClCompile Include="navigation_mesh_handle.cpp" />
     <ClCompile Include="navigation_tile_handle.cpp" />
-    <ClCompile Include="Recast.cpp" />
-    <ClCompile Include="RecastAlloc.cpp" />
-    <ClCompile Include="RecastArea.cpp" />
-    <ClCompile Include="RecastAssert.cpp" />
-    <ClCompile Include="RecastContour.cpp" />
-    <ClCompile Include="RecastFilter.cpp" />
-    <ClCompile Include="RecastLayers.cpp" />
-    <ClCompile Include="RecastMesh.cpp" />
-    <ClCompile Include="RecastMeshDetail.cpp" />
-    <ClCompile Include="RecastRasterization.cpp" />
-    <ClCompile Include="RecastRegion.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="DetourAlloc.h" />
-    <ClInclude Include="DetourAssert.h" />
-    <ClInclude Include="DetourCommon.h" />
-    <ClInclude Include="DetourCrowd.h" />
-    <ClInclude Include="DetourLocalBoundary.h" />
-    <ClInclude Include="DetourMath.h" />
-    <ClInclude Include="DetourNavMesh.h" />
-    <ClInclude Include="DetourNavMeshBuilder.h" />
-    <ClInclude Include="DetourNavMeshQuery.h" />
-    <ClInclude Include="DetourNode.h" />
-    <ClInclude Include="DetourObstacleAvoidance.h" />
-    <ClInclude Include="DetourPathCorridor.h" />
-    <ClInclude Include="DetourPathQueue.h" />
-    <ClInclude Include="DetourProximityGrid.h" />
-    <ClInclude Include="DetourStatus.h" />
-    <ClInclude Include="DetourTileCache.h" />
-    <ClInclude Include="DetourTileCacheBuilder.h" />
     <ClInclude Include="navigation.h" />
     <ClInclude Include="navigation_handle.h" />
     <ClInclude Include="navigation_mesh_handle.h" />
     <ClInclude Include="navigation_tile_handle.h" />
-    <ClInclude Include="Recast.h" />
-    <ClInclude Include="RecastAlloc.h" />
-    <ClInclude Include="RecastAssert.h" />
     <ClInclude Include="stlastar.h" />
     <ClInclude Include="stlstarfsa.h" />
   </ItemGroup>

@@ -23,10 +23,10 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "navigation/navigation_handle.h"
 
-#include "DetourNavMeshBuilder.h"
-#include "DetourNavMeshQuery.h"
-#include "DetourCommon.h"
-#include "DetourNavMesh.h"
+#include "recastnavigation/DetourNavMeshBuilder.h"
+#include "recastnavigation/DetourNavMeshQuery.h"
+#include "recastnavigation/DetourCommon.h"
+#include "recastnavigation/DetourNavMesh.h"
 
 namespace KBEngine{
 
