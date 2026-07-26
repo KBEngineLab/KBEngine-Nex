@@ -30,6 +30,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/bundle.h"
 #include "network/packet_reader.h"
 #include "network/network_interface.h"
+#include "network/event_poller.h"
 #include "network/tcp_packet_receiver.h"
 #include "network/tcp_packet_sender.h"
 #include "network/udp_packet_receiver.h"
@@ -134,7 +135,8 @@ Channel::Channel(NetworkInterface & networkInterface,
 	componentID_(UNKNOWN_COMPONENT_TYPE),
 	pMsgHandlers_(NULL),
 	flags_(0),
-	condemnReason_()
+	condemnReason_(),
+	tlsDetectionPrefix_()
 {
 	this->clearBundle();
 	initialize(networkInterface, pEndPoint, traits, pt, pFilter, id);
@@ -169,7 +171,8 @@ Channel::Channel():
 	componentID_(UNKNOWN_COMPONENT_TYPE),
 	pMsgHandlers_(NULL),
 	flags_(0),
-	condemnReason_()
+	condemnReason_(),
+	tlsDetectionPrefix_()
 {
 	this->clearBundle();
 }
@@ -374,6 +377,7 @@ void Channel::clearState( bool warnOnDiscard /*=false*/ )
 	strextra_ = "";
 	channelType_ = CHANNEL_NORMAL;
 	condemnReason_ = "";
+	tlsDetectionPrefix_.clear();
 
 	if(pEndPoint_ && protocoltype_ == PROTOCOL_TCP && !this->isDestroyed())
 	{
@@ -751,11 +755,36 @@ bool Channel::handshake(Packet* pPacket)
 	// https/wss
 	if (!pEndPoint_->isSSL())
 	{
+		const size_t packetLength = pPacket->length();
+		const bool mayBeTLS = !tlsDetectionPrefix_.empty() ||
+			(packetLength > 0 && static_cast<uint8>(pPacket->data()[pPacket->rpos()]) == 0x16 && packetLength < 3);
+		if (mayBeTLS)
+		{
+			// 判定前最多只保留两个字节；第三字节到达后立即重建当前 packet 并进入正常协议探测。
+			// Keep at most two bytes before classification; rebuild the current packet as soon as byte three arrives and resume normal probing.
+			tlsDetectionPrefix_.insert(tlsDetectionPrefix_.end(),
+				pPacket->data() + pPacket->rpos(), pPacket->data() + pPacket->wpos());
+			pPacket->read_skip(packetLength);
+			if (tlsDetectionPrefix_.size() < 3)
+				return true;
+
+			pPacket->clear(false);
+			pPacket->append(tlsDetectionPrefix_.data(), tlsDetectionPrefix_.size());
+			tlsDetectionPrefix_.clear();
+		}
+
 		int sslVersion = KB_SSL::isSSLProtocal(pPacket);
 		if (sslVersion != -1)
 		{
-			// 无论成功和失败都返回true，让外部回收数据包并继续等待握手
-			pEndPoint_->setupSSL(sslVersion, pPacket);
+			EventPoller* pPoller = this->dispatcher().pPoller();
+			const bool useMemoryBIO = pPoller != NULL && pPoller->supportsCompletion();
+			if (!pEndPoint_->setupSSL(sslVersion, pPacket, useMemoryBIO) || !flushSSLNetworkOutput())
+			{
+				// TLS 状态一旦推进就不能把原 ClientHello 当明文重试；失败连接必须确定性关闭。
+				// Once TLS state advances, the original ClientHello cannot be retried as plaintext; fail the connection deterministically.
+				this->condemn("TLS handshake failed");
+				return true;
+			}
 
 			if (pPacket->length() == 0)
 				return true;
@@ -801,6 +830,35 @@ bool Channel::handshake(Packet* pPacket)
 	}
 
 	return false;
+}
+
+//-------------------------------------------------------------------------------------
+bool Channel::flushSSLNetworkOutput()
+{
+	if (!pEndPoint_ || !pEndPoint_->usesSSLMemoryBIO())
+		return true;
+
+	std::vector<char> output;
+	if (!pEndPoint_->takeSSLNetworkOutput(output))
+		return true;
+
+	EventPoller* pPoller = this->dispatcher().pPoller();
+	if (!pPoller || !pPoller->supportsCompletion())
+	{
+		ERROR_MSG("Channel::flushSSLNetworkOutput: memory BIO requires a completion poller.\n");
+		return false;
+	}
+
+	// OpenSSL 已推进 record 序列号，密文入队失败后不能重新 SSL_write 同一明文，否则双方状态会分叉。
+	// OpenSSL has advanced its record sequence; after enqueue failure the same plaintext cannot be SSL_write again without desynchronizing peers.
+	if (!pPoller->queueTcpSend(*pEndPoint_, output.data(), static_cast<int>(output.size())))
+	{
+		ERROR_MSG(fmt::format("Channel::flushSSLNetworkOutput: failed to queue {} TLS bytes for {}.\n",
+			output.size(), this->c_str()));
+		return false;
+	}
+
+	return true;
 }
 
 //-------------------------------------------------------------------------------------

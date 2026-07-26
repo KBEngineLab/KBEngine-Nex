@@ -374,19 +374,33 @@ Reason WebSocketPacketFilter::onPing(Channel * pChannel, Packet* pPacket)
 	}
 
 	int sendSize = pPongPacket->length();
-
-	while (sendSize > 0)
+	if (pChannel->pEndPoint()->usesSSLMemoryBIO())
 	{
-		int ret = pChannel->pEndPoint()->send(pPongPacket->data() + (pPongPacket->length() - sendSize), sendSize);
-		if (ret <= 0)
+		// pong 已经是完整 WebSocket 控制帧，只需进行 TLS 编码并交给 IOCP，不能再经过 WebSocketPacketFilter 二次封帧。
+		// The pong is already a complete WebSocket control frame; encode it as TLS and hand it to IOCP without framing it a second time.
+		if (!pChannel->pEndPoint()->encryptSSLNetworkData(pPongPacket->data(), sendSize) ||
+			!pChannel->flushSSLNetworkOutput())
 		{
-			ERROR_MSG(fmt::format("WebSocketPacketFilter::recv: send({}) pong-frame error! addr={}, sendSize={}\n",
-				ret, pChannel_->c_str(), sendSize));
-
-			break;
+			ERROR_MSG(fmt::format("WebSocketPacketFilter::recv: queue encrypted pong-frame failed! addr={}, sendSize={}\n",
+				pChannel_->c_str(), sendSize));
+			pChannel->condemn("WebSocket encrypted pong send failed");
 		}
+	}
+	else
+	{
+		while (sendSize > 0)
+		{
+			int ret = pChannel->pEndPoint()->send(pPongPacket->data() + (pPongPacket->length() - sendSize), sendSize);
+			if (ret <= 0)
+			{
+				ERROR_MSG(fmt::format("WebSocketPacketFilter::recv: send({}) pong-frame error! addr={}, sendSize={}\n",
+					ret, pChannel_->c_str(), sendSize));
 
-		sendSize -= ret;
+				break;
+			}
+
+			sendSize -= ret;
+		}
 	}
 
 	TCPPacket::reclaimPoolObject(pPongPacket);

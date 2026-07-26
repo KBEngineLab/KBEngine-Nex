@@ -831,7 +831,7 @@ static long ssl_bio_callback(BIO *bio, int cmd, const char *argp, int argi, long
 	return argi;
 }
 
-bool EndPoint::setupSSL(int sslVersion, Packet* pPacket)
+bool EndPoint::setupSSL(int sslVersion, Packet* pPacket, bool useMemoryBIO)
 {
 	switch (sslVersion)
 	{
@@ -904,6 +904,48 @@ bool EndPoint::setupSSL(int sslVersion, Packet* pPacket)
 		ERROR_MSG(fmt::format("EndPoint::setupSSL: SSL_new: {}!\n", ERR_error_string(ERR_get_error(), NULL)));
 		destroySSL();
 		return false;
+	}
+
+	sslUsesMemoryBIO_ = useMemoryBIO;
+	if (sslUsesMemoryBIO_)
+	{
+		// IOCP/io_uring/kqueue 已经从 socket 取得密文，TLS 层只能消费显式喂入的内存 BIO。
+		// IOCP/io_uring/kqueue have already consumed socket ciphertext, so TLS may only read explicitly supplied memory BIO data.
+		BIO* readBIO = BIO_new(BIO_s_mem());
+		BIO* writeBIO = BIO_new(BIO_s_mem());
+		if (!readBIO || !writeBIO)
+		{
+			if (readBIO)
+				BIO_free(readBIO);
+			if (writeBIO)
+				BIO_free(writeBIO);
+
+			ERROR_MSG(fmt::format("EndPoint::setupSSL: BIO_new(BIO_s_mem): {}!\n", ERR_error_string(ERR_get_error(), NULL)));
+			destroySSL();
+			return false;
+		}
+
+		// 空输入必须表现为暂时不可读，而不是 EOF，否则分片 ClientHello 会被误判为连接关闭。
+		// Empty input must mean temporarily unavailable rather than EOF, otherwise fragmented ClientHello records look disconnected.
+		BIO_set_mem_eof_return(readBIO, -1);
+		SSL_set_bio(sslHandle_, readBIO, writeBIO);
+		SSL_set_accept_state(sslHandle_);
+
+		const int inputLength = static_cast<int>(pPacket->length());
+		if (inputLength > 0)
+		{
+			const int written = BIO_write(readBIO, pPacket->data() + pPacket->rpos(), inputLength);
+			if (written != inputLength)
+			{
+				ERROR_MSG(fmt::format("EndPoint::setupSSL: BIO_write accepted {}/{} ClientHello bytes.\n", written, inputLength));
+				destroySSL();
+				return false;
+			}
+
+			pPacket->read_skip(inputLength);
+		}
+
+		return driveSSLHandshake();
 	}
 
 #if KBE_PLATFORM == PLATFORM_WIN32
@@ -980,6 +1022,147 @@ bool EndPoint::setupSSL(int sslVersion, Packet* pPacket)
 }
 
 //-------------------------------------------------------------------------------------
+bool EndPoint::driveSSLHandshake()
+{
+	KBE_ASSERT(sslHandle_ != NULL && sslUsesMemoryBIO_);
+	if (SSL_is_init_finished(sslHandle_))
+		return drainSSLNetworkOutput();
+
+	ERR_clear_error();
+	const int result = SSL_do_handshake(sslHandle_);
+	const int sslError = result == 1 ? SSL_ERROR_NONE : SSL_get_error(sslHandle_, result);
+	if (!drainSSLNetworkOutput())
+		return false;
+
+	if (result == 1 || sslError == SSL_ERROR_WANT_READ || sslError == SSL_ERROR_WANT_WRITE)
+		return true;
+
+	const unsigned long errorCode = ERR_get_error();
+	ERROR_MSG(fmt::format("EndPoint::driveSSLHandshake: SSL_do_handshake failed, sslError={}, error={}.\n",
+		sslError, errorCode ? ERR_error_string(errorCode, NULL) : "none"));
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
+bool EndPoint::drainSSLNetworkOutput()
+{
+	if (!sslUsesMemoryBIO_ || !sslHandle_)
+		return true;
+
+	BIO* writeBIO = SSL_get_wbio(sslHandle_);
+	char buffer[16 * 1024];
+	while (BIO_ctrl_pending(writeBIO) > 0)
+	{
+		const int length = BIO_read(writeBIO, buffer, sizeof(buffer));
+		if (length <= 0)
+		{
+			ERROR_MSG(fmt::format("EndPoint::drainSSLNetworkOutput: BIO_read failed: {}.\n",
+				ERR_error_string(ERR_get_error(), NULL)));
+			return false;
+		}
+
+		sslNetworkOutput_.insert(sslNetworkOutput_.end(), buffer, buffer + length);
+	}
+
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
+bool EndPoint::consumeSSLNetworkData(const void* data, int length, std::vector<char>& plaintext, bool& peerClosed)
+{
+	plaintext.clear();
+	peerClosed = false;
+	if (!sslHandle_ || !sslUsesMemoryBIO_ || length < 0)
+		return false;
+
+	BIO* readBIO = SSL_get_rbio(sslHandle_);
+	if (length > 0)
+	{
+		const int written = BIO_write(readBIO, data, length);
+		if (written != length)
+		{
+			ERROR_MSG(fmt::format("EndPoint::consumeSSLNetworkData: BIO_write accepted {}/{} bytes.\n", written, length));
+			return false;
+		}
+	}
+
+	if (!driveSSLHandshake())
+		return false;
+
+	if (!SSL_is_init_finished(sslHandle_))
+		return true;
+
+	char buffer[16 * 1024];
+	for (;;)
+	{
+		ERR_clear_error();
+		const int result = SSL_read(sslHandle_, buffer, sizeof(buffer));
+		if (result > 0)
+		{
+			plaintext.insert(plaintext.end(), buffer, buffer + result);
+			continue;
+		}
+
+		const int sslError = SSL_get_error(sslHandle_, result);
+		if (sslError == SSL_ERROR_WANT_READ || sslError == SSL_ERROR_WANT_WRITE)
+			break;
+
+		if (sslError == SSL_ERROR_ZERO_RETURN)
+		{
+			peerClosed = true;
+			break;
+		}
+
+		const unsigned long errorCode = ERR_get_error();
+		ERROR_MSG(fmt::format("EndPoint::consumeSSLNetworkData: SSL_read failed, sslError={}, error={}.\n",
+			sslError, errorCode ? ERR_error_string(errorCode, NULL) : "none"));
+		return false;
+	}
+
+	return drainSSLNetworkOutput();
+}
+
+//-------------------------------------------------------------------------------------
+bool EndPoint::encryptSSLNetworkData(const void* data, int length)
+{
+	if (!sslHandle_ || !sslUsesMemoryBIO_ || !SSL_is_init_finished(sslHandle_) || length < 0)
+		return false;
+
+	const char* bytes = static_cast<const char*>(data);
+	int offset = 0;
+	while (offset < length)
+	{
+		ERR_clear_error();
+		const int result = SSL_write(sslHandle_, bytes + offset, length - offset);
+		if (result <= 0)
+		{
+			const int sslError = SSL_get_error(sslHandle_, result);
+			const unsigned long errorCode = ERR_get_error();
+			ERROR_MSG(fmt::format("EndPoint::encryptSSLNetworkData: SSL_write failed, sslError={}, error={}.\n",
+				sslError, errorCode ? ERR_error_string(errorCode, NULL) : "none"));
+			return false;
+		}
+
+		offset += result;
+		if (!drainSSLNetworkOutput())
+			return false;
+	}
+
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
+bool EndPoint::takeSSLNetworkOutput(std::vector<char>& output)
+{
+	output.clear();
+	if (sslNetworkOutput_.empty())
+		return false;
+
+	output.swap(sslNetworkOutput_);
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
 bool EndPoint::destroySSL()
 {
 	if (sslHandle_)
@@ -993,6 +1176,9 @@ bool EndPoint::destroySSL()
 		SSL_CTX_free(sslContext_);
 		sslContext_ = NULL;
 	}
+
+	sslUsesMemoryBIO_ = false;
+	sslNetworkOutput_.clear();
 
 	return true;
 }

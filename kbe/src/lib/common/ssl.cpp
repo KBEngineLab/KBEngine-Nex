@@ -88,10 +88,11 @@ int KB_SSL::isSSLProtocal(MemoryStream* s)
 		// SSLv2 协议
 		return SSL2_VERSION;
 	}
-	else if (s->length() >= 47 && recvData[0] == 0x16 && recvData[1] == 0x03
+	else if (s->length() >= 3 && recvData[0] == 0x16 && recvData[1] == 0x03
 		&& (recvData[2] == 0x00 || recvData[2] == 0x01 || recvData[2] == 0x02 || recvData[2] == 0x03))
 	{
-		// SSLv3 协议
+		// TLS record 的前三字节已经足够识别协议；ClientHello 剩余分片由 OpenSSL BIO 缓存。
+		// The first three TLS-record bytes identify the protocol; OpenSSL BIO retains the remaining fragmented ClientHello.
 		if (recvData[2] == 0x00)
 		{
 			return SSL3_VERSION;

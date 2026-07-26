@@ -144,6 +144,37 @@ bool TCPPacketReceiver::processRecv(bool expectingPacket)
 			return false;
 		}
 
+		if (pEndpoint_->usesSSLMemoryBIO())
+		{
+			// IOCP 已经消费 socket 中的 TLS record；必须先经内存 BIO 解密，不能把密文交给 KBE/WebSocket 解析器。
+			// IOCP has consumed TLS records from the socket; decrypt through the memory BIO before KBE/WebSocket parsing sees the bytes.
+			std::vector<char> plaintext;
+			bool peerClosed = false;
+			if (!pEndpoint_->consumeSSLNetworkData(data.data(), static_cast<int>(data.size()), plaintext, peerClosed) ||
+				!pChannel->flushSSLNetworkOutput())
+			{
+				TCPPacket::reclaimPoolObject(pReceiveWindow);
+				onGetError(pChannel, "TLS receive failed");
+				return false;
+			}
+
+			if (plaintext.empty())
+			{
+				TCPPacket::reclaimPoolObject(pReceiveWindow);
+				if (peerClosed)
+				{
+					onGetError(pChannel, "TLS close_notify");
+					return false;
+				}
+
+				// 分片握手或不完整 TLS record 已由 OpenSSL 缓存，本轮没有应用层数据也属于成功消费。
+				// OpenSSL retains fragmented handshakes or incomplete TLS records; no application bytes in this turn is still successful consumption.
+				return true;
+			}
+
+			data.swap(plaintext);
+		}
+
 		// append 会按 MemoryStream 规则检查容量，避免 completion 缓冲区直接覆盖 Packet 内存。
 		// append applies MemoryStream capacity checks and prevents completion buffers from overwriting Packet memory.
 		pReceiveWindow->append(data.data(), data.size());

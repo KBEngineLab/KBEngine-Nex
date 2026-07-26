@@ -38,6 +38,8 @@ socket_(-1)
 
 	sslHandle_ = NULL;
 	sslContext_ = NULL;
+	sslUsesMemoryBIO_ = false;
+	sslNetworkOutput_.clear();
 }
 
 INLINE EndPoint::EndPoint(Address address):
@@ -54,6 +56,8 @@ socket_(-1)
 
 	sslHandle_ = NULL;
 	sslContext_ = NULL;
+	sslUsesMemoryBIO_ = false;
+	sslNetworkOutput_.clear();
 }
 
 INLINE EndPoint::~EndPoint()

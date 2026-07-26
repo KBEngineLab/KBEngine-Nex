@@ -213,6 +213,9 @@ public:
 	void componentID(COMPONENT_ID cid){ componentID_ = cid; }
 
 	bool handshake(Packet* pPacket);
+	// 将 TLS 内存 BIO 的输出密文交给 completion poller，保持 socket IO 的单一所有权。
+	// Hand memory-BIO ciphertext to the completion poller so socket IO keeps a single owner.
+	bool flushSSLNetworkOutput();
 
 	KBEngine::Network::MessageHandlers* pMsgHandlers() const { return pMsgHandlers_; }
 	void pMsgHandlers(KBEngine::Network::MessageHandlers* pMsgHandlers) { pMsgHandlers_ = pMsgHandlers; }
@@ -295,6 +298,9 @@ private:
 	uint32						flags_;
 
 	std::string					condemnReason_;
+	// 只缓存不足以判定 TLS record header 的前 1-2 字节，避免首个 completion 过短时误判原生协议。
+	// Retain only the first 1-2 bytes needed to classify a TLS record header when the initial completion is too short.
+	std::vector<char>			tlsDetectionPrefix_;
 };
 
 }
