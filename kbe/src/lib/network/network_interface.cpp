@@ -156,26 +156,6 @@ bool NetworkInterface::initialize(const char* pEndPointName, uint16 listeningPor
 	if (listeningPort_min > 0 && listeningPort_min == listeningPort_max)
 		pEP->setreuseaddr(true);
 	
-	if (!this->dispatcher().registerReadFileDescriptor(*pEP, pLR))
-	{
-		// The completion backend must own the read registration before bind/listen proceeds; otherwise no accept can ever complete.
-		// 完成式后端必须先成功接管读注册才能继续 bind/listen，否则后续永远不会产生 accept 完成事件。
-		ERROR_MSG(fmt::format("NetworkInterface::initialize({}): couldn't register the listening socket\n",
-			pEndPointName));
-		pEP->close();
-		return false;
-	}
-
-	// Registration intentionally precedes bind/listen for compatibility with the 1.x initialization order.
-	// Every failure after this point must deregister before closing, because an IOCP poller may still own OVERLAPPED state for the handle.
-	// 为兼容 1.x 初始化顺序，读注册有意发生在 bind/listen 之前。
-	// 从这里开始的所有失败路径都必须先注销再关闭，因为 IOCP poller 仍可能持有该句柄的 OVERLAPPED 状态。
-	auto closeRegisteredEndPoint = [this, pEP]()
-	{
-		this->dispatcher().deregisterReadFileDescriptor(*pEP);
-		pEP->close();
-	};
-	
 	u_int32_t ifIPAddr = INADDR_ANY;
 
 	bool listeningInterfaceEmpty =
@@ -231,7 +211,7 @@ bool NetworkInterface::initialize(const char* pEndPointName, uint16 listeningPor
 		ERROR_MSG(fmt::format("NetworkInterface::initialize({}): Couldn't bind the socket to {}:{} ({})\n",
 			pEndPointName, inet_ntoa((struct in_addr&)ifIPAddr), ntohs(listeningPort), kbe_strerror()));
 		
-		closeRegisteredEndPoint();
+		pEP->close();
 		return false;
 	}
 
@@ -255,7 +235,7 @@ bool NetworkInterface::initialize(const char* pEndPointName, uint16 listeningPor
 		{
 			ERROR_MSG(fmt::format("NetworkInterface::initialize({}): Couldn't determine ip addr of default interface\n", pEndPointName));
 
-			closeRegisteredEndPoint();
+			pEP->close();
 			return false;
 		}
 	}
@@ -290,10 +270,22 @@ bool NetworkInterface::initialize(const char* pEndPointName, uint16 listeningPor
 		ERROR_MSG(fmt::format("NetworkInterface::initialize({}): listen to {} ({})\n",
 			pEndPointName, address.c_str(), kbe_strerror()));
 
-		closeRegisteredEndPoint();
+		pEP->close();
 		return false;
 	}
-	
+
+	// SO_ACCEPTCONN 只有在 listen() 成功后才会把流式 socket 标识为 listener；完成式后端必须在此后识别并投递 accept。
+	// SO_ACCEPTCONN identifies a stream socket as a listener only after listen() succeeds; completion backends must detect and arm accept after that point.
+	// 延后注册同时避免 io_uring/kqueue 把未监听 socket 缓存为普通 TCP，并保持 IOCP 的 AcceptEx 投递语义一致。
+	// Delayed registration also prevents io_uring/kqueue from caching an unbound socket as ordinary TCP and keeps IOCP AcceptEx arming consistent.
+	if (!this->dispatcher().registerReadFileDescriptor(*pEP, pLR))
+	{
+		ERROR_MSG(fmt::format("NetworkInterface::initialize({}): couldn't register the listening socket\n",
+			pEndPointName));
+		pEP->close();
+		return false;
+	}
+
 	INFO_MSG(fmt::format("NetworkInterface::initialize({}): address {}, SOMAXCONN={}.\n", 
 		pEndPointName, address.c_str(), backlog));
 
