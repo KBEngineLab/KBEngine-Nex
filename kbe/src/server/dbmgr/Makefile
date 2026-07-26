@@ -21,7 +21,8 @@ MY_LIBS =		\
 	db_interface\
 	db_mysql	\
 	db_redis	\
-	db_postgresql
+	db_postgresql\
+	db_mongodb
 
 BUILD_TIME_FILE = main
 USE_PYTHON = 1
@@ -29,6 +30,7 @@ USE_G3DMATH = 1
 USE_MYSQL = 1
 USE_REDIS = 1
 USE_POSTGRESQL = 1
+USE_MONGODB = 1
 USE_OPENSSL = 1
 
 

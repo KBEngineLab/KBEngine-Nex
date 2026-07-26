@@ -157,6 +157,15 @@ LDLIBS += $(shell pkg-config --libs libpq)
 CPPFLAGS += -DUSE_KBE_POSTGRESQL
 endif # USE_POSTGRESQL
 
+ifdef USE_MONGODB
+# mongo-c-driver 2.x 为静态包提供 mongoc2-static 元数据，允许 Linux 工具链通过变量覆盖为发行版的动态包名。
+# mongo-c-driver 2.x exposes mongoc2-static metadata for static builds while allowing Linux toolchains to override the package name.
+MONGOC_PKG_CONFIG ?= mongoc2-static
+KBE_INCLUDES += $(shell pkg-config --cflags $(MONGOC_PKG_CONFIG))
+LDLIBS += $(shell pkg-config --libs $(MONGOC_PKG_CONFIG))
+CPPFLAGS += -DUSE_KBE_MONGODB
+endif # USE_MONGODB
+
 # everyone needs pthread if LDLINUX_TLS_IS_BROKEN
 ifdef LDLINUX_TLS_IS_BROKEN
 CPPFLAGS += -DLDLINUX_TLS_IS_BROKEN

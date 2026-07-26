@@ -61,7 +61,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>../../lib/python/PC;../../lib/python/Include;../../lib;../../common;../../lib/dependencies/g3dlite;../../server;../../lib/dependencies;../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>USE_OPENSSL;ENABLE_WATCHERS;WIN32;_DEBUG;_CONSOLE;CODE_INLINE;KBE_USE_ASSERTS;USE_KBE_MYSQL;USE_KBE_REDIS;USE_KBE_POSTGRESQL;LOG4CXX_STATIC;KBE_SERVER;KBE_DBMGR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_OPENSSL;ENABLE_WATCHERS;WIN32;_DEBUG;_CONSOLE;CODE_INLINE;KBE_USE_ASSERTS;USE_KBE_MYSQL;USE_KBE_REDIS;USE_KBE_POSTGRESQL;USE_KBE_MONGODB;LOG4CXX_STATIC;KBE_SERVER;KBE_DBMGR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
@@ -76,7 +76,7 @@
       <AdditionalOptions>/ignore:4049
 /ignore:4217
  %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>ncrypt.lib;Dnsapi.lib;secur32.lib;Rpcrt4.lib;crypt32.lib;shlwapi.lib;db_mysql_d.lib;db_redis_d.lib;db_postgresql_d.lib;python37_d.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr_d.lib;db_interface_d.lib;server_d.lib;xml_d.lib;common_d.lib;helper_d.lib;math_d.lib;network_d.lib;thread_d.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ncrypt.lib;Dnsapi.lib;secur32.lib;Rpcrt4.lib;crypt32.lib;shlwapi.lib;db_mysql_d.lib;db_redis_d.lib;db_postgresql_d.lib;db_mongodb_d.lib;python37_d.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr_d.lib;db_interface_d.lib;server_d.lib;xml_d.lib;common_d.lib;helper_d.lib;math_d.lib;network_d.lib;thread_d.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>../../libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
@@ -89,7 +89,7 @@
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>../../lib/python/PC;../../lib/python/Include;../../lib;../../common;../../lib/dependencies/g3dlite;../../server;../../lib/dependencies;../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>USE_OPENSSL;ENABLE_WATCHERS;WIN32;NDEBUG;_CONSOLE;CODE_INLINE;KBE_USE_ASSERTS;USE_KBE_MYSQL;USE_KBE_REDIS;USE_KBE_POSTGRESQL;LOG4CXX_STATIC;KBE_SERVER;KBE_DBMGR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_OPENSSL;ENABLE_WATCHERS;WIN32;NDEBUG;_CONSOLE;CODE_INLINE;KBE_USE_ASSERTS;USE_KBE_MYSQL;USE_KBE_REDIS;USE_KBE_POSTGRESQL;USE_KBE_MONGODB;LOG4CXX_STATIC;KBE_SERVER;KBE_DBMGR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
@@ -103,7 +103,7 @@
     <Link>
       <AdditionalOptions>/ignore:4049
 /ignore:4217 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>ncrypt.lib;Dnsapi.lib;secur32.lib;Rpcrt4.lib;crypt32.lib;shlwapi.lib;db_mysql.lib;db_redis.lib;db_postgresql.lib;python37.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr.lib;db_interface.lib;server.lib;xml.lib;common.lib;helper.lib;math.lib;network.lib;thread.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ncrypt.lib;Dnsapi.lib;secur32.lib;Rpcrt4.lib;crypt32.lib;shlwapi.lib;db_mysql.lib;db_redis.lib;db_postgresql.lib;db_mongodb.lib;python37.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr.lib;db_interface.lib;server.lib;xml.lib;common.lib;helper.lib;math.lib;network.lib;thread.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>../../libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -150,6 +150,10 @@
     </ProjectReference>
     <ProjectReference Include="..\..\lib\db_mysql\db_mysql.vcxproj">
       <Project>{24cb1a43-c6e1-442e-af99-a91d26ba8fa0}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\lib\db_mongodb\db_mongodb.vcxproj">
+      <Project>{e6ef5cfc-f447-477e-b546-2ddf45805d54}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
     <ProjectReference Include="..\..\lib\db_postgresql\db_postgresql.vcxproj">
