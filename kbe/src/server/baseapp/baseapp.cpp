@@ -258,8 +258,8 @@ Baseapp::Baseapp(Network::EventDispatcher& dispatcher,
 	KBEngine::Network::MessageHandlers::pMainMessageHandlers = &BaseappInterface::messageHandlers;
 
 	// hook entitycall
-	static EntityCall::EntityCallCallHookFunc entityCallHookFunc = std::tr1::bind(&Baseapp::createEntityCallCallEntityRemoteMethod, this, 
-		std::tr1::placeholders::_1, std::tr1::placeholders::_2);
+	static EntityCall::EntityCallCallHookFunc entityCallHookFunc = std::bind(&Baseapp::createEntityCallCallEntityRemoteMethod, this,
+		std::placeholders::_1, std::placeholders::_2);
 
 	EntityCall::setEntityCallCallHookFunc(&entityCallHookFunc);
 }

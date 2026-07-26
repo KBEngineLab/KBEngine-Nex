@@ -44,6 +44,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include <functional>
 #include <cctype>
 #include <iterator>
+#include <memory>
+#include <unordered_map>
 #include "common/strutil.h"
 // windows include	
 #if defined( __WIN32__ ) || defined( WIN32 ) || defined( _WIN32 )
@@ -61,9 +63,6 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h> 
-#include <unordered_map>
-#include <functional>
-#include <memory>
 #define _SCL_SECURE_NO_WARNINGS
 #else
 // linux include
@@ -83,9 +82,6 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include <netinet/tcp.h> 
 #include <netinet/ip.h>
 #include <arpa/inet.h>
-#include <tr1/unordered_map>
-#include <tr1/functional>
-#include <tr1/memory>
 #include <linux/types.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -231,8 +227,8 @@ typedef unsigned long											ulong;
 #define const_charptr											const char*
 #define PyObject_ptr											PyObject*
 
-#define KBEShared_ptr											std::tr1::shared_ptr
-#define KBEUnordered_map										std::tr1::unordered_map
+#define KBEShared_ptr											std::shared_ptr
+#define KBEUnordered_map										std::unordered_map
 
 /* Use correct types for x64 platforms, too */
 #if KBE_COMPILER != COMPILER_GNU

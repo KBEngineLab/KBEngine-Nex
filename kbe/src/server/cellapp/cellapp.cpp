@@ -75,8 +75,8 @@ Cellapp::Cellapp(Network::EventDispatcher& dispatcher,
 	KBEngine::Network::MessageHandlers::pMainMessageHandlers = &CellappInterface::messageHandlers;
 
 	// hook entitycall
-	static EntityCall::EntityCallCallHookFunc entityCallCallHookFunc = std::tr1::bind(&Cellapp::createEntityCallCallEntityRemoteMethod, this,
-		std::tr1::placeholders::_1, std::tr1::placeholders::_2);
+	static EntityCall::EntityCallCallHookFunc entityCallCallHookFunc = std::bind(&Cellapp::createEntityCallCallEntityRemoteMethod, this,
+		std::placeholders::_1, std::placeholders::_2);
 
 	EntityCall::setEntityCallCallHookFunc(&entityCallCallHookFunc);
 }
