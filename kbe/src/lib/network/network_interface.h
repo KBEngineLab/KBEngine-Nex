@@ -62,6 +62,9 @@ public:
 		const char * listeningInterface, EndPoint* pEP, ListenerReceiver* pLR, uint32 rbuffer = 0, uint32 wbuffer = 0);
 
 	bool registerChannel(Channel* pChannel);
+	// listener 接受的新 TCP 连接可以替换同一对端地址的旧 Channel，用于处理内核先复用四元组、主线稍后消费断开 completion 的时序。
+	// A newly accepted TCP connection may replace an old Channel for the same peer when the kernel reuses the tuple before the main thread consumes the terminal completion.
+	bool registerAcceptedChannel(Channel* pChannel);
 	bool deregisterChannel(Channel* pChannel);
 	bool deregisterAllChannels();
 	Channel * findChannel(const Address & addr);
@@ -106,6 +109,7 @@ private:
 	virtual void handleTimeout(TimerHandle handle, void * arg);
 
 	void closeSocket();
+	bool registerChannel(Channel* pChannel, bool replaceExistingAcceptedChannel);
 
 private:
 	EndPoint								extEndpoint_, intEndpoint_;

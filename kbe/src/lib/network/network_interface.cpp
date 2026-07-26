@@ -346,6 +346,18 @@ Channel * NetworkInterface::findChannel(KBESOCKET fd)
 //-------------------------------------------------------------------------------------
 bool NetworkInterface::registerChannel(Channel* pChannel)
 {
+	return registerChannel(pChannel, false);
+}
+
+//-------------------------------------------------------------------------------------
+bool NetworkInterface::registerAcceptedChannel(Channel* pChannel)
+{
+	return registerChannel(pChannel, true);
+}
+
+//-------------------------------------------------------------------------------------
+bool NetworkInterface::registerChannel(Channel* pChannel, bool replaceExistingAcceptedChannel)
+{
 	const Address & addr = pChannel->addr();
 	KBE_ASSERT(addr.ip != 0);
 	KBE_ASSERT(&pChannel->networkInterface() == this);
@@ -354,9 +366,24 @@ bool NetworkInterface::registerChannel(Channel* pChannel)
 
 	if(pExisting)
 	{
-		CRITICAL_MSG(fmt::format("NetworkInterface::registerChannel: channel {} is exist.\n",
-		pChannel->c_str()));
-		return false;
+		if (!replaceExistingAcceptedChannel || pExisting == pChannel ||
+			pExisting->protocoltype() != PROTOCOL_TCP ||
+			pExisting->isDestroyed() || pExisting->pEndPoint() == NULL)
+		{
+			CRITICAL_MSG(fmt::format("NetworkInterface::registerChannel: channel {} is exist.\n",
+				pChannel->c_str()));
+			return false;
+		}
+
+		// TCP 内核不会让两条存活连接共享同一四元组；新 accept 成功证明旧 Channel 只是还没有消费终止 completion。
+		// The TCP stack cannot keep two live connections on one tuple; a successful new accept proves the old Channel is only waiting for its terminal completion to be consumed.
+		// 复用统一注销路径，保证上层回调、外部 Channel 计数和 IOCP 取消的顺序与普通断线一致。
+		// Reuse the normal deregistration path so callbacks, external-channel accounting, and IOCP cancellation retain their ordinary disconnect ordering.
+		if (!deregisterChannel(pExisting))
+			return false;
+
+		pExisting->destroy();
+		Network::Channel::reclaimPoolObject(pExisting);
 	}
 
 	channelMap_[addr] = pChannel;

@@ -123,6 +123,9 @@ public:
 	INLINE const Address& addr() const;
 	void pEndPoint(const EndPoint* pEndPoint);
 	INLINE EndPoint * pEndPoint() const;
+	// 暴露只读传输类型，使地址索引维护能够区分 TCP 与 UDP/KCP Channel，而不允许外部改写生命周期状态。
+	// Expose the transport type read-only so address-index maintenance can distinguish TCP from UDP/KCP channels without allowing external lifecycle mutation.
+	ProtocolType protocoltype() const { return protocoltype_; }
 
 	typedef std::vector<Bundle*> Bundles;
 	Bundles & bundles();

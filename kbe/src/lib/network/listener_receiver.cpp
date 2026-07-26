@@ -119,7 +119,7 @@ int ListenerReceiver::handleInputNotification(KBESOCKET fd)
 				return 0;
 			}
 
-			if(!networkInterface_.registerChannel(pChannel))
+			if(!networkInterface_.registerAcceptedChannel(pChannel))
 			{
 				ERROR_MSG(fmt::format("ListenerReceiver::handleInputNotification: registerChannel({}) is failed!\n",
 					pChannel->c_str()));
