@@ -19,12 +19,10 @@
     public class PacketSenderKCP : PacketSenderBase
     {
 		Socket socket_;
-		EndPoint remoteEndPint_;
 
         public PacketSenderKCP(NetworkInterfaceBase networkInterface) : base(networkInterface)
         {
 			socket_ = _networkInterface.sock();
-			remoteEndPint_ = ((NetworkInterfaceKCP)_networkInterface).remoteEndPint;
         }
 
 		~PacketSenderKCP()
@@ -43,7 +41,7 @@
 		{
 			try
 			{
-				socket_.SendTo(packet, size, SocketFlags.None, remoteEndPint_);
+				socket_.Send(packet, 0, size, SocketFlags.None);
 			}
 			catch (SocketException se)
 			{

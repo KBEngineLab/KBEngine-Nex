@@ -623,8 +623,14 @@ namespace KBEngine
 				
 				_networkInterface.reset();
 
-				if (_args.networkType is NETWORK_TYPE.TCP)
+				if (_args.networkType is NETWORK_TYPE.TCP || (_args.networkType is NETWORK_TYPE.KCP && baseappUdpPort == 0))
 				{
+					if (_args.networkType is NETWORK_TYPE.KCP)
+					{
+						// 旧服务端可能不提供 UDP 端点；自动回退 TCP 保持现有账号能够登录。
+						// Older servers may not expose a UDP endpoint; automatically fall back to TCP so existing accounts can still log in.
+						KBELog.WARNING_MSG("KBEngine::login_baseapp(): UDP port is unavailable, falling back to TCP.");
+					}
 					_networkInterface = new NetworkInterfaceTCP();
 					
 					_networkInterface.connectTo(baseappIP, baseappTcpPort, onConnectTo_baseapp_callback, null,_args.domainMapping,_args.portMapping);
@@ -690,8 +696,14 @@ namespace KBEngine
 
 			_networkInterface.reset();
 
-			if (_args.networkType is NETWORK_TYPE.TCP)
+			if (_args.networkType is NETWORK_TYPE.TCP || (_args.networkType is NETWORK_TYPE.KCP && baseappUdpPort == 0))
 			{
+				if (_args.networkType is NETWORK_TYPE.KCP)
+				{
+					// 重登录必须采用与首次登录相同的 UDP 缺失回退规则。
+					// Relogin must use the same missing-UDP fallback rule as the initial login.
+					KBELog.WARNING_MSG("KBEngine::reloginBaseapp(): UDP port is unavailable, falling back to TCP.");
+				}
 				_networkInterface = new NetworkInterfaceTCP();
 				
 				_networkInterface.connectTo(baseappIP, baseappTcpPort, onReConnectTo_baseapp_callback, null,_args.domainMapping,_args.portMapping);

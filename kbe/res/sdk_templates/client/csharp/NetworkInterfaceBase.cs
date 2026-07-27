@@ -271,6 +271,10 @@ namespace KBEngine
 			catch (Exception ex)
 			{
 				KBELog.ERROR_MSG($"NetworkInterfaceBase::ConnectAsync() error: {ex}");
+				// 所有异步失败都必须回到主线程完成连接状态回调，否则登录状态机会永久等待。
+				// Every asynchronous failure must return to the main thread connection callback or the login state machine waits forever.
+				state.error = ex.ToString();
+				Event.fireIn("_onConnectionState", new object[] { state });
 			}
 		}
 

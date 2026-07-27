@@ -70,19 +70,27 @@
 
                 while (true)
                 {
-                    length = kcp_.Recv(_buffer, 0, _buffer.Length);
+					int messageSize = kcp_.PeekSize();
+					if (messageSize < 0)
+						break;
+
+					// KCP 会重组跨 UDP 数据报的完整消息，接收缓冲区必须按 PeekSize 动态扩展。
+					// KCP reassembles complete messages across UDP datagrams, so the receive buffer must grow from PeekSize.
+					byte[] messageBuffer = messageSize <= _buffer.Length ? _buffer : new byte[messageSize];
+					length = kcp_.Recv(messageBuffer, 0, messageBuffer.Length);
                     if (length < 0)
                     {
+						KBELog.ERROR_MSG(string.Format("PacketReceiverKCP::process(): KCP Recv failed with {0}!", length));
                         break;
                     }
 					
                     if (_networkInterface.fileter() != null)
                     {
-                        _networkInterface.fileter().recv(_messageReader, _buffer, 0, (MessageLengthEx)length);
+						_networkInterface.fileter().recv(_messageReader, messageBuffer, 0, (MessageLengthEx)length);
                     }
                     else
                     {
-                        _messageReader.process(_buffer, 0, (MessageLengthEx)length);
+						_messageReader.process(messageBuffer, 0, (MessageLengthEx)length);
                     }
                 }
 			}
