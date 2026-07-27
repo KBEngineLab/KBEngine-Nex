@@ -77,6 +77,25 @@ public:
 
 	int raycast(int layer, const Position3D& start, const Position3D& end, std::vector<Position3D>& hitPointVec);
 
+	/**
+	 * 查找世界坐标所在的最近可行走多边形，并可返回投影点。
+	 * Finds the nearest walkable polygon for a world position and optionally returns its projected point.
+	 */
+	dtPolyRef findNearestPoly(int layer, const Position3D& position, Position3D* nearestPoint = NULL);
+
+	/**
+	 * 沿导航网格表面移动，更新调用方持有的多边形引用以支持连续移动。
+	 * Moves along the navmesh surface and updates the caller-owned polygon reference for continuous movement.
+	 */
+	bool moveAlongSurface(int layer, dtPolyRef& polygon, const Position3D& start,
+		const Position3D& end, Position3D& result);
+
+	/**
+	 * 查询指定多边形上的地面高度，失败时不修改输出参数。
+	 * Queries the ground height on a polygon and leaves the output unchanged on failure.
+	 */
+	bool getPolyHeight(int layer, dtPolyRef polygon, const Position3D& position, float& height);
+
 	virtual NavigationHandle::NAV_TYPE type() const{ return NAV_MESH; }
 
 	static NavigationHandle* create(std::string resPath, const std::map< int, std::string >& params);

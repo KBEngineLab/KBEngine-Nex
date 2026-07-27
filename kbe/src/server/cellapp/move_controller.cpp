@@ -66,7 +66,9 @@ void MoveController::createFromStream(KBEngine::MemoryStream& s)
 	uint8 utype;
 	s >> utype;
 
-	if(utype == MoveToPointHandler::MOVE_TYPE_NAV)
+	if(utype == MoveToPointHandler::MOVE_TYPE_NAV_DETOUR)
+		pMoveToPointHandler_ = new NavigateHandler(true);
+	else if(utype == MoveToPointHandler::MOVE_TYPE_NAV)
 		pMoveToPointHandler_ = new NavigateHandler();
 	else if(utype == MoveToPointHandler::MOVE_TYPE_ENTITY)
 		pMoveToPointHandler_ = new MoveToEntityHandler();

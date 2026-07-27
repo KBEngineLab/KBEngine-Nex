@@ -54,9 +54,10 @@ bool Navigation::removeNavigation(std::string resPath)
 {
 	KBEngine::thread::ThreadGuard tg(&mutex_); 
 	KBEUnordered_map<std::string, NavigationHandlePtr>::iterator iter = navhandles_.find(resPath);
-	if(navhandles_.find(resPath) != navhandles_.end())
+	if(iter != navhandles_.end())
 	{
-		iter->second->decRef();
+		// 容器中的 SmartPointer 会在擦除时释放自身引用，手动减引用会造成重复释放。
+		// The SmartPointer stored in the container releases its reference on erase; a manual decrement would release it twice.
 		navhandles_.erase(iter);
 
 		DEBUG_MSG(fmt::format("Navigation::removeNavigation: ({}) is destroyed!\n", resPath));
@@ -135,7 +136,14 @@ NavigationHandlePtr Navigation::loadNavigation(std::string resPath, const std::m
 	else 	
 	{
 		results.clear();
-		Resmgr::getSingleton().listPathRes(wspath, L"navmesh", results);
+		// Nex 导出的 Detour 数据使用 .bin 扩展名，旧资源仍可能使用 .navmesh。
+		// Nex exports Detour data with the .bin extension, while legacy resources may still use .navmesh.
+		Resmgr::getSingleton().listPathRes(wspath, L"bin", results);
+
+		if(results.size() == 0)
+		{
+			Resmgr::getSingleton().listPathRes(wspath, L"navmesh", results);
+		}
 
 		if(results.size() == 0)
 		{

@@ -304,12 +304,13 @@ public:
 	bool canNavigate();
 	uint32 navigate(const Position3D& destination, float velocity, float distance,
 					float maxMoveDistance, float maxSearchDistance,
-					bool faceMovement, int8 layer, PyObject* userData);
+					bool faceMovement, int8 layer, PyObject* userData, bool useDetour = false);
 	bool navigatePathPoints(std::vector<Position3D>& outPaths, const Position3D& destination, float maxSearchDistance, int8 layer);
 
 	DECLARE_PY_MOTHOD_ARG0(pycanNavigate);
 	DECLARE_PY_MOTHOD_ARG3(pyNavigatePathPoints, PyObject_ptr, float, int8);
 	DECLARE_PY_MOTHOD_ARG8(pyNavigate, PyObject_ptr, float, float, float, float, int8, int8, PyObject_ptr);
+	DECLARE_PY_MOTHOD_ARG8(pyNavigateToDetour, PyObject_ptr, float, float, float, float, int8, int8, PyObject_ptr);
 
 	/** 
 		entity获得随机点 

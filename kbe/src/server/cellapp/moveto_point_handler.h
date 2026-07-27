@@ -36,6 +36,9 @@ public:
 		MOVE_TYPE_POINT = 0,		// 常规类型
 		MOVE_TYPE_ENTITY = 1,		// 范围触发器类型
 		MOVE_TYPE_NAV = 2,			// 移动控制器类型
+		// 使用新类型隔离 Detour 的流格式，保证旧导航控制器备份仍可读取。
+		// A distinct type isolates the Detour stream format so legacy navigation backups remain readable.
+		MOVE_TYPE_NAV_DETOUR = 3,
 	};
 
 	void addToStream(KBEngine::MemoryStream& s);
@@ -64,6 +67,12 @@ public:
 
 	void velocity(float v) {
 		velocity_ = v;
+	}
+
+	// 反序列化处理器时构造函数无法取得拥有它的共享控制器，因此由实体恢复流程显式回填。
+	// A deserialized handler cannot obtain its owning shared controller in the constructor, so entity restoration binds it explicitly.
+	void pController(const KBEShared_ptr<Controller>& controller) {
+		pController_ = controller;
 	}
 
 protected:

@@ -72,6 +72,7 @@ SCRIPT_METHOD_DECLARE("cancelController",			pyCancelController,				METH_VARARGS,
 SCRIPT_METHOD_DECLARE("canNavigate",				pycanNavigate,					METH_VARARGS,				0)
 SCRIPT_METHOD_DECLARE("navigatePathPoints",			pyNavigatePathPoints,			METH_VARARGS,				0)
 SCRIPT_METHOD_DECLARE("navigate",					pyNavigate,						METH_VARARGS,				0)
+SCRIPT_METHOD_DECLARE("navigateToDetour",		pyNavigateToDetour,				METH_VARARGS,				0)
 SCRIPT_METHOD_DECLARE("getRandomPoints",			pyGetRandomPoints,				METH_VARARGS,				0)
 SCRIPT_METHOD_DECLARE("moveToPoint",				pyMoveToPoint,					METH_VARARGS,				0)
 SCRIPT_METHOD_DECLARE("moveToEntity",				pyMoveToEntity,					METH_VARARGS,				0)
@@ -2623,7 +2624,7 @@ PyObject* Entity::pyNavigatePathPoints(PyObject_ptr pyDestination, float maxSear
 
 //-------------------------------------------------------------------------------------
 uint32 Entity::navigate(const Position3D& destination, float velocity, float distance, float maxMoveDistance, float maxSearchDistance,
-	bool faceMovement, int8 layer, PyObject* userData)
+	bool faceMovement, int8 layer, PyObject* userData, bool useDetour)
 {
 	VECTOR_POS3D_PTR paths_ptr( new std::vector<Position3D>() );
 	navigatePathPoints(*paths_ptr, destination, maxSearchDistance, layer);
@@ -2638,8 +2639,16 @@ uint32 Entity::navigate(const Position3D& destination, float velocity, float dis
 
 	KBEShared_ptr<Controller> p(new MoveController(this, NULL));
 	
-	new NavigateHandler(p, destination, velocity, 
-		distance, faceMovement, maxMoveDistance, paths_ptr, userData);
+	if (useDetour)
+	{
+		new NavigateHandler(p, destination, velocity, distance,
+			faceMovement, maxMoveDistance, layer, userData);
+	}
+	else
+	{
+		new NavigateHandler(p, destination, velocity,
+			distance, faceMovement, maxMoveDistance, paths_ptr, userData);
+	}
 
 	bool ret = pControllers_->add(p);
 	KBE_ASSERT(ret);
@@ -2689,6 +2698,40 @@ PyObject* Entity::pyNavigate(PyObject_ptr pyDestination, float velocity, float d
 
 	return PyLong_FromLong(navigate(destination, velocity, distance, maxMoveDistance, 
 		maxDistance, faceMovement > 0, layer, userData));
+}
+
+//-------------------------------------------------------------------------------------
+PyObject* Entity::pyNavigateToDetour(PyObject_ptr pyDestination, float velocity, float distance,
+	float maxMoveDistance, float maxDistance, int8 faceMovement, int8 layer, PyObject_ptr userData)
+{
+	if(!isReal())
+	{
+		PyErr_Format(PyExc_AssertionError, "%s::navigateToDetour: not is real entity(%d).",
+			scriptName(), id());
+		PyErr_PrintEx(0);
+		return 0;
+	}
+
+	if(this->isDestroyed())
+	{
+		PyErr_Format(PyExc_AssertionError, "%s::navigateToDetour: %d is destroyed!\n",
+			scriptName(), id());
+		PyErr_PrintEx(0);
+		return 0;
+	}
+
+	if(!PySequence_Check(pyDestination) || PySequence_Size(pyDestination) != 3)
+	{
+		PyErr_Format(PyExc_TypeError, "%s::navigateToDetour: args1(position) invalid!", scriptName());
+		PyErr_PrintEx(0);
+		return 0;
+	}
+
+	Position3D destination;
+	script::ScriptVector3::convertPyObjectToVector3(destination, pyDestination);
+
+	return PyLong_FromLong(navigate(destination, velocity, distance, maxMoveDistance,
+		maxDistance, faceMovement > 0, layer, userData, true));
 }
 
 //-------------------------------------------------------------------------------------
@@ -4288,6 +4331,9 @@ void Entity::createMovementHandlerFromStream(KBEngine::MemoryStream& s)
 
 		pMoveController_ = KBEShared_ptr<Controller>(new MoveController(this));
 		pMoveController_->createFromStream(s);
+		// 控制器必须先完成流恢复，再把同一个共享所有权交还给移动处理器。
+		// The controller must restore its stream first, then return the same shared ownership to its movement handler.
+		static_cast<MoveController*>(pMoveController_.get())->bindHandlerController(pMoveController_);
 		pControllers_->add(pMoveController_);
 	}
 	

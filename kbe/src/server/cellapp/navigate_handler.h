@@ -24,6 +24,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "move_controller.h"	
 #include "math/math.h"
 #include "navigation/navigation_handle.h"
+#include "navigation/navigation_mesh_handle.h"
 
 namespace KBEngine{
 
@@ -33,24 +34,40 @@ public:
 	NavigateHandler(KBEShared_ptr<Controller>& pController, const Position3D& destPos, float velocity, float distance, bool faceMovement, 
 		float maxMoveDistance, VECTOR_POS3D_PTR paths_ptr,
 		PyObject* userarg);
+	NavigateHandler(KBEShared_ptr<Controller>& pController, const Position3D& destPos,
+		float velocity, float distance, bool faceMovement, float maxMoveDistance,
+		int8 layer, PyObject* userarg);
 
 	NavigateHandler();
+	explicit NavigateHandler(bool useDetour);
 	virtual ~NavigateHandler();
 	
 	void addToStream(KBEngine::MemoryStream& s);
 	void createFromStream(KBEngine::MemoryStream& s);
 
 	virtual bool requestMoveOver(const Position3D& oldPos);
+	virtual bool update();
 
 	virtual bool isOnGround(){ return true; }
 
-	virtual MoveType type() const { return MOVE_TYPE_NAV; }
+	virtual MoveType type() const { return useDetour_ ? MOVE_TYPE_NAV_DETOUR : MOVE_TYPE_NAV; }
 
 protected:
+	bool updateDetour();
+	bool buildDetourPath(const Position3D& currentPosition);
+	bool requestMoveFailure();
+	void invalidateDetourPath();
+
 	int destPosIdx_;
 	VECTOR_POS3D_PTR paths_;
 
 	float maxMoveDistance_;
+	bool useDetour_;
+	NavigationHandlePtr navHandle_;
+	dtPolyRef currentPolygon_;
+	std::vector<Position3D> straightPath_;
+	size_t straightPathIndex_;
+	uint8 retryCount_;
 };
  
 }

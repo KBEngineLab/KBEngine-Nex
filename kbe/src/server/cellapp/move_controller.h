@@ -49,6 +49,12 @@ public:
 		pMoveToPointHandler_->velocity(v);
 	}
 
+	// 流恢复完成后统一绑定共享控制器，避免处理器持有无所有权保证的裸指针。
+	// Bind the shared controller after stream restoration so the handler never relies on an unowned raw pointer.
+	void bindHandlerController(const KBEShared_ptr<Controller>& controller) {
+		pMoveToPointHandler_->pController(controller);
+	}
+
 protected:
 	MoveToPointHandler* pMoveToPointHandler_;
 };

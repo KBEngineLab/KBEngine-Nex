@@ -47,6 +47,14 @@ thread::TPTask::TPTaskState LoadNavmeshTask::presentMainThread()
 	}
 	else
 	{
+		if(pNavigationHandle == NULL)
+		{
+			// 保留既有几何加载完成回调，避免改变脚本生命周期，同时明确暴露资源加载失败。
+			// Preserve the existing geometry completion callback to avoid changing script lifecycle while exposing the load failure.
+			ERROR_MSG(fmt::format("LoadNavmeshTask::presentMainThread(): failed to load navigation resource({}) for space({})\n",
+				resPath_, spaceID_));
+		}
+
 		pSpace->onLoadedSpaceGeometryMapping(pNavigationHandle);
 	}
 	

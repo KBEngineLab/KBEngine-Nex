@@ -422,6 +422,95 @@ int NavMeshHandle::raycast(int layer, const Position3D& start, const Position3D&
 }
 
 //-------------------------------------------------------------------------------------
+dtPolyRef NavMeshHandle::findNearestPoly(int layer, const Position3D& position, Position3D* nearestPoint)
+{
+	std::map<int, NavmeshLayer>::iterator iter = navmeshLayer.find(layer);
+	if (iter == navmeshLayer.end())
+		return INVALID_NAVMESH_POLYREF;
+
+	dtQueryFilter filter;
+	filter.setIncludeFlags(0xffff);
+	filter.setExcludeFlags(0);
+
+	const float point[3] = { position.x, position.y, position.z };
+	const float extents[3] = { 2.f, 4.f, 2.f };
+	float projectedPoint[3] = { position.x, position.y, position.z };
+	dtPolyRef polygon = INVALID_NAVMESH_POLYREF;
+
+	dtStatus status = iter->second.pNavmeshQuery->findNearestPoly(
+		point, extents, &filter, &polygon, projectedPoint);
+
+	if (dtStatusFailed(status) || polygon == INVALID_NAVMESH_POLYREF)
+		return INVALID_NAVMESH_POLYREF;
+
+	if (nearestPoint != NULL)
+	{
+		nearestPoint->x = projectedPoint[0];
+		nearestPoint->y = projectedPoint[1];
+		nearestPoint->z = projectedPoint[2];
+	}
+
+	return polygon;
+}
+
+//-------------------------------------------------------------------------------------
+bool NavMeshHandle::moveAlongSurface(int layer, dtPolyRef& polygon, const Position3D& start,
+	const Position3D& end, Position3D& result)
+{
+	if (polygon == INVALID_NAVMESH_POLYREF)
+		return false;
+
+	std::map<int, NavmeshLayer>::iterator iter = navmeshLayer.find(layer);
+	if (iter == navmeshLayer.end())
+		return false;
+
+	dtQueryFilter filter;
+	filter.setIncludeFlags(0xffff);
+	filter.setExcludeFlags(0);
+
+	const float startPoint[3] = { start.x, start.y, start.z };
+	const float endPoint[3] = { end.x, end.y, end.z };
+	float movedPoint[3] = { start.x, start.y, start.z };
+	dtPolyRef visitedPolygons[16];
+	int visitedCount = 0;
+
+	dtStatus status = iter->second.pNavmeshQuery->moveAlongSurface(
+		polygon, startPoint, endPoint, &filter, movedPoint,
+		visitedPolygons, &visitedCount, 16);
+
+	if (dtStatusFailed(status))
+		return false;
+
+	if (visitedCount > 0)
+		polygon = visitedPolygons[visitedCount - 1];
+
+	result.x = movedPoint[0];
+	result.y = movedPoint[1];
+	result.z = movedPoint[2];
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
+bool NavMeshHandle::getPolyHeight(int layer, dtPolyRef polygon, const Position3D& position, float& height)
+{
+	if (polygon == INVALID_NAVMESH_POLYREF)
+		return false;
+
+	std::map<int, NavmeshLayer>::iterator iter = navmeshLayer.find(layer);
+	if (iter == navmeshLayer.end())
+		return false;
+
+	const float point[3] = { position.x, position.y, position.z };
+	float result = height;
+	dtStatus status = iter->second.pNavmeshQuery->getPolyHeight(polygon, point, &result);
+	if (dtStatusFailed(status))
+		return false;
+
+	height = result;
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
 NavigationHandle* NavMeshHandle::create(std::string resPath, const std::map< int, std::string >& params)
 {
 	if(resPath == "")
@@ -438,7 +527,14 @@ NavigationHandle* NavMeshHandle::create(std::string resPath, const std::map< int
 	if(params.size() == 0)
 	{
 		std::vector<std::wstring> results;
-		Resmgr::getSingleton().listPathRes(wspath, L"navmesh", results);
+		// 加载器必须与 Navigation 的类型探测规则一致，否则会出现探测成功但句柄创建失败。
+		// The loader must match Navigation's type detection or detection can succeed while handle creation fails.
+		Resmgr::getSingleton().listPathRes(wspath, L"bin", results);
+
+		if(results.size() == 0)
+		{
+			Resmgr::getSingleton().listPathRes(wspath, L"navmesh", results);
+		}
 
 		if(results.size() == 0)
 		{
