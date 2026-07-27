@@ -112,6 +112,7 @@ struct DBInterfaceInfo
 		memset(db_username, 0, sizeof(db_username));
 		memset(db_password, 0, sizeof(db_password));
 		memset(db_authSource, 0, sizeof(db_authSource));
+		memset(db_replicaSet, 0, sizeof(db_replicaSet));
 		memset(db_name, 0, sizeof(db_name));
 	}
 
@@ -126,6 +127,9 @@ struct DBInterfaceInfo
 	// MongoDB 认证数据库；为空时使用业务数据库以保持现有配置兼容。
 	// MongoDB authentication database; an empty value uses the application database for backward compatibility.
 	char db_authSource[MAX_NAME];
+	// MongoDB 副本集名称；为空时保持单节点部署行为。
+	// MongoDB replica-set name; an empty value preserves standalone deployment behavior.
+	char db_replicaSet[MAX_NAME];
 	bool db_passwordEncrypt;								// db密码是否是加密的
 	char db_name[MAX_NAME];									// 数据库名
 	uint16 db_numConnections;								// 数据库最大连接

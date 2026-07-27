@@ -610,6 +610,9 @@ protected:
 	std::string accountName_;
 	std::string password_;
 	std::string postdatas_, getdatas_;
+	// 接口鉴权结果在数据库任务重放期间保持不变，不能与每次尝试产生的返回码共用状态。
+	// The interface authentication result remains immutable across database task replays and must not share state with per-attempt return codes.
+	SERVER_ERROR_CODE interfacesRetcode_;
 	SERVER_ERROR_CODE retcode_;
 	COMPONENT_ID componentID_;
 	ENTITY_ID entityID_;

@@ -52,6 +52,9 @@ public:
 	virtual bool db_thread_process() = 0;
 	virtual DBTaskBase* tryGetNextTask(){ return NULL; }
 	virtual thread::TPTask::TPTaskState presentMainThread();
+	// 结构同步任务需要由后端决定是否启用事务，避免把 MongoDB 索引枚举放进多文档事务。
+	// Schema synchronization lets each backend choose transaction usage so MongoDB index enumeration never enters a multi-document transaction.
+	virtual bool isSchemaSynchronization() const { return false; }
 
 	virtual void pdbi(DBInterface* ptr){ pdbi_ = ptr; }
 	void transactionResult(DBTransactionResult value){ transactionResult_ = value; }
@@ -78,6 +81,9 @@ public:
 	virtual ~DBTaskSyncTable();
 	virtual bool db_thread_process();
 	virtual thread::TPTask::TPTaskState presentMainThread();
+	// 该标记只描述任务类别，具体事务能力仍由数据库适配层声明。
+	// This flag identifies the task category; the database adapter still declares the actual transaction capability.
+	virtual bool isSchemaSynchronization() const { return true; }
 
 protected:
 	KBEShared_ptr<EntityTable> pEntityTable_;

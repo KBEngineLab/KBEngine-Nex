@@ -196,6 +196,7 @@ DBInterface* DBUtil::createInterface(const std::string& name, bool showinfo)
 	dbinterface->db_numConnections_ = pDBInfo->db_numConnections;
 	kbe_snprintf(dbinterface->db_password_, MAX_BUF * 10, "%s", pDBInfo->db_password);
 	kbe_snprintf(dbinterface->db_authSource_, MAX_BUF, "%s", pDBInfo->db_authSource);
+	kbe_snprintf(dbinterface->db_replicaSet_, MAX_BUF, "%s", pDBInfo->db_replicaSet);
 
 	if (!dbinterface->attach(pDBInfo->db_name))
 	{

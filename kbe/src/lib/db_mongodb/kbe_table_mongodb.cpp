@@ -66,6 +66,7 @@ namespace KBEngine {
 
 			mongoDBI(pdbi)->setLastError(error);
 			ERROR_MSG(fmt::format("{}: {}\n", operation, error.message));
+			mongoDBI(pdbi)->throwError();
 			return false;
 		}
 
@@ -205,6 +206,7 @@ namespace KBEngine {
 				{
 					mongoDBI(pdbi)->setLastError(error);
 					ERROR_MSG(fmt::format("find_one({}): {}\n", collection, error.message));
+					mongoDBI(pdbi)->throwError();
 				}
 
 				return false;

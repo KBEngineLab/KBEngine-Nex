@@ -148,6 +148,9 @@ public:
 	virtual bool lock() = 0;
 	virtual DBTransactionResult unlock() = 0;
 	virtual bool rollback() = 0;
+	// PostgreSQL 等数据库可以保留事务化 DDL；不允许事务内执行索引命令的后端应覆盖此能力。
+	// Databases such as PostgreSQL retain transactional DDL; backends that forbid index commands in transactions override this capability.
+	virtual bool supportsTransactionalSchemaSynchronization() const { return true; }
 
 	/**
 		处理异常
@@ -169,6 +172,9 @@ protected:
 	// MongoDB 的独立认证数据库；其他数据库适配层忽略该字段。
 	// Separate MongoDB authentication database; other database adapters ignore this field.
 	char db_authSource_[MAX_BUF];
+	// MongoDB 副本集发现名称；其他数据库适配层忽略该字段。
+	// MongoDB replica-set discovery name; other database adapters ignore this field.
+	char db_replicaSet_[MAX_BUF];
 	char db_name_[MAX_BUF];									// 数据库名
 	uint16 db_numConnections_;								// 数据库最大连接
 	std::string lastquery_;									// 最后一次查询描述

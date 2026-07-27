@@ -944,6 +944,12 @@ bool ServerConfig::loadConfig(std::string fileName)
 					else
 						missingFields.push_back("port");
 
+					// replicaSet 是可选的 MongoDB 拓扑配置；指定后驱动会从种子节点发现并切换主节点。
+					// replicaSet is optional MongoDB topology configuration; when set, the driver discovers members and follows primary changes from the seed node.
+					node = xml->enterNode(interfaceNode, "replicaSet");
+					if (node != NULL)
+						strncpy((char*)&pDBInfo->db_replicaSet, xml->getValStr(node).c_str(), MAX_NAME - 1);
+
 					node = xml->enterNode(interfaceNode, "auth");
 					if(node != NULL)
 					{

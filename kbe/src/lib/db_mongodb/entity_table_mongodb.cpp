@@ -217,7 +217,7 @@ namespace KBEngine {
 		{
 			pdbiMongodb->setLastError(cursorError);
 			ERROR_MSG(fmt::format("EntityTableMongodb::syncIndexToDB({}): {}\n", name, cursorError.message));
-			return false;
+			pdbiMongodb->throwError();
 		}
 
 		std::vector<EntityTableItem*>::iterator iiter = indexs.begin();
@@ -360,6 +360,7 @@ namespace KBEngine {
 		{
 			pdbiMongodb->setLastError(error);
 			ERROR_MSG(fmt::format("EntityTableMongodb::queryAutoLoadEntities: {}\n", error.message));
+			pdbiMongodb->throwError();
 		}
 
 		bson_destroy(&fields);
@@ -748,6 +749,7 @@ namespace KBEngine {
 		if (mongoc_cursor_error(guard->cursor(), &error)) {
 			pdbiMongodb->setLastError(error);
 			ERROR_MSG(fmt::format("An error occurred: {}\n", error.message));
+			pdbiMongodb->throwError();
 		}
 
 		if (doc == NULL)

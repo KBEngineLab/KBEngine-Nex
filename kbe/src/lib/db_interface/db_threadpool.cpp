@@ -87,19 +87,41 @@ public:
 	virtual void processTask(thread::TPTask* pTask)
 	{
 		DBTaskBase* pDBTask = static_cast<DBTaskBase*>(pTask);
+		// 有限重放可覆盖短暂断线和主节点切换，同时防止永久故障占住数据库工作线程。
+		// Bounded replay covers brief disconnects and primary transitions without trapping a DB worker on a permanent failure.
+		const uint32 maxRetries = 6;
+		uint32 retryCount = 0;
+		auto waitBeforeRetry = [](uint32 count)
+		{
+			const uint32 exponentialDelay = 250U << (count - 1);
+			KBEngine::sleep(exponentialDelay > 4000U ? 4000U : exponentialDelay);
+		};
+		// MongoDB 禁止在多文档事务内执行 listIndexes 等结构命令，其他任务仍使用完整事务边界。
+		// MongoDB forbids schema commands such as listIndexes in multi-document transactions; all other tasks keep full transaction boundaries.
+		const bool useTransaction = !pDBTask->isSchemaSynchronization() ||
+			_pDBInterface->supportsTransactionalSchemaSynchronization();
 		while (true)
 		{
-			bool transactionStarted = false;
-			try
+			bool transactionStarted = !useTransaction;
+			if (useTransaction)
 			{
-				transactionStarted = _pDBInterface->lock();
-			}
-			catch (std::exception& e)
-			{
-				// BEGIN 之前没有用户数据，连接恢复后可以安全地重新建立事务而不重复写入。
-				// No user data exists before BEGIN, so reconnecting and opening a new transaction cannot duplicate writes.
-				if (_pDBInterface->processException(e))
-					continue;
+				try
+				{
+					transactionStarted = _pDBInterface->lock();
+				}
+				catch (std::exception& e)
+				{
+					// BEGIN 之前没有用户数据，连接恢复后可以安全地重新建立事务而不重复写入。
+					// No user data exists before BEGIN, so reconnecting and opening a new transaction cannot duplicate writes.
+					if (_pDBInterface->processException(e) && retryCount < maxRetries)
+					{
+						++retryCount;
+						// 递增退避覆盖 MongoDB 默认选举窗口，同时把最长单次等待限制为四秒。
+						// Incremental backoff covers MongoDB's default election window while capping each wait at four seconds.
+						waitBeforeRetry(retryCount);
+						continue;
+					}
+				}
 			}
 
 			if (!transactionStarted)
@@ -128,18 +150,33 @@ public:
 			{
 				// 死锁或连接恢复会使当前事务失效，重放任务前必须建立全新的事务边界。
 				// A deadlock or reconnect invalidates the current transaction, so task replay requires a fresh transaction boundary.
-				_pDBInterface->rollback();
+				if (useTransaction)
+					_pDBInterface->rollback();
+
+				if (retryCount >= maxRetries)
+				{
+					ERROR_MSG(fmt::format("DBThread::processTask: retry budget exhausted, task={:p}, retries={}.\n",
+						(void*)pTask, retryCount));
+					pDBTask->transactionResult(DB_TRANSACTION_NOT_COMMITTED);
+					return;
+				}
+
+				++retryCount;
+				// 瞬态错误立即重放只会命中同一份过期拓扑，有限退避比扩大重试次数更可控。
+				// Immediate replay of a transient error only sees the same stale topology; bounded backoff is safer than expanding the retry count.
+				waitBeforeRetry(retryCount);
 				continue;
 			}
 
 			if (failed)
 			{
-				_pDBInterface->rollback();
+				if (useTransaction)
+					_pDBInterface->rollback();
 				pDBTask->transactionResult(DB_TRANSACTION_NOT_COMMITTED);
 				return;
 			}
 
-			DBTransactionResult result = _pDBInterface->unlock();
+			DBTransactionResult result = useTransaction ? _pDBInterface->unlock() : DB_TRANSACTION_COMMITTED;
 			pDBTask->transactionResult(result);
 			if (result != DB_TRANSACTION_COMMITTED)
 			{

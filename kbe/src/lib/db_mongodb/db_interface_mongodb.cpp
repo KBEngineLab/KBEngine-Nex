@@ -199,6 +199,13 @@ namespace KBEngine {
 		}
 
 		bool uriOK = mongoc_uri_set_database(uri, db_name_) && mongoc_uri_set_appname(uri, "KBEngine-dbmgr");
+		if (db_replicaSet_[0] != '\0')
+		{
+			// 显式副本集名称把 host:port 变为种子地址，使驱动能够发现其他成员并跟随 PRIMARY 切换。
+			// An explicit replica-set name turns host:port into a seed address so the driver can discover members and follow PRIMARY changes.
+			uriOK = uriOK && mongoc_uri_set_option_as_utf8(uri, MONGOC_URI_REPLICASET, db_replicaSet_);
+		}
+
 		if (db_username_[0] != '\0')
 		{
 			// 显式认证数据库适配集中管理的 root@admin；空值继续认证业务库，兼容原有部署。
@@ -423,6 +430,11 @@ namespace KBEngine {
 			const bool unknown = mongoc_error_has_label(&reply, "UnknownTransactionCommitResult") ||
 				mongodb::DBException(this).isLostConnection();
 			bson_destroy(&reply);
+			// commitTransaction 一旦返回，驱动不允许再对同一事务调用 abort；这里只丢弃本地会话且绝不重放结果不确定的提交。
+			// Once commitTransaction returns, the driver forbids aborting that transaction; discard only the local session and never replay an indeterminate commit.
+			mongoc_client_session_destroy(session_);
+			session_ = NULL;
+			inTransaction(false);
 			return unknown ? DB_TRANSACTION_UNKNOWN : DB_TRANSACTION_NOT_COMMITTED;
 		}
 
@@ -875,7 +887,10 @@ namespace KBEngine {
 		bson_destroy(&options);
 		mongoc_collection_destroy(collection);
 
-		return r;
+		if (!r)
+			throwError();
+
+		return true;
 	}
 
 	std::unique_ptr<MongoCursorGuard> DBInterfaceMongodb::collectionFind(const char* tableName, mongoc_query_flags_t flags, uint32_t skip, uint32_t limit, uint32_t  batch_size, const bson_t* query, const bson_t* fields, const mongoc_read_prefs_t* read_prefs)
@@ -914,7 +929,8 @@ namespace KBEngine {
 		if (!appendSession(&opts))
 		{
 			bson_destroy(&opts);
-			return std::make_unique<MongoCursorGuard>(collection, nullptr);
+			mongoc_collection_destroy(collection);
+			throwError();
 		}
 
 		mongoc_cursor_t* cursor =
@@ -959,7 +975,10 @@ namespace KBEngine {
 
 		bson_destroy(&options);
 		mongoc_collection_destroy(collection);
-		return r;
+		if (!r)
+			throwError();
+
+		return true;
 	}
 
 	bool DBInterfaceMongodb::collectionRemove(const char* tableName, mongoc_remove_flags_t flags, const bson_t* selector, const mongoc_write_concern_t* write_concern)
@@ -987,7 +1006,10 @@ namespace KBEngine {
 
 		bson_destroy(&options);
 		mongoc_collection_destroy(collection);
-		return r;
+		if (!r)
+			throwError();
+
+		return true;
 	}
 
 	std::unique_ptr<MongoCursorGuard> DBInterfaceMongodb::collectionFindIndexes(const char* tableName)
@@ -1002,7 +1024,8 @@ namespace KBEngine {
 		if (!appendSession(&opts))
 		{
 			bson_destroy(&opts);
-			return std::make_unique<MongoCursorGuard>(collection, nullptr);
+			mongoc_collection_destroy(collection);
+			throwError();
 		}
 
 		mongoc_cursor_t* cursor =

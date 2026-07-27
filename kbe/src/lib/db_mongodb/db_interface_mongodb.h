@@ -150,6 +150,9 @@ namespace KBEngine
 		virtual bool lock();
 		virtual DBTransactionResult unlock();
 		virtual bool rollback();
+		// MongoDB 不允许在多文档事务中执行 listIndexes，结构同步必须在普通会话中完成。
+		// MongoDB forbids listIndexes in multi-document transactions, so schema synchronization must run in a regular session.
+		virtual bool supportsTransactionalSchemaSynchronization() const { return false; }
 
 		void throwError();
 		bool beginTransaction();

@@ -1692,6 +1692,7 @@ accountName_(accountName),
 password_(password),
 postdatas_(postdatas),
 getdatas_(getdatas),
+interfacesRetcode_(retcode),
 retcode_(retcode),
 componentID_(0),
 entityID_(0),
@@ -1712,13 +1713,21 @@ DBTaskAccountLogin::~DBTaskAccountLogin()
 bool DBTaskAccountLogin::db_thread_process()
 {
 	// 如果Interfaces已经判断不成功就没必要继续下去
-	if(retcode_ != SERVER_SUCCESS)
+	if(interfacesRetcode_ != SERVER_SUCCESS)
 	{
-		ERROR_MSG(fmt::format("DBTaskAccountLogin::db_thread_process(): interfaces report failed(errcode={})!\n", retcode_));
+		ERROR_MSG(fmt::format("DBTaskAccountLogin::db_thread_process(): interfaces report failed(errcode={})!\n", interfacesRetcode_));
 		return false;
 	}
 
+	// 数据库异常会从头重放整个任务，每次尝试必须从干净的输出状态开始。
+	// Database exceptions replay the whole task, so every attempt must begin with clean output state.
 	retcode_ = SERVER_ERR_OP_FAILED;
+	componentID_ = 0;
+	entityID_ = 0;
+	dbid_ = 0;
+	flags_ = 0;
+	deadline_ = 0;
+	serverGroupID_ = 0;
 
 	if(accountName_.size() == 0)
 	{
