@@ -86,6 +86,13 @@ public:
 	*/
 	virtual void newCall(Network::Bundle& bundle);
 
+	/**
+		按组件脚本类型查找当前调用目标可见的组件代理；all 为 true 时返回全部同类型实例。
+		Find component-call proxies visible to this call target by component script type; return every matching instance when all is true.
+	*/
+	PyObject* pyGetComponent(const std::string& componentName, bool all);
+	static PyObject* __py_pyGetComponent(PyObject* self, PyObject* args);
+
 	/** 
 		通过entity的ID尝试寻找它的实例
 	*/

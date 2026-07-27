@@ -20,6 +20,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include "entity_call.h"
+#include "entity_component_call.h"
 #include "scriptdef_module.h"
 #include "helper/debug_helper.h"
 #include "network/channel.h"	
@@ -39,6 +40,7 @@ EntityCall::EntityCallCallHookFunc*	EntityCall::__hookCallFuncPtr = NULL;
 EntityCall::ENTITYCALLS EntityCall::entityCalls;
 
 SCRIPT_METHOD_DECLARE_BEGIN(EntityCall)
+	SCRIPT_METHOD_DECLARE("getComponent", pyGetComponent, METH_VARARGS, 0)
 SCRIPT_METHOD_DECLARE_END()
 
 SCRIPT_MEMBER_DECLARE_BEGIN(EntityCall)
@@ -142,6 +144,16 @@ PyObject* EntityCall::onScriptGetAttribute(PyObject* attr)
 		}
 
 		return createRemoteMethod(pMethodDescription);
+	}
+	else
+	{
+		// 组件属性必须先转换为携带父属性 UID 的调用代理，后续方法编码才能与普通实体 RPC 明确区分。
+		// Component properties must become call proxies carrying the parent-property UID so later method encoding remains distinct from regular entity RPCs.
+		PropertyDescription* pComponentPropertyDescription =
+			pScriptModule_->findComponentPropertyDescription(ccattr);
+
+		if(pComponentPropertyDescription != NULL)
+			return new EntityComponentCall(this, pComponentPropertyDescription);
 	}
 
 	// 首先要求名称不能为自己  比如：自身是一个cell， 不能使用cell.cell
@@ -301,6 +313,68 @@ void EntityCall::newCall(Network::Bundle& bundle)
 		bundle << static_cast<uint8>(0);
 	else
 		bundle << static_cast<ENTITY_PROPERTY_UID>(0);
+}
+
+//-------------------------------------------------------------------------------------
+PyObject* EntityCall::pyGetComponent(const std::string& componentName, bool all)
+{
+	std::vector<EntityComponentCall*> founds =
+		EntityComponentCall::getComponents(componentName, this, pScriptModule_);
+
+	if(!all)
+	{
+		if(founds.empty())
+			Py_RETURN_NONE;
+
+		// 属性查询返回新引用；单结果模式必须释放未返回项，避免重复组件类型在每次查询时泄漏代理对象。
+		// Attribute lookup returns new references; single-result mode must release unreturned entries to avoid leaking proxies on repeated component types.
+		for(size_t i = 1; i < founds.size(); ++i)
+			Py_DECREF(founds[i]);
+
+		return founds[0];
+	}
+
+	PyObject* pyComponents = PyTuple_New(static_cast<Py_ssize_t>(founds.size()));
+	if(pyComponents == NULL)
+	{
+		for(size_t i = 0; i < founds.size(); ++i)
+			Py_DECREF(founds[i]);
+
+		return NULL;
+	}
+
+	for(Py_ssize_t i = 0; i < static_cast<Py_ssize_t>(founds.size()); ++i)
+	{
+		// PyTuple_SET_ITEM 接管新引用，成功路径不得再次递减引用计数。
+		// PyTuple_SET_ITEM steals each new reference, so the success path must not decrement it again.
+		PyTuple_SET_ITEM(pyComponents, i, founds[static_cast<size_t>(i)]);
+	}
+
+	return pyComponents;
+}
+
+//-------------------------------------------------------------------------------------
+PyObject* EntityCall::__py_pyGetComponent(PyObject* self, PyObject* args)
+{
+	const Py_ssize_t argsSize = PyTuple_Size(args);
+	if(argsSize < 1 || argsSize > 2)
+	{
+		PyErr_SetString(PyExc_TypeError, "EntityCall.getComponent() requires one or two arguments");
+		return NULL;
+	}
+
+	const char* componentName = NULL;
+	PyObject* pyAll = Py_False;
+	if(!PyArg_ParseTuple(args, "s|O:getComponent", &componentName, &pyAll))
+		return NULL;
+
+	// 第二参数遵循 Python 真值语义，同时让无效对象通过标准异常返回给脚本而不是吞掉错误。
+	// The second argument follows Python truth semantics and propagates standard errors instead of swallowing invalid objects.
+	const int all = PyObject_IsTrue(pyAll);
+	if(all < 0)
+		return NULL;
+
+	return static_cast<EntityCall*>(self)->pyGetComponent(componentName, all != 0);
 }
 
 //-------------------------------------------------------------------------------------

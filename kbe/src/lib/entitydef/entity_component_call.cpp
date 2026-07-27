@@ -56,9 +56,17 @@ EntityComponentCall::~EntityComponentCall()
 //-------------------------------------------------------------------------------------
 RemoteEntityMethod* EntityComponentCall::createRemoteMethod(MethodDescription* pMethodDescription)
 {
-	// The 1.x abstract call layer does not expose the 2.x component hook.
 	// 1.x 抽象调用层未提供 2.x 组件钩子，因此直接创建远程方法包装器。
+	// The 1.x abstract call layer does not expose the 2.x component hook, so create the remote-method wrapper directly.
 	return new RemoteEntityMethod(pMethodDescription, this);
+}
+
+//-------------------------------------------------------------------------------------
+Network::Channel* EntityComponentCall::getChannel(void)
+{
+	// 父调用对象集中管理本地直达与跨 Base/Cell 转发通道，组件代理只增加协议寻址信息。
+	// The parent call centralizes direct and Base/Cell-forwarded channels; the component proxy only adds protocol addressing data.
+	return pEntityCall_->getChannel();
 }
 
 //-------------------------------------------------------------------------------------

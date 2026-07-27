@@ -62,6 +62,12 @@ public:
 	virtual RemoteEntityMethod* createRemoteMethod(MethodDescription* pMethodDescription);
 
 	/**
+		组件调用代理不拥有独立连接，始终复用父 EntityCall 的通道与转发语义。
+		A component-call proxy owns no separate connection and always reuses its parent EntityCall channel and forwarding semantics.
+	*/
+	Network::Channel* getChannel(void) override;
+
+	/**
 		unpickle方法
 	*/
 	static PyObject* __unpickle__(PyObject* self, PyObject* args);
