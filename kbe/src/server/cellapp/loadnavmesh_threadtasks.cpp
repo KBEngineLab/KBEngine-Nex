@@ -45,6 +45,13 @@ thread::TPTask::TPTaskState LoadNavmeshTask::presentMainThread()
 		WARNING_MSG(fmt::format("LoadNavmeshTask::presentMainThread(): space({}) was removed while loading navigation resource({})\n",
 			spaceID_, resPath_));
 	}
+	else if(!pSpace->isGeometryLoadCurrent(resPath_, loadGeneration_))
+	{
+		// 路径切换或卸载后，旧任务可以完成缓存填充，但不能覆盖 Space 的新几何状态。
+		// After a path switch or unload, an old task may populate the cache but must not overwrite the Space's new geometry state.
+		WARNING_MSG(fmt::format("LoadNavmeshTask::presentMainThread(): ignored stale navigation resource({}) generation({}) for space({})\n",
+			resPath_, loadGeneration_, spaceID_));
+	}
 	else if(!loadSucceeded_)
 	{
 		ERROR_MSG(fmt::format("LoadNavmeshTask::presentMainThread(): failed to load navigation resource({}) for space({})\n",
@@ -52,7 +59,7 @@ thread::TPTask::TPTaskState LoadNavmeshTask::presentMainThread()
 
 		// 保留既有几何加载完成回调，避免改变脚本生命周期，同时明确传递空句柄。
 		// Preserve the existing geometry completion callback to avoid changing script lifecycle while explicitly passing a null handle.
-		pSpace->onLoadedSpaceGeometryMapping(NULL);
+		pSpace->onLoadedSpaceGeometryMapping(resPath_, loadGeneration_, NULL);
 	}
 	else
 	{
@@ -63,7 +70,7 @@ thread::TPTask::TPTaskState LoadNavmeshTask::presentMainThread()
 				resPath_, spaceID_));
 		}
 
-		pSpace->onLoadedSpaceGeometryMapping(pNavigationHandle);
+		pSpace->onLoadedSpaceGeometryMapping(resPath_, loadGeneration_, pNavigationHandle);
 	}
 	
 	return thread::TPTask::TPTASK_STATE_COMPLETED; 

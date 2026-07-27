@@ -30,9 +30,10 @@ namespace KBEngine{
 class LoadNavmeshTask : public thread::TPTask
 {
 public:
-	LoadNavmeshTask(const std::string& resPath, SPACE_ID spaceID, const std::map< int, std::string >& params):
+	LoadNavmeshTask(const std::string& resPath, SPACE_ID spaceID, uint64 loadGeneration, const std::map< int, std::string >& params):
 	resPath_(resPath),
 	spaceID_(spaceID),
+	loadGeneration_(loadGeneration),
 	params_(params),
 	loadSucceeded_(false)
 	{
@@ -45,6 +46,7 @@ public:
 protected:
 	std::string resPath_;
 	SPACE_ID spaceID_;
+	uint64 loadGeneration_;
 	std::map< int, std::string > params_;
 	// 子线程只向主线程传递结果状态，导航句柄仍通过带锁缓存取得。
 	// The worker passes only result state to the main thread; the handle still comes from the locked cache.

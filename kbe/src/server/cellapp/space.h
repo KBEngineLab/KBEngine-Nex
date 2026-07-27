@@ -92,8 +92,10 @@ public:
 	static PyObject* __py_GetSpaceGeometryMapping(PyObject* self, PyObject* args);
 	const std::string& getGeometryPath();
 	void setGeometryPath(const std::string& path);
-	void onLoadedSpaceGeometryMapping(NavigationHandlePtr pNavHandle);
+	void onLoadedSpaceGeometryMapping(const std::string& resPath, uint64 loadGeneration, NavigationHandlePtr pNavHandle);
 	void onAllSpaceGeometryLoaded();
+	bool isGeometryLoadCurrent(const std::string& resPath, uint64 loadGeneration);
+	bool isGeometryLoading() const { return isGeometryLoading_; }
 	
 	NavigationHandlePtr pNavHandle() const{ return pNavHandle_; }
 
@@ -145,6 +147,11 @@ protected:
 	CoordinateSystem			coordinateSystem_;
 
 	NavigationHandlePtr			pNavHandle_;
+
+	// 代次用于拒绝路径切换后晚到的异步结果，加载状态用于阻止重复任务并让移动控制器等待。
+	// The generation rejects late asynchronous results after path changes; the loading flag prevents duplicates and lets movement wait.
+	uint64						geometryLoadGeneration_;
+	bool						isGeometryLoading_;
 
 	// spaceData, 只能存储字符串资源， 这样能比较好的兼容客户端。
 	// 开发者可以将其他类型转换成字符串进行传输

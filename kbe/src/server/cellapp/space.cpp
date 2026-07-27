@@ -45,6 +45,8 @@ hasGeometry_(false),
 pCell_(NULL),
 coordinateSystem_(),
 pNavHandle_(),
+geometryLoadGeneration_(0),
+isGeometryLoading_(false),
 state_(STATE_NORMAL),
 destroyTime_(0)
 {
@@ -261,12 +263,25 @@ bool Space::addSpaceGeometryMapping(std::string respath, bool shouldLoadOnServer
 	hasGeometry_ = true;
 	if(getGeometryPath() == respath)
 	{
-		WARNING_MSG(fmt::format("KBEngine::addSpaceGeometryMapping: spaceID={}, respath={} exist!\n",
-			id(), respath));
+		if(!shouldLoadOnServer || pNavHandle_ != NULL || isGeometryLoading_)
+		{
+			WARNING_MSG(fmt::format("KBEngine::addSpaceGeometryMapping: spaceID={}, respath={} exist!\n",
+				id(), respath));
 
+			return true;
+		}
+
+		// 上一次加载失败后允许相同路径重试，成功句柄和正在执行的任务仍保持幂等。
+		// Allow the same path to retry after a failed load while successful handles and active tasks remain idempotent.
+		loadSpaceGeometry(params);
 		return true;
 	}
 
+	// 路径切换立即使旧任务和旧句柄失效，避免新映射完成前继续使用旧几何。
+	// A path switch immediately invalidates the old task and handle so old geometry is not used before the new mapping completes.
+	++geometryLoadGeneration_;
+	isGeometryLoading_ = false;
+	pNavHandle_.clear();
 	setGeometryPath(respath);
 
 	if(shouldLoadOnServer)
@@ -279,12 +294,24 @@ bool Space::addSpaceGeometryMapping(std::string respath, bool shouldLoadOnServer
 void Space::loadSpaceGeometry(const std::map< int, std::string >& params)
 {
 	KBE_ASSERT(pNavHandle_ == NULL);
-	Cellapp::getSingleton().threadPool().addTask(new LoadNavmeshTask(getGeometryPath(), this->id(), params));
+	KBE_ASSERT(!isGeometryLoading_);
+	isGeometryLoading_ = true;
+	const uint64 loadGeneration = ++geometryLoadGeneration_;
+	Cellapp::getSingleton().threadPool().addTask(new LoadNavmeshTask(
+		getGeometryPath(), this->id(), loadGeneration, params));
 }
 
 //-------------------------------------------------------------------------------------
 void Space::unLoadSpaceGeometry()
 {
+	// 先递增代次再释放句柄，确保已经进入线程池的旧任务无法重新挂回当前 Space。
+	// Advance the generation before releasing the handle so queued old tasks cannot attach themselves to this Space again.
+	++geometryLoadGeneration_;
+	isGeometryLoading_ = false;
+	pNavHandle_.clear();
+	hasGeometry_ = false;
+	delSpaceData("_mapping");
+
 	Network::Channel* pChannel = Components::getSingleton().getCellappmgrChannel();
 	if (pChannel != NULL)
 	{
@@ -302,8 +329,10 @@ void Space::unLoadSpaceGeometry()
 }
 
 //-------------------------------------------------------------------------------------
-void Space::onLoadedSpaceGeometryMapping(NavigationHandlePtr pNavHandle)
+void Space::onLoadedSpaceGeometryMapping(const std::string& resPath, uint64 loadGeneration, NavigationHandlePtr pNavHandle)
 {
+	KBE_ASSERT(isGeometryLoadCurrent(resPath, loadGeneration));
+	isGeometryLoading_ = false;
 	pNavHandle_ = pNavHandle;
 	INFO_MSG(fmt::format("KBEngine::onLoadedSpaceGeometryMapping: spaceID={}, respath={}!\n",
 			id(), getGeometryPath()));
@@ -331,6 +360,14 @@ void Space::onLoadedSpaceGeometryMapping(NavigationHandlePtr pNavHandle)
 
 		pChannel->send(pBundle);
 	}
+}
+
+//-------------------------------------------------------------------------------------
+bool Space::isGeometryLoadCurrent(const std::string& resPath, uint64 loadGeneration)
+{
+	return isGeometryLoading_ &&
+		geometryLoadGeneration_ == loadGeneration &&
+		getGeometryPath() == resPath;
 }
 
 //-------------------------------------------------------------------------------------

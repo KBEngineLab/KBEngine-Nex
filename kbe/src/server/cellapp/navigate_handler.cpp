@@ -211,6 +211,31 @@ bool NavigateHandler::updateDetour()
 	Position3D oldPosition = currentPosition;
 	const float arrivalDistance = std::max(distance_, 0.05f);
 
+	Space* pSpace = Spaces::findSpace(pEntity->spaceID());
+	if (pSpace == NULL || !pSpace->isGood())
+	{
+		requestMoveFailure();
+		Py_DECREF(pEntity);
+		delete this;
+		return false;
+	}
+
+	NavigationHandlePtr currentNavHandle = pSpace->pNavHandle();
+	if (navHandle_.get() != currentNavHandle.get())
+	{
+		// Space 更换句柄后必须丢弃旧 polygon 与直线路径，不能在旧网格上继续推进实体。
+		// A Space handle change must discard the old polygon and straight path so the entity cannot continue on the old mesh.
+		navHandle_.clear();
+		invalidateDetourPath();
+		retryCount_ = 0;
+	}
+
+	if (pSpace->isGeometryLoading())
+	{
+		Py_DECREF(pEntity);
+		return true;
+	}
+
 	if ((destPos_ - currentPosition).squaredLength() <= arrivalDistance * arrivalDistance)
 	{
 		requestMoveOver(oldPosition);
