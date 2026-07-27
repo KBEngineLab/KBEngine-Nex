@@ -80,6 +80,9 @@ public:
 	ClientObject::C_ERROR lasterror() { return error_; }
 
 	bool isDestroyed() { return state_ == C_STATE_DESTROYED; }
+	bool isKcpHandshakePending() const { return state_ == C_STATE_LOGIN_BASEAPP_KCP_HANDSHAKE; }
+	bool isKcpTransport() const;
+	bool isTcpTransport() const;
 	void destroy() { state_ = C_STATE_DESTROYED; }
 	void onNetworkError(const std::string& err);
 
@@ -123,6 +126,7 @@ protected:
 	bool completeKcpHandshake(uint32 channelID);
 	bool connectBaseappTcp();
 	bool sendKcpHello();
+	void sendBaseappActiveTick(bool force);
 	void fallbackToBaseappTcp(const char* reason);
 	void deregisterReceiverEndPoint(Network::PacketReceiver* pPacketReceiver);
 

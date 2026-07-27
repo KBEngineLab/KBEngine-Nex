@@ -163,6 +163,50 @@ void ClientObject::deregisterReceiverEndPoint(Network::PacketReceiver* pPacketRe
 }
 
 //-------------------------------------------------------------------------------------
+bool ClientObject::isKcpTransport() const
+{
+	return connectedBaseapp_ && pServerChannel_ != NULL && pServerChannel_->pEndPoint() != NULL &&
+		pServerChannel_->protocoltype() == Network::PROTOCOL_UDP &&
+		pServerChannel_->protocolSubtype() == Network::SUB_PROTOCOL_KCP;
+}
+
+//-------------------------------------------------------------------------------------
+bool ClientObject::isTcpTransport() const
+{
+	return connectedBaseapp_ && pServerChannel_ != NULL && pServerChannel_->pEndPoint() != NULL &&
+		pServerChannel_->protocoltype() == Network::PROTOCOL_TCP;
+}
+
+//-------------------------------------------------------------------------------------
+void ClientObject::sendBaseappActiveTick(bool force)
+{
+	if (!connectedBaseapp_ || pServerChannel_ == NULL || pServerChannel_->pEndPoint() == NULL ||
+		pServerChannel_->isDestroyed() || pServerChannel_->condemn() > 0)
+	{
+		return;
+	}
+
+	uint64 interval = stampsPerSecond() * 10;
+	if (Network::g_channelExternalTimeout > 0.f)
+	{
+		// 心跳最多使用外部超时的四分之一，并限制在 1 至 10 秒，给拥塞和调度抖动留出恢复余量。
+		// Cap heartbeats at one quarter of the external timeout and between 1-10 seconds, leaving recovery margin for congestion and scheduler jitter.
+		interval = KBE_MAX<uint64>(stampsPerSecond(),
+			static_cast<uint64>(Network::g_channelExternalTimeout * stampsPerSecond()) / 4);
+		interval = KBE_MIN<uint64>(interval, stampsPerSecond() * 10);
+	}
+
+	const uint64 now = timestamp();
+	if (!force && now - lastSentActiveTickTime_ < interval)
+		return;
+
+	lastSentActiveTickTime_ = now;
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	(*pBundle).newMessage(BaseappInterface::onClientActiveTick);
+	pServerChannel_->send(pBundle);
+}
+
+//-------------------------------------------------------------------------------------
 void ClientObject::clearStates(void)
 {
 	if (pServerChannel_ == NULL)
@@ -172,6 +216,7 @@ void ClientObject::clearStates(void)
 	deregisterReceiverEndPoint(pKCPPacketReceiverEx_);
 
 	pServerChannel_->stopSend();
+	pServerChannel_->stopInactivityDetection();
 	pServerChannel_->pPacketSender(NULL);
 	pServerChannel_->pPacketReceiver(NULL);
 	pServerChannel_->resetTransport();
@@ -196,8 +241,12 @@ void ClientObject::clearStates(void)
 //-------------------------------------------------------------------------------------
 void ClientObject::onNetworkError(const std::string& err)
 {
+	if (isDestroyed())
+		return;
+
 	WARNING_MSG(fmt::format("ClientObject::onNetworkError: name={}, state={}, error={}\n",
 		name_, static_cast<int>(state_), err));
+	Bots::getSingleton().onClientNetworkError();
 	destroy();
 }
 
@@ -447,6 +496,10 @@ bool ClientObject::completeKcpHandshake(uint32 channelID)
 	}
 
 	pKCPPacketReceiverEx_ = pReceiver;
+	// Bots 自己管理客户端 Channel，传输激活后必须显式启动超时检测，不能依赖 NetworkInterface 注册流程。
+	// Bots owns client Channels directly, so transport activation must explicitly start timeout detection instead of relying on NetworkInterface registration.
+	pServerChannel_->startInactivityDetection(Network::g_channelExternalTimeout,
+		Network::g_channelExternalTimeout / 2.f);
 	connectedBaseapp_ = true;
 	state_ = C_STATE_PLAY;
 
@@ -469,6 +522,7 @@ bool ClientObject::completeKcpHandshake(uint32 channelID)
 	// Channel 接管 Bundle 所有权，可靠标志会把 BaseApp hello 写入 KCP 队列。
 	// Channel takes Bundle ownership, and the reliable flag queues the BaseApp hello through KCP.
 	pServerChannel_->sendTo(true, pBundle);
+	Bots::getSingleton().onKcpHandshakeSucceeded();
 	const double elapsedSeconds = static_cast<double>(timestamp() - kcpHandshakeStartTime_) /
 		static_cast<double>(stampsPerSecond());
 	INFO_MSG(fmt::format("ClientObject::completeKcpHandshake: name={}, address={}:{}, channelID={}, attempts={}, elapsed={:.3f}s\n",
@@ -483,6 +537,7 @@ void ClientObject::fallbackToBaseappTcp(const char* reason)
 		static_cast<double>(timestamp() - kcpHandshakeStartTime_) / static_cast<double>(stampsPerSecond());
 	WARNING_MSG(fmt::format("ClientObject::fallbackToBaseappTcp: name={}, reason={}, attempts={}, elapsed={:.3f}s\n",
 		name_, reason, kcpHelloAttempts_, elapsedSeconds));
+	Bots::getSingleton().onTcpFallback();
 	clearStates();
 	connectedBaseapp_ = false;
 	state_ = C_STATE_PLAY;
@@ -539,6 +594,8 @@ bool ClientObject::connectBaseappTcp()
 	}
 
 	pServerChannel_->pPacketSender(pTCPPacketSenderEx_);
+	pServerChannel_->startInactivityDetection(Network::g_channelExternalTimeout,
+		Network::g_channelExternalTimeout / 2.f);
 	connectedBaseapp_ = true;
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
@@ -559,6 +616,7 @@ bool ClientObject::connectBaseappTcp()
 
 	pEndpoint->send(pBundle);
 	Network::Bundle::reclaimPoolObject(pBundle);
+	Bots::getSingleton().onTcpConnected();
 	INFO_MSG(fmt::format("ClientObject::connectBaseappTcp: name={}, address={}:{}\n", name_, ip_, tcp_port_));
 	return true;
 }
@@ -657,6 +715,7 @@ void ClientObject::gameTick()
 			break;
 	};
 
+	sendBaseappActiveTick(false);
 	tickSend();
 }
 
@@ -677,6 +736,7 @@ void ClientObject::onHelloCB_(Network::Channel* pChannel, const std::string& ver
 	}
 	else
 	{
+		sendBaseappActiveTick(true);
 		state_ = C_STATE_LOGIN_BASEAPP;
 	}
 }

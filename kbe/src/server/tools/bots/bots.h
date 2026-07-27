@@ -67,6 +67,7 @@ public:
 	~Bots();
 
 	virtual bool initialize();
+	bool initializeWatcher();
 	virtual void finalise();
 
 	virtual bool initializeBegin();
@@ -79,6 +80,7 @@ public:
 	bool installEntityDef();
 
 	virtual void handleTimeout(TimerHandle, void * pUser);
+	virtual void onChannelTimeOut(Network::Channel* pChannel);
 	virtual void handleGameTick();
 
 	static Bots& getSingleton(){ 
@@ -122,6 +124,22 @@ public:
 
 	typedef std::map< Network::Channel*, ClientObject* > CLIENTS;
 	CLIENTS& clients(){ return clients_; }
+	uint32 numKcpClients() const;
+	uint32 numTcpClients() const;
+	uint32 numKcpHandshakes() const;
+	uint32 numDestroyedClients() const;
+	uint32 numClients() const { return static_cast<uint32>(clients_.size()); }
+	uint64 totalKcpHandshakeSuccesses() const { return totalKcpHandshakeSuccesses_; }
+	uint64 totalTcpConnections() const { return totalTcpConnections_; }
+	uint64 totalTcpFallbacks() const { return totalTcpFallbacks_; }
+	uint64 totalNetworkErrors() const { return totalNetworkErrors_; }
+	uint64 totalRemovedClients() const { return totalRemovedClients_; }
+	uint64 lastBotsTickMicros() const { return lastBotsTickMicros_; }
+	uint64 maxBotsTickMicros() const { return maxBotsTickMicros_; }
+	void onKcpHandshakeSucceeded() { ++totalKcpHandshakeSuccesses_; }
+	void onTcpConnected() { ++totalTcpConnections_; }
+	void onTcpFallback() { ++totalTcpFallbacks_; }
+	void onClientNetworkError() { ++totalNetworkErrors_; }
 
 	uint32 reqCreateAndLoginTotalCount(){ return reqCreateAndLoginTotalCount_; }
 	void reqCreateAndLoginTotalCount(uint32 v){ reqCreateAndLoginTotalCount_ = v; }
@@ -400,6 +418,16 @@ protected:
 	// 独立心跳发送器使 Bots 保持 ClientApp 职责边界，不把服务端组件生命周期逻辑混入机器人客户端循环。
 	// A dedicated heartbeat publisher keeps Bots within ClientApp responsibilities instead of mixing server-component lifecycle work into bot client ticks.
 	BotsActiveReportHandler*							pActiveReportHandler_;
+
+	// 累计计数与 Tick 高水位不在客户端删除时回退，用于定位长压测中的瞬时故障和延迟尖峰。
+	// Cumulative counters and Tick high-water marks do not decrease on client removal, preserving transient failures and latency spikes during long stress runs.
+	uint64											totalKcpHandshakeSuccesses_;
+	uint64											totalTcpConnections_;
+	uint64											totalTcpFallbacks_;
+	uint64											totalNetworkErrors_;
+	uint64											totalRemovedClients_;
+	uint64											lastBotsTickMicros_;
+	uint64											maxBotsTickMicros_;
 };
 
 }

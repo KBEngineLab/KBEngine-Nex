@@ -38,6 +38,8 @@ protected:
 	virtual void handleTimeout(TimerHandle handle, void * arg);
 
 	TimerHandle timerHandle_;
+	uint64 nextCreateTime_;
+	bool wasPending_;
 
 };
 

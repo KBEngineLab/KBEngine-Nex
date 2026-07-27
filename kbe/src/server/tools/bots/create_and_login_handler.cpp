@@ -33,10 +33,14 @@ namespace KBEngine {
 uint64 g_accountID = 0;
 
 //-------------------------------------------------------------------------------------
-CreateAndLoginHandler::CreateAndLoginHandler()
+CreateAndLoginHandler::CreateAndLoginHandler():
+nextCreateTime_(0),
+wasPending_(false)
 {
+	// 使用 100ms 调度粒度以兑现既有 tickTime 小数秒语义，同时仍由批量参数限制每次创建量。
+	// Use a 100 ms scheduling quantum to honor the existing fractional tickTime contract while retaining per-batch limits.
 	timerHandle_ = Bots::getSingleton().networkInterface().dispatcher().addTimer(
-							1 * 1000000, this);
+							100000, this);
 
 	g_accountID = KBEngine::genUUID64() * 100000;
 	if(g_kbeSrvConfig.getBots().bots_account_name_suffix_inc > 0)
@@ -58,16 +62,28 @@ void CreateAndLoginHandler::handleTimeout(TimerHandle handle, void * arg)
 	
 	Bots& bots = Bots::getSingleton();
 
-	static float lasttick = bots.reqCreateAndLoginTickTime();
-
-	if(lasttick > 0.f)
+	const bool hasPendingClients = bots.reqCreateAndLoginTotalCount() > bots.clients().size();
+	if (!hasPendingClients)
 	{
-		// 每个tick减去0.1秒， 为0则可以创建一次且重置;
-		lasttick -= 0.1f;
+		wasPending_ = false;
 		return;
 	}
 
-	uint32 count = bots.reqCreateAndLoginTickCount();
+	const uint64 now = timestamp();
+	if (!wasPending_)
+	{
+		// 新增批次立即开始，避免沿用上一次已经完成的等待窗口。
+		// Start a newly queued batch immediately instead of inheriting a completed batch's delay window.
+		nextCreateTime_ = now;
+		wasPending_ = true;
+	}
+
+	if (now < nextCreateTime_)
+		return;
+
+	// 至少推进一个客户端，避免错误配置把待创建队列永久锁死。
+	// Always advance at least one client so an invalid configuration cannot permanently stall the pending queue.
+	uint32 count = KBE_MAX<uint32>(1, bots.reqCreateAndLoginTickCount());
 
 	while(bots.reqCreateAndLoginTotalCount() - bots.clients().size() > 0 && count-- > 0)
 	{
@@ -77,6 +93,9 @@ void CreateAndLoginHandler::handleTimeout(TimerHandle handle, void * arg)
 
 		Bots::getSingleton().addClient(pClient);
 	}
+
+	const float intervalSeconds = KBE_MAX(0.f, bots.reqCreateAndLoginTickTime());
+	nextCreateTime_ = timestamp() + static_cast<uint64>(intervalSeconds * stampsPerSecond());
 }
 
 //-------------------------------------------------------------------------------------

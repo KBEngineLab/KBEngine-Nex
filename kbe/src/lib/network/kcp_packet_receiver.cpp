@@ -125,6 +125,9 @@ Reason KCPPacketReceiver::processPacket(Channel* pChannel, Packet * pPacket)
 {
 	if (pChannel != NULL && pChannel->hasHandshake())
 	{
+		// KCP ACK 与窗口更新本身就是有效的对端活动，即使尚未重组出业务消息也必须刷新超时基准。
+		// KCP ACKs and window updates are valid peer activity, so refresh the timeout baseline even before an application message is reassembled.
+		pChannel->updateLastReceivedTime();
 		pChannel->scheduleKcpUpdate();
 
 		if (ikcp_input(pChannel->pKCP(), (const char*)pPacket->data(), toLongSize(pPacket->length())) < 0)

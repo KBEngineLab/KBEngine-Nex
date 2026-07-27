@@ -64,7 +64,14 @@ reqCreateAndLoginTickTime_(g_kbeSrvConfig.getBots().defaultAddBots_tickTime),
 pCreateAndLoginHandler_(NULL),
 pEventPoller_(Network::EventPoller::create()),
 pTelnetServer_(NULL),
-pActiveReportHandler_(NULL)
+pActiveReportHandler_(NULL),
+totalKcpHandshakeSuccesses_(0),
+totalTcpConnections_(0),
+totalTcpFallbacks_(0),
+totalNetworkErrors_(0),
+totalRemovedClients_(0),
+lastBotsTickMicros_(0),
+maxBotsTickMicros_(0)
 {
 	// Bots 同时承载多个客户端，组件 owner 查找必须先通过 componentID 路由到对应的 ClientObject。
 	// Bots hosts multiple clients, so component owner lookup must route through componentID to the matching ClientObject first.
@@ -93,7 +100,25 @@ bool Bots::initialize()
 {
 	// 广播自己的地址给网上上的所有kbemachine
 	this->dispatcher().addTask(&Components::getSingleton());
-	return ClientApp::initialize();
+	return ClientApp::initialize() && initializeWatcher();
+}
+
+//-------------------------------------------------------------------------------------
+bool Bots::initializeWatcher()
+{
+	WATCH_OBJECT("bots/clients/total", this, &Bots::numClients);
+	WATCH_OBJECT("bots/clients/kcp", this, &Bots::numKcpClients);
+	WATCH_OBJECT("bots/clients/tcp", this, &Bots::numTcpClients);
+	WATCH_OBJECT("bots/clients/kcpHandshaking", this, &Bots::numKcpHandshakes);
+	WATCH_OBJECT("bots/clients/destroyed", this, &Bots::numDestroyedClients);
+	WATCH_OBJECT("bots/totals/kcpHandshakeSuccesses", this, &Bots::totalKcpHandshakeSuccesses);
+	WATCH_OBJECT("bots/totals/tcpConnections", this, &Bots::totalTcpConnections);
+	WATCH_OBJECT("bots/totals/tcpFallbacks", this, &Bots::totalTcpFallbacks);
+	WATCH_OBJECT("bots/totals/networkErrors", this, &Bots::totalNetworkErrors);
+	WATCH_OBJECT("bots/totals/removedClients", this, &Bots::totalRemovedClients);
+	WATCH_OBJECT("bots/tick/lastMicros", this, &Bots::lastBotsTickMicros);
+	WATCH_OBJECT("bots/tick/maxMicros", this, &Bots::maxBotsTickMicros);
+	return WatchPool::initWatchPools();
 }
 
 //-------------------------------------------------------------------------------------	
@@ -309,8 +334,24 @@ void Bots::handleTimeout(TimerHandle handle, void * arg)
 }
 
 //-------------------------------------------------------------------------------------
+void Bots::onChannelTimeOut(Network::Channel* pChannel)
+{
+	ClientObject* pClient = findClient(pChannel);
+	if (pClient != NULL)
+	{
+		// ClientObject 保留 Channel 所有权并在下一个游戏 Tick 统一释放接收器、socket 与 KCP 定时器。
+		// ClientObject retains Channel ownership and releases receivers, sockets, and the KCP timer together on the next game Tick.
+		pClient->onNetworkError("channel inactivity timeout");
+		return;
+	}
+
+	ClientApp::onChannelTimeOut(pChannel);
+}
+
+//-------------------------------------------------------------------------------------
 void Bots::handleGameTick()
 {
+	const uint64 botsTickStart = timestamp();
 	// time_t t = ::time(NULL);
 	// static int kbeTime = 0;
 	// DEBUG_MSG(fmt::format("Bots::handleGameTick[{}]:{}\n", t, ++kbeTime));
@@ -338,6 +379,47 @@ void Bots::handleGameTick()
 			pClientObject->gameTick();
 		}
 	}
+
+	const uint64 elapsedStamps = timestamp() - botsTickStart;
+	lastBotsTickMicros_ = static_cast<uint64>(
+		static_cast<double>(elapsedStamps) * 1000000.0 / static_cast<double>(stampsPerSecond()));
+	maxBotsTickMicros_ = KBE_MAX(maxBotsTickMicros_, lastBotsTickMicros_);
+}
+
+//-------------------------------------------------------------------------------------
+uint32 Bots::numKcpClients() const
+{
+	uint32 count = 0;
+	for (CLIENTS::const_iterator iter = clients_.begin(); iter != clients_.end(); ++iter)
+		count += iter->second->isKcpTransport() ? 1 : 0;
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint32 Bots::numTcpClients() const
+{
+	uint32 count = 0;
+	for (CLIENTS::const_iterator iter = clients_.begin(); iter != clients_.end(); ++iter)
+		count += iter->second->isTcpTransport() ? 1 : 0;
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint32 Bots::numKcpHandshakes() const
+{
+	uint32 count = 0;
+	for (CLIENTS::const_iterator iter = clients_.begin(); iter != clients_.end(); ++iter)
+		count += iter->second->isKcpHandshakePending() ? 1 : 0;
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint32 Bots::numDestroyedClients() const
+{
+	uint32 count = 0;
+	for (CLIENTS::const_iterator iter = clients_.begin(); iter != clients_.end(); ++iter)
+		count += iter->second->isDestroyed() ? 1 : 0;
+	return count;
 }
 
 //-------------------------------------------------------------------------------------
@@ -566,6 +648,7 @@ bool Bots::delClient(Network::Channel * pChannel)
 	pClient->finalise();
 	clients().erase(pChannel);
 	Py_DECREF(pClient);
+	++totalRemovedClients_;
 	return true;
 }
 
