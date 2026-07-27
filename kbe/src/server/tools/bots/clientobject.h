@@ -23,6 +23,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "tcp_packet_receiver_ex.h"
 #include "tcp_packet_sender_ex.h"
+#include "kcp_packet_receiver_ex.h"
+#include "kcp_packet_sender_ex.h"
 #include "client_lib/entity.h"
 #include "client_lib/clientobjectbase.h"
 #include "network/encryption_filter.h"
@@ -56,9 +58,10 @@ public:
 		C_STATE_CREATE = 1,
 		C_STATE_LOGIN = 2,
 		C_STATE_LOGIN_BASEAPP_CREATE = 3,
-		C_STATE_LOGIN_BASEAPP = 4,
-		C_STATE_PLAY = 5,
-		C_STATE_DESTROYED = 6,
+		C_STATE_LOGIN_BASEAPP_KCP_HANDSHAKE = 4,
+		C_STATE_LOGIN_BASEAPP = 5,
+		C_STATE_PLAY = 6,
+		C_STATE_DESTROYED = 7,
 	};
 
 	ClientObject(std::string name, Network::NetworkInterface& ninterface);
@@ -78,6 +81,7 @@ public:
 
 	bool isDestroyed() { return state_ == C_STATE_DESTROYED; }
 	void destroy() { state_ = C_STATE_DESTROYED; }
+	void onNetworkError(const std::string& err);
 
 	virtual void onHelloCB_(Network::Channel* pChannel, const std::string& verInfo,
 		const std::string& scriptVerInfo, const std::string& protocolMD5, 
@@ -114,12 +118,24 @@ public:
 	virtual void onLogin(Network::Bundle* pBundle);
 
 protected:
+	bool startKcpHandshake();
+	void processKcpHandshake();
+	bool completeKcpHandshake(uint32 channelID);
+	bool connectBaseappTcp();
+	bool sendKcpHello();
+	void fallbackToBaseappTcp(const char* reason);
+	void deregisterReceiverEndPoint(Network::PacketReceiver* pPacketReceiver);
+
 	C_ERROR error_;
 	C_STATE state_;
 	Network::BlowfishFilter* pBlowfishFilter_;
 
 	Network::TCPPacketSenderEx* pTCPPacketSenderEx_;
 	Network::TCPPacketReceiverEx* pTCPPacketReceiverEx_;
+	Network::KCPPacketSenderEx* pKCPPacketSenderEx_;
+	Network::KCPPacketReceiverEx* pKCPPacketReceiverEx_;
+	uint64 kcpHandshakeStartTime_;
+	uint64 kcpHelloSentTime_;
 };
 
 

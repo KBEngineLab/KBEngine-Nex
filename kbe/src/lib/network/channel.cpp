@@ -330,6 +330,32 @@ bool Channel::finalise()
 }
 
 //-------------------------------------------------------------------------------------
+bool Channel::configureTransport(ProtocolType protocolType, ProtocolSubType protocolSubtype, ChannelID channelID)
+{
+	finaliseKcp();
+	protocoltype_ = protocolType;
+	protocolSubtype_ = protocolType == PROTOCOL_UDP && protocolSubtype == SUB_PROTOCOL_DEFAULT
+		? SUB_PROTOCOL_UDP : protocolSubtype;
+	id_ = channelID;
+	setFlags(false, FLAG_HANDSHAKE);
+
+	if (protocolSubtype_ == SUB_PROTOCOL_KCP)
+		return initKcp();
+
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
+void Channel::resetTransport()
+{
+	finaliseKcp();
+	protocoltype_ = PROTOCOL_TCP;
+	protocolSubtype_ = SUB_PROTOCOL_DEFAULT;
+	id_ = CHANNEL_ID_NULL;
+	setFlags(false, FLAG_HANDSHAKE);
+}
+
+//-------------------------------------------------------------------------------------
 uint32 Channel::getRTT()
 {
 	if (protocolSubtype_ == SUB_PROTOCOL_KCP && pKCP_)

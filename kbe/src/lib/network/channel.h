@@ -129,6 +129,12 @@ public:
 	// Expose the transport type read-only so address-index maintenance can distinguish TCP from UDP/KCP channels without allowing external lifecycle mutation.
 	ProtocolType protocoltype() const { return protocoltype_; }
 	ProtocolSubType protocolSubtype() const { return protocolSubtype_; }
+	// 外部客户端在完成传输握手后通过该接口原子更新协议、会话号和 KCP 生命周期。
+	// External clients use this API to update protocol, conversation ID, and KCP lifetime atomically after transport negotiation.
+	bool configureTransport(ProtocolType protocolType, ProtocolSubType protocolSubtype, ChannelID channelID);
+	// 连接回退或复用前恢复默认 TCP 状态，避免旧 KCP 定时器和握手标志污染下一条连接。
+	// Restore default TCP state before fallback or reuse so stale KCP timers and handshake flags cannot contaminate the next connection.
+	void resetTransport();
 
 	typedef std::vector<Bundle*> Bundles;
 	Bundles & bundles();
