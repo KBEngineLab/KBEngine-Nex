@@ -115,7 +115,8 @@ pTCPPacketReceiverEx_(NULL),
 pKCPPacketSenderEx_(NULL),
 pKCPPacketReceiverEx_(NULL),
 kcpHandshakeStartTime_(0),
-kcpHelloSentTime_(0)
+kcpHelloSentTime_(0),
+kcpHelloAttempts_(0)
 {
 	name_ = name;
 	typeClient_ = CLIENT_TYPE_BOTS;
@@ -189,6 +190,7 @@ void ClientObject::clearStates(void)
 
 	kcpHandshakeStartTime_ = 0;
 	kcpHelloSentTime_ = 0;
+	kcpHelloAttempts_ = 0;
 }
 
 //-------------------------------------------------------------------------------------
@@ -321,6 +323,7 @@ bool ClientObject::startKcpHandshake()
 	state_ = C_STATE_LOGIN_BASEAPP_KCP_HANDSHAKE;
 	kcpHandshakeStartTime_ = timestamp();
 	kcpHelloSentTime_ = 0;
+	kcpHelloAttempts_ = 0;
 
 	if (!sendKcpHello())
 	{
@@ -338,6 +341,7 @@ bool ClientObject::sendKcpHello()
 	if (pEndpoint == NULL)
 		return false;
 
+	++kcpHelloAttempts_;
 	const int helloLength = static_cast<int>(std::strlen(Network::UDP_HELLO));
 	const int sent = pEndpoint->send(Network::UDP_HELLO, helloLength);
 	if (sent != helloLength)
@@ -465,15 +469,20 @@ bool ClientObject::completeKcpHandshake(uint32 channelID)
 	// Channel 接管 Bundle 所有权，可靠标志会把 BaseApp hello 写入 KCP 队列。
 	// Channel takes Bundle ownership, and the reliable flag queues the BaseApp hello through KCP.
 	pServerChannel_->sendTo(true, pBundle);
-	INFO_MSG(fmt::format("ClientObject::completeKcpHandshake: name={}, address={}:{}, channelID={}\n",
-		name_, ip_, udp_port_, channelID));
+	const double elapsedSeconds = static_cast<double>(timestamp() - kcpHandshakeStartTime_) /
+		static_cast<double>(stampsPerSecond());
+	INFO_MSG(fmt::format("ClientObject::completeKcpHandshake: name={}, address={}:{}, channelID={}, attempts={}, elapsed={:.3f}s\n",
+		name_, ip_, udp_port_, channelID, kcpHelloAttempts_, elapsedSeconds));
 	return true;
 }
 
 //-------------------------------------------------------------------------------------
 void ClientObject::fallbackToBaseappTcp(const char* reason)
 {
-	WARNING_MSG(fmt::format("ClientObject::fallbackToBaseappTcp: name={}, reason={}\n", name_, reason));
+	const double elapsedSeconds = kcpHandshakeStartTime_ == 0 ? 0.0 :
+		static_cast<double>(timestamp() - kcpHandshakeStartTime_) / static_cast<double>(stampsPerSecond());
+	WARNING_MSG(fmt::format("ClientObject::fallbackToBaseappTcp: name={}, reason={}, attempts={}, elapsed={:.3f}s\n",
+		name_, reason, kcpHelloAttempts_, elapsedSeconds));
 	clearStates();
 	connectedBaseapp_ = false;
 	state_ = C_STATE_PLAY;

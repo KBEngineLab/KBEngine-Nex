@@ -136,6 +136,9 @@ protected:
 	Network::KCPPacketReceiverEx* pKCPPacketReceiverEx_;
 	uint64 kcpHandshakeStartTime_;
 	uint64 kcpHelloSentTime_;
+	// 记录实际 hello 发送尝试，便于区分首包成功、重试恢复和超时回退。
+	// Track actual hello attempts so logs distinguish first-send success, retry recovery, and timeout fallback.
+	uint32 kcpHelloAttempts_;
 };
 
 
