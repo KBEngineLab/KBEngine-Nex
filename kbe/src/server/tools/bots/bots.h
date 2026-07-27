@@ -54,6 +54,7 @@ namespace KBEngine{
 class ClientObject;
 class PyBots;
 class TelnetServer;
+class BotsActiveReportHandler;
 
 class Bots  : public ClientApp
 {
@@ -389,6 +390,10 @@ protected:
 	Network::EventPoller*									pEventPoller_;
 
 	TelnetServer*											pTelnetServer_;
+
+	// 独立心跳发送器使 Bots 保持 ClientApp 职责边界，不把服务端组件生命周期逻辑混入机器人客户端循环。
+	// A dedicated heartbeat publisher keeps Bots within ClientApp responsibilities instead of mixing server-component lifecycle work into bot client ticks.
+	BotsActiveReportHandler*							pActiveReportHandler_;
 };
 
 }

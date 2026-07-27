@@ -21,6 +21,9 @@
     <ClCompile Include="bots.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="bots_active_report_handler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="bots_interface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -51,6 +54,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="bots.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="bots_active_report_handler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="bots_interface.h">

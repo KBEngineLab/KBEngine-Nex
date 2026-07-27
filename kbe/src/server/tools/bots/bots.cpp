@@ -27,6 +27,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "client_lib/entity.h"
 #include "clientobject.h"
 #include "bots_interface.h"
+#include "bots_active_report_handler.h"
 #include "resmgr/resmgr.h"
 #include "network/common.h"
 #include "network/tcp_packet.h"
@@ -61,15 +62,22 @@ reqCreateAndLoginTickCount_(g_kbeSrvConfig.getBots().defaultAddBots_tickCount),
 reqCreateAndLoginTickTime_(g_kbeSrvConfig.getBots().defaultAddBots_tickTime),
 pCreateAndLoginHandler_(NULL),
 pEventPoller_(Network::EventPoller::create()),
-pTelnetServer_(NULL)
+pTelnetServer_(NULL),
+pActiveReportHandler_(NULL)
 {
 	KBEngine::Network::MessageHandlers::pMainMessageHandlers = &BotsInterface::messageHandlers;
 	Components::getSingleton().initialize(&ninterface, componentType, componentID);
+
+	// 使用内部通道超时的一半作为报告周期，并设置一秒下限，兼顾失联检测速度与大量组件场景下的消息开销。
+	// Report at half the internal-channel timeout with a one-second floor, balancing failure detection against message volume in large deployments.
+	pActiveReportHandler_ = new BotsActiveReportHandler(this);
+	pActiveReportHandler_->start(KBE_MAX(1.f, Network::g_channelInternalTimeout / 2.f));
 }
 
 //-------------------------------------------------------------------------------------
 Bots::~Bots()
 {
+	SAFE_RELEASE(pActiveReportHandler_);
 	Components::getSingleton().finalise();
 	SAFE_RELEASE(pEventPoller_);
 }

@@ -114,6 +114,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="bots.cpp" />
+    <ClCompile Include="bots_active_report_handler.cpp" />
     <ClCompile Include="bots_interface.cpp" />
     <ClCompile Include="clientobject.cpp" />
     <ClCompile Include="create_and_login_handler.cpp" />
@@ -126,6 +127,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="bots.h" />
+    <ClInclude Include="bots_active_report_handler.h" />
     <ClInclude Include="bots_interface.h" />
     <ClInclude Include="bots_interface_macros.h" />
     <ClInclude Include="clientobject.h" />
