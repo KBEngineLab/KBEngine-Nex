@@ -25,6 +25,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "server/components.h"
 #include "server/plugin_runtime.h"
 #include "client_lib/entity.h"
+#include "entitydef/entity_component.h"
 #include "clientobject.h"
 #include "bots_interface.h"
 #include "bots_active_report_handler.h"
@@ -65,6 +66,11 @@ pEventPoller_(Network::EventPoller::create()),
 pTelnetServer_(NULL),
 pActiveReportHandler_(NULL)
 {
+	// Bots 同时承载多个客户端，组件 owner 查找必须先通过 componentID 路由到对应的 ClientObject。
+	// Bots hosts multiple clients, so component owner lookup must route through componentID to the matching ClientObject first.
+	EntityCall::setGetEntityFunc(std::bind(&Bots::tryGetEntity, this,
+		std::placeholders::_1, std::placeholders::_2));
+
 	KBEngine::Network::MessageHandlers::pMainMessageHandlers = &BotsInterface::messageHandlers;
 	Components::getSingleton().initialize(&ninterface, componentType, componentID);
 
@@ -209,6 +215,9 @@ bool Bots::installPyModules()
 {
 	ClientObject::installScript(NULL);
 	PyBots::installScript(NULL);
+	// 组件脚本会在实体定义初始化期间直接求值，因此必须先把基类导出到 KBEngine 模块。
+	// Component scripts are evaluated while entity definitions initialize, so export their base type to the KBEngine module first.
+	EntityComponent::installScript(getScript().getModule());
 
 	pPyBots_ = new PyBots();
 	registerPyObjectToScript("bots", pPyBots_);
@@ -242,7 +251,10 @@ bool Bots::installPyModules()
 		ERROR_MSG( "Bots::installPyModules: Unable to set KBEngine.LOG_TYPE_WAR.\n");
 	}
 
+	// EntityDef 在导入 Bots 脚本前必须同时看到实体与组件基类，否则组件脚本无法继承 KBEngine.EntityComponent。
+	// EntityDef must see both entity and component base types before importing Bots scripts, otherwise component scripts cannot inherit KBEngine.EntityComponent.
 	registerScript(client::Entity::getScriptType());
+	registerScript(EntityComponent::getScriptType());
 
 	// 安装入口模块
 	PyObject *entryScriptFileName = PyUnicode_FromString(g_kbeSrvConfig.getBots().entryScriptFile);
@@ -279,6 +291,7 @@ bool Bots::uninstallPyModules()
 
 	ClientObject::uninstallScript();
 	PyBots::uninstallScript();
+	EntityComponent::uninstallScript();
 	return ClientApp::uninstallPyModules();
 }
 
@@ -337,6 +350,16 @@ Network::Channel* Bots::findChannelByEntityCall(EntityCall& entitycall)
 		return pClient->findChannelByEntityCall(entitycall);
 
 	return NULL;
+}
+
+//-------------------------------------------------------------------------------------
+PyObject* Bots::tryGetEntity(COMPONENT_ID componentID, ENTITY_ID entityID)
+{
+	ClientObject* pClient = findClientByAppID(static_cast<int32>(componentID));
+	if (!pClient)
+		return NULL;
+
+	return pClient->tryGetEntity(componentID, entityID);
 }
 
 //-------------------------------------------------------------------------------------

@@ -31,6 +31,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "../../server/cellapp/cellapp_interface.h"
 #include "../../server/dbmgr/dbmgr_interface.h"
 #include "../../server/loginapp/loginapp_interface.h"
+#include "../../server/tools/bots/bots_interface.h"
 #include "../../server/tools/logger/logger_interface.h"
 #include "../../server/tools/interfaces/interfaces_interface.h"
 
@@ -71,8 +72,10 @@ void ComponentActiveReportHandler::handleTimeout(TimerHandle handle, void * arg)
 	{
 		case TIMEOUT_ACTIVE_TICK:
 		{
-			int8 findComponentTypes[] = {BASEAPPMGR_TYPE, CELLAPPMGR_TYPE, DBMGR_TYPE, CELLAPP_TYPE, 
-								BASEAPP_TYPE, LOGINAPP_TYPE, LOGGER_TYPE, UNKNOWN_COMPONENT_TYPE};
+			// Bots 参与内部组件表后也必须接收反向心跳，否则它只能报告自身存活却仍会判定服务端通道超时。
+			// Bots must receive reciprocal heartbeats after joining the internal registry, or it reports itself alive while still timing out server channels.
+			int8 findComponentTypes[] = {BASEAPPMGR_TYPE, CELLAPPMGR_TYPE, DBMGR_TYPE, CELLAPP_TYPE,
+								BASEAPP_TYPE, LOGINAPP_TYPE, LOGGER_TYPE, BOTS_TYPE, UNKNOWN_COMPONENT_TYPE};
 			
 			int ifind = 0;
 			while(findComponentTypes[ifind] != UNKNOWN_COMPONENT_TYPE)

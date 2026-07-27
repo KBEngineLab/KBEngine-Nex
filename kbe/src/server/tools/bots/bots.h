@@ -97,6 +97,12 @@ public:
 	*/
 	virtual Network::Channel* findChannelByEntityCall(EntityCall& entitycall);
 
+	/**
+		先按机器人 appID 定位客户端，再在其实体容器内查找 owner。
+		Locate the bot client by app ID before resolving the owner in that client's entity collection.
+	*/
+	virtual PyObject* tryGetEntity(COMPONENT_ID componentID, ENTITY_ID entityID);
+
 	/** 网络接口
 		某个app请求查看该app
 	*/

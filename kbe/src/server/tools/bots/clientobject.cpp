@@ -215,7 +215,7 @@ bool ClientObject::initLoginBaseapp()
 	u_int32_t address;
 
 	Network::Address::string2ip(ip_.c_str(), address);
-	if(pEndpoint->connect(htons(port_), address) == -1)
+	if(pEndpoint->connect(htons(tcp_port_), address) == -1)
 	{
 		ERROR_MSG(fmt::format("ClientObject::initLogin({}): connect server error({})!\n",
 			kbe_strerror(), name_));
@@ -226,7 +226,7 @@ bool ClientObject::initLoginBaseapp()
 		return false;
 	}
 
-	Network::Address addr(ip_.c_str(), port_);
+	Network::Address addr(ip_.c_str(), tcp_port_);
 	pEndpoint->addr(addr);
 	pServerChannel_->pEndPoint(pEndpoint);
 	pEndpoint->setnonblocking(true);
@@ -403,11 +403,12 @@ void ClientObject::onLoginSuccessfully(Network::Channel * pChannel, MemoryStream
 
 	s >> accountName;
 	s >> ip_;
-	s >> port_;
+	s >> tcp_port_;
+	s >> udp_port_;
 	s.readBlob(serverDatas_);
 
-	INFO_MSG(fmt::format("ClientObject::onLoginSuccessfully: {} addr={}:{}!\n", 
-		name_, ip_, port_));
+	INFO_MSG(fmt::format("ClientObject::onLoginSuccessfully: {} addr={}:{}|{}!\n",
+		name_, ip_, tcp_port_, udp_port_));
 
 	state_ = C_STATE_LOGIN_BASEAPP_CREATE;
 }

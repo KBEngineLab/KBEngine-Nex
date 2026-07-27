@@ -25,6 +25,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "clientobjectbase.h"
 #include "moveto_point_handler.h"	
 #include "entitydef/entity_call.h"
+#include "entitydef/entity_component.h"
 #include "network/channel.h"	
 #include "network/bundle.h"	
 #include "network/fixed_messages.h"
@@ -176,26 +177,69 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent,
 void Entity::onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_METHOD_UID utype = 0;
-	
 	MethodDescription* pMethodDescription = NULL;
-	
-	if(pScriptModule_->useMethodDescrAlias())
+	ScriptDefModule* pScriptModule = pScriptModule_;
+	PropertyDescription* pComponentPropertyDescription = NULL;
+
+	// Nex 2.8 在方法标识前携带组件属性标识，0 表示调用实体本身。
+	// Nex 2.8 prefixes every method identifier with a component-property identifier; zero targets the entity itself.
+	if (pScriptModule->usePropertyDescrAlias())
+	{
+		uint8 componentPropertyAliasID = 0;
+		s >> componentPropertyAliasID;
+
+		if (componentPropertyAliasID > 0)
+			pComponentPropertyDescription = pScriptModule->findAliasPropertyDescription(componentPropertyAliasID);
+	}
+	else
+	{
+		ENTITY_PROPERTY_UID componentPropertyUID = 0;
+		s >> componentPropertyUID;
+
+		if (componentPropertyUID > 0)
+			pComponentPropertyDescription = pScriptModule->findClientPropertyDescription(componentPropertyUID);
+	}
+
+	PyObject* pyCallObject = this;
+	if (pComponentPropertyDescription)
+	{
+		DataType* pDataType = pComponentPropertyDescription->getDataType();
+		if (!pDataType || pDataType->type() != DATA_TYPE_ENTITY_COMPONENT)
+		{
+			ERROR_MSG(fmt::format("{}::onRemoteMethodCall: property[{}] is not an entity component. entityID={}.\n",
+				this->scriptName(), pComponentPropertyDescription->getName(), id_));
+			return;
+		}
+
+		pScriptModule = static_cast<EntityComponentType*>(pDataType)->pScriptDefModule();
+		pyCallObject = PyObject_GetAttrString(this, pComponentPropertyDescription->getName());
+		if (!pyCallObject)
+		{
+			SCRIPT_ERROR_CHECK();
+			return;
+		}
+	}
+
+	if(pScriptModule->useMethodDescrAlias())
 	{
 		ENTITY_DEF_ALIASID aliasID;
 		s >> aliasID;
-		pMethodDescription = pScriptModule_->findAliasMethodDescription(aliasID);
+		pMethodDescription = pScriptModule->findAliasMethodDescription(aliasID);
 		utype = aliasID;
 	}
 	else
 	{
 		s >> utype;
-		pMethodDescription = pScriptModule_->findClientMethodDescription(utype);
+		pMethodDescription = pScriptModule->findClientMethodDescription(utype);
 	}
 
 	if(pMethodDescription == NULL)
 	{
 		ERROR_MSG(fmt::format("{2}::onRemoteMethodCall: can't found method. utype={0}, methodName=unknown, callerID:{1}.\n", 
 			utype, id_, this->scriptName()));
+
+		if (pyCallObject != static_cast<PyObject*>(this))
+			Py_DECREF(pyCallObject);
 
 		return;
 	}
@@ -206,7 +250,7 @@ void Entity::onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s)
 			id_, (pMethodDescription ? pMethodDescription->getName() : "unknown"), utype, this->scriptName()));
 	}
 
-	PyObject* pyFunc = PyObject_GetAttrString(this, const_cast<char*>
+	PyObject* pyFunc = PyObject_GetAttrString(pyCallObject, const_cast<char*>
 						(pMethodDescription->getName()));
 
 	if(pMethodDescription != NULL)
@@ -231,6 +275,10 @@ void Entity::onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s)
 	}
 	
 	Py_XDECREF(pyFunc);
+
+	if (pyCallObject != static_cast<PyObject*>(this))
+		Py_DECREF(pyCallObject);
+
 	SCRIPT_ERROR_CHECK();
 }
 

@@ -142,6 +142,12 @@ public:
 	*/
 	virtual Network::Channel* findChannelByEntityCall(EntityCall& entitycall);
 
+	/**
+		通过当前客户端实例查找实体，供实体组件绑定 owner。
+		Resolve an entity through this client instance so entity components can bind their owner.
+	*/
+	virtual PyObject* tryGetEntity(COMPONENT_ID componentID, ENTITY_ID entityID);
+
 	/** 网络接口
 		客户端与服务端第一次建立交互, 服务端返回
 	*/
@@ -470,7 +476,8 @@ protected:
 	DBID													dbid_;
 
 	std::string												ip_;
-	uint16													port_;
+	uint16													tcp_port_;
+	uint16													udp_port_;
 
 	std::string												baseappIP_;
 	uint16													baseappPort_;
