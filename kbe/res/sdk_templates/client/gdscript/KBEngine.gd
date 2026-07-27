@@ -456,6 +456,10 @@ func _connectToBaseapp(_callback:Callable)-> void:
 		self.m_networkInterface = NetworkInterfaceKCP.new()
 		self.m_networkInterface.connectTo(self.baseappIP, self.baseappUdpPort, _callback, null)
 	else:
+		if self.m_args.networkType == NETWORK_TYPE.KCP:
+			# 旧服务端可能不提供 UDP 端点；自动回退 TCP 保持首次登录与重登录可用。
+			# Older servers may not expose UDP; automatically fall back to TCP for both login and relogin.
+			Dbg.WARNING_MSG("KBEngine::_connectToBaseapp: UDP port is unavailable, falling back to TCP.")
 		self.m_networkInterface = NetworkInterfaceTCP.new()
 		self.m_networkInterface.connectTo(self.baseappIP, self.baseappTcpPort, _callback, null)
 
