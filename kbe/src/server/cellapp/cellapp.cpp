@@ -210,6 +210,8 @@ bool Cellapp::installPyModules()
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		setSpaceData,					Space::__py_SetSpaceData,								METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		getSpaceData,					Space::__py_GetSpaceData,								METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		delSpaceData,					Space::__py_DelSpaceData,								METH_VARARGS,			0);
+	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		spaces,						Spaces::__py_Spaces,									METH_VARARGS,			0);
+	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		entitiesForSpace,				Spaces::__py_EntitiesForSpace,							METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		isShuttingDown,					__py_isShuttingDown,									METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		address,						__py_address,											METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		raycast,						__py_raycast,											METH_VARARGS,			0);
@@ -938,6 +940,10 @@ void Cellapp::onCreateCellEntityInNewSpaceFromBaseapp(Network::Channel* pChannel
 			return;
 		}
 
+		// createCellEntityInNewSpace 允许普通 Entity 脚本创建空间，因此不能只依赖 Python 子类型识别空间实体。
+		// createCellEntityInNewSpace allows regular Entity scripts to create spaces, so space ownership cannot rely only on the Python subtype.
+		e->isSpace(true);
+
 		PyObject* cellData = e->createCellDataFromStream(&s);
 
 		// 设置entity的baseEntityCall
@@ -1041,6 +1047,10 @@ void Cellapp::onRestoreSpaceInCellFromBaseapp(Network::Channel* pChannel, KBEngi
 			s.done();
 			return;
 		}
+
+		// 灾难恢复重建空间实体时必须恢复运行时标志，使 KBEngine.spaces() 与首次创建结果一致。
+		// Disaster recovery must restore the runtime flag so KBEngine.spaces() matches the initial creation result.
+		e->isSpace(true);
 
 		PyObject* cellData = e->createCellDataFromStream(&s);
 

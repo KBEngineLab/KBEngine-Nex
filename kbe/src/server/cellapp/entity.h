@@ -94,6 +94,11 @@ public:
 	*/
 	INLINE bool isReal(void) const;
 
+	// 标记实体是否拥有其所在空间，兼容普通 Entity 创建空间的 Nex 行为。
+	// Marks whether the entity owns its space, preserving Nex behavior for spaces created by regular Entity types.
+	bool isSpace() const { return isSpace_; }
+	void isSpace(bool value) { isSpace_ = value; }
+
 	/** 
 		判断自身是否有ghostEntity 
 	*/
@@ -658,6 +663,10 @@ protected:
 	// 此属性可用于如:决定在某期间是否要高度同步该entity
 	GAME_TIME												posChangedTime_;
 	GAME_TIME												dirChangedTime_;
+
+	// 空间拥有者标志独立于 Python 继承关系，供创建、恢复和空间查询共同使用。
+	// The space-owner flag is independent of Python inheritance and shared by creation, recovery, and space queries.
+	bool isSpace_;
 
 	// 是否在地面上
 	bool													isOnGround_;

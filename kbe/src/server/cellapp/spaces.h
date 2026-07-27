@@ -51,8 +51,16 @@ public:
 
 	/** 
 		寻找一个指定space 
-	*/
+	 */
 	static Space* findSpace(SPACE_ID spaceID);
+
+	// 返回当前 CellApp 的空间拥有者实体集合，兼容普通 Entity 创建空间的场景。
+	// Returns space-owner entities in this CellApp, including spaces created by regular Entity types.
+	static PyObject* __py_Spaces(PyObject* self, PyObject* args);
+
+	// 返回指定空间中的实体集合，键为实体 ID。
+	// Returns entities in a space, keyed by entity ID.
+	static PyObject* __py_EntitiesForSpace(PyObject* self, PyObject* args);
 	
 	/** 
 		更新所有的space 

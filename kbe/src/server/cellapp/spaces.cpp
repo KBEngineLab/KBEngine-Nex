@@ -18,7 +18,9 @@ You should have received a copy of the GNU Lesser General Public License
 along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "spaces.h"	
+#include "spaces.h"
+#include "cellapp.h"
+#include "entity.h"
 namespace KBEngine{	
 
 Spaces::SPACES& Spaces::spaces()
@@ -108,6 +110,66 @@ Space* Spaces::findSpace(SPACE_ID spaceID)
 		return iter->second.get();
 	
 	return NULL;
+}
+
+//-------------------------------------------------------------------------------------
+PyObject* Spaces::__py_Spaces(PyObject* /*self*/, PyObject* args)
+{
+	if(PyTuple_Size(args) != 0)
+	{
+		PyErr_SetString(PyExc_TypeError, "KBEngine.spaces: expected no arguments.");
+		return NULL;
+	}
+
+	PyObject* result = PyDict_New();
+	Entities<Entity>::ENTITYS_MAP& entities = Cellapp::getSingleton().pEntities()->getEntities();
+	for(Entities<Entity>::ENTITYS_MAP::iterator iter = entities.begin(); iter != entities.end(); ++iter)
+	{
+		Entity* entity = static_cast<Entity*>(iter->second.get());
+		if(entity == NULL || entity->isDestroyed() || !entity->isSpace())
+			continue;
+
+		PyObject* key = PyLong_FromUnsignedLong(entity->spaceID());
+		PyDict_SetItem(result, key, entity);
+		Py_DECREF(key);
+	}
+
+	return result;
+}
+
+//-------------------------------------------------------------------------------------
+PyObject* Spaces::__py_EntitiesForSpace(PyObject* /*self*/, PyObject* args)
+{
+	SPACE_ID spaceID = 0;
+	if(PyTuple_Size(args) != 1)
+	{
+		PyErr_SetString(PyExc_TypeError, "KBEngine.entitiesForSpace: expected one space ID.");
+		return NULL;
+	}
+
+	if(!PyArg_ParseTuple(args, "I", &spaceID))
+		return NULL;
+
+	if(Spaces::findSpace(spaceID) == NULL)
+	{
+		PyErr_Format(PyExc_AssertionError, "KBEngine.entitiesForSpace: spaceID %u not found.", spaceID);
+		return NULL;
+	}
+
+	PyObject* result = PyDict_New();
+	Entities<Entity>::ENTITYS_MAP& entities = Cellapp::getSingleton().pEntities()->getEntities();
+	for(Entities<Entity>::ENTITYS_MAP::iterator iter = entities.begin(); iter != entities.end(); ++iter)
+	{
+		Entity* entity = static_cast<Entity*>(iter->second.get());
+		if(entity == NULL || entity->isDestroyed() || entity->spaceID() != spaceID)
+			continue;
+
+		PyObject* key = PyLong_FromLong(entity->id());
+		PyDict_SetItem(result, key, entity);
+		Py_DECREF(key);
+	}
+
+	return result;
 }
 
 //-------------------------------------------------------------------------------------
