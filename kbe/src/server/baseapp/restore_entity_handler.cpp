@@ -131,6 +131,10 @@ bool RestoreEntityHandler::process()
 	{
 		if(timestamp() - tickReport_ > uint64( 3 * stampsPerSecond() ))
 		{
+			// 探测发出后立即重置窗口，避免在响应到达前每个 Tick 都重复占用网络队列。
+			// Reset the window as soon as a probe is sent so every tick cannot flood the network queue before the response arrives.
+			tickReport_ = timestamp();
+
 			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 			(*pBundle).newMessage(CellappInterface::requestRestore);
 			(*pBundle) << cellappID();
