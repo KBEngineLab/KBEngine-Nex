@@ -30,28 +30,36 @@ namespace KBEngine{
 //-------------------------------------------------------------------------------------
 bool LoadNavmeshTask::process()
 {
-	Navigation::getSingleton().loadNavigation(resPath_, params_);
+	loadSucceeded_ = Navigation::getSingleton().loadNavigation(resPath_, params_) != NULL;
 	return false;
 }
 
 //-------------------------------------------------------------------------------------
 thread::TPTask::TPTaskState LoadNavmeshTask::presentMainThread()
 {
-	NavigationHandlePtr pNavigationHandle = Navigation::getSingleton().findNavigation(resPath_);
-	
 	Space* pSpace = Spaces::findSpace(spaceID_);
 	if(pSpace == NULL || !pSpace->isGood())
 	{
-		ERROR_MSG(fmt::format("LoadNavmeshTask::presentMainThread(): not found space({})\n",
-			spaceID_));
+		// Space 可在异步加载期间销毁，晚到任务应静默结束而不是回调失效对象。
+		// A space may be destroyed during asynchronous loading; a late task must finish without calling an invalid object.
+		WARNING_MSG(fmt::format("LoadNavmeshTask::presentMainThread(): space({}) was removed while loading navigation resource({})\n",
+			spaceID_, resPath_));
+	}
+	else if(!loadSucceeded_)
+	{
+		ERROR_MSG(fmt::format("LoadNavmeshTask::presentMainThread(): failed to load navigation resource({}) for space({})\n",
+			resPath_, spaceID_));
+
+		// 保留既有几何加载完成回调，避免改变脚本生命周期，同时明确传递空句柄。
+		// Preserve the existing geometry completion callback to avoid changing script lifecycle while explicitly passing a null handle.
+		pSpace->onLoadedSpaceGeometryMapping(NULL);
 	}
 	else
 	{
+		NavigationHandlePtr pNavigationHandle = Navigation::getSingleton().findNavigation(resPath_);
 		if(pNavigationHandle == NULL)
 		{
-			// 保留既有几何加载完成回调，避免改变脚本生命周期，同时明确暴露资源加载失败。
-			// Preserve the existing geometry completion callback to avoid changing script lifecycle while exposing the load failure.
-			ERROR_MSG(fmt::format("LoadNavmeshTask::presentMainThread(): failed to load navigation resource({}) for space({})\n",
+			ERROR_MSG(fmt::format("LoadNavmeshTask::presentMainThread(): navigation resource({}) disappeared from cache for space({})\n",
 				resPath_, spaceID_));
 		}
 

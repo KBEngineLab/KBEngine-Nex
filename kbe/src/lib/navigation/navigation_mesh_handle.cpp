@@ -565,9 +565,17 @@ NavigationHandle* NavMeshHandle::create(std::string resPath, const std::map< int
 		for(; iter != params.end(); ++iter)
 		{
 			_create(iter->first, resPath, path + "/" + iter->second, pNavMeshHandle);
-		}		
+		}
 	}
-	
+
+	// 文件存在不代表 Detour 数据有效，所有 layer 都失败时必须让上层获得明确失败。
+	// File presence does not make Detour data valid; report failure when every layer fails to load.
+	if(pNavMeshHandle->navmeshLayer.empty())
+	{
+		delete pNavMeshHandle;
+		return NULL;
+	}
+
 	return pNavMeshHandle;
 }
 

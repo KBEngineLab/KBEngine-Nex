@@ -154,8 +154,14 @@ NavigationHandlePtr Navigation::loadNavigation(std::string resPath, const std::m
 	}
 
 
-	navhandles_[resPath] = NavigationHandlePtr(pNavigationHandle_);
-	return pNavigationHandle_;
+	// 创建失败的句柄不能进入缓存，否则修复资源后同一路径也无法重新加载。
+	// A failed handle must not enter the cache or the same path cannot be retried after the resource is fixed.
+	if(pNavigationHandle_ == NULL)
+		return NULL;
+
+	NavigationHandlePtr pNavigationHandle(pNavigationHandle_);
+	navhandles_[resPath] = pNavigationHandle;
+	return pNavigationHandle;
 }
 
 //-------------------------------------------------------------------------------------		
