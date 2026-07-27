@@ -40,6 +40,12 @@ class EventDispatcher;
 class PacketSender : public OutputNotificationHandler, public PoolObject
 {
 public:
+	enum PACKET_SENDER_TYPE
+	{
+		TCP_PACKET_SENDER = 0,
+		UDP_PACKET_SENDER = 1
+	};
+
 	PacketSender();
 	PacketSender(EndPoint & endpoint, NetworkInterface & networkInterface);
 	virtual ~PacketSender();
@@ -64,14 +70,17 @@ public:
 
 	virtual int handleOutputNotification(KBESOCKET fd);
 
-	virtual Reason processPacket(Channel* pChannel, Packet * pPacket);
-	virtual Reason processFilterPacket(Channel* pChannel, Packet * pPacket) = 0;
+	// userarg 区分送入 KCP 可靠队列与直接发送 UDP 数据报，TCP 调用保持默认值即可。
+	// userarg distinguishes KCP reliable queuing from direct UDP datagrams; TCP callers keep the default value.
+	virtual Reason processPacket(Channel* pChannel, Packet * pPacket, int userarg = 0);
+	virtual Reason processFilterPacket(Channel* pChannel, Packet * pPacket, int userarg = 0) = 0;
 
 	static Reason checkSocketErrors(const EndPoint * pEndpoint);
 
 	virtual Channel* getChannel();
 
-	virtual bool processSend(Channel* pChannel) = 0;
+	virtual bool processSend(Channel* pChannel, int userarg = 0) = 0;
+	virtual PACKET_SENDER_TYPE type() const { return TCP_PACKET_SENDER; }
 
 protected:
 	EndPoint* pEndpoint_;

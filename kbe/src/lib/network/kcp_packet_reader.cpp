@@ -13,38 +13,43 @@ KBEngine is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Lesser General Public License for more details.
- 
+
 You should have received a copy of the GNU Lesser General Public License
 along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
-
-
-#include "packet_filter.h"
-
-#ifndef CODE_INLINE
-#include "packet_filter.inl"
-#endif
-
+#include "kcp_packet_reader.h"
 #include "network/channel.h"
-#include "network/network_interface.h"
-#include "network/packet_receiver.h"
-#include "network/packet_sender.h"
+#include "network/message_handler.h"
+#include "network/network_stats.h"
 
-namespace KBEngine { 
+namespace KBEngine {
 namespace Network
 {
+
+
 //-------------------------------------------------------------------------------------
-Reason PacketFilter::send(Channel * pChannel, PacketSender& sender, Packet * pPacket, int userarg)
+KCPPacketReader::KCPPacketReader(Channel* pChannel):
+	PacketReader(pChannel)
 {
-	return sender.processFilterPacket(pChannel, pPacket, userarg);
 }
 
 //-------------------------------------------------------------------------------------
-Reason PacketFilter::recv(Channel * pChannel, PacketReceiver & receiver, Packet * pPacket)
+KCPPacketReader::~KCPPacketReader()
 {
-	return receiver.processFilteredPacket(pChannel, pPacket);
 }
 
 //-------------------------------------------------------------------------------------
-} 
+void KCPPacketReader::reset()
+{
+	PacketReader::reset();
+}
+
+//-------------------------------------------------------------------------------------
+void KCPPacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandlers, Packet* pPacket)
+{
+	PacketReader::processMessages(pMsgHandlers, pPacket);
+}
+
+//-------------------------------------------------------------------------------------
+}
 }

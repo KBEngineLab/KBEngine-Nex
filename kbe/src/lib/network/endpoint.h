@@ -123,6 +123,9 @@ public:
 	INLINE int getremotehostname(std::string * name) const;
 	
 	INLINE int sendto(void * gramData, int gramSize, u_int16_t networkPort, u_int32_t networkAddr = BROADCAST);
+	// peer EndPoint 已保存目标地址，sender 通过该重载避免重复拆装端口和 IP。
+	// A peer EndPoint already stores its destination, so this overload avoids repeatedly unpacking the port and IP in senders.
+	INLINE int sendto(void* gramData, int gramSize);
 	INLINE int sendto(void * gramData, int gramSize, struct sockaddr_in & sin);
 	INLINE int recvfrom(void * gramData, int gramSize, u_int16_t * networkPort, u_int32_t * networkAddr);
 	INLINE int recvfrom(void * gramData, int gramSize, struct sockaddr_in & sin);
@@ -132,6 +135,14 @@ public:
 	INLINE void addr(u_int16_t newNetworkPort, u_int32_t newNetworkAddress);
 
 	bool waitSend();
+
+	// UDP peer EndPoint 仅引用 listener socket；销毁 peer Channel 时绝不能关闭所有连接共享的原生句柄。
+	// A UDP peer EndPoint only references the listener socket; destroying one peer Channel must never close the native handle shared by all peers.
+	void setSocketRef(KBESOCKET socket)
+	{
+		socket_ = socket;
+		isRefSocket_ = true;
+	}
 
 	// completion 后端使用内存 BIO 接管 TLS 密文，readiness 后端继续使用原生 socket BIO。
 	// Completion backends use memory BIOs for TLS ciphertext while readiness backends retain the native socket BIO.
@@ -170,6 +181,7 @@ protected:
 	Address address_;
 	SSL* sslHandle_;
 	SSL_CTX* sslContext_;
+	bool isRefSocket_;
 	bool sslUsesMemoryBIO_;
 	std::vector<char> sslNetworkOutput_;
 };

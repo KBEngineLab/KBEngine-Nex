@@ -34,6 +34,10 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/tcp_packet_receiver.h"
 #include "network/tcp_packet_sender.h"
 #include "network/udp_packet_receiver.h"
+#include "network/kcp_packet_receiver.h"
+#include "network/kcp_packet_reader.h"
+#include "network/kcp_packet_sender.h"
+#include "network/udp_packet_sender.h"
 #include "network/tcp_packet.h"
 #include "network/udp_packet.h"
 #include "network/message_handler.h"
@@ -80,13 +84,14 @@ void Channel::destroyObjPool()
 //-------------------------------------------------------------------------------------
 size_t Channel::getPoolObjectBytes()
 {
-	size_t bytes = sizeof(pNetworkInterface_) + sizeof(traits_) + sizeof(protocoltype_) +
+	size_t bytes = sizeof(pNetworkInterface_) + sizeof(traits_) + sizeof(protocoltype_) + sizeof(protocolSubtype_) +
 		sizeof(id_) + sizeof(inactivityTimerHandle_) + sizeof(inactivityExceptionPeriod_) + 
 		sizeof(lastReceivedTime_) + sizeof(lastTickBufferedReceives_) + sizeof(pPacketReader_) + (bundles_.size() * sizeof(Bundle*)) +
 		+ sizeof(flags_) + sizeof(numPacketsSent_) + sizeof(numPacketsReceived_) + sizeof(numBytesSent_) + sizeof(numBytesReceived_)
 		+ sizeof(lastTickBytesReceived_) + sizeof(lastTickBytesSent_) + sizeof(pFilter_) + sizeof(pEndPoint_) + sizeof(pPacketReceiver_) + sizeof(pPacketSender_)
 		+ sizeof(proxyID_) + strextra_.size() + sizeof(channelType_)
-		+ sizeof(componentID_) + sizeof(pMsgHandlers_) + condemnReason_.size();
+		+ sizeof(componentID_) + sizeof(pMsgHandlers_) + sizeof(pKCP_) + sizeof(kcpUpdateTimerHandle_) +
+		sizeof(hasSetNextKcpUpdate_) + condemnReason_.size();
 
 	return bytes;
 }
@@ -112,10 +117,11 @@ void Channel::onEabledPoolObject()
 //-------------------------------------------------------------------------------------
 Channel::Channel(NetworkInterface & networkInterface,
 		const EndPoint * pEndPoint, Traits traits, ProtocolType pt,
-		PacketFilterPtr pFilter, ChannelID id):
+		PacketFilterPtr pFilter, ChannelID id, ProtocolSubType protocolSubtype):
 	pNetworkInterface_(NULL),
 	traits_(traits),
 	protocoltype_(pt),
+	protocolSubtype_(protocolSubtype),
 	id_(id),
 	inactivityTimerHandle_(),
 	inactivityExceptionPeriod_(0),
@@ -139,6 +145,9 @@ Channel::Channel(NetworkInterface & networkInterface,
 	componentID_(UNKNOWN_COMPONENT_TYPE),
 	pMsgHandlers_(NULL),
 	flags_(0),
+	pKCP_(NULL),
+	kcpUpdateTimerHandle_(),
+	hasSetNextKcpUpdate_(false),
 	condemnReason_(),
 	tlsDetectionPrefix_(),
 	gracefulCloseStarted_(false),
@@ -148,7 +157,7 @@ Channel::Channel(NetworkInterface & networkInterface,
 	gracefulCloseDeadline_(0)
 {
 	this->clearBundle();
-	initialize(networkInterface, pEndPoint, traits, pt, pFilter, id);
+	initialize(networkInterface, pEndPoint, traits, pt, pFilter, id, protocolSubtype);
 }
 
 //-------------------------------------------------------------------------------------
@@ -156,6 +165,7 @@ Channel::Channel():
 	pNetworkInterface_(NULL),
 	traits_(EXTERNAL),
 	protocoltype_(PROTOCOL_TCP),
+	protocolSubtype_(SUB_PROTOCOL_DEFAULT),
 	id_(0),
 	inactivityTimerHandle_(),
 	inactivityExceptionPeriod_(0),
@@ -180,6 +190,9 @@ Channel::Channel():
 	componentID_(UNKNOWN_COMPONENT_TYPE),
 	pMsgHandlers_(NULL),
 	flags_(0),
+	pKCP_(NULL),
+	kcpUpdateTimerHandle_(),
+	hasSetNextKcpUpdate_(false),
 	condemnReason_(),
 	tlsDetectionPrefix_(),
 	gracefulCloseStarted_(false),
@@ -204,10 +217,13 @@ bool Channel::initialize(NetworkInterface & networkInterface,
 		Traits traits, 
 		ProtocolType pt, 
 		PacketFilterPtr pFilter, 
-		ChannelID id)
+		ChannelID id,
+		ProtocolSubType protocolSubtype)
 {
 	id_ = id;
 	protocoltype_ = pt;
+	protocolSubtype_ = protocoltype_ == PROTOCOL_UDP && protocolSubtype == SUB_PROTOCOL_DEFAULT
+		? SUB_PROTOCOL_UDP : protocolSubtype;
 	traits_ = traits;
 	pFilter_ = pFilter;
 	pNetworkInterface_ = &networkInterface;
@@ -242,20 +258,38 @@ bool Channel::initialize(NetworkInterface & networkInterface,
 	}
 	else
 	{
+		const bool useKcp = protocolSubtype_ == SUB_PROTOCOL_KCP;
 		if(pPacketReceiver_)
 		{
-			if(pPacketReceiver_->type() == PacketReceiver::TCP_PACKET_RECEIVER)
+			const bool receiverMismatch = pPacketReceiver_->type() == PacketReceiver::TCP_PACKET_RECEIVER ||
+				(pPacketReceiver_->type() == PacketReceiver::UDP_PACKET_RECEIVER &&
+				 static_cast<UDPPacketReceiver*>(pPacketReceiver_)->protocolSubType() != protocolSubtype_);
+			if(receiverMismatch)
 			{
 				SAFE_RELEASE(pPacketReceiver_);
-				pPacketReceiver_ = new UDPPacketReceiver(*pEndPoint_, *pNetworkInterface_);
+				pPacketReceiver_ = useKcp ? static_cast<PacketReceiver*>(new KCPPacketReceiver(*pEndPoint_, *pNetworkInterface_)) : static_cast<PacketReceiver*>(new UDPPacketReceiver(*pEndPoint_, *pNetworkInterface_));
 			}
 		}
 		else
 		{
-			pPacketReceiver_ = new UDPPacketReceiver(*pEndPoint_, *pNetworkInterface_);
+			pPacketReceiver_ = useKcp ? static_cast<PacketReceiver*>(new KCPPacketReceiver(*pEndPoint_, *pNetworkInterface_)) : static_cast<PacketReceiver*>(new UDPPacketReceiver(*pEndPoint_, *pNetworkInterface_));
 		}
 
 		KBE_ASSERT(pPacketReceiver_->type() == PacketReceiver::UDP_PACKET_RECEIVER);
+
+		SAFE_RELEASE(pPacketSender_);
+		pPacketSender_ = useKcp ? static_cast<PacketSender*>(new KCPPacketSender(*pEndPoint_, *pNetworkInterface_)) : static_cast<PacketSender*>(new UDPPacketSender(*pEndPoint_, *pNetworkInterface_));
+		if (useKcp)
+		{
+			if (!pPacketReader_ || pPacketReader_->type() != PacketReader::PACKET_READER_TYPE_KCP)
+			{
+				SAFE_RELEASE(pPacketReader_);
+				pPacketReader_ = new KCPPacketReader(this);
+			}
+
+			if (!initKcp())
+				return false;
+		}
 	}
 
 	pPacketReceiver_->pEndPoint(pEndPoint_);
@@ -296,10 +330,114 @@ bool Channel::finalise()
 //-------------------------------------------------------------------------------------
 uint32 Channel::getRTT()
 {
+	if (protocolSubtype_ == SUB_PROTOCOL_KCP && pKCP_)
+		return static_cast<uint32>(pKCP_->rx_srtt) * 1000;
+
 	if (!pEndPoint())
 		return 0;
 
 	return pEndPoint()->getRTT();
+}
+
+//-------------------------------------------------------------------------------------
+bool Channel::initKcp()
+{
+	if (pKCP_)
+		return true;
+
+	// 每个组件在单线程 dispatcher 中创建 Channel，因此递增会话号不需要额外加锁；零值保留为未分配状态。
+	// Channels are created on the component's single dispatcher thread, so the increment needs no lock; zero remains reserved for the unassigned state.
+	static IUINT32 nextConversation = 1;
+	if (id_ == CHANNEL_ID_NULL)
+	{
+		id_ = static_cast<ChannelID>(nextConversation++);
+		if (nextConversation == 0)
+			nextConversation = 1;
+	}
+
+	pKCP_ = ikcp_create(static_cast<IUINT32>(id_), this);
+	if (!pKCP_)
+	{
+		ERROR_MSG(fmt::format("Channel::initKcp: ikcp_create failed, channel={}\n", c_str()));
+		return false;
+	}
+
+	pKCP_->output = &Channel::kcpOutput;
+	const int sendWindow = static_cast<int>(isExternal() ? g_rudp_extWritePacketsQueueSize : g_rudp_intWritePacketsQueueSize);
+	const int receiveWindow = static_cast<int>(isExternal() ? g_rudp_extReadPacketsQueueSize : g_rudp_intReadPacketsQueueSize);
+	ikcp_wndsize(pKCP_, sendWindow, receiveWindow);
+	ikcp_nodelay(pKCP_, g_rudp_nodelay ? 1 : 0, static_cast<int>(g_rudp_tickInterval),
+		static_cast<int>(g_rudp_missAcksResend), g_rudp_congestionControl ? 0 : 1);
+	pKCP_->rx_minrto = static_cast<IUINT32>(g_rudp_minRTO);
+
+	const int mtu = isExternal() && g_rudp_mtu > 0 && g_rudp_mtu < PACKET_MAX_SIZE_UDP * 4
+		? static_cast<int>(g_rudp_mtu) : PACKET_MAX_SIZE_UDP - 72;
+	if (ikcp_setmtu(pKCP_, mtu) < 0)
+	{
+		ERROR_MSG(fmt::format("Channel::initKcp: invalid mtu={}, channel={}\n", mtu, c_str()));
+		finaliseKcp();
+		return false;
+	}
+
+	scheduleKcpUpdate();
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
+void Channel::finaliseKcp()
+{
+	if (kcpUpdateTimerHandle_.isSet())
+		kcpUpdateTimerHandle_.cancel();
+
+	hasSetNextKcpUpdate_ = false;
+	if (pKCP_)
+	{
+		ikcp_release(pKCP_);
+		pKCP_ = NULL;
+	}
+}
+
+//-------------------------------------------------------------------------------------
+int Channel::kcpOutput(const char* buffer, int length, ikcpcb* kcp, void* user)
+{
+	Channel* pChannel = static_cast<Channel*>(user);
+	if (!pChannel || pChannel->condemn() == FLAG_CONDEMN_AND_DESTROY || !pChannel->pPacketSender_)
+		return -1;
+
+	return static_cast<KCPPacketSender*>(pChannel->pPacketSender_)->kcp_output(buffer, length, kcp, pChannel);
+}
+
+//-------------------------------------------------------------------------------------
+void Channel::scheduleKcpUpdate(int64 microseconds)
+{
+	if (!pKCP_ || isDestroyed())
+		return;
+
+	// 同一 dispatcher tick 内的多次发送只安排一次立即更新，防止频繁取消和重建 timer。
+	// Multiple sends in one dispatcher tick schedule only one immediate update, avoiding repeated timer cancellation and allocation.
+	if (microseconds <= 0 && hasSetNextKcpUpdate_)
+		return;
+
+	if (kcpUpdateTimerHandle_.isSet())
+		kcpUpdateTimerHandle_.cancel();
+
+	hasSetNextKcpUpdate_ = microseconds <= 0;
+	kcpUpdateTimerHandle_ = dispatcher().addTimer(microseconds > 0 ? microseconds : 1, this,
+		reinterpret_cast<void*>(TIMEOUT_KCP_UPDATE));
+}
+
+//-------------------------------------------------------------------------------------
+void Channel::updateKcp()
+{
+	if (!pKCP_ || isDestroyed())
+		return;
+
+	hasSetNextKcpUpdate_ = false;
+	const IUINT32 current = static_cast<IUINT32>(kbe_clock());
+	ikcp_update(pKCP_, current);
+	const IUINT32 next = ikcp_check(pKCP_, current);
+	const IUINT32 delay = next > current ? next - current : 1;
+	scheduleKcpUpdate(static_cast<int64>(delay) * 1000);
 }
 
 //-------------------------------------------------------------------------------------
@@ -376,6 +514,9 @@ void Channel::destroy()
 //-------------------------------------------------------------------------------------
 void Channel::clearState( bool warnOnDiscard /*=false*/ )
 {
+	// KCP timer 必须在 Channel 进入对象池前取消，否则旧回调可能作用于已经复用的新连接。
+	// The KCP timer must be cancelled before pooling the Channel, or a stale callback could target a newly reused connection.
+	finaliseKcp();
 	clearBundle();
 
 	lastReceivedTime_ = timestamp();
@@ -502,6 +643,11 @@ void Channel::handleTimeout(TimerHandle, void * arg)
 
 			break;
 		}
+		case TIMEOUT_KCP_UPDATE:
+		{
+			updateKcp();
+			break;
+		}
 		default:
 			break;
 	}
@@ -510,6 +656,12 @@ void Channel::handleTimeout(TimerHandle, void * arg)
 //-------------------------------------------------------------------------------------
 void Channel::send(Bundle * pBundle)
 {
+	if (protocoltype_ == PROTOCOL_UDP)
+	{
+		sendTo(true, pBundle);
+		return;
+	}
+
 	if (isDestroyed())
 	{
 		ERROR_MSG(fmt::format("Channel::send({}): channel has destroyed.\n", 
@@ -620,6 +772,38 @@ void Channel::send(Bundle * pBundle)
 			}
 		}
 	}
+}
+
+//-------------------------------------------------------------------------------------
+void Channel::sendTo(bool reliable, Bundle* pBundle)
+{
+	if (protocoltype_ != PROTOCOL_UDP || isDestroyed() || condemn() > 0)
+	{
+		if (pBundle)
+			Bundle::reclaimPoolObject(pBundle);
+		return;
+	}
+
+	if (pBundle)
+	{
+		pBundle->pChannel(this);
+		pBundle->finiMessage(true);
+		bundles_.push_back(pBundle);
+	}
+
+	if (bundles_.empty())
+		return;
+
+	if (!pPacketSender_)
+	{
+		pPacketSender_ = protocolSubtype_ == SUB_PROTOCOL_KCP
+			? static_cast<PacketSender*>(new KCPPacketSender(*pEndPoint_, *pNetworkInterface_))
+			: static_cast<PacketSender*>(new UDPPacketSender(*pEndPoint_, *pNetworkInterface_));
+	}
+
+	// KCP sender 的 userarg=1 表示写入可靠队列；普通 UDP 以及 KCP 控制报文直接走 socket。
+	// KCP sender userarg=1 means enqueue reliably; plain UDP and KCP control datagrams go directly to the socket.
+	pPacketSender_->processSend(this, reliable && protocolSubtype_ == SUB_PROTOCOL_KCP ? 1 : 0);
 }
 
 //-------------------------------------------------------------------------------------
@@ -819,6 +1003,16 @@ bool Channel::handshake(Packet* pPacket)
 	}
 
 	flags_ |= FLAG_HANDSHAKE;
+	if (protocolSubtype_ == SUB_PROTOCOL_KCP)
+	{
+		if (!pPacketReader_ || pPacketReader_->type() != PacketReader::PACKET_READER_TYPE_KCP)
+		{
+			SAFE_RELEASE(pPacketReader_);
+			pPacketReader_ = new KCPPacketReader(this);
+		}
+
+		return false;
+	}
 
 	// 此处判定是否为websocket或者其他协议的握手
 	if(websocket::WebSocketProtocol::isWebSocketProtocol(pPacket))

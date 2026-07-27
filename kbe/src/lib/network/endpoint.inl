@@ -38,6 +38,7 @@ socket_(-1)
 
 	sslHandle_ = NULL;
 	sslContext_ = NULL;
+	isRefSocket_ = false;
 	sslUsesMemoryBIO_ = false;
 	sslNetworkOutput_.clear();
 }
@@ -56,6 +57,7 @@ socket_(-1)
 
 	sslHandle_ = NULL;
 	sslContext_ = NULL;
+	isRefSocket_ = false;
 	sslUsesMemoryBIO_ = false;
 	sslNetworkOutput_.clear();
 }
@@ -237,6 +239,15 @@ INLINE int EndPoint::close()
 		return 0;
 	}
 
+	if (isRefSocket_)
+	{
+		// 引用型 EndPoint 放弃本地句柄即可，listener 继续拥有并驱动共享 UDP socket。
+		// A reference EndPoint only drops its local handle; the listener remains the owner and driver of the shared UDP socket.
+		this->setFileDescriptor(invalidSocket);
+		isRefSocket_ = false;
+		return 0;
+	}
+
 #if KBE_PLATFORM == PLATFORM_UNIX
 	int ret = ::close(socket_);
 #else
@@ -337,6 +348,11 @@ INLINE int EndPoint::sendto(void * gramData, int gramSize,
 	sin.sin_addr.s_addr = networkAddr;
 
 	return this->sendto(gramData, gramSize, sin);
+}
+
+INLINE int EndPoint::sendto(void* gramData, int gramSize)
+{
+	return sendto(gramData, gramSize, address_.port, address_.ip);
 }
 
 INLINE int EndPoint::sendto(void * gramData, int gramSize,

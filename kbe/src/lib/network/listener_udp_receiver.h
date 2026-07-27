@@ -13,48 +13,44 @@ KBEngine is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Lesser General Public License for more details.
- 
+
 You should have received a copy of the GNU Lesser General Public License
 along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
+#ifndef KBE_NETWORKUDPLISTENER_RECEIVER_H
+#define KBE_NETWORKUDPLISTENER_RECEIVER_H
 
-
-#ifndef KBE_PACKET_FILTER_H
-#define KBE_PACKET_FILTER_H
-
+#include "common/common.h"
+#include "common/timer.h"
+#include "helper/debug_helper.h"
 #include "network/common.h"
-#include "common/smartpointer.h"
-#include "common/refcountable.h"
+#include "network/interfaces.h"
+#include "network/packet.h"
+#include "network/channel.h"
+#include "network/listener_receiver.h"
 
-namespace KBEngine { 
+namespace KBEngine {
 namespace Network
 {
+class UDPPacketReceiver;
 
-class Channel;
-class NetworkInterface;
-class Packet;
-class Address;
-class PacketFilter;
-class PacketReceiver;
-class PacketSender;
-
-class PacketFilter : public RefCountable
+class ListenerUdpReceiver : public ListenerReceiver
 {
 public:
-	virtual ~PacketFilter() {}
+	ListenerUdpReceiver(EndPoint & endpoint, Channel::Traits traits, NetworkInterface & networkInterface);
+	virtual ~ListenerUdpReceiver();
 
-	virtual Reason send(Channel * pChannel, PacketSender& sender, Packet * pPacket, int userarg = 0);
+protected:
+	virtual int handleInputNotification(int fd);
 
-	virtual Reason recv(Channel * pChannel, PacketReceiver & receiver, Packet * pPacket);
+protected:
+	UDPPacketReceiver* pUDPPacketReceiver_;
 };
-
-typedef SmartPointer<PacketFilter> PacketFilterPtr;
 
 }
 }
 
 #ifdef CODE_INLINE
-#include "packet_filter.inl"
+#include "listener_udp_receiver.inl"
 #endif
-
-#endif // KBE_PACKET_FILTER_H
+#endif // KBE_NETWORKUDPLISTENER_RECEIVER_H

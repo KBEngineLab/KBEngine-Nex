@@ -13,14 +13,13 @@ KBEngine is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Lesser General Public License for more details.
- 
+
 You should have received a copy of the GNU Lesser General Public License
 along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
-#ifndef KBE_NETWORKTCPPACKET_SENDER_H
-#define KBE_NETWORKTCPPACKET_SENDER_H
+#ifndef KBE_NETWORKKCPPACKET_SENDER_H
+#define KBE_NETWORKKCPPACKET_SENDER_H
 
 #include "common/common.h"
 #include "common/timer.h"
@@ -29,45 +28,39 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/common.h"
 #include "network/interfaces.h"
 #include "network/tcp_packet.h"
-#include "network/packet_sender.h"
+#include "network/udp_packet_sender.h"
+#include "network/ikcp.h"
 
-namespace KBEngine { 
+namespace KBEngine {
 namespace Network
 {
-class EndPoint;
-class Channel;
-class Address;
-class NetworkInterface;
-class EventDispatcher;
 
-class TCPPacketSender : public PacketSender
+class KCPPacketSender : public UDPPacketSender
 {
 public:
-	typedef KBEShared_ptr< SmartPoolObject< TCPPacketSender > > SmartPoolObjectPtr;
+	typedef KBEShared_ptr< SmartPoolObject< KCPPacketSender > > SmartPoolObjectPtr;
 	static SmartPoolObjectPtr createSmartPoolObj(const std::string& logPoint);
-	static ObjectPool<TCPPacketSender>& ObjPool();
-	static TCPPacketSender* createPoolObject(const std::string& logPoint);
-	static void reclaimPoolObject(TCPPacketSender* obj);
+	static ObjectPool<KCPPacketSender>& ObjPool();
+	static KCPPacketSender* createPoolObject(const std::string& logPoint);
+	static void reclaimPoolObject(KCPPacketSender* obj);
 	virtual void onReclaimObject();
 	static void destroyObjPool();
-	
-	TCPPacketSender():PacketSender(){}
-	TCPPacketSender(EndPoint & endpoint, NetworkInterface & networkInterface);
-	~TCPPacketSender();
 
-	virtual void onGetError(Channel* pChannel, const std::string& err);
-	virtual bool processSend(Channel* pChannel, int userarg = 0);
-	virtual PacketSender::PACKET_SENDER_TYPE type() const { return TCP_PACKET_SENDER; }
+	KCPPacketSender():UDPPacketSender(){}
+	KCPPacketSender(EndPoint & endpoint, NetworkInterface & networkInterface);
+	virtual ~KCPPacketSender();
+
+	int kcp_output(const char *buf, int len, ikcpcb *kcp, Channel* pChannel);
 
 protected:
-	virtual Reason processFilterPacket(Channel* pChannel, Packet * pPacket, int userarg = 0);
+	virtual void onSent(Packet* pPacket);
+	virtual Reason processFilterPacket(Channel* pChannel, Packet * pPacket, int userarg);
 
-	uint8 sendfailCount_;
 };
 }
 }
 
 #ifdef CODE_INLINE
-#include "tcp_packet_sender.inl"
+#include "udp_packet_sender.inl"
 #endif
-#endif // KBE_NETWORKTCPPACKET_SENDER_H
+#endif // KBE_NETWORKKCPPACKET_SENDER_H

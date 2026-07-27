@@ -84,6 +84,12 @@ UDPPacketReceiver::~UDPPacketReceiver()
 }
 
 //-------------------------------------------------------------------------------------
+Channel* UDPPacketReceiver::findChannel(const Address& address)
+{
+	return pNetworkInterface_->findChannel(address);
+}
+
+//-------------------------------------------------------------------------------------
 bool UDPPacketReceiver::processRecv(bool expectingPacket)
 {	
 	Address	srcAddr;
@@ -138,15 +144,19 @@ bool UDPPacketReceiver::processRecv(bool expectingPacket)
 
 	}
 
-	Channel* pSrcChannel = pNetworkInterface_->findChannel(srcAddr);
+	Channel* pSrcChannel = findChannel(srcAddr);
 
 	if(pSrcChannel == NULL) 
 	{
 		EndPoint* pNewEndPoint = EndPoint::createPoolObject(OBJECTPOOL_POINT);
 		pNewEndPoint->addr(srcAddr.port, srcAddr.ip);
+		// 每个远端地址拥有独立的 Channel 状态，但底层 UDP listener socket 由监听器统一持有。
+		// Each remote address owns independent Channel state while the underlying UDP listener socket remains owned by the listener.
+		pNewEndPoint->setSocketRef(static_cast<KBESOCKET>(*pEndpoint_));
 
 		pSrcChannel = Network::Channel::createPoolObject(OBJECTPOOL_POINT);
-		bool ret = pSrcChannel->initialize(*pNetworkInterface_, pNewEndPoint, Channel::EXTERNAL, PROTOCOL_UDP);
+		bool ret = pSrcChannel->initialize(*pNetworkInterface_, pNewEndPoint, Channel::EXTERNAL,
+			PROTOCOL_UDP, NULL, CHANNEL_ID_NULL, protocolSubType());
 		if(!ret)
 		{
 			ERROR_MSG(fmt::format("UDPPacketReceiver::processRecv: initialize({}) is failed!\n",

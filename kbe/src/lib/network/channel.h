@@ -35,6 +35,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/bundle.h"
 #include "network/interfaces.h"
 #include "network/packet_filter.h"
+#include "network/ikcp.h"
 
 namespace KBEngine { 
 namespace Network
@@ -95,7 +96,8 @@ public:
 		Traits traits, 
 		ProtocolType pt = PROTOCOL_TCP, 
 		PacketFilterPtr pFilter = NULL, 
-		ChannelID id = CHANNEL_ID_NULL);
+		ChannelID id = CHANNEL_ID_NULL,
+		ProtocolSubType protocolSubtype = SUB_PROTOCOL_DEFAULT);
 
 	virtual ~Channel();
 	
@@ -126,6 +128,7 @@ public:
 	// 暴露只读传输类型，使地址索引维护能够区分 TCP 与 UDP/KCP Channel，而不允许外部改写生命周期状态。
 	// Expose the transport type read-only so address-index maintenance can distinguish TCP from UDP/KCP channels without allowing external lifecycle mutation.
 	ProtocolType protocoltype() const { return protocoltype_; }
+	ProtocolSubType protocolSubtype() const { return protocolSubtype_; }
 
 	typedef std::vector<Bundle*> Bundles;
 	Bundles & bundles();
@@ -146,7 +149,13 @@ public:
 	void stopSend();
 
 	void send(Bundle * pBundle = NULL);
+	// reliable=true 时数据进入 KCP 可靠队列，否则直接作为 UDP 数据报发送。
+	// reliable=true queues data through KCP; false sends it directly as a UDP datagram.
+	void sendTo(bool reliable, Bundle* pBundle = NULL);
 	void delayedSend();
+
+	ikcpcb* pKCP() const { return pKCP_; }
+	void scheduleKcpUpdate(int64 microseconds = 0);
 
 
 	INLINE PacketReader* pPacketReader() const;
@@ -243,7 +252,8 @@ public:
 		Traits traits, 
 		ProtocolType pt = PROTOCOL_TCP, 
 		PacketFilterPtr pFilter = NULL, 
-		ChannelID id = CHANNEL_ID_NULL);
+		ChannelID id = CHANNEL_ID_NULL,
+		ProtocolSubType protocolSubtype = SUB_PROTOCOL_DEFAULT);
 
 	bool finalise();
 
@@ -257,17 +267,23 @@ private:
 
 	enum TimeOutType
 	{
-		TIMEOUT_INACTIVITY_CHECK
+		TIMEOUT_INACTIVITY_CHECK,
+		TIMEOUT_KCP_UPDATE
 	};
 
 	virtual void handleTimeout(TimerHandle, void * pUser);
 	void clearState( bool warnOnDiscard = false );
 	EventDispatcher & dispatcher();
+	bool initKcp();
+	void finaliseKcp();
+	void updateKcp();
+	static int kcpOutput(const char* buffer, int length, ikcpcb* kcp, void* user);
 
 private:
 	NetworkInterface * 			pNetworkInterface_;
 	Traits						traits_;
 	ProtocolType				protocoltype_;
+	ProtocolSubType			protocolSubtype_;
 		
 	ChannelID					id_;
 	
@@ -312,6 +328,9 @@ private:
 	KBEngine::Network::MessageHandlers* pMsgHandlers_;
 
 	uint32						flags_;
+	ikcpcb*						pKCP_;
+	TimerHandle					kcpUpdateTimerHandle_;
+	bool						hasSetNextKcpUpdate_;
 
 	std::string					condemnReason_;
 	// 只缓存不足以判定 TLS record header 的前 1-2 字节，避免首个 completion 过短时误判原生协议。

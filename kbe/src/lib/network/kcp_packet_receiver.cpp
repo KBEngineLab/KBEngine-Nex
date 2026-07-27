@@ -1,0 +1,185 @@
+/*
+This source file is part of KBEngine
+For the latest info, see http://www.kbengine.org/
+
+Copyright (c) 2008-2018 KBEngine.
+
+KBEngine is free software: you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+KBEngine is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#include "kcp_packet_receiver.h"
+#ifndef CODE_INLINE
+#include "kcp_packet_receiver.inl"
+#endif
+
+#include "network/address.h"
+#include "network/bundle.h"
+#include "network/channel.h"
+#include "network/endpoint.h"
+#include "network/event_dispatcher.h"
+#include "network/network_interface.h"
+#include "network/event_poller.h"
+#include "network/error_reporter.h"
+#include <limits>
+
+namespace KBEngine {
+namespace Network
+{
+namespace
+{
+inline int toIntSize(size_t v)
+{
+	KBE_ASSERT(v <= static_cast<size_t>(std::numeric_limits<int>::max()));
+	return static_cast<int>(v);
+}
+
+inline long toLongSize(size_t v)
+{
+	KBE_ASSERT(v <= static_cast<size_t>(std::numeric_limits<long>::max()));
+	return static_cast<long>(v);
+}
+}
+
+//-------------------------------------------------------------------------------------
+static ObjectPool<KCPPacketReceiver> _g_objPool("KCPPacketReceiver");
+ObjectPool<KCPPacketReceiver>& KCPPacketReceiver::ObjPool()
+{
+	return _g_objPool;
+}
+
+//-------------------------------------------------------------------------------------
+KCPPacketReceiver* KCPPacketReceiver::createPoolObject(const std::string& logPoint)
+{
+	return _g_objPool.createObject(logPoint);
+}
+
+//-------------------------------------------------------------------------------------
+void KCPPacketReceiver::reclaimPoolObject(KCPPacketReceiver* obj)
+{
+	_g_objPool.reclaimObject(obj);
+}
+
+//-------------------------------------------------------------------------------------
+void KCPPacketReceiver::destroyObjPool()
+{
+	DEBUG_MSG(fmt::format("KCPPacketReceiver::destroyObjPool(): size {}.\n",
+		_g_objPool.size()));
+
+	_g_objPool.destroy();
+}
+
+//-------------------------------------------------------------------------------------
+KCPPacketReceiver::SmartPoolObjectPtr KCPPacketReceiver::createSmartPoolObj(const std::string& logPoint)
+{
+	return SmartPoolObjectPtr(new SmartPoolObject<KCPPacketReceiver>(ObjPool().createObject(logPoint), _g_objPool));
+}
+
+//-------------------------------------------------------------------------------------
+KCPPacketReceiver::KCPPacketReceiver(EndPoint & endpoint,
+	   NetworkInterface & networkInterface	) :
+	UDPPacketReceiver(endpoint, networkInterface)
+{
+}
+
+//-------------------------------------------------------------------------------------
+KCPPacketReceiver::~KCPPacketReceiver()
+{
+}
+
+//-------------------------------------------------------------------------------------
+bool KCPPacketReceiver::processRecv(bool expectingPacket)
+{
+	return UDPPacketReceiver::processRecv(expectingPacket);
+}
+
+//-------------------------------------------------------------------------------------
+bool KCPPacketReceiver::processRecv(UDPPacket* pReceiveWindow)
+{
+	Channel* pChannel = getChannel();
+	if (pChannel && pChannel->condemn() > 0)
+	{
+		return false;
+	}
+
+	Reason ret = this->processPacket(pChannel, pReceiveWindow);
+
+	if (ret != REASON_SUCCESS)
+		this->dispatcher().errorReporter().reportException(ret, pEndpoint_->addr());
+
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
+Reason KCPPacketReceiver::processPacket(Channel* pChannel, Packet * pPacket)
+{
+	if (pChannel != NULL && pChannel->hasHandshake())
+	{
+		pChannel->scheduleKcpUpdate();
+
+		if (ikcp_input(pChannel->pKCP(), (const char*)pPacket->data(), toLongSize(pPacket->length())) < 0)
+		{
+			RECLAIM_PACKET(pPacket->isTCPPacket(), pPacket);
+			return REASON_CHANNEL_LOST;
+		}
+
+		RECLAIM_PACKET(pPacket->isTCPPacket(), pPacket);
+
+		while (true)
+		{
+			const int messageSize = ikcp_peeksize(pChannel->pKCP());
+			if (messageSize < 0)
+				return REASON_SUCCESS;
+
+			Packet* pRcvdUDPPacket = UDPPacket::createPoolObject(OBJECTPOOL_POINT);
+			// KCP 会重组跨数据报消息，完整消息可能大于单个 UDP MTU，必须按 peeksize 扩容后再读取。
+			// KCP reassembles messages across datagrams, so a complete message may exceed one UDP MTU and must be resized from peeksize before reading.
+			if (messageSize > toIntSize(pRcvdUDPPacket->size()))
+				pRcvdUDPPacket->data_resize(static_cast<size_t>(messageSize));
+
+			int bytes_recvd = ikcp_recv(pChannel->pKCP(), (char*)pRcvdUDPPacket->data(), toIntSize(pRcvdUDPPacket->size()));
+			if (bytes_recvd < 0)
+			{
+				//WARNING_MSG(fmt::format("KCPPacketReceiver::processPacket(): recvd_bytes({}) <= 0! addr={}\n", bytes_recvd, pChannel->c_str()));
+				RECLAIM_PACKET(pRcvdUDPPacket->isTCPPacket(), pRcvdUDPPacket);
+				return REASON_SUCCESS;
+			}
+			else
+			{
+				if (bytes_recvd >= (int)pRcvdUDPPacket->size())
+				{
+					ERROR_MSG(fmt::format("KCPPacketReceiver::processPacket(): recvd_bytes({}) >= maxBuf({})! addr={}\n", bytes_recvd, pRcvdUDPPacket->size(), pChannel->c_str()));
+				}
+
+				pRcvdUDPPacket->wpos(bytes_recvd);
+
+				Reason r = PacketReceiver::processPacket(pChannel, pRcvdUDPPacket);
+				if (r != REASON_SUCCESS)
+				{
+					RECLAIM_PACKET(pRcvdUDPPacket->isTCPPacket(), pRcvdUDPPacket);
+					return r;
+				}
+			}
+		}
+	}
+	else
+	{
+		return PacketReceiver::processPacket(pChannel, pPacket);
+	}
+
+	return REASON_SUCCESS;
+}
+
+//-------------------------------------------------------------------------------------
+}
+}

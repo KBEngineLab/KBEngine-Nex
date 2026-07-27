@@ -61,7 +61,7 @@ BlowfishFilter::~BlowfishFilter()
 }
 
 //-------------------------------------------------------------------------------------
-Reason BlowfishFilter::send(Channel * pChannel, PacketSender& sender, Packet * pPacket)
+Reason BlowfishFilter::send(Channel * pChannel, PacketSender& sender, Packet * pPacket, int userarg)
 {
 	if(!pPacket->encrypted())
 	{
@@ -121,7 +121,7 @@ Reason BlowfishFilter::send(Channel * pChannel, PacketSender& sender, Packet * p
 		}
 	}
 	
-	return sender.processFilterPacket(pChannel, pPacket);
+	return sender.processFilterPacket(pChannel, pPacket, userarg);
 }
 
 //-------------------------------------------------------------------------------------

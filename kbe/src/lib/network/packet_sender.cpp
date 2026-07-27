@@ -76,22 +76,22 @@ Channel* PacketSender::getChannel()
 //-------------------------------------------------------------------------------------
 int PacketSender::handleOutputNotification(KBESOCKET fd)
 {
-	processSend(NULL);
+	processSend(NULL, 0);
 	return 0;
 }
 
 //-------------------------------------------------------------------------------------
-Reason PacketSender::processPacket(Channel* pChannel, Packet * pPacket)
+Reason PacketSender::processPacket(Channel* pChannel, Packet * pPacket, int userarg)
 {
 	if (pChannel != NULL)
 	{
 		if (pChannel->pFilter())
 		{
-			return pChannel->pFilter()->send(pChannel, *this, pPacket);
+			return pChannel->pFilter()->send(pChannel, *this, pPacket, userarg);
 		}
 	}
 
-	return this->processFilterPacket(pChannel, pPacket);
+	return this->processFilterPacket(pChannel, pPacket, userarg);
 }
 
 //-------------------------------------------------------------------------------------

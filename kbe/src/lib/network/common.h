@@ -58,6 +58,19 @@ extern int8 g_channelExternalEncryptType;
 // listen监听队列最大值
 extern uint32 g_SOMAXCONN;
 
+// KCP 可靠 UDP 的队列、时钟和拥塞控制参数由 Channel 统一读取，后续配置层只需覆盖这些默认值。
+// KCP reliable-UDP queue, clock, and congestion parameters are centralized here so the configuration layer can override the defaults later.
+extern uint32 g_rudp_intWritePacketsQueueSize;
+extern uint32 g_rudp_intReadPacketsQueueSize;
+extern uint32 g_rudp_extWritePacketsQueueSize;
+extern uint32 g_rudp_extReadPacketsQueueSize;
+extern uint32 g_rudp_tickInterval;
+extern uint32 g_rudp_minRTO;
+extern uint32 g_rudp_missAcksResend;
+extern uint32 g_rudp_mtu;
+extern bool g_rudp_congestionControl;
+extern bool g_rudp_nodelay;
+
 // Certificate file required for HTTPS/WSS/SSL communication
 extern std::string g_sslCertificate;
 extern std::string g_sslPrivateKey;
@@ -128,6 +141,15 @@ enum ProtocolType
 {
 	PROTOCOL_TCP = 0,
 	PROTOCOL_UDP = 1,
+};
+
+// UDP 与 KCP 共用同一种 socket 类型，但生命周期和报文处理不同，因此需要独立的子协议标识。
+// UDP and KCP share the same socket type but use different lifecycles and packet processing, so they require a separate subtype.
+enum ProtocolSubType
+{
+	SUB_PROTOCOL_DEFAULT = 0,
+	SUB_PROTOCOL_UDP = 1,
+	SUB_PROTOCOL_KCP = 2,
 };
 
 enum Reason

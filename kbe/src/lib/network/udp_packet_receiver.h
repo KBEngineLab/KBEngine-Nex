@@ -54,14 +54,17 @@ public:
 	~UDPPacketReceiver();
 
 	Reason processFilteredPacket(Channel* pChannel, Packet * pPacket);
+	virtual ProtocolSubType protocolSubType() const { return SUB_PROTOCOL_UDP; }
+	virtual Channel* findChannel(const Address& address);
 	
 	virtual PacketReceiver::PACKET_RECEIVER_TYPE type() const
 	{
 		return UDP_PACKET_RECEIVER;
 	}
 
+	virtual bool processRecv(bool expectingPacket);
+
 protected:
-	bool processRecv(bool expectingPacket);
 	PacketReceiver::RecvState checkSocketErrors(int len, bool expectingPacket);
 
 protected:

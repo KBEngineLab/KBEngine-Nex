@@ -105,7 +105,7 @@ void TCPPacketSender::onGetError(Channel* pChannel, const std::string& err)
 }
 
 //-------------------------------------------------------------------------------------
-bool TCPPacketSender::processSend(Channel* pChannel)
+bool TCPPacketSender::processSend(Channel* pChannel, int userarg)
 {
 	bool noticed = pChannel == NULL;
 
@@ -130,7 +130,7 @@ bool TCPPacketSender::processSend(Channel* pChannel)
 		Bundle::Packets::iterator iter1 = pakcets.begin();
 		for (; iter1 != pakcets.end(); ++iter1)
 		{
-			reason = processPacket(pChannel, (*iter1));
+			reason = processPacket(pChannel, (*iter1), userarg);
 			if(reason != REASON_SUCCESS)
 				break; 
 			else
@@ -209,7 +209,7 @@ bool TCPPacketSender::processSend(Channel* pChannel)
 }
 
 //-------------------------------------------------------------------------------------
-Reason TCPPacketSender::processFilterPacket(Channel* pChannel, Packet * pPacket)
+Reason TCPPacketSender::processFilterPacket(Channel* pChannel, Packet * pPacket, int userarg)
 {
 	if(pChannel->condemn() == Channel::FLAG_CONDEMN_AND_DESTROY)
 	{

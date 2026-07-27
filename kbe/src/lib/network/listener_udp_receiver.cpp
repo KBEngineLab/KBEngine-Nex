@@ -13,38 +13,60 @@ KBEngine is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Lesser General Public License for more details.
- 
+
 You should have received a copy of the GNU Lesser General Public License
 along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
-#include "packet_filter.h"
-
+#include "listener_udp_receiver.h"
 #ifndef CODE_INLINE
-#include "packet_filter.inl"
+#include "listener_udp_receiver.inl"
 #endif
 
-#include "network/channel.h"
+#include "network/address.h"
+#include "network/bundle.h"
+#include "network/endpoint.h"
+#include "network/event_dispatcher.h"
 #include "network/network_interface.h"
 #include "network/packet_receiver.h"
-#include "network/packet_sender.h"
+#include "network/kcp_packet_receiver.h"
+#include "network/error_reporter.h"
 
-namespace KBEngine { 
+#include "network/ikcp.h"
+
+namespace KBEngine {
 namespace Network
 {
 //-------------------------------------------------------------------------------------
-Reason PacketFilter::send(Channel * pChannel, PacketSender& sender, Packet * pPacket, int userarg)
+ListenerUdpReceiver::ListenerUdpReceiver(EndPoint & endpoint,
+								   Channel::Traits traits,
+									NetworkInterface & networkInterface	):
+	ListenerReceiver(endpoint, traits, networkInterface),
+	pUDPPacketReceiver_(NULL)
 {
-	return sender.processFilterPacket(pChannel, pPacket, userarg);
+	pUDPPacketReceiver_ = new KCPPacketReceiver(endpoint, networkInterface);
 }
 
 //-------------------------------------------------------------------------------------
-Reason PacketFilter::recv(Channel * pChannel, PacketReceiver & receiver, Packet * pPacket)
+ListenerUdpReceiver::~ListenerUdpReceiver()
 {
-	return receiver.processFilteredPacket(pChannel, pPacket);
+	SAFE_RELEASE(pUDPPacketReceiver_);
 }
 
 //-------------------------------------------------------------------------------------
-} 
+int ListenerUdpReceiver::handleInputNotification(int fd)
+{
+	int tickcount = 0;
+
+	while (tickcount++ < 256)
+	{
+		if (!pUDPPacketReceiver_->processRecv(false))
+			return 0;
+	}
+
+	return 0;
+}
+
+//-------------------------------------------------------------------------------------
+}
 }

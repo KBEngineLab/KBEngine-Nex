@@ -51,7 +51,7 @@ public:
 	BlowfishFilter(const Key & key);
 	BlowfishFilter();
 
-	virtual Reason send(Channel * pChannel, PacketSender& sender, Packet * pPacket);
+	virtual Reason send(Channel * pChannel, PacketSender& sender, Packet * pPacket, int userarg = 0);
 
 	virtual Reason recv(Channel * pChannel, PacketReceiver & receiver, Packet * pPacket);
 
