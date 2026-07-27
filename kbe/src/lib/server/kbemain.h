@@ -159,7 +159,8 @@ inline bool checkComponentID(COMPONENT_TYPE componentType)
 template <class SERVER_APP>
 int kbeMainT(int argc, char * argv[], COMPONENT_TYPE componentType, 
 			int32 extlisteningPort_min = -1, int32 extlisteningPort_max = -1, const char * extlisteningInterface = "",
-			int32 intlisteningPort_min = 0, int32 intlisteningPort_max = 0, const char * intlisteningInterface = "")
+			int32 intlisteningPort_min = 0, int32 intlisteningPort_max = 0, const char * intlisteningInterface = "",
+			int32 extlisteningUdpPort_min = -1, int32 extlisteningUdpPort_max = -1)
 {
 	int getuid = getUserUID();
 
@@ -200,7 +201,8 @@ int kbeMainT(int argc, char * argv[], COMPONENT_TYPE componentType,
 		extlisteningPort_min, extlisteningPort_max, extlisteningInterface, 
 		channelCommon.extReadBufferSize, channelCommon.extWriteBufferSize,
 		intlisteningPort_min, intlisteningPort_max, intlisteningInterface,
-		channelCommon.intReadBufferSize, channelCommon.intWriteBufferSize);
+		channelCommon.intReadBufferSize, channelCommon.intWriteBufferSize,
+		extlisteningUdpPort_min, extlisteningUdpPort_max);
 	
 	DebugHelper::getSingleton().pNetworkInterface(&networkInterface);
 

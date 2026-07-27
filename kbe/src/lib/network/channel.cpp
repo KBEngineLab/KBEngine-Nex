@@ -44,6 +44,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/network_stats.h"
 #include "helper/profile.h"
 #include "common/ssl.h"
+#include "common/kbeversion.h"
+#include <cstring>
 
 namespace KBEngine { 
 namespace Network
@@ -957,6 +959,52 @@ bool Channel::handshake(Packet* pPacket)
 	if(hasHandshake())
 		return false;
 
+	if (protocolSubtype_ == SUB_PROTOCOL_KCP)
+	{
+		const size_t helloLength = std::strlen(UDP_HELLO);
+		const bool validHello = pPacket->length() == helloLength &&
+			std::memcmp(pPacket->data() + pPacket->rpos(), UDP_HELLO, helloLength) == 0;
+		pPacket->clear(false);
+
+		if (!validHello)
+		{
+			// 断线探测期间可能有迟到的 KCP 数据报，丢弃它但保留该远端重新握手的机会。
+			// Late KCP datagrams may arrive during disconnect detection; discard them while allowing the peer to retry the handshake.
+			return true;
+		}
+
+		UDPPacket* pAckPacket = UDPPacket::createPoolObject(OBJECTPOOL_POINT);
+		(*pAckPacket) << UDP_HELLO_ACK << KBEVersion::versionString() << static_cast<uint32>(id());
+
+		bool sent = false;
+		EventPoller* pPoller = this->networkInterface().dispatcher().pPoller();
+		if (pPoller != NULL && pPoller->supportsCompletion())
+		{
+			// ACK 必须进入 completion UDP 队列；KBESOCKET 在 Win64 上不能缩窄为 int。
+			// The ACK must use the completion UDP queue, and KBESOCKET must not be narrowed to int on Win64.
+			sent = pPoller->queueUdpSend(static_cast<KBESOCKET>(*pEndPoint_), pAckPacket->data(),
+				static_cast<int>(pAckPacket->length()), pEndPoint_->addr());
+		}
+		else
+		{
+			sent = pEndPoint_->sendto(pAckPacket->data(), static_cast<int>(pAckPacket->length())) >= 0;
+		}
+
+		UDPPacket::reclaimPoolObject(pAckPacket);
+		if (!sent)
+			return true;
+
+		if (!pPacketReader_ || pPacketReader_->type() != PacketReader::PACKET_READER_TYPE_KCP)
+		{
+			SAFE_RELEASE(pPacketReader_);
+			pPacketReader_ = new KCPPacketReader(this);
+		}
+
+		flags_ |= FLAG_HANDSHAKE;
+		DEBUG_MSG(fmt::format("Channel::handshake: kcp({}) successfully!\n", this->c_str()));
+		return true;
+	}
+
 	// https/wss
 	if (!pEndPoint_->isSSL())
 	{
@@ -1003,17 +1051,6 @@ bool Channel::handshake(Packet* pPacket)
 	}
 
 	flags_ |= FLAG_HANDSHAKE;
-	if (protocolSubtype_ == SUB_PROTOCOL_KCP)
-	{
-		if (!pPacketReader_ || pPacketReader_->type() != PacketReader::PACKET_READER_TYPE_KCP)
-		{
-			SAFE_RELEASE(pPacketReader_);
-			pPacketReader_ = new KCPPacketReader(this);
-		}
-
-		return false;
-	}
-
 	// 此处判定是否为websocket或者其他协议的握手
 	if(websocket::WebSocketProtocol::isWebSocketProtocol(pPacket))
 	{

@@ -49,17 +49,20 @@ public:
 	
 	NetworkInterface(EventDispatcher * pDispatcher,
 		int32 extlisteningPort_min = -1, int32 extlisteningPort_max = -1, const char * extlisteningInterface = "",
-		uint32 extrbuffer = 0, uint32 extwbuffer = 0, 
+		uint32 extrbuffer = 0, uint32 extwbuffer = 0,
 		int32 intlisteningPort_min = 0, int32 intlisteningPort_max = 0, const char * intlisteningInterface = "",
-		uint32 intrbuffer = 0, uint32 intwbuffer = 0);
+		uint32 intrbuffer = 0, uint32 intwbuffer = 0,
+		int32 extlisteningUdpPort_min = -1, int32 extlisteningUdpPort_max = -1);
 
 	~NetworkInterface();
 
 	INLINE const Address & extaddr() const;
+	INLINE const Address & extUdpAddr() const;
 	INLINE const Address & intaddr() const;
 
 	bool initialize(const char* pEndPointName, uint16 listeningPort_min, uint16 listeningPort_max,
-		const char * listeningInterface, EndPoint* pEP, ListenerReceiver* pLR, uint32 rbuffer = 0, uint32 wbuffer = 0);
+		const char * listeningInterface, EndPoint* pEP, ListenerReceiver* pLR, uint32 rbuffer = 0,
+		uint32 wbuffer = 0, ProtocolType protocolType = PROTOCOL_TCP);
 
 	bool registerChannel(Channel* pChannel);
 	// listener 接受的新 TCP 连接可以替换同一对端地址的旧 Channel，用于处理内核先复用四元组、主线稍后消费断开 completion 的时序。
@@ -84,6 +87,7 @@ public:
 
 	/* 外部网点和内部网点 */
 	EndPoint & extEndpoint()				{ return extEndpoint_; }
+	EndPoint & extUdpEndpoint()			{ return extUdpEndpoint_; }
 	EndPoint & intEndpoint()				{ return intEndpoint_; }
 
 	const char * c_str() const { return extEndpoint_.c_str(); }
@@ -94,7 +98,11 @@ public:
 	void sendIfDelayed(Channel & channel);
 	void delayedSend(Channel & channel);
 	
-	bool good() const{ return (!pExtListenerReceiver_ || extEndpoint_.good()) && (intEndpoint_.good()); }
+	bool good() const
+	{
+		return (!pExtListenerReceiver_ || extEndpoint_.good()) &&
+			(!pExtUdpListenerReceiver_ || extUdpEndpoint_.good()) && intEndpoint_.good();
+	}
 
 	void onChannelTimeOut(Channel * pChannel);
 	
@@ -112,13 +120,14 @@ private:
 	bool registerChannel(Channel* pChannel, bool replaceExistingAcceptedChannel);
 
 private:
-	EndPoint								extEndpoint_, intEndpoint_;
+	EndPoint								extEndpoint_, extUdpEndpoint_, intEndpoint_;
 
 	ChannelMap								channelMap_;
 
 	EventDispatcher *						pDispatcher_;
 	
 	ListenerReceiver *						pExtListenerReceiver_;
+	ListenerReceiver *						pExtUdpListenerReceiver_;
 	ListenerReceiver *						pIntListenerReceiver_;
 	
 	DelayedChannels * 						pDelayedChannels_;

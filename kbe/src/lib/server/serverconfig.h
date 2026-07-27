@@ -151,6 +151,8 @@ typedef struct EngineComponentInfo
 		debugDBMgr = false;
 
 		externalAddress[0] = '\0';
+		externalUdpPorts_min = -1;
+		externalUdpPorts_max = -1;
 
 		isOnInitCallPropertysSetMethods = true;
 		forceInternalLogin = false;
@@ -192,6 +194,10 @@ typedef struct EngineComponentInfo
 	char externalAddress[MAX_NAME];							// 外部IP地址
 	int32 externalPorts_min;								// 对外socket端口使用指定范围
 	int32 externalPorts_max;
+	// UDP 使用独立端口范围；-1 表示该组件不创建外部 UDP endpoint。
+	// UDP uses an independent port range; -1 means the component does not create an external UDP endpoint.
+	int32 externalUdpPorts_min;
+	int32 externalUdpPorts_max;
 
 	std::vector<DBInterfaceInfo> dbInterfaceInfos;			// 数据库接口
 	bool notFoundAccountAutoCreate;							// 登录合法时游戏数据库找不到游戏账号则自动创建

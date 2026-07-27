@@ -382,6 +382,58 @@ bool ServerConfig::loadConfig(std::string fileName)
 		{
 			Network::g_sslPrivateKey = xml->getValStr(childnode);
 		}
+
+		TiXmlNode* rudpNode = xml->enterNode(rootNode, "reliableUDP");
+		if (rudpNode)
+		{
+			childnode = xml->enterNode(rudpNode, "readPacketsQueueSize");
+			if (childnode)
+			{
+				TiXmlNode* valueNode = xml->enterNode(childnode, "internal");
+				if (valueNode)
+					Network::g_rudp_intReadPacketsQueueSize = KBE_MAX(0, xml->getValInt(valueNode));
+
+				valueNode = xml->enterNode(childnode, "external");
+				if (valueNode)
+					Network::g_rudp_extReadPacketsQueueSize = KBE_MAX(0, xml->getValInt(valueNode));
+			}
+
+			childnode = xml->enterNode(rudpNode, "writePacketsQueueSize");
+			if (childnode)
+			{
+				TiXmlNode* valueNode = xml->enterNode(childnode, "internal");
+				if (valueNode)
+					Network::g_rudp_intWritePacketsQueueSize = KBE_MAX(0, xml->getValInt(valueNode));
+
+				valueNode = xml->enterNode(childnode, "external");
+				if (valueNode)
+					Network::g_rudp_extWritePacketsQueueSize = KBE_MAX(0, xml->getValInt(valueNode));
+			}
+
+			childnode = xml->enterNode(rudpNode, "tickInterval");
+			if (childnode)
+				Network::g_rudp_tickInterval = KBE_MAX(0, xml->getValInt(childnode));
+
+			childnode = xml->enterNode(rudpNode, "minRTO");
+			if (childnode)
+				Network::g_rudp_minRTO = KBE_MAX(0, xml->getValInt(childnode));
+
+			childnode = xml->enterNode(rudpNode, "missAcksResend");
+			if (childnode)
+				Network::g_rudp_missAcksResend = KBE_MAX(0, xml->getValInt(childnode));
+
+			childnode = xml->enterNode(rudpNode, "mtu");
+			if (childnode)
+				Network::g_rudp_mtu = KBE_MAX(0, xml->getValInt(childnode));
+
+			childnode = xml->enterNode(rudpNode, "congestionControl");
+			if (childnode)
+				Network::g_rudp_congestionControl = xml->getValStr(childnode) == "true";
+
+			childnode = xml->enterNode(rudpNode, "nodelay");
+			if (childnode)
+				Network::g_rudp_nodelay = xml->getValStr(childnode) == "true";
+		}
 	}
 
 	rootNode = xml->getRootNode("gameUpdateHertz");
@@ -664,6 +716,19 @@ bool ServerConfig::loadConfig(std::string fileName)
 			_baseAppInfo.externalPorts_min = 0;
 		if(_baseAppInfo.externalPorts_max < _baseAppInfo.externalPorts_min)
 			_baseAppInfo.externalPorts_max = _baseAppInfo.externalPorts_min;
+
+		node = xml->enterNode(rootNode, "externalUdpPorts_min");
+		if (node != NULL)
+			_baseAppInfo.externalUdpPorts_min = xml->getValInt(node);
+
+		node = xml->enterNode(rootNode, "externalUdpPorts_max");
+		if (node != NULL)
+			_baseAppInfo.externalUdpPorts_max = xml->getValInt(node);
+
+		if (_baseAppInfo.externalUdpPorts_min < 0)
+			_baseAppInfo.externalUdpPorts_min = -1;
+		if (_baseAppInfo.externalUdpPorts_max < _baseAppInfo.externalUdpPorts_min)
+			_baseAppInfo.externalUdpPorts_max = _baseAppInfo.externalUdpPorts_min;
 
 		node = xml->enterNode(rootNode, "archivePeriod");
 		if(node != NULL)
@@ -1199,6 +1264,19 @@ bool ServerConfig::loadConfig(std::string fileName)
 			_loginAppInfo.externalPorts_min = 0;
 		if(_loginAppInfo.externalPorts_max < _loginAppInfo.externalPorts_min)
 			_loginAppInfo.externalPorts_max = _loginAppInfo.externalPorts_min;
+
+		node = xml->enterNode(rootNode, "externalUdpPorts_min");
+		if (node != NULL)
+			_loginAppInfo.externalUdpPorts_min = xml->getValInt(node);
+
+		node = xml->enterNode(rootNode, "externalUdpPorts_max");
+		if (node != NULL)
+			_loginAppInfo.externalUdpPorts_max = xml->getValInt(node);
+
+		if (_loginAppInfo.externalUdpPorts_min < 0)
+			_loginAppInfo.externalUdpPorts_min = -1;
+		if (_loginAppInfo.externalUdpPorts_max < _loginAppInfo.externalUdpPorts_min)
+			_loginAppInfo.externalUdpPorts_max = _loginAppInfo.externalUdpPorts_min;
 
 		node = xml->enterNode(rootNode, "SOMAXCONN");
 		if(node != NULL){

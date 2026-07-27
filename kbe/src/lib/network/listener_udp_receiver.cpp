@@ -54,7 +54,7 @@ ListenerUdpReceiver::~ListenerUdpReceiver()
 }
 
 //-------------------------------------------------------------------------------------
-int ListenerUdpReceiver::handleInputNotification(int fd)
+int ListenerUdpReceiver::handleInputNotification(KBESOCKET fd)
 {
 	int tickcount = 0;
 

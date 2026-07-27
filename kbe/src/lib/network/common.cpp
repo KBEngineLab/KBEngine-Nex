@@ -56,6 +56,9 @@ uint32 g_rudp_mtu = 0;
 bool g_rudp_congestionControl = false;
 bool g_rudp_nodelay = true;
 
+const char* UDP_HELLO = "62a559f3fa7748bc22f8e0766019d498";
+const char* UDP_HELLO_ACK = "1432ad7c829170a76dd31982c3501eca";
+
 // network stats
 uint64						g_numPacketsSent = 0;
 uint64						g_numPacketsReceived = 0;

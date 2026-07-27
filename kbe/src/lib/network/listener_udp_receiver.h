@@ -41,7 +41,7 @@ public:
 	virtual ~ListenerUdpReceiver();
 
 protected:
-	virtual int handleInputNotification(int fd);
+	int handleInputNotification(KBESOCKET fd) override;
 
 protected:
 	UDPPacketReceiver* pUDPPacketReceiver_;

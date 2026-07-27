@@ -28,6 +28,11 @@ INLINE const Address & NetworkInterface::extaddr() const
 	return extEndpoint_.addr();
 }
 
+INLINE const Address & NetworkInterface::extUdpAddr() const
+{
+	return extUdpEndpoint_.addr();
+}
+
 INLINE const Address & NetworkInterface::intaddr() const
 {
 	return intEndpoint_.addr();

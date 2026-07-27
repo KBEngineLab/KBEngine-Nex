@@ -71,6 +71,11 @@ extern uint32 g_rudp_mtu;
 extern bool g_rudp_congestionControl;
 extern bool g_rudp_nodelay;
 
+// Nex 2.8 客户端使用固定明文探测 UDP endpoint，ACK 之后才启动 KCP 数据流。
+// Nex 2.8 clients probe the UDP endpoint with fixed plaintext tokens and start KCP only after the ACK.
+extern const char* UDP_HELLO;
+extern const char* UDP_HELLO_ACK;
+
 // Certificate file required for HTTPS/WSS/SSL communication
 extern std::string g_sslCertificate;
 extern std::string g_sslPrivateKey;
