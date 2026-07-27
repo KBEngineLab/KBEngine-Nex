@@ -295,7 +295,20 @@ void Entity::createCellData(void)
 		
 		if(dataType)
 		{
-			PyObject* pyObj = propertyDescription->newDefaultVal();
+			// 普通属性使用描述默认值；组件必须保留为 Cell 数据字典，BaseApp 不应实例化未加载的 Cell 脚本类。
+			// Regular properties use descriptor defaults; components must remain Cell-data dictionaries because BaseApp must not instantiate unloaded Cell script classes.
+			PyObject* pyObj = dataType->type() == DATA_TYPE_ENTITY_COMPONENT
+				? ((EntityComponentType*)dataType)->createCellData()
+				: propertyDescription->newDefaultVal();
+
+			if(pyObj == NULL)
+			{
+				ERROR_MSG(fmt::format("{}::createCellData: failed to create default value for {}.\n",
+					this->scriptName(), propertyDescription->getName()));
+				SCRIPT_ERROR_CHECK();
+				continue;
+			}
+
 			PyDict_SetItemString(cellDataDict_, propertyDescription->getName(), pyObj);
 			Py_DECREF(pyObj);
 		}
@@ -477,7 +490,12 @@ void Entity::addPersistentsDataToStream(uint32 flags, MemoryStream* s)
 				{
 					(*s) << (ENTITY_PROPERTY_UID)0 << propertyDescription->getUType();
 					log.push_back(propertyDescription->getUType());
-	    			propertyDescription->addPersistentToStream(s, pyVal);
+					// 组件持久化需要合并 Base 对象和 Cell 字典，不能退化为面向在线组件协议的普通流编码。
+					// Component persistence must merge the Base object and Cell dictionary instead of falling back to normal live-component stream encoding.
+					if(isComponent)
+						static_cast<EntityComponentType*>(propertyDescription->getDataType())->addPersistentToStream(s, pyVal);
+					else
+						propertyDescription->addPersistentToStream(s, pyVal);
 					DEBUG_PERSISTENT_PROPERTY("addBasePersistentsDataToStream", attrname);
 				}
 			}
@@ -513,7 +531,7 @@ void Entity::addPersistentsDataToStream(uint32 flags, MemoryStream* s)
 					{
 						(*s) << (ENTITY_PROPERTY_UID)0 << propertyDescription->getUType();
 						log.push_back(propertyDescription->getUType());
-						propertyDescription->addPersistentToStream(s, pyVal);
+						pEntityComponentType->addPersistentToStream(s, pyVal);
 						DEBUG_PERSISTENT_PROPERTY("addCellPersistentsDataToStream", attrname);
 					}
 				}

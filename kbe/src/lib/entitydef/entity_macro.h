@@ -492,6 +492,11 @@ public:																										\
 					}																						\
 					else																					\
 					{																						\
+						/* 持久化流只携带组件类型和值；父属性与所有者必须在替换默认组件前由实体上下文补齐。 */\
+						/* Persistent streams carry only component type and value; the entity context must bind parent property and owner before replacing the default component. */\
+						EntityComponent* pEntityComponent = static_cast<EntityComponent*>(value);		\
+						pEntityComponent->pPropertyDescription(pCompPropertyDescription);				\
+						pEntityComponent->updateOwner(id(), this);									\
 						PyObject_SetAttr(this, key, value);													\
 					}																						\
 				}																							\
@@ -1363,10 +1368,21 @@ public:																										\
 			if(dataType)																					\
 			{																								\
 				PyObject* defObj = propertyDescription->newDefaultVal();									\
-				/* 赋值会先触发组件类型校验，而校验可能读取 owner，因此必须在赋值前绑定所有者。 */				\
-				/* Assignment validates the component type first, and validation may read owner, so bind it before assignment. */	\
+				if(defObj == NULL)																	\
+				{																			\
+					ERROR_MSG(fmt::format(#CLASS"::initProperty: failed to create default value for {}.\n",	\
+						propertyDescription->getName()));										\
+					SCRIPT_ERROR_CHECK();													\
+					continue;																\
+				}																			\
+				/* 赋值会先校验组件并可能读取 owner；后续字典合并还依赖父属性区分同类型的多个组件实例。 */				\
+				/* Assignment validates the component and may read owner; later dictionary merges also need the parent property to distinguish same-type instances. */\
 				if(dataType->type() == DATA_TYPE_ENTITY_COMPONENT)										\
-					((EntityComponent*)defObj)->updateOwner(id(), this);									\
+				{																					\
+					EntityComponent* pEntityComponent = (EntityComponent*)defObj;						\
+					pEntityComponent->pPropertyDescription(propertyDescription);							\
+					pEntityComponent->updateOwner(id(), this);										\
+				}																					\
 																							\
 				PyObject_SetAttrString(static_cast<PyObject*>(this),										\
 							propertyDescription->getName(), defObj);										\
