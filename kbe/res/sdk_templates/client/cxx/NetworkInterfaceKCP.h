@@ -17,9 +17,11 @@ namespace KBEngine
 {
 
 /*
-	KCP 网络实现。
-	UDP socket 使用原生系统 API；KCP 仍使用 ikcp 作为可靠传输协议。
+	KCP 网络实现，UDP socket 使用原生系统 API，可靠传输由 ikcp 提供。
+	KCP network implementation using native UDP sockets and ikcp for reliable delivery.
+
 	后台线程负责 UDP 收包和 KCP 输入，主线程 process() 负责 update 与消息分发。
+	The worker thread receives UDP datagrams and feeds KCP; process() updates KCP and dispatches messages on the main thread.
 */
 class NetworkInterfaceKCP : public NetworkInterfaceBase
 {
@@ -48,6 +50,7 @@ private:
 	void closeSocket_(bool fireDisconnectedEvent);
 	void handleDatagram_(const uint8* data, int32 length, uint64 sessionId);
 	void drainKCPRecvLocked_();
+	bool parseHelloAck_(const uint8* data, int32 length, KBString& versionString, uint32& connID) const;
 	void fireConnectionState_(InterfaceConnect* callback, const KBString& addr, uint16 port, bool success, int userdata, uint64 sessionId);
 	bool sendDatagram_(const uint8* data, int32 length);
 	static uint32 nowMs_();

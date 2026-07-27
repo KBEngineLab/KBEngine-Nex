@@ -12,6 +12,8 @@
 #include "MessageReader.h"
 
 #include <chrono>
+#include <cstring>
+#include <limits>
 #include <thread>
 
 namespace KBEngine
@@ -117,7 +119,16 @@ bool NetworkInterfaceKCP::sendTo(MemoryStream* pMemoryStream)
 		return false;
 	}
 
-	const int result = ikcp_send(kcp_, reinterpret_cast<const char*>(pMemoryStream->data()), pMemoryStream->length());
+	if (pMemoryStream->length() > static_cast<uint32>(std::numeric_limits<int>::max()))
+	{
+		ERROR_MSG("NetworkInterfaceKCP::sendTo(): payload is too large, length=%u", pMemoryStream->length());
+		return false;
+	}
+
+	const int result = ikcp_send(
+		kcp_,
+		reinterpret_cast<const char*>(pMemoryStream->data()),
+		static_cast<int>(pMemoryStream->length()));
 	if (result < 0)
 	{
 		ERROR_MSG("NetworkInterfaceKCP::sendTo(): ikcp_send failed ret=%d", result);
@@ -187,9 +198,16 @@ bool NetworkInterfaceKCP::initKCP_()
 	}
 
 	kcp_ = ikcp_create(static_cast<IUINT32>(connID_), this);
+	if (!kcp_)
+	{
+		ERROR_MSG("NetworkInterfaceKCP::initKCP_(): ikcp_create failed, conv=%u", connID_);
+		return false;
+	}
+
 	kcp_->output = &NetworkInterfaceKCP::kcpOutput_;
 
 	// KBE 服务端 UDP 默认 MTU 低于以太网 MTU，保守设置避免 IP 分片。
+	// The KBE server UDP MTU is below the Ethernet MTU, so this conservative value avoids IP fragmentation.
 	ikcp_setmtu(kcp_, 1400);
 
 	KBEngineArgs* args = KBEngineApp::getSingleton().getInitArgs();
@@ -199,6 +217,7 @@ bool NetworkInterfaceKCP::initKCP_()
 	}
 
 	// 使用 fast mode，保持原有同步参数，降低移动与战斗同步延迟。
+	// Preserve the existing fast-mode parameters to reduce movement and combat synchronization latency.
 	ikcp_nodelay(kcp_, 1, 10, 2, 1);
 	kcp_->rx_minrto = 10;
 	nextKcpUpdate_ = nowMs_();
@@ -263,21 +282,13 @@ void NetworkInterfaceKCP::workerLoop_(KBString addr, uint16 port, InterfaceConne
 		{
 			if (!handshakeDone)
 			{
-				MemoryStream ms;
-				ms.append(buffer, received);
-				ms.rpos(0);
-
-				KBString helloAck;
 				KBString versionString;
 				uint32 connID = 0;
-				ms >> helloAck >> versionString >> connID;
 
-				bool success = true;
-				if (helloAck != UDP_HELLO_ACK)
+				bool success = parseHelloAck_(buffer, received, versionString, connID);
+				if (!success)
 				{
-					ERROR_MSG("NetworkInterfaceKCP::connectTo(): receive hello-ack(%s!=%s) mismatch!",
-						*helloAck, *UDP_HELLO_ACK);
-					success = false;
+					ERROR_MSG("NetworkInterfaceKCP::connectTo(): malformed hello acknowledgement, length=%d", received);
 				}
 				else if (KBEngineApp::getSingleton().serverVersion() != versionString)
 				{
@@ -377,7 +388,12 @@ void NetworkInterfaceKCP::handleDatagram_(const uint8* data, int32 length, uint6
 		return;
 	}
 
-	ikcp_input(kcp_, reinterpret_cast<const char*>(data), length);
+	if (ikcp_input(kcp_, reinterpret_cast<const char*>(data), length) < 0)
+	{
+		WARNING_MSG("NetworkInterfaceKCP::handleDatagram_(): ignored invalid KCP datagram, length=%d", length);
+		return;
+	}
+
 	drainKCPRecvLocked_();
 }
 
@@ -388,18 +404,75 @@ void NetworkInterfaceKCP::drainKCPRecvLocked_()
 		return;
 	}
 
-	char recvBuf[65536];
-	int recvLen = ikcp_recv(kcp_, recvBuf, sizeof(recvBuf));
-	while (recvLen > 0)
+	while (true)
 	{
-		std::vector<uint8> payload(reinterpret_cast<uint8*>(recvBuf), reinterpret_cast<uint8*>(recvBuf) + recvLen);
+		const int messageSize = ikcp_peeksize(kcp_);
+		if (messageSize < 0)
+		{
+			break;
+		}
+
+		// KCP 会重组跨数据报消息，固定 64 KiB 缓冲区会让更大的合法协议消息永久留在接收队列中。
+		// KCP reassembles messages across datagrams; a fixed 64 KiB buffer leaves larger valid protocol messages stuck in its receive queue.
+		std::vector<uint8> payload(static_cast<size_t>(messageSize));
+		const int recvLen = ikcp_recv(
+			kcp_,
+			reinterpret_cast<char*>(payload.data()),
+			messageSize);
+		if (recvLen < 0)
+		{
+			ERROR_MSG("NetworkInterfaceKCP::drainKCPRecvLocked_(): ikcp_recv failed, ret=%d", recvLen);
+			break;
+		}
+
+		payload.resize(static_cast<size_t>(recvLen));
 		{
 			std::lock_guard<std::mutex> lock(recvMutex_);
 			recvQueue_.push(std::move(payload));
 		}
-
-		recvLen = ikcp_recv(kcp_, recvBuf, sizeof(recvBuf));
 	}
+}
+
+bool NetworkInterfaceKCP::parseHelloAck_(
+	const uint8* data,
+	int32 length,
+	KBString& versionString,
+	uint32& connID) const
+{
+	versionString = KBTEXT("");
+	connID = 0;
+
+	const size_t ackLength = UDP_HELLO_ACK.length();
+	const size_t packetLength = length > 0 ? static_cast<size_t>(length) : 0;
+	const size_t minimumLength = ackLength + 1 + 1 + sizeof(uint32);
+	if (!data || packetLength < minimumLength ||
+		std::memcmp(data, UDP_HELLO_ACK.data(), ackLength) != 0 ||
+		data[ackLength] != 0)
+	{
+		return false;
+	}
+
+	const uint8* versionBegin = data + ackLength + 1;
+	const uint8* packetEnd = data + packetLength;
+	const uint8* versionEnd = static_cast<const uint8*>(
+		std::memchr(versionBegin, 0, static_cast<size_t>(packetEnd - versionBegin)));
+	if (!versionEnd || versionEnd == versionBegin || packetEnd - versionEnd - 1 != sizeof(uint32))
+	{
+		return false;
+	}
+
+	versionString.assign(
+		reinterpret_cast<const char*>(versionBegin),
+		static_cast<size_t>(versionEnd - versionBegin));
+
+	// 握手协议固定使用小端 uint32，逐字节解码避免依赖客户端 CPU 字节序和未对齐访问。
+	// The handshake uses a little-endian uint32; byte-wise decoding avoids host-endian and unaligned-access assumptions.
+	const uint8* connBytes = versionEnd + 1;
+	connID = static_cast<uint32>(connBytes[0]) |
+		(static_cast<uint32>(connBytes[1]) << 8) |
+		(static_cast<uint32>(connBytes[2]) << 16) |
+		(static_cast<uint32>(connBytes[3]) << 24);
+	return connID != 0;
 }
 
 void NetworkInterfaceKCP::fireConnectionState_(
