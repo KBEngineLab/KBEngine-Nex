@@ -11,6 +11,7 @@
   },
   "include": [
     "Program.ts",
-    "../../../../res/sdk_templates/client/typescript/WebSocketFrameParser.ts"
+    "../../../../res/sdk_templates/client/typescript/WebSocketFrameParser.ts",
+    "../../../../res/sdk_templates/client/typescript/WebSocketTransport.ts"
   ]
 }

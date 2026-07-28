@@ -17,10 +17,17 @@ import { MemoryStream } from "./MemoryStream";
 import NetworkInterface from "./NetworkInterface";
 import { DataTypes } from "./DataTypes";
 import * as KBETypes from "./KBETypes";
+import {
+    DefaultWebSocketTransportFactory,
+    KBEChannel,
+    KBEPlatform,
+    WebSocketTransportFactory
+} from "./WebSocketTransport";
 
 // 兼容入口只重新导出唯一实现，避免聚合文件再次定义协议与网络类。
 // The compatibility entry point only re-exports canonical implementations instead of redefining protocol and network classes.
-export { MemoryStream, NetworkInterface, DataTypes, KBETypes };
+export { MemoryStream, NetworkInterface, DataTypes, KBETypes, KBEChannel, KBEPlatform };
+export type { WebSocketTransport, WebSocketTransportFactory } from "./WebSocketTransport";
 
 //#region KBEngine app
 export class KBEngineArgs {
@@ -35,6 +42,9 @@ export class KBEngineArgs {
     isOnInitCallPropertysSetMethods: boolean = true;
     useWss = false;
     wssBaseappPort = 443;
+    platform: KBEPlatform = KBEPlatform.TypeScript;
+    channel: KBEChannel = KBEChannel.Auto;
+    webSocketTransportFactory: WebSocketTransportFactory | undefined;
 
     
     domainMapping : { [key: string]: string } = { };
@@ -188,6 +198,10 @@ export class KBEngineApp {
         this.useWss = args.useWss;
         this.wssBaseappPort = args.wssBaseappPort;
         this.protocol = args.useWss ? "wss://" : "ws://";
+
+        // 显式工厂优先于渠道选择，便于项目接入尚未内置的平台并进行确定性测试。
+        // An explicit factory takes precedence over channel selection so projects can integrate new runtimes and write deterministic tests.
+        this.networkInterface.ConfigureTransport(args.webSocketTransportFactory || new DefaultWebSocketTransportFactory(args.channel));
 
         this.portMapping = args.portMapping;
         this.domainMapping = args.domainMapping;

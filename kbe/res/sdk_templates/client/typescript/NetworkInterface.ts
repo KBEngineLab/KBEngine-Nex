@@ -5,22 +5,39 @@ import { MemoryStream } from "./MemoryStream";
 import Messages from "./Messages";
 import type { Message } from "./Messages";
 import { parseWebSocketFrame } from "./WebSocketFrameParser";
+import {
+    DefaultWebSocketTransportFactory,
+    KBEChannel,
+    WebSocketTransport,
+    WebSocketTransportFactory
+} from "./WebSocketTransport";
 
 export default class NetworkInterface
 {
-    private socket: WebSocket | undefined;
+    private transport: WebSocketTransport | undefined;
     private onOpenCB: Function | undefined;
+
+    constructor(private transportFactory: WebSocketTransportFactory = new DefaultWebSocketTransportFactory(KBEChannel.Auto))
+    {
+    }
+
+    ConfigureTransport(factory: WebSocketTransportFactory): void
+    {
+        if(this.transport !== undefined)
+            throw new Error("NetworkInterface transport cannot be changed while a connection exists.");
+        this.transportFactory = factory;
+    }
 
     get IsGood(): boolean
     {
-        return this.socket != undefined && this.socket.readyState === WebSocket.OPEN;
+        return this.transport !== undefined && this.transport.isOpen;
     }
 
     ConnectTo(addr: string, callbackFunc?: (event:Event)=>any)
     {
         try
         {
-            this.socket = new WebSocket(addr);
+            this.transport = this.transportFactory.create(addr);
         }
         catch(e)
         {
@@ -29,12 +46,11 @@ export default class NetworkInterface
             return;
         }
 
-        this.socket.binaryType = "arraybuffer";
-
-        this.socket.onerror = this.onerror;
-        this.socket.onclose = this.onclose;
-        this.socket.onmessage = this.onmessage;
-        this.socket.onopen = this.onopen;
+        const transport = this.transport;
+        transport.onError = event => this.onerror(transport, event);
+        transport.onClose = event => this.onclose(transport, event);
+        transport.onMessage = (data, event) => this.onmessage(transport, data, event);
+        transport.onOpen = event => this.onopen(transport, event);
         if(callbackFunc)
         {
             this.onOpenCB = callbackFunc;
@@ -43,16 +59,17 @@ export default class NetworkInterface
 
     Close(notifyDisconnected: boolean = false)
     {
-        const socket = this.socket;
-        if(socket === undefined)
+        const transport = this.transport;
+        if(transport === undefined)
             return;
 
         KBELog.DEBUG_MSG("NetworkInterface::Close on good:" + this.IsGood)
-        this.ReleaseSocket(socket);
+        this.ReleaseTransport(transport);
 
         try
         {
-            socket.close();
+            transport.close(undefined, undefined, error =>
+                KBELog.ERROR_MSG("NetworkInterface::Close async error:%s.", error));
         }
         catch(e)
         {
@@ -74,7 +91,14 @@ export default class NetworkInterface
         try
         {
             KBELog.DEBUG_MSG("NetworkInterface::Send buffer length:[%d].", buffer.byteLength);
-            this.socket!.send(buffer);
+            const transport = this.transport!;
+            transport.send(buffer, error =>
+            {
+                if(this.transport !== transport)
+                    return;
+                KBELog.ERROR_MSG("NetworkInterface::Send async error:%s.", error);
+                KBEEvent.fireIn("onNetworkError", error as MessageEvent);
+            });
         }
         catch(e)
         {
@@ -82,8 +106,10 @@ export default class NetworkInterface
         }
     }
 
-    private onopen = (event: Event) =>
+    private onopen = (transport: WebSocketTransport, event: unknown) =>
     {
+        if(this.transport !== transport)
+            return;
         KBELog.DEBUG_MSG("NetworkInterface::onopen:success!");
         if(this.onOpenCB)
         {
@@ -92,24 +118,24 @@ export default class NetworkInterface
         }
     }
     
-    private onerror = (event: Event) =>
+    private onerror = (transport: WebSocketTransport, event: unknown) =>
     {
+        if(this.transport !== transport)
+            return;
         KBELog.DEBUG_MSG("NetworkInterface::onerror:...!");
         KBEEvent.fireIn("onNetworkError", event as MessageEvent);
     }
 
-    private onmessage = (event: MessageEvent) =>
+    private onmessage = (transport: WebSocketTransport, data: unknown, _event: unknown) =>
     {
-        const sourceSocket = (event.currentTarget || event.target) as WebSocket | null;
-        if(sourceSocket === null || this.socket !== sourceSocket)
+        if(this.transport !== transport)
             return;
-        if(!(event.data instanceof ArrayBuffer))
+        if(!(data instanceof ArrayBuffer))
         {
-            this.RejectProtocolFrame(sourceSocket, "expected ArrayBuffer payload");
+            this.RejectProtocolFrame(transport, "expected ArrayBuffer payload");
             return;
         }
 
-        const data = event.data;
         const stream = new MemoryStream(data);
         const result = parseWebSocketFrame(
             data,
@@ -132,21 +158,22 @@ export default class NetworkInterface
             });
 
         if(!result.ok)
-            this.RejectProtocolFrame(sourceSocket, result.error || "malformed KBEngine frame");
+            this.RejectProtocolFrame(transport, result.error || "malformed KBEngine frame");
     }
 
-    private RejectProtocolFrame(socket: WebSocket, reason: string): void
+    private RejectProtocolFrame(transport: WebSocketTransport, reason: string): void
     {
-        if(this.socket !== socket)
+        if(this.transport !== transport)
             return;
 
         // 协议错误先摘除回调和当前引用，再关闭旧 socket 并通知一次，避免 close 回调重入或误伤同步重登录的新连接。
         // Detach callbacks and the current reference before closing a protocol-failed socket so close reentry cannot duplicate notification or damage a synchronous relogin.
         KBELog.ERROR_MSG("NetworkInterface::onmessage: rejected malformed WebSocket message: " + reason);
-        this.ReleaseSocket(socket);
+        this.ReleaseTransport(transport);
         try
         {
-            socket.close(1002, "Malformed KBEngine frame");
+            transport.close(1002, "Malformed KBEngine frame", error =>
+                KBELog.ERROR_MSG("NetworkInterface::onmessage: protocol close failed: " + error));
         }
         catch(error)
         {
@@ -155,30 +182,26 @@ export default class NetworkInterface
         KBEEvent.fireAll("onDisconnected");
     }
 
-    private onclose = (event: CloseEvent) =>
+    private onclose = (transport: WebSocketTransport, _event: unknown) =>
     {
         KBELog.DEBUG_MSG("NetworkInterface::onclose:...!");
 
         // close 回调可能晚于下一次 ConnectTo；只允许产生该事件的 socket 清理自身，避免陈旧事件破坏重登录连接。
         // A close callback may arrive after the next ConnectTo; only the socket that emitted it may clean itself up, protecting the relogin connection from stale events.
-        const closedSocket = (event.currentTarget || event.target) as WebSocket | null;
-        if(closedSocket === null || this.socket !== closedSocket)
+        if(this.transport !== transport)
             return;
 
-        this.ReleaseSocket(closedSocket);
+        this.ReleaseTransport(transport);
         KBEEvent.fireAll("onDisconnected");
     }
 
-    private ReleaseSocket(socket: WebSocket): void
+    private ReleaseTransport(transport: WebSocketTransport): void
     {
         // 先解除回调并清除当前引用，再关闭或发布事件，避免同步业务回调创建的新连接被旧生命周期覆盖。
         // Detach callbacks and clear the current reference before closing or publishing events so synchronous application callbacks cannot have their new connection overwritten.
-        socket.onerror = null;
-        socket.onclose = null;
-        socket.onmessage = null;
-        socket.onopen = null;
-        if(this.socket === socket)
-            this.socket = undefined;
+        transport.release();
+        if(this.transport === transport)
+            this.transport = undefined;
         this.onOpenCB = undefined;
     }
 }

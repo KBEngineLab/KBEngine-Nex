@@ -33,6 +33,7 @@ function verifySourceDependencies(sdkPath)
     const entityDefSource = readSource(sdkPath, "EntityDef.ts");
     const dataTypesSource = readSource(sdkPath, "DataTypes.ts");
     const kbeTypesSource = readSource(sdkPath, "KBETypes.ts");
+    const transportSource = readSource(sdkPath, "WebSocketTransport.ts");
     const aggregateImport = /from\s+["']\.\/KBEngine["']/;
 
     // 协议核心和网络实现不能反向依赖兼容聚合入口，否则 re-export 会重新形成运行时初始化环。
@@ -44,6 +45,7 @@ function verifySourceDependencies(sdkPath)
     assertCondition(!aggregateImport.test(entityDefSource), "EntityDef.ts imports KBEngine.ts");
     assertCondition(!aggregateImport.test(dataTypesSource), "DataTypes.ts imports KBEngine.ts");
     assertCondition(!aggregateImport.test(kbeTypesSource), "KBETypes.ts imports KBEngine.ts");
+    assertCondition(!aggregateImport.test(transportSource), "WebSocketTransport.ts imports KBEngine.ts");
     assertCondition(!/export\s+class\s+MemoryStream\b/.test(engineSource), "KBEngine.ts still defines MemoryStream");
     assertCondition(!/export\s+class\s+NetworkInterface\b/.test(engineSource), "KBEngine.ts still defines NetworkInterface");
     assertCondition(!/export\s+namespace\s+DataTypes\b/.test(engineSource), "KBEngine.ts still defines DataTypes");
@@ -104,6 +106,89 @@ function verifyMessageDispatch(compiledPath)
     assertCondition(unboundRejected, "Message dispatch succeeded without a bound target");
 }
 
+function createTransport()
+{
+    return {
+        isOpen: false,
+        onOpen: undefined,
+        onMessage: undefined,
+        onError: undefined,
+        onClose: undefined,
+        sent: [],
+        closed: [],
+        released: false,
+        sendError: undefined,
+        send(data, onError)
+        {
+            this.sent.push(data);
+            if(this.sendError !== undefined)
+                onError(this.sendError);
+        },
+        close(code, reason, _onError)
+        {
+            this.closed.push({ code, reason });
+        },
+        release()
+        {
+            this.released = true;
+            this.onOpen = undefined;
+            this.onMessage = undefined;
+            this.onError = undefined;
+            this.onClose = undefined;
+        }
+    };
+}
+
+function verifyTransportLifecycle(compiledPath)
+{
+    const NetworkInterface = loadModule(compiledPath, "NetworkInterface.js").default;
+    const first = createTransport();
+    const second = createTransport();
+    const malformed = createTransport();
+    const transports = [first, second, malformed];
+    const addresses = [];
+    const network = new NetworkInterface({
+        create(address)
+        {
+            addresses.push(address);
+            return transports[addresses.length - 1];
+        }
+    });
+
+    let opens = 0;
+    network.ConnectTo("ws://first", () => opens += 1);
+    const staleOpen = first.onOpen;
+    first.isOpen = true;
+    first.onOpen({});
+    assertCondition(network.IsGood && opens === 1, "Custom transport open state was not observed");
+
+    network.Send(new ArrayBuffer(6));
+    assertCondition(first.sent.length === 1 && first.sent[0].byteLength === 6,
+        "NetworkInterface did not send through the configured transport");
+    first.sendError = "send-failed";
+    network.Send(new ArrayBuffer(1));
+    network.Close();
+    assertCondition(first.released && first.closed.length === 1 && !network.IsGood,
+        "NetworkInterface did not release and close the active transport");
+
+    network.ConnectTo("ws://second", () => opens += 1);
+    staleOpen({});
+    assertCondition(opens === 1, "A stale transport callback affected the replacement connection");
+    second.isOpen = true;
+    second.onOpen({});
+    assertCondition(opens === 2 && addresses.join(",") === "ws://first,ws://second",
+        "The replacement transport did not receive the expected address or open callback");
+    network.Close();
+
+    network.ConnectTo("ws://malformed");
+    malformed.isOpen = true;
+    malformed.onMessage(new ArrayBuffer(0), {});
+    assertCondition(malformed.released && malformed.closed.length === 1,
+        "A malformed frame did not release and close its transport exactly once");
+    assertCondition(malformed.closed[0].code === 1002 && malformed.closed[0].reason === "Malformed KBEngine frame",
+        "A malformed frame did not preserve the WebSocket protocol close contract");
+}
+
 function verifyRuntimeIdentity(compiledPath)
 {
     const engine = loadModule(compiledPath, "KBEngine.js");
@@ -112,11 +197,14 @@ function verifyRuntimeIdentity(compiledPath)
     const network = loadModule(compiledPath, "NetworkInterface.js");
     const dataTypes = loadModule(compiledPath, "DataTypes.js");
     const kbeTypes = loadModule(compiledPath, "KBETypes.js");
+    const transport = loadModule(compiledPath, "WebSocketTransport.js");
 
     assertCondition(engine.MemoryStream === memory.MemoryStream, "MemoryStream re-export changed class identity");
     assertCondition(engine.NetworkInterface === network.default, "NetworkInterface re-export changed class identity");
     assertCondition(engine.DataTypes === dataTypes.DataTypes, "DataTypes compatibility re-export changed namespace identity");
     assertCondition(engine.KBETypes === kbeTypes, "KBETypes compatibility re-export changed module identity");
+    assertCondition(engine.KBEChannel === transport.KBEChannel, "KBEChannel compatibility re-export changed enum identity");
+    assertCondition(engine.KBEPlatform === transport.KBEPlatform, "KBEPlatform compatibility re-export changed enum identity");
     assertCondition(engine.DataTypes.KB_INT64 === int64.KB_INT64, "KB_INT64 compatibility alias changed class identity");
     assertCondition(engine.DataTypes.KB_UINT64 === int64.KB_UINT64, "KB_UINT64 compatibility alias changed class identity");
 
@@ -156,6 +244,8 @@ function verifyAppDispatchLifecycle(compiledPath)
 {
     const engine = loadModule(compiledPath, "KBEngine.js");
     const Messages = loadModule(compiledPath, "Messages.js").default;
+    const injectedTransport = createTransport();
+    let injectedFactoryCalls = 0;
     const originalDebug = console.debug;
     const originalWarn = console.warn;
     let app;
@@ -166,9 +256,22 @@ function verifyAppDispatchLifecycle(compiledPath)
     console.warn = () => {};
     try
     {
-        app = engine.KBEngineApp.Create(new engine.KBEngineArgs());
+        const args = new engine.KBEngineArgs();
+        args.channel = engine.KBEChannel.Douyin;
+        args.webSocketTransportFactory = {
+            create()
+            {
+                injectedFactoryCalls += 1;
+                return injectedTransport;
+            }
+        };
+        app = engine.KBEngineApp.Create(args);
         assertCondition(Messages.RequireDispatchTarget("Client_onAppActiveTickCB") === app,
             "KBEngineApp.Create did not bind the message dispatch target");
+        app.networkInterface.ConnectTo("ws://injected");
+        assertCondition(injectedFactoryCalls === 1,
+            "KBEngineArgs explicit transport factory did not override the selected channel");
+        app.networkInterface.Close();
     }
     finally
     {
@@ -201,8 +304,9 @@ function main()
     verifyRuntimeIdentity(compiledPath);
     verifySchemaBinding(compiledPath);
     verifyMessageDispatch(compiledPath);
+    verifyTransportLifecycle(compiledPath);
     verifyAppDispatchLifecycle(compiledPath);
-    console.log("TYPESCRIPT_MODULE_TEST_PASS root=true imports=true schema=true schema-bind=true memory=true network=true int64=true roundtrip=true dispatch=true lifecycle=true app-lifecycle=true");
+    console.log("TYPESCRIPT_MODULE_TEST_PASS root=true imports=true schema=true schema-bind=true memory=true network=true transport=true stale-transport=true int64=true roundtrip=true dispatch=true lifecycle=true app-lifecycle=true");
 }
 
 try
