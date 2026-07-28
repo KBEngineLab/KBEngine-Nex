@@ -53,6 +53,7 @@ ehthumbs.db
 /kbe/src/build/
 /kbe/src/_objs/
 /kbe/src/ipch/
+/kbe/src/out/
 /kbe/src/vcpkg_installed/
 /kbe/src/python-runtime/vcpkg_installed/
 /kbe/src/lib/dependencies/apr/LibR/
