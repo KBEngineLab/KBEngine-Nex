@@ -32,6 +32,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "entity_messages_forward_handler.h"
 #include "forward_message_over_handler.h"
 #include "sync_entitystreamtemplate_handler.h"
+#include "server/asyncio_helper.h"
 #include "common/timestamp.h"
 #include "common/kbeversion.h"
 #include "common/sha1.h"
@@ -730,7 +731,10 @@ void Baseapp::onCellAppDeath(Network::Channel * pChannel)
 		Py_DECREF(pyarg);
 
 		if(pyResult != NULL)
+		{
+			AsyncioHelper::submitCoroutine(pyResult);
 			Py_DECREF(pyResult);
+		}
 		else
 			SCRIPT_ERROR_CHECK();
 	}
@@ -3593,7 +3597,10 @@ void Baseapp::onChargeCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 										pyOrder, pydbid, pySuccess, pyBytes);
 
 		if(pyResult != NULL)
+		{
+			AsyncioHelper::submitCoroutine(pyResult);
 			Py_DECREF(pyResult);
+		}
 		else
 			SCRIPT_ERROR_CHECK();
 	}
@@ -3631,7 +3638,10 @@ void Baseapp::onDbmgrInitCompleted(Network::Channel* pChannel,
 										0);
 
 	if(pyResult != NULL)
+	{
+		AsyncioHelper::submitCoroutine(pyResult);
 		Py_DECREF(pyResult);
+	}
 	else
 		SCRIPT_ERROR_CHECK();
 

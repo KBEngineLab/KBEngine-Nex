@@ -25,6 +25,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/channel.h"
 #include "entitydef/entitydef.h"
 #include "server/serverconfig.h"
+#include "server/asyncio_helper.h"
 
 #include "../../server/dbmgr/dbmgr_interface.h"
 
@@ -108,6 +109,7 @@ void EntityAutoLoader::onEntityAutoLoadCBFromDBMgr(Network::Channel* pChannel, M
 
 			if(pyResult != NULL)
 			{
+				AsyncioHelper::submitCoroutine(pyResult);
 				Py_DECREF(pyResult);
 			}
 			else

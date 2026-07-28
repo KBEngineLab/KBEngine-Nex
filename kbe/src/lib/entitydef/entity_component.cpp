@@ -14,6 +14,7 @@ The entity-component runtime owns component script objects, property serializati
 #include "client_lib/clientobjectbase.h"
 #include "entitydef/entitydef.h"
 #include "entitydef/common.h"
+#include "server/asyncio_helper.h"
 
 #include "../../server/baseapp/baseapp_interface.h"
 #include "../../server/cellapp/cellapp_interface.h"
@@ -249,8 +250,7 @@ void EntityComponent::initializeScript()
 			const_cast<char*>(""));
 
 		if (pyResult != NULL) {
-			// The 1.x runtime executes component callbacks synchronously.
-			// 1.x 运行时同步执行组件回调，避免引入不存在的异步调度器。
+			AsyncioHelper::submitCoroutine(pyResult);
 			Py_DECREF(pyResult);
 		}
 		else
@@ -267,8 +267,7 @@ void EntityComponent::onAttached()
 			const_cast<char*>("O"), owner());
 
 		if (pyResult != NULL) {
-			// The 1.x runtime executes component callbacks synchronously.
-			// 1.x 运行时同步执行组件回调，避免引入不存在的异步调度器。
+			AsyncioHelper::submitCoroutine(pyResult);
 			Py_DECREF(pyResult);
 		}
 		else
@@ -285,8 +284,7 @@ void EntityComponent::onDetached()
 			const_cast<char*>("O"), owner());
 
 		if (pyResult != NULL) {
-			// The 1.x runtime executes component callbacks synchronously.
-			// 1.x 运行时同步执行组件回调，避免引入不存在的异步调度器。
+			AsyncioHelper::submitCoroutine(pyResult);
 			Py_DECREF(pyResult);
 		}
 		else

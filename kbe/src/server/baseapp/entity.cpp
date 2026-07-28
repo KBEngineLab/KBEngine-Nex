@@ -1335,7 +1335,16 @@ void Entity::onCellWriteToDBCompleted(CALLBACK_ID callbackID, int8 shouldAutoLoa
 {
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	
-	SCRIPT_OBJECT_CALL_ARGS0(this, const_cast<char*>("onPreArchive"), false);
+	// onPreArchive 必须在归档继续前同步完成，因此不能经过支持 awaitable 的通用回调宏。
+	// onPreArchive must finish before archiving continues, so it must bypass the generic callback macro that accepts awaitables.
+	if (PyObject_HasAttrString(this, "onPreArchive"))
+	{
+		PyObject* pyResult = PyObject_CallMethod(this, const_cast<char*>("onPreArchive"), const_cast<char*>(""));
+		if (pyResult != NULL)
+			Py_DECREF(pyResult);
+		else
+			SCRIPT_ERROR_CHECK();
+	}
 
 	if (dbInterfaceIndex >= 0)
 		dbInterfaceIndex_ = dbInterfaceIndex;
@@ -1699,14 +1708,9 @@ void Entity::onGetDBID(Network::Channel* pChannel, DBID dbid)
 void Entity::onTimer(ScriptID timerID, int useraAgs)
 {
 	SCOPED_PROFILE(ONTIMER_PROFILE);
-	
-	PyObject* pyResult = PyObject_CallMethod(this, const_cast<char*>("onTimer"),
-		const_cast<char*>("Ii"), timerID, useraAgs);
 
-	if (pyResult != NULL)
-		Py_DECREF(pyResult);
-	else
-		SCRIPT_ERROR_CHECK();
+	CALL_ENTITY_AND_COMPONENTS_METHOD(this, SCRIPT_OBJECT_CALL_ARGS2(pyTempObj,
+		const_cast<char*>("onTimer"), const_cast<char*>("Ii"), timerID, useraAgs, GETERR));
 }
 
 //-------------------------------------------------------------------------------------

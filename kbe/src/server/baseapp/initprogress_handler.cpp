@@ -22,6 +22,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "initprogress_handler.h"
 #include "entity_autoloader.h"
 #include "server/plugin_runtime.h"
+#include "server/asyncio_helper.h"
 #include "network/bundle.h"
 #include "network/channel.h"
 
@@ -207,7 +208,10 @@ bool InitProgressHandler::process()
 											PyBool_FromLong((g_componentGroupOrder == 1) ? 1 : 0));
 
 		if(pyResult != NULL)
+		{
+			AsyncioHelper::submitCoroutine(pyResult);
 			Py_DECREF(pyResult);
+		}
 		else
 			SCRIPT_ERROR_CHECK();
 

@@ -23,6 +23,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #define KBE_ENTITY_MACRO_H
 
 #include "common/common.h"
+#include "server/asyncio_helper.h"
 #include "server/callbackmgr.h"		
 
 namespace KBEngine{
@@ -353,6 +354,7 @@ public:																										\
 			PyObject* pyResult = PyObject_CallMethod(this, const_cast<char*>("__init__"),					\
 											const_cast<char*>(""));											\
 			if(pyResult != NULL){																			\
+				AsyncioHelper::submitCoroutine(pyResult);															\
 				Py_DECREF(pyResult);																		\
 			}																								\
 			else																							\

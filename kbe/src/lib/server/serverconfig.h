@@ -290,6 +290,7 @@ public:
 	void updateExternalAddress(char* buf);
 
 	INLINE int16 gameUpdateHertz(void) const;
+	INLINE float asyncioRepeatOffset(void) const;
 
 	std::string interfacesAddress(void) const;
 	int32 interfacesPortMin(void) const;
@@ -329,6 +330,7 @@ private:
 
 public:
 	int16 gameUpdateHertz_;
+	float asyncioRepeatOffset_;
 	uint32 tick_max_buffered_logs_;
 	uint32 tick_max_sync_logs_;
 

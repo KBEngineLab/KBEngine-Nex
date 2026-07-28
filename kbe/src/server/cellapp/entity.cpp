@@ -37,6 +37,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "navigate_handler.h"	
 #include "rotator_handler.h"
 #include "turn_controller.h"
+#include "server/asyncio_helper.h"
 #include "pyscript/py_gc.h"
 #include "entitydef/volatileinfo.h"
 #include "entitydef/entity_call.h"
@@ -1349,6 +1350,7 @@ bool Entity::bufferOrExeCallback(const char * funcName, PyObject * funcArgs, boo
 
 		if (pyResult)
 		{
+			AsyncioHelper::submitCoroutine(pyResult);
 			Py_DECREF(pyResult);
 		}
 		else
@@ -1383,6 +1385,7 @@ void Entity::bufferCallback(bool enable)
 
 				if (pyResult)
 				{
+					AsyncioHelper::submitCoroutine(pyResult);
 					Py_DECREF(pyResult);
 				}
 				else

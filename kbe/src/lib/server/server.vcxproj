@@ -98,6 +98,7 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="asyncio_helper.cpp" />
     <ClCompile Include="common.cpp" />
     <ClCompile Include="component_active_report_handler.cpp" />
     <ClCompile Include="components.cpp" />
@@ -122,6 +123,7 @@
     <ClCompile Include="telnet_server.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="asyncio_helper.h" />
     <ClInclude Include="callbackmgr.h" />
     <ClInclude Include="common.h" />
     <ClInclude Include="component_active_report_handler.h" />

@@ -118,6 +118,9 @@ INLINE ENGINE_COMPONENT_INFO& ServerConfig::getComponent(COMPONENT_TYPE componen
 //-------------------------------------------------------------------------------------	
 INLINE int16 ServerConfig::gameUpdateHertz(void) const { return gameUpdateHertz_;}
 
+//-------------------------------------------------------------------------------------
+INLINE float ServerConfig::asyncioRepeatOffset(void) const { return asyncioRepeatOffset_; }
+
 //-------------------------------------------------------------------------------------	
 INLINE std::string ServerConfig::interfacesAddress(void) const { return interfacesAddress_; }
 INLINE int32 ServerConfig::interfacesPortMin(void) const { return interfacesPort_min_; }

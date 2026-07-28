@@ -38,6 +38,7 @@ static bool g_dbmgr_addDefaultAddress = true;
 //-------------------------------------------------------------------------------------
 ServerConfig::ServerConfig():
 	gameUpdateHertz_(10),
+	asyncioRepeatOffset_(0.f),
 	tick_max_buffered_logs_(4096),
 	tick_max_sync_logs_(32),
 	channelCommon_(),
@@ -439,6 +440,15 @@ bool ServerConfig::loadConfig(std::string fileName)
 	rootNode = xml->getRootNode("gameUpdateHertz");
 	if(rootNode != NULL){
 		gameUpdateHertz_ = xml->getValInt(rootNode);
+	}
+
+	rootNode = xml->getRootNode("asyncioRepeatOffset");
+	if (rootNode != NULL)
+	{
+		// 零表示关闭实验性 asyncio；启用时最小间隔为 10ms，避免错误配置形成忙循环。
+		// Zero disables experimental asyncio; when enabled, clamp to 10ms so an invalid value cannot create a busy loop.
+		const float configuredOffset = float(xml->getValFloat(rootNode));
+		asyncioRepeatOffset_ = configuredOffset <= 0.f ? 0.f : KBE_MAX(0.01f, configuredOffset);
 	}
 
 	rootNode = xml->getRootNode("bitsPerSecondToClient");

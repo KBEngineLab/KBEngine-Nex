@@ -21,6 +21,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "cellapp.h"
 #include "initprogress_handler.h"
 #include "server/plugin_runtime.h"
+#include "server/asyncio_helper.h"
 #include "network/bundle.h"
 #include "network/channel.h"
 
@@ -159,7 +160,10 @@ bool InitProgressHandler::process()
 			0);
 
 		if (pyResult != NULL)
+		{
+			AsyncioHelper::submitCoroutine(pyResult);
 			Py_DECREF(pyResult);
+		}
 		else
 			SCRIPT_ERROR_CHECK();
 

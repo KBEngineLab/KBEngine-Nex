@@ -1,6 +1,7 @@
 LIB =	server
 
 SRCS =				\
+	asyncio_helper		\
 	common			\
 	components		\
 	component_active_report_handler \

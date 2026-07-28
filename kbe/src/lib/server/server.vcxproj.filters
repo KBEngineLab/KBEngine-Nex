@@ -18,6 +18,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="asyncio_helper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="common.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -86,6 +89,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="asyncio_helper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="callbackmgr.h">
       <Filter>Header Files</Filter>
     </ClInclude>

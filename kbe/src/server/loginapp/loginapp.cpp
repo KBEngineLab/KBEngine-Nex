@@ -32,6 +32,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "thread/threadpool.h"
 #include "common/kbeversion.h"
 #include "server/components.h"
+#include "server/asyncio_helper.h"
 #include "server/plugin_runtime.h"
 #include "server/telnet_server.h"
 #include "server/sendmail_threadtasks.h"
@@ -153,6 +154,7 @@ void Loginapp::onChannelDeregister(Network::Channel * pChannel)
 
                 if(pyResult != NULL)
                 {
+					AsyncioHelper::submitCoroutine(pyResult);
                     Py_DECREF(pyResult);
                 }
                 else
@@ -196,7 +198,10 @@ bool Loginapp::initializeEnd()
 										const_cast<char*>(""));
 
 	if(pyResult != NULL)
+	{
+		AsyncioHelper::submitCoroutine(pyResult);
 		Py_DECREF(pyResult);
+	}
 	else
 		SCRIPT_ERROR_CHECK();
 	
@@ -619,6 +624,7 @@ void Loginapp::onReqCreateAccountResult(Network::Channel* pChannel, MemoryStream
 
 	if(pyResult != NULL)
 	{
+		AsyncioHelper::submitCoroutine(pyResult);
 		Py_DECREF(pyResult);
 	}
 	else
@@ -1261,6 +1267,7 @@ void Loginapp::onLoginAccountQueryResultFromDbmgr(Network::Channel* pChannel, Me
 
 	if(pyResult != NULL)
 	{
+		AsyncioHelper::submitCoroutine(pyResult);
 		Py_DECREF(pyResult);
 	}
 	else

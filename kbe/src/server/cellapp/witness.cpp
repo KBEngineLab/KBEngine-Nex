@@ -23,6 +23,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "profile.h"
 #include "cellapp.h"
 #include "view_trigger.h"
+#include "server/asyncio_helper.h"
 #include "network/channel.h"	
 #include "network/bundle.h"
 #include "network/network_stats.h"
@@ -773,6 +774,7 @@ bool Witness::update()
 
 		if (pyResult != NULL)
 		{
+			AsyncioHelper::submitCoroutine(pyResult);
 			Py_DECREF(pyResult);
 		}
 		else
@@ -919,6 +921,7 @@ bool Witness::update()
 
 		if (pyResult != NULL)
 		{
+			AsyncioHelper::submitCoroutine(pyResult);
 			Py_DECREF(pyResult);
 		}
 		else

@@ -19,6 +19,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "method.h"
+#include "server/asyncio_helper.h"
 #include "entitydef.h"
 #include "network/bundle.h"
 
@@ -255,6 +256,11 @@ PyObject* MethodDescription::call(PyObject* func, PyObject* args)
 				pyResult = PyObject_CallObject(func, args);
 		}
 	}
+
+	// 远程方法允许 async def；同步返回值会被调度器识别并保持原有行为。
+	// Remote methods may use async def; synchronous return values are recognized and retain their original behavior.
+	if (pyResult != NULL)
+		AsyncioHelper::submitCoroutine(pyResult);
 
 	if (PyErr_Occurred())
 	{

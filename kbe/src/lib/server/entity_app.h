@@ -35,6 +35,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "helper/script_loglevel.h"
 #include "helper/profile.h"
 #include "server/kbemain.h"	
+#include "server/asyncio_helper.h"
 #include "server/script_timers.h"
 #include "server/plugin_runtime.h"
 #include "server/idallocate.h"
@@ -316,6 +317,10 @@ bool EntityApp<E>::initialize()
 	{
 		gameTimer_ = this->dispatcher().addTimer(1000000 / g_kbeSrvConfig.gameUpdateHertz(), this,
 								reinterpret_cast<void *>(TIMEOUT_GAME_TICK));
+
+		// asyncio 与组件共享主线程，确保 Entity 状态和脚本回调仍遵守原有串行执行模型。
+		// asyncio shares the component main thread so Entity state and script callbacks retain the existing serial execution model.
+		ret = AsyncioHelper::installTimer(this->dispatcher());
 	}
 
 	lastTimestamp_ = timestamp();
@@ -332,6 +337,10 @@ bool EntityApp<E>::initializeWatcher()
 template<class E>
 void EntityApp<E>::finalise(void)
 {
+	// 在插件、Entity 和 Python 类型卸载前取消协程，避免 Task 持有已失效的脚本对象。
+	// Cancel coroutines before plugins, entities, and Python types are unloaded so Tasks cannot retain invalid script objects.
+	AsyncioHelper::shutdown();
+
 	gameTimer_.cancel();
 
 	WATCH_FINALIZE;
@@ -1493,7 +1502,10 @@ void EntityApp<E>::reloadScript(bool fullReload)
 										1);
 
 	if(pyResult != NULL)
+	{
+		AsyncioHelper::submitCoroutine(pyResult);
 		Py_DECREF(pyResult);
+	}
 	else
 		SCRIPT_ERROR_CHECK();
 }

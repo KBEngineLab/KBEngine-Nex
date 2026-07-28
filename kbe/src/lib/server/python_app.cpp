@@ -20,6 +20,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include "python_app.h"
+#include "asyncio_helper.h"
 #include "pyscript/py_memorystream.h"
 #include "server/py_file_descriptor.h"
 #include "server/plugin_runtime.h"
@@ -122,6 +123,11 @@ bool PythonApp::initializeEnd()
 		!PluginRuntime::instance().initialize(componentType_, false))
 		return false;
 
+	// 非 EntityApp 组件也使用自身 dispatcher 在主线程推进 asyncio，避免跨线程访问脚本状态。
+	// Non-EntityApp components also pump asyncio on their own dispatcher thread to avoid cross-thread script access.
+	if (!AsyncioHelper::installTimer(this->dispatcher()))
+		return false;
+
 	return true;
 }
 
@@ -140,6 +146,10 @@ void PythonApp::onShutdownEnd()
 //-------------------------------------------------------------------------------------
 void PythonApp::finalise(void)
 {
+	// 必须先停止协程，再卸载插件和 Python 模块，否则待执行 Task 可能访问已释放对象。
+	// Coroutines must stop before plugins and Python modules are unloaded or pending Tasks may access released objects.
+	AsyncioHelper::shutdown();
+
 	if (usesPythonAppPluginRuntime(componentType_))
 		PluginRuntime::instance().finalise();
 
@@ -781,7 +791,10 @@ void PythonApp::reloadScript(bool fullReload)
 										1);
 
 	if(pyResult != NULL)
+	{
+		AsyncioHelper::submitCoroutine(pyResult);
 		Py_DECREF(pyResult);
+	}
 	else
 		SCRIPT_ERROR_CHECK();
 

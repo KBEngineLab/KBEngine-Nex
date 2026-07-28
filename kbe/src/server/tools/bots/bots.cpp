@@ -23,6 +23,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "clientobject.h"
 #include "server/telnet_server.h"
 #include "server/components.h"
+#include "server/asyncio_helper.h"
 #include "server/plugin_runtime.h"
 #include "client_lib/entity.h"
 #include "entitydef/entity_component.h"
@@ -133,6 +134,11 @@ bool Bots::initializeBegin()
 	gameTimer_ = this->dispatcher().addTimer(1000000 / g_kbeSrvConfig.gameUpdateHertz(), this,
 							reinterpret_cast<void *>(TIMEOUT_GAME_TICK));
 
+	// Bots 不继承 EntityApp/PythonApp，必须在自身生命周期显式安装 asyncio dispatcher timer。
+	// Bots does not inherit EntityApp or PythonApp, so it must install the asyncio dispatcher timer in its own lifecycle.
+	if (!AsyncioHelper::installTimer(this->dispatcher()))
+		return false;
+
 	ProfileVal::setWarningPeriod(stampsPerSecond() / g_kbeSrvConfig.gameUpdateHertz());
 	return true;
 }
@@ -159,6 +165,7 @@ bool Bots::initializeEnd()
 
 	if(pyResult != NULL)
 	{
+		AsyncioHelper::submitCoroutine(pyResult);
 		Py_DECREF(pyResult);
 	}
 	else
@@ -188,12 +195,17 @@ void Bots::finalise()
 
 	if(pyResult != NULL)
 	{
+		AsyncioHelper::submitCoroutine(pyResult);
 		Py_DECREF(pyResult);
 	}
 	else
 	{
 		SCRIPT_ERROR_CHECK();
 	}
+
+	// 在客户端实体和 Python 类型释放前停止 Task，避免协程继续访问 Bots 持有的对象。
+	// Stop Tasks before client entities and Python types are released so coroutines cannot access objects owned by Bots.
+	AsyncioHelper::shutdown();
 
 	// 插件先于机器人客户端和 Python 类型释放，以便 onFini 安全注销回调与共享状态。
 	// Plugins stop before bot clients and Python types so onFini can safely unregister callbacks and shared state.

@@ -30,6 +30,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "thread/threadpool.h"
 #include "server/components.h"
 #include "server/plugin_runtime.h"
+#include "server/asyncio_helper.h"
 #include "server/telnet_server.h"
 
 #include "baseapp/baseapp_interface.h"
@@ -175,7 +176,10 @@ bool Interfaces::initializeEnd()
 										const_cast<char*>(""));
 
 	if(pyResult != NULL)
+	{
+		AsyncioHelper::submitCoroutine(pyResult);
 		Py_DECREF(pyResult);
+	}
 	else
 		SCRIPT_ERROR_CHECK();
 
@@ -553,7 +557,10 @@ void Interfaces::reqCreateAccount(Network::Channel* pChannel, KBEngine::MemorySt
 										datas.c_str(), datas.length());
 
 	if(pyResult != NULL)
+	{
+		AsyncioHelper::submitCoroutine(pyResult);
 		Py_DECREF(pyResult);
+	}
 	else
 		SCRIPT_ERROR_CHECK();
 }
@@ -665,7 +672,10 @@ void Interfaces::onAccountLogin(Network::Channel* pChannel, KBEngine::MemoryStre
 										datas.c_str(), datas.length());
 
 	if(pyResult != NULL)
+	{
+		AsyncioHelper::submitCoroutine(pyResult);
 		Py_DECREF(pyResult);
+	}
 	else
 		SCRIPT_ERROR_CHECK();
 }
@@ -780,7 +790,10 @@ void Interfaces::charge(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 										pOrdersCharge->postDatas.c_str(), pOrdersCharge->postDatas.length());
 
 	if(pyResult != NULL)
+	{
+		AsyncioHelper::submitCoroutine(pyResult);
 		Py_DECREF(pyResult);
+	}
 	else
 		SCRIPT_ERROR_CHECK();
 }

@@ -3,6 +3,11 @@
 		(Update frequency process, HZ)
 	-->
 	<gameUpdateHertz> 10 </gameUpdateHertz>
+
+	<!-- asyncio主线程调度间隔（秒），0表示关闭实验性async支持
+		(Main-thread asyncio scheduling interval in seconds; 0 disables experimental async support)
+	-->
+	<asyncioRepeatOffset> 0 </asyncioRepeatOffset>
 	
 	<!-- 每秒发送到客户端的带宽限制(bit) 
 		(The data sent to the client, the second bandwidth limit (bit))
