@@ -297,7 +297,9 @@ export class KBEngineApp {
         if ((now - this.lastTickTime) / 1000 > 15) {
             if (this.lastTickCBTime < this.lastTickTime) {
                 KBELog.ERROR_MSG("KBEngineApp::Update: Receive appTick timeout!");
-                this.networkInterface.Close();
+                // 心跳超时属于被动断线，必须显式通知业务层；登录切换、Reset 和 Destroy 仍使用默认静默关闭。
+                // A heartbeat timeout is a passive disconnect and must notify the application; login handoff, Reset, and Destroy keep using the silent default.
+                this.networkInterface.Close(true);
                 return;
             }
 
@@ -3886,22 +3888,26 @@ export class NetworkInterface
         }
     }
 
-    Close()
+    Close(notifyDisconnected: boolean = false)
     {
+        const socket = this.socket;
+        if(socket === undefined)
+            return;
+
+        KBELog.DEBUG_MSG("NetworkInterface::Close on good:" + this.IsGood)
+        this.ReleaseSocket(socket);
+
         try
         {
-            KBELog.DEBUG_MSG("NetworkInterface::Close on good:" + this.IsGood)
-            if(this.socket != undefined)
-            {
-                this.socket.close();
-                this.socket.onclose = null;
-                this.socket = undefined;
-            }
+            socket.close();
         }
         catch(e)
         {
             KBELog.ERROR_MSG("NetworkInterface::Close error:%s.", e);
         }
+
+        if(notifyDisconnected)
+            KBEEvent.fireAll("onDisconnected");
     }
 
     Send(buffer: ArrayBuffer)
@@ -3997,13 +4003,21 @@ export class NetworkInterface
         if(closedSocket === null || this.socket !== closedSocket)
             return;
 
-        closedSocket.onerror = null;
-        closedSocket.onclose = null;
-        closedSocket.onmessage = null;
-        closedSocket.onopen = null;
-        this.socket = undefined;
-        this.onOpenCB = undefined;
+        this.ReleaseSocket(closedSocket);
         KBEEvent.fireAll("onDisconnected");
+    }
+
+    private ReleaseSocket(socket: WebSocket): void
+    {
+        // 先解除回调并清除当前引用，再关闭或发布事件，避免同步业务回调创建的新连接被旧生命周期覆盖。
+        // Detach callbacks and clear the current reference before closing or publishing events so synchronous application callbacks cannot have their new connection overwritten.
+        socket.onerror = null;
+        socket.onclose = null;
+        socket.onmessage = null;
+        socket.onopen = null;
+        if(this.socket === socket)
+            this.socket = undefined;
+        this.onOpenCB = undefined;
     }
 }
 //#endregion

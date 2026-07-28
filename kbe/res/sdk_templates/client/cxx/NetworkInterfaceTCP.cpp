@@ -62,14 +62,15 @@ void NetworkInterfaceTCP::reset()
 
 void NetworkInterfaceTCP::close()
 {
+	const bool wasActive = connected_.load() || connectCB_ != nullptr;
 	stopWorker_();
 	clearRecvQueue_();
+	const bool shouldNotifyDisconnected = wasActive || disconnectedEventPending_.exchange(false);
 
 	KBE_SAFE_RELEASE(pMessageReader_);
 	KBE_SAFE_RELEASE(pBuffer_);
 	KBE_SAFE_RELEASE(pFilter_);
 
-	disconnectedEventPending_ = false;
 	connected_ = false;
 	connectCB_ = nullptr;
 	connectIP_ = KBTEXT("");
@@ -77,8 +78,13 @@ void NetworkInterfaceTCP::close()
 	connectUserdata_ = 0;
 	startTime_ = 0.0;
 
-	INFO_MSG("NetworkInterfaceTCP::close(): network closed!");
-	KBENGINE_EVENT_FIRE_ALL(KBEventTypes::onDisconnected, std::make_shared<UKBEventData_onDisconnected>());
+	if (shouldNotifyDisconnected)
+	{
+		// 主动关闭和工作线程检测到的断线共享一次通知；重复 close() 不得触发重复重登录。
+		// Active close and worker-detected loss share one notification; repeated close() calls must not trigger duplicate relogins.
+		INFO_MSG("NetworkInterfaceTCP::close(): network closed!");
+		KBENGINE_EVENT_FIRE_ALL(KBEventTypes::onDisconnected, std::make_shared<UKBEventData_onDisconnected>());
+	}
 }
 
 bool NetworkInterfaceTCP::valid()
