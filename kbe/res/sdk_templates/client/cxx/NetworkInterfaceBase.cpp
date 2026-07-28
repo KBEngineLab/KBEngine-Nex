@@ -25,7 +25,11 @@ NetworkInterfaceBase::NetworkInterfaceBase():
 
 NetworkInterfaceBase::~NetworkInterfaceBase()
 {
-	NetworkInterfaceBase::close();
+	// 派生类析构会先停止工作线程和关闭 socket，基类最终负责静默释放共享解析资源，避免重登录替换接口时泄漏。
+	// Derived destructors stop workers and close sockets first; the base finally releases shared parsing resources silently when relogin replaces an interface.
+	KBE_SAFE_RELEASE(pMessageReader_);
+	KBE_SAFE_RELEASE(pBuffer_);
+	KBE_SAFE_RELEASE(pFilter_);
 }
 
 void NetworkInterfaceBase::reset()

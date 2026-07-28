@@ -906,6 +906,9 @@ void KBEngineApp::reloginBaseapp()
 	// UKBEventData_onReloginBaseapp* pEventData = NewObject<UKBEventData_onReloginBaseapp>();
 	KBENGINE_EVENT_FIRE_ALL(KBEventTypes::onReloginBaseapp, pEventData);
 
+	// close() 会释放消息解析器，且断线后服务端的 UDP 可用性可能已经变化；重建接口可同时恢复解析状态并重新选择 TCP/KCP。
+	// close() releases message parsers and UDP availability may change after a disconnect; rebuilding restores parser state and reselects TCP or KCP.
+	initNetwork();
 	pNetworkInterface_->connectTo(baseappIP_, (!pArgs_->forceDisableUDP && baseappUdpPort_ > 0) ? baseappUdpPort_ : baseappTcpPort_, this, 3);
 }
 
@@ -955,7 +958,7 @@ void KBEngineApp::Client_onReloginBaseappFailed(uint16 failedcode)
 void KBEngineApp::Client_onReloginBaseappSuccessfully(MemoryStream& stream)
 {
 	stream >> entity_uuid_;
-	ERROR_MSG("KBEngineApp::Client_onReloginBaseappSuccessfully(): name(%s)!", username_.c_str());
+	INFO_MSG("KBEngineApp::Client_onReloginBaseappSuccessfully(): name(%s)!", username_.c_str());
 	// UKBEventData_onReloginBaseappSuccessfully* pEventData = NewObject<UKBEventData_onReloginBaseappSuccessfully>();
 	auto pEventData = std::make_shared<UKBEventData_onReloginBaseappSuccessfully>();
 	KBENGINE_EVENT_FIRE_ALL(KBEventTypes::onReloginBaseappSuccessfully, pEventData);

@@ -140,9 +140,22 @@ export default class NetworkInterface
         }
     }
 
-    private onclose = () =>
+    private onclose = (event: CloseEvent) =>
     {
         KBELog.DEBUG_MSG("NetworkInterface::onclose:...!");
+
+        // close 回调可能晚于下一次 ConnectTo；只允许产生该事件的 socket 清理自身，避免陈旧事件破坏重登录连接。
+        // A close callback may arrive after the next ConnectTo; only the socket that emitted it may clean itself up, protecting the relogin connection from stale events.
+        const closedSocket = (event.currentTarget || event.target) as WebSocket | null;
+        if(closedSocket === null || this.socket !== closedSocket)
+            return;
+
+        closedSocket.onerror = null;
+        closedSocket.onclose = null;
+        closedSocket.onmessage = null;
+        closedSocket.onopen = null;
+        this.socket = undefined;
+        this.onOpenCB = undefined;
         KBEEvent.fireAll("onDisconnected");
     }
 }
