@@ -134,12 +134,19 @@
 		
 		public void checkStream(int v)
 		{
+			if (v < 0)
+				throw new ArgumentOutOfRangeException(nameof(v));
+
 			if(v > stream.space())
 			{
 				streamList.Add(stream);
 				stream = MemoryStream.createObject();
 				++ _curMsgStreamIndex;
 			}
+
+			// 单个 BLOB/UNICODE 字段可能大于默认分段容量；换到新 stream 后仍需保证整个字段连续，读取端才能按长度前缀解析。
+			// A single BLOB/UNICODE field may exceed the default segment; after switching streams it must remain contiguous for length-prefixed decoding.
+			stream.ensureSpace(v);
 	
 			messageLength += v;
 		}

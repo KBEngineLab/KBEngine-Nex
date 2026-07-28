@@ -9,10 +9,11 @@ internal static class Program
         wraparoundPreservesBytes();
         concurrentProducersPreservePackets();
         abortAllowsWorkerRestart();
+        largeMemoryStreamFieldGrowsAndReleasesCapacity();
         kcpBatchFailureIsAtomic();
         kcpAcknowledgementReleasesBytes();
 
-        Console.WriteLine("CSHARP_SEND_BACKPRESSURE_TEST_PASS tcp-full=true tcp-wrap=true concurrent=true restart=true kcp-atomic=true kcp-ack-release=true");
+        Console.WriteLine("CSHARP_SEND_BACKPRESSURE_TEST_PASS tcp-full=true tcp-wrap=true concurrent=true restart=true large-field=true kcp-atomic=true kcp-ack-release=true");
         return 0;
     }
 
@@ -83,6 +84,29 @@ internal static class Program
         Require(queue.tryEnqueue(new byte[] { 3 }, 0, 1, out start) && start,
             "A failed worker left the running state armed.");
         Require(ReadAll(queue).SequenceEqual(new byte[] { 3 }), "Abort retained bytes from the failed transport.");
+    }
+
+    private static void largeMemoryStreamFieldGrowsAndReleasesCapacity()
+    {
+        byte[] payload = Enumerable.Range(0, 60000).Select(value => (byte)((value * 31 + 7) & 0xff)).ToArray();
+        var stream = new KBEngine.MemoryStream();
+        stream.ensureSpace(checked(payload.Length + sizeof(uint)));
+        stream.writeBlob(payload);
+
+        Require(stream.length() == payload.Length + sizeof(uint), "A large BLOB was truncated during serialization.");
+        Require(BitConverter.ToUInt32(stream.data(), 0) == payload.Length,
+            "A large BLOB changed its protocol length prefix.");
+        Require(new ArraySegment<byte>(stream.data(), sizeof(uint), payload.Length).SequenceEqual(payload),
+            "A large BLOB changed payload bytes during serialization.");
+
+        int expandedCapacity = stream.data().Length;
+        Require(expandedCapacity >= payload.Length + sizeof(uint), "MemoryStream did not grow to the required capacity.");
+        stream.clear();
+
+        // 池化对象释放一次性大字段后必须恢复默认容量，否则少量峰值消息会永久抬高客户端常驻内存。
+        // A pooled object must return to its default capacity after a one-off large field, or a brief spike permanently raises client memory use.
+        Require(stream.length() == 0 && stream.data().Length == KBEngine.MemoryStream.BUFFER_MAX,
+            "MemoryStream retained an oversized pooled buffer after clear.");
     }
 
     private static void tcpBatchFailureIsAtomic()

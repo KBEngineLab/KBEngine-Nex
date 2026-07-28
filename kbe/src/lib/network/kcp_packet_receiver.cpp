@@ -159,9 +159,11 @@ Reason KCPPacketReceiver::processPacket(Channel* pChannel, Packet * pPacket)
 			}
 			else
 			{
-				if (bytes_recvd >= (int)pRcvdUDPPacket->size())
+				// KCP 返回值等于 peeksize 和缓冲容量时表示消息恰好装满，并非越界；只有大于容量才是实现异常。
+				// A KCP result equal to peeksize and buffer capacity is an exact fit, not an overflow; only a larger result is invalid.
+				if (bytes_recvd > toIntSize(pRcvdUDPPacket->size()))
 				{
-					ERROR_MSG(fmt::format("KCPPacketReceiver::processPacket(): recvd_bytes({}) >= maxBuf({})! addr={}\n", bytes_recvd, pRcvdUDPPacket->size(), pChannel->c_str()));
+					ERROR_MSG(fmt::format("KCPPacketReceiver::processPacket(): recvd_bytes({}) > maxBuf({})! addr={}\n", bytes_recvd, pRcvdUDPPacket->size(), pChannel->c_str()));
 				}
 
 				pRcvdUDPPacket->wpos(bytes_recvd);

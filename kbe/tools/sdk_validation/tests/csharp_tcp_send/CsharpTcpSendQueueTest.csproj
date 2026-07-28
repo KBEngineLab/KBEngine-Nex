@@ -6,6 +6,11 @@
     <Nullable>disable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\..\..\..\res\sdk_templates\client\csharp\MemoryStream.cs" Link="MemoryStream.cs" />
+    <Compile Include="..\..\..\..\res\sdk_templates\client\csharp\ObjectPool.cs" Link="ObjectPool.cs" />
+    <Compile Include="..\..\..\..\res\sdk_templates\client\csharp\Math.cs" Link="Math.cs" />
+    <Compile Include="..\..\..\..\res\sdk_templates\client\csharp\kblog\ILogProvider.cs" Link="kblog\ILogProvider.cs" />
+    <Compile Include="..\..\..\..\res\sdk_templates\client\csharp\kblog\KBELog.cs" Link="kblog\KBELog.cs" />
     <Compile Include="..\..\..\..\res\sdk_templates\client\csharp\TcpSendQueue.cs" Link="TcpSendQueue.cs" />
     <Compile Include="..\..\..\..\res\sdk_templates\client\csharp\deps\KCP.cs" Link="KCP.cs" />
   </ItemGroup>

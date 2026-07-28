@@ -409,6 +409,24 @@
 		{
 			return (UInt32)(data().Length - wpos);
 		}
+
+		public void ensureSpace(int size)
+		{
+			if (size < 0)
+				throw new ArgumentOutOfRangeException(nameof(size));
+
+			long required = (long)wpos + size;
+			if (required <= datas_.Length)
+				return;
+
+			if (required > Int32.MaxValue)
+				throw new InvalidOperationException("MemoryStream capacity exceeds the CLR array limit.");
+
+			// 大字段按所需容量或当前容量的两倍扩展，兼顾一次性 BLOB 和连续 append，同时避免逐字节重复分配。
+			// Grow to either the required size or twice the current capacity for large fields and repeated appends without per-byte reallocations.
+			int newCapacity = (int)Math.Max(required, Math.Max((long)datas_.Length * 2, BUFFER_MAX));
+			Array.Resize(ref datas_, newCapacity);
+		}
 	
 		//---------------------------------------------------------------------------------
 		public UInt32 length()
