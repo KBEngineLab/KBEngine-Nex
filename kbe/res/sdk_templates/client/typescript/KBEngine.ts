@@ -59,6 +59,9 @@ export class KBEngineArgs {
     webSocketTransportFactory: WebSocketTransportFactory | undefined;
     hostLifecycleAdapter: HostLifecycleAdapter | undefined;
     heartbeatClock: MonotonicClock | undefined;
+    // 上限覆盖当前底层积压与下一次完整 Bundle，超限时断开以避免静默丢失 RPC。
+    // The limit covers native backlog plus the next complete Bundle; overflow disconnects instead of silently dropping an RPC.
+    sendQueueMax: number = 256 * 1024;
 
     
     domainMapping : { [key: string]: string } = { };
@@ -220,6 +223,7 @@ export class KBEngineApp {
         // 显式工厂优先于渠道选择，便于项目接入尚未内置的平台并进行确定性测试。
         // An explicit factory takes precedence over channel selection so projects can integrate new runtimes and write deterministic tests.
         this.networkInterface.ConfigureTransport(args.webSocketTransportFactory || new DefaultWebSocketTransportFactory(args.channel));
+        this.networkInterface.ConfigureSendQueueLimit(args.sendQueueMax);
         this.hostLifecycle = args.hostLifecycleAdapter || new DefaultHostLifecycleFactory(args.platform).create();
         this.heartbeatState = new HeartbeatState(args.heartbeatClock ?? new DefaultMonotonicClock());
 
@@ -2099,14 +2103,14 @@ export class KBEngineApp {
 //#region KBEngine Bundle
 const MAX_BUFFER: number = 1460 * 4;
 const MESSAGE_ID_LENGTH: number = 2;
+const EXTENDED_MESSAGE_LENGTH: number = 65535;
 
 export class Bundle
 {
     private stream: MemoryStream = new MemoryStream(MAX_BUFFER);
-    private streams: Array<MemoryStream> = new Array<MemoryStream>();
 
     private messageNum = 0;
-    private messageLengthBuffer: Uint8Array | null = null;
+    private messageLengthOffset: number | undefined;
     private messageLength = 0;
     private message: Message | null = null;
 
@@ -2116,11 +2120,18 @@ export class Bundle
 
     WriteMessageLength(len: number)
     {
-        if(this.messageLengthBuffer)
-        {
-            this.messageLengthBuffer[0] = len & 0xff;
-            this.messageLengthBuffer[1] = (len >> 8) & 0xff;
-        }
+        if(this.messageLengthOffset === undefined)
+            return;
+        if(!Number.isSafeInteger(len) || len < 0 || len > 0xffffffff)
+            throw new Error("Bundle variable message length exceeds uint32.");
+
+        if(len >= EXTENDED_MESSAGE_LENGTH)
+            this.stream.Insert(this.messageLengthOffset + 2, 4);
+        const data = new DataView(this.stream.GetRawBuffer());
+        data.setUint16(this.messageLengthOffset,
+            len >= EXTENDED_MESSAGE_LENGTH ? EXTENDED_MESSAGE_LENGTH : len, true);
+        if(len >= EXTENDED_MESSAGE_LENGTH)
+            data.setUint32(this.messageLengthOffset + 2, len, true);
     }
 
     Fini(isSend: boolean)
@@ -2129,20 +2140,14 @@ export class Bundle
         //     KBELog.DEBUG_MSG("Bundle::Fini............message(%s:%s):messageNum(%d).stream length(%d).", this.message!.name, isSend, this.messageNum, this.stream.Length());
 
         if(this.messageNum > 0)
-        {
             this.WriteMessageLength(this.messageLength);
-            if(this.stream)
-            {
-                this.streams.push(this.stream);
-            }
-        }
 
         if(isSend)
         {
-            this.messageLengthBuffer = null;
             this.messageNum = 0;
             this.message = null;
         }
+        this.messageLengthOffset = undefined;
         this.messageLength = 0;
     }
 
@@ -2152,50 +2157,54 @@ export class Bundle
 
         this.messageNum += 1;
         this.message = message;
+        this.stream.EnsureSpace(message.msglen == -1 ? 4 : MESSAGE_ID_LENGTH);
+        this.stream.WriteUint16(message.id);
 
         if(message.msglen == -1)
         {
-            this.messageLengthBuffer = new Uint8Array(this.stream.GetRawBuffer(), this.stream.wpos + MESSAGE_ID_LENGTH, 2);
+            this.messageLengthOffset = this.stream.wpos;
+            this.stream.WriteUint16(0);
         }
-
-        this.stream.WriteUint16(message.id);
-        
-        if(this.messageLengthBuffer)
-        {
-            this.WriteUint16(0);
-            this.messageLengthBuffer[0] = 0;
-            this.messageLengthBuffer[1] = 0;
-            this.messageLength = 0;
-        }
+        this.messageLength = 0;
     }
 
     Send(networkInterface: NetworkInterface): boolean
     {
-        this.Fini(true);
-
-        let sent = true;
-        for(let stream of this.streams)
+        let sent = false;
+        try
         {
-            if(!networkInterface.Send(stream.GetBuffer()))
-            {
-                sent = false;
-                break;
-            }
+            this.Fini(true);
+            const payload = this.stream.GetBuffer();
+            // 同一 Bundle 内的消息具有顺序和提交原子性，必须作为一个 WebSocket 消息交给传输层。
+            // Messages in one Bundle have ordering and submission atomicity and must reach the transport as one WebSocket message.
+            sent = payload.byteLength > 0 && networkInterface.SendBatch([payload]);
         }
-
-        this.streams = new Array<MemoryStream>();
-        this.stream = new MemoryStream(MAX_BUFFER);
+        catch(error)
+        {
+            KBELog.ERROR_MSG("Bundle::Send error:%s.", error);
+            networkInterface.Close(true);
+        }
+        finally
+        {
+            // Bundle 是消费型对象；发送后恢复默认容量，避免偶发大 RPC 永久抬高后续常驻内存。
+            // A Bundle is consumed by send and returns to default capacity so an occasional large RPC cannot permanently raise later resident memory.
+            this.stream = new MemoryStream(MAX_BUFFER);
+            this.messageNum = 0;
+            this.messageLengthOffset = undefined;
+            this.messageLength = 0;
+            this.message = null;
+        }
         return sent;
     }
 
     CheckStream(len: number)
     {
-        if(len > this.stream.Space())
-        {
-            this.streams.push(this.stream);
-            this.stream = new MemoryStream(MAX_BUFFER);
-        }
+        if(!Number.isSafeInteger(len) || len < 0)
+            throw new Error("Bundle field length must be a non-negative safe integer.");
+        if(this.messageLength > 0xffffffff - len)
+            throw new Error("Bundle variable message length exceeds uint32.");
 
+        this.stream.EnsureSpace(len);
         this.messageLength += len;
     }
 

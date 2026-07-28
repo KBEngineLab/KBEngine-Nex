@@ -20,6 +20,7 @@ export default class NetworkInterface
     private connectionGeneration = 0;
     private connectedGeneration: number | undefined;
     private onOpenCB: Function | undefined;
+    private sendQueueMax = 256 * 1024;
 
     constructor(private transportFactory: WebSocketTransportFactory = new DefaultWebSocketTransportFactory(KBEChannel.Auto))
     {
@@ -30,6 +31,15 @@ export default class NetworkInterface
         if(this.transport !== undefined)
             throw new Error("NetworkInterface transport cannot be changed while a connection exists.");
         this.transportFactory = factory;
+    }
+
+    ConfigureSendQueueLimit(bytes: number): void
+    {
+        if(this.transport !== undefined)
+            throw new Error("NetworkInterface send queue limit cannot be changed while a connection exists.");
+        if(!Number.isSafeInteger(bytes) || bytes <= 0)
+            throw new Error("NetworkInterface send queue limit must be a positive safe integer.");
+        this.sendQueueMax = bytes;
     }
 
     get IsGood(): boolean
@@ -82,20 +92,62 @@ export default class NetworkInterface
 
     Send(buffer: ArrayBuffer): boolean
     {
+        return this.SendBatch([buffer]);
+    }
+
+    SendBatch(buffers: ReadonlyArray<ArrayBuffer>): boolean
+    {
         if(!this.IsGood)
         {
             KBELog.ERROR_MSG("NetworkInterface::Send:socket is unavailable.");
             return false;
         }
 
+        if(buffers.length === 0)
+        {
+            KBELog.ERROR_MSG("NetworkInterface::SendBatch:empty batch.");
+            return false;
+        }
+
         const transport = this.transport!;
         const generation = this.connectionGeneration;
+        let totalBytes = 0;
         try
         {
-            KBELog.DEBUG_MSG("NetworkInterface::Send buffer length:[%d].", buffer.byteLength);
+            for(const buffer of buffers)
+            {
+                if(totalBytes > this.sendQueueMax - buffer.byteLength)
+                    return this.RejectSend(transport, generation,
+                        new Error("send batch exceeds queue limit " + this.sendQueueMax));
+                totalBytes += buffer.byteLength;
+            }
+
+            const pendingBytes = transport.pendingBytes ?? 0;
+            // 自定义传输可省略积压指标，但此时只能执行单批次上限，累计队列控制由该传输自行负责。
+            // A custom transport may omit backlog metrics, but then only the per-batch limit applies and cumulative queue control is its responsibility.
+            if(!Number.isSafeInteger(pendingBytes) || pendingBytes < 0)
+                return this.RejectSend(transport, generation, new Error("transport reported invalid pending bytes"));
+            if(pendingBytes > this.sendQueueMax - totalBytes)
+                return this.RejectSend(transport, generation,
+                    new Error("send queue limit exceeded: pending=" + pendingBytes + ", batch=" + totalBytes));
+
+            let payload = buffers[0];
+            if(buffers.length > 1)
+            {
+                payload = new ArrayBuffer(totalBytes);
+                const output = new Uint8Array(payload);
+                let offset = 0;
+                for(const buffer of buffers)
+                {
+                    output.set(new Uint8Array(buffer), offset);
+                    offset += buffer.byteLength;
+                }
+            }
+
+            KBELog.DEBUG_MSG("NetworkInterface::SendBatch buffer length:[%d].", totalBytes);
             let synchronousError = false;
             let invokingTransport = true;
-            transport.send(buffer, error =>
+            transport.send(payload, error =>
             {
                 if(invokingTransport)
                     synchronousError = true;
@@ -112,11 +164,16 @@ export default class NetworkInterface
         }
         catch(e)
         {
-            KBELog.ERROR_MSG("NetworkInterface::Send error:%s.", e);
-            this.FailTransport(transport, generation);
-            KBEEvent.fireIn("onNetworkError", e as MessageEvent);
-            return false;
+            return this.RejectSend(transport, generation, e);
         }
+    }
+
+    private RejectSend(transport: WebSocketTransport, generation: number, error: unknown): false
+    {
+        KBELog.ERROR_MSG("NetworkInterface::SendBatch error:%s.", error);
+        this.FailTransport(transport, generation);
+        KBEEvent.fireIn("onNetworkError", error as MessageEvent);
+        return false;
     }
 
     private onopen = (transport: WebSocketTransport, generation: number, event: unknown) =>

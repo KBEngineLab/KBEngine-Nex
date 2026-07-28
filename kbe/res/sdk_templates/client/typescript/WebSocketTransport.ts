@@ -18,6 +18,9 @@ export enum KBEChannel
 export interface WebSocketTransport
 {
     readonly isOpen: boolean;
+    // 返回底层已接受但尚未完成发送的字节数，使 NetworkInterface 能在提交完整 Bundle 前实施背压。
+    // Reports bytes accepted but not yet sent by the native layer so NetworkInterface can apply backpressure before submitting a complete Bundle.
+    readonly pendingBytes?: number;
     onOpen: ((event: unknown) => void) | undefined;
     onMessage: ((data: unknown, event: unknown) => void) | undefined;
     onError: ((event: unknown) => void) | undefined;
@@ -35,6 +38,7 @@ export interface WebSocketTransportFactory
 interface BrowserWebSocketLike
 {
     readyState: number;
+    readonly bufferedAmount: number;
     binaryType: string;
     onopen: ((event: unknown) => void) | null;
     onmessage: ((event: { data: unknown }) => void) | null;
@@ -114,6 +118,11 @@ export class BrowserWebSocketTransport extends TransportBase
         return this.socket.readyState === this.openState;
     }
 
+    get pendingBytes(): number
+    {
+        return this.socket.bufferedAmount;
+    }
+
     send(data: ArrayBuffer, onError: (error: unknown) => void): void
     {
         try
@@ -145,6 +154,7 @@ class MiniProgramWebSocketTransport extends TransportBase
 {
     private readonly task: MiniProgramSocketTask;
     private opened = false;
+    private bufferedBytes = 0;
 
     constructor(address: string, api: MiniProgramSocketApi)
     {
@@ -169,17 +179,41 @@ class MiniProgramWebSocketTransport extends TransportBase
         return this.opened;
     }
 
+    get pendingBytes(): number
+    {
+        return this.bufferedBytes;
+    }
+
     send(data: ArrayBuffer, onError: (error: unknown) => void): void
     {
         // SocketTask 的发送错误通过异步 fail 回调返回，不能只依赖同步 try/catch。
         // SocketTask reports send failures through an asynchronous fail callback, so synchronous try/catch is insufficient.
+        let settled = false;
+        this.bufferedBytes += data.byteLength;
+        const settle = (): boolean =>
+        {
+            if(settled)
+                return false;
+            settled = true;
+            this.bufferedBytes = Math.max(0, this.bufferedBytes - data.byteLength);
+            return true;
+        };
         try
         {
-            this.task.send({ data, fail: onError });
+            this.task.send({
+                data,
+                success: settle,
+                fail: error =>
+                {
+                    if(settle())
+                        onError(error);
+                }
+            });
         }
         catch(error)
         {
-            onError(error);
+            if(settle())
+                onError(error);
         }
     }
 
@@ -189,6 +223,12 @@ class MiniProgramWebSocketTransport extends TransportBase
         // 主动释放会先清空事件转发目标，因此关闭失败必须通过本次操作回调返回，不能依赖 onError 事件。
         // Active release clears event forwarding first, so close failures must return through this operation callback instead of relying on onError.
         this.task.close({ code, reason, fail: onError });
+    }
+
+    release(): void
+    {
+        this.bufferedBytes = 0;
+        super.release();
     }
 }
 

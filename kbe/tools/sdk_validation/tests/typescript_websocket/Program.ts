@@ -123,11 +123,12 @@ interface MockSocketTask
     closeOptions: { code?: number; reason?: string } | undefined;
     closeFailure: unknown;
     sendFailure: unknown;
+    lastSendOptions: { data: ArrayBuffer; success?: () => void; fail?: (error: unknown) => void } | undefined;
     onOpen(callback: (event: unknown) => void): void;
     onMessage(callback: (event: { data: unknown }) => void): void;
     onError(callback: (event: unknown) => void): void;
     onClose(callback: (event: unknown) => void): void;
-    send(options: { data: ArrayBuffer; fail?: (error: unknown) => void }): void;
+    send(options: { data: ArrayBuffer; success?: () => void; fail?: (error: unknown) => void }): void;
     close(options?: { code?: number; reason?: string; fail?: (error: unknown) => void }): void;
 }
 
@@ -139,6 +140,7 @@ function createSocketTask(): MockSocketTask
         closeOptions: undefined,
         closeFailure: undefined,
         sendFailure: undefined,
+        lastSendOptions: undefined,
         onOpen(callback): void { this.callbacks.open = callback; },
         onMessage(callback): void { this.callbacks.message = callback; },
         onError(callback): void { this.callbacks.error = callback; },
@@ -146,6 +148,7 @@ function createSocketTask(): MockSocketTask
         send(options): void
         {
             this.sent.push(options.data);
+            this.lastSendOptions = options;
             if(this.sendFailure !== undefined)
                 options.fail?.(this.sendFailure);
         },
@@ -189,6 +192,16 @@ function verifyMiniProgramTransport(channel: KBEChannel, runtimeName: "wx" | "tt
     transport.send(new ArrayBuffer(5), error => sendError = error);
     assertCondition(task.sent.length === 1 && task.sent[0].byteLength === 5, runtimeName + " did not send the binary payload.");
     assertCondition(sendError === "send-failed", runtimeName + " ignored the asynchronous send failure.");
+    assertCondition(transport.pendingBytes === 0, runtimeName + " retained bytes after a failed send.");
+
+    task.sendFailure = undefined;
+    transport.send(new ArrayBuffer(7), error => sendError = error);
+    assertCondition(transport.pendingBytes === 7, runtimeName + " did not account for an in-flight send.");
+    task.lastSendOptions?.success?.();
+    task.lastSendOptions?.success?.();
+    task.lastSendOptions?.fail?.("late-failure");
+    assertCondition(transport.pendingBytes === 0 && sendError === "send-failed",
+        runtimeName + " did not settle completion callbacks idempotently.");
 
     let closeError: unknown;
     task.closeFailure = "close-failed";
@@ -199,6 +212,7 @@ function verifyMiniProgramTransport(channel: KBEChannel, runtimeName: "wx" | "tt
     assertCondition(closeError === "close-failed", runtimeName + " ignored the asynchronous close failure.");
 
     transport.release();
+    assertCondition(transport.pendingBytes === 0, runtimeName + " retained pending bytes after release.");
     task.callbacks.open?.({});
     task.callbacks.message?.({ data: new ArrayBuffer(7) });
     assertCondition(opened === 1 && (received as ArrayBuffer).byteLength === 3,
@@ -235,6 +249,7 @@ function verifyBrowserTransport(): void
     {
         static readonly OPEN = 1;
         readyState = MockBrowserSocket.OPEN;
+        bufferedAmount = 13;
         binaryType = "";
         onopen: ((event: unknown) => void) | null = null;
         onmessage: ((event: { data: unknown }) => void) | null = null;
@@ -251,6 +266,7 @@ function verifyBrowserTransport(): void
         KBEChannel.Web,
         { WebSocket: MockBrowserSocket }).create("ws://browser");
     assertCondition(transport.isOpen, "Browser transport did not use the constructor OPEN state.");
+    assertCondition(transport.pendingBytes === 13, "Browser transport did not expose native bufferedAmount.");
     let sendError = false;
     transport.send(new ArrayBuffer(2), () => sendError = true);
     assertCondition(!sendError, "Browser transport reported a successful synchronous send as failed.");

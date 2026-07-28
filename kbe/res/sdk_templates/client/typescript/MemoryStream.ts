@@ -41,6 +41,41 @@ export class MemoryStream
         return this.buffer.byteLength - this.wpos;
     }
 
+    EnsureSpace(size: number): void
+    {
+        if(!Number.isSafeInteger(size) || size < 0)
+            throw new Error("MemoryStream growth size must be a non-negative safe integer.");
+        if(size <= this.Space())
+            return;
+
+        const required = this.wpos + size;
+        let capacity = Math.max(this.buffer.byteLength, 1);
+        while(capacity < required)
+            capacity = Math.max(capacity * 2, required);
+
+        // 扩容只复制已写入字节，避免把未使用容量带入大字段的瞬时分配和 GC 压力。
+        // Growth copies only written bytes so unused capacity does not amplify transient allocation and GC pressure for large fields.
+        const replacement = new ArrayBuffer(capacity);
+        new Uint8Array(replacement).set(new Uint8Array(this.buffer, 0, this.wpos));
+        this.buffer = replacement;
+    }
+
+    Insert(offset: number, size: number): void
+    {
+        if(!Number.isSafeInteger(offset) || offset < 0 || offset > this.wpos)
+            throw new Error("MemoryStream insertion offset is outside written data.");
+        if(!Number.isSafeInteger(size) || size < 0)
+            throw new Error("MemoryStream insertion size must be a non-negative safe integer.");
+        if(size === 0)
+            return;
+
+        this.EnsureSpace(size);
+        const bytes = new Uint8Array(this.buffer);
+        bytes.copyWithin(offset + size, offset, this.wpos);
+        bytes.fill(0, offset, offset + size);
+        this.wpos += size;
+    }
+
     ReadInt8(): number
     {
         let buf = new Int8Array(this.buffer, this.rpos);

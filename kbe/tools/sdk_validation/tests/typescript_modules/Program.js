@@ -112,6 +112,7 @@ function createTransport()
 {
     return {
         isOpen: false,
+        pendingBytes: 0,
         onOpen: undefined,
         onMessage: undefined,
         onError: undefined,
@@ -287,23 +288,120 @@ function verifyNetworkCloseLifecycle(compiledPath)
 function verifyBundleSendResult(compiledPath)
 {
     const { Bundle } = loadModule(compiledPath, "KBEngine.js");
-    const message = { id: 1, msglen: 0 };
-    let acceptedCalls = 0;
+    const fixedMessage = { id: 1, msglen: 1 };
+    const variableMessage = { id: 2, msglen: -1 };
+    const submissions = [];
     const acceptedBundle = new Bundle();
-    acceptedBundle.NewMessage(message);
+    acceptedBundle.NewMessage(fixedMessage);
+    acceptedBundle.WriteUint8(9);
+    acceptedBundle.NewMessage(variableMessage);
+    acceptedBundle.WriteBlob(new Uint8Array([10, 11, 12]));
     const accepted = acceptedBundle.Send({
-        Send(buffer)
+        SendBatch(buffers)
         {
-            acceptedCalls += 1;
-            return buffer.byteLength === 2;
+            submissions.push(buffers);
+            return true;
         }
     });
-    assertCondition(accepted && acceptedCalls === 1, "Bundle did not propagate an accepted network submission");
+    assertCondition(accepted && submissions.length === 1 && submissions[0].length === 1,
+        "Bundle did not submit all messages as one atomic batch");
+    const frame = submissions[0][0];
+    const parsed = [];
+    const parseResult = loadModule(compiledPath, "WebSocketFrameParser.js").parseWebSocketFrame(
+        frame,
+        messageID => messageID === 1 ? 1 : messageID === 2 ? -1 : undefined,
+        (messageID, bodyOffset, bodyLength) => parsed.push({
+            messageID,
+            body: Array.from(new Uint8Array(frame, bodyOffset, bodyLength))
+        }));
+    assertCondition(parseResult.ok && parseResult.messages === 2 &&
+        JSON.stringify(parsed) === JSON.stringify([
+            { messageID: 1, body: [9] },
+            { messageID: 2, body: [3, 0, 0, 0, 10, 11, 12] }
+        ]), "Bundle changed the fixed or variable message wire layout");
+
+    for(const bodyLength of [60000, 70000])
+    {
+        const body = new Uint8Array(bodyLength);
+        let expectedChecksum = 0;
+        for(let index = 0; index < body.length; ++index)
+        {
+            body[index] = index % 251;
+            expectedChecksum += body[index];
+        }
+        let payload;
+        const largeBundle = new Bundle();
+        largeBundle.NewMessage(variableMessage);
+        largeBundle.WriteBlob(body);
+        assertCondition(largeBundle.Send({ SendBatch(buffers) { payload = buffers[0]; return true; } }),
+            "Bundle rejected a valid large message");
+        const view = new DataView(payload);
+        const encodedBodyLength = bodyLength + 4;
+        const extended = encodedBodyLength >= 65535;
+        const payloadOffset = extended ? 8 : 4;
+        assertCondition(view.getUint16(2, true) === (extended ? 65535 : encodedBodyLength) &&
+            (!extended || view.getUint32(4, true) === encodedBodyLength),
+            "Bundle encoded the large variable-message length incorrectly");
+        assertCondition(view.getUint32(payloadOffset, true) === bodyLength,
+            "Bundle changed the large BLOB length prefix");
+        assertCondition(payload.byteLength === payloadOffset + 4 + bodyLength,
+            "Bundle retained duplicate or trailing bytes after a large message");
+        let actualChecksum = 0;
+        for(const value of new Uint8Array(payload, payloadOffset + 4, bodyLength))
+            actualChecksum += value;
+        assertCondition(actualChecksum === expectedChecksum, "Bundle truncated or changed a large BLOB body");
+
+        let reusedPayload;
+        largeBundle.NewMessage(fixedMessage);
+        largeBundle.WriteUint8(7);
+        assertCondition(largeBundle.Send({ SendBatch(buffers) { reusedPayload = buffers[0]; return true; } }) &&
+            reusedPayload.byteLength === 3,
+            "A consumed large Bundle retained its previous payload when reused");
+    }
 
     const rejectedBundle = new Bundle();
-    rejectedBundle.NewMessage(message);
-    const rejected = rejectedBundle.Send({ Send: () => false });
+    rejectedBundle.NewMessage(fixedMessage);
+    rejectedBundle.WriteUint8(1);
+    const rejected = rejectedBundle.Send({ SendBatch: () => false });
     assertCondition(!rejected, "Bundle did not propagate a rejected network submission");
+}
+
+function verifyNetworkSendBackpressure(compiledPath)
+{
+    const NetworkInterface = loadModule(compiledPath, "NetworkInterface.js").default;
+    const transport = createTransport();
+    const network = new NetworkInterface({ create: () => transport });
+    network.ConfigureSendQueueLimit(8);
+    network.ConnectTo("ws://backpressure");
+    transport.isOpen = true;
+    transport.onOpen({});
+
+    assertCondition(network.SendBatch([new Uint8Array([1, 2]).buffer, new Uint8Array([3, 4, 5]).buffer]) &&
+        transport.sent.length === 1 &&
+        JSON.stringify(Array.from(new Uint8Array(transport.sent[0]))) === JSON.stringify([1, 2, 3, 4, 5]),
+        "NetworkInterface did not coalesce one batch into one ordered transport send");
+
+    transport.pendingBytes = 6;
+    assertCondition(!network.SendBatch([new ArrayBuffer(3)]) && transport.sent.length === 1 &&
+        transport.closed.length === 1 && transport.released,
+        "NetworkInterface did not atomically reject a batch that exceeded pending-byte capacity");
+
+    const oversized = createTransport();
+    const oversizedNetwork = new NetworkInterface({ create: () => oversized });
+    oversizedNetwork.ConfigureSendQueueLimit(8);
+    oversizedNetwork.ConnectTo("ws://oversized");
+    oversized.isOpen = true;
+    oversized.onOpen({});
+    assertCondition(!oversizedNetwork.SendBatch([new ArrayBuffer(9)]) && oversized.sent.length === 0 &&
+        oversized.closed.length === 1, "NetworkInterface partially submitted an oversized batch");
+
+    const empty = createTransport();
+    const emptyNetwork = new NetworkInterface({ create: () => empty });
+    emptyNetwork.ConnectTo("ws://empty");
+    empty.isOpen = true;
+    empty.onOpen({});
+    assertCondition(!emptyNetwork.SendBatch([]) && empty.closed.length === 0 && !empty.released,
+        "NetworkInterface closed a healthy connection for an empty caller batch");
 }
 
 function verifyTransportLifecycle(compiledPath)
@@ -614,9 +712,10 @@ function main()
     verifyMessageDispatch(compiledPath);
     verifyTransportLifecycle(compiledPath);
     verifyNetworkCloseLifecycle(compiledPath);
+    verifyNetworkSendBackpressure(compiledPath);
     verifyBundleSendResult(compiledPath);
     verifyAppDispatchLifecycle(compiledPath);
-    console.log("TYPESCRIPT_MODULE_TEST_PASS root=true imports=true schema=true schema-bind=true memory=true network=true transport=true stale-transport=true generation=true reused=true close-idempotent=true async-send-close=true preopen=true reentrant-open=true int64=true roundtrip=true dispatch=true lifecycle=true app-lifecycle=true heartbeat=true send-result=true");
+    console.log("TYPESCRIPT_MODULE_TEST_PASS root=true imports=true schema=true schema-bind=true memory=true network=true transport=true stale-transport=true generation=true reused=true close-idempotent=true async-send-close=true preopen=true reentrant-open=true int64=true roundtrip=true dispatch=true lifecycle=true app-lifecycle=true heartbeat=true send-result=true bundle-atomic=true large-send=true backpressure=true");
 }
 
 try
