@@ -152,6 +152,52 @@
   <ItemGroup>
     <None Include="ReadMe.txt" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\lib\common\common.vcxproj">
+      <Project>{a04109a7-46c9-42f9-ab29-8e3d84450172}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\lib\dependencies\jwsmtp\jwsmtp.vcxproj">
+      <Project>{45a08c1b-d249-42c4-932c-615ed3924cbb}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\lib\entitydef\entitydef.vcxproj">
+      <Project>{44fa54e8-0a60-4a6c-a449-118872e75502}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\lib\helper\helper.vcxproj">
+      <Project>{0e032fa8-bb7b-40f6-8cb1-15f204113b24}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\lib\math\math.vcxproj">
+      <Project>{f67b2c56-d1b1-4ea7-b16e-ef8e7f1b6c5f}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\lib\network\network.vcxproj">
+      <Project>{5ef24499-4f74-4af6-8048-650be7bd7808}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\lib\pyscript\pyscript.vcxproj">
+      <Project>{7a411d5d-da3b-474d-b08b-3dd787a1f375}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\lib\resmgr\resmgr.vcxproj">
+      <Project>{3f8b2057-492f-4332-99de-3e12f20ed489}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\lib\server\server.vcxproj">
+      <Project>{56d453a7-787b-49e3-84bc-465eed38de8a}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\lib\thread\thread.vcxproj">
+      <Project>{863b8043-533c-499d-b48e-f5ec91a6cb9b}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\lib\xml\xml.vcxproj">
+      <Project>{2992abdb-0853-4c43-b9e2-98d4211192ee}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
