@@ -14,7 +14,9 @@
         private byte[] _key = new byte[0];
         private bool _isGood = true;
 
-        private static RNGCryptoServiceProvider rngCsp = new RNGCryptoServiceProvider();
+        // 使用抽象工厂保留旧 Unity/.NET 兼容性，同时避免绑定到已废弃的 CSP 实现。
+        // Use the abstract factory to preserve older Unity/.NET compatibility without binding to the obsolete CSP implementation.
+        private static readonly RandomNumberGenerator rng = RandomNumberGenerator.Create();
 
         // key的最小和最大大小
         private const int MIN_KEY_SIZE = 32 / 8;
@@ -230,7 +232,7 @@
         public Blowfish(int keySize = DEFAULT_KEY_SIZE)
         {
             _key = new byte[keySize];
-            rngCsp.GetBytes(_key);
+            rng.GetBytes(_key);
             init();
         }
 

@@ -2440,7 +2440,7 @@ namespace KBEngine
 		{
 
 			KBEngineApp app_;
-			public bool over = false;
+			public volatile bool over = false;
 			
 			public KBEThread(KBEngineApp app)
 			{
@@ -2476,7 +2476,7 @@ namespace KBEngine
 		private static float threadUpdatePeriod = 1000f / threadUpdateHZ;
 		
 		// 插件是否退出
-		private bool _isbreak = false;
+		private volatile bool _isbreak = false;
 		
 		private System.DateTime _lasttime = System.DateTime.Now;
 
@@ -2551,18 +2551,18 @@ namespace KBEngine
 		{
 			KBELog.WARNING_MSG("KBEngineAppThread::destroy()");
 			breakProcess();
-			
-			int i = 0;
-			while(!kbethread.over && i < 50)
+
+			if (_t != null)
 			{
-				Thread.Sleep(100);
-				i += 1;
+				// 线程只执行非阻塞 process 与短暂 Sleep，协作退出可避免 Thread.Abort 在现代 .NET 上直接抛出平台异常。
+				// The worker only performs nonblocking process calls and short sleeps, so cooperative exit avoids Thread.Abort platform failures on modern .NET.
+				if (_t != Thread.CurrentThread && !_t.Join(TimeSpan.FromSeconds(5)))
+					throw new TimeoutException("KBEngine worker thread did not stop within 5 seconds.");
+
+				// destroy 可能由工作线程事件回调触发；该路径不能 Join 自身，break 标记会让当前 process 返回后自然退出。
+				// destroy may run from a worker-thread event callback; that path cannot join itself, and the break flag exits naturally after the current process call returns.
+				_t = null;
 			}
-			
-			if(_t != null)
-				_t.Abort();
-			
-			_t = null;
 
 			base.destroy();
 		}

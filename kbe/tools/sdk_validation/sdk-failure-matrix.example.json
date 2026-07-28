@@ -16,7 +16,8 @@
       "build": {
         "file": "dotnet",
         "arguments": ["build", "${AssetsPath}/kbeclient/csharp-failure-e2e/CsharpFailureE2E.csproj", "-c", "Release"],
-        "timeoutSeconds": 300
+        "timeoutSeconds": 300,
+        "forbiddenPatterns": ["(?:warning|警告)\\s+[A-Z]+[0-9]+:"]
       },
       "scenarios": [
         {

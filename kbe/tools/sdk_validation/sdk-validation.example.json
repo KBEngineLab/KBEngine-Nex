@@ -24,7 +24,8 @@
       "build": {
         "file": "dotnet",
         "arguments": ["build", "${AssetsPath}/kbeclient/csharp-e2e/CsharpE2E.csproj", "-c", "Release"],
-        "timeoutSeconds": 300
+        "timeoutSeconds": 300,
+        "forbiddenPatterns": ["(?:warning|警告)\\s+[A-Z]+[0-9]+:"]
       },
       "run": {
         "file": "dotnet",

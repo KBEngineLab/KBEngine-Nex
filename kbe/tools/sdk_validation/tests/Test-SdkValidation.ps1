@@ -176,7 +176,32 @@ try {
     Assert-Condition (($warningSummary.stages | Where-Object stage -eq "run").status -eq "blocked") "The baseline run was not blocked after the warning gate failed."
     Assert-Condition (($warningSummary.stages | Where-Object stage -eq "scenario-alpha").status -eq "blocked") "The scenario was not blocked after the warning gate failed."
 
-    Write-Output "SDK_VALIDATION_TEST_PASS matrix=true filtering=true unmatched=true verify-after-failure=true prerequisite-blocking=true zero-warning-gate=true"
+    $csharpWarningBuild = New-CommandDefinition -Mode "build-warning-csharp" -Scenario "build"
+    $csharpWarningBuild.forbiddenPatterns = @("E2E_FAIL", "RESOURCE_FAIL", "(?:warning|警告)\s+[A-Z]+[0-9]+:")
+    $csharpWarningManifest = [ordered] @{
+        schemaVersion = 1
+        sdks = @(
+            [ordered] @{
+                name = "csharp"
+                build = $csharpWarningBuild
+                run = New-CommandDefinition -Mode "pass"
+            }
+        )
+    }
+    $csharpWarningPath = Write-Manifest -Name "csharp-warning" -Manifest $csharpWarningManifest
+    $csharpWarningResults = Join-Path $temporaryRoot "csharp-warning-results"
+    $csharpWarningRun = Invoke-Runner -ManifestPath $csharpWarningPath -ResultsPath $csharpWarningResults
+    Assert-Condition ($csharpWarningRun.exitCode -eq 1) "A zero-exit C# build containing a warning must fail."
+
+    $csharpWarningSummaryPath = Join-Path $csharpWarningResults "summary.json"
+    Assert-Condition (Test-Path -LiteralPath $csharpWarningSummaryPath) "The C# warning runner did not write a summary: $($csharpWarningRun.output)"
+    $csharpWarningSummary = Get-Content -LiteralPath $csharpWarningSummaryPath -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 16
+    $csharpWarningBuildResult = $csharpWarningSummary.stages | Where-Object stage -eq "build"
+    Assert-Condition ($csharpWarningBuildResult.status -eq "failed") "The C# warning output did not fail the build stage."
+    Assert-Condition ($csharpWarningBuildResult.exitCode -eq 0) "The C# warning fixture must prove output validation independently of exit codes."
+    Assert-Condition (($csharpWarningSummary.stages | Where-Object stage -eq "run").status -eq "blocked") "The C# baseline run was not blocked after the warning gate failed."
+
+    Write-Output "SDK_VALIDATION_TEST_PASS matrix=true filtering=true unmatched=true verify-after-failure=true prerequisite-blocking=true zero-warning-gate=true csharp-zero-warning-gate=true"
 }
 finally {
     if (Test-Path -LiteralPath $temporaryRoot) {

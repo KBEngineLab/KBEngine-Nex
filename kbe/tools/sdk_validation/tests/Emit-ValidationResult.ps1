@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("pass", "fail", "build-fail", "build-warning")]
+    [ValidateSet("pass", "fail", "build-fail", "build-warning", "build-warning-csharp")]
     [string] $Mode,
 
     [string] $Scenario = "baseline"
@@ -26,6 +26,10 @@ switch ($Mode) {
     }
     "build-warning" {
         Write-Output "sample.cpp(42): warning C4267: Synthetic narrowing warning"
+        exit 0
+    }
+    "build-warning-csharp" {
+        Write-Output "Sample.cs(17,24): warning SYSLIB0023: Synthetic obsolete API warning"
         exit 0
     }
 }

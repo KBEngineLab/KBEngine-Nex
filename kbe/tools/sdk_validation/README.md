@@ -97,6 +97,7 @@ Run the following commands to verify scenario isolation, resource watchers, C# h
 ```powershell
 pwsh -File kbe/tools/sdk_validation/tests/Test-SdkValidation.ps1
 pwsh -File kbe/tools/sdk_validation/tests/Test-CxxSdkBoundaries.ps1
+pwsh -File kbe/tools/sdk_validation/tests/Test-CsharpSdkWarnings.ps1
 python -B -m unittest kbe/tools/sdk_validation/tests/Test-SdkResourceRelease.py -v
 dotnet run --project kbe/tools/sdk_validation/tests/csharp_heartbeat/CsharpHeartbeatStateTest.csproj -c Release
 dotnet run --project kbe/tools/sdk_validation/tests/csharp_tcp_send/CsharpTcpSendQueueTest.csproj -c Release
@@ -111,6 +112,10 @@ pwsh -File kbe/tools/sdk_validation/tests/gdscript_websocket/Invoke-GdscriptWebS
 The full schema is available in `sdk-validation.schema.json`.
 
 ## Release compatibility gate
+
+C# 发布构建必须保持零警告。两份示例清单都拒绝 C# 编译器、SDK 与 MSBuild 的中英文 warning 标记；`Test-CsharpSdkWarnings.ps1` 使用真实 `kbcmd` 和仓库自带 Python assets 生成完整 SDK，再以 `.NET 8 Release` 和 `TreatWarningsAsErrors` 编译，并验证外部销毁与 worker 自触发销毁都能协作结束线程。该门禁禁止通过恢复过时 RNG、`Thread.Abort` 或无效占位事件来换取表面兼容。
+
+C# release builds must remain warning-free. Both example manifests reject localized C# compiler, SDK, and MSBuild warning markers. `Test-CsharpSdkWarnings.ps1` generates a complete SDK with real `kbcmd` and the repository Python assets, compiles it under `.NET 8 Release` with `TreatWarningsAsErrors`, and verifies cooperative shutdown initiated externally and by the worker itself. The gate prevents obsolete RNG APIs, `Thread.Abort`, or inert placeholder events from returning as superficial compatibility fixes.
 
 C++ 发布构建必须保持 `/W4` 零警告。两份示例清单都在 C++ `build.forbiddenPatterns` 中拒绝 MSVC 编译器、链接器与 MSBuild 的中英文 warning 标记，因此即使构建工具错误地返回 `0`，后续运行和故障场景仍会被阻断。`Test-CxxSdkBoundaries.ps1` 还会以 `/W4 /WX` 验证 `uint16/uint32` 受检转换，并通过真实 `kbcmd` 生成证明错误码 `65535` 保持不变、`65536` 与 `-1` 在写入生成表前被拒绝。
 

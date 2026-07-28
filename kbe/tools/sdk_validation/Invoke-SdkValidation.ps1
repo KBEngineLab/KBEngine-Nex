@@ -610,7 +610,8 @@ foreach ($sdkDefinition in $manifestSdks) {
         $sdkPassed = $sdkPassed -and $runResult.status -eq "passed"
     }
 
-    $scenarios = @(Get-OptionalPropertyValue -InputObject $sdkDefinition -Name "scenarios")
+    $configuredScenarios = Get-OptionalPropertyValue -InputObject $sdkDefinition -Name "scenarios"
+    $scenarios = if ($null -eq $configuredScenarios) { @() } else { @($configuredScenarios) }
     $duplicateScenarios = @($scenarios | Group-Object { ([string] $_.name).ToLowerInvariant() } | Where-Object Count -gt 1)
     if ($duplicateScenarios.Count -gt 0) {
         throw "SDK '$sdkName' contains duplicate scenarios: $(($duplicateScenarios.Name | Sort-Object) -join ', ')."

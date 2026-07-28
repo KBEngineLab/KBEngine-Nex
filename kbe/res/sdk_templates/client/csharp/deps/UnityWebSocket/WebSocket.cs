@@ -898,10 +898,12 @@ namespace NativeWebSocket
     public class WebSocket : IWebSocket
     {
 
-        public event WebSocketOpenEventHandler OnOpen;
-        public event WebSocketMessageEventHandler OnMessage;
-        public event WebSocketErrorEventHandler OnError;
-        public event WebSocketCloseEventHandler OnClose;
+        // 非 Unity 占位类型必须保留 IWebSocket 事件契约，但构造函数始终拒绝运行，因此不应分配永远无法触发的 backing fields。
+        // The non-Unity placeholder must retain the IWebSocket event contract, but construction always fails, so it should not allocate backing fields that can never fire.
+        public event WebSocketOpenEventHandler OnOpen { add { } remove { } }
+        public event WebSocketMessageEventHandler OnMessage { add { } remove { } }
+        public event WebSocketErrorEventHandler OnError { add { } remove { } }
+        public event WebSocketCloseEventHandler OnClose { add { } remove { } }
 
         public WebSocket(string url, Dictionary<string, string> headers = null)
         {
