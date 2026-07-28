@@ -37,6 +37,17 @@ pwsh -File kbe/tools/sdk_validation/Invoke-SdkValidation.ps1 `
   -SkipGenerate
 ```
 
+只运行指定故障场景，并跳过各 SDK 的基线 `run`：
+
+Run selected failure scenarios without executing each SDK's baseline `run` stage:
+
+```powershell
+pwsh -File kbe/tools/sdk_validation/Invoke-SdkValidation.ps1 `
+  -ManifestPath D:/game/assets/sdk-failure-validation.json `
+  -Scenario heartbeat-timeout,repeated-close-kcp `
+  -SkipGenerate
+```
+
 只验证生成和编译，不连接服务器：
 
 Validate generation and compilation without connecting to a server:
@@ -53,13 +64,37 @@ pwsh -File kbe/tools/sdk_validation/Invoke-SdkValidation.ps1 `
 - Custom scalar variables are declared under `variables` and may reference other variables.
 - Manifest-level environment variables apply to every command; stage-level values override them.
 - Every stage uses a `file` plus an `arguments` array. Commands are not evaluated as PowerShell source.
+- `scenarios` is an optional array of named run commands. Names are case-insensitive and limited to letters, digits, `.`, `_`, and `-`, producing stable and safe log filenames.
+- `-Scenario` selects named scenarios across the selected SDKs and skips the baseline `run`; `-SkipRun` skips both the baseline and every scenario.
 - A stage fails on timeout, a nonzero exit code, a missing `requiredPatterns` regular expression, or a matching `forbiddenPatterns` regular expression.
-- If one stage fails, later stages for that SDK are marked `blocked`; other SDKs continue so the final report captures independent failures.
+- If generation or build fails, later stages for that SDK are marked `blocked`; other SDKs continue so the final report captures independent failures.
+- Scenarios run after successful generation and build and are independent. A failed scenario does not block the remaining scenarios for that SDK, preserving the complete failure matrix in one report.
 - Missing stages and stages disabled by `-SkipGenerate`, `-SkipBuild`, or `-SkipRun` are marked `skipped`.
 - Successful stages keep full output in their log and print only the PASS summary; `-ShowOutput` enables full terminal output, while failed stages automatically print the last 80 lines.
 
 每次执行会为各阶段保存 UTF-8 日志，并生成 `summary.json`。默认输出目录是清单旁的 `sdk-validation-results`，也可以通过清单的 `resultsDirectory` 或命令行 `-ResultsPath` 覆盖。构建产物和验收日志不应提交到 Git。
 
 Each run saves a UTF-8 log for every stage and writes `summary.json`. The default output directory is `sdk-validation-results` next to the manifest; override it through manifest `resultsDirectory` or command-line `-ResultsPath`. Build output and validation logs should not be committed to Git.
+
+## Failure recovery contract
+
+`sdk-failure-matrix.example.json` 定义推荐的四端恢复矩阵。命令仍由具体项目的 E2E 夹具提供；只需调整路径，不要把游戏业务相关的故障注入移入引擎。恢复夹具必须等待异步清理稳定后再同时输出以下标记：
+
+`sdk-failure-matrix.example.json` defines the recommended four-SDK recovery matrix. The commands remain project-owned E2E harnesses; update their paths without moving game-specific fault injection into the engine. A recovery harness should emit both markers only after asynchronous cleanup has settled:
+
+- `E2E_PASS ...` proves the expected disconnect count, relogin, Space reconstruction, Entity Component reconstruction, and post-recovery RPC.
+- `RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0` proves deterministic client shutdown and server Channel/KCP timer reclamation.
+
+Keep `E2E_FAIL` and `RESOURCE_FAIL` in `forbiddenPatterns`. This prevents a successful process exit from hiding a protocol, state-rebuild, or resource-lifecycle failure.
+
+必须把 `E2E_FAIL` 与 `RESOURCE_FAIL` 保留在 `forbiddenPatterns` 中，避免进程以成功状态退出时掩盖协议、状态重建或资源生命周期错误。
+
+执行以下命令可回归场景隔离、筛选、未知名称拒绝和前置阶段阻断；测试产物只写入系统临时目录：
+
+Run the following command to verify scenario isolation, filtering, unknown-name rejection, and prerequisite blocking. Test artifacts are written only to the system temporary directory:
+
+```powershell
+pwsh -File kbe/tools/sdk_validation/tests/Test-SdkValidation.ps1
+```
 
 The full schema is available in `sdk-validation.schema.json`.

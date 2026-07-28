@@ -1,0 +1,120 @@
+{
+  "$schema": "./sdk-validation.schema.json",
+  "schemaVersion": 1,
+  "variables": {
+    "AssetsPath": "D:/path/to/project_assets",
+    "MSBuild": "E:/ProgramFiles/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe",
+    "Godot": "D:/ProgramFiles/Godot/Godot_v4.7-stable_win64/Godot_v4.7-stable_win64_console.exe"
+  },
+  "resultsDirectory": "${AssetsPath}/sdk-failure-results",
+  "sdks": [
+    {
+      "name": "csharp",
+      "build": {
+        "file": "dotnet",
+        "arguments": ["build", "${AssetsPath}/kbeclient/csharp-failure-e2e/CsharpFailureE2E.csproj", "-c", "Release"],
+        "timeoutSeconds": 300
+      },
+      "scenarios": [
+        {
+          "name": "active-tcp-disconnect",
+          "file": "dotnet",
+          "arguments": ["run", "--project", "${AssetsPath}/kbeclient/csharp-failure-e2e/CsharpFailureE2E.csproj", "-c", "Release", "--no-build", "--", "--scenario", "active-tcp-disconnect"],
+          "timeoutSeconds": 180,
+          "requiredPatterns": ["E2E_PASS scenario=active-tcp-disconnect relogin=true component-rebuilt=true", "RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
+          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL"]
+        },
+        {
+          "name": "heartbeat-timeout",
+          "file": "dotnet",
+          "arguments": ["run", "--project", "${AssetsPath}/kbeclient/csharp-failure-e2e/CsharpFailureE2E.csproj", "-c", "Release", "--no-build", "--", "--scenario", "heartbeat-timeout"],
+          "timeoutSeconds": 180,
+          "requiredPatterns": ["E2E_PASS scenario=heartbeat-timeout relogin=true component-rebuilt=true", "RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
+          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL"]
+        }
+      ]
+    },
+    {
+      "name": "cxx",
+      "build": {
+        "file": "${MSBuild}",
+        "arguments": ["${AssetsPath}/kbeclient/cxx-failure-e2e/CxxFailureE2E.vcxproj", "/m:1", "/nr:false", "/t:Rebuild", "/p:Configuration=Release", "/p:Platform=x64", "/p:PlatformToolset=v143", "/v:minimal"],
+        "timeoutSeconds": 600
+      },
+      "scenarios": [
+        {
+          "name": "repeated-close-tcp",
+          "file": "${AssetsPath}/kbeclient/cxx-failure-e2e/x64/Release/CxxFailureE2E.exe",
+          "arguments": ["--scenario", "repeated-close-tcp"],
+          "timeoutSeconds": 180,
+          "requiredPatterns": ["E2E_PASS scenario=repeated-close-tcp disconnect_events=1 relogin=true", "RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
+          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL"]
+        },
+        {
+          "name": "repeated-close-kcp",
+          "file": "${AssetsPath}/kbeclient/cxx-failure-e2e/x64/Release/CxxFailureE2E.exe",
+          "arguments": ["--scenario", "repeated-close-kcp"],
+          "timeoutSeconds": 180,
+          "requiredPatterns": ["E2E_PASS scenario=repeated-close-kcp disconnect_events=1 relogin=true", "RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
+          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL"]
+        }
+      ]
+    },
+    {
+      "name": "typescript",
+      "build": {
+        "file": "npm.cmd",
+        "arguments": ["run", "build"],
+        "workingDirectory": "${AssetsPath}/kbeclient/typescript-failure-e2e",
+        "timeoutSeconds": 300
+      },
+      "scenarios": [
+        {
+          "name": "websocket-heartbeat-timeout",
+          "file": "npm.cmd",
+          "arguments": ["run", "test:failure", "--", "--scenario", "websocket-heartbeat-timeout"],
+          "workingDirectory": "${AssetsPath}/kbeclient/typescript-failure-e2e",
+          "timeoutSeconds": 180,
+          "requiredPatterns": ["E2E_PASS scenario=websocket-heartbeat-timeout disconnect_events=1 relogin=true", "RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
+          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL"]
+        },
+        {
+          "name": "websocket-exit-cleanup",
+          "file": "npm.cmd",
+          "arguments": ["run", "test:failure", "--", "--scenario", "websocket-exit-cleanup"],
+          "workingDirectory": "${AssetsPath}/kbeclient/typescript-failure-e2e",
+          "timeoutSeconds": 120,
+          "requiredPatterns": ["E2E_PASS scenario=websocket-exit-cleanup", "RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
+          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL"]
+        }
+      ]
+    },
+    {
+      "name": "gdscript",
+      "build": {
+        "file": "${Godot}",
+        "arguments": ["--headless", "--path", "${AssetsPath}/kbeclient/gdscript-failure-e2e", "--editor", "--quit"],
+        "timeoutSeconds": 300,
+        "forbiddenPatterns": ["SCRIPT ERROR", "Parse Error"]
+      },
+      "scenarios": [
+        {
+          "name": "active-kcp-disconnect",
+          "file": "${Godot}",
+          "arguments": ["--headless", "--path", "${AssetsPath}/kbeclient/gdscript-failure-e2e", "--", "--scenario", "active-kcp-disconnect"],
+          "timeoutSeconds": 180,
+          "requiredPatterns": ["E2E_PASS scenario=active-kcp-disconnect relogin=true component-rebuilt=true", "RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
+          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL", "SCRIPT ERROR", "Parse Error"]
+        },
+        {
+          "name": "kcp-exit-cleanup",
+          "file": "${Godot}",
+          "arguments": ["--headless", "--path", "${AssetsPath}/kbeclient/gdscript-failure-e2e", "--", "--scenario", "kcp-exit-cleanup"],
+          "timeoutSeconds": 120,
+          "requiredPatterns": ["E2E_PASS scenario=kcp-exit-cleanup", "RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
+          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL", "SCRIPT ERROR", "Parse Error"]
+        }
+      ]
+    }
+  ]
+}

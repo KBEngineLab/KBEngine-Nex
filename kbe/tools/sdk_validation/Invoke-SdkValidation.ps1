@@ -5,6 +5,8 @@ param(
 
     [string[]] $Sdk,
 
+    [string[]] $Scenario,
+
     [string] $ResultsPath,
 
     [switch] $SkipGenerate,
@@ -20,7 +22,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $supportedSdks = @("csharp", "cxx", "typescript", "gdscript")
-$stageNames = @("generate", "build", "run")
+$prerequisiteStageNames = @("generate", "build")
 
 function Resolve-NormalizedPath {
     param(
@@ -443,6 +445,33 @@ function Invoke-ValidationStage {
     }
 }
 
+function New-NonExecutedStageResult {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $SdkName,
+
+        [Parameter(Mandatory = $true)]
+        [string] $StageName,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("skipped", "blocked")]
+        [string] $Status,
+
+        [string] $Failure
+    )
+
+    return [pscustomobject] @{
+        sdk = $SdkName
+        stage = $StageName
+        status = $Status
+        exitCode = $null
+        timedOut = $false
+        elapsedMilliseconds = 0
+        log = $null
+        failures = if ([string]::IsNullOrWhiteSpace($Failure)) { @() } else { @($Failure) }
+    }
+}
+
 $manifestFullPath = Resolve-NormalizedPath -Path $ManifestPath -BasePath (Get-Location).Path -RequireExisting
 $manifestDirectory = Split-Path -Parent $manifestFullPath
 $repoRoot = Resolve-NormalizedPath -Path "../../.." -BasePath $PSScriptRoot -RequireExisting
@@ -505,6 +534,14 @@ foreach ($requestedSdk in $requestedSdks) {
     }
 }
 
+$requestedScenarios = @(if ($null -ne $Scenario -and $Scenario.Count -gt 0) {
+    @($Scenario | ForEach-Object { $_.ToLowerInvariant() } | Select-Object -Unique)
+}
+else {
+    @()
+})
+$matchedScenarios = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+
 $manifestSdks = @(Get-OptionalPropertyValue -InputObject $manifest -Name "sdks")
 if ($manifestSdks.Count -eq 0) {
     throw "The SDK validation manifest does not define any SDK entries."
@@ -530,39 +567,22 @@ foreach ($sdkDefinition in $manifestSdks) {
 
     Write-Host "=== SDK $sdkName ===" -ForegroundColor Cyan
     $sdkPassed = $true
-    foreach ($stageName in $stageNames) {
+    $runtimeReady = $true
+    foreach ($stageName in $prerequisiteStageNames) {
         $skipStage = ($stageName -eq "generate" -and $SkipGenerate) -or
-            ($stageName -eq "build" -and $SkipBuild) -or
-            ($stageName -eq "run" -and $SkipRun)
+            ($stageName -eq "build" -and $SkipBuild)
         $stage = Get-OptionalPropertyValue -InputObject $sdkDefinition -Name $stageName
 
         if ($skipStage -or $null -eq $stage) {
-            $results.Add([pscustomobject] @{
-                sdk = $sdkName
-                stage = $stageName
-                status = "skipped"
-                exitCode = $null
-                timedOut = $false
-                elapsedMilliseconds = 0
-                log = $null
-                failures = @()
-            })
+            $results.Add((New-NonExecutedStageResult -SdkName $sdkName -StageName $stageName -Status "skipped"))
             continue
         }
 
-        if (-not $sdkPassed) {
+        if (-not $runtimeReady) {
             # 前一阶段失败后继续运行会污染诊断，例如拿旧生成物掩盖生成失败，因此同 SDK 后续阶段直接跳过。
             # Running after an earlier failure can pollute diagnostics, such as stale output hiding generation failure, so later stages are skipped.
-            $results.Add([pscustomobject] @{
-                sdk = $sdkName
-                stage = $stageName
-                status = "blocked"
-                exitCode = $null
-                timedOut = $false
-                elapsedMilliseconds = 0
-                log = $null
-                failures = @("A previous stage failed.")
-            })
+            $results.Add((New-NonExecutedStageResult -SdkName $sdkName -StageName $stageName `
+                -Status "blocked" -Failure "A previous prerequisite stage failed."))
             continue
         }
 
@@ -570,7 +590,62 @@ foreach ($sdkDefinition in $manifestSdks) {
             -DefaultWorkingDirectory $defaultWorkingDirectory -CommonEnvironment $commonEnvironment `
             -Variables $variables -OutputDirectory $outputDirectory -ShowOutput $ShowOutput.IsPresent
         $results.Add($stageResult)
-        $sdkPassed = $stageResult.status -eq "passed"
+        $runtimeReady = $stageResult.status -eq "passed"
+        $sdkPassed = $sdkPassed -and $runtimeReady
+    }
+
+    $runStage = Get-OptionalPropertyValue -InputObject $sdkDefinition -Name "run"
+    if ($SkipRun -or $null -eq $runStage -or $requestedScenarios.Count -gt 0) {
+        $results.Add((New-NonExecutedStageResult -SdkName $sdkName -StageName "run" -Status "skipped"))
+    }
+    elseif (-not $runtimeReady) {
+        $results.Add((New-NonExecutedStageResult -SdkName $sdkName -StageName "run" `
+            -Status "blocked" -Failure "A prerequisite stage failed."))
+    }
+    else {
+        $runResult = Invoke-ValidationStage -SdkName $sdkName -StageName "run" -Stage $runStage `
+            -DefaultWorkingDirectory $defaultWorkingDirectory -CommonEnvironment $commonEnvironment `
+            -Variables $variables -OutputDirectory $outputDirectory -ShowOutput $ShowOutput.IsPresent
+        $results.Add($runResult)
+        $sdkPassed = $sdkPassed -and $runResult.status -eq "passed"
+    }
+
+    $scenarios = @(Get-OptionalPropertyValue -InputObject $sdkDefinition -Name "scenarios")
+    $duplicateScenarios = @($scenarios | Group-Object { ([string] $_.name).ToLowerInvariant() } | Where-Object Count -gt 1)
+    if ($duplicateScenarios.Count -gt 0) {
+        throw "SDK '$sdkName' contains duplicate scenarios: $(($duplicateScenarios.Name | Sort-Object) -join ', ')."
+    }
+
+    foreach ($scenarioDefinition in $scenarios) {
+        $scenarioName = ([string] $scenarioDefinition.name).ToLowerInvariant()
+        if ($scenarioName -notmatch '^[a-z0-9][a-z0-9._-]*$') {
+            throw "SDK '$sdkName' scenario '$scenarioName' must contain only letters, digits, '.', '_' or '-', and must start with a letter or digit."
+        }
+
+        $scenarioSelected = $requestedScenarios.Count -eq 0 -or $scenarioName -in $requestedScenarios
+        if ($scenarioSelected) {
+            $null = $matchedScenarios.Add($scenarioName)
+        }
+
+        $stageName = "scenario-$scenarioName"
+        if ($SkipRun -or -not $scenarioSelected) {
+            $results.Add((New-NonExecutedStageResult -SdkName $sdkName -StageName $stageName -Status "skipped"))
+            continue
+        }
+
+        if (-not $runtimeReady) {
+            $results.Add((New-NonExecutedStageResult -SdkName $sdkName -StageName $stageName `
+                -Status "blocked" -Failure "A prerequisite stage failed."))
+            continue
+        }
+
+        # 故障场景彼此独立运行，单个失败不能隐藏同一 SDK 的其他恢复与资源回收结果。
+        # Failure scenarios run independently so one failure cannot hide other recovery and resource-reclamation results for the same SDK.
+        $scenarioResult = Invoke-ValidationStage -SdkName $sdkName -StageName $stageName -Stage $scenarioDefinition `
+            -DefaultWorkingDirectory $defaultWorkingDirectory -CommonEnvironment $commonEnvironment `
+            -Variables $variables -OutputDirectory $outputDirectory -ShowOutput $ShowOutput.IsPresent
+        $results.Add($scenarioResult)
+        $sdkPassed = $sdkPassed -and $scenarioResult.status -eq "passed"
     }
 
     $sdkSummaries.Add([pscustomobject] @{
@@ -581,6 +656,13 @@ foreach ($sdkDefinition in $manifestSdks) {
 
 if ($sdkSummaries.Count -eq 0) {
     throw "No manifest SDK entries matched the requested -Sdk filter."
+}
+
+if ($requestedScenarios.Count -gt 0) {
+    $unmatchedScenarios = @($requestedScenarios | Where-Object { -not $matchedScenarios.Contains($_) })
+    if ($unmatchedScenarios.Count -gt 0) {
+        throw "No selected SDK defines the requested scenarios: $($unmatchedScenarios -join ', ')."
+    }
 }
 
 $summary = [pscustomobject] @{

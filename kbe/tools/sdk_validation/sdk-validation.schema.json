@@ -54,17 +54,46 @@
         },
         "run": {
           "$ref": "#/$defs/stage"
+        },
+        "scenarios": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/scenario"
+          }
         }
       },
       "anyOf": [
         { "required": ["generate"] },
         { "required": ["build"] },
-        { "required": ["run"] }
+        { "required": ["run"] },
+        { "required": ["scenarios"] }
       ]
     },
     "stage": {
+      "allOf": [
+        { "$ref": "#/$defs/command" }
+      ],
+      "unevaluatedProperties": false
+    },
+    "scenario": {
+      "allOf": [
+        { "$ref": "#/$defs/command" },
+        {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "command": {
       "type": "object",
-      "additionalProperties": false,
       "required": ["file"],
       "properties": {
         "file": {
