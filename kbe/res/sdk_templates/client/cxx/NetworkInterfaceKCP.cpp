@@ -172,7 +172,7 @@ void NetworkInterfaceKCP::process()
 		if (!data.empty() && pMessageReader_)
 		{
 			pBuffer_->clear(true);
-			pBuffer_->append(data.data(), static_cast<uint32>(data.size()));
+			pBuffer_->append(data.data(), checkedUint32(data.size(), "KCP receive buffer length"));
 
 			if (pFilter_)
 			{

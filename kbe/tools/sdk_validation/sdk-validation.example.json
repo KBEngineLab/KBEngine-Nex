@@ -44,7 +44,8 @@
       "build": {
         "file": "${VsRoot}/MSBuild/Current/Bin/MSBuild.exe",
         "arguments": ["${AssetsPath}/kbeclient/cxx-e2e/CxxE2E.vcxproj", "/m:1", "/nr:false", "/t:Rebuild", "/p:Configuration=Release", "/p:Platform=x64", "/p:PlatformToolset=v143", "/v:minimal"],
-        "timeoutSeconds": 600
+        "timeoutSeconds": 600,
+        "forbiddenPatterns": ["(?:warning|警告)\\s+[A-Z]+[0-9]+:"]
       },
       "run": {
         "file": "${AssetsPath}/kbeclient/cxx-e2e/bin/x64/Release/CxxE2E.exe",

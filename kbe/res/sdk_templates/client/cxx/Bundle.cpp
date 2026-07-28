@@ -256,7 +256,9 @@ Bundle &Bundle::operator<<(bool value)
 
 Bundle &Bundle::operator<<(const KBString &value)
 {
-	uint32 len = static_cast<uint32>(value.length());
+	uint32 len = checkedUint32(value.length(), "Bundle string length");
+	if (len == std::numeric_limits<uint32>::max())
+		throw std::length_error("Bundle string plus terminator is outside uint32 range");
 
 	// +1为字符串尾部的0位置
 	checkStream(len + 1);
@@ -267,7 +269,10 @@ Bundle &Bundle::operator<<(const KBString &value)
 Bundle &Bundle::operator<<(const char *str)
 {
 	// +1为字符串尾部的0位置
-	uint32 len = (uint32)strlen(str) + 1; 
+	uint32 len = checkedUint32(strlen(str), "Bundle C string length");
+	if (len == std::numeric_limits<uint32>::max())
+		throw std::length_error("Bundle C string plus terminator is outside uint32 range");
+	++len;
 
 	checkStream(len);
 	(*pCurrPacket_) << str;

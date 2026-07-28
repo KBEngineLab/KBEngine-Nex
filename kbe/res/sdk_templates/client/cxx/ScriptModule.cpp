@@ -21,7 +21,7 @@ ScriptModule::ScriptModule(const KBString& moduleName, int type):
 	idmethods(),
 	idbase_methods(),
 	idcell_methods(),
-	utype(static_cast<uint16>(type))
+	utype(checkedUint16(type, "ScriptModule type"))
 {
 }
 

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("pass", "fail", "build-fail")]
+    [ValidateSet("pass", "fail", "build-fail", "build-warning")]
     [string] $Mode,
 
     [string] $Scenario = "baseline"
@@ -23,5 +23,9 @@ switch ($Mode) {
     "build-fail" {
         Write-Error "Synthetic build failure"
         exit 9
+    }
+    "build-warning" {
+        Write-Output "sample.cpp(42): warning C4267: Synthetic narrowing warning"
+        exit 0
     }
 }

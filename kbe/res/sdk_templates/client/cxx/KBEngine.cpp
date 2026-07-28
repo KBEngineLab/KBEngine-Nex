@@ -774,7 +774,7 @@ void KBEngineApp::login_loginapp(bool noconnect)
 	if (noconnect)
 	{
 		reset();
-		pNetworkInterface_->connectTo(pArgs_->ip, static_cast<uint16>(pArgs_->port), this, static_cast<uint16>(0));
+		pNetworkInterface_->connectTo(pArgs_->ip, checkedUint16(pArgs_->port, "KBEngineArgs.port"), this, static_cast<uint16>(0));
 	}
 	else
 	{
@@ -1263,7 +1263,7 @@ void KBEngineApp::resetpassword_loginapp(bool noconnect)
 	if (noconnect)
 	{
 		reset();
-		pNetworkInterface_->connectTo(pArgs_->ip, static_cast<uint16>(pArgs_->port), this, static_cast<uint16>(4));
+		pNetworkInterface_->connectTo(pArgs_->ip, checkedUint16(pArgs_->port, "KBEngineArgs.port"), this, static_cast<uint16>(4));
 	}
 	else
 	{
@@ -1344,7 +1344,7 @@ void KBEngineApp::createAccount_loginapp(bool noconnect)
 	if (noconnect)
 	{
 		reset();
-		pNetworkInterface_->connectTo(pArgs_->ip, static_cast<uint16>(pArgs_->port), this, static_cast<uint16>(1));
+		pNetworkInterface_->connectTo(pArgs_->ip, checkedUint16(pArgs_->port, "KBEngineArgs.port"), this, static_cast<uint16>(1));
 	}
 	else
 	{

@@ -6,6 +6,8 @@
 #include <cfloat>
 #include <cmath>
 #include <cstdlib>
+#include <limits>
+#include <stdexcept>
 #include <string>
 
 
@@ -64,6 +66,35 @@ typedef uint64 DBID;
 typedef KBArray<uint8> ByteArray;
 typedef KBMap<KBString, KBEngine::KBVariant> KB_FIXED_DICT;
 typedef KBArray<KBEngine::KBVariant> KB_ARRAY;
+
+namespace KBEngine
+{
+
+// 协议字段必须在缩窄转换前失败，避免端口、类型 ID 或长度静默回绕成另一个合法值。
+// Protocol fields must fail before narrowing so ports, type IDs, and lengths cannot silently wrap into another valid value.
+inline uint16 checkedUint16(int value, const char* fieldName)
+{
+	if (value < 0 || value > static_cast<int>(std::numeric_limits<uint16>::max()))
+	{
+		throw std::out_of_range(std::string(fieldName) + " is outside uint16 range");
+	}
+
+	return static_cast<uint16>(value);
+}
+
+// size_t 在 64 位客户端上宽于协议长度，集中校验可让所有调用点保持相同的失败语义。
+// size_t is wider than protocol lengths on 64-bit clients; centralized validation keeps failure semantics consistent at every call site.
+inline uint32 checkedUint32(std::size_t value, const char* fieldName)
+{
+	if (value > static_cast<std::size_t>(std::numeric_limits<uint32>::max()))
+	{
+		throw std::length_error(std::string(fieldName) + " is outside uint32 range");
+	}
+
+	return static_cast<uint32>(value);
+}
+
+}
 
 #define KBE_FLT_MAX FLT_MAX
 

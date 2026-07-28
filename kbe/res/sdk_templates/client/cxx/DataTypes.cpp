@@ -439,8 +439,11 @@ void DATATYPE_ARRAY::bind()
 	if (tmpset_uitemtype == -1)
 		vtype->bind();
 	else
-		if (EntityDef::id2datatypes.Contains(static_cast<uint16>(tmpset_uitemtype)))
-			vtype = EntityDef::id2datatypes[static_cast<uint16>(tmpset_uitemtype)];
+	{
+		const uint16 itemType = checkedUint16(tmpset_uitemtype, "DATATYPE_ARRAY item type");
+		if (EntityDef::id2datatypes.Contains(itemType))
+			vtype = EntityDef::id2datatypes[itemType];
+	}
 }
 
 KBVariant* DATATYPE_ARRAY::createFromStream(MemoryStream& stream)

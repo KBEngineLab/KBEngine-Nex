@@ -56,7 +56,8 @@
       "build": {
         "file": "${MSBuild}",
         "arguments": ["${AssetsPath}/kbeclient/cxx-failure-e2e/CxxFailureE2E.vcxproj", "/m:1", "/nr:false", "/t:Rebuild", "/p:Configuration=Release", "/p:Platform=x64", "/p:PlatformToolset=v143", "/v:minimal"],
-        "timeoutSeconds": 600
+        "timeoutSeconds": 600,
+        "forbiddenPatterns": ["(?:warning|警告)\\s+[A-Z]+[0-9]+:"]
       },
       "scenarios": [
         {

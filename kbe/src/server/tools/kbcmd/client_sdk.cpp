@@ -43,7 +43,26 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "dbmgr/dbmgr_interface.h"
 #include "loginapp/loginapp_interface.h"
 
-namespace KBEngine {	
+#include <limits>
+
+namespace KBEngine {
+
+namespace
+{
+
+// 错误码在线上协议中固定为 uint16，必须在放入容器前校验，避免 map 键先截断后掩盖非法配置。
+// Error IDs are uint16 on the wire, so validate before insertion to prevent a narrowed map key from hiding invalid configuration.
+bool validateServerErrorID(int errorID, const char* resourceName)
+{
+	if (errorID >= 0 && errorID <= std::numeric_limits<uint16>::max())
+		return true;
+
+	ERROR_MSG(fmt::format("ClientSDK::writeServerErrorDescrsModule: errorID({}) in {} is outside uint16 range!\n",
+		errorID, resourceName));
+	return false;
+}
+
+}
 
 //-------------------------------------------------------------------------------------
 ClientSDK::ClientSDK():
@@ -131,8 +150,8 @@ bool ClientSDK::saveFile()
 			return false;
 		}
 
-		int written = fwrite(sourcefileBody_.c_str(), 1, sourcefileBody_.size(), fp);
-		if (written != (int)sourcefileBody_.size())
+		size_t written = fwrite(sourcefileBody_.c_str(), 1, sourcefileBody_.size(), fp);
+		if (written != sourcefileBody_.size())
 		{
 			ERROR_MSG(fmt::format("ClientSDK::saveFile(): fwrite error! {}\n",
 				path));
@@ -175,8 +194,8 @@ bool ClientSDK::saveFile()
 			return false;
 		}
 
-		int written = fwrite(headerfileBody_.c_str(), 1, headerfileBody_.size(), fp);
-		if (written != (int)headerfileBody_.size())
+		size_t written = fwrite(headerfileBody_.c_str(), 1, headerfileBody_.size(), fp);
+		if (written != headerfileBody_.size())
 		{
 			ERROR_MSG(fmt::format("ClientSDK::saveFile(): fwrite error! {}\n",
 				path));
@@ -382,7 +401,7 @@ bool ClientSDK::copyPluginsSourceToPath(const std::string& path)
 //-------------------------------------------------------------------------------------
 bool ClientSDK::writeServerErrorDescrsModule()
 {
-	std::map<uint16, std::pair< std::string, std::string> > errsDescrs;
+	std::map<int, std::pair< std::string, std::string> > errsDescrs;
 
 	{
 		TiXmlNode *rootNode = NULL;
@@ -403,7 +422,12 @@ bool ClientSDK::writeServerErrorDescrsModule()
 			{
 				TiXmlNode* node = xml->enterNode(rootNode->FirstChild(), "id");
 				TiXmlNode* node1 = xml->enterNode(rootNode->FirstChild(), "descr");
-				errsDescrs[xml->getValInt(node)] = std::make_pair< std::string, std::string>(xml->getKey(rootNode), xml->getVal(node1));
+				const int errorID = xml->getValInt(node);
+
+				if (!validateServerErrorID(errorID, "server_errors_defaults.xml"))
+					return false;
+
+				errsDescrs[errorID] = std::make_pair< std::string, std::string>(xml->getKey(rootNode), xml->getVal(node1));
 			}
 			XML_FOR_END(rootNode);
 		}
@@ -428,7 +452,12 @@ bool ClientSDK::writeServerErrorDescrsModule()
 					{
 						TiXmlNode* node = xml->enterNode(rootNode->FirstChild(), "id");
 						TiXmlNode* node1 = xml->enterNode(rootNode->FirstChild(), "descr");
-						errsDescrs[xml->getValInt(node)] = std::make_pair< std::string, std::string>(xml->getKey(rootNode), xml->getVal(node1));
+						const int errorID = xml->getValInt(node);
+
+						if (!validateServerErrorID(errorID, "server_errors.xml"))
+							return false;
+
+						errsDescrs[errorID] = std::make_pair< std::string, std::string>(xml->getKey(rootNode), xml->getVal(node1));
 					}
 					XML_FOR_END(rootNode);
 				}
@@ -447,7 +476,7 @@ bool ClientSDK::writeServerErrorDescrsModule()
 	if (!writeServerErrorDescrsModuleBegin())
 		return false;
 
-	std::map<uint16, std::pair< std::string, std::string> >::iterator iter = errsDescrs.begin();
+	std::map<int, std::pair< std::string, std::string> >::iterator iter = errsDescrs.begin();
 
 	for (; iter != errsDescrs.end(); ++iter)
 	{

@@ -96,6 +96,7 @@ Run the following commands to verify scenario isolation, resource watchers, C# h
 
 ```powershell
 pwsh -File kbe/tools/sdk_validation/tests/Test-SdkValidation.ps1
+pwsh -File kbe/tools/sdk_validation/tests/Test-CxxSdkBoundaries.ps1
 python -B -m unittest kbe/tools/sdk_validation/tests/Test-SdkResourceRelease.py -v
 dotnet run --project kbe/tools/sdk_validation/tests/csharp_heartbeat/CsharpHeartbeatStateTest.csproj -c Release
 dotnet run --project kbe/tools/sdk_validation/tests/csharp_tcp_send/CsharpTcpSendQueueTest.csproj -c Release
@@ -110,6 +111,10 @@ pwsh -File kbe/tools/sdk_validation/tests/gdscript_websocket/Invoke-GdscriptWebS
 The full schema is available in `sdk-validation.schema.json`.
 
 ## Release compatibility gate
+
+C++ 发布构建必须保持 `/W4` 零警告。两份示例清单都在 C++ `build.forbiddenPatterns` 中拒绝 MSVC 编译器、链接器与 MSBuild 的中英文 warning 标记，因此即使构建工具错误地返回 `0`，后续运行和故障场景仍会被阻断。`Test-CxxSdkBoundaries.ps1` 还会以 `/W4 /WX` 验证 `uint16/uint32` 受检转换，并通过真实 `kbcmd` 生成证明错误码 `65535` 保持不变、`65536` 与 `-1` 在写入生成表前被拒绝。
+
+C++ release builds must remain warning-free under `/W4`. Both example manifests reject localized MSVC compiler, linker, and MSBuild warning markers through the C++ `build.forbiddenPatterns`, so later runs and failure scenarios remain blocked even if a build tool incorrectly exits with `0`. `Test-CxxSdkBoundaries.ps1` also verifies checked `uint16/uint32` conversions under `/W4 /WX` and uses real `kbcmd` generation to prove error ID `65535` is preserved while `65536` and `-1` are rejected before reaching the generated table.
 
 最终发布矩阵不能只检查进程退出码或宽泛的 `E2E_PASS`。`sdk-validation.example.json` 要求 C# 与 C++ 同时证明服务端 Entity Component 初始流和实体 RPC，TypeScript 还必须证明 WebSocket 断线后的 BaseApp 重登录、Space/组件重建和恢复后 RPC，GDScript 必须通过 Godot headless 的真实 KCP 登录、组件初始流和实体 RPC。项目夹具可以输出更多诊断字段，但不能删除这些稳定标记。
 

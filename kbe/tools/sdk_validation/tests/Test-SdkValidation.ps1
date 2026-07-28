@@ -149,7 +149,34 @@ try {
     Assert-Condition (($blockedSummary.stages | Where-Object stage -eq "scenario-alpha-verify").status -eq "blocked") "Scenario alpha verification was not blocked after build failure."
     Assert-Condition (($blockedSummary.stages | Where-Object stage -eq "scenario-gamma").status -eq "blocked") "Scenario gamma was not blocked after build failure."
 
-    Write-Output "SDK_VALIDATION_TEST_PASS matrix=true filtering=true unmatched=true verify-after-failure=true prerequisite-blocking=true"
+    $warningBuild = New-CommandDefinition -Mode "build-warning" -Scenario "build"
+    $warningBuild.forbiddenPatterns = @("E2E_FAIL", "RESOURCE_FAIL", "(?:warning|警告)\s+[A-Z]+[0-9]+:")
+    $warningManifest = [ordered] @{
+        schemaVersion = 1
+        sdks = @(
+            [ordered] @{
+                name = "cxx"
+                build = $warningBuild
+                run = New-CommandDefinition -Mode "pass"
+                scenarios = @(
+                    ([ordered] @{ name = "alpha" } + (New-CommandDefinition -Mode "pass" -Scenario "alpha"))
+                )
+            }
+        )
+    }
+    $warningPath = Write-Manifest -Name "warning" -Manifest $warningManifest
+    $warningResults = Join-Path $temporaryRoot "warning-results"
+    $warningRun = Invoke-Runner -ManifestPath $warningPath -ResultsPath $warningResults
+    Assert-Condition ($warningRun.exitCode -eq 1) "A zero-exit build containing an MSVC warning must fail."
+
+    $warningSummary = Get-Content -LiteralPath (Join-Path $warningResults "summary.json") -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 16
+    $warningBuildResult = $warningSummary.stages | Where-Object stage -eq "build"
+    Assert-Condition ($warningBuildResult.status -eq "failed") "The warning output did not fail the build stage."
+    Assert-Condition ($warningBuildResult.exitCode -eq 0) "The warning fixture must prove output validation independently of exit codes."
+    Assert-Condition (($warningSummary.stages | Where-Object stage -eq "run").status -eq "blocked") "The baseline run was not blocked after the warning gate failed."
+    Assert-Condition (($warningSummary.stages | Where-Object stage -eq "scenario-alpha").status -eq "blocked") "The scenario was not blocked after the warning gate failed."
+
+    Write-Output "SDK_VALIDATION_TEST_PASS matrix=true filtering=true unmatched=true verify-after-failure=true prerequisite-blocking=true zero-warning-gate=true"
 }
 finally {
     if (Test-Path -LiteralPath $temporaryRoot) {
