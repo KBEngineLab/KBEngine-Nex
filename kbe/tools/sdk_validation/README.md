@@ -97,6 +97,7 @@ Run the following command to verify scenario isolation, filtering, unknown-name 
 ```powershell
 pwsh -File kbe/tools/sdk_validation/tests/Test-SdkValidation.ps1
 python -B -m unittest kbe/tools/sdk_validation/tests/Test-SdkResourceRelease.py -v
+dotnet run --project kbe/tools/sdk_validation/tests/csharp_heartbeat/CsharpHeartbeatStateTest.csproj -c Release
 ```
 
 The full schema is available in `sdk-validation.schema.json`.

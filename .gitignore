@@ -123,3 +123,7 @@ ehthumbs.db
 logs/
 build.log
 kbe_temp_*
+
+# SDK validation test output
+/kbe/tools/sdk_validation/tests/csharp_heartbeat/bin/
+/kbe/tools/sdk_validation/tests/csharp_heartbeat/obj/

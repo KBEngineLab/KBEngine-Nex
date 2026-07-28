@@ -130,8 +130,7 @@ namespace KBEngine
 		// 所有服务端错误码对应的错误描述
 		private ServerErrorDescrs _serverErrs = new ServerErrorDescrs(); 
 		
-		private System.DateTime _lastTickTime = System.DateTime.Now;
-		private System.DateTime _lastTickCBTime = System.DateTime.Now;
+		private readonly HeartbeatState _heartbeatState = new HeartbeatState();
 		private System.DateTime _lastUpdateToServerTime = System.DateTime.Now;
 		
 		//上传玩家信息到服务器间隔，单位毫秒
@@ -276,8 +275,7 @@ namespace KBEngine
 			_entityIDAliasIDList.Clear();
 			_bufferedCreateEntityMessages.Clear();
 			
-			_lastTickTime = System.DateTime.Now;
-			_lastTickCBTime = System.DateTime.Now;
+			resetHeartbeatState();
 			_lastUpdateToServerTime = System.DateTime.Now;
 			
 			spaceID = 0;
@@ -346,18 +344,16 @@ namespace KBEngine
 			if(_networkInterface == null || _networkInterface.connected == false)
 				return;
 
-			TimeSpan span = DateTime.Now - _lastTickTime;
+			long now = HeartbeatState.timestamp();
 			
 			// 更新玩家的位置与朝向到服务端
 			updatePlayerToServer();
 			
-			if(_args.serverHeartbeatTick > 0 && span.Seconds > _args.serverHeartbeatTick)
+			if(_args.serverHeartbeatTick > 0 && _heartbeatState.isDue(now, _args.serverHeartbeatTick))
 			{
-				span = _lastTickCBTime - _lastTickTime;
-				
-				// 如果心跳回调接收时间小于心跳发送时间，说明没有收到回调
-				// 此时应该通知客户端掉线了
-				if(span.Seconds < 0)
+				// 显式 pending 状态避免使用墙钟时间隐式推断响应；系统时间跳变和超过 59 秒的间隔都不会改变超时语义。
+				// Explicit pending state avoids inferring replies from wall-clock timestamps, so clock changes and intervals above 59 seconds cannot alter timeout semantics.
+				if(_heartbeatState.replyPending)
 				{
 					KBELog.ERROR_MSG("sendTick: Receive appTick timeout!");
 					_networkInterface.close();
@@ -366,6 +362,7 @@ namespace KBEngine
 
 				Message Loginapp_onClientActiveTickMsg = null;
 				Message Baseapp_onClientActiveTickMsg = null;
+				bool heartbeatSent = false;
 				
 				Messages.messages.TryGetValue("Loginapp_onClientActiveTick", out Loginapp_onClientActiveTickMsg);
 				Messages.messages.TryGetValue("Baseapp_onClientActiveTick", out Baseapp_onClientActiveTickMsg);
@@ -377,6 +374,7 @@ namespace KBEngine
 						Bundle bundle = Bundle.createObject();
 						bundle.newMessage(Messages.messages["Loginapp_onClientActiveTick"]);
 						bundle.send(_networkInterface);
+						heartbeatSent = true;
 					}
 				}
 				else
@@ -386,11 +384,19 @@ namespace KBEngine
 						Bundle bundle = Bundle.createObject();
 						bundle.newMessage(Messages.messages["Baseapp_onClientActiveTick"]);
 						bundle.send(_networkInterface);
+						heartbeatSent = true;
 					}
 				}
 				
-				_lastTickTime = System.DateTime.Now;
+				_heartbeatState.markAttempt(now, heartbeatSent);
 			}
+		}
+
+		private void resetHeartbeatState()
+		{
+			// 连接切换和协议握手会重建网络接口；在新链路上不能继承旧链路尚未完成的心跳请求。
+			// Connection transitions and protocol handshakes rebuild the network interface, so a new link must not inherit an outstanding heartbeat from the old link.
+			_heartbeatState.reset(HeartbeatState.timestamp());
 		}
 
 		/*
@@ -398,7 +404,7 @@ namespace KBEngine
 		*/
 		public void Client_onAppActiveTickCB()
 		{
-			_lastTickCBTime = System.DateTime.Now;
+			_heartbeatState.markReply();
 		}
 
 		/*
@@ -590,7 +596,7 @@ namespace KBEngine
 		
 		private void onConnectTo_loginapp_callback(string ip, int port, bool success, object userData)
 		{
-			_lastTickCBTime = System.DateTime.Now;
+			resetHeartbeatState();
 			
 			if(!success)
 			{
@@ -608,7 +614,7 @@ namespace KBEngine
 		
 		private void onLogin_loginapp()
 		{
-			_lastTickCBTime = System.DateTime.Now;
+			resetHeartbeatState();
 			login_loginapp(false);
 		}
 		
@@ -658,7 +664,7 @@ namespace KBEngine
 
 		private void onConnectTo_baseapp_callback(string ip, int port, bool success, object userData)
 		{
-			_lastTickCBTime = System.DateTime.Now;
+			resetHeartbeatState();
 			
 			if(!success)
 			{
@@ -676,7 +682,7 @@ namespace KBEngine
 		
 		private void onLogin_baseapp()
 		{
-			_lastTickCBTime = System.DateTime.Now;
+			resetHeartbeatState();
 			login_baseapp(false);
 		}
 		
@@ -686,8 +692,7 @@ namespace KBEngine
 		*/
 		public void reloginBaseapp()
 		{
-			_lastTickTime = System.DateTime.Now;
-			_lastTickCBTime = System.DateTime.Now;
+			resetHeartbeatState();
 
 			if(_networkInterface.valid())
 				return;
@@ -737,7 +742,7 @@ namespace KBEngine
 			bundle.writeInt32(entity_id);
 			bundle.send(_networkInterface);
 			
-			_lastTickCBTime = System.DateTime.Now;
+			resetHeartbeatState();
 		}
 
 		/*
@@ -765,7 +770,7 @@ namespace KBEngine
 			KBELog.DEBUG_MSG("KBEngine::onOpenLoginapp_resetpassword: successfully!");
 			currserver = "loginapp";
 			currstate = "resetpassword";
-			_lastTickCBTime = System.DateTime.Now;
+			resetHeartbeatState();
 
 			resetpassword_loginapp(false);
 		}
@@ -800,7 +805,7 @@ namespace KBEngine
 
 		private void onConnectTo_resetpassword_callback(string ip, int port, bool success, object userData)
 		{
-			_lastTickCBTime = System.DateTime.Now;
+			resetHeartbeatState();
 			
 			if(!success)
 			{
@@ -912,14 +917,14 @@ namespace KBEngine
 			KBELog.DEBUG_MSG("KBEngine::onOpenLoginapp_createAccount: successfully!");
 			currserver = "loginapp";
 			currstate = "createAccount";
-			_lastTickCBTime = System.DateTime.Now;
+			resetHeartbeatState();
 			
 			createAccount_loginapp(false);
 		}
 		
 		private void onConnectTo_createAccount_callback(string ip, int port, bool success, object userData)
 		{
-			_lastTickCBTime = System.DateTime.Now;
+			resetHeartbeatState();
 			
 			if(!success)
 			{
