@@ -35,6 +35,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(KbeBuildOptions)
 include(KbePythonRuntime)
+include(KbeServerTarget)
 
 find_package(fmt CONFIG REQUIRED)
 find_package(OpenSSL REQUIRED)
@@ -64,6 +65,17 @@ add_subdirectory(lib/db_mysql)
 add_subdirectory(lib/db_redis)
 add_subdirectory(lib/db_mongodb)
 add_subdirectory(lib/db_postgresql)
+add_subdirectory(server/machine)
+add_subdirectory(server/baseappmgr)
+add_subdirectory(server/cellappmgr)
+add_subdirectory(server/dbmgr)
+add_subdirectory(server/loginapp)
+add_subdirectory(server/baseapp)
+add_subdirectory(server/cellapp)
+add_subdirectory(server/tools/bots)
+add_subdirectory(server/tools/logger)
+add_subdirectory(server/tools/interfaces)
+add_subdirectory(server/tools/kbcmd)
 
 # 首阶段只迁移无 Python 和数据库依赖的底层库，后续目标按依赖拓扑逐层接入。
 # The first stage migrates foundational libraries without Python or database dependencies; later targets are added in dependency order.
@@ -86,4 +98,20 @@ add_custom_target(kbe_libraries DEPENDS
     server
     jwsmtp
     tmxparser
+)
+
+# 聚合目标覆盖全部跨平台服务进程和命令行工具；MFC guiconsole 继续由既有 VS 工程维护。
+# The aggregate target covers every cross-platform server process and command-line tool; the MFC guiconsole remains maintained by the existing VS project.
+add_custom_target(kbe_servers DEPENDS
+    machine
+    baseappmgr
+    cellappmgr
+    dbmgr
+    loginapp
+    baseapp
+    cellapp
+    bots
+    logger
+    interfaces
+    kbcmd
 )

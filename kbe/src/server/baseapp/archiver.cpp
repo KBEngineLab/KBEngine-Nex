@@ -21,6 +21,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "baseapp.h"
 #include "archiver.h"
 #include "entity.h"
+#include <random>
 
 namespace KBEngine{	
 
@@ -97,8 +98,10 @@ void Archiver::createArchiveTable()
 		}
 	}
 
-	// 随机一下序列
-	std::random_shuffle(arEntityIDs_.begin(), arEntityIDs_.end());
+	// 线程局部引擎避免每轮归档重复构造随机源，并替代 C++17 已移除的 random_shuffle。
+	// A thread-local engine avoids rebuilding the entropy source for every archive pass and replaces random_shuffle removed by C++17.
+	static thread_local std::mt19937 rng(std::random_device{}());
+	std::shuffle(arEntityIDs_.begin(), arEntityIDs_.end(), rng);
 }
 
 }

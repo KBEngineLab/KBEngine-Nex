@@ -1,0 +1,20 @@
+kbe_add_server_executable(kbcmd KBE_CMD
+    SOURCES
+        client_sdk.cpp
+        client_sdk_csharp.cpp
+        client_sdk_cxx.cpp
+        client_sdk_gdscript.cpp
+        client_sdk_typescript.cpp
+        entity_component.cpp
+        kbcmd.cpp
+        kbcmd_interface.cpp
+        main.cpp
+        profile.cpp
+        server_assets.cpp
+    DEFINITIONS
+        USE_PYTHON
+        USE_KBE_MYSQL
+    LIBRARIES
+        entitydef
+        jwsmtp
+)

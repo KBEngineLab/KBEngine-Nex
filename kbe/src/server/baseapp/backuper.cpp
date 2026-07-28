@@ -21,6 +21,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "baseapp.h"
 #include "backuper.h"
 #include "server/serverconfig.h"
+#include <random>
 
 namespace KBEngine{	
 float backupPeriod = 0.0;
@@ -106,8 +107,10 @@ void Backuper::createBackupTable()
 			backupEntityIDs_.push_back(iter->first);
 	}
 
-	// 随机一下序列
-	std::random_shuffle(backupEntityIDs_.begin(), backupEntityIDs_.end());
+	// 线程局部引擎保持备份批次的随机分布，同时兼容 C++17 标准库。
+	// A thread-local engine preserves randomized backup batches while remaining compatible with the C++17 standard library.
+	static thread_local std::mt19937 rng(std::random_device{}());
+	std::shuffle(backupEntityIDs_.begin(), backupEntityIDs_.end(), rng);
 }
 
 }

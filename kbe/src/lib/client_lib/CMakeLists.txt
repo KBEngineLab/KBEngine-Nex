@@ -22,7 +22,6 @@ target_link_libraries(client_lib PUBLIC
     network
     pyscript
     resmgr
-    server
     thread
     xml
     KBE::PythonRuntime

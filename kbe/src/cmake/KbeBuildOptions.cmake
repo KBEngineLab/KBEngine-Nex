@@ -29,8 +29,17 @@ if(MSVC)
     # Match the existing VS projects' /MT and /MTd ABI while explicitly using UTF-8 source and execution character sets.
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "MSVC runtime" FORCE)
     target_compile_definitions(kbe_build_options INTERFACE UNICODE _UNICODE)
-    target_compile_options(kbe_build_options INTERFACE /utf-8 /W3 $<$<COMPILE_LANGUAGE:CXX>:/permissive->)
+    # /FS 让同一目标的并行编译通过 mspdbsrv 串行写 PDB，避免首次完整构建出现 C1041。
+    # /FS serializes parallel PDB writes through mspdbsrv, preventing C1041 during the first complete build.
+    target_compile_options(kbe_build_options INTERFACE /utf-8 /W3 /FS $<$<COMPILE_LANGUAGE:CXX>:/permissive->)
 else()
+    # 分配器选择发生在 common 编译期，头文件、宏和库必须通过公共 ABI 接口同时传播。
+    # Allocator selection happens while compiling common, so its header, macro, and library must travel together through the shared ABI interface.
+    find_path(KBE_JEMALLOC_INCLUDE_DIR NAMES jemalloc/jemalloc.h REQUIRED)
+    find_library(KBE_JEMALLOC_LIBRARY NAMES jemalloc REQUIRED)
+    target_include_directories(kbe_build_options INTERFACE "${KBE_JEMALLOC_INCLUDE_DIR}")
+    target_compile_definitions(kbe_build_options INTERFACE USE_JEMALLOC)
+    target_link_libraries(kbe_build_options INTERFACE "${KBE_JEMALLOC_LIBRARY}")
     target_compile_options(kbe_build_options INTERFACE -Wall)
 endif()
 

@@ -1,0 +1,25 @@
+kbe_add_server_executable(baseapp KBE_BASEAPP
+    SOURCES
+        archiver.cpp
+        backuper.cpp
+        entity.cpp
+        entity_component.cpp
+        entity_messages_forward_handler.cpp
+        entity_remotemethod.cpp
+        space.cpp
+        baseapp.cpp
+        baseapp_interface.cpp
+        data_download.cpp
+        data_downloads.cpp
+        entity_autoloader.cpp
+        forward_message_over_handler.cpp
+        initprogress_handler.cpp
+        main.cpp
+        profile.cpp
+        proxy.cpp
+        proxy_forwarder.cpp
+        restore_entity_handler.cpp
+        sync_entitystreamtemplate_handler.cpp
+    DEFINITIONS
+        USE_PYTHON
+)
