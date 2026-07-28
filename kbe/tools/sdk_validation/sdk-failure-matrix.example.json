@@ -4,7 +4,10 @@
   "variables": {
     "AssetsPath": "D:/path/to/project_assets",
     "MSBuild": "E:/ProgramFiles/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe",
-    "Godot": "D:/ProgramFiles/Godot/Godot_v4.7-stable_win64/Godot_v4.7-stable_win64_console.exe"
+    "Godot": "D:/ProgramFiles/Godot/Godot_v4.7-stable_win64/Godot_v4.7-stable_win64_console.exe",
+    "Python": "python",
+    "BaseappWatcherHost": "127.0.0.1",
+    "BaseappWatcherPort": 0
   },
   "resultsDirectory": "${AssetsPath}/sdk-failure-results",
   "sdks": [
@@ -21,16 +24,30 @@
           "file": "dotnet",
           "arguments": ["run", "--project", "${AssetsPath}/kbeclient/csharp-failure-e2e/CsharpFailureE2E.csproj", "-c", "Release", "--no-build", "--", "--scenario", "active-tcp-disconnect"],
           "timeoutSeconds": 180,
-          "requiredPatterns": ["E2E_PASS scenario=active-tcp-disconnect relogin=true component-rebuilt=true", "RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
-          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL"]
+          "requiredPatterns": ["E2E_PASS scenario=active-tcp-disconnect relogin=true component-rebuilt=true"],
+          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL"],
+          "verify": {
+            "file": "${Python}",
+            "arguments": ["${RepoRoot}/kbe/tools/sdk_validation/Wait-SdkResourceRelease.py", "--component", "baseapp", "--host", "${BaseappWatcherHost}", "--port", "${BaseappWatcherPort}", "--timeout", "30"],
+            "timeoutSeconds": 35,
+            "requiredPatterns": ["RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
+            "forbiddenPatterns": ["RESOURCE_FAIL"]
+          }
         },
         {
           "name": "heartbeat-timeout",
           "file": "dotnet",
           "arguments": ["run", "--project", "${AssetsPath}/kbeclient/csharp-failure-e2e/CsharpFailureE2E.csproj", "-c", "Release", "--no-build", "--", "--scenario", "heartbeat-timeout"],
           "timeoutSeconds": 180,
-          "requiredPatterns": ["E2E_PASS scenario=heartbeat-timeout relogin=true component-rebuilt=true", "RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
-          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL"]
+          "requiredPatterns": ["E2E_PASS scenario=heartbeat-timeout relogin=true component-rebuilt=true"],
+          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL"],
+          "verify": {
+            "file": "${Python}",
+            "arguments": ["${RepoRoot}/kbe/tools/sdk_validation/Wait-SdkResourceRelease.py", "--component", "baseapp", "--host", "${BaseappWatcherHost}", "--port", "${BaseappWatcherPort}", "--timeout", "30"],
+            "timeoutSeconds": 35,
+            "requiredPatterns": ["RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
+            "forbiddenPatterns": ["RESOURCE_FAIL"]
+          }
         }
       ]
     },
@@ -47,16 +64,30 @@
           "file": "${AssetsPath}/kbeclient/cxx-failure-e2e/x64/Release/CxxFailureE2E.exe",
           "arguments": ["--scenario", "repeated-close-tcp"],
           "timeoutSeconds": 180,
-          "requiredPatterns": ["E2E_PASS scenario=repeated-close-tcp disconnect_events=1 relogin=true", "RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
-          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL"]
+          "requiredPatterns": ["E2E_PASS scenario=repeated-close-tcp disconnect_events=1 relogin=true"],
+          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL"],
+          "verify": {
+            "file": "${Python}",
+            "arguments": ["${RepoRoot}/kbe/tools/sdk_validation/Wait-SdkResourceRelease.py", "--component", "baseapp", "--host", "${BaseappWatcherHost}", "--port", "${BaseappWatcherPort}", "--timeout", "30"],
+            "timeoutSeconds": 35,
+            "requiredPatterns": ["RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
+            "forbiddenPatterns": ["RESOURCE_FAIL"]
+          }
         },
         {
           "name": "repeated-close-kcp",
           "file": "${AssetsPath}/kbeclient/cxx-failure-e2e/x64/Release/CxxFailureE2E.exe",
           "arguments": ["--scenario", "repeated-close-kcp"],
           "timeoutSeconds": 180,
-          "requiredPatterns": ["E2E_PASS scenario=repeated-close-kcp disconnect_events=1 relogin=true", "RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
-          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL"]
+          "requiredPatterns": ["E2E_PASS scenario=repeated-close-kcp disconnect_events=1 relogin=true"],
+          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL"],
+          "verify": {
+            "file": "${Python}",
+            "arguments": ["${RepoRoot}/kbe/tools/sdk_validation/Wait-SdkResourceRelease.py", "--component", "baseapp", "--host", "${BaseappWatcherHost}", "--port", "${BaseappWatcherPort}", "--timeout", "30"],
+            "timeoutSeconds": 35,
+            "requiredPatterns": ["RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
+            "forbiddenPatterns": ["RESOURCE_FAIL"]
+          }
         }
       ]
     },
@@ -75,8 +106,15 @@
           "arguments": ["run", "test:failure", "--", "--scenario", "websocket-heartbeat-timeout"],
           "workingDirectory": "${AssetsPath}/kbeclient/typescript-failure-e2e",
           "timeoutSeconds": 180,
-          "requiredPatterns": ["E2E_PASS scenario=websocket-heartbeat-timeout disconnect_events=1 relogin=true", "RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
-          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL"]
+          "requiredPatterns": ["E2E_PASS scenario=websocket-heartbeat-timeout disconnect_events=1 relogin=true"],
+          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL"],
+          "verify": {
+            "file": "${Python}",
+            "arguments": ["${RepoRoot}/kbe/tools/sdk_validation/Wait-SdkResourceRelease.py", "--component", "baseapp", "--host", "${BaseappWatcherHost}", "--port", "${BaseappWatcherPort}", "--timeout", "30"],
+            "timeoutSeconds": 35,
+            "requiredPatterns": ["RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
+            "forbiddenPatterns": ["RESOURCE_FAIL"]
+          }
         },
         {
           "name": "websocket-exit-cleanup",
@@ -84,8 +122,15 @@
           "arguments": ["run", "test:failure", "--", "--scenario", "websocket-exit-cleanup"],
           "workingDirectory": "${AssetsPath}/kbeclient/typescript-failure-e2e",
           "timeoutSeconds": 120,
-          "requiredPatterns": ["E2E_PASS scenario=websocket-exit-cleanup", "RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
-          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL"]
+          "requiredPatterns": ["E2E_PASS scenario=websocket-exit-cleanup"],
+          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL"],
+          "verify": {
+            "file": "${Python}",
+            "arguments": ["${RepoRoot}/kbe/tools/sdk_validation/Wait-SdkResourceRelease.py", "--component", "baseapp", "--host", "${BaseappWatcherHost}", "--port", "${BaseappWatcherPort}", "--timeout", "30"],
+            "timeoutSeconds": 35,
+            "requiredPatterns": ["RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
+            "forbiddenPatterns": ["RESOURCE_FAIL"]
+          }
         }
       ]
     },
@@ -103,16 +148,30 @@
           "file": "${Godot}",
           "arguments": ["--headless", "--path", "${AssetsPath}/kbeclient/gdscript-failure-e2e", "--", "--scenario", "active-kcp-disconnect"],
           "timeoutSeconds": 180,
-          "requiredPatterns": ["E2E_PASS scenario=active-kcp-disconnect relogin=true component-rebuilt=true", "RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
-          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL", "SCRIPT ERROR", "Parse Error"]
+          "requiredPatterns": ["E2E_PASS scenario=active-kcp-disconnect relogin=true component-rebuilt=true"],
+          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL", "SCRIPT ERROR", "Parse Error"],
+          "verify": {
+            "file": "${Python}",
+            "arguments": ["${RepoRoot}/kbe/tools/sdk_validation/Wait-SdkResourceRelease.py", "--component", "baseapp", "--host", "${BaseappWatcherHost}", "--port", "${BaseappWatcherPort}", "--timeout", "30"],
+            "timeoutSeconds": 35,
+            "requiredPatterns": ["RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
+            "forbiddenPatterns": ["RESOURCE_FAIL"]
+          }
         },
         {
           "name": "kcp-exit-cleanup",
           "file": "${Godot}",
           "arguments": ["--headless", "--path", "${AssetsPath}/kbeclient/gdscript-failure-e2e", "--", "--scenario", "kcp-exit-cleanup"],
           "timeoutSeconds": 120,
-          "requiredPatterns": ["E2E_PASS scenario=kcp-exit-cleanup", "RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
-          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL", "SCRIPT ERROR", "Parse Error"]
+          "requiredPatterns": ["E2E_PASS scenario=kcp-exit-cleanup"],
+          "forbiddenPatterns": ["E2E_FAIL", "RESOURCE_FAIL", "SCRIPT ERROR", "Parse Error"],
+          "verify": {
+            "file": "${Python}",
+            "arguments": ["${RepoRoot}/kbe/tools/sdk_validation/Wait-SdkResourceRelease.py", "--component", "baseapp", "--host", "${BaseappWatcherHost}", "--port", "${BaseappWatcherPort}", "--timeout", "30"],
+            "timeoutSeconds": 35,
+            "requiredPatterns": ["RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0"],
+            "forbiddenPatterns": ["RESOURCE_FAIL"]
+          }
         }
       ]
     }

@@ -519,6 +519,96 @@ void NetworkInterface::processChannels(KBEngine::Network::MessageHandlers* pMsgH
 		}
 	}
 }
+
+//-------------------------------------------------------------------------------------
+uint32 NetworkInterface::numExternalTcpChannels() const
+{
+	uint32 count = 0;
+	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
+	{
+		const Channel* pChannel = iter->second;
+		if (pChannel && pChannel->isExternal() && pChannel->protocoltype() == PROTOCOL_TCP &&
+			pChannel->type() != Channel::CHANNEL_WEB)
+		{
+			++count;
+		}
+	}
+
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint32 NetworkInterface::numExternalWebSocketChannels() const
+{
+	uint32 count = 0;
+	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
+	{
+		const Channel* pChannel = iter->second;
+		if (pChannel && pChannel->isExternal() && pChannel->type() == Channel::CHANNEL_WEB)
+			++count;
+	}
+
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint32 NetworkInterface::numExternalKcpChannels() const
+{
+	uint32 count = 0;
+	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
+	{
+		const Channel* pChannel = iter->second;
+		if (pChannel && pChannel->isExternal() && pChannel->protocolSubtype() == SUB_PROTOCOL_KCP)
+			++count;
+	}
+
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint32 NetworkInterface::numExternalUdpChannels() const
+{
+	uint32 count = 0;
+	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
+	{
+		const Channel* pChannel = iter->second;
+		if (pChannel && pChannel->isExternal() && pChannel->protocoltype() == PROTOCOL_UDP &&
+			pChannel->protocolSubtype() != SUB_PROTOCOL_KCP)
+		{
+			++count;
+		}
+	}
+
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint32 NetworkInterface::numExternalKcpControlBlocks() const
+{
+	uint32 count = 0;
+	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
+	{
+		const Channel* pChannel = iter->second;
+		if (pChannel && pChannel->isExternal() && pChannel->pKCP())
+			++count;
+	}
+
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint32 NetworkInterface::numExternalKcpUpdateTimers() const
+{
+	uint32 count = 0;
+	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
+	{
+		const Channel* pChannel = iter->second;
+		if (pChannel && pChannel->isExternal() && pChannel->hasKcpUpdateTimer())
+			++count;
+	}
+
+	return count;
+}
 //-------------------------------------------------------------------------------------
 }
 }

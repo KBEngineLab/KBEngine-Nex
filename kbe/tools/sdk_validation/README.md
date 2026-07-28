@@ -65,6 +65,7 @@ pwsh -File kbe/tools/sdk_validation/Invoke-SdkValidation.ps1 `
 - Manifest-level environment variables apply to every command; stage-level values override them.
 - Every stage uses a `file` plus an `arguments` array. Commands are not evaluated as PowerShell source.
 - `scenarios` is an optional array of named run commands. Names are case-insensitive and limited to letters, digits, `.`, `_`, and `-`, producing stable and safe log filenames.
+- A scenario may define a `verify` command. It runs after the main command even when that command fails or times out, and receives its own `scenario-<name>-verify` log and summary entry.
 - `-Scenario` selects named scenarios across the selected SDKs and skips the baseline `run`; `-SkipRun` skips both the baseline and every scenario.
 - A stage fails on timeout, a nonzero exit code, a missing `requiredPatterns` regular expression, or a matching `forbiddenPatterns` regular expression.
 - If generation or build fails, later stages for that SDK are marked `blocked`; other SDKs continue so the final report captures independent failures.
@@ -78,12 +79,12 @@ Each run saves a UTF-8 log for every stage and writes `summary.json`. The defaul
 
 ## Failure recovery contract
 
-`sdk-failure-matrix.example.json` 定义推荐的四端恢复矩阵。命令仍由具体项目的 E2E 夹具提供；只需调整路径，不要把游戏业务相关的故障注入移入引擎。恢复夹具必须等待异步清理稳定后再同时输出以下标记：
+`sdk-failure-matrix.example.json` 定义推荐的四端恢复矩阵。命令仍由具体项目的 E2E 夹具提供；只需调整路径，不要把游戏业务相关的故障注入移入引擎。每个场景的 `verify` 使用 `Wait-SdkResourceRelease.py` 读取 BaseApp 内部 watcher 端口；该动态端口应从 Machine 组件信息获取并写入项目清单的 `BaseappWatcherPort`。
 
-`sdk-failure-matrix.example.json` defines the recommended four-SDK recovery matrix. The commands remain project-owned E2E harnesses; update their paths without moving game-specific fault injection into the engine. A recovery harness should emit both markers only after asynchronous cleanup has settled:
+`sdk-failure-matrix.example.json` defines the recommended four-SDK recovery matrix. The commands remain project-owned E2E harnesses; update their paths without moving game-specific fault injection into the engine. Each scenario's `verify` uses `Wait-SdkResourceRelease.py` against the BaseApp internal watcher port; obtain that dynamic port from Machine component information and set `BaseappWatcherPort` in the project manifest.
 
 - `E2E_PASS ...` proves the expected disconnect count, relogin, Space reconstruction, Entity Component reconstruction, and post-recovery RPC.
-- `RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0` proves deterministic client shutdown and server Channel/KCP timer reclamation.
+- `RESOURCE_PASS client_connections=0 server_channels=0 kcp_timers=0` is emitted by the independent verifier after external Channels, KCP control blocks, and KCP update timers all reach zero.
 
 Keep `E2E_FAIL` and `RESOURCE_FAIL` in `forbiddenPatterns`. This prevents a successful process exit from hiding a protocol, state-rebuild, or resource-lifecycle failure.
 
@@ -95,6 +96,7 @@ Run the following command to verify scenario isolation, filtering, unknown-name 
 
 ```powershell
 pwsh -File kbe/tools/sdk_validation/tests/Test-SdkValidation.ps1
+python -B -m unittest kbe/tools/sdk_validation/tests/Test-SdkResourceRelease.py -v
 ```
 
 The full schema is available in `sdk-validation.schema.json`.

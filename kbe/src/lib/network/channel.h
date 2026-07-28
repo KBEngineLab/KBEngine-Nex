@@ -161,6 +161,9 @@ public:
 	void delayedSend();
 
 	ikcpcb* pKCP() const { return pKCP_; }
+	// 资源验收必须读取 Channel 实际持有的 timer handle，不能用 KCP Channel 数量推断，避免取消延迟被误报为已回收。
+	// Resource validation must inspect the timer handle actually owned by the Channel instead of inferring it from KCP channel count, so delayed cancellation cannot be reported as reclaimed.
+	bool hasKcpUpdateTimer() const { return kcpUpdateTimerHandle_.isSet(); }
 	void scheduleKcpUpdate(int64 microseconds = 0);
 
 

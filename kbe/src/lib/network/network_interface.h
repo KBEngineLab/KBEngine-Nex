@@ -92,7 +92,7 @@ public:
 
 	const char * c_str() const { return extEndpoint_.c_str(); }
 	
-	const ChannelMap& channels(void) { return channelMap_; }
+	const ChannelMap& channels(void) const { return channelMap_; }
 		
 	/** 发送相关 */
 	void sendIfDelayed(Channel & channel);
@@ -112,6 +112,14 @@ public:
 	void processChannels(KBEngine::Network::MessageHandlers* pMsgHandlers);
 
 	INLINE int32 numExtChannels() const;
+	// 这些只读统计仅在 watcher 查询时遍历 ChannelMap，不给网络 Tick 增加持续计数开销，也不会复制 Channel 生命周期状态。
+	// These read-only statistics scan ChannelMap only for watcher queries, adding no continuous accounting cost to the network tick and duplicating no Channel lifecycle state.
+	uint32 numExternalTcpChannels() const;
+	uint32 numExternalWebSocketChannels() const;
+	uint32 numExternalKcpChannels() const;
+	uint32 numExternalUdpChannels() const;
+	uint32 numExternalKcpControlBlocks() const;
+	uint32 numExternalKcpUpdateTimers() const;
 
 private:
 	virtual void handleTimeout(TimerHandle handle, void * arg);

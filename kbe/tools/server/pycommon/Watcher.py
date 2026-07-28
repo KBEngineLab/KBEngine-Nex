@@ -44,7 +44,7 @@ class Watcher(ServerApp.ServerApp):
 	"""
 	使用样例：
 	import sys
-	sys.path.append(r"x:\kbengine\kbe\tools\server")
+	sys.path.append("x:\\kbengine\\kbe\\tools\\server")
 	import pycommon.Watcher
 	import pycommon.Define
 	w = pycommon.Watcher.Watcher(pycommon.Define.CELLAPP_TYPE)

@@ -190,6 +190,13 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("globalOrder", this, &ServerApp::globalOrder);
 	WATCH_OBJECT("groupOrder", this, &ServerApp::groupOrder);
 	WATCH_OBJECT("gametime", this, &ServerApp::time);
+	WATCH_OBJECT("network/channels/external", &networkInterface_, &Network::NetworkInterface::numExtChannels);
+	WATCH_OBJECT("network/channels/externalTcp", &networkInterface_, &Network::NetworkInterface::numExternalTcpChannels);
+	WATCH_OBJECT("network/channels/externalWebSocket", &networkInterface_, &Network::NetworkInterface::numExternalWebSocketChannels);
+	WATCH_OBJECT("network/channels/externalKcp", &networkInterface_, &Network::NetworkInterface::numExternalKcpChannels);
+	WATCH_OBJECT("network/channels/externalUdp", &networkInterface_, &Network::NetworkInterface::numExternalUdpChannels);
+	WATCH_OBJECT("network/channels/externalKcpControlBlocks", &networkInterface_, &Network::NetworkInterface::numExternalKcpControlBlocks);
+	WATCH_OBJECT("network/channels/externalKcpUpdateTimers", &networkInterface_, &Network::NetworkInterface::numExternalKcpUpdateTimers);
 
 	return Network::initializeWatcher() && Resmgr::getSingleton().initializeWatcher() &&
 		threadPool_.initializeWatcher() && WatchPool::initWatchPools();

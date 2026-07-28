@@ -91,8 +91,8 @@ try {
                 build = New-CommandDefinition -Mode "pass" -Scenario "build"
                 run = New-CommandDefinition -Mode "pass"
                 scenarios = @(
-                    ([ordered] @{ name = "alpha" } + (New-CommandDefinition -Mode "pass" -Scenario "alpha")),
-                    ([ordered] @{ name = "beta" } + (New-CommandDefinition -Mode "fail" -Scenario "beta")),
+                    ([ordered] @{ name = "alpha"; verify = New-CommandDefinition -Mode "pass" -Scenario "alpha-verify" } + (New-CommandDefinition -Mode "pass" -Scenario "alpha")),
+                    ([ordered] @{ name = "beta"; verify = New-CommandDefinition -Mode "pass" -Scenario "beta-verify" } + (New-CommandDefinition -Mode "fail" -Scenario "beta")),
                     ([ordered] @{ name = "gamma" } + (New-CommandDefinition -Mode "pass" -Scenario "gamma"))
                 )
             }
@@ -106,6 +106,7 @@ try {
     $matrixSummary = Get-Content -LiteralPath (Join-Path $matrixResults "summary.json") -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 16
     Assert-Condition (($matrixSummary.stages | Where-Object stage -eq "scenario-alpha").status -eq "passed") "Scenario alpha did not pass."
     Assert-Condition (($matrixSummary.stages | Where-Object stage -eq "scenario-beta").status -eq "failed") "Scenario beta did not fail."
+    Assert-Condition (($matrixSummary.stages | Where-Object stage -eq "scenario-beta-verify").status -eq "passed") "Scenario beta verification was blocked by the scenario failure."
     Assert-Condition (($matrixSummary.stages | Where-Object stage -eq "scenario-gamma").status -eq "passed") "Scenario gamma was incorrectly blocked."
     Assert-Condition (Test-Path -LiteralPath (Join-Path $matrixResults "csharp-scenario-gamma.log")) "Scenario gamma log was not created."
 
@@ -132,7 +133,7 @@ try {
                 name = "cxx"
                 build = New-CommandDefinition -Mode "build-fail" -Scenario "build"
                 scenarios = @(
-                    ([ordered] @{ name = "alpha" } + (New-CommandDefinition -Mode "pass" -Scenario "alpha")),
+                    ([ordered] @{ name = "alpha"; verify = New-CommandDefinition -Mode "pass" -Scenario "alpha-verify" } + (New-CommandDefinition -Mode "pass" -Scenario "alpha")),
                     ([ordered] @{ name = "gamma" } + (New-CommandDefinition -Mode "pass" -Scenario "gamma"))
                 )
             }
@@ -145,9 +146,10 @@ try {
 
     $blockedSummary = Get-Content -LiteralPath (Join-Path $blockedResults "summary.json") -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 16
     Assert-Condition (($blockedSummary.stages | Where-Object stage -eq "scenario-alpha").status -eq "blocked") "Scenario alpha was not blocked after build failure."
+    Assert-Condition (($blockedSummary.stages | Where-Object stage -eq "scenario-alpha-verify").status -eq "blocked") "Scenario alpha verification was not blocked after build failure."
     Assert-Condition (($blockedSummary.stages | Where-Object stage -eq "scenario-gamma").status -eq "blocked") "Scenario gamma was not blocked after build failure."
 
-    Write-Output "SDK_VALIDATION_TEST_PASS matrix=true filtering=true unmatched=true prerequisite-blocking=true"
+    Write-Output "SDK_VALIDATION_TEST_PASS matrix=true filtering=true unmatched=true verify-after-failure=true prerequisite-blocking=true"
 }
 finally {
     if (Test-Path -LiteralPath $temporaryRoot) {

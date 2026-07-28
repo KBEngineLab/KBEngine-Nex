@@ -628,14 +628,23 @@ foreach ($sdkDefinition in $manifestSdks) {
         }
 
         $stageName = "scenario-$scenarioName"
+        $verifyDefinition = Get-OptionalPropertyValue -InputObject $scenarioDefinition -Name "verify"
+        $verifyStageName = "$stageName-verify"
         if ($SkipRun -or -not $scenarioSelected) {
             $results.Add((New-NonExecutedStageResult -SdkName $sdkName -StageName $stageName -Status "skipped"))
+            if ($null -ne $verifyDefinition) {
+                $results.Add((New-NonExecutedStageResult -SdkName $sdkName -StageName $verifyStageName -Status "skipped"))
+            }
             continue
         }
 
         if (-not $runtimeReady) {
             $results.Add((New-NonExecutedStageResult -SdkName $sdkName -StageName $stageName `
                 -Status "blocked" -Failure "A prerequisite stage failed."))
+            if ($null -ne $verifyDefinition) {
+                $results.Add((New-NonExecutedStageResult -SdkName $sdkName -StageName $verifyStageName `
+                    -Status "blocked" -Failure "A prerequisite stage failed."))
+            }
             continue
         }
 
@@ -646,6 +655,16 @@ foreach ($sdkDefinition in $manifestSdks) {
             -Variables $variables -OutputDirectory $outputDirectory -ShowOutput $ShowOutput.IsPresent
         $results.Add($scenarioResult)
         $sdkPassed = $sdkPassed -and $scenarioResult.status -eq "passed"
+
+        if ($null -ne $verifyDefinition) {
+            # 后置资源验证不依赖主场景成功，失败和超时路径同样必须证明 Channel 与 timer 已回收。
+            # Post-run resource verification does not depend on scenario success; failure and timeout paths must also prove Channel and timer reclamation.
+            $verifyResult = Invoke-ValidationStage -SdkName $sdkName -StageName $verifyStageName -Stage $verifyDefinition `
+                -DefaultWorkingDirectory $defaultWorkingDirectory -CommonEnvironment $commonEnvironment `
+                -Variables $variables -OutputDirectory $outputDirectory -ShowOutput $ShowOutput.IsPresent
+            $results.Add($verifyResult)
+            $sdkPassed = $sdkPassed -and $verifyResult.status -eq "passed"
+        }
     }
 
     $sdkSummaries.Add([pscustomobject] @{
