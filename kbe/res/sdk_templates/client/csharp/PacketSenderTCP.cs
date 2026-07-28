@@ -1,38 +1,21 @@
-﻿namespace KBEngine
+namespace KBEngine
 {
-	using System; 
-	using System.Net.Sockets; 
-	using System.Net; 
-	using System.Collections; 
-	using System.Collections.Generic;
-	using System.Text;
-	using System.Text.RegularExpressions;
-	using System.Threading;
+	using System;
+	using System.Net.Sockets;
 
-	using MessageID = System.UInt16;
-	using MessageLength = System.UInt16;
-	
 	/*
 		包发送模块(与服务端网络部分的名称对应)
 		处理网络数据的发送
 	*/
 	public class PacketSenderTCP : PacketSenderBase
 	{
-		private byte[] _buffer;
+		private readonly TcpSendQueue _sendQueue;
 
-		int _wpos = 0;				// 写入的数据位置
-		int _spos = 0;				// 发送完毕的数据位置
-
-		object _sendingObj = new object();
-		Boolean _sending = false;
-		
 		public PacketSenderTCP(NetworkInterfaceBase networkInterface) : base(networkInterface)
 		{
-			_buffer = new byte[KBEngineApp.app.getInitArgs().TCP_SEND_BUFFER_MAX];
-
-			_wpos = 0; 
-			_spos = 0;
-			_sending = false;
+			// CLR 数组使用 Int32 索引；checked 转换让无效的超大配置在初始化时明确失败，而不是产生截断后的队列。
+			// CLR arrays use Int32 indices; a checked conversion rejects an invalid oversized setting during initialization instead of creating a truncated queue.
+			_sendQueue = new TcpSendQueue(checked((int)KBEngineApp.app.getInitArgs().TCP_SEND_BUFFER_MAX));
 		}
 
 		~PacketSenderTCP()
@@ -46,111 +29,53 @@
 			if (dataLength <= 0)
 				return true;
 
-			Monitor.Enter(_sendingObj);
-			if (!_sending)
+			bool startWorker;
+			if (!_sendQueue.tryEnqueue(stream.data(), stream.rpos, dataLength, out startWorker))
 			{
-				if (_wpos == _spos)
-				{
-					_wpos = 0;
-					_spos = 0;
-				}
-			}
-
-			int t_spos =_spos;
-			int space = 0;
-			int tt_wpos = _wpos % _buffer.Length;
-			int tt_spos = t_spos % _buffer.Length;
-			
-			if(tt_wpos >= tt_spos)
-				space = _buffer.Length - tt_wpos + tt_spos - 1;
-			else
-				space = tt_spos - tt_wpos - 1;
-
-			if (dataLength > space)
-			{
-				KBELog.ERROR_MSG("PacketSenderTCP::send(): no space, Please adjust 'SEND_BUFFER_MAX'! data(" + dataLength 
-					+ ") > space(" + space + "), wpos=" + _wpos + ", spos=" + t_spos);
-				
+				KBELog.ERROR_MSG("PacketSenderTCP::send(): no space, Please adjust 'TCP_SEND_BUFFER_MAX'! data(" +
+					dataLength + ") > available queue capacity, capacity=" + _sendQueue.capacity);
 				return false;
 			}
 
-			int expect_total = tt_wpos + dataLength;
-			if(expect_total <= _buffer.Length)
-			{
-				Array.Copy(stream.data(), stream.rpos, _buffer, tt_wpos, dataLength);
-			}
-			else
-			{
-				int remain = _buffer.Length - tt_wpos;
-				Array.Copy(stream.data(), stream.rpos, _buffer, tt_wpos, remain);
-				Array.Copy(stream.data(), stream.rpos + remain, _buffer, 0, expect_total - _buffer.Length);
-			}
-
-			_wpos += dataLength;
-
-			if (!_sending)
-			{
-				_sending = true;
-				Monitor.Exit(_sendingObj);
-
+			if (startWorker)
 				_startSend();
-			}
-			else
-			{
-				Monitor.Exit(_sendingObj);
-			}
 
 			return true;
 		}
 
 		protected override void _asyncSend()
 		{
-			if (_networkInterface == null || !_networkInterface.valid())
+			NetworkInterfaceBase networkInterface = _networkInterface;
+			if (networkInterface == null || !networkInterface.valid())
 			{
 				KBELog.WARNING_MSG("PacketSenderTCP::_asyncSend(): network interface invalid!");
+				_sendQueue.abort();
 				return;
 			}
 
-			var socket = _networkInterface.sock();
-
-			while (true)
+			Socket socket = networkInterface.sock();
+			try
 			{
-				Monitor.Enter(_sendingObj);
-
-				int sendSize = _wpos - _spos;
-				int t_spos = _spos % _buffer.Length;
-				if (t_spos == 0)
-					t_spos = sendSize;
-
-				if (sendSize > _buffer.Length - t_spos)
-					sendSize = _buffer.Length - t_spos;
-
-				int bytesSent = 0;
-				try
+				byte[] buffer;
+				int offset;
+				int count;
+				while (_sendQueue.tryGetContiguousData(out buffer, out offset, out count))
 				{
-					bytesSent = socket.Send(_buffer, _spos % _buffer.Length, sendSize, 0);
+					// 队列在 send 完成前不会释放当前片段的容量，因此生产者无法覆盖锁外发送所引用的字节。
+					// The queue does not release this segment until send completes, so producers cannot overwrite bytes referenced by the lock-free socket operation.
+					int bytesSent = socket.Send(buffer, offset, count, SocketFlags.None);
+					if (bytesSent <= 0)
+						throw new SocketException((int)SocketError.ConnectionReset);
+
+					_sendQueue.consume(bytesSent);
 				}
-				catch (SocketException se)
-				{
-					KBELog.ERROR_MSG(string.Format("PacketSenderTCP::_asyncSend(): send data error, disconnect from '{0}'! error = '{1}'", socket.RemoteEndPoint, se));
-					Event.fireIn("_closeNetwork", new object[] { _networkInterface });
-
-					Monitor.Exit(_sendingObj);
-					return;
-				}
-
-				_spos += bytesSent;
-
-				// 所有数据发送完毕了
-				if (_spos == _wpos)
-				{
-					_sending = false;
-					Monitor.Exit(_sendingObj);
-					return;
-				}
-
-				Monitor.Exit(_sendingObj);
+			}
+			catch (Exception exception)
+			{
+				_sendQueue.abort();
+				KBELog.ERROR_MSG(string.Format("PacketSenderTCP::_asyncSend(): send data error, disconnect! error = '{0}'", exception));
+				Event.fireIn("_closeNetwork", new object[] { networkInterface });
 			}
 		}
 	}
-} 
+}

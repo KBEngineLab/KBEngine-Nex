@@ -90,14 +90,15 @@ Keep `E2E_FAIL` and `RESOURCE_FAIL` in `forbiddenPatterns`. This prevents a succ
 
 必须把 `E2E_FAIL` 与 `RESOURCE_FAIL` 保留在 `forbiddenPatterns` 中，避免进程以成功状态退出时掩盖协议、状态重建或资源生命周期错误。
 
-执行以下命令可回归场景隔离、资源 watcher、C# 心跳和并发关闭状态。PowerShell 合成产物只写入系统临时目录，C# 的 `bin/obj` 已按测试工程精确忽略：
+执行以下命令可回归场景隔离、资源 watcher、C# 心跳与并发关闭状态，以及 TCP 发送队列的容量、回绕、并发和故障重启。PowerShell 合成产物只写入系统临时目录，C# 测试工程的 `bin/obj` 已按专用目录模式精确忽略：
 
-Run the following commands to verify scenario isolation, resource watchers, C# heartbeats, and concurrent close state. PowerShell fixtures write only to the system temporary directory, while the C# project's `bin/obj` paths are narrowly ignored:
+Run the following commands to verify scenario isolation, resource watchers, C# heartbeats and concurrent close state, plus TCP send queue capacity, wraparound, concurrency, and failure restart. PowerShell fixtures write only to the system temporary directory, while the dedicated C# test projects' `bin/obj` paths are narrowly ignored:
 
 ```powershell
 pwsh -File kbe/tools/sdk_validation/tests/Test-SdkValidation.ps1
 python -B -m unittest kbe/tools/sdk_validation/tests/Test-SdkResourceRelease.py -v
 dotnet run --project kbe/tools/sdk_validation/tests/csharp_heartbeat/CsharpHeartbeatStateTest.csproj -c Release
+dotnet run --project kbe/tools/sdk_validation/tests/csharp_tcp_send/CsharpTcpSendQueueTest.csproj -c Release
 ```
 
 The full schema is available in `sdk-validation.schema.json`.
