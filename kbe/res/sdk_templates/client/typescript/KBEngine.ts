@@ -959,7 +959,7 @@ export class KBEngineApp {
 
         let entity = this.entities[eid];
         if (entity === undefined) {
-            let scriptModule: ScriptModule = EntityDef.moduledefs[entityType];
+            let scriptModule = EntityDef.moduledefs.get(entityType);
             if (scriptModule === undefined) {
                 KBELog.ERROR_MSG("KBEngineApp::Client_onCreatedProxies:script(%s) is undefined.", entityType);
                 return;
@@ -1032,7 +1032,7 @@ export class KBEngineApp {
             this.entityIDAliasIDList.push(eid);
 
         let uentityType = 0;
-        let useScriptModuleAlias: boolean = Object.keys(EntityDef.moduledefs).length > 255;
+        let useScriptModuleAlias: boolean = EntityDef.moduledefs.size > 255;
         if (useScriptModuleAlias)
             uentityType = stream.ReadUint16();
         else
@@ -1050,13 +1050,13 @@ export class KBEngineApp {
                 return;
             }
 
-            let entityTypeIdMod = EntityDef.idmoduledefs[uentityType];
+            let entityTypeIdMod = EntityDef.idmoduledefs.get(uentityType);
             if (entityTypeIdMod === undefined) {
                 KBELog.ERROR_MSG("KBEngine::Client_onEntityEnterWorld: not found entityType for utype(" + uentityType + ")!");
                 return;
             }
             let entityType  = entityTypeIdMod.name
-            let module: ScriptModule = EntityDef.moduledefs[entityType]
+            let module = EntityDef.moduledefs.get(entityType);
             if (module === undefined) {
                 KBELog.ERROR_MSG("KBEngine::Client_onEntityEnterWorld: not found module(" + entityType + ")!");
                 return;
@@ -2368,10 +2368,18 @@ export class Entity
         //     KBELog.ERROR_MSG("Entity::BaseCall: entity(%d) base is undefined.", this.id);
         // }
 
-        let method: Method = EntityDef.moduledefs[this.className].baseMethods[methodName];
+        const module = EntityDef.moduledefs.get(this.className);
+        if(module === undefined)
+        {
+            KBELog.ERROR_MSG("Entity::BaseCall: entity(%d) module(%s) not found.", this.id, this.className);
+            return;
+        }
+
+        let method: Method | undefined = module.baseMethods[methodName];
         if(method === undefined)
         {
             KBELog.ERROR_MSG("Entity::BaseCall: entity(%d) method(%s) not found.", this.id, methodName);
+            return;
         }
 
         if(args.length !== method.args.length)
@@ -2425,10 +2433,18 @@ export class Entity
         }
 
 
-        let method: Method = EntityDef.moduledefs[this.className].cellMethods[methodName];
+        const module = EntityDef.moduledefs.get(this.className);
+        if(module === undefined)
+        {
+            KBELog.ERROR_MSG("Entity::CellCall: entity(%d) module(%s) not found.", this.id, this.className);
+            return;
+        }
+
+        let method: Method | undefined = module.cellMethods[methodName];
         if(method === undefined)
         {
             KBELog.ERROR_MSG("Entity::CellCall: entity(%d) method(%s) not found.", this.id, methodName);
+            return;
         }
 
         if(args.length !== method.args.length)
@@ -2760,7 +2776,7 @@ export abstract class EntityCall
             return null;
         }
 
-        const module = EntityDef.moduledefs[this.className];
+        const module = EntityDef.moduledefs.get(this.className);
         if(!module){
             KBELog.ERROR_MSG(this.className + "::newCall: entity-module(" + this.className + ") error, can not find from EntityDef.moduledefs");
             return null;
@@ -2775,6 +2791,7 @@ export abstract class EntityCall
         
         if(!method){
             KBELog.ERROR_MSG(this.className + "::newCall: entity-method(" + this.className + ") error, can not find from EntityDef.moduledefs");
+            return null;
         }
 
 

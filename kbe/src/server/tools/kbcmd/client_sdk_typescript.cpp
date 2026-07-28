@@ -1275,7 +1275,7 @@ bool ClientSDKTypeScript::writeEntityDefsModuleInitDefTypesEnd()
             if (dataType != null) {
                 // schema 注册表由所有者显式传入，基础类型模块不再反向读取 EntityDef 静态状态。
                 // The schema owner passes its registry explicitly so base data types never read EntityDef static state.
-                dataType.Bind((type) => typeof type === "number" ? EntityDef.id2datatypes[type] : EntityDef.datatypes.get(type));
+                dataType.Bind((type) => typeof type === "number" ? EntityDef.id2datatypes.get(type) : EntityDef.datatypes.get(type));
             }
         }
 )delimiter";
@@ -1329,8 +1329,8 @@ bool ClientSDKTypeScript::writeEntityDefsModuleInitDefType(const DataType* pData
 		sourcefileBody_ += fmt::format("\t\t\tEntityDef.datatypes.set(typeName, val);\n");
 	}
 
-	sourcefileBody_ += fmt::format("\t\t\tEntityDef.id2datatypes[utype] = EntityDef.datatypes.get(typeName);\n");
-	sourcefileBody_ += fmt::format("\t\t\tEntityDef.datatype2id[typeName] = utype;\n");
+	sourcefileBody_ += fmt::format("\t\t\tEntityDef.id2datatypes.set(utype, EntityDef.datatypes.get(typeName)!);\n");
+	sourcefileBody_ += fmt::format("\t\t\tEntityDef.datatype2id.set(typeName, utype);\n");
 	sourcefileBody_ += fmt::format("\t\t}}\n\n");
 
 	return true;
@@ -1420,19 +1420,19 @@ bool ClientSDKTypeScript::writeEntityCallMethodBegin(ScriptDefModule* pScriptDef
 
 		if (pDataType->type() == DATA_TYPE_FIXEDDICT)
 		{
-			writeName = fmt::format("(EntityDef.id2datatypes[{}] as KBETypes.DATATYPE_{}).addToStreamEx(this.bundle!, arg{})",
+			writeName = fmt::format("(EntityDef.id2datatypes.get({})! as KBETypes.DATATYPE_{}).addToStreamEx(this.bundle!, arg{})",
 				pDataType->id(),pDataType->aliasName(), i);
 		}
 		else if (pDataType->type() == DATA_TYPE_FIXEDARRAY)
 		{
 			if (strlen(pDataType->aliasName()) > 0)
 			{
-				writeName = fmt::format("(EntityDef.id2datatypes[{}] as KBETypes.DATATYPE_{}).addToStreamEx(this.bundle!, arg{})",
+				writeName = fmt::format("(EntityDef.id2datatypes.get({})! as KBETypes.DATATYPE_{}).addToStreamEx(this.bundle!, arg{})",
 					pDataType->id(), pDataType->aliasName(),  i);
 			}
 			else
 			{
-				writeName = fmt::format("(EntityDef.id2datatypes[{}] as KBETypes.DATATYPE_AnonymousArray_{}).addToStreamEx(this.bundle!, arg{})",
+				writeName = fmt::format("(EntityDef.id2datatypes.get({})! as KBETypes.DATATYPE_AnonymousArray_{}).addToStreamEx(this.bundle!, arg{})",
 					pDataType->id(), pDataType->id(),  i);
 			}
 		}
@@ -2186,8 +2186,8 @@ bool ClientSDKTypeScript::writeCustomDataType(const DataType* pDataType)
 bool ClientSDKTypeScript::writeEntityDefsModuleInitScript_ScriptModule(ScriptDefModule* pScriptDefModule)
 {
 	sourcefileBody_ += fmt::format("\t\tlet p{}Module = new ScriptModule(\"{}\");\n", pScriptDefModule->getName(), pScriptDefModule->getName());
-	sourcefileBody_ += fmt::format("\t\tEntityDef.moduledefs[\"{}\"] = p{}Module;\n", pScriptDefModule->getName(), pScriptDefModule->getName());
-	sourcefileBody_ += fmt::format("\t\tEntityDef.idmoduledefs[{}] = p{}Module;\n\n", pScriptDefModule->getUType(), pScriptDefModule->getName());
+	sourcefileBody_ += fmt::format("\t\tEntityDef.moduledefs.set(\"{}\", p{}Module);\n", pScriptDefModule->getName(), pScriptDefModule->getName());
+	sourcefileBody_ += fmt::format("\t\tEntityDef.idmoduledefs.set({}, p{}Module);\n\n", pScriptDefModule->getUType(), pScriptDefModule->getName());
 	return true;
 }
 
@@ -2213,7 +2213,7 @@ bool ClientSDKTypeScript::writeEntityDefsModuleInitScript_MethodDescr(ScriptDefM
 		if (typeID == 0 || strcmp((*argiter)->getName(), "FIXED_DICT") == 0 || strcmp((*argiter)->getName(), "ARRAY") == 0)
 			typeID = (*argiter)->id();
 
-		sourcefileBody_ += fmt::format("\t\tp{}_{}_args.push(EntityDef.id2datatypes[{}]);\n", pScriptDefModule->getName(), pDescr->getName(), typeID);
+		sourcefileBody_ += fmt::format("\t\tp{}_{}_args.push(EntityDef.id2datatypes.get({})!);\n", pScriptDefModule->getName(), pDescr->getName(), typeID);
 	}
 
 	sourcefileBody_ += fmt::format("\n\t\tlet p{}_{} = new Method();\n", pScriptDefModule->getName(), pDescr->getName());
@@ -2287,7 +2287,7 @@ bool ClientSDKTypeScript::writeEntityDefsModuleInitScript_PropertyDescr(ScriptDe
 
 	if (isFixedType)
 	{
-		sourcefileBody_ += fmt::format("\t\tp{}_{}.defaultValStr = EntityDef.id2datatypes[{}].ParseDefaultValueString(\"{}\");\n",
+		sourcefileBody_ += fmt::format("\t\tp{}_{}.defaultValStr = EntityDef.id2datatypes.get({})!.ParseDefaultValueString(\"{}\");\n",
 			pScriptDefModule->getName(), pDescr->getName(), typeID, pDescr->getDefaultValStr());
 	}
 	else
@@ -3108,7 +3108,7 @@ bool ClientSDKTypeScript::writeEntityProcessMessagesMethod(ScriptDefModule* pEnt
 	if (pEntityScriptDefModule->isComponentModule())
 	{
 		sourcefileBody_ += fmt::format("\n\tpublic override getScriptModule() : ScriptModule{{\n");
-		sourcefileBody_ += fmt::format("\t\treturn EntityDef.moduledefs[\"{}\"];\n", pEntityScriptDefModule->getName());
+		sourcefileBody_ += fmt::format("\t\treturn EntityDef.moduledefs.get(\"{}\")!;\n", pEntityScriptDefModule->getName());
 		sourcefileBody_ += "\t}\n";
 	}
 
@@ -3118,7 +3118,7 @@ bool ClientSDKTypeScript::writeEntityProcessMessagesMethod(ScriptDefModule* pEnt
 	else
 		sourcefileBody_ += fmt::format("\n\tpublic override onRemoteMethodCall(methodUtype:number, stream:MemoryStream){{\n");
 
-	sourcefileBody_ += fmt::format("\t\tlet sm:ScriptModule = EntityDef.moduledefs[\"{}\"];\n\n", pEntityScriptDefModule->getName());
+	sourcefileBody_ += fmt::format("\t\tlet sm:ScriptModule = EntityDef.moduledefs.get(\"{}\")!;\n\n", pEntityScriptDefModule->getName());
 	
 	if (!pEntityScriptDefModule->isComponentModule())
 	{
@@ -3362,7 +3362,7 @@ bool ClientSDKTypeScript::writeEntityProcessMessagesMethod(ScriptDefModule* pEnt
 	else
 		sourcefileBody_ += fmt::format("\n\tpublic override onUpdatePropertys(stream:MemoryStream){{\n");
 
-	sourcefileBody_ += fmt::format("\t\tlet sm:ScriptModule = EntityDef.moduledefs[\"{}\"];\n", pEntityScriptDefModule->getName());
+	sourcefileBody_ += fmt::format("\t\tlet sm:ScriptModule = EntityDef.moduledefs.get(\"{}\")!;\n", pEntityScriptDefModule->getName());
 	sourcefileBody_ += fmt::format("\t\tlet pdatas = sm.idpropertys;\n\n");
 
 	if (pEntityScriptDefModule->isComponentModule())
@@ -3511,19 +3511,19 @@ bool ClientSDKTypeScript::writeEntityProcessMessagesMethod(ScriptDefModule* pEnt
 
 		if (pPropertyDescription->getDataType()->type() == DATA_TYPE_FIXEDDICT)
 		{
-			readName = fmt::format("(EntityDef.id2datatypes[{}] as KBETypes.DATATYPE_{}).createFromStreamEx(stream)", 
+			readName = fmt::format("(EntityDef.id2datatypes.get({})! as KBETypes.DATATYPE_{}).createFromStreamEx(stream)",
 				 pPropertyDescription->getDataType()->id(), pPropertyDescription->getDataType()->aliasName());
 		}
 		else if (pPropertyDescription->getDataType()->type() == DATA_TYPE_FIXEDARRAY)
 		{
 			if (strlen(pPropertyDescription->getDataType()->aliasName()) > 0)
 			{
-				readName = fmt::format("(EntityDef.id2datatypes[{}] as KBETypes.DATATYPE_{}).createFromStreamEx(stream)", 
+				readName = fmt::format("(EntityDef.id2datatypes.get({})! as KBETypes.DATATYPE_{}).createFromStreamEx(stream)",
 					pPropertyDescription->getDataType()->id(), pPropertyDescription->getDataType()->aliasName());
 			}
 			else
 			{
-				readName = fmt::format("(EntityDef.id2datatypes[{}] as KBETypes.DATATYPE_AnonymousArray_{}).createFromStreamEx(stream)", 
+				readName = fmt::format("(EntityDef.id2datatypes.get({})! as KBETypes.DATATYPE_AnonymousArray_{}).createFromStreamEx(stream)",
 					pPropertyDescription->getDataType()->id(),pPropertyDescription->getDataType()->id());
 			}
 		}
@@ -3561,7 +3561,7 @@ bool ClientSDKTypeScript::writeEntityProcessMessagesMethod(ScriptDefModule* pEnt
 
 	// 处理属性callPropertysSetMethods
 	sourcefileBody_ += fmt::format("\n\tpublic override callPropertysSetMethods(){{\n");
-	sourcefileBody_ += fmt::format("\t\tlet sm:ScriptModule = EntityDef.moduledefs[\"{}\"];\n", pEntityScriptDefModule->getName());
+	sourcefileBody_ += fmt::format("\t\tlet sm:ScriptModule = EntityDef.moduledefs.get(\"{}\")!;\n", pEntityScriptDefModule->getName());
 	sourcefileBody_ += fmt::format("\t\tlet pdatas = sm.idpropertys;\n\n");
 
 	propIter = clientPropertys.begin();
@@ -3989,7 +3989,7 @@ bool ClientSDKTypeScript::writeEntityProperty_ENTITYCALL(ScriptDefModule* pEntit
 bool ClientSDKTypeScript::writeEntityMethod(ScriptDefModule* pEntityScriptDefModule,
 	ScriptDefModule* pCurrScriptDefModule, MethodDescription* pMethodDescription, const char* fillString)
 {
-	sourcefileBody_ += fmt::format("\tpublic abstract {}({}); \n", pMethodDescription->getName(), fillString);
+	sourcefileBody_ += fmt::format("\tpublic abstract {}({}): void; \n", pMethodDescription->getName(), fillString);
 	return true;
 }
 

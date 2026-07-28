@@ -124,6 +124,16 @@ pwsh -File kbe/tools/sdk_validation/New-SdkReleaseArtifacts.ps1 `
   -OutputPath D:/release/kbe-sdk-2.8.2
 ```
 
+Windows 最终候选门禁会在生成上述不可变目录后，于隔离且自动清理的工作目录完成 C# warning-as-error、C++ v143 `/W4 /WX`、TypeScript 4.9 全量编译/模块回归/Map 契约与 AST 零循环依赖、Godot headless parse。它不会启动服务器或修改项目 assets；在线四端 E2E 仍由项目清单负责。TypeScript SDK 仍保留部分历史隐式类型，完整 strict 模式迁移不属于当前 Windows 候选门禁。
+
+The Windows release-candidate gate generates the immutable directory above, then uses isolated, automatically cleaned work directories for C# warning-as-error, C++ v143 `/W4 /WX`, TypeScript 4.9 full compilation, module regression, Map-contract and AST-based zero-cycle checks, and Godot headless parsing. It does not start servers or modify project assets; the project manifest remains responsible for online four-SDK E2E validation. The TypeScript SDK still contains some legacy implicit typing, so full strict-mode migration is outside the current Windows candidate gate.
+
+```powershell
+pwsh -File kbe/tools/sdk_validation/Test-WindowsReleaseCandidate.ps1 `
+  -AssetsPath D:/game/assets `
+  -OutputPath D:/release/kbe-sdk-2.8.2
+```
+
 ## Release compatibility gate
 
 C# 发布构建必须保持零警告。两份示例清单都拒绝 C# 编译器、SDK 与 MSBuild 的中英文 warning 标记；`Test-CsharpSdkWarnings.ps1` 使用真实 `kbcmd` 和仓库自带 Python assets 生成完整 SDK，再以 `.NET 8 Release` 和 `TreatWarningsAsErrors` 编译，并验证外部销毁与 worker 自触发销毁都能协作结束线程。该门禁禁止通过恢复过时 RNG、`Thread.Abort` 或无效占位事件来换取表面兼容。
