@@ -18,11 +18,11 @@ public:
 	virtual ~EntityComponent();
 
 public:
-	virtual void onAttached(Entity* pOwnerEntity)
+	virtual void onAttached(Entity*)
 	{
 	}
 		
-	virtual void onDetached(Entity* pOwnerEntity)
+	virtual void onDetached(Entity*)
 	{
 	}
 
@@ -54,12 +54,12 @@ public:
 		// 动态生成
 	}
 
-	virtual void onRemoteMethodCall(uint16 methodUtype, MemoryStream& stream)
+	virtual void onRemoteMethodCall(uint16, MemoryStream&)
 	{
 		// 动态生成
 	}
 
-	virtual void onUpdatePropertys(uint16 propUtype, MemoryStream& stream, int maxCount)
+	virtual void onUpdatePropertys(uint16, MemoryStream&, int)
 	{
 		// 动态生成
 	}

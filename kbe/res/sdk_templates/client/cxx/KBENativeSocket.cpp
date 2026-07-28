@@ -115,6 +115,8 @@ void configureCommonOptions(NativeSocketHandle socket)
 #if defined(__APPLE__)
 	int noSigPipe = 1;
 	setsockopt(socket, SOL_SOCKET, SO_NOSIGPIPE, reinterpret_cast<const char*>(&noSigPipe), sizeof(noSigPipe));
+#else
+	(void)socket;
 #endif
 }
 

@@ -194,12 +194,14 @@ void ikcp_allocator(void* (*new_malloc)(size_t), void (*new_free)(void*))
 // allocate a new kcp segment
 static IKCPSEG* ikcp_segment_new(ikcpcb *kcp, int size)
 {
+	(void)kcp;
 	return (IKCPSEG*)ikcp_malloc(sizeof(IKCPSEG) + size);
 }
 
 // delete a segment
 static void ikcp_segment_delete(ikcpcb *kcp, IKCPSEG *seg)
 {
+	(void)kcp;
 	ikcp_free(seg);
 }
 
@@ -238,6 +240,8 @@ static int ikcp_output(ikcpcb *kcp, const void *data, int size)
 // output queue
 void ikcp_qprint(const char *name, const struct IQUEUEHEAD *head)
 {
+	(void)name;
+	(void)head;
 #if 0
 	const struct IQUEUEHEAD *p;
 	printf("<%s>: [", name);
@@ -529,7 +533,7 @@ int ikcp_send(ikcpcb *kcp, const char *buffer, int len)
 	if (len <= (int)kcp->mss) count = 1;
 	else count = (len + kcp->mss - 1) / kcp->mss;
 
-	if (count >= IKCP_WND_RCV) return -2;
+	if (count >= (int)IKCP_WND_RCV) return -2;
 
 	if (count == 0) count = 1;
 
@@ -678,7 +682,7 @@ static void ikcp_ack_push(ikcpcb *kcp, IUINT32 sn, IUINT32 ts)
 		}
 
 		kcp->acklist = acklist;
-		kcp->ackblock = newblock;
+		kcp->ackblock = (IUINT32)newblock;
 	}
 
 	ptr = &kcp->acklist[kcp->ackcount * 2];
@@ -1101,7 +1105,7 @@ void ikcp_flush(ikcpcb *kcp)
 			}
 
 			if (segment->xmit >= kcp->dead_link) {
-				kcp->state = -1;
+				kcp->state = (IUINT32)-1;
 			}
 		}
 	}

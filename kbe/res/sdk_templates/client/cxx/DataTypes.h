@@ -32,21 +32,21 @@ public:
 		{
 		}
 
-		virtual KBVariant* createFromStream(MemoryStream& stream)
+		virtual KBVariant* createFromStream(MemoryStream&)
 		{
 			return nullptr;
 		}
 		
-		virtual void addToStream(Bundle& stream, KBVariant& v)
+		virtual void addToStream(Bundle&, KBVariant&)
 		{
 		}
 		
-		virtual KBVariant* parseDefaultValStr(const KBString& v)
+		virtual KBVariant* parseDefaultValStr(const KBString&)
 		{
 			return nullptr;
 		}
 		
-		virtual bool isSameType(KBVariant& v)
+		virtual bool isSameType(KBVariant&)
 		{
 			return false;
 		}

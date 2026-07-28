@@ -256,7 +256,7 @@ Bundle &Bundle::operator<<(bool value)
 
 Bundle &Bundle::operator<<(const KBString &value)
 {
-	uint32 len = value.length();
+	uint32 len = static_cast<uint32>(value.length());
 
 	// +1为字符串尾部的0位置
 	checkStream(len + 1);

@@ -285,7 +285,7 @@ void DATATYPE_VECTOR2::addToStream(Bundle& stream, KBVariant& v)
 	stream << val.x << val.y;
 }
 
-KBVariant* DATATYPE_VECTOR2::parseDefaultValStr(const KBString& v)
+KBVariant* DATATYPE_VECTOR2::parseDefaultValStr(const KBString&)
 {
 	return new KBVariant(KBVector2f());
 }
@@ -308,7 +308,7 @@ void DATATYPE_VECTOR3::addToStream(Bundle& stream, KBVariant& v)
 	stream << val.x << val.y << val.z;
 }
 
-KBVariant* DATATYPE_VECTOR3::parseDefaultValStr(const KBString& v)
+KBVariant* DATATYPE_VECTOR3::parseDefaultValStr(const KBString&)
 {
 	return new KBVariant(KBVector3f());
 }
@@ -331,7 +331,7 @@ void DATATYPE_VECTOR4::addToStream(Bundle& stream, KBVariant& v)
 	stream << val.x << val.y << val.z << val.w;
 }
 
-KBVariant* DATATYPE_VECTOR4::parseDefaultValStr(const KBString& v)
+KBVariant* DATATYPE_VECTOR4::parseDefaultValStr(const KBString&)
 {
 	return new KBVariant(KBVector4f());
 }
@@ -354,7 +354,7 @@ void DATATYPE_PYTHON::addToStream(Bundle& stream, KBVariant& v)
 	stream.appendBlob(val);
 }
 
-KBVariant* DATATYPE_PYTHON::parseDefaultValStr(const KBString& v)
+KBVariant* DATATYPE_PYTHON::parseDefaultValStr(const KBString&)
 {
 	return new KBVariant(KBArray<uint8>());
 }
@@ -401,7 +401,7 @@ void DATATYPE_ENTITYCALL::addToStream(Bundle& stream, KBVariant& v)
 	stream.appendBlob(val);
 }
 
-KBVariant* DATATYPE_ENTITYCALL::parseDefaultValStr(const KBString& v)
+KBVariant* DATATYPE_ENTITYCALL::parseDefaultValStr(const KBString&)
 {
 	return new KBVariant(KBArray<uint8>());
 }
@@ -424,7 +424,7 @@ void DATATYPE_BLOB::addToStream(Bundle& stream, KBVariant& v)
 	stream.appendBlob(val);
 }
 
-KBVariant* DATATYPE_BLOB::parseDefaultValStr(const KBString& v)
+KBVariant* DATATYPE_BLOB::parseDefaultValStr(const KBString&)
 {
 	return new KBVariant(KBArray<uint8>());
 }
@@ -439,8 +439,8 @@ void DATATYPE_ARRAY::bind()
 	if (tmpset_uitemtype == -1)
 		vtype->bind();
 	else
-		if (EntityDef::id2datatypes.Contains(tmpset_uitemtype))
-			vtype = EntityDef::id2datatypes[tmpset_uitemtype];
+		if (EntityDef::id2datatypes.Contains(static_cast<uint16>(tmpset_uitemtype)))
+			vtype = EntityDef::id2datatypes[static_cast<uint16>(tmpset_uitemtype)];
 }
 
 KBVariant* DATATYPE_ARRAY::createFromStream(MemoryStream& stream)
@@ -488,7 +488,7 @@ void DATATYPE_ARRAY::addToStream(Bundle& stream, KBVariant& v)
 	}
 }
 
-KBVariant* DATATYPE_ARRAY::parseDefaultValStr(const KBString& v)
+KBVariant* DATATYPE_ARRAY::parseDefaultValStr(const KBString&)
 {
 	return new KBVariant(KBVariant::KBVarArray());
 }
@@ -566,7 +566,7 @@ void DATATYPE_FIXED_DICT::addToStream(Bundle& stream, KBVariant& v)
 	}
 }
 
-KBVariant* DATATYPE_FIXED_DICT::parseDefaultValStr(const KBString& v)
+KBVariant* DATATYPE_FIXED_DICT::parseDefaultValStr(const KBString&)
 {
 	KBVariant::KBVarMap val;
 

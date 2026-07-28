@@ -172,7 +172,7 @@ void NetworkInterfaceKCP::process()
 		if (!data.empty() && pMessageReader_)
 		{
 			pBuffer_->clear(true);
-			pBuffer_->append(data.data(), data.size());
+			pBuffer_->append(data.data(), static_cast<uint32>(data.size()));
 
 			if (pFilter_)
 			{
@@ -544,7 +544,7 @@ uint32 NetworkInterfaceKCP::nowMs_()
 	return static_cast<uint32>(duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count());
 }
 
-int NetworkInterfaceKCP::kcpOutput_(const char* buf, int len, ikcpcb* kcp, void* user)
+int NetworkInterfaceKCP::kcpOutput_(const char* buf, int len, ikcpcb*, void* user)
 {
 	NetworkInterfaceKCP* self = reinterpret_cast<NetworkInterfaceKCP*>(user);
 	if (!self)

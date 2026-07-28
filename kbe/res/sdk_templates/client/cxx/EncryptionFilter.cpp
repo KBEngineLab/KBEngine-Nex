@@ -288,7 +288,7 @@ bool BlowfishFilter::recv(MessageReader* pMessageReader, MemoryStream* pPacket) 
     // 检查是否为一个完整的包
     if (len > MIN_PACKET_SIZE) {
 
-        if (0 == pPacket_->length() && packeLen - 1 == len - 3) {
+        if (0 == pPacket_->length() && static_cast<uint32>(packeLen - 1) == len - 3) {
             uint8 padSize = pPacket->readUint8();
             decrypt(pPacket);
 

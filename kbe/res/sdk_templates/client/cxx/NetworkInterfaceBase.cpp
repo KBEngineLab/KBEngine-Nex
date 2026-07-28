@@ -89,7 +89,7 @@ bool NetworkInterfaceBase::send(MemoryStream* pMemoryStream)
 	return sendTo(pMemoryStream);
 }
 
-bool NetworkInterfaceBase::sendTo(MemoryStream *pMemoryStream) {
+bool NetworkInterfaceBase::sendTo(MemoryStream*) {
 	return true;
 }
 

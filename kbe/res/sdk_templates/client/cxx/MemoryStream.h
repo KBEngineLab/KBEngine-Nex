@@ -577,22 +577,22 @@ public:
 	KBArray<uint8> readEntitycall()
 	{
 		KBArray<uint8> datas;
-		uint64 cid = readUint64();
-		int32 id = readInt32();
-		uint16 type = readUint16();
-		uint16 utype = readUint16();
+		readUint64();
+		readInt32();
+		readUint16();
+		readUint16();
 		return datas;
 	}
 
-	uint32 readEntitycall(KBArray<uint8>& datas)
+	uint32 readEntitycall(KBArray<uint8>&)
 	{
 		if (length() <= 0)
 			return 0;
 
-		uint64 cid = readUint64();
-		int32 id = readInt32();
-		uint16 type = readUint16();
-		uint16 utype = readUint16();
+		readUint64();
+		readInt32();
+		readUint16();
+		readUint16();
 		return 0;
 	}
 
@@ -940,7 +940,7 @@ public:
 		(*this) << v;
 	}
 
-	void writeEntitycall(const KBArray<uint8>& v)
+	void writeEntitycall(const KBArray<uint8>&)
 	{
 		uint64 cid = 0;
 		int32 id = 0;

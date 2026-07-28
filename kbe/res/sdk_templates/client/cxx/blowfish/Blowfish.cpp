@@ -2,7 +2,7 @@
 #include <cstring>
 #include <algorithm>
 
-#if !defined(__LITTLE_ENDIAN__) and !defined(__BIG_ENDIAN__)
+#if !defined(__LITTLE_ENDIAN__) && !defined(__BIG_ENDIAN__)
 #define __LITTLE_ENDIAN__
 #endif
 

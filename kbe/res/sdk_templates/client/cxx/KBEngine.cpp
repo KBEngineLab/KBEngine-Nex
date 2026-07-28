@@ -172,7 +172,7 @@ void KBEngineApp::installEvents()
 		login(data.username, data.password, data.datas);
 	});
 
-	KBENGINE_REGISTER_EVENT_IN_OVERRIDE_FUNC(KBEventTypes::logout, KBEventTypes::logout, [this](std::shared_ptr<UKBEventData> pEventData)
+	KBENGINE_REGISTER_EVENT_IN_OVERRIDE_FUNC(KBEventTypes::logout, KBEventTypes::logout, [this](std::shared_ptr<UKBEventData>)
 	{
 		logout();
 	});
@@ -183,7 +183,7 @@ void KBEngineApp::installEvents()
 		createAccount(data.username, data.password, data.datas);
 	});
 
-	KBENGINE_REGISTER_EVENT_IN_OVERRIDE_FUNC(KBEventTypes::reloginBaseapp, KBEventTypes::reloginBaseapp, [this](std::shared_ptr<UKBEventData> pEventData)
+	KBENGINE_REGISTER_EVENT_IN_OVERRIDE_FUNC(KBEventTypes::reloginBaseapp, KBEventTypes::reloginBaseapp, [this](std::shared_ptr<UKBEventData>)
 	{
 		reloginBaseapp();
 	});
@@ -207,7 +207,7 @@ void KBEngineApp::installEvents()
 	});
 
 	// 内部事件
-	KBENGINE_REGISTER_EVENT_IN_OVERRIDE_FUNC("_closeNetwork", "_closeNetwork", [this](std::shared_ptr<UKBEventData> pEventData)
+	KBENGINE_REGISTER_EVENT_IN_OVERRIDE_FUNC("_closeNetwork", "_closeNetwork", [this](std::shared_ptr<UKBEventData>)
 	{
 		_closeNetwork();
 	});
@@ -774,7 +774,7 @@ void KBEngineApp::login_loginapp(bool noconnect)
 	if (noconnect)
 	{
 		reset();
-		pNetworkInterface_->connectTo(pArgs_->ip, pArgs_->port, this, 0);
+		pNetworkInterface_->connectTo(pArgs_->ip, static_cast<uint16>(pArgs_->port), this, static_cast<uint16>(0));
 	}
 	else
 	{
@@ -1215,7 +1215,7 @@ void KBEngineApp::Client_setSpaceData(uint32 spaceID, const KBString& key, const
 	KBENGINE_EVENT_FIRE_OUT(KBEventTypes::onSetSpaceData, pEventData);
 }
 
-void KBEngineApp::Client_delSpaceData(uint32 spaceID, const KBString& key)
+void KBEngineApp::Client_delSpaceData(uint32, const KBString& key)
 {
 	DEBUG_MSG("KBEngineApp::Client_delSpaceData(): spaceID(%d), key(%s)!", spaceID_, *key);
 
@@ -1263,7 +1263,7 @@ void KBEngineApp::resetpassword_loginapp(bool noconnect)
 	if (noconnect)
 	{
 		reset();
-		pNetworkInterface_->connectTo(pArgs_->ip, pArgs_->port, this, 4);
+		pNetworkInterface_->connectTo(pArgs_->ip, static_cast<uint16>(pArgs_->port), this, static_cast<uint16>(4));
 	}
 	else
 	{
@@ -1344,7 +1344,7 @@ void KBEngineApp::createAccount_loginapp(bool noconnect)
 	if (noconnect)
 	{
 		reset();
-		pNetworkInterface_->connectTo(pArgs_->ip, pArgs_->port, this, 1);
+		pNetworkInterface_->connectTo(pArgs_->ip, static_cast<uint16>(pArgs_->port), this, static_cast<uint16>(1));
 	}
 	else
 	{

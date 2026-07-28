@@ -114,7 +114,7 @@ public:
 	// See the Entity.controlledBy() method in the CellApp server code for more infomation.
 	// 对于玩家自身来说，它表示是否自己被其它玩家控制了；
 	// 对于其它entity来说，表示我本机是否控制了这个entity
-	virtual void onControlled(bool isControlled)
+	virtual void onControlled(bool)
 	{
 
 	}
@@ -140,12 +140,12 @@ public:
 		return NULL;
 	}
 
-	virtual void onRemoteMethodCall(MemoryStream& stream)
+	virtual void onRemoteMethodCall(MemoryStream&)
 	{
 		// 动态生成
 	}
 
-	virtual void onUpdatePropertys(MemoryStream& stream)
+	virtual void onUpdatePropertys(MemoryStream&)
 	{
 		// 动态生成
 	}
@@ -190,7 +190,7 @@ public:
 		// 动态生成
 	}
 
-	virtual KBArray<EntityComponent*> getComponents(KBString componentName, bool all)
+	virtual KBArray<EntityComponent*> getComponents(KBString, bool)
 	{
 		KBArray<EntityComponent*> founds;
 

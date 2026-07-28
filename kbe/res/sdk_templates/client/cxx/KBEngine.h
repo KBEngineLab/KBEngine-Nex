@@ -90,7 +90,7 @@ public:
 	/*
 		服务端错误描述导入了
 	*/
-	void Client_onImportServerErrorsDescr(MemoryStream& stream)
+	void Client_onImportServerErrorsDescr(MemoryStream&)
 	{
 		// 无需实现，已由插件生成静态代码
 	}
@@ -98,7 +98,7 @@ public:
 	/*
 		从服务端返回的二进制流导入客户端消息协议
 	*/
-	void Client_onImportClientMessages(MemoryStream& stream)
+	void Client_onImportClientMessages(MemoryStream&)
 	{
 		// 无需实现，已由插件生成静态代码
 	}
@@ -106,7 +106,7 @@ public:
 	/*
 		从服务端返回的二进制流导入客户端消息协议
 	*/
-	void Client_onImportClientEntityDef(MemoryStream& stream)
+	void Client_onImportClientEntityDef(MemoryStream&)
 	{
 		// 无需实现，已由插件生成静态代码
 	}

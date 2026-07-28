@@ -128,7 +128,7 @@ public:
 		appendBlob(v);
 	}
 
-	void writeEntitycall(const KBArray<uint8>& v)
+	void writeEntitycall(const KBArray<uint8>&)
 	{
 		uint64 cid = 0;
 		int32 id = 0;
