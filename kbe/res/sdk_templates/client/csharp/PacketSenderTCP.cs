@@ -1,6 +1,7 @@
 namespace KBEngine
 {
 	using System;
+	using System.Collections.Generic;
 	using System.Net.Sockets;
 
 	/*
@@ -15,7 +16,7 @@ namespace KBEngine
 		{
 			// CLR 数组使用 Int32 索引；checked 转换让无效的超大配置在初始化时明确失败，而不是产生截断后的队列。
 			// CLR arrays use Int32 indices; a checked conversion rejects an invalid oversized setting during initialization instead of creating a truncated queue.
-			_sendQueue = new TcpSendQueue(checked((int)KBEngineApp.app.getInitArgs().TCP_SEND_BUFFER_MAX));
+			_sendQueue = new TcpSendQueue(KBEngineApp.app.getInitArgs().getSendQueueSize());
 		}
 
 		~PacketSenderTCP()
@@ -25,15 +26,26 @@ namespace KBEngine
 
 		public override bool send(MemoryStream stream)
 		{
-			int dataLength = (int)stream.length();
-			if (dataLength <= 0)
-				return true;
+			return send(new MemoryStream[] { stream });
+		}
+
+		public override bool send(IReadOnlyList<MemoryStream> streams)
+		{
+			var segments = new ArraySegment<byte>[streams.Count];
+			long totalLength = 0;
+			for (int index = 0; index < streams.Count; ++index)
+			{
+				MemoryStream stream = streams[index];
+				int length = checked((int)stream.length());
+				segments[index] = new ArraySegment<byte>(stream.data(), stream.rpos, length);
+				totalLength += length;
+			}
 
 			bool startWorker;
-			if (!_sendQueue.tryEnqueue(stream.data(), stream.rpos, dataLength, out startWorker))
+			if (!_sendQueue.tryEnqueue(segments, out startWorker))
 			{
-				KBELog.ERROR_MSG("PacketSenderTCP::send(): no space, Please adjust 'TCP_SEND_BUFFER_MAX'! data(" +
-					dataLength + ") > available queue capacity, capacity=" + _sendQueue.capacity);
+				KBELog.ERROR_MSG("PacketSenderTCP::send(): no space, Please adjust 'SEND_QUEUE_MAX'! batch(" +
+					totalLength + ") > available queue capacity, capacity=" + _sendQueue.capacity);
 				return false;
 			}
 

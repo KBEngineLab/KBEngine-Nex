@@ -5,11 +5,14 @@ internal static class Program
     private static int Main()
     {
         fullQueueDoesNotLeakLock();
+        tcpBatchFailureIsAtomic();
         wraparoundPreservesBytes();
         concurrentProducersPreservePackets();
         abortAllowsWorkerRestart();
+        kcpBatchFailureIsAtomic();
+        kcpAcknowledgementReleasesBytes();
 
-        Console.WriteLine("CSHARP_TCP_SEND_QUEUE_TEST_PASS full=true wrap=true concurrent=true restart=true");
+        Console.WriteLine("CSHARP_SEND_BACKPRESSURE_TEST_PASS tcp-full=true tcp-wrap=true concurrent=true restart=true kcp-atomic=true kcp-ack-release=true");
         return 0;
     }
 
@@ -80,6 +83,78 @@ internal static class Program
         Require(queue.tryEnqueue(new byte[] { 3 }, 0, 1, out start) && start,
             "A failed worker left the running state armed.");
         Require(ReadAll(queue).SequenceEqual(new byte[] { 3 }), "Abort retained bytes from the failed transport.");
+    }
+
+    private static void tcpBatchFailureIsAtomic()
+    {
+        var queue = new TcpSendQueue(4);
+        Require(queue.tryEnqueue(new byte[] { 1, 2 }, 0, 2, out _), "Initial TCP bytes were rejected.");
+        var rejected = new[]
+        {
+            new ArraySegment<byte>(new byte[] { 3 }),
+            new ArraySegment<byte>(new byte[] { 4, 5 })
+        };
+        Require(!queue.tryEnqueue(rejected, out _), "Oversized TCP batch was accepted.");
+        Require(ReadAll(queue).SequenceEqual(new byte[] { 1, 2 }),
+            "Rejected TCP batch partially changed queued bytes.");
+
+        var accepted = new[]
+        {
+            new ArraySegment<byte>(new byte[] { 3 }),
+            new ArraySegment<byte>(new byte[] { 4, 5 })
+        };
+        Require(queue.tryEnqueue(accepted, out _), "Valid TCP batch was rejected after draining.");
+        Require(ReadAll(queue).SequenceEqual(new byte[] { 3, 4, 5 }),
+            "Accepted TCP batch changed segment order.");
+    }
+
+    private static void kcpBatchFailureIsAtomic()
+    {
+        var kcp = new Deps.KCP(1, null);
+        byte[] first = Enumerable.Range(0, 100).Select(value => (byte)value).ToArray();
+        Require(kcp.SendBatch(new[] { new ArraySegment<byte>(first) }, 120) == 0,
+            "The initial KCP batch was rejected.");
+        Require(kcp.PendingSendBytes() == 100 && kcp.WaitSnd() == 1,
+            "KCP did not account for the accepted payload.");
+
+        // 整个第二批超过剩余字节上限时必须零修改，不能留下可发送的前半批 segment。
+        // When the complete second batch exceeds remaining bytes, it must make zero changes and cannot leave sendable segments from its first half.
+        var rejected = new[]
+        {
+            new ArraySegment<byte>(new byte[10]),
+            new ArraySegment<byte>(new byte[11])
+        };
+        Require(kcp.SendBatch(rejected, 120) == -3, "KCP did not report byte backpressure.");
+        Require(kcp.PendingSendBytes() == 100 && kcp.WaitSnd() == 1,
+            "A rejected KCP batch partially changed the send queue.");
+
+        kcp.Release();
+        Require(kcp.PendingSendBytes() == 0 && kcp.WaitSnd() == 0,
+            "KCP release retained pending send accounting.");
+    }
+
+    private static void kcpAcknowledgementReleasesBytes()
+    {
+        var sender = new Deps.KCP(7, null);
+        var receiver = new Deps.KCP(7, null);
+        sender.NoDelay(1, 10, 2, 1);
+        receiver.NoDelay(1, 10, 2, 1);
+        sender.SetOutput((data, size, _) => Require(receiver.Input(data, 0, size) == 0,
+            "The receiving KCP endpoint rejected a data datagram."));
+        receiver.SetOutput((data, size, _) => Require(sender.Input(data, 0, size) == 0,
+            "The sending KCP endpoint rejected an acknowledgement datagram."));
+
+        byte[] payload = Enumerable.Range(0, 100).Select(value => (byte)value).ToArray();
+        Require(sender.SendBatch(new[] { new ArraySegment<byte>(payload) }, 100) == 0,
+            "KCP sender rejected a batch at its exact byte limit.");
+        sender.Update(1);
+        receiver.Update(1);
+
+        var received = new byte[payload.Length];
+        Require(receiver.Recv(received, 0, received.Length) == payload.Length && received.SequenceEqual(payload),
+            "KCP loopback changed the acknowledged payload.");
+        Require(sender.PendingSendBytes() == 0 && sender.WaitSnd() == 0,
+            "KCP acknowledgement did not release pending payload bytes.");
     }
 
     private static byte[] ReadAll(TcpSendQueue queue)

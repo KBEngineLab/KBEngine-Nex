@@ -343,6 +343,20 @@ namespace KBEngine
 			return _packetSender.send(stream);
 		}
 
+		public virtual bool send(IReadOnlyList<MemoryStream> streams)
+		{
+			if (!valid())
+				return false;
+
+			if (_packetSender == null)
+				_packetSender = createPacketSender();
+
+			if (_filter != null)
+				return _filter.send(_packetSender, streams);
+
+			return _packetSender.send(streams);
+		}
+
 		public virtual void process()
 		{
 			if (!valid())

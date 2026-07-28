@@ -82,6 +82,19 @@ namespace KBEngine
 		}
 	
 		public abstract bool send(MemoryStream stream);
+
+		public virtual bool send(IReadOnlyList<MemoryStream> streams)
+		{
+			if (streams == null)
+				throw new ArgumentNullException(nameof(streams));
+
+			if (streams.Count == 0)
+				return true;
+
+			// 批量发送默认拒绝多片段，避免新传输在未实现原子提交时悄悄退化成部分发送。
+			// Batch sending rejects multiple segments by default so a new transport cannot silently degrade to partial delivery without atomic commit support.
+			return streams.Count == 1 && send(streams[0]);
+		}
 	
 		protected void _startSend()
 		{

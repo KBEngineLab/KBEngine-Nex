@@ -43,6 +43,10 @@ public partial class GodotKBEMain : Node
 	public int serverHeartbeatTick = @{KBE_SERVER_EXTERNAL_TIMEOUT};
     [Export]
     public int TCP_SEND_BUFFER_MAX = (int)KBEngine.NetworkInterfaceBase.TCP_PACKET_MAX;
+    // 限制尚未完成的应用层发送字节，独立于单个 socket 包缓冲大小。
+    // Limits unfinished application send bytes independently from the per-socket packet buffer size.
+    [Export]
+    public int SEND_QUEUE_MAX = 256 * 1024;
     [Export]
     public int TCP_RECV_BUFFER_MAX = (int)KBEngine.NetworkInterfaceBase.TCP_PACKET_MAX;
     [Export]
@@ -109,6 +113,7 @@ public partial class GodotKBEMain : Node
         args.isOnInitCallPropertysSetMethods = isOnInitCallPropertysSetMethods;
 
         args.TCP_SEND_BUFFER_MAX = (UInt32)TCP_SEND_BUFFER_MAX;
+        args.SEND_QUEUE_MAX = (UInt32)SEND_QUEUE_MAX;
         args.TCP_RECV_BUFFER_MAX = (UInt32)TCP_RECV_BUFFER_MAX;
         args.UDP_SEND_BUFFER_MAX = (UInt32)UDP_SEND_BUFFER_MAX;
         args.UDP_RECV_BUFFER_MAX = (UInt32)UDP_RECV_BUFFER_MAX;

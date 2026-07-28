@@ -1,6 +1,7 @@
 namespace KBEngine
 {
 	using System;
+	using System.Collections.Generic;
 
 	// TCP 发送队列将容量判断、环形缓冲区游标和工作线程所有权集中管理，避免网络发送路径散落手工锁操作。
 	// The TCP send queue centralizes capacity checks, ring-buffer cursors, and worker ownership so the network path does not scatter manual lock operations.
@@ -30,23 +31,48 @@ namespace KBEngine
 			if (offset < 0 || count < 0 || offset > data.Length - count)
 				throw new ArgumentOutOfRangeException(nameof(offset));
 
+			return tryEnqueue(new ArraySegment<byte>[] { new ArraySegment<byte>(data, offset, count) }, out startWorker);
+		}
+
+		internal bool tryEnqueue(IReadOnlyList<ArraySegment<byte>> segments, out bool startWorker)
+		{
+			if (segments == null)
+				throw new ArgumentNullException(nameof(segments));
+
 			lock (_gate)
 			{
+				long totalCount = 0;
+				for (int index = 0; index < segments.Count; ++index)
+				{
+					ArraySegment<byte> segment = segments[index];
+					if (segment.Array == null)
+						throw new ArgumentException("A send segment has no backing array.", nameof(segments));
+
+					totalCount += segment.Count;
+				}
+
 				long queued = _writePosition - _sendPosition;
-				if (count > _buffer.Length - queued)
+				if (totalCount > _buffer.Length - queued)
 				{
 					startWorker = false;
 					return false;
 				}
 
-				int writeOffset = (int)(_writePosition % _buffer.Length);
-				int firstPart = Math.Min(count, _buffer.Length - writeOffset);
-				Array.Copy(data, offset, _buffer, writeOffset, firstPart);
-				if (firstPart < count)
-					Array.Copy(data, offset + firstPart, _buffer, 0, count - firstPart);
+				// 所有片段在同一个容量检查和锁周期内复制，失败时队列保持不变，成功时其他生产者也看不到半个 Bundle。
+				// Every segment is copied under one capacity check and lock cycle, leaving the queue unchanged on failure and hiding partial Bundles from other producers.
+				for (int index = 0; index < segments.Count; ++index)
+				{
+					ArraySegment<byte> segment = segments[index];
+					int writeOffset = (int)(_writePosition % _buffer.Length);
+					int firstPart = Math.Min(segment.Count, _buffer.Length - writeOffset);
+					Array.Copy(segment.Array, segment.Offset, _buffer, writeOffset, firstPart);
+					if (firstPart < segment.Count)
+						Array.Copy(segment.Array, segment.Offset + firstPart, _buffer, 0, segment.Count - firstPart);
 
-				_writePosition += count;
-				startWorker = !_workerRunning && count > 0;
+					_writePosition += segment.Count;
+				}
+
+				startWorker = !_workerRunning && totalCount > 0;
 				if (startWorker)
 					_workerRunning = true;
 

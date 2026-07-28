@@ -51,6 +51,9 @@
 		// 发送缓冲大小
 		public MessageLengthEx TCP_SEND_BUFFER_MAX = NetworkInterfaceBase.TCP_PACKET_MAX;
 		public MessageLengthEx UDP_SEND_BUFFER_MAX = 128;
+		// 应用发送队列与 socket/KCP 窗口分开配置，使合法大消息不受单个网络包大小限制，同时保持明确的内存上限。
+		// Configure the application send queue separately from socket/KCP windows so valid large messages are not limited by one network packet while memory remains bounded.
+		public MessageLengthEx SEND_QUEUE_MAX = 256 * 1024;
 
 		// 接收缓冲区大小
 		public MessageLengthEx TCP_RECV_BUFFER_MAX = NetworkInterfaceBase.TCP_PACKET_MAX;
@@ -84,6 +87,11 @@
 		public int getUDPSendBufferSize()
 		{
 			return (int)UDP_SEND_BUFFER_MAX;
+		}
+
+		public int getSendQueueSize()
+		{
+			return checked((int)SEND_QUEUE_MAX);
 		}
     }
 

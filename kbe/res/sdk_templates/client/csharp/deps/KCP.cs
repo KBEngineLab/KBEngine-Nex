@@ -204,6 +204,7 @@ namespace Deps
         UInt32 nsnd_buf_ = 0;
         UInt32 nrcv_que_ = 0;
         UInt32 nsnd_que_ = 0;
+		long pending_send_bytes_ = 0;
 
         UInt32 nodelay_ = 0;
         UInt32 updated_ = 0;
@@ -268,6 +269,7 @@ namespace Deps
             nsnd_buf_ = 0;
             nrcv_que_ = 0;
             nsnd_que_ = 0;
+			pending_send_bytes_ = 0;
             ackblock_ = 0;
             ackcount_ = 0;
             buffer_ = null;
@@ -391,42 +393,68 @@ namespace Deps
         // user/upper level send, returns below zero for error
         public int Send(byte[] buffer, int offset, int len)
         {
-            Debug.Assert(mss_ > 0);
-            if (len < 0)
-                return -1;
+			if (len < 0 || offset < 0 || (buffer == null && len > 0) || (buffer != null && offset > buffer.Length - len))
+				return -1;
+
+			byte[] source = buffer ?? Array.Empty<byte>();
+			return SendBatch(new ArraySegment<byte>[] { new ArraySegment<byte>(source, offset, len) }, long.MaxValue);
+        }
+
+		// 整个批次在创建任何 Segment 前完成校验，保证背压失败不会把半个 Bundle 留在 KCP 队列中。
+		// Validate the complete batch before creating any Segment so backpressure failure cannot leave half a Bundle in the KCP queue.
+		public int SendBatch(IReadOnlyList<ArraySegment<byte>> packets, long maxPendingBytes)
+		{
+			Debug.Assert(mss_ > 0);
+			if (packets == null || maxPendingBytes < 0)
+				return -1;
+
+			long totalBytes = 0;
+			for (int packetIndex = 0; packetIndex < packets.Count; ++packetIndex)
+			{
+				ArraySegment<byte> packet = packets[packetIndex];
+				if (packet.Array == null)
+					return -1;
+
+				int fragmentCount = packet.Count <= (int)mss_ ? 1 : (packet.Count + (int)mss_ - 1) / (int)mss_;
+				if (fragmentCount > 255)
+					return -2;
+
+				totalBytes += packet.Count;
+			}
+
+			if (totalBytes > maxPendingBytes - pending_send_bytes_)
+				return -3;
+
+			for (int packetIndex = 0; packetIndex < packets.Count; ++packetIndex)
+			{
+				ArraySegment<byte> packet = packets[packetIndex];
+				int offset = packet.Offset;
+				int remaining = packet.Count;
+				int count = remaining <= (int)mss_ ? 1 : (remaining + (int)mss_ - 1) / (int)mss_;
 
             //
             // not implement streaming mode here as ikcp.c
             //
 
-            int count = 0;
-            if (len <= (int)mss_)
-                count = 1;
-            else
-                count = (len + (int)mss_ - 1) / (int)mss_;
+				for (int fragmentIndex = 0; fragmentIndex < count; ++fragmentIndex)
+				{
+					int size = remaining > (int)mss_ ? (int)mss_ : remaining;
+					var segment = new Segment(size);
+					if (size > 0)
+					{
+						Buffer.BlockCopy(packet.Array, offset, segment.data, 0, size);
+						offset += size;
+					}
 
-            if (count > 255) // maximum value `frg` can present
-                return -2;
+					segment.frg = (UInt32)(count - fragmentIndex - 1);
+					snd_queue_.AddLast(segment);
+					nsnd_que_++;
+					remaining -= size;
+				}
+			}
 
-            if (count == 0)
-                count = 1;
-
-            // fragment
-            for (int i = 0; i < count; i++)
-            {
-                int size = len > (int)mss_ ? (int)mss_ : len;
-                var seg = new Segment(size);
-                if (buffer != null && len > 0)
-                {
-                    Buffer.BlockCopy(buffer, offset, seg.data, 0, size);
-                    offset += size;
-                }
-                seg.frg = (UInt32)(count - i - 1);
-                snd_queue_.AddLast(seg);
-                nsnd_que_++;
-                len -= size;
-            }
-            return 0;
+			pending_send_bytes_ += totalBytes;
+			return 0;
         }
 
         // parse ack
@@ -481,6 +509,7 @@ namespace Deps
                 {
                     snd_buf_.Remove(node);
                     nsnd_buf_--;
+					pending_send_bytes_ -= seg.data.Length;
                     break;
                 }
                 if (_itimediff(sn, seg.sn) < 0)
@@ -499,6 +528,7 @@ namespace Deps
                 {
                     snd_buf_.Remove(node);
                     nsnd_buf_--;
+					pending_send_bytes_ -= seg.data.Length;
                 }
                 else
                 {
@@ -1136,6 +1166,11 @@ namespace Deps
         {
             return (int)(nsnd_buf_ + nsnd_que_);
         }
+
+		public long PendingSendBytes()
+		{
+			return pending_send_bytes_;
+		}
 
         // read conv
         public UInt32 GetConv()

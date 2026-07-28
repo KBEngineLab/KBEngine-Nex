@@ -105,18 +105,34 @@
 
 		public override bool send(MemoryStream stream)
 		{
+			return send(new MemoryStream[] { stream });
+		}
+
+		public override bool send(IReadOnlyList<MemoryStream> streams)
+		{
 			if (!valid())
+				return false;
+
+			var packets = new ArraySegment<byte>[streams.Count];
+			for (int index = 0; index < streams.Count; ++index)
 			{
-				throw new ArgumentException("invalid socket!");
+				MemoryStream stream = streams[index];
+				if (_filter != null)
+					_filter.encrypt(stream);
+
+				packets[index] = new ArraySegment<byte>(stream.data(), stream.rpos, checked((int)stream.length()));
 			}
 
-            if(_filter != null)
-            {
-                _filter.encrypt(stream);
-            }
-
 			nextTickKcpUpdate = 0;
-			return kcp_.Send(stream.data(), stream.rpos, (int)stream.length()) >= 0;
+			int result = kcp_.SendBatch(packets, KBEngineApp.app.getInitArgs().getSendQueueSize());
+			if (result < 0)
+			{
+				KBELog.ERROR_MSG("NetworkInterfaceKCP::send(): atomic batch rejected, result=" + result +
+					", pendingBytes=" + kcp_.PendingSendBytes());
+				return false;
+			}
+
+			return true;
 		}
 
 		public override void process()

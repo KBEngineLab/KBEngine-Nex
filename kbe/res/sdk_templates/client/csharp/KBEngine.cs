@@ -381,8 +381,7 @@ namespace KBEngine
 					{
 						Bundle bundle = Bundle.createObject();
 						bundle.newMessage(Messages.messages["Loginapp_onClientActiveTick"]);
-						bundle.send(_networkInterface);
-						heartbeatSent = true;
+						heartbeatSent = bundle.send(_networkInterface);
 					}
 				}
 				else
@@ -391,8 +390,7 @@ namespace KBEngine
 					{
 						Bundle bundle = Bundle.createObject();
 						bundle.newMessage(Messages.messages["Baseapp_onClientActiveTick"]);
-						bundle.send(_networkInterface);
-						heartbeatSent = true;
+						heartbeatSent = bundle.send(_networkInterface);
 					}
 				}
 				

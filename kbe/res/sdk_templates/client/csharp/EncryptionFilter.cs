@@ -12,6 +12,7 @@
         public abstract void decrypt(byte[] buffer, int startIndex, int length);
 
         public abstract bool send(PacketSenderBase sender, MemoryStream stream);
+        public abstract bool send(PacketSenderBase sender, IReadOnlyList<MemoryStream> streams);
         public abstract bool recv(MessageReaderBase reader, byte[] buffer, UInt32 rpos, UInt32 len);
     }
 
@@ -84,6 +85,22 @@
 
             encrypt(stream);
             return sender.send(stream);
+        }
+
+        public override bool send(PacketSenderBase sender, IReadOnlyList<MemoryStream> streams)
+        {
+            if(!_blowfish.isGood())
+            {
+                KBELog.ERROR_MSG("BlowfishFilter::send: Dropping batch, due to invalid filter");
+                return false;
+            }
+
+            // 每个 MemoryStream 保持独立加密 frame，批量化只改变队列提交原子性，不改变 2.8 的线上 framing。
+            // Each MemoryStream keeps its own encrypted frame; batching changes queue commit atomicity only and preserves 2.8 wire framing.
+            for (int index = 0; index < streams.Count; ++index)
+                encrypt(streams[index]);
+
+            return sender.send(streams);
         }
 
         public override bool recv(MessageReaderBase reader, byte[] buffer, UInt32 rpos, UInt32 len)

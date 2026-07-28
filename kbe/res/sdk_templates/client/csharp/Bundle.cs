@@ -104,29 +104,32 @@
 			_curMsgStreamIndex = 0;
 		}
 		
-		public void send(NetworkInterfaceBase networkInterface)
+		public bool send(NetworkInterfaceBase networkInterface)
 		{
 			fini(true);
-			
-			if(networkInterface.valid())
+			bool sent = false;
+			try
 			{
-				for(int i=0; i<streamList.Count; i++)
-				{
-					MemoryStream tempStream = streamList[i];
-					networkInterface.send(tempStream);
-				}
+				sent = networkInterface != null && networkInterface.send(streamList);
 			}
-			else
+			catch (Exception exception)
 			{
-				KBELog.ERROR_MSG("Bundle::send: networkInterface invalid!");  
+				KBELog.ERROR_MSG("Bundle::send: atomic batch raised an exception: " + exception);
+			}
+			finally
+			{
+				// Bundle 是消费型对象；无论提交成功、背压拒绝还是 transport 异常，都必须归还全部 stream，防止对象池资源泄漏。
+				// A Bundle is consumed by send; success, backpressure rejection, and transport exceptions must all return every stream to prevent pooled-resource leaks.
+				reclaimObject();
 			}
 
-			// 我们认为，发送完成，就视为这个bundle不再使用了，
-			// 所以我们会把它放回对象池，以减少垃圾回收带来的消耗，
-			// 如果需要继续使用，应该重新Bundle.createObject()，
-			// 如果外面不重新createObject()而直接使用，就可能会出现莫名的问题，
-			// 仅以此备注，警示使用者。
-			reclaimObject();
+			if (!sent && networkInterface != null)
+			{
+				KBELog.ERROR_MSG("Bundle::send: atomic batch rejected; closing the current transport!");
+				Event.fireIn("_closeNetwork", new object[] { networkInterface });
+			}
+
+			return sent;
 		}
 		
 		public void checkStream(int v)

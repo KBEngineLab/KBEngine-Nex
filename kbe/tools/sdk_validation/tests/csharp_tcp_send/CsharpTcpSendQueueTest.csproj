@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\..\..\res\sdk_templates\client\csharp\TcpSendQueue.cs" Link="TcpSendQueue.cs" />
+    <Compile Include="..\..\..\..\res\sdk_templates\client\csharp\deps\KCP.cs" Link="KCP.cs" />
   </ItemGroup>
 </Project>
