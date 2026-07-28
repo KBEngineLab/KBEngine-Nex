@@ -9,11 +9,13 @@ internal static class Program
         wraparoundPreservesBytes();
         concurrentProducersPreservePackets();
         abortAllowsWorkerRestart();
+        receiveQueueBlocksWithoutPollingAndPreservesBytes();
+        receiveQueueStopWakesWriter();
         largeMemoryStreamFieldGrowsAndReleasesCapacity();
         kcpBatchFailureIsAtomic();
         kcpAcknowledgementReleasesBytes();
 
-        Console.WriteLine("CSHARP_SEND_BACKPRESSURE_TEST_PASS tcp-full=true tcp-wrap=true concurrent=true restart=true large-field=true kcp-atomic=true kcp-ack-release=true");
+        Console.WriteLine("CSHARP_SEND_BACKPRESSURE_TEST_PASS tcp-full=true tcp-wrap=true concurrent=true restart=true receive-wait=true receive-stop=true large-field=true kcp-atomic=true kcp-ack-release=true");
         return 0;
     }
 
@@ -107,6 +109,40 @@ internal static class Program
         // A pooled object must return to its default capacity after a one-off large field, or a brief spike permanently raises client memory use.
         Require(stream.length() == 0 && stream.data().Length == KBEngine.MemoryStream.BUFFER_MAX,
             "MemoryStream retained an oversized pooled buffer after clear.");
+    }
+
+    private static void receiveQueueBlocksWithoutPollingAndPreservesBytes()
+    {
+        var queue = new TcpReceiveQueue(4);
+        Require(queue.write(new byte[] { 1, 2, 3, 4 }, 0, 4), "The receive queue rejected its exact capacity.");
+
+        var writerStarted = new ManualResetEventSlim(false);
+        Task<bool> writer = Task.Run(() =>
+        {
+            writerStarted.Set();
+            return queue.write(new byte[] { 5, 6 }, 0, 2);
+        });
+        writerStarted.Wait();
+        Require(!writer.Wait(50), "A full receive queue did not block its producer.");
+
+        var first = new byte[2];
+        Require(queue.drain(first) == 2 && first.SequenceEqual(new byte[] { 1, 2 }),
+            "The first receive drain changed FIFO bytes.");
+        Require(writer.Wait(1000) && writer.Result, "Consuming capacity did not wake the receive producer.");
+
+        var remaining = new byte[4];
+        Require(queue.drain(remaining) == 4 && remaining.SequenceEqual(new byte[] { 3, 4, 5, 6 }),
+            "Receive queue wraparound changed FIFO bytes.");
+    }
+
+    private static void receiveQueueStopWakesWriter()
+    {
+        var queue = new TcpReceiveQueue(1);
+        queue.write(new byte[] { 1 }, 0, 1);
+        Task<bool> writer = Task.Run(() => queue.write(new byte[] { 2 }, 0, 1));
+        Require(!writer.Wait(50), "The stop test writer was not waiting.");
+        queue.stop();
+        Require(writer.Wait(1000) && !writer.Result, "Stopping the receive queue did not cancel its waiting producer.");
     }
 
     private static void tcpBatchFailureIsAtomic()

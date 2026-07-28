@@ -102,7 +102,13 @@ namespace KBEngine
 
 		protected virtual void releaseTransport()
 		{
+			// 先从接口摘除接收器再通知停止，确保被唤醒的接收线程观察到失效状态，避免把本地主动关闭误报为远端断线。
+			// Detach the receiver before stopping it so the awakened receive thread observes invalid state and does not report a local shutdown as a remote disconnect.
+			PacketReceiverBase packetReceiver = _packetReceiver;
 			_packetReceiver = null;
+			if (packetReceiver != null)
+				packetReceiver.stop();
+
 			_packetSender = null;
 			_filter = null;
 			connected = false;

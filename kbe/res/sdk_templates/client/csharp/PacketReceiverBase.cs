@@ -40,6 +40,12 @@ namespace KBEngine
 
 		public abstract void process();
 
+		// 接收器可覆盖此钩子来解除阻塞并结束后台接收；默认空实现保持非阻塞传输和既有派生类兼容。
+		// Receivers may override this hook to unblock and finish background reads; the no-op default preserves nonblocking transports and existing subclasses.
+		public virtual void stop()
+		{
+		}
+
 		public virtual void startRecv()
 		{
 			// AsyncReceiveMethod asyncReceiveMethod = new AsyncReceiveMethod(this._asyncReceive);

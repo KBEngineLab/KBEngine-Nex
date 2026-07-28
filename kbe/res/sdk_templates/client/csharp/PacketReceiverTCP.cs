@@ -1,34 +1,26 @@
-﻿namespace KBEngine
+namespace KBEngine
 {
-	using System; 
-	using System.Net.Sockets; 
-	using System.Net; 
-	using System.Collections; 
-	using System.Collections.Generic;
-	using System.Text;
-	using System.Text.RegularExpressions;
-	using System.Threading;
+	using System;
+	using System.Net.Sockets;
 
-	using MessageID = System.UInt16;
-	using MessageLength = System.UInt16;
-	
+	using MessageLengthEx = System.UInt32;
+
 	/*
 		包接收模块(与服务端网络部分的名称对应)
 		处理网络数据的接收
 	*/
 	public class PacketReceiverTCP : PacketReceiverBase
 	{
-		private byte[] _buffer;
+		private readonly TcpReceiveQueue _receiveQueue;
+		private readonly byte[] _socketBuffer;
+		private readonly byte[] _processBuffer;
 
-		// socket向缓冲区写的起始位置
-		int _wpos = 0;
-
-		// 主线程读取数据的起始位置
-		int _rpos = 0;
-
-		public PacketReceiverTCP(NetworkInterfaceBase networkInterface) : base(networkInterface) 
+		public PacketReceiverTCP(NetworkInterfaceBase networkInterface) : base(networkInterface)
 		{
-			_buffer = new byte[KBEngineApp.app.getInitArgs().TCP_RECV_BUFFER_MAX];
+			int capacity = KBEngineApp.app.getInitArgs().getTCPRecvBufferSize();
+			_receiveQueue = new TcpReceiveQueue(capacity);
+			_socketBuffer = new byte[Math.Min(capacity, NetworkInterfaceBase.TCP_PACKET_MAX)];
+			_processBuffer = new byte[capacity];
 			_messageReader = new MessageReaderTCP();
 		}
 
@@ -39,123 +31,66 @@
 
 		public override void process()
 		{
-			int t_wpos = Interlocked.Add(ref _wpos, 0);
+			int length = _receiveQueue.drain(_processBuffer);
+			if (length == 0)
+				return;
 
-			if (_rpos < t_wpos)
-			{
-                if (_networkInterface.fileter() != null)
-                {
-                    _networkInterface.fileter().recv(_messageReader, _buffer, (UInt32)_rpos, (UInt32)(t_wpos - _rpos));
-                }
-                else
-                {
-                    _messageReader.process(_buffer, (UInt32)_rpos, (UInt32)(t_wpos - _rpos));
-                }
-                    
-				Interlocked.Exchange(ref _rpos, t_wpos);
-			}
-			else if (t_wpos < _rpos)
-			{
-                if (_networkInterface.fileter() != null)
-                {
-                    _networkInterface.fileter().recv(_messageReader, _buffer, (UInt32)_rpos, (UInt32)(_buffer.Length - _rpos));
-                    _networkInterface.fileter().recv(_messageReader, _buffer, (UInt32)0, (UInt32)t_wpos);
-                }
-                else
-                {
-                    _messageReader.process(_buffer, (UInt32)_rpos, (UInt32)(_buffer.Length - _rpos));
-                    _messageReader.process(_buffer, (UInt32)0, (UInt32)t_wpos);
-                }
-                
-				Interlocked.Exchange(ref _rpos, t_wpos);
-			}
+			// 先在队列锁内复制并释放容量，再在锁外解密和派发 RPC，避免业务回调阻塞接收线程或形成锁重入。
+			// Copy and release queue capacity under lock, then decrypt and dispatch RPCs outside it so callbacks cannot block the receiver or reenter the queue lock.
+			EncryptionFilter filter = _networkInterface.fileter();
+			if (filter != null)
+				filter.recv(_messageReader, _processBuffer, 0, (MessageLengthEx)length);
 			else
-			{
-				// 没有可读数据
-			}
+				_messageReader.process(_processBuffer, 0, (MessageLengthEx)length);
 		}
 
-		int _free()
+		public override void stop()
 		{
-			int t_rpos = Interlocked.Add(ref _rpos, 0);
-
-			if (_wpos == _buffer.Length)
-			{
-				if (t_rpos == 0)
-				{
-					return 0;
-				}
-
-				Interlocked.Exchange(ref _wpos, 0);
-			}
-
-			if (t_rpos <= _wpos)
-			{
-				return _buffer.Length - _wpos;
-			}
-
-			return t_rpos - _wpos - 1;
+			_receiveQueue.stop();
 		}
 
 		protected override void _asyncReceive()
 		{
-			if (_networkInterface == null || !_networkInterface.valid())
+			NetworkInterfaceBase networkInterface = _networkInterface;
+			if (networkInterface == null || !networkInterface.valid())
 			{
 				KBELog.WARNING_MSG("PacketReceiverTCP::_asyncReceive(): network interface invalid!");
 				return;
 			}
 
-			var socket = _networkInterface.sock();
-
+			Socket socket = networkInterface.sock();
 			while (true)
 			{
-				// 必须有空间可写，否则我们阻塞在线程中直到有空间为止
-				int first = 0;
-				int space = _free();
-
-				while (space == 0)
-				{
-					if (first > 0)
-					{
-						if (first > 1000)
-						{
-							KBELog.ERROR_MSG("PacketReceiverTCP::_asyncReceive(): no space!");
-							Event.fireIn("_closeNetwork", new object[] { _networkInterface });
-							return;
-						}
-
-						KBELog.WARNING_MSG("PacketReceiverTCP::_asyncReceive(): waiting for space, Please adjust 'RECV_BUFFER_MAX'! retries=" + first);
-						System.Threading.Thread.Sleep(5);
-					}
-
-					first += 1;
-					space = _free();
-				}
-
-				int bytesRead = 0;
+				int bytesRead;
 				try
 				{
-					bytesRead = socket.Receive(_buffer, _wpos, space, 0);
+					bytesRead = socket.Receive(_socketBuffer, 0, _socketBuffer.Length, SocketFlags.None);
 				}
-				catch (SocketException se)
+				catch (SocketException exception)
 				{
-					KBELog.ERROR_MSG(string.Format("PacketReceiverTCP::_asyncReceive(): receive error, disconnect from '{0}'! error = '{1}'", socket.RemoteEndPoint, se));
-					Event.fireIn("_closeNetwork", new object[] { _networkInterface });
+					// reset/destroy 会先使接口失效再关闭 socket，接收任务此时被本地主动唤醒，不应伪造网络错误或重复关闭事件。
+					// reset/destroy invalidates the interface before closing its socket, so the locally awakened receiver must not report a network fault or duplicate close event.
+					if (!networkInterface.valid())
+						return;
+
+					KBELog.ERROR_MSG(string.Format("PacketReceiverTCP::_asyncReceive(): receive error, disconnect! error = '{0}'", exception));
+					Event.fireIn("_closeNetwork", new object[] { networkInterface });
 					return;
 				}
 
-				if (bytesRead > 0)
+				if (bytesRead <= 0)
 				{
-					// 更新写位置
-					Interlocked.Add(ref _wpos, bytesRead);
-				}
-				else
-				{
-					KBELog.WARNING_MSG(string.Format("PacketReceiverTCP::_asyncReceive(): receive 0 bytes, disconnect from '{0}'!", socket.RemoteEndPoint));
-					Event.fireIn("_closeNetwork", new object[] { _networkInterface });
+					if (!networkInterface.valid())
+						return;
+
+					KBELog.WARNING_MSG("PacketReceiverTCP::_asyncReceive(): receive 0 bytes, disconnect!");
+					Event.fireIn("_closeNetwork", new object[] { networkInterface });
 					return;
 				}
+
+				if (!_receiveQueue.write(_socketBuffer, 0, bytesRead))
+					return;
 			}
 		}
 	}
-} 
+}

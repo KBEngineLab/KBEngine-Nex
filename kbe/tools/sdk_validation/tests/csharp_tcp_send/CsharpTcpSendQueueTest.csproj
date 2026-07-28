@@ -12,6 +12,7 @@
     <Compile Include="..\..\..\..\res\sdk_templates\client\csharp\kblog\ILogProvider.cs" Link="kblog\ILogProvider.cs" />
     <Compile Include="..\..\..\..\res\sdk_templates\client\csharp\kblog\KBELog.cs" Link="kblog\KBELog.cs" />
     <Compile Include="..\..\..\..\res\sdk_templates\client\csharp\TcpSendQueue.cs" Link="TcpSendQueue.cs" />
+    <Compile Include="..\..\..\..\res\sdk_templates\client\csharp\TcpReceiveQueue.cs" Link="TcpReceiveQueue.cs" />
     <Compile Include="..\..\..\..\res\sdk_templates\client\csharp\deps\KCP.cs" Link="KCP.cs" />
   </ItemGroup>
 </Project>
