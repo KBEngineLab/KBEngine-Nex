@@ -30,8 +30,8 @@
         "file": "dotnet",
         "arguments": ["run", "--project", "${AssetsPath}/kbeclient/csharp-e2e/CsharpE2E.csproj", "-c", "Release", "--no-build"],
         "timeoutSeconds": 120,
-        "requiredPatterns": ["E2E_PASS"],
-        "forbiddenPatterns": ["E2E_FAIL"]
+        "requiredPatterns": ["E2E_PASS .*component-initial=true.*entity-rpc=dialog"],
+        "forbiddenPatterns": ["E2E_FAIL", "E2E_EXCEPTION", "SDK_ERROR"]
       }
     },
     {
@@ -49,8 +49,8 @@
       "run": {
         "file": "${AssetsPath}/kbeclient/cxx-e2e/bin/x64/Release/CxxE2E.exe",
         "timeoutSeconds": 120,
-        "requiredPatterns": ["E2E_PASS"],
-        "forbiddenPatterns": ["E2E_FAIL"]
+        "requiredPatterns": ["E2E_PASS .*component-initial=true.*entity-rpc=dialog"],
+        "forbiddenPatterns": ["E2E_FAIL", "E2E_EXCEPTION", "SDK_ERROR"]
       }
     },
     {
@@ -71,8 +71,8 @@
         "arguments": ["run", "test:e2e"],
         "workingDirectory": "${AssetsPath}/kbeclient/typescript-e2e",
         "timeoutSeconds": 120,
-        "requiredPatterns": ["E2E_PASS"],
-        "forbiddenPatterns": ["E2E_FAIL"]
+        "requiredPatterns": ["E2E_PASS .*relogin=true.*component-rebuilt=true.*entity-rpc=dialog"],
+        "forbiddenPatterns": ["E2E_FAIL", "E2E_EXCEPTION", "SDK_ERROR"]
       }
     },
     {
@@ -92,8 +92,8 @@
         "file": "${GodotRoot}/Godot_v4.7-stable_win64_console.exe",
         "arguments": ["--headless", "--path", "${AssetsPath}/kbeclient/gdscript-e2e", "--quit-after", "120"],
         "timeoutSeconds": 130,
-        "requiredPatterns": ["E2E_PASS"],
-        "forbiddenPatterns": ["E2E_FAIL", "SCRIPT ERROR", "Parse Error"]
+        "requiredPatterns": ["E2E_PASS .*transport=kcp.*component-initial=true.*entity-rpc=dialog"],
+        "forbiddenPatterns": ["E2E_FAIL", "E2E_EXCEPTION", "SDK_ERROR", "SCRIPT ERROR", "Parse Error"]
       }
     }
   ]
