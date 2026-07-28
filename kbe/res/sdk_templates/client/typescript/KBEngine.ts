@@ -324,9 +324,10 @@ export class KBEngineApp {
         return;
     }
 
-    OnNetworkError(event: MessageEvent) {
-        KBELog.ERROR_MSG("KBEngineApp::OnNetworkError:%s.", event.toString())
-        this.networkInterface.Close();
+    OnNetworkError(event: unknown) {
+        KBELog.ERROR_MSG("KBEngineApp::OnNetworkError:%s.", String(event))
+        // NetworkInterface 在错误来源仍可识别时已经完成关闭和单次通知；排队事件只能记录，不能关闭可能已重连的新 transport。
+        // NetworkInterface closes and notifies while the failing source is still identifiable; this queued event may only log and must not close a newly reconnected transport.
     }
 
     UninstallEvents() {

@@ -121,8 +121,10 @@ function createTransport()
         released: false,
         sendError: undefined,
         sendThrows: undefined,
+        sendCallbacks: [],
         send(data, onError)
         {
+            this.sendCallbacks.push(onError);
             if(this.sendThrows !== undefined)
                 throw this.sendThrows;
             this.sent.push(data);
@@ -142,6 +144,144 @@ function createTransport()
             this.onClose = undefined;
         }
     };
+}
+
+function verifyNetworkCloseLifecycle(compiledPath)
+{
+    const NetworkInterface = loadModule(compiledPath, "NetworkInterface.js").default;
+    const KBEEvent = loadModule(compiledPath, "Event.js").default;
+    const transports = Array.from({ length: 8 }, () => createTransport());
+    let transportIndex = 0;
+    const network = new NetworkInterface({ create: () => transports[transportIndex++] });
+    const counts = { disconnected: 0, connectionFailed: 0, networkError: 0 };
+    const observer = {
+        onDisconnected() { counts.disconnected += 1; },
+        onConnectionState(success) { if(!success) counts.connectionFailed += 1; },
+        onNetworkError() { counts.networkError += 1; }
+    };
+    KBEEvent.registerOut("onDisconnected", observer, observer.onDisconnected);
+    KBEEvent.registerOut("onConnectionState", observer, observer.onConnectionState);
+    KBEEvent.registerIn("onNetworkError", observer, observer.onNetworkError);
+
+    try
+    {
+        const first = transports[0];
+        network.ConnectTo("ws://first");
+        const staleOpen = first.onOpen;
+        const staleError = first.onError;
+        const staleClose = first.onClose;
+        first.isOpen = true;
+        first.onOpen({});
+        network.Send(new ArrayBuffer(1));
+        const staleSendFailure = first.sendCallbacks[0];
+
+        const second = transports[1];
+        network.ConnectTo("ws://second");
+        second.isOpen = true;
+        second.onOpen({});
+        staleOpen({});
+        staleError("stale error");
+        staleClose({});
+        staleSendFailure("stale send failure");
+        KBEEvent.processInEvents();
+        KBEEvent.processOutEvents();
+        assertCondition(network.IsGood && first.released && first.closed.length === 1 && counts.disconnected === 0,
+            "Connection replacement leaked the old transport or published a false disconnect");
+
+        const secondError = second.onError;
+        const secondClose = second.onClose;
+        secondError("active error");
+        secondClose({});
+        secondError("duplicate active error");
+        KBEEvent.processInEvents();
+        KBEEvent.processOutEvents();
+        assertCondition(!network.IsGood && second.released && second.closed.length === 1 &&
+            counts.disconnected === 1 && counts.networkError === 1,
+            "Active transport error did not close and notify exactly once");
+
+        const connecting = transports[2];
+        network.ConnectTo("ws://connecting");
+        connecting.onClose({});
+        KBEEvent.processOutEvents();
+        assertCondition(counts.connectionFailed === 1 && counts.disconnected === 1,
+            "A pre-open close was reported as an established-connection disconnect");
+
+        const malformed = transports[3];
+        network.ConnectTo("ws://malformed-lifecycle");
+        malformed.isOpen = true;
+        malformed.onOpen({});
+        malformed.onMessage(new ArrayBuffer(0), {});
+        KBEEvent.processOutEvents();
+        assertCondition(counts.disconnected === 2 && malformed.closed.length === 1 &&
+            malformed.closed[0].code === 1002,
+            "Protocol rejection did not consume one established disconnect notification");
+
+        const passive = transports[4];
+        network.ConnectTo("ws://passive-close");
+        passive.isOpen = true;
+        passive.onOpen({});
+        const passiveClose = passive.onClose;
+        network.Close(true);
+        passiveClose({});
+        KBEEvent.processOutEvents();
+        assertCondition(counts.disconnected === 3 && passive.closed.length === 1,
+            "Explicit passive close did not notify exactly once");
+
+        const active = transports[5];
+        network.ConnectTo("ws://active-close");
+        active.isOpen = true;
+        active.onOpen({});
+        const activeClose = active.onClose;
+        network.Close();
+        activeClose({});
+        KBEEvent.processOutEvents();
+        assertCondition(counts.disconnected === 3 && active.closed.length === 1,
+            "Active close published a passive disconnect notification");
+
+        const reentrant = transports[6];
+        const replacement = transports[7];
+        let replacementOpens = 0;
+        network.ConnectTo("ws://reentrant", () =>
+            network.ConnectTo("ws://replacement", () => replacementOpens += 1));
+        reentrant.isOpen = true;
+        reentrant.onOpen({});
+        replacement.isOpen = true;
+        replacement.onOpen({});
+        assertCondition(replacementOpens === 1 && network.IsGood,
+            "Reentrant open callback cleared the replacement connection callback");
+        network.Close();
+
+        const reused = createTransport();
+        const reusedNetwork = new NetworkInterface({ create: () => reused });
+        reusedNetwork.ConnectTo("ws://reused-first");
+        reused.isOpen = true;
+        const reusedStaleError = reused.onError;
+        const reusedStaleClose = reused.onClose;
+        reused.onOpen({});
+        reusedNetwork.Send(new ArrayBuffer(1));
+        const reusedStaleSendFailure = reused.sendCallbacks[0];
+        reusedNetwork.ConnectTo("ws://reused-second");
+        reused.isOpen = true;
+        reused.onOpen({});
+        reusedStaleError("reused stale error");
+        reusedStaleClose({});
+        reusedStaleSendFailure("reused stale send failure");
+        assertCondition(reusedNetwork.IsGood,
+            "A stale callback matched a reused transport object from a newer connection generation");
+        reusedNetwork.Send(new ArrayBuffer(1));
+        const activeAsyncFailure = reused.sendCallbacks[1];
+        activeAsyncFailure("active async send failure");
+        activeAsyncFailure("duplicate async send failure");
+        KBEEvent.processInEvents();
+        KBEEvent.processOutEvents();
+        assertCondition(!reusedNetwork.IsGood && reused.closed.length === 2 &&
+            counts.disconnected === 4 && counts.networkError === 2,
+            "Active asynchronous send failure did not close and notify exactly once");
+    }
+    finally
+    {
+        KBEEvent.DeregisterObject(observer);
+    }
 }
 
 function verifyBundleSendResult(compiledPath)
@@ -276,6 +416,8 @@ function verifyAppDispatchLifecycle(compiledPath)
     const engine = loadModule(compiledPath, "KBEngine.js");
     const Messages = loadModule(compiledPath, "Messages.js").default;
     const injectedTransport = createTransport();
+    const replacementTransport = createTransport();
+    const injectedTransports = [injectedTransport, replacementTransport];
     let injectedFactoryCalls = 0;
     let lifecycleCallbacks;
     let lifecycleIntervals;
@@ -297,7 +439,7 @@ function verifyAppDispatchLifecycle(compiledPath)
             create()
             {
                 injectedFactoryCalls += 1;
-                return injectedTransport;
+                return injectedTransports[injectedFactoryCalls - 1];
             }
         };
         args.hostLifecycleAdapter = {
@@ -329,13 +471,19 @@ function verifyAppDispatchLifecycle(compiledPath)
         injectedTransport.isOpen = true;
         injectedTransport.sendThrows = "expected synchronous send failure";
         lifecycleCallbacks.update();
-        assertCondition(!app.heartbeatState.replyPending && injectedTransport.sent.length === 0,
-            "A synchronously rejected heartbeat entered pending state");
+        assertCondition(!app.heartbeatState.replyPending && injectedTransport.sent.length === 0 &&
+            injectedTransport.released && injectedTransport.closed.length === 1,
+            "A synchronously rejected heartbeat entered pending state or retained its failed transport");
 
-        injectedTransport.sendThrows = undefined;
+        app.networkInterface.ConnectTo("ws://replacement");
+        replacementTransport.isOpen = true;
+        replacementTransport.onOpen({});
+        lifecycleCallbacks.processEvents();
+        assertCondition(app.networkInterface.IsGood && injectedFactoryCalls === 2,
+            "A queued old transport error closed the replacement connection");
         heartbeatNow += 15001;
         lifecycleCallbacks.update();
-        assertCondition(app.heartbeatState.replyPending && injectedTransport.sent.length === 1,
+        assertCondition(app.heartbeatState.replyPending && replacementTransport.sent.length === 1,
             "An accepted heartbeat did not enter pending state");
         app.Client_onAppActiveTickCB();
         assertCondition(!app.heartbeatState.replyPending, "Heartbeat acknowledgement did not clear pending state");
@@ -344,7 +492,7 @@ function verifyAppDispatchLifecycle(compiledPath)
         lifecycleCallbacks.update();
         heartbeatNow += 15001;
         lifecycleCallbacks.update();
-        assertCondition(injectedTransport.released && injectedTransport.closed.length === 1,
+        assertCondition(replacementTransport.released && replacementTransport.closed.length === 1,
             "An unanswered heartbeat did not close the transport exactly once");
     }
     finally
@@ -465,9 +613,10 @@ function main()
     verifySchemaBinding(compiledPath);
     verifyMessageDispatch(compiledPath);
     verifyTransportLifecycle(compiledPath);
+    verifyNetworkCloseLifecycle(compiledPath);
     verifyBundleSendResult(compiledPath);
     verifyAppDispatchLifecycle(compiledPath);
-    console.log("TYPESCRIPT_MODULE_TEST_PASS root=true imports=true schema=true schema-bind=true memory=true network=true transport=true stale-transport=true int64=true roundtrip=true dispatch=true lifecycle=true app-lifecycle=true heartbeat=true send-result=true");
+    console.log("TYPESCRIPT_MODULE_TEST_PASS root=true imports=true schema=true schema-bind=true memory=true network=true transport=true stale-transport=true generation=true reused=true close-idempotent=true async-send-close=true preopen=true reentrant-open=true int64=true roundtrip=true dispatch=true lifecycle=true app-lifecycle=true heartbeat=true send-result=true");
 }
 
 try
