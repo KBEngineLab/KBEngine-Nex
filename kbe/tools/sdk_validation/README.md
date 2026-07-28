@@ -98,6 +98,7 @@ Run the following commands to verify scenario isolation, resource watchers, C# h
 pwsh -File kbe/tools/sdk_validation/tests/Test-SdkValidation.ps1
 pwsh -File kbe/tools/sdk_validation/tests/Test-CxxSdkBoundaries.ps1
 pwsh -File kbe/tools/sdk_validation/tests/Test-CsharpSdkWarnings.ps1
+pwsh -File kbe/tools/sdk_validation/tests/Test-SdkReleaseArtifacts.ps1
 python -B -m unittest kbe/tools/sdk_validation/tests/Test-SdkResourceRelease.py -v
 dotnet run --project kbe/tools/sdk_validation/tests/csharp_heartbeat/CsharpHeartbeatStateTest.csproj -c Release
 dotnet run --project kbe/tools/sdk_validation/tests/csharp_tcp_send/CsharpTcpSendQueueTest.csproj -c Release
@@ -110,6 +111,18 @@ pwsh -File kbe/tools/sdk_validation/tests/gdscript_websocket/Invoke-GdscriptWebS
 ```
 
 The full schema is available in `sdk-validation.schema.json`.
+
+## Release artifacts
+
+发布目录必须是新目录或空目录，生成器不会删除调用方已有内容。以下命令从同一份 assets clean-generate 四端 SDK，拒绝构建缓存、本地二进制和未知文件类型，并生成不含本机绝对路径的 `sdk-release-manifest.json`。manifest 记录生成器 SHA-256、四端一致的版本/协议/EntityDef 摘要、每个文件与每棵 SDK tree 的 SHA-256，以及整套发布产物的根摘要；自动化测试还会在独立目录重复生成并验证根摘要稳定。
+
+The release directory must be new or empty; the generator never deletes caller-owned content. This command clean-generates all four SDKs from one assets tree, rejects build caches, local binaries, and unknown file types, and writes `sdk-release-manifest.json` without local absolute paths. The manifest records the generator SHA-256, cross-SDK version/protocol/EntityDef metadata, SHA-256 values for every file and SDK tree, and one root digest for the complete release set; the automated test repeats generation in an independent directory and requires the root digest to remain stable.
+
+```powershell
+pwsh -File kbe/tools/sdk_validation/New-SdkReleaseArtifacts.ps1 `
+  -AssetsPath D:/game/assets `
+  -OutputPath D:/release/kbe-sdk-2.8.2
+```
 
 ## Release compatibility gate
 

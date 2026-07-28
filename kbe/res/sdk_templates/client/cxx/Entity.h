@@ -17,8 +17,6 @@ class EntityComponent;
 /*
 	KBEngine逻辑层的实体基础类
 	所有扩展出的游戏实体都应该继承于该模块
-
-	https://github.com/kbengine/kbengine/blob/master/kbe/res/sdk_templates/client/ue4/README.md
 */
 class Entity
 {
