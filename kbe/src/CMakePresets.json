@@ -31,6 +31,18 @@
       "configurePreset": "windows-vs2022",
       "configuration": "Release",
       "targets": ["kbe_core_dependencies"]
+    },
+    {
+      "name": "windows-vs2022-libraries-debug",
+      "configurePreset": "windows-vs2022",
+      "configuration": "Debug",
+      "targets": ["kbe_libraries"]
+    },
+    {
+      "name": "windows-vs2022-libraries-release",
+      "configurePreset": "windows-vs2022",
+      "configuration": "Release",
+      "targets": ["kbe_libraries"]
     }
   ]
 }

@@ -2,9 +2,7 @@
 # The MongoDB adapter consumes the mongo-c-driver 2.x config target provided by vcpkg.
 find_package(mongoc CONFIG REQUIRED)
 
-# 适配层源文件。
-# Adapter source files.
-set(SRCS
+add_library(db_mongodb STATIC
 	common.cpp
 	db_exception.cpp
 	db_interface_mongodb.cpp
@@ -12,12 +10,13 @@ set(SRCS
 	entity_table_mongodb.cpp
 	kbe_table_mongodb.cpp
 )
-# 与其他数据库后端一致构建为静态库，并由 DBMgr 最终链接。
-# Build a static library like the other database backends and link it into DBMgr.
-add_library(db_mongodb STATIC ${SRCS})
 
+kbe_configure_target(db_mongodb)
 target_link_libraries(db_mongodb PUBLIC
-	fmt::fmt
+	db_interface
+	entitydef
 	mongoc::static
-	python_interface
+	network
+	server
+	KBE::PythonRuntime
 )

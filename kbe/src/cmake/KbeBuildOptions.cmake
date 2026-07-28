@@ -18,10 +18,10 @@ target_compile_definitions(kbe_build_options INTERFACE
     KBE_USE_ASSERTS
     LOG4CXX_STATIC
     USE_OPENSSL
+    CODE_INLINE
     $<$<PLATFORM_ID:Windows>:WIN32>
     $<$<CONFIG:Debug>:_DEBUG>
     $<$<NOT:$<CONFIG:Debug>>:NDEBUG>
-    $<$<NOT:$<CONFIG:Debug>>:CODE_INLINE>
 )
 
 if(MSVC)
