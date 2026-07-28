@@ -90,9 +90,9 @@ Keep `E2E_FAIL` and `RESOURCE_FAIL` in `forbiddenPatterns`. This prevents a succ
 
 必须把 `E2E_FAIL` 与 `RESOURCE_FAIL` 保留在 `forbiddenPatterns` 中，避免进程以成功状态退出时掩盖协议、状态重建或资源生命周期错误。
 
-执行以下命令可回归场景隔离、资源 watcher、C# 心跳与并发关闭状态，以及 C#、C++ TCP 发送/接收队列的容量、等待唤醒、回绕、并发、故障重启、大响应流和 KCP 原子背压。PowerShell 合成产物只写入系统临时目录，C# 的 `bin/obj` 与 C++ 的 `x64` 测试产物已按专用目录模式精确忽略：
+执行以下命令可回归场景隔离、资源 watcher、C# 心跳与并发关闭状态，C#、C++ TCP 背压，以及 TypeScript/GDScript WebSocket 普通长度、扩展长度、整帧原子验证和畸形边界拒绝。PowerShell 合成产物只写入系统临时目录，C# 的 `bin/obj`、C++ 的 `x64` 和 TypeScript 的 `dist` 测试产物已按专用目录模式精确忽略。Godot runner 需要隔离的已生成 GDScript SDK 目录；目录不是项目时会添加最小 `project.godot` 以建立 `class_name` 缓存：
 
-Run the following commands to verify scenario isolation, resource watchers, C# heartbeats and concurrent close state, plus C# and C++ TCP send/receive queue capacity, wait/wake behavior, wraparound, concurrency, failure restart, large response streams, and atomic KCP backpressure. PowerShell fixtures write only to the system temporary directory, while the dedicated C# `bin/obj` and C++ `x64` test outputs are narrowly ignored:
+Run the following commands to verify scenario isolation, resource watchers, C# heartbeats and concurrent close state, C# and C++ TCP backpressure, plus TypeScript/GDScript WebSocket normal lengths, extended lengths, whole-frame atomic validation, and malformed-boundary rejection. PowerShell fixtures write only to the system temporary directory, while dedicated C# `bin/obj`, C++ `x64`, and TypeScript `dist` outputs are narrowly ignored. The Godot runner requires an isolated generated GDScript SDK directory; when it is not already a project, the runner adds a minimal `project.godot` to build the `class_name` cache:
 
 ```powershell
 pwsh -File kbe/tools/sdk_validation/tests/Test-SdkValidation.ps1
@@ -101,6 +101,9 @@ dotnet run --project kbe/tools/sdk_validation/tests/csharp_heartbeat/CsharpHeart
 dotnet run --project kbe/tools/sdk_validation/tests/csharp_tcp_send/CsharpTcpSendQueueTest.csproj -c Release
 & "E:/ProgramFiles/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe" kbe/tools/sdk_validation/tests/cxx_tcp_receive/CxxTcpReceiveQueueTest.vcxproj /t:Rebuild /p:Configuration=Release /p:Platform=x64 /v:minimal
 & kbe/tools/sdk_validation/tests/cxx_tcp_receive/x64/Release/CxxTcpReceiveQueueTest.exe
+tsc -p kbe/tools/sdk_validation/tests/typescript_websocket/tsconfig.json
+node kbe/tools/sdk_validation/tests/typescript_websocket/dist/tools/sdk_validation/tests/typescript_websocket/Program.js
+pwsh -File kbe/tools/sdk_validation/tests/gdscript_websocket/Invoke-GdscriptWebSocketTest.ps1 -SdkPath D:/generated/gdscript -GodotPath D:/ProgramFiles/Godot/Godot_v4.7-stable_win64/Godot_v4.7-stable_win64_console.exe
 ```
 
 The full schema is available in `sdk-validation.schema.json`.

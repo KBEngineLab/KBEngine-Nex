@@ -3,6 +3,7 @@ import KBELog from "./KBELog";
 import KBEEvent from "./Event";
 import { MemoryStream } from "./KBEngine";
 import Messages, { Message } from "./Messages";
+import { parseWebSocketFrame } from "./WebSocketFrameParser";
 
 export default class NetworkInterface
 {
@@ -98,50 +99,59 @@ export default class NetworkInterface
 
     private onmessage = (event: MessageEvent) =>
     {
-        let data: ArrayBuffer = event.data;
-        //KBELog.DEBUG_MSG("NetworkInterface::onmessage:...!" + data.byteLength);
-        let stream: MemoryStream = new MemoryStream(data);
-        stream.wpos = data.byteLength;
-
-        while(stream.rpos < stream.wpos)
+        const sourceSocket = (event.currentTarget || event.target) as WebSocket | null;
+        if(sourceSocket === null || this.socket !== sourceSocket)
+            return;
+        if(!(event.data instanceof ArrayBuffer))
         {
-            let msgID = stream.ReadUint16();
-            //KBELog.DEBUG_MSG("NetworkInterface::onmessage:...!msgID:" + msgID);
+            this.RejectProtocolFrame(sourceSocket, "expected ArrayBuffer payload");
+            return;
+        }
 
-            let handler: Message = Messages.clientMessages[msgID];
-            if(!handler)
+        const data = event.data;
+        const stream = new MemoryStream(data);
+        const result = parseWebSocketFrame(
+            data,
+            (messageID: number) => Messages.clientMessages[messageID]?.msglen,
+            (messageID: number, bodyOffset: number, bodyLength: number) =>
             {
-                KBELog.ERROR_MSG("NetworkInterface::onmessage:message(%d) has not found.", msgID);
-                // msgID已消费但无法确定body长度→ 跳出循环防止流位置错位
-                break;
-            }
-            else
-            {
-                let msgLen = handler.msglen;
-                if(msgLen === -1)
-                {
-                    msgLen = stream.ReadUint16();
-                    if(msgLen === 65535)
-                    {
-                        msgLen = stream.ReadUint32();
-                    }
-                }
-
-                let wpos = stream.wpos;
-                let rpos = stream.rpos + msgLen;
-                stream.wpos = rpos;
+                const handler: Message = Messages.clientMessages[messageID];
+                stream.rpos = bodyOffset;
+                stream.wpos = bodyOffset + bodyLength;
                 try
                 {
                     handler.handleMessage(stream);
                 }
-                catch(e)
+                catch(error)
                 {
-                    KBELog.ERROR_MSG("NetworkInterface::onmessage: handleMessage exception! msg=" + handler.name + ", error=" + e);
+                    // 业务 handler 异常与传输 framing 无关，保持既有记录并继续的语义，不能伪造协议断线。
+                    // An application handler failure is unrelated to transport framing; preserve log-and-continue behavior instead of inventing a protocol disconnect.
+                    KBELog.ERROR_MSG("NetworkInterface::onmessage: handleMessage exception! msg=" + handler.name + ", error=" + error);
                 }
-                stream.wpos = wpos;
-                stream.rpos = rpos;
-            }
+            });
+
+        if(!result.ok)
+            this.RejectProtocolFrame(sourceSocket, result.error || "malformed KBEngine frame");
+    }
+
+    private RejectProtocolFrame(socket: WebSocket, reason: string): void
+    {
+        if(this.socket !== socket)
+            return;
+
+        // 协议错误先摘除回调和当前引用，再关闭旧 socket 并通知一次，避免 close 回调重入或误伤同步重登录的新连接。
+        // Detach callbacks and the current reference before closing a protocol-failed socket so close reentry cannot duplicate notification or damage a synchronous relogin.
+        KBELog.ERROR_MSG("NetworkInterface::onmessage: rejected malformed WebSocket message: " + reason);
+        this.ReleaseSocket(socket);
+        try
+        {
+            socket.close(1002, "Malformed KBEngine frame");
         }
+        catch(error)
+        {
+            KBELog.ERROR_MSG("NetworkInterface::onmessage: protocol close failed: " + error);
+        }
+        KBEEvent.fireAll("onDisconnected");
     }
 
     private onclose = (event: CloseEvent) =>

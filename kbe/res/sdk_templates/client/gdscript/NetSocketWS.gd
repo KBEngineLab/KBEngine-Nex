@@ -16,8 +16,10 @@ func connectHost(_addr:String, _port:int)-> void:
 	self.error = self.socket.connect_to_url(_url)
 
 func close(_code:int=1000, _reason:String="")-> void:
-	self.socket.close(_code, _reason)
+	if self.isClose:
+		return
 	self.isClose = true
+	self.socket.close(_code, _reason)
 
 func send(_stream:MemoryStream)-> bool:
 	var dataLength:int = _stream.length()
@@ -43,11 +45,28 @@ func process()-> void:
 		# 接收数据
 		while self.socket.get_available_packet_count() > 0:
 			var _buffer:PackedByteArray = self.socket.get_packet()
+			var packet_error:Error = self.socket.get_packet_error()
+			if packet_error != Error.OK:
+				_rejectProtocolFrame("WebSocket packet error " + str(packet_error))
+				break
+			if self.socket.was_string_packet():
+				_rejectProtocolFrame("expected binary WebSocket message")
+				break
+
 			var _filter:EncryptionFilter = self.networkInterface.fileter() if self.networkInterface else null
+			var receive_ok:bool = true
 			if _filter:
-				_filter.recv(self.m_messageReader, _buffer, 0, _buffer.size())
+				receive_ok = _filter.recv(self.m_messageReader, _buffer, 0, _buffer.size())
 			else:
 				self.m_messageReader.process(_buffer, 0, _buffer.size())
+
+			if not receive_ok:
+				_rejectProtocolFrame("incomplete or invalid encrypted WebSocket message")
+				break
+			var frame_error:String = self.m_messageReader.finishFrame()
+			if not frame_error.is_empty():
+				_rejectProtocolFrame(frame_error)
+				break
 	elif state == WebSocketPeer.STATE_CONNECTING:
 		pass  # 继续等待
 	elif state == WebSocketPeer.STATE_CLOSED:
@@ -56,3 +75,16 @@ func process()-> void:
 			if self.onerror and self.onerror.is_valid():
 				self.onerror.call()
 	self.state = state
+
+func _rejectProtocolFrame(_reason:String)-> void:
+	if self.isClose:
+		return
+
+	# 在回调业务关闭逻辑前标记旧 socket，保证同一畸形 message 只产生一次断线通知。
+	# Mark the old socket before invoking application close logic so one malformed message produces only one disconnect notification.
+	self.isClose = true
+	self.error = Error.ERR_INVALID_DATA
+	Dbg.ERROR_MSG("NetSocketWS: rejected malformed WebSocket message: " + _reason)
+	self.socket.close(1002, "Malformed KBEngine frame")
+	if self.onerror and self.onerror.is_valid():
+		self.onerror.call()

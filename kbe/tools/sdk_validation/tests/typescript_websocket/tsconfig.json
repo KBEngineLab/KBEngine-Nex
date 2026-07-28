@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "lib": ["ES2020", "DOM"],
+    "outDir": "dist",
+    "rootDir": "../../../..",
+    "strict": true,
+    "noEmitOnError": true
+  },
+  "include": [
+    "Program.ts",
+    "../../../../res/sdk_templates/client/typescript/WebSocketFrameParser.ts"
+  ]
+}
