@@ -3,6 +3,15 @@ import {
     DefaultWebSocketTransportFactory,
     KBEChannel
 } from "../../../../res/sdk_templates/client/typescript/WebSocketTransport";
+import {
+    CocosHostLifecycle,
+    DefaultHostLifecycleFactory,
+    HostLifecycleAdapter,
+    HostLifecycleCallbacks,
+    LayaHostLifecycle,
+    TypeScriptHostLifecycle
+} from "../../../../res/sdk_templates/client/typescript/HostLifecycle";
+import { KBEPlatform } from "../../../../res/sdk_templates/client/typescript/WebSocketTransport";
 
 function assertCondition(condition: boolean, message: string): void
 {
@@ -244,6 +253,200 @@ function verifyBrowserTransport(): void
     transport.release();
 }
 
+function createLifecycleCallbacks()
+{
+    const counts = { update: 0, player: 0, events: 0, pause: 0, resume: 0 };
+    const callbacks: HostLifecycleCallbacks = {
+        update: () => counts.update += 1,
+        updatePlayer: () => counts.player += 1,
+        processEvents: () => counts.events += 1,
+        pause: () => counts.pause += 1,
+        resume: () => counts.resume += 1
+    };
+    return { callbacks, counts };
+}
+
+function startLifecycle(adapter: HostLifecycleAdapter, callbacks: HostLifecycleCallbacks): void
+{
+    adapter.start(callbacks, { updateMS: 100, updatePlayerMS: 200, processEventsMS: 50 });
+}
+
+function verifyTypeScriptLifecycle(): void
+{
+    const scheduled: Array<() => void> = [];
+    const cleared: unknown[] = [];
+    let visibilityListener: (() => void) | undefined;
+    const timer = {
+        setInterval(callback: () => void): unknown
+        {
+            scheduled.push(callback);
+            return scheduled.length;
+        },
+        clearInterval(handle: unknown): void
+        {
+            cleared.push(handle);
+        }
+    };
+    const document = {
+        hidden: false,
+        addEventListener(_name: string, callback: () => void): void { visibilityListener = callback; },
+        removeEventListener(_name: string, callback: () => void): void
+        {
+            if(visibilityListener === callback)
+                visibilityListener = undefined;
+        }
+    };
+    const { callbacks, counts } = createLifecycleCallbacks();
+    const lifecycle = new TypeScriptHostLifecycle(timer, document);
+    startLifecycle(lifecycle, callbacks);
+    scheduled.forEach(callback => callback());
+    assertCondition(counts.update === 1 && counts.player === 1 && counts.events === 1,
+        "TypeScript lifecycle did not schedule all application tasks.");
+
+    document.hidden = true;
+    visibilityListener?.();
+    scheduled.forEach(callback => callback());
+    assertCondition(counts.pause === 1 && counts.update === 1 && counts.player === 1 && counts.events === 1,
+        "TypeScript lifecycle executed tasks while hidden.");
+    document.hidden = false;
+    visibilityListener?.();
+    scheduled[0]();
+    assertCondition(counts.resume === 1 && counts.update === 2, "TypeScript lifecycle did not resume tasks.");
+    lifecycle.stop();
+    assertCondition(cleared.length === 3 && visibilityListener === undefined,
+        "TypeScript lifecycle did not release timers and visibility events.");
+}
+
+function verifyLifecycleStartupRollback(): void
+{
+    const cleared: unknown[] = [];
+    let registrations = 0;
+    const timer = {
+        setInterval(): unknown
+        {
+            registrations += 1;
+            if(registrations === 2)
+                throw new Error("expected timer registration failure");
+            return registrations;
+        },
+        clearInterval(handle: unknown): void
+        {
+            cleared.push(handle);
+        }
+    };
+    const lifecycle = new TypeScriptHostLifecycle(timer);
+    let rejected = false;
+    try
+    {
+        startLifecycle(lifecycle, createLifecycleCallbacks().callbacks);
+    }
+    catch(_error)
+    {
+        rejected = true;
+    }
+    lifecycle.stop();
+    assertCondition(rejected && cleared.length === 1 && cleared[0] === 1,
+        "Host lifecycle startup failure did not roll back partially registered timers exactly once.");
+}
+
+function verifyCocosLifecycle(): void
+{
+    const scheduled: Array<() => void> = [];
+    const gameCallbacks = new Map<string, () => void>();
+    let unscheduled = 0;
+    let removed = 0;
+    const cocos = {
+        director: {
+            getScheduler()
+            {
+                return {
+                    schedule(callback: () => void): void { scheduled.push(callback); },
+                    unscheduleAllForTarget(): void { unscheduled += 1; }
+                };
+            }
+        },
+        game: {
+            EVENT_HIDE: "hide",
+            EVENT_SHOW: "show",
+            on(name: string, callback: () => void): void { gameCallbacks.set(name, callback); },
+            off(name: string, callback: () => void): void
+            {
+                if(gameCallbacks.get(name) === callback)
+                {
+                    gameCallbacks.delete(name);
+                    removed += 1;
+                }
+            }
+        }
+    };
+    const { callbacks, counts } = createLifecycleCallbacks();
+    const lifecycle = new CocosHostLifecycle(cocos);
+    startLifecycle(lifecycle, callbacks);
+    scheduled.forEach(callback => callback());
+    gameCallbacks.get("hide")?.();
+    scheduled.forEach(callback => callback());
+    gameCallbacks.get("show")?.();
+    scheduled[0]();
+    assertCondition(counts.update === 2 && counts.player === 1 && counts.events === 1 &&
+        counts.pause === 1 && counts.resume === 1, "Cocos lifecycle pause or scheduling contract changed.");
+    lifecycle.stop();
+    assertCondition(unscheduled === 1 && removed === 2 && gameCallbacks.size === 0,
+        "Cocos lifecycle did not release scheduler and game events.");
+}
+
+function verifyLayaLifecycle(): void
+{
+    const scheduled: Array<() => void> = [];
+    const stageCallbacks = new Map<string, () => void>();
+    let cleared = 0;
+    let removed = 0;
+    const laya = {
+        timer: {
+            loop(_milliseconds: number, _caller: object, callback: () => void): void { scheduled.push(callback); },
+            clearAll(): void { cleared += 1; }
+        },
+        stage: {
+            on(name: string, _caller: object, callback: () => void): void { stageCallbacks.set(name, callback); },
+            off(name: string, _caller: object, callback: () => void): void
+            {
+                if(stageCallbacks.get(name) === callback)
+                {
+                    stageCallbacks.delete(name);
+                    removed += 1;
+                }
+            }
+        },
+        Event: { BLUR: "blur", FOCUS: "focus" }
+    };
+    const { callbacks, counts } = createLifecycleCallbacks();
+    const lifecycle = new LayaHostLifecycle(laya);
+    startLifecycle(lifecycle, callbacks);
+    scheduled.forEach(callback => callback());
+    stageCallbacks.get("blur")?.();
+    scheduled.forEach(callback => callback());
+    stageCallbacks.get("focus")?.();
+    scheduled[0]();
+    assertCondition(counts.update === 2 && counts.player === 1 && counts.events === 1 &&
+        counts.pause === 1 && counts.resume === 1, "Laya lifecycle pause or scheduling contract changed.");
+    lifecycle.stop();
+    assertCondition(cleared === 1 && removed === 2 && stageCallbacks.size === 0,
+        "Laya lifecycle did not release timers and stage events.");
+}
+
+function verifyLifecycleFactoryFailure(): void
+{
+    let rejected = false;
+    try
+    {
+        new DefaultHostLifecycleFactory(KBEPlatform.Cocos, {}).create();
+    }
+    catch(_error)
+    {
+        rejected = true;
+    }
+    assertCondition(rejected, "A missing explicit host runtime was accepted.");
+}
+
 function main(): void
 {
     verifyLargeVariableMessage();
@@ -254,7 +457,12 @@ function main(): void
     verifyMiniProgramTransport(KBEChannel.Douyin, "tt");
     verifyChannelSelection();
     verifyBrowserTransport();
-    console.log("TYPESCRIPT_WEBSOCKET_FRAME_TEST_PASS large=true bytes=60000 extended=true atomic=true unknown=true truncated=true overrun=true web=true wechat=true douyin=true stale=true async-send=true async-close=true");
+    verifyTypeScriptLifecycle();
+    verifyLifecycleStartupRollback();
+    verifyCocosLifecycle();
+    verifyLayaLifecycle();
+    verifyLifecycleFactoryFailure();
+    console.log("TYPESCRIPT_WEBSOCKET_FRAME_TEST_PASS large=true bytes=60000 extended=true atomic=true unknown=true truncated=true overrun=true web=true wechat=true douyin=true stale=true async-send=true async-close=true lifecycle=true cocos=true laya=true");
 }
 
 try

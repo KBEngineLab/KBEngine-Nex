@@ -23,11 +23,16 @@ import {
     KBEPlatform,
     WebSocketTransportFactory
 } from "./WebSocketTransport";
+import {
+    DefaultHostLifecycleFactory,
+    HostLifecycleAdapter
+} from "./HostLifecycle";
 
 // 兼容入口只重新导出唯一实现，避免聚合文件再次定义协议与网络类。
 // The compatibility entry point only re-exports canonical implementations instead of redefining protocol and network classes.
 export { MemoryStream, NetworkInterface, DataTypes, KBETypes, KBEChannel, KBEPlatform };
 export type { WebSocketTransport, WebSocketTransportFactory } from "./WebSocketTransport";
+export type { HostLifecycleAdapter, HostLifecycleCallbacks, HostLifecycleIntervals } from "./HostLifecycle";
 
 //#region KBEngine app
 export class KBEngineArgs {
@@ -45,6 +50,7 @@ export class KBEngineArgs {
     platform: KBEPlatform = KBEPlatform.TypeScript;
     channel: KBEChannel = KBEChannel.Auto;
     webSocketTransportFactory: WebSocketTransportFactory | undefined;
+    hostLifecycleAdapter: HostLifecycleAdapter | undefined;
 
     
     domainMapping : { [key: string]: string } = { };
@@ -63,9 +69,8 @@ const KBE_FLT_MAX: number = 3.402823466e+38;
 
 export class KBEngineApp {
     private args: KBEngineArgs;
-    private idInterval: ReturnType<typeof setInterval>;
-    private updatePlayerToServerInterval: ReturnType<typeof setInterval>;
-    private kbEventInterval: ReturnType<typeof setInterval>;
+    private hostLifecycle: HostLifecycleAdapter;
+    private hostPaused = false;
 
     private userName: string = "test";
     private password: string = "123456";
@@ -162,35 +167,42 @@ export class KBEngineApp {
     }
 
     static Destroy() {
-        if (KBEngineApp.app === undefined) {
+        const app = KBEngineApp.app;
+        if (app === undefined) {
             return;
         }
 
-        if(KBEngineApp.app.currserver == "baseapp")
-            KBEngineApp.app.Logout();
-
-        if (KBEngineApp.app.idInterval) {
-            clearInterval(KBEngineApp.app.idInterval);
+        try
+        {
+            if(app.currserver == "baseapp")
+                app.Logout();
         }
-
-        
-        if (KBEngineApp.app.updatePlayerToServerInterval) {
-            clearInterval(KBEngineApp.app.updatePlayerToServerInterval);
+        finally
+        {
+            try
+            {
+                app.hostLifecycle.stop();
+            }
+            finally
+            {
+                // 宿主清理异常不能阻止全局所有权释放，否则单例和消息派发目标会永久指向失效实例。
+                // Host cleanup failures must not prevent global ownership release or the singleton and message target remain stuck on a dead instance.
+                try
+                {
+                    app.UninstallEvents();
+                    app.Reset();
+                }
+                finally
+                {
+                    Messages.UnbindDispatchTarget(app);
+                    KBEngineApp._app = undefined;
+                }
+            }
         }
-
-        if(KBEngineApp.app.kbEventInterval){
-            clearInterval(KBEngineApp.app.kbEventInterval);
-        }
-
-        KBEngineApp.app.UninstallEvents();
-        KBEngineApp.app.Reset();
-        Messages.UnbindDispatchTarget(KBEngineApp.app);
-        KBEngineApp._app = undefined;
     }
 
     private constructor(args: KBEngineArgs) {
         KBELog.ASSERT(KBEngineApp._app === undefined, "KBEngineApp::constructor:singleton KBEngineApp._app must be undefined.");
-        KBEngineApp._app = this;
 
         this.args = args;
         this.serverAddress = args.address;
@@ -202,31 +214,92 @@ export class KBEngineApp {
         // 显式工厂优先于渠道选择，便于项目接入尚未内置的平台并进行确定性测试。
         // An explicit factory takes precedence over channel selection so projects can integrate new runtimes and write deterministic tests.
         this.networkInterface.ConfigureTransport(args.webSocketTransportFactory || new DefaultWebSocketTransportFactory(args.channel));
+        this.hostLifecycle = args.hostLifecycleAdapter || new DefaultHostLifecycleFactory(args.platform).create();
 
         this.portMapping = args.portMapping;
         this.domainMapping = args.domainMapping;
 
-        EntityDef.init();
+        try
+        {
+            KBEngineApp._app = this;
+            EntityDef.init();
 
-        this.InstallEvents();
+            this.InstallEvents();
 
-        // 消息模块只持有显式派发目标，不再反向导入聚合入口或读取 KBEngineApp 全局单例。
-        // The message module keeps only an explicit dispatch target instead of importing the aggregate or reading the KBEngineApp singleton.
-        Messages.BindDispatchTarget(this);
-        Messages.BindFixedMessage();
-        // DataTypes.InitDatatypeMapping();
+            // 消息模块只持有显式派发目标，不再反向导入聚合入口或读取 KBEngineApp 全局单例。
+            // The message module keeps only an explicit dispatch target instead of importing the aggregate or reading the KBEngineApp singleton.
+            Messages.BindDispatchTarget(this);
+            Messages.BindFixedMessage();
+            // DataTypes.InitDatatypeMapping();
 
-        let now = new Date().getTime();
-        this.lastTickTime = now;
-        this.lastTickCBTime = now;
-        this.idInterval = setInterval(this.Update.bind(this), this.args.updateTick);
-        this.updatePlayerToServerInterval = setInterval(this.UpdatePlayer.bind(this), this.args.syncPlayerMS);
-        this.kbEventInterval = setInterval(this.ProcessOutEvents.bind(this), 50);
+            let now = new Date().getTime();
+            this.lastTickTime = now;
+            this.lastTickCBTime = now;
+            this.hostLifecycle.start(
+                {
+                    update: this.Update.bind(this),
+                    updatePlayer: this.UpdatePlayer.bind(this),
+                    processEvents: this.ProcessOutEvents.bind(this),
+                    pause: this.OnHostPause.bind(this),
+                    resume: this.OnHostResume.bind(this)
+                },
+                {
+                    updateMS: this.args.updateTick,
+                    updatePlayerMS: this.args.syncPlayerMS,
+                    processEventsMS: 50
+                });
+        }
+        catch(error)
+        {
+            // 构造失败不得遗留单例、消息目标或宿主任务，否则调用方无法修正配置后重新创建应用。
+            // Failed construction must not retain the singleton, message target, or host tasks so callers can fix configuration and retry creation.
+            try
+            {
+                this.hostLifecycle.stop();
+            }
+            catch(_cleanupError)
+            {
+                // 保留初始化异常作为根因，同时继续清理不依赖宿主适配器的全局状态。
+                // Preserve the initialization failure as the root cause while continuing to clear global state independent of the host adapter.
+            }
+            finally
+            {
+                try
+                {
+                    this.UninstallEvents();
+                }
+                finally
+                {
+                    Messages.UnbindDispatchTarget(this);
+                    KBEngineApp._app = undefined;
+                }
+            }
+            throw error;
+        }
     }
 
     ProcessOutEvents(){
+        if(this.hostPaused)
+            return;
         KBEEvent.processOutEvents();
         KBEEvent.processInEvents();
+    }
+
+    private OnHostPause(): void {
+        this.hostPaused = true;
+    }
+
+    private OnHostResume(): void {
+        if(!this.hostPaused)
+            return;
+
+        this.hostPaused = false;
+        const now = new Date().getTime();
+        // 后台暂停不代表网络已断开；恢复时先刷新 ACK 基准并安排立即心跳，避免用暂停前时间误判超时。
+        // Background suspension does not prove a disconnect; refresh the ACK baseline and schedule an immediate heartbeat to avoid comparing stale timestamps.
+        this.lastTickCBTime = now;
+        this.lastTickTime = now - 15001;
+        this.ProcessOutEvents();
     }
 
     InstallEvents(): void {
@@ -261,6 +334,8 @@ export class KBEngineApp {
     }
 
     Update(): void {
+        if(this.hostPaused)
+            return;
         KBEngineApp.app!.SendTick();
     }
 
@@ -671,6 +746,8 @@ export class KBEngineApp {
 
 
     private UpdatePlayer(){
+        if(this.hostPaused)
+            return;
         KBEngineApp.app!.UpdatePlayerToServer();
     }
 

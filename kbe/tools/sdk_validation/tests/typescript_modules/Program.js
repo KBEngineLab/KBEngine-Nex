@@ -246,6 +246,9 @@ function verifyAppDispatchLifecycle(compiledPath)
     const Messages = loadModule(compiledPath, "Messages.js").default;
     const injectedTransport = createTransport();
     let injectedFactoryCalls = 0;
+    let lifecycleCallbacks;
+    let lifecycleIntervals;
+    let lifecycleStops = 0;
     const originalDebug = console.debug;
     const originalWarn = console.warn;
     let app;
@@ -265,9 +268,28 @@ function verifyAppDispatchLifecycle(compiledPath)
                 return injectedTransport;
             }
         };
+        args.hostLifecycleAdapter = {
+            start(callbacks, intervals)
+            {
+                lifecycleCallbacks = callbacks;
+                lifecycleIntervals = intervals;
+            },
+            stop()
+            {
+                lifecycleStops += 1;
+            }
+        };
         app = engine.KBEngineApp.Create(args);
         assertCondition(Messages.RequireDispatchTarget("Client_onAppActiveTickCB") === app,
             "KBEngineApp.Create did not bind the message dispatch target");
+        assertCondition(lifecycleCallbacks !== undefined && lifecycleIntervals.updateMS === args.updateTick &&
+            lifecycleIntervals.updatePlayerMS === args.syncPlayerMS && lifecycleIntervals.processEventsMS === 50,
+            "KBEngineApp did not configure the injected host lifecycle adapter");
+        lifecycleCallbacks.pause();
+        const resumeStart = Date.now();
+        lifecycleCallbacks.resume();
+        assertCondition(app.lastTickCBTime >= resumeStart && app.lastTickTime <= app.lastTickCBTime - 15000,
+            "Host resume did not reset the heartbeat baseline and schedule an immediate tick");
         app.networkInterface.ConnectTo("ws://injected");
         assertCondition(injectedFactoryCalls === 1,
             "KBEngineArgs explicit transport factory did not override the selected channel");
@@ -282,6 +304,7 @@ function verifyAppDispatchLifecycle(compiledPath)
         console.debug = originalDebug;
         console.warn = originalWarn;
     }
+    assertCondition(lifecycleStops === 1, "KBEngineApp.Destroy did not stop the host lifecycle adapter exactly once");
 
     let destroyUnbound = false;
     try
@@ -293,6 +316,91 @@ function verifyAppDispatchLifecycle(compiledPath)
         destroyUnbound = true;
     }
     assertCondition(destroyUnbound, "KBEngineApp.Destroy did not unbind the message dispatch target");
+
+    let failedLifecycleStops = 0;
+    const failedArgs = new engine.KBEngineArgs();
+    failedArgs.hostLifecycleAdapter = {
+        start()
+        {
+            throw new Error("expected lifecycle startup failure");
+        },
+        stop()
+        {
+            failedLifecycleStops += 1;
+        }
+    };
+    let startupRejected = false;
+    try
+    {
+        engine.KBEngineApp.Create(failedArgs);
+    }
+    catch(_error)
+    {
+        startupRejected = true;
+    }
+    assertCondition(startupRejected && failedLifecycleStops === 1 && engine.KBEngineApp.app === undefined,
+        "Failed lifecycle startup retained host resources or the KBEngineApp singleton");
+
+    let failedCreateUnbound = false;
+    try
+    {
+        Messages.RequireDispatchTarget("Client_onAppActiveTickCB");
+    }
+    catch(_error)
+    {
+        failedCreateUnbound = true;
+    }
+    assertCondition(failedCreateUnbound, "Failed KBEngineApp creation retained the message dispatch target");
+
+    let retryStops = 0;
+    const retryArgs = new engine.KBEngineArgs();
+    retryArgs.hostLifecycleAdapter = {
+        start()
+        {
+        },
+        stop()
+        {
+            retryStops += 1;
+        }
+    };
+    engine.KBEngineApp.Create(retryArgs);
+    engine.KBEngineApp.Destroy();
+    assertCondition(retryStops === 1 && engine.KBEngineApp.app === undefined,
+        "KBEngineApp could not be created and destroyed after a lifecycle startup failure");
+
+    const stopFailureArgs = new engine.KBEngineArgs();
+    stopFailureArgs.hostLifecycleAdapter = {
+        start()
+        {
+        },
+        stop()
+        {
+            throw new Error("expected lifecycle stop failure");
+        }
+    };
+    engine.KBEngineApp.Create(stopFailureArgs);
+    let stopRejected = false;
+    try
+    {
+        engine.KBEngineApp.Destroy();
+    }
+    catch(_error)
+    {
+        stopRejected = true;
+    }
+    assertCondition(stopRejected && engine.KBEngineApp.app === undefined,
+        "Lifecycle stop failure retained the KBEngineApp singleton");
+
+    let failedDestroyUnbound = false;
+    try
+    {
+        Messages.RequireDispatchTarget("Client_onAppActiveTickCB");
+    }
+    catch(_error)
+    {
+        failedDestroyUnbound = true;
+    }
+    assertCondition(failedDestroyUnbound, "Lifecycle stop failure retained the message dispatch target");
 }
 
 function main()
