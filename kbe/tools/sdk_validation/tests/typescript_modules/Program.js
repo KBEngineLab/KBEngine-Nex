@@ -30,6 +30,9 @@ function verifySourceDependencies(sdkPath)
     const networkSource = readSource(sdkPath, "NetworkInterface.ts");
     const int64Source = readSource(sdkPath, "Int64.ts");
     const messagesSource = readSource(sdkPath, "Messages.ts");
+    const entityDefSource = readSource(sdkPath, "EntityDef.ts");
+    const dataTypesSource = readSource(sdkPath, "DataTypes.ts");
+    const kbeTypesSource = readSource(sdkPath, "KBETypes.ts");
     const aggregateImport = /from\s+["']\.\/KBEngine["']/;
 
     // 协议核心和网络实现不能反向依赖兼容聚合入口，否则 re-export 会重新形成运行时初始化环。
@@ -38,8 +41,14 @@ function verifySourceDependencies(sdkPath)
     assertCondition(!aggregateImport.test(networkSource), "NetworkInterface.ts imports KBEngine.ts");
     assertCondition(!aggregateImport.test(int64Source), "Int64.ts imports KBEngine.ts");
     assertCondition(!aggregateImport.test(messagesSource), "Messages.ts imports KBEngine.ts");
+    assertCondition(!aggregateImport.test(entityDefSource), "EntityDef.ts imports KBEngine.ts");
+    assertCondition(!aggregateImport.test(dataTypesSource), "DataTypes.ts imports KBEngine.ts");
+    assertCondition(!aggregateImport.test(kbeTypesSource), "KBETypes.ts imports KBEngine.ts");
     assertCondition(!/export\s+class\s+MemoryStream\b/.test(engineSource), "KBEngine.ts still defines MemoryStream");
     assertCondition(!/export\s+class\s+NetworkInterface\b/.test(engineSource), "KBEngine.ts still defines NetworkInterface");
+    assertCondition(!/export\s+namespace\s+DataTypes\b/.test(engineSource), "KBEngine.ts still defines DataTypes");
+    assertCondition(/import\s+\{\s*DataTypes\s*\}\s+from\s+["']\.\/DataTypes["']/.test(entityDefSource),
+        "EntityDef.ts does not import the canonical DataTypes module");
     assertCondition(/import\s+type\s+\{\s*MemoryStream\s*\}\s+from\s+["']\.\/MemoryStream["']/.test(messagesSource),
         "Messages.ts does not use a type-only MemoryStream import");
 
@@ -101,9 +110,13 @@ function verifyRuntimeIdentity(compiledPath)
     const memory = loadModule(compiledPath, "MemoryStream.js");
     const int64 = loadModule(compiledPath, "Int64.js");
     const network = loadModule(compiledPath, "NetworkInterface.js");
+    const dataTypes = loadModule(compiledPath, "DataTypes.js");
+    const kbeTypes = loadModule(compiledPath, "KBETypes.js");
 
     assertCondition(engine.MemoryStream === memory.MemoryStream, "MemoryStream re-export changed class identity");
     assertCondition(engine.NetworkInterface === network.default, "NetworkInterface re-export changed class identity");
+    assertCondition(engine.DataTypes === dataTypes.DataTypes, "DataTypes compatibility re-export changed namespace identity");
+    assertCondition(engine.KBETypes === kbeTypes, "KBETypes compatibility re-export changed module identity");
     assertCondition(engine.DataTypes.KB_INT64 === int64.KB_INT64, "KB_INT64 compatibility alias changed class identity");
     assertCondition(engine.DataTypes.KB_UINT64 === int64.KB_UINT64, "KB_UINT64 compatibility alias changed class identity");
 
@@ -113,6 +126,30 @@ function verifyRuntimeIdentity(compiledPath)
     stream.rpos = 0;
     assertCondition(stream.ReadInt64().toBigInt() === -1234567890123n, "Signed 64-bit protocol roundtrip changed");
     assertCondition(stream.ReadUint64().toBigInt() === 1234567890123n, "Unsigned 64-bit protocol roundtrip changed");
+}
+
+function verifySchemaBinding(compiledPath)
+{
+    const EntityDef = loadModule(compiledPath, "EntityDef.js").default;
+    const dataTypes = loadModule(compiledPath, "DataTypes.js").DataTypes;
+    const originalWarn = console.warn;
+
+    // 未注册业务实体脚本的 warning 与 schema 类型绑定无关，只在本夹具的初始化窗口内静默。
+    // Warnings about unregistered project entity scripts are unrelated to schema binding and are silenced only during fixture initialization.
+    console.warn = () => {};
+    try
+    {
+        EntityDef.reset();
+    }
+    finally
+    {
+        console.warn = originalWarn;
+    }
+
+    const customArray = EntityDef.datatypes.get("AVATAR_LIST");
+    assertCondition(EntityDef.datatypes.size > 0, "EntityDef did not initialize its data type registry");
+    assertCondition(customArray instanceof dataTypes.DATATYPE_BASE,
+        "Custom schema data type does not inherit the canonical DataTypes base");
 }
 
 function verifyAppDispatchLifecycle(compiledPath)
@@ -162,9 +199,10 @@ function main()
     assertCondition(sdkPath.length > 0 && fs.existsSync(sdkPath), "Usage: node Program.js <generated-sdk-path> [compiled-sdk-path]");
     verifySourceDependencies(sdkPath);
     verifyRuntimeIdentity(compiledPath);
+    verifySchemaBinding(compiledPath);
     verifyMessageDispatch(compiledPath);
     verifyAppDispatchLifecycle(compiledPath);
-    console.log("TYPESCRIPT_MODULE_TEST_PASS root=true imports=true memory=true network=true int64=true roundtrip=true dispatch=true lifecycle=true app-lifecycle=true");
+    console.log("TYPESCRIPT_MODULE_TEST_PASS root=true imports=true schema=true schema-bind=true memory=true network=true int64=true roundtrip=true dispatch=true lifecycle=true app-lifecycle=true");
 }
 
 try

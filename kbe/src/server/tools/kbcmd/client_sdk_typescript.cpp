@@ -843,8 +843,7 @@ bool ClientSDKTypeScript::writeEntityMethods(ScriptDefModule* pEntityScriptDefMo
 //-------------------------------------------------------------------------------------
 void ClientSDKTypeScript::onCreateTypeFileName()
 {
-	//sourcefileName_ = "KBETypes.ts";
-	sourcefileName_ = "KBEngine.ts";
+	sourcefileName_ = "KBETypes.ts";
 }
 
 //-------------------------------------------------------------------------------------
@@ -868,7 +867,7 @@ void ClientSDKTypeScript::onCreateEngineMessagesModuleFileName()
 //-------------------------------------------------------------------------------------
 void ClientSDKTypeScript::onCreateDefsCustomTypesModuleFileName()
 {
-	sourcefileName_ = "KBEngine.ts";
+	sourcefileName_ = "KBETypes.ts";
 }
 
 //-------------------------------------------------------------------------------------
@@ -1169,7 +1168,8 @@ bool ClientSDKTypeScript::writeEntityDefsModuleBegin()
 	strutil::kbe_replace(sourcefileBody_, "#REPLACE#", "");
 
 	sourcefileBody_ += R"delimiter(
-import { DataTypes , KBETypes } from "./KBEngine";
+import { DataTypes } from "./DataTypes";
+import * as KBETypes from "./KBETypes";
 import { ScriptModule } from "./ScriptModule";
 import { Vector3, Vector2 ,Vector4} from "./KBEMath";
 import { Property } from "./Property";
@@ -1273,7 +1273,9 @@ bool ClientSDKTypeScript::writeEntityDefsModuleInitDefTypesEnd()
 		for (let datatypeStr of EntityDef.datatypes.keys()) {
             let dataType = EntityDef.datatypes.get(datatypeStr);
             if (dataType != null) {
-                dataType.Bind();
+                // schema 注册表由所有者显式传入，基础类型模块不再反向读取 EntityDef 静态状态。
+                // The schema owner passes its registry explicitly so base data types never read EntityDef static state.
+                dataType.Bind((type) => typeof type === "number" ? EntityDef.id2datatypes[type] : EntityDef.datatypes.get(type));
             }
         }
 )delimiter";
@@ -1347,7 +1349,9 @@ bool ClientSDKTypeScript::writeEntityCallBegin(ScriptDefModule* pScriptDefModule
 	strutil::kbe_replace(sourcefileBody_, "#REPLACE#", fmt::format("\t\n",
 		sourcefileName_));
 
-	sourcefileBody_ += "import { EntityCall,DataTypes,KBETypes } from './KBEngine';\n";
+	sourcefileBody_ += "import { EntityCall } from './KBEngine';\n";
+	sourcefileBody_ += "import { DataTypes } from './DataTypes';\n";
+	sourcefileBody_ += "import * as KBETypes from './KBETypes';\n";
 	sourcefileBody_ += "import EntityDef from './EntityDef';\n";
 	//sourcefileBody_ += "import * as KBEngine from './KBEngine';\n";
 
@@ -1596,7 +1600,6 @@ bool ClientSDKTypeScript::writeCustomDataTypesBegin()
 //-------------------------------------------------------------------------------------
 bool ClientSDKTypeScript::writeCustomDataTypesEnd()
 {
-	sourcefileBody_ += "\n}";
 	return true;
 }
 
@@ -1654,7 +1657,7 @@ bool ClientSDKTypeScript::createArrayChildClass(DataType* pRootDataType, DataTyp
 		sourcefileBody_ += fmt::format("\t}}\n\n");
 
 
-		sourcefileBody_ += fmt::format("\tpublic addToStreamEx(stream:Bundle, v:{} ){{\n", typeName);
+		sourcefileBody_ += fmt::format("\tpublic addToStreamEx(stream:DataTypeWriter, v:{} ){{\n", typeName);
 		sourcefileBody_ += fmt::format("\t\tstream.WriteUint32(v.length >>> 0);\n");
 		sourcefileBody_ += fmt::format("\t\tfor(let i=0; i<v.length; ++i)\n");
 		sourcefileBody_ += fmt::format("\t\t{{\n");
@@ -1734,7 +1737,7 @@ bool ClientSDKTypeScript::createArrayChildClass(DataType* pRootDataType, DataTyp
 		sourcefileBody_ += fmt::format("\t}}\n\n");
 
 
-		sourcefileBody_ += fmt::format("\tpublic addToStreamEx(stream:Bundle ,v:{} ){{\n", typeName);
+		sourcefileBody_ += fmt::format("\tpublic addToStreamEx(stream:DataTypeWriter ,v:{} ){{\n", typeName);
 		sourcefileBody_ += fmt::format("\t\tstream.WriteUint32(v.length >>> 0);\n");
 		sourcefileBody_ += fmt::format("\t\tfor(let i=0; i<v.length; ++i)\n");
 		sourcefileBody_ += fmt::format("\t\t{{\n");
@@ -1797,7 +1800,7 @@ bool ClientSDKTypeScript::createArrayChildClass(DataType* pRootDataType, DataTyp
 		sourcefileBody_ += fmt::format("\t\treturn datas;\n");
 		sourcefileBody_ += fmt::format("\t}}\n\n");
 
-		sourcefileBody_ += fmt::format("\tpublic addToStreamEx(stream:Bundle, v:Array<{}> ){{\n", typeName);
+		sourcefileBody_ += fmt::format("\tpublic addToStreamEx(stream:DataTypeWriter, v:Array<{}> ){{\n", typeName);
 		sourcefileBody_ += fmt::format("\t\tstream.WriteUint32(v.length >>> 0);\n");
 		sourcefileBody_ += fmt::format("\t\tfor(let i=0; i<v.length; ++i)\n");
 		sourcefileBody_ += fmt::format("\t\t{{\n");
@@ -1938,7 +1941,7 @@ bool ClientSDKTypeScript::writeCustomDataType(const DataType* pDataType)
 
 		// 创建addToStreamEx方法
 		{
-			sourcefileBody_ += fmt::format("\tpublic addToStreamEx(stream:Bundle,  v:{}){{\n", typeName);
+			sourcefileBody_ += fmt::format("\tpublic addToStreamEx(stream:DataTypeWriter,  v:{}){{\n", typeName);
 
 			FixedDictType::FIXEDDICT_KEYTYPE_MAP& keys = dictdatatype->getKeyTypes();
 			FixedDictType::FIXEDDICT_KEYTYPE_MAP::const_iterator keyiter = keys.begin();
@@ -2053,7 +2056,7 @@ bool ClientSDKTypeScript::writeCustomDataType(const DataType* pDataType)
 			sourcefileBody_ += fmt::format("\t\treturn datas;\n");
 			sourcefileBody_ += fmt::format("\t}}\n\n");
 
-			sourcefileBody_ += fmt::format("\tpublic addToStreamEx(stream:Bundle, v:{}){{\n", typeName);
+			sourcefileBody_ += fmt::format("\tpublic addToStreamEx(stream:DataTypeWriter, v:{}){{\n", typeName);
 			sourcefileBody_ += fmt::format("\t\tstream.WriteUint32(v.length >>> 0 );\n");
 			sourcefileBody_ += fmt::format("\t\tfor(let i=0; i< v.length; ++i)\n");
 			sourcefileBody_ += fmt::format("\t\t{{\n");
@@ -2100,7 +2103,7 @@ bool ClientSDKTypeScript::writeCustomDataType(const DataType* pDataType)
 			sourcefileBody_ += fmt::format("\t\treturn {};\n", readName);
 			sourcefileBody_ += fmt::format("\t}}\n\n");
 
-			sourcefileBody_ += fmt::format("\tpublic addToStreamEx(stream:Bundle, v:{}) {{\n", typeName);
+			sourcefileBody_ += fmt::format("\tpublic addToStreamEx(stream:DataTypeWriter, v:{}) {{\n", typeName);
 			std::string writeName = fmt::format("this.itemType.addToStreamEx(stream, v)", writeName);
 			sourcefileBody_ += fmt::format("\t\t{};\n", writeName);
 			sourcefileBody_ += fmt::format("\t}}\n");
@@ -2138,7 +2141,7 @@ bool ClientSDKTypeScript::writeCustomDataType(const DataType* pDataType)
 			sourcefileBody_ += fmt::format("\t\treturn datas;\n");
 			sourcefileBody_ += fmt::format("\t}}\n\n");
 
-			sourcefileBody_ += fmt::format("\tpublic addToStreamEx(stream:Bundle, v:{}){{\n", typeName);
+			sourcefileBody_ += fmt::format("\tpublic addToStreamEx(stream:DataTypeWriter, v:{}){{\n", typeName);
 			sourcefileBody_ += fmt::format("\t\tstream.WriteUint32( v.length >>> 0 );\n");
 			sourcefileBody_ += fmt::format("\t\tfor(let i=0; i< v.length; ++i){{\n");
 
@@ -2353,9 +2356,16 @@ bool ClientSDKTypeScript::writeTypesBegin()
 	strutil::kbe_replace(sourcefileBody_, "#REPLACE#", "");
 
 
-	sourcefileBody_ += "\nexport namespace KBETypes {\n";
-	sourcefileBody_ += "\n// defined in */entity_defs/types.xml\n\n";
-	//sourcefileBody_ += "\n\nimport { Vector2, Vector3, Vector4 } from \"./KBEMath\";\n// defined in */entity_defs/types.xml\n\n";
+	sourcefileBody_ += R"delimiter(
+
+import { DataTypes } from "./DataTypes";
+import type { DataTypeWriter } from "./DataTypes";
+import { MemoryStream } from "./MemoryStream";
+import { Vector2, Vector3, Vector4 } from "./KBEMath";
+
+// defined in */entity_defs/types.xml
+
+)delimiter";
 
 	return true;
 }
@@ -2363,7 +2373,6 @@ bool ClientSDKTypeScript::writeTypesBegin()
 //-------------------------------------------------------------------------------------
 bool ClientSDKTypeScript::writeTypesEnd()
 {
-	//sourcefileBody_ += "\n}";
 	return true;
 }
 
@@ -2702,7 +2711,9 @@ bool ClientSDKTypeScript::writeEntityModuleBegin(ScriptDefModule* pEntityScriptD
 		pEntityScriptDefModule->getName(), pEntityScriptDefModule->getName(), moduleSuffix));
 
 	sourcefileBody_ += R"delimiter(
-import { Entity, EntityComponent, EntityCall, DataTypes, KBETypes } from './KBEngine';
+import { Entity, EntityComponent, EntityCall } from './KBEngine';
+import { DataTypes } from './DataTypes';
+import * as KBETypes from './KBETypes';
 import type { MemoryStream } from './MemoryStream';
 import * as ExportEntity from './ExportEntity';
 
