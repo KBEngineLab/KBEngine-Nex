@@ -4007,8 +4007,26 @@ void Baseapp::reloginBaseapp(Network::Channel* pChannel, std::string& accountNam
 		accountName, key, entityID));
 
 	Entity* pEntity = findEntity(entityID);
-	if(pEntity == NULL || !PyObject_TypeCheck(pEntity, Proxy::getScriptType()) || pEntity->isDestroyed())
+	if(pEntity == NULL)
 	{
+		WARNING_MSG(fmt::format("Baseapp::reloginBaseapp: rejected accountName={}, entityID={} because the entity does not exist.\n",
+			accountName, entityID));
+		loginBaseappFailed(pChannel, accountName, SERVER_ERR_ILLEGAL_LOGIN, true);
+		return;
+	}
+
+	if(!PyObject_TypeCheck(pEntity, Proxy::getScriptType()))
+	{
+		WARNING_MSG(fmt::format("Baseapp::reloginBaseapp: rejected accountName={}, entityID={} because the entity is not a Proxy.\n",
+			accountName, entityID));
+		loginBaseappFailed(pChannel, accountName, SERVER_ERR_ILLEGAL_LOGIN, true);
+		return;
+	}
+
+	if(pEntity->isDestroyed())
+	{
+		WARNING_MSG(fmt::format("Baseapp::reloginBaseapp: rejected accountName={}, entityID={} because the Proxy is being destroyed.\n",
+			accountName, entityID));
 		loginBaseappFailed(pChannel, accountName, SERVER_ERR_ILLEGAL_LOGIN, true);
 		return;
 	}
@@ -4017,6 +4035,8 @@ void Baseapp::reloginBaseapp(Network::Channel* pChannel, std::string& accountNam
 	
 	if(key == 0 || proxy->rndUUID() != key)
 	{
+		WARNING_MSG(fmt::format("Baseapp::reloginBaseapp: rejected accountName={}, entityID={} because the relogin key is invalid.\n",
+			accountName, entityID));
 		loginBaseappFailed(pChannel, accountName, SERVER_ERR_ILLEGAL_LOGIN, true);
 		return;
 	}
