@@ -172,6 +172,7 @@ export class KBEngineApp {
 
         KBEngineApp.app.UninstallEvents();
         KBEngineApp.app.Reset();
+        Messages.UnbindDispatchTarget(KBEngineApp.app);
         KBEngineApp._app = undefined;
     }
 
@@ -193,6 +194,9 @@ export class KBEngineApp {
 
         this.InstallEvents();
 
+        // 消息模块只持有显式派发目标，不再反向导入聚合入口或读取 KBEngineApp 全局单例。
+        // The message module keeps only an explicit dispatch target instead of importing the aggregate or reading the KBEngineApp singleton.
+        Messages.BindDispatchTarget(this);
         Messages.BindFixedMessage();
         // DataTypes.InitDatatypeMapping();
 

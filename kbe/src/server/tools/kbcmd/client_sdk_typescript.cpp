@@ -961,7 +961,6 @@ bool ClientSDKTypeScript::writeEngineMessagesModuleBegin()
 
 	
 	sourcefileBody_ += R"delimiter(
-import { KBEngineApp, DataTypes } from "./KBEngine";
 import type { MemoryStream } from "./MemoryStream";
 import KBELog from "./KBELog";
 
@@ -1028,11 +1027,11 @@ bool ClientSDKTypeScript::writeEngineMessagesModuleMessage(Network::ExposedMessa
 		{
 			if (messageInfos.argsType < 0)
 			{
-				sourcefileBody_ += fmt::format("\t\tKBEngineApp.app!.{}(msgstream); \n", messageInfos.name);
+				sourcefileBody_ += fmt::format("\t\tMessages.RequireDispatchTarget(\"{}\").{}(msgstream); \n", messageInfos.name, messageInfos.name);
 			}
 			else
 			{
-				sourcefileBody_ += fmt::format("\t\tKBEngineApp.app!.{}(); \n", messageInfos.name);
+				sourcefileBody_ += fmt::format("\t\tMessages.RequireDispatchTarget(\"{}\").{}(); \n", messageInfos.name, messageInfos.name);
 			}
 		}
 	}
@@ -1072,7 +1071,7 @@ bool ClientSDKTypeScript::writeEngineMessagesModuleMessage(Network::ExposedMessa
 		if (componentType == CLIENT_TYPE)
 		{
 			sourcefileBody_ += argsparse;
-			sourcefileBody_ += fmt::format("\t\tKBEngineApp.app!.{}({});\n", messageInfos.name, giveargs);
+			sourcefileBody_ += fmt::format("\t\tMessages.RequireDispatchTarget(\"{}\").{}({});\n", messageInfos.name, messageInfos.name, giveargs);
 		}
 	}
 
@@ -1109,6 +1108,31 @@ export default class Messages {
     public static baseappMessages: { [key: string]: Message } = {};
     public static clientMessages: { [key: string]: Message } = {};
     public static messages: { [key: string]: Message } = {};
+    private static dispatchTarget: object | undefined;
+
+    static BindDispatchTarget(target: object): void {
+        if(Messages.dispatchTarget !== undefined && Messages.dispatchTarget !== target)
+            throw new Error("Messages dispatch target is already bound.");
+        Messages.dispatchTarget = target;
+    }
+
+    static UnbindDispatchTarget(target: object): void {
+        // 只允许当前拥有者解除绑定，避免旧 App 的迟到销毁清除新实例的派发目标。
+        // Only the current owner may unbind so stale destruction of an old App cannot clear a newer instance's dispatch target.
+        if(Messages.dispatchTarget === target)
+            Messages.dispatchTarget = undefined;
+    }
+
+    static RequireDispatchTarget(methodName: string): Record<string, (...args: unknown[]) => unknown> {
+        const target = Messages.dispatchTarget;
+        if(target === undefined)
+            throw new Error("Messages dispatch target is not bound for " + methodName + ".");
+
+        const handler = (target as Record<string, unknown>)[methodName];
+        if(typeof handler !== "function")
+            throw new Error("Messages dispatch target has no handler " + methodName + ".");
+        return target as Record<string, (...args: unknown[]) => unknown>;
+    }
 
 	static clear() {
         Messages.loginappMessages = {};
