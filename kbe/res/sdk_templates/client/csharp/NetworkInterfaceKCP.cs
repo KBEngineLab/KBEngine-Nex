@@ -43,21 +43,17 @@
 			return new PacketSenderKCP(this);
 		}
 
-		public override void reset()
+		protected override void releaseTransport()
 		{
 			finiKCP();
-			base.reset();
+			base.releaseTransport();
 		}
-		
-        public override void close()
-        {
-			finiKCP();
-			base.close();
-        }
 
 		public override bool valid()
 		{
-			return ((kcp_ != null) && (_socket != null) && connected);
+			Deps.KCP kcp = kcp_;
+			Socket socket = _socket;
+			return kcp != null && socket != null && connected;
 		}
 
 		protected void outputKCP(byte[] data, int size, object userData)
@@ -143,6 +139,14 @@
 		{
 			if(state.error.Length > 0)
 				return;
+
+			// reset 或后续连接已经替换 socket 时，迟到握手不能重新创建 KCP control block。
+			// When reset or a later connection has replaced the socket, a late handshake must not recreate the KCP control block.
+			if (!isCurrentConnection(state))
+			{
+				state.error = "connection superseded";
+				return;
+			}
 
 			if (!initKCP())
 			{

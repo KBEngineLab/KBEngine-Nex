@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\..\..\res\sdk_templates\client\csharp\HeartbeatState.cs" Link="HeartbeatState.cs" />
+    <Compile Include="..\..\..\..\res\sdk_templates\client\csharp\NetworkLifecycleState.cs" Link="NetworkLifecycleState.cs" />
   </ItemGroup>
 </Project>

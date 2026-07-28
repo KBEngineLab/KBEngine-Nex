@@ -21,7 +21,8 @@
 	{
 		public override bool valid()
 		{
-			return ((_socket != null) && (_socket.Connected == true));
+			Socket socket = _socket;
+			return socket != null && socket.Connected;
 		}
 
 		protected override Socket createSocket()

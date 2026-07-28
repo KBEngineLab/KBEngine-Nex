@@ -90,9 +90,9 @@ Keep `E2E_FAIL` and `RESOURCE_FAIL` in `forbiddenPatterns`. This prevents a succ
 
 必须把 `E2E_FAIL` 与 `RESOURCE_FAIL` 保留在 `forbiddenPatterns` 中，避免进程以成功状态退出时掩盖协议、状态重建或资源生命周期错误。
 
-执行以下命令可回归场景隔离、筛选、未知名称拒绝和前置阶段阻断；测试产物只写入系统临时目录：
+执行以下命令可回归场景隔离、资源 watcher、C# 心跳和并发关闭状态。PowerShell 合成产物只写入系统临时目录，C# 的 `bin/obj` 已按测试工程精确忽略：
 
-Run the following command to verify scenario isolation, filtering, unknown-name rejection, and prerequisite blocking. Test artifacts are written only to the system temporary directory:
+Run the following commands to verify scenario isolation, resource watchers, C# heartbeats, and concurrent close state. PowerShell fixtures write only to the system temporary directory, while the C# project's `bin/obj` paths are narrowly ignored:
 
 ```powershell
 pwsh -File kbe/tools/sdk_validation/tests/Test-SdkValidation.ps1

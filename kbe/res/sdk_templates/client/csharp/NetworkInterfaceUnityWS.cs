@@ -17,6 +17,10 @@ namespace KBEngine
     {
         private WebSocket _webSocket = null;
         private MessageReaderUnityWS _messageReader = new();
+        private WebSocketOpenEventHandler _openHandler = null;
+        private WebSocketErrorEventHandler _errorHandler = null;
+        private WebSocketCloseEventHandler _closeHandler = null;
+        private WebSocketMessageEventHandler _messageHandler = null;
 
         private ConnectState _state = null;
         ~NetworkInterfaceUnityWS()
@@ -27,12 +31,18 @@ namespace KBEngine
 
         public override bool valid()
         {
-            return ((_webSocket != null) && (_webSocket.State == WebSocketState.Open || _webSocket.State == WebSocketState.Connecting));
+            WebSocket webSocket = _webSocket;
+            return webSocket != null && (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.Connecting);
         }
 
         public WebSocket GetWebSocket()
         {
             return _webSocket;
+        }
+
+        protected override bool isCurrentConnection(ConnectState state)
+        {
+            return Object.ReferenceEquals(state.networkInterface, this) && Object.ReferenceEquals(state.webSocket, _webSocket);
         }
 
         public override void  connectTo(string ip, int port, ConnectCallback callback, object userData, Dictionary<string, string> domainMapping, Dictionary<int, int> portMapping)
@@ -91,10 +101,14 @@ namespace KBEngine
 
                 KBELog.DEBUG_MSG($"NetworkInterfaceBase::ConnectAsync(), connect to '{state.connectIP}:{state.connectPort}' finished. error = '{state.error}'");
 
+                if (state.error.Length > 0)
+                    Event.fireIn("_onConnectionState", new object[] { state });
             }
             catch (Exception ex)
             {
                 KBELog.ERROR_MSG($"NetworkInterfaceBase::ConnectAsync() error: {ex}");
+                state.error = ex.ToString();
+                Event.fireIn("_onConnectionState", new object[] { state });
             }
         }
 
@@ -119,32 +133,42 @@ namespace KBEngine
         }
 
 
-        public override void reset()
+        protected override void releaseTransport()
         {
-            _ = UninstallEvent();
-            base.reset();
-        }
-
-        public override void close()
-        {
-            _ = UninstallEvent();
-            base.close();
-        }
-
-        private async Task UninstallEvent()
-        {
-            
-            
-            // 主动关闭连接
-            if (_webSocket != null)
+            WebSocket webSocket = _webSocket;
+            _webSocket = null;
+            if (webSocket != null)
             {
-                _webSocket.OnOpen -= OnOpenHandler;
-                _webSocket.OnError -= OnErrorHandler;
-                _webSocket.OnClose -= OnCloseHandler;
-                _webSocket.OnMessage -= OnMessageHandler;
-                
-                await _webSocket.Close();
-                _webSocket = null;
+                if (_openHandler != null)
+                    webSocket.OnOpen -= _openHandler;
+                if (_errorHandler != null)
+                    webSocket.OnError -= _errorHandler;
+                if (_closeHandler != null)
+                    webSocket.OnClose -= _closeHandler;
+                if (_messageHandler != null)
+                    webSocket.OnMessage -= _messageHandler;
+                _ = CloseWebSocket(webSocket);
+            }
+
+            _openHandler = null;
+            _errorHandler = null;
+            _closeHandler = null;
+            _messageHandler = null;
+
+            base.releaseTransport();
+        }
+
+        private static async Task CloseWebSocket(WebSocket webSocket)
+        {
+            try
+            {
+                await webSocket.Close();
+            }
+            catch (Exception exception)
+            {
+                // 状态和事件已同步拆除，异步 close 失败只保留诊断，不能重新激活或重复通知旧连接。
+                // State and handlers are detached synchronously; an asynchronous close failure is diagnostic only and must not reactivate or renotify the old connection.
+                KBELog.WARNING_MSG("NetworkInterfaceUnityWS::CloseWebSocket(): " + exception);
             }
         }
 
@@ -156,10 +180,16 @@ namespace KBEngine
         private WebSocket createWebSocket(String url)
         {
             WebSocket webSocket = new WebSocket(url);
-            webSocket.OnOpen += OnOpenHandler;
-            webSocket.OnError += OnErrorHandler;
-            webSocket.OnClose += OnCloseHandler;
-            webSocket.OnMessage += OnMessageHandler;
+            // 每个委托捕获自己的 transport；即使事件已经由底层排队，旧连接也不能借用后来连接的 _state。
+            // Each delegate captures its own transport, so even an event already queued by the backend cannot reuse a later connection's _state.
+            _openHandler = () => OnOpenHandler(webSocket);
+            _errorHandler = error => OnErrorHandler(webSocket, error);
+            _closeHandler = code => OnCloseHandler(webSocket, code);
+            _messageHandler = bytes => OnMessageHandler(webSocket, bytes);
+            webSocket.OnOpen += _openHandler;
+            webSocket.OnError += _errorHandler;
+            webSocket.OnClose += _closeHandler;
+            webSocket.OnMessage += _messageHandler;
             
             return webSocket;
         }
@@ -179,25 +209,51 @@ namespace KBEngine
 
         
         
-        private void OnOpenHandler()
+        private void OnOpenHandler(WebSocket source)
         {
+            if (!Object.ReferenceEquals(source, _webSocket))
+                return;
+
             Event.fireIn("_onConnectionState", new object[] { _state });
         }
 
-        private void OnErrorHandler(string e)
+        private void OnErrorHandler(WebSocket source, string error)
         {
-            KBELog.ERROR_MSG("NetworkInterfaceUnityWS::Error! " + e);
+            if (!Object.ReferenceEquals(source, _webSocket))
+                return;
+
+            KBELog.ERROR_MSG("NetworkInterfaceUnityWS::Error! " + error);
+            if (!connected)
+            {
+                _state.error = error;
+                Event.fireIn("_onConnectionState", new object[] { _state });
+                return;
+            }
+
             close();
         }
 
-        private void OnCloseHandler(WebSocketCloseCode code)
+        private void OnCloseHandler(WebSocket source, WebSocketCloseCode code)
         {
+            if (!Object.ReferenceEquals(source, _webSocket))
+                return;
+
             KBELog.ERROR_MSG("NetworkInterfaceUnityWS::Connection closed! code=" + code);
+            if (!connected)
+            {
+                _state.error = "WebSocket closed while connecting: " + code;
+                Event.fireIn("_onConnectionState", new object[] { _state });
+                return;
+            }
+
             close();
         }
 
-        private void OnMessageHandler(byte[] bytes)
+        private void OnMessageHandler(WebSocket source, byte[] bytes)
         {
+            if (!Object.ReferenceEquals(source, _webSocket))
+                return;
+
             try
             {
                 _messageReader.process(bytes, 0, (MessageLengthEx)bytes.Length);

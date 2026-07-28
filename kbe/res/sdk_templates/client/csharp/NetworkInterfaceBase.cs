@@ -34,6 +34,8 @@ namespace KBEngine
 		protected PacketReceiverBase _packetReceiver = null;
 		protected PacketSenderBase _packetSender = null;
 		protected EncryptionFilter _filter = null;
+		private readonly object _lifecycleLock = new object();
+		private readonly NetworkLifecycleState _lifecycleState = new NetworkLifecycleState();
 
 		public bool connected = false;
 		
@@ -53,7 +55,6 @@ namespace KBEngine
 		
 		public NetworkInterfaceBase()
 		{
-			reset();
 		}
 
 		~NetworkInterfaceBase()
@@ -69,17 +70,51 @@ namespace KBEngine
 		
 		public virtual void reset()
 		{
+			shutdown(false, null);
+		}
+
+		public virtual void close()
+		{
+			shutdown(true, null);
+		}
+
+		private bool shutdown(bool notifyDisconnected, ConnectState expectedConnection)
+		{
+			bool shouldNotify;
+			lock (_lifecycleLock)
+			{
+				if (expectedConnection != null && !isCurrentConnection(expectedConnection))
+					return false;
+
+				// 通知资格只在成功连接后建立，并在 reset/close 中一次性消费；socket 是否存在不能代表连接是否曾经可用。
+				// Notification eligibility is armed only after a successful connection and consumed once by reset/close; socket presence does not prove that a connection was ever usable.
+				shouldNotify = _lifecycleState.consume(notifyDisconnected);
+				releaseTransport();
+			}
+
+			// 公开事件必须在生命周期锁外派发，业务回调才能同步发起重登录而不造成锁重入或锁顺序反转。
+			// Dispatch the public event outside the lifecycle lock so application callbacks may relogin synchronously without lock reentry or lock-order inversion.
+			if (shouldNotify)
+				Event.fireAll(EventOutTypes.onDisconnected);
+
+			return true;
+		}
+
+		protected virtual void releaseTransport()
+		{
 			_packetReceiver = null;
 			_packetSender = null;
 			_filter = null;
 			connected = false;
 
-			if(_socket != null)
+			Socket socket = _socket;
+			_socket = null;
+			if(socket != null)
 			{
 				try
 				{
-					if(_socket.RemoteEndPoint != null)
-						KBELog.DEBUG_MSG(string.Format("NetworkInterfaceBase::reset(), close socket from '{0}'", _socket.RemoteEndPoint.ToString()));
+					if(socket.RemoteEndPoint != null)
+						KBELog.DEBUG_MSG(string.Format("NetworkInterfaceBase::releaseTransport(), close socket from '{0}'", socket.RemoteEndPoint.ToString()));
 				}
 				catch (Exception)
 				{
@@ -87,38 +122,38 @@ namespace KBEngine
 				}
 				try
 				{
-					_socket.Shutdown(SocketShutdown.Both);
+					socket.Shutdown(SocketShutdown.Both);
 				}
 				catch
 				{
 					// ignored
 				}
 
-				_socket.Close(0);
-				_socket = null;
+				socket.Close(0);
 			}
 		}
-		
 
-		public virtual void close()
+		protected virtual bool isCurrentConnection(ConnectState state)
 		{
-			if(_socket != null)
-			{
-				try
-				{
-					_socket.Shutdown(SocketShutdown.Both);
-				}
-				catch
-				{
-					// ignored
-				}
-				_socket.Close(0);
-				_socket = null;
-				Event.fireAll(EventOutTypes.onDisconnected);
-			}
+			return Object.ReferenceEquals(state.networkInterface, this) && Object.ReferenceEquals(state.socket, _socket);
+		}
 
-			_socket = null;
-			connected = false;
+		private bool activateConnection(ConnectState state, out PacketReceiverBase packetReceiver)
+		{
+			packetReceiver = null;
+			lock (_lifecycleLock)
+			{
+				// 异步 connect 完成可能晚于 reset 或下一次连接；只有仍指向当前 transport 的回调可以激活接口。
+				// Async connect completion may arrive after reset or a later connection; only a callback still referring to the current transport may activate the interface.
+				if (!isCurrentConnection(state))
+					return false;
+
+				packetReceiver = createPacketReceiver();
+				_packetReceiver = packetReceiver;
+				connected = true;
+				_lifecycleState.arm();
+				return true;
+			}
 		}
 
 		protected abstract PacketReceiverBase createPacketReceiver();
@@ -138,24 +173,38 @@ namespace KBEngine
 
 		public virtual bool valid()
 		{
-			return ((_socket != null) && (_socket.Connected == true));
+			Socket socket = _socket;
+			return socket != null && socket.Connected;
 		}
 		
 		public void _onConnectionState(ConnectState state)
 		{
-			KBEngine.Event.deregisterIn(this);
-
 			bool success = (state.error == "" && valid());
+			bool handled;
+			PacketReceiverBase packetReceiver = null;
 			if (success)
 			{
-				KBELog.DEBUG_MSG(string.Format("NetworkInterfaceBase::_onConnectionState(), connect to {0}:{1} is success!", state.connectIP, state.connectPort));
-				_packetReceiver = createPacketReceiver();
-				_packetReceiver.startRecv();
-				connected = true;
+				handled = activateConnection(state, out packetReceiver);
+				success = handled;
 			}
 			else
 			{
-				reset();
+				handled = shutdown(false, state);
+			}
+
+			// 连接已被 reset 或后续尝试替换时，迟到结果不能注销新事件、回调业务或改变当前状态。
+			// When reset or a later attempt has replaced the connection, a late result must not deregister new events, call the application, or mutate current state.
+			if (!handled)
+				return;
+
+			KBEngine.Event.deregisterIn(this);
+			if (success)
+			{
+				KBELog.DEBUG_MSG(string.Format("NetworkInterfaceBase::_onConnectionState(), connect to {0}:{1} is success!", state.connectIP, state.connectPort));
+				packetReceiver.startRecv();
+			}
+			else
+			{
 				KBELog.ERROR_MSG(string.Format("NetworkInterfaceBase::_onConnectionState(), connect error! ip: {0}:{1}, err: {2}", state.connectIP, state.connectPort, state.error));
 			}
 

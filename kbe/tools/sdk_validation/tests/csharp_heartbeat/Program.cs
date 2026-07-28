@@ -32,7 +32,21 @@ internal static class Program
         state.reset(origin + interval * 5 + 1);
         Require(!state.replyPending, "A connection reset inherited the old link's pending heartbeat.");
 
-        Console.WriteLine("CSHARP_HEARTBEAT_STATE_TEST_PASS boundary=true reply=true timeout=true unsent=true reset=true");
+        var lifecycle = new NetworkLifecycleState();
+        lifecycle.arm();
+        int notifications = 0;
+        Parallel.For(0, 64, _ =>
+        {
+            if (lifecycle.consume(true))
+                Interlocked.Increment(ref notifications);
+        });
+        Require(notifications == 1, "Concurrent close paths consumed disconnect notification more than once.");
+
+        lifecycle.arm();
+        Require(!lifecycle.consume(false), "A silent reset published a disconnect notification.");
+        Require(!lifecycle.consume(true), "A close after silent reset inherited notification eligibility.");
+
+        Console.WriteLine("CSHARP_NETWORK_STATE_TEST_PASS heartbeat=true concurrent-close=true silent-reset=true");
         return 0;
     }
 

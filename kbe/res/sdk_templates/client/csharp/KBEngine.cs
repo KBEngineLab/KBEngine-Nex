@@ -333,6 +333,14 @@ namespace KBEngine
 
 		public void _closeNetwork(NetworkInterfaceBase networkInterface)
 		{
+			// 旧接收/发送任务可能在重登录建立新接口后才投递关闭事件；旧接口只能静默清理，不能关闭或通知当前连接。
+			// Old receive/send tasks may enqueue closure after relogin installs a new interface; a stale interface may only clean up silently and cannot close or notify the current connection.
+			if (!Object.ReferenceEquals(networkInterface, _networkInterface))
+			{
+				networkInterface.reset();
+				return;
+			}
+
 			networkInterface.close();
 		}
 		
