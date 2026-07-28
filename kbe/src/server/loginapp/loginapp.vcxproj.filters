@@ -33,9 +33,6 @@
     <ClCompile Include="profile.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\lib\python\Modules\getbuildinfo.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="clientsdk_downloader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

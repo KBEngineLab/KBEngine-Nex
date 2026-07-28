@@ -42,7 +42,6 @@ public:
 
 protected:
 	std::string* pBuffer_;
-	std::string buffer_;
 	bool isPrint_;
 } ;
 

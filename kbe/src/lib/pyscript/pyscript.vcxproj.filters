@@ -92,6 +92,9 @@
     <ClInclude Include="copy.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="kbe_python.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="map.h">
       <Filter>Header Files</Filter>
     </ClInclude>

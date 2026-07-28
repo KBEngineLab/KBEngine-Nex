@@ -44,17 +44,23 @@ public:
 
 	virtual void error_msg(const char* msg, uint32 msglen);
 	virtual void info_msg(const char* msg, uint32 msglen);
+	virtual void flush_error();
+	virtual void flush_info();
 
 	void pyPrint(const std::string& str);
 
 	INLINE std::string& buffer();
 
 protected:
+	void emitCompleteLines(std::string& buffer, bool isError);
+	void flushBuffer(std::string& buffer, bool isError);
+
 	ScriptStdErr* pStderr_;
 	ScriptStdOut* pStdout_;
 	PyObject* pyPrint_;
 	bool isInstall_;
 	std::string sbuffer_;
+	std::string errorBuffer_;
 };
 
 }

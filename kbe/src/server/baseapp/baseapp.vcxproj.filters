@@ -39,9 +39,6 @@
     <ClCompile Include="forward_message_over_handler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\lib\python\Modules\getbuildinfo.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="initprogress_handler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

@@ -34,7 +34,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef KBE_CALLBACKMGR_H
 #define KBE_CALLBACKMGR_H
 	
-#include "Python.h"
+#include "pyscript/kbe_python.h"
 #include "idallocate.h"
 #include "serverconfig.h"
 #include "helper/debug_helper.h"

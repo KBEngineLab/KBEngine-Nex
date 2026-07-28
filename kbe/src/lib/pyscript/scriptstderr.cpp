@@ -68,8 +68,20 @@ bool ScriptStdErr::install(void)
 	
 
 	old_stdobj_ = PyObject_GetAttrString(sysModule, "stderr");
+	if (!old_stdobj_)
+	{
+		Py_DECREF(sysModule);
+		return false;
+	}
 
-	PyObject_SetAttrString(sysModule, "stderr", (PyObject *)this);
+	if (PyObject_SetAttrString(sysModule, "stderr", (PyObject *)this) != 0)
+	{
+		Py_DECREF(old_stdobj_);
+		old_stdobj_ = NULL;
+		Py_DECREF(sysModule);
+		return false;
+	}
+
 	isInstall_ = true;
 	Py_DECREF(sysModule);
 	return true;	
@@ -87,7 +99,12 @@ bool ScriptStdErr::uninstall(void)
 
 	if (old_stdobj_)
 	{
-		PyObject_SetAttrString(sysModule, "stderr", old_stdobj_);
+		if (PyObject_SetAttrString(sysModule, "stderr", old_stdobj_) != 0)
+		{
+			Py_DECREF(sysModule);
+			return false;
+		}
+
 		Py_DECREF(old_stdobj_);
 		old_stdobj_ = NULL;
 	}
@@ -109,13 +126,14 @@ PyObject* ScriptStdErr::__py_write(PyObject* self, PyObject *args)
 		return NULL;
 	}
 		
-	static_cast<ScriptStdErr*>(self)->pScriptStdOutErr()->error_msg(sdata, size);
+	static_cast<ScriptStdErr*>(self)->pScriptStdOutErr()->error_msg(sdata, static_cast<uint32>(size));
 	S_Return;
 }
 
 //-------------------------------------------------------------------------------------
 PyObject* ScriptStdErr::__py_flush(PyObject* self, PyObject *args)
 {
+	static_cast<ScriptStdErr*>(self)->pScriptStdOutErr()->flush_error();
 	S_Return;
 }
 

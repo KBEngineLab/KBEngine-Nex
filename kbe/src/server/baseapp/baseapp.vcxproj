@@ -60,7 +60,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>../../lib/python/PC;../../lib/python/Include;../../lib;../../common;../../lib/dependencies/g3dlite;../../server;../../lib/dependencies;../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../lib;../../common;../../lib/dependencies/g3dlite;../../server;../../lib/dependencies;../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>USE_OPENSSL;ENABLE_WATCHERS;WIN32;_DEBUG;_CONSOLE;CODE_INLINE;KBE_USE_ASSERTS;USE_PYTHON;LOG4CXX_STATIC;KBE_SERVER;KBE_BASEAPP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -76,7 +76,7 @@
       <AdditionalOptions>/ignore:4049
 /ignore:4217
 /ignore:4996 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>secur32.lib;Rpcrt4.lib;crypt32.lib;jwsmtp_d.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr_d.lib;python37_d.lib;server_d.lib;pyscript_d.lib;entitydef_d.lib;xml_d.lib;common_d.lib;helper_d.lib;math_d.lib;network_d.lib;thread_d.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>secur32.lib;Rpcrt4.lib;crypt32.lib;jwsmtp_d.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr_d.lib;$(KbePythonLibrary);server_d.lib;pyscript_d.lib;entitydef_d.lib;xml_d.lib;common_d.lib;helper_d.lib;math_d.lib;network_d.lib;thread_d.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>../../libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
@@ -88,7 +88,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>../../lib/python/PC;../../lib/python/Include;../../lib;../../common;../../lib/dependencies/g3dlite;../../server;../../lib/dependencies;../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../lib;../../common;../../lib/dependencies/g3dlite;../../server;../../lib/dependencies;../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>USE_OPENSSL;ENABLE_WATCHERS;WIN32;NDEBUG;_CONSOLE;CODE_INLINE;KBE_USE_ASSERTS;USE_PYTHON;LOG4CXX_STATIC;KBE_SERVER;KBE_BASEAPP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -104,7 +104,7 @@
       <AdditionalOptions>/ignore:4049
 /ignore:4217
 /ignore:4996 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>secur32.lib;Rpcrt4.lib;crypt32.lib;jwsmtp.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr.lib;python37.lib;server.lib;pyscript.lib;entitydef.lib;xml.lib;common.lib;helper.lib;math.lib;network.lib;thread.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>secur32.lib;Rpcrt4.lib;crypt32.lib;jwsmtp.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr.lib;$(KbePythonLibrary);server.lib;pyscript.lib;entitydef.lib;xml.lib;common.lib;helper.lib;math.lib;network.lib;thread.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>../../libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
@@ -128,7 +128,6 @@
     <ClCompile Include="data_downloads.cpp" />
     <ClCompile Include="entity_autoloader.cpp" />
     <ClCompile Include="forward_message_over_handler.cpp" />
-    <ClCompile Include="..\..\lib\python\Modules\getbuildinfo.c" />
     <ClCompile Include="initprogress_handler.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="profile.cpp" />

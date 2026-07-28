@@ -32,6 +32,17 @@
     <KbeVcpkgIncludeDir>$(KbeVcpkgInstalledDir)\include</KbeVcpkgIncludeDir>
     <KbeVcpkgLibraryDir Condition="'$(Configuration)' == 'Debug'">$(KbeVcpkgInstalledDir)\debug\lib</KbeVcpkgLibraryDir>
     <KbeVcpkgLibraryDir Condition="'$(Configuration)' != 'Debug'">$(KbeVcpkgInstalledDir)\lib</KbeVcpkgLibraryDir>
+    <KbePythonVersion>3.12</KbePythonVersion>
+    <KbePythonAbiVersion>312</KbePythonAbiVersion>
+    <KbePythonTriplet Condition="'$(Platform)' == 'x64' Or '$(Platform)' == 'Win64'">x64-windows</KbePythonTriplet>
+    <KbePythonTriplet Condition="'$(Platform)' == 'ARM64'">arm64-windows</KbePythonTriplet>
+    <KbePythonInstallRoot>$(MSBuildThisFileDirectory)python-runtime\vcpkg_installed</KbePythonInstallRoot>
+    <KbePythonInstalledDir>$(KbePythonInstallRoot)\$(KbePythonTriplet)</KbePythonInstalledDir>
+    <KbePythonIncludeDir>$(KbePythonInstalledDir)\include\python$(KbePythonVersion)</KbePythonIncludeDir>
+    <KbePythonLibraryDir>$(KbePythonInstalledDir)\lib</KbePythonLibraryDir>
+    <KbePythonLibrary>python$(KbePythonAbiVersion).lib</KbePythonLibrary>
+    <KbePythonRuntimeDir>$(KbePythonInstalledDir)\tools\python3</KbePythonRuntimeDir>
+    <KbePythonBinaryDir>$(KbePythonInstalledDir)\bin</KbePythonBinaryDir>
   </PropertyGroup>
 
   <!--

@@ -60,7 +60,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>../../lib/python/PC;../../lib/python/Include;../../lib;../../common;../../lib/dependencies/g3dlite;../../server;../../lib/dependencies;../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../lib;../../common;../../lib/dependencies/g3dlite;../../server;../../lib/dependencies;../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>USE_OPENSSL;ENABLE_WATCHERS;WIN32;_DEBUG;_CONSOLE;CODE_INLINE;KBE_USE_ASSERTS;USE_KBE_MYSQL;USE_KBE_REDIS;USE_KBE_POSTGRESQL;USE_KBE_MONGODB;LOG4CXX_STATIC;KBE_SERVER;KBE_DBMGR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -76,7 +76,7 @@
       <AdditionalOptions>/ignore:4049
 /ignore:4217
  %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>ncrypt.lib;Dnsapi.lib;secur32.lib;Rpcrt4.lib;crypt32.lib;shlwapi.lib;db_mysql_d.lib;db_redis_d.lib;db_postgresql_d.lib;db_mongodb_d.lib;python37_d.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr_d.lib;db_interface_d.lib;server_d.lib;xml_d.lib;common_d.lib;helper_d.lib;math_d.lib;network_d.lib;thread_d.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ncrypt.lib;Dnsapi.lib;secur32.lib;Rpcrt4.lib;crypt32.lib;shlwapi.lib;db_mysql_d.lib;db_redis_d.lib;db_postgresql_d.lib;db_mongodb_d.lib;$(KbePythonLibrary);Version.lib;wldap32.lib;netapi32.lib;resmgr_d.lib;db_interface_d.lib;server_d.lib;xml_d.lib;common_d.lib;helper_d.lib;math_d.lib;network_d.lib;thread_d.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>../../libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
@@ -88,7 +88,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>../../lib/python/PC;../../lib/python/Include;../../lib;../../common;../../lib/dependencies/g3dlite;../../server;../../lib/dependencies;../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../lib;../../common;../../lib/dependencies/g3dlite;../../server;../../lib/dependencies;../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>USE_OPENSSL;ENABLE_WATCHERS;WIN32;NDEBUG;_CONSOLE;CODE_INLINE;KBE_USE_ASSERTS;USE_KBE_MYSQL;USE_KBE_REDIS;USE_KBE_POSTGRESQL;USE_KBE_MONGODB;LOG4CXX_STATIC;KBE_SERVER;KBE_DBMGR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -103,7 +103,7 @@
     <Link>
       <AdditionalOptions>/ignore:4049
 /ignore:4217 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>ncrypt.lib;Dnsapi.lib;secur32.lib;Rpcrt4.lib;crypt32.lib;shlwapi.lib;db_mysql.lib;db_redis.lib;db_postgresql.lib;db_mongodb.lib;python37.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr.lib;db_interface.lib;server.lib;xml.lib;common.lib;helper.lib;math.lib;network.lib;thread.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ncrypt.lib;Dnsapi.lib;secur32.lib;Rpcrt4.lib;crypt32.lib;shlwapi.lib;db_mysql.lib;db_redis.lib;db_postgresql.lib;db_mongodb.lib;$(KbePythonLibrary);Version.lib;wldap32.lib;netapi32.lib;resmgr.lib;db_interface.lib;server.lib;xml.lib;common.lib;helper.lib;math.lib;network.lib;thread.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>../../libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -119,7 +119,6 @@
     <ClCompile Include="entity_component.cpp" />
     <ClCompile Include="dbmgr_interface.cpp" />
     <ClCompile Include="dbtasks.cpp" />
-    <ClCompile Include="..\..\lib\python\Modules\getbuildinfo.c" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="profile.cpp" />
     <ClCompile Include="sync_app_datas_handler.cpp" />

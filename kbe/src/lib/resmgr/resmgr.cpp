@@ -64,6 +64,7 @@ bool Resmgr::initializeWatcher()
 	WATCH_OBJECT("syspaths/KBE_ROOT", kb_env_.root_path);
 	WATCH_OBJECT("syspaths/KBE_RES_PATH", kb_env_.res_path);
 	WATCH_OBJECT("syspaths/KBE_BIN_PATH", kb_env_.bin_path);
+	WATCH_OBJECT("syspaths/KBE_VENV_PATH", kb_env_.venv_path);
 	return true;
 }
 
@@ -152,6 +153,33 @@ void Resmgr::updatePaths()
 }
 
 //-------------------------------------------------------------------------------------
+void Resmgr::detectPythonVenv()
+{
+	if (!kb_env_.venv_path.empty())
+		return;
+
+	/*
+		只在已解析的资产根目录中检查两个约定名称，避免递归扫描选中缓存或无关工作区。
+		Check only the two conventional names under the resolved asset root so recursive scanning cannot select caches or unrelated workspaces.
+	*/
+	std::string assetRoot = getPyUserAssetsPath();
+	strutil::kbe_replace(assetRoot, "\\", "/");
+	if (!assetRoot.empty() && assetRoot[assetRoot.size() - 1] != '/')
+		assetRoot += "/";
+
+	const char* candidateNames[] = { ".venv", "venv" };
+	for (size_t index = 0; index < sizeof(candidateNames) / sizeof(candidateNames[0]); ++index)
+	{
+		const std::string candidate = assetRoot + candidateNames[index];
+		if (access((candidate + "/pyvenv.cfg").c_str(), 0) == 0)
+		{
+			kb_env_.venv_path = candidate;
+			return;
+		}
+	}
+}
+
+//-------------------------------------------------------------------------------------
 bool Resmgr::initialize()
 {
 	//if(isInit())
@@ -161,6 +189,7 @@ bool Resmgr::initialize()
 	kb_env_.root_path		= getenv("KBE_ROOT") == NULL ? "" : getenv("KBE_ROOT");
 	kb_env_.res_path		= getenv("KBE_RES_PATH") == NULL ? "" : getenv("KBE_RES_PATH"); 
 	kb_env_.bin_path		= getenv("KBE_BIN_PATH") == NULL ? "" : getenv("KBE_BIN_PATH"); 
+	kb_env_.venv_path		= getenv("KBE_VENV_PATH") == NULL ? "" : getenv("KBE_VENV_PATH");
 
 	//kb_env_.root			= "/home/kbengine/";
 	//kb_env_.res_path		= "/home/kbengine/kbe/res/;/home/kbengine/assets/;/home/kbengine/assets/scripts/;/home/kbengine/assets/res/"; 
@@ -171,6 +200,7 @@ bool Resmgr::initialize()
 		autoSetPaths();
 
 	updatePaths();
+	detectPythonVenv();
 
 	if(getPySysResPath() == "" || getPyUserResPath() == "" || getPyUserScriptsPath() == "")
 	{
@@ -196,11 +226,13 @@ void Resmgr::print(void)
 	INFO_MSG(fmt::format("Resmgr::initialize: KBE_ROOT={0}\n", kb_env_.root_path));
 	INFO_MSG(fmt::format("Resmgr::initialize: KBE_RES_PATH={0}\n", kb_env_.res_path));
 	INFO_MSG(fmt::format("Resmgr::initialize: KBE_BIN_PATH={0}\n", kb_env_.bin_path));
+	INFO_MSG(fmt::format("Resmgr::initialize: KBE_VENV_PATH={0}\n", kb_env_.venv_path));
 
 #if KBE_PLATFORM == PLATFORM_WIN32
 	printf("%s", fmt::format("KBE_ROOT = {0}\n", kb_env_.root_path).c_str());
 	printf("%s", fmt::format("KBE_RES_PATH = {0}\n", kb_env_.res_path).c_str());
 	printf("%s", fmt::format("KBE_BIN_PATH = {0}\n", kb_env_.bin_path).c_str());
+	printf("%s", fmt::format("KBE_VENV_PATH = {0}\n", kb_env_.venv_path).c_str());
 	printf("\n");
 #endif
 }

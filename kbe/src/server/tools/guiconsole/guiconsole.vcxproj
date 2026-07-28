@@ -76,7 +76,7 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>../../../lib/python/PC;../../../lib/python/Include;../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies;../../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies;../../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>ENABLE_WATCHERS;WIN32;_WINDOWS;USE_PYTHON;_DEBUG;KBE_USE_ASSERTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -97,7 +97,7 @@
       <AdditionalOptions>/ignore:4049
 /ignore:4217
 /ignore:4244 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>secur32.lib;Crypt32.lib;Rpcrt4.lib;entitydef_d.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr_d.lib;python37_d.lib;pyscript_d.lib;xml_d.lib;common_d.lib;helper_d.lib;network_d.lib;thread_d.lib;client_lib_d.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>secur32.lib;Crypt32.lib;Rpcrt4.lib;entitydef_d.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr_d.lib;$(KbePythonLibrary);pyscript_d.lib;xml_d.lib;common_d.lib;helper_d.lib;network_d.lib;thread_d.lib;client_lib_d.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>../../../libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
@@ -116,7 +116,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>../../../lib/python/PC;../../../lib/python/Include;../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies;../../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies;../../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>ENABLE_WATCHERS;WIN32;_WINDOWS;NDEBUG;USE_PYTHON;KBE_USE_ASSERTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -138,7 +138,7 @@
       <AdditionalOptions>/ignore:4049
 /ignore:4217
 /ignore:4244 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>secur32.lib;Crypt32.lib;Rpcrt4.lib;entitydef.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr.lib;python37.lib;pyscript.lib;xml.lib;common.lib;helper.lib;network.lib;thread.lib;client_lib.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>secur32.lib;Crypt32.lib;Rpcrt4.lib;entitydef.lib;Version.lib;wldap32.lib;netapi32.lib;resmgr.lib;$(KbePythonLibrary);pyscript.lib;xml.lib;common.lib;helper.lib;network.lib;thread.lib;client_lib.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>../../../libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
@@ -156,7 +156,6 @@
     <ClCompile Include="ConnectRemoteMachineWindow.cpp" />
     <ClCompile Include="DebugWindow.cpp" />
     <ClCompile Include="EditSendbuffer.cpp" />
-    <ClCompile Include="..\..\..\lib\python\Modules\getbuildinfo.c" />
     <ClCompile Include="GraphsWindow.cpp" />
     <ClCompile Include="guiconsole.cpp" />
     <ClCompile Include="guiconsoleDlg.cpp" />

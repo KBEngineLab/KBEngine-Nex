@@ -29,6 +29,7 @@ namespace KBEngine{ namespace script{
 								
 //-------------------------------------------------------------------------------------
 ScriptStdOutErrHook::ScriptStdOutErrHook():
+pBuffer_(NULL),
 isPrint_(true)
 {
 }
@@ -44,16 +45,10 @@ void ScriptStdOutErrHook::info_msg(const char* msg, uint32 msglen)
 	if(isPrint_)
 		ScriptStdOutErr::info_msg(msg, msglen);
 
-	buffer_ += msg;
-
-	if(msg[0] == '\n')
-	{
-		if(pBuffer_)
-		{
-			(*pBuffer_) += buffer_;
-			buffer_ = "";
-		}
-	}
+	// Hook 返回的是 Python 原始字符流，不应受日志行缓冲和 flush 时机影响。
+	// The hook returns Python's original character stream and must not depend on log line buffering or flush timing.
+	if (pBuffer_ && msg != NULL && msglen > 0)
+		pBuffer_->append(msg, msglen);
 }
 
 //-------------------------------------------------------------------------------------
@@ -62,16 +57,8 @@ void ScriptStdOutErrHook::error_msg(const char* msg, uint32 msglen)
 	if(isPrint_)
 		ScriptStdOutErr::error_msg(msg, msglen);
 
-	buffer_ += msg;
-
-	if(msg[0] == '\n')
-	{
-		if(pBuffer_)
-		{
-			(*pBuffer_) += buffer_;
-			buffer_ = "";
-		}
-	}
+	if (pBuffer_ && msg != NULL && msglen > 0)
+		pBuffer_->append(msg, msglen);
 }
 
 //-------------------------------------------------------------------------------------

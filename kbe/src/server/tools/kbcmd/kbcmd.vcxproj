@@ -71,7 +71,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>../../../lib/python/PC;../../../lib/python/Include;../../../lib/python/Include/internal;../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies;../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies;../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>USE_OPENSSL;ENABLE_WATCHERS;_DEBUG;_CONSOLE;CODE_INLINE;KBE_USE_ASSERTS;USE_PYTHON;USE_KBE_MYSQL;LOG4CXX_STATIC;KBE_SERVER;KBE_CMD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -87,7 +87,7 @@
     <Link>
       <AdditionalOptions>/ignore:4049
 /ignore:4217 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>secur32.lib;jwsmtp_d.lib;crypt32.lib;Version.lib;wldap32.lib;netapi32.lib;libssl.lib;libcrypto.lib;resmgr_d.lib;entitydef_d.lib;python37_d.lib;server_d.lib;pyscript_d.lib;xml_d.lib;common_d.lib;helper_d.lib;math_d.lib;network_d.lib;thread_d.lib;ws2_32.lib;Rpcrt4.lib;../../../vcpkg_installed/x64-windows-static/lib/libexpatMT.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>secur32.lib;jwsmtp_d.lib;crypt32.lib;Version.lib;wldap32.lib;netapi32.lib;libssl.lib;libcrypto.lib;resmgr_d.lib;entitydef_d.lib;$(KbePythonLibrary);server_d.lib;pyscript_d.lib;xml_d.lib;common_d.lib;helper_d.lib;math_d.lib;network_d.lib;thread_d.lib;ws2_32.lib;Rpcrt4.lib;../../../vcpkg_installed/x64-windows-static/lib/libexpatMT.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>../../../libs;../../../vcpkg_installed/x64-windows-static/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
@@ -99,7 +99,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>../../../lib/python/PC;../../../lib/python/Include;../../../lib/python/Include/internal;../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies;../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../../lib;../../../common;../../../lib/dependencies/g3dlite;../../../server;../../../lib/dependencies;../../lib/dependencies/jsoncpp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>USE_OPENSSL;ENABLE_WATCHERS;NDEBUG;_CONSOLE;CODE_INLINE;KBE_USE_ASSERTS;USE_PYTHON;USE_KBE_MYSQL;LOG4CXX_STATIC;KBE_SERVER;KBE_CMD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -115,7 +115,7 @@
     <Link>
       <AdditionalOptions>/ignore:4049
 /ignore:4217 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>secur32.lib;Rpcrt4.lib;jwsmtp.lib;crypt32.lib;Version.lib;wldap32.lib;netapi32.lib;libssl.lib;libcrypto.lib;resmgr.lib;entitydef.lib;python37.lib;server.lib;pyscript.lib;xml.lib;common.lib;helper.lib;math.lib;network.lib;thread.lib;ws2_32.lib;../../../vcpkg_installed/x64-windows-static/lib/libexpatMT.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>secur32.lib;Rpcrt4.lib;jwsmtp.lib;crypt32.lib;Version.lib;wldap32.lib;netapi32.lib;libssl.lib;libcrypto.lib;resmgr.lib;entitydef.lib;$(KbePythonLibrary);server.lib;pyscript.lib;xml.lib;common.lib;helper.lib;math.lib;network.lib;thread.lib;ws2_32.lib;../../../vcpkg_installed/x64-windows-static/lib/libexpatMT.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>../../../libs;../../../vcpkg_installed/x64-windows-static/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>

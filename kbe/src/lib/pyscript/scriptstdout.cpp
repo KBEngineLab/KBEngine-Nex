@@ -68,8 +68,20 @@ bool ScriptStdOut::install(void)
 	
 
 	old_stdobj_ = PyObject_GetAttrString(sysModule, "stdout");
+	if (!old_stdobj_)
+	{
+		Py_DECREF(sysModule);
+		return false;
+	}
 
-	PyObject_SetAttrString(sysModule, "stdout", (PyObject *)this);
+	if (PyObject_SetAttrString(sysModule, "stdout", (PyObject *)this) != 0)
+	{
+		Py_DECREF(old_stdobj_);
+		old_stdobj_ = NULL;
+		Py_DECREF(sysModule);
+		return false;
+	}
+
 	isInstall_ = true;
 	Py_DECREF(sysModule);
 	return true;	
@@ -87,7 +99,12 @@ bool ScriptStdOut::uninstall(void)
 
 	if (old_stdobj_)
 	{
-		PyObject_SetAttrString(sysModule, "stdout", old_stdobj_);
+		if (PyObject_SetAttrString(sysModule, "stdout", old_stdobj_) != 0)
+		{
+			Py_DECREF(sysModule);
+			return false;
+		}
+
 		Py_DECREF(old_stdobj_);
 		old_stdobj_ = NULL;
 	}
@@ -109,13 +126,14 @@ PyObject* ScriptStdOut::__py_write(PyObject* self, PyObject *args)
 		return NULL;
 	}
 
-	static_cast<ScriptStdErr*>(self)->pScriptStdOutErr()->info_msg(sdata, size);
+	static_cast<ScriptStdOut*>(self)->pScriptStdOutErr()->info_msg(sdata, static_cast<uint32>(size));
 	S_Return;
 }
 
 //-------------------------------------------------------------------------------------
 PyObject* ScriptStdOut::__py_flush(PyObject* self, PyObject *args)
 {
+	static_cast<ScriptStdOut*>(self)->pScriptStdOutErr()->flush_info();
 	S_Return;
 }
 

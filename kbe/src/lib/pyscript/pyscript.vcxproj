@@ -59,7 +59,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>../python/PC;../python/Include;../;../../common;../../lib/dependencies/g3dlite;../../lib/dependencies;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../;../../common;../../lib/dependencies/g3dlite;../../lib/dependencies;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>ENABLE_WATCHERS;WIN32;_DEBUG;_LIB;CODE_INLINE;KBE_USE_ASSERTS;LOG4CXX_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -80,7 +80,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>../python/PC;../python/Include;../;../../common;../../lib/dependencies/g3dlite;../../lib/dependencies;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../;../../common;../../lib/dependencies/g3dlite;../../lib/dependencies;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>ENABLE_WATCHERS;WIN32;NDEBUG;_LIB;CODE_INLINE;KBE_USE_ASSERTS;LOG4CXX_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -124,6 +124,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="copy.h" />
+    <ClInclude Include="kbe_python.h" />
     <ClInclude Include="map.h" />
     <ClInclude Include="math.h" />
     <ClInclude Include="pickler.h" />
@@ -164,8 +165,8 @@
     <None Include="sequence.inl" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\python\PCbuild\pythoncore.vcxproj">
-      <Project>{cf7ac3d1-e2df-41d2-bea6-1e2556cdea26}</Project>
+    <ProjectReference Include="..\..\python-runtime\python-runtime.vcxproj">
+      <Project>{86B36683-25C7-4C38-AC02-BD205A5FF56E}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
   </ItemGroup>

@@ -22,7 +22,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #define KBE_SCRIPTOBJECT_H
 
 #include <vector>	
-#include "Python.h"     
+#include "pyscript/kbe_python.h"
 #include "py_macros.h" 
 #include "helper/debug_helper.h"
 #include "common/common.h"

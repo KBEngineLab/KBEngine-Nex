@@ -13,24 +13,28 @@ KBEngine is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Lesser General Public License for more details.
- 
+
 You should have received a copy of the GNU Lesser General Public License
 along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef KBE_PYTHON_H
+#define KBE_PYTHON_H
 
-namespace KBEngine {
-namespace script{
+/*
+	KBE 的 Debug 配置仍使用 Python Release ABI；包含 CPython 头时临时隐藏 _DEBUG，避免头文件启用 Py_DEBUG 并自动链接 pythonXY_d.lib。
+	KBE Debug configurations still use Python's Release ABI; hide _DEBUG while including CPython headers so they neither enable Py_DEBUG nor auto-link pythonXY_d.lib.
+*/
+#if defined(_MSC_VER) && defined(_DEBUG)
+#	define KBE_RESTORE_MSVC_DEBUG_MACRO
+#	undef _DEBUG
+#endif
 
-INLINE void ScriptStdOutErrHook::setHookBuffer(std::string* buffer){ 
-	pBuffer_ = buffer; 
-};
+#include "Python.h"
 
-INLINE void ScriptStdOutErrHook::setPrint(bool v)
-{
-	isPrint_ = v;
-}
+#ifdef KBE_RESTORE_MSVC_DEBUG_MACRO
+#	define _DEBUG
+#	undef KBE_RESTORE_MSVC_DEBUG_MACRO
+#endif
 
-}
-}
-
+#endif // KBE_PYTHON_H

@@ -18,4 +18,19 @@
       <AdditionalLibraryDirectories>$(KbeVcpkgLibraryDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
+
+  <!--
+    Python 头文件与导入库由独立 manifest 的官方动态 triplet 提供，Debug 和 Release 都使用同一套 Release ABI。
+    Python headers and the import library come from an official dynamic triplet in the dedicated manifest, and both configurations share the Release ABI.
+  -->
+  <ItemDefinitionGroup Condition="'$(KbePythonTriplet)' != ''">
+    <ClCompile>
+      <PreprocessorDefinitions>PY_SSIZE_T_CLEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(KbePythonIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(KbePythonLibraryDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+
 </Project>

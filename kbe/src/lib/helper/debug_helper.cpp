@@ -1155,14 +1155,16 @@ void DebugHelper::script_info_msg(const std::string& s)
 //-------------------------------------------------------------------------------------
 void DebugHelper::script_error_msg(const std::string& s)
 {
-	KBEngine::thread::ThreadGuard tg(&this->logMutex); 
-
-	setScriptMsgType(log4cxx::ScriptLevel::SCRIPT_ERR);
+	KBEngine::thread::ThreadGuard tg(&this->logMutex);
 
 #ifdef NO_USE_LOG4CXX
 #else
+	/*
+		stderr 只影响当前记录，不能覆盖用户为后续 stdout 显式选择的脚本日志级别。
+		stderr affects only the current record and must not overwrite the script log level explicitly selected for subsequent stdout.
+	*/
 	if(canLogFile_)
-		KBE_LOG4CXX_LOG(g_logger,  log4cxx::ScriptLevel::toLevel(scriptMsgType_), s);
+		KBE_LOG4CXX_LOG(g_logger, log4cxx::ScriptLevel::toLevel(log4cxx::ScriptLevel::SCRIPT_ERR), s);
 #endif
 
 	onMessage(KBELOG_SCRIPT_ERROR, s.c_str(), (uint32)s.size());
