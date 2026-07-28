@@ -1,8 +1,9 @@
 
 import KBELog from "./KBELog";
 import KBEEvent from "./Event";
-import { MemoryStream } from "./KBEngine";
-import Messages, { Message } from "./Messages";
+import { MemoryStream } from "./MemoryStream";
+import Messages from "./Messages";
+import type { Message } from "./Messages";
 import { parseWebSocketFrame } from "./WebSocketFrameParser";
 
 export default class NetworkInterface

@@ -961,7 +961,8 @@ bool ClientSDKTypeScript::writeEngineMessagesModuleBegin()
 
 	
 	sourcefileBody_ += R"delimiter(
-import { KBEngineApp ,MemoryStream , DataTypes } from "./KBEngine";
+import { KBEngineApp, DataTypes } from "./KBEngine";
+import type { MemoryStream } from "./MemoryStream";
 import KBELog from "./KBELog";
 
 
@@ -2677,7 +2678,8 @@ bool ClientSDKTypeScript::writeEntityModuleBegin(ScriptDefModule* pEntityScriptD
 		pEntityScriptDefModule->getName(), pEntityScriptDefModule->getName(), moduleSuffix));
 
 	sourcefileBody_ += R"delimiter(
-import {Entity , EntityComponent , EntityCall , MemoryStream , DataTypes , KBETypes} from './KBEngine';
+import { Entity, EntityComponent, EntityCall, DataTypes, KBETypes } from './KBEngine';
+import type { MemoryStream } from './MemoryStream';
 import * as ExportEntity from './ExportEntity';
 
 import { Method } from './Method';
