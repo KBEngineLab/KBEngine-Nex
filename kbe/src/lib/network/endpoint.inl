@@ -460,7 +460,7 @@ INLINE int EndPoint::recv(void * gramData, int gramSize)
 }
 
 #if KBE_PLATFORM == PLATFORM_UNIX
-INLINE int EndPoint::getInterfaceFlags(char * name, int & flags)
+INLINE int EndPoint::getInterfaceFlags(const char * name, int & flags)
 {
 	struct ifreq	request;
 
@@ -512,7 +512,7 @@ INLINE int EndPoint::getInterfaceNetmask(const char * name,
 }
 
 #else
-INLINE int EndPoint::getInterfaceFlags(char * name, int & flags)
+INLINE int EndPoint::getInterfaceFlags(const char * name, int & flags)
 {
 	if (!strcmp(name,"eth0"))
 	{

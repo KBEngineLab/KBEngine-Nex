@@ -1343,9 +1343,10 @@ void DebugHelper::backtrace_msg()
 //-------------------------------------------------------------------------------------
 void DebugHelper::closeLogger()
 {
-	// close logger for fork + execv
+	// 在 fork + execv 前释放当前 logger 所有权，避免子进程继承仍打开的 appender。
+	// Release logger ownership before fork + execv so the child cannot inherit appenders that remain open.
 #ifndef NO_USE_LOG4CXX
-	g_logger = (const int)NULL;
+	g_logger.reset();
 	log4cxx::LogManager::shutdown();
 #endif
 }

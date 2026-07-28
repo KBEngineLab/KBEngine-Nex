@@ -96,7 +96,7 @@ public:
 	
 	INLINE uint32 getRTT();
 
-	INLINE int getInterfaceFlags(char * name, int & flags);
+	INLINE int getInterfaceFlags(const char * name, int & flags);
 	INLINE int getInterfaceAddress(const char * name, u_int32_t & address);
 	INLINE int getInterfaceNetmask(const char * name, u_int32_t & netmask);
 	bool getInterfaces(std::map< u_int32_t, std::string > &interfaces);

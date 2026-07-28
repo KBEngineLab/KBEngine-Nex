@@ -18,6 +18,7 @@ target_compile_definitions(kbe_build_options INTERFACE
     KBE_USE_ASSERTS
     LOG4CXX_STATIC
     USE_OPENSSL
+    $<$<PLATFORM_ID:Windows>:WIN32>
     $<$<CONFIG:Debug>:_DEBUG>
     $<$<NOT:$<CONFIG:Debug>>:NDEBUG>
     $<$<NOT:$<CONFIG:Debug>>:CODE_INLINE>
@@ -27,7 +28,8 @@ if(MSVC)
     # 与既有 VS 工程保持 /MT、/MTd ABI，并显式使用 UTF-8 源码和执行字符集。
     # Match the existing VS projects' /MT and /MTd ABI while explicitly using UTF-8 source and execution character sets.
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "MSVC runtime" FORCE)
-    target_compile_options(kbe_build_options INTERFACE /utf-8 /W3 /permissive-)
+    target_compile_definitions(kbe_build_options INTERFACE UNICODE _UNICODE)
+    target_compile_options(kbe_build_options INTERFACE /utf-8 /W3 $<$<COMPILE_LANGUAGE:CXX>:/permissive->)
 else()
     target_compile_options(kbe_build_options INTERFACE -Wall)
 endif()

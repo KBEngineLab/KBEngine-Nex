@@ -24,13 +24,13 @@
       "name": "windows-vs2022-debug",
       "configurePreset": "windows-vs2022",
       "configuration": "Debug",
-      "targets": ["kbe_core"]
+      "targets": ["kbe_core_dependencies"]
     },
     {
       "name": "windows-vs2022-release",
       "configurePreset": "windows-vs2022",
       "configuration": "Release",
-      "targets": ["kbe_core"]
+      "targets": ["kbe_core_dependencies"]
     }
   ]
 }

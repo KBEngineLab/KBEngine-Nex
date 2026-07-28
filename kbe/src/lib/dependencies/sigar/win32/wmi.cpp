@@ -44,7 +44,9 @@ class WMI {
     ~WMI();
     HRESULT Open(LPCTSTR machine=NULL, LPCTSTR user=NULL, LPCTSTR pass=NULL);
     void Close();
-    HRESULT GetProcStringProperty(DWORD pid, TCHAR *name, TCHAR *value, DWORD len);
+    // WMI 属性名只用于查询，保持 const 可防止实现意外修改调用方的字符串。
+    // WMI property names are query-only; const prevents the implementation from mutating caller-owned strings.
+    HRESULT GetProcStringProperty(DWORD pid, const TCHAR *name, TCHAR *value, DWORD len);
     HRESULT GetProcExecutablePath(DWORD pid, TCHAR *value);
     HRESULT GetProcCommandLine(DWORD pid, TCHAR *value);
     int GetLastError();
@@ -152,7 +154,7 @@ BSTR WMI::GetProcQuery(DWORD pid)
     return bstr_t(query);
 }
 
-HRESULT WMI::GetProcStringProperty(DWORD pid, TCHAR *name, TCHAR *value, DWORD len)
+HRESULT WMI::GetProcStringProperty(DWORD pid, const TCHAR *name, TCHAR *value, DWORD len)
 {
     IWbemClassObject *obj;
     VARIANT var;

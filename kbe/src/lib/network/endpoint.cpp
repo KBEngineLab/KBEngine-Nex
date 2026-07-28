@@ -55,7 +55,9 @@ namespace Network
 
 		unsigned int if_index;	/* 1, 2, ... */
 
-		char *if_name;			/* null terminated name: "eth0", ... */
+		// Windows 回退表持有静态接口名，调用链只读取名称，不应暴露可写指针。
+		// The Windows fallback table owns static interface names; the call chain only reads them and must not expose writable pointers.
+		const char *if_name;
 
 	};
 

@@ -25,16 +25,31 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(KbeBuildOptions)
+include(KbePythonRuntime)
 
 find_package(fmt CONFIG REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
+find_package(CURL CONFIG REQUIRED)
+find_package(EXPAT REQUIRED)
+find_package(log4cxx CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 
 add_subdirectory(lib/common)
 add_subdirectory(lib/math)
 add_subdirectory(lib/thread)
 add_subdirectory(lib/xml)
+add_subdirectory(lib/dependencies/sigar)
+add_subdirectory(lib/helper)
+add_subdirectory(lib/resmgr)
+add_subdirectory(lib/network)
+add_subdirectory(lib/pyscript)
+add_subdirectory(lib/entitydef)
 
 # 首阶段只迁移无 Python 和数据库依赖的底层库，后续目标按依赖拓扑逐层接入。
 # The first stage migrates foundational libraries without Python or database dependencies; later targets are added in dependency order.
 add_custom_target(kbe_core DEPENDS common math thread xml)
+
+# 第二层闭合资源、网络、脚本和实体定义依赖，但仍不改变旧 VS 工程或服务端链接入口。
+# The second layer closes resource, network, scripting, and entity-definition dependencies without changing legacy VS projects or server link entry points.
+add_custom_target(kbe_core_dependencies DEPENDS helper resmgr network pyscript entitydef)
