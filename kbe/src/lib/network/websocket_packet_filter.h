@@ -34,10 +34,12 @@ class WebSocketPacketFilter : public PacketFilter
 {
 public:
 	WebSocketPacketFilter(Channel* pChannel);
-	virtual ~WebSocketPacketFilter();
+	~WebSocketPacketFilter() override;
 
-	virtual Reason send(Channel * pChannel, PacketSender& sender, Packet * pPacket);
-	virtual Reason recv(Channel * pChannel, PacketReceiver & receiver, Packet * pPacket);
+	// 该签名必须覆盖 PacketFilter::send；遗漏 userarg 会静默调用基类并把裸 KBE 数据写入 WebSocket TCP 流。
+	// This signature must override PacketFilter::send; omitting userarg silently invokes the base class and writes raw KBE data to the WebSocket TCP stream.
+	Reason send(Channel * pChannel, PacketSender& sender, Packet * pPacket, int userarg = 0) override;
+	Reason recv(Channel * pChannel, PacketReceiver & receiver, Packet * pPacket) override;
 
 protected:
 	void reset();
