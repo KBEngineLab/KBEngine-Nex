@@ -6,6 +6,8 @@
 #include "KBEvent.h"
 #include "KBDebug.h"
 #include "Interfaces.h"
+#include "KBEngine.h"
+#include "KBEngineArgs.h"
 #include "MessageReader.h"
 
 namespace KBEngine
@@ -17,7 +19,8 @@ NetworkInterfaceTCP::NetworkInterfaceTCP():
 	connected_(false),
 	disconnectedEventPending_(false),
 	sessionId_(0),
-	socket_(NativeSocket::InvalidSocket)
+	socket_(NativeSocket::InvalidSocket),
+	recvQueue_(TCP_PACKET_MAX)
 {
 }
 
@@ -40,6 +43,15 @@ bool NetworkInterfaceTCP::connectTo(const KBString& addr, uint16 port, Interface
 	stopRequested_ = false;
 	connected_ = false;
 	disconnectedEventPending_ = false;
+	KBEngineArgs* args = KBEngineApp::getSingleton().getInitArgs();
+	const int configuredCapacity = args ? args->getTCPRecvBufferSize() : static_cast<int>(TCP_PACKET_MAX);
+	const std::size_t receiveCapacity = configuredCapacity > 0 ? static_cast<std::size_t>(configuredCapacity) : TCP_PACKET_MAX;
+	recvQueue_.reset(receiveCapacity);
+	// 复用主线程 drain 缓冲，避免每个 Tick 为固定上限的网络数据重复分配和释放堆内存。
+	// Reuse the game-thread drain buffer to avoid allocating and freeing bounded network storage on every tick.
+	std::vector<uint8> processBuffer;
+	processBuffer.reserve(receiveCapacity);
+	processBuffer_.swap(processBuffer);
 
 	const uint64 sessionId = ++sessionId_;
 	workerThread_ = std::thread(&NetworkInterfaceTCP::workerLoop_, this, addr, port, callback, userdata, sessionId);
@@ -125,31 +137,21 @@ bool NetworkInterfaceTCP::sendTo(MemoryStream* pMemoryStream)
 
 void NetworkInterfaceTCP::process()
 {
-	std::queue<std::vector<uint8>> pending;
+	if (recvQueue_.drain(processBuffer_) > 0 && pMessageReader_)
 	{
-		std::lock_guard<std::mutex> lock(recvMutex_);
-		std::swap(pending, recvQueue_);
-	}
+		pBuffer_->clear(true);
+		pBuffer_->append(processBuffer_.data(), static_cast<MessageLengthEx>(processBuffer_.size()));
 
-	while (!pending.empty())
-	{
-		const std::vector<uint8>& data = pending.front();
-		if (!data.empty() && pMessageReader_)
+		// 先释放有界队列容量，再在主线程执行解密和消息回调，避免业务逻辑阻塞接收线程或持有队列锁。
+		// Release bounded queue capacity before decrypting and dispatching on the game thread so application work cannot block the receiver or hold its lock.
+		if (pFilter_)
 		{
-			pBuffer_->clear(true);
-			pBuffer_->append(data.data(), data.size());
-
-			if (pFilter_)
-			{
-				pFilter_->recv(pMessageReader_, pBuffer_);
-			}
-			else
-			{
-				pMessageReader_->process(pBuffer_->data(), 0, pBuffer_->length());
-			}
+			pFilter_->recv(pMessageReader_, pBuffer_);
 		}
-
-		pending.pop();
+		else
+		{
+			pMessageReader_->process(pBuffer_->data(), 0, pBuffer_->length());
+		}
 	}
 
 	if (disconnectedEventPending_.exchange(false))
@@ -184,15 +186,16 @@ void NetworkInterfaceTCP::workerLoop_(KBString addr, uint16 port, InterfaceConne
 	INFO_MSG("NetworkInterfaceTCP::connectTo(): connect to %s:%d success!", *addr, port);
 	fireConnectionState_(callback, addr, port, true, userdata, sessionId);
 
-	uint8 buffer[65536];
+	std::vector<uint8> buffer(recvQueue_.capacity());
 	while (!stopRequested_.load() && sessionId == sessionId_.load())
 	{
-		const int received = NativeSocket::recvSome(socket, buffer, sizeof(buffer), error);
+		const int received = NativeSocket::recvSome(socket, buffer.data(), static_cast<int32>(buffer.size()), error);
 		if (received > 0)
 		{
-			std::vector<uint8> data(buffer, buffer + received);
-			std::lock_guard<std::mutex> lock(recvMutex_);
-			recvQueue_.push(std::move(data));
+			if (!recvQueue_.write(buffer.data(), static_cast<std::size_t>(received)))
+			{
+				break;
+			}
 			continue;
 		}
 
@@ -216,6 +219,9 @@ void NetworkInterfaceTCP::stopWorker_()
 {
 	++sessionId_;
 	stopRequested_ = true;
+	// 停止队列会唤醒可能因满载而休眠的接收线程，确保关闭和重登录不会在 join() 中死锁。
+	// Stopping the queue wakes a receiver sleeping on full capacity so close and relogin cannot deadlock in join().
+	recvQueue_.stop();
 	closeSocket_(false);
 
 	if (workerThread_.joinable())
@@ -226,9 +232,7 @@ void NetworkInterfaceTCP::stopWorker_()
 
 void NetworkInterfaceTCP::clearRecvQueue_()
 {
-	std::lock_guard<std::mutex> lock(recvMutex_);
-	std::queue<std::vector<uint8>> empty;
-	std::swap(recvQueue_, empty);
+	recvQueue_.stop();
 }
 
 void NetworkInterfaceTCP::closeSocket_(bool fireDisconnectedEvent)

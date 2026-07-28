@@ -5,10 +5,10 @@
 #include "KBECommon.h"
 #include "KBENativeSocket.h"
 #include "NetworkInterfaceBase.h"
+#include "TcpReceiveQueue.h"
 
 #include <atomic>
 #include <mutex>
-#include <queue>
 #include <thread>
 #include <vector>
 
@@ -48,10 +48,10 @@ private:
 	std::thread workerThread_;
 	std::mutex socketMutex_;
 	std::mutex sendMutex_;
-	std::mutex recvMutex_;
 
 	NativeSocket::Socket socket_;
-	std::queue<std::vector<uint8>> recvQueue_;
+	TcpReceiveQueue recvQueue_;
+	std::vector<uint8> processBuffer_;
 };
 
 }
