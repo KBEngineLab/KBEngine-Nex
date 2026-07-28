@@ -80,29 +80,38 @@ export default class NetworkInterface
             KBEEvent.fireAll("onDisconnected");
     }
 
-    Send(buffer: ArrayBuffer)
+    Send(buffer: ArrayBuffer): boolean
     {
         if(!this.IsGood)
         {
             KBELog.ERROR_MSG("NetworkInterface::Send:socket is unavailable.");
-            return;
+            return false;
         }
 
         try
         {
             KBELog.DEBUG_MSG("NetworkInterface::Send buffer length:[%d].", buffer.byteLength);
             const transport = this.transport!;
+            let synchronousError = false;
+            let invokingTransport = true;
             transport.send(buffer, error =>
             {
+                if(invokingTransport)
+                    synchronousError = true;
                 if(this.transport !== transport)
                     return;
                 KBELog.ERROR_MSG("NetworkInterface::Send async error:%s.", error);
                 KBEEvent.fireIn("onNetworkError", error as MessageEvent);
             });
+            invokingTransport = false;
+            // 返回值只表达底层 API 是否同步接受提交；小程序后续异步 fail 仍通过 onNetworkError 关闭当前连接。
+            // The return value only reports synchronous submission acceptance; a later mini-program fail still closes the current connection through onNetworkError.
+            return !synchronousError;
         }
         catch(e)
         {
             KBELog.ERROR_MSG("NetworkInterface::Send error:%s.", e);
+            return false;
         }
     }
 

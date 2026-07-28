@@ -12,6 +12,10 @@ import {
     TypeScriptHostLifecycle
 } from "../../../../res/sdk_templates/client/typescript/HostLifecycle";
 import { KBEPlatform } from "../../../../res/sdk_templates/client/typescript/WebSocketTransport";
+import {
+    DefaultMonotonicClock,
+    HeartbeatState
+} from "../../../../res/sdk_templates/client/typescript/HeartbeatState";
 
 function assertCondition(condition: boolean, message: string): void
 {
@@ -447,6 +451,44 @@ function verifyLifecycleFactoryFailure(): void
     assertCondition(rejected, "A missing explicit host runtime was accepted.");
 }
 
+function verifyHeartbeatState(): void
+{
+    const clockValues = [100, 90, 110];
+    const defaultClock = new DefaultMonotonicClock({
+        performance: { now: () => clockValues.shift() as number }
+    });
+    assertCondition(defaultClock.now() === 100 && defaultClock.now() === 110,
+        "Default monotonic clock moved backward with its runtime source.");
+
+    let now = 1000;
+    const state = new HeartbeatState({ now: () => now }, 15000);
+    now = 16000;
+    assertCondition(!state.isDue(state.timestamp()), "Heartbeat became due at the exact interval boundary.");
+    now = 16001;
+    assertCondition(state.isDue(state.timestamp()), "Heartbeat did not become due after a complete interval.");
+
+    state.markAttempt(now, false);
+    assertCondition(!state.replyPending, "An unsubmitted heartbeat entered pending state.");
+    now = 31002;
+    assertCondition(state.isDue(state.timestamp()), "A failed submission did not advance to the next retry interval.");
+
+    state.markAttempt(now, true);
+    assertCondition(state.replyPending, "A submitted heartbeat did not enter pending state.");
+    state.markReply();
+    assertCondition(!state.replyPending, "A heartbeat reply did not clear pending state.");
+
+    state.markAttempt(now, true);
+    now = 46003;
+    assertCondition(state.replyPending && state.isDue(state.timestamp()),
+        "An unanswered submitted heartbeat did not preserve timeout state.");
+    state.reset();
+    assertCondition(!state.replyPending && !state.isDue(state.timestamp()),
+        "Connection reset retained heartbeat state from the previous transport.");
+    state.scheduleImmediate();
+    assertCondition(!state.replyPending && state.isDue(state.timestamp()),
+        "Host resume did not clear pending state and schedule an immediate heartbeat.");
+}
+
 function main(): void
 {
     verifyLargeVariableMessage();
@@ -462,7 +504,8 @@ function main(): void
     verifyCocosLifecycle();
     verifyLayaLifecycle();
     verifyLifecycleFactoryFailure();
-    console.log("TYPESCRIPT_WEBSOCKET_FRAME_TEST_PASS large=true bytes=60000 extended=true atomic=true unknown=true truncated=true overrun=true web=true wechat=true douyin=true stale=true async-send=true async-close=true lifecycle=true cocos=true laya=true");
+    verifyHeartbeatState();
+    console.log("TYPESCRIPT_WEBSOCKET_FRAME_TEST_PASS large=true bytes=60000 extended=true atomic=true unknown=true truncated=true overrun=true web=true wechat=true douyin=true stale=true async-send=true async-close=true lifecycle=true cocos=true laya=true heartbeat=true");
 }
 
 try

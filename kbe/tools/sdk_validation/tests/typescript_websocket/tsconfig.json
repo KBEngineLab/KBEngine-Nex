@@ -13,6 +13,7 @@
     "Program.ts",
     "../../../../res/sdk_templates/client/typescript/WebSocketFrameParser.ts",
     "../../../../res/sdk_templates/client/typescript/WebSocketTransport.ts",
-    "../../../../res/sdk_templates/client/typescript/HostLifecycle.ts"
+    "../../../../res/sdk_templates/client/typescript/HostLifecycle.ts",
+    "../../../../res/sdk_templates/client/typescript/HeartbeatState.ts"
   ]
 }

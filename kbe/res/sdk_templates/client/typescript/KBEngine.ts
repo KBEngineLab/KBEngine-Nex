@@ -27,12 +27,19 @@ import {
     DefaultHostLifecycleFactory,
     HostLifecycleAdapter
 } from "./HostLifecycle";
+import {
+    DefaultMonotonicClock,
+    HeartbeatState,
+    MonotonicClock
+} from "./HeartbeatState";
 
 // 兼容入口只重新导出唯一实现，避免聚合文件再次定义协议与网络类。
 // The compatibility entry point only re-exports canonical implementations instead of redefining protocol and network classes.
 export { MemoryStream, NetworkInterface, DataTypes, KBETypes, KBEChannel, KBEPlatform };
 export type { WebSocketTransport, WebSocketTransportFactory } from "./WebSocketTransport";
 export type { HostLifecycleAdapter, HostLifecycleCallbacks, HostLifecycleIntervals } from "./HostLifecycle";
+export { DefaultMonotonicClock, HeartbeatState };
+export type { MonotonicClock } from "./HeartbeatState";
 
 //#region KBEngine app
 export class KBEngineArgs {
@@ -51,6 +58,7 @@ export class KBEngineArgs {
     channel: KBEChannel = KBEChannel.Auto;
     webSocketTransportFactory: WebSocketTransportFactory | undefined;
     hostLifecycleAdapter: HostLifecycleAdapter | undefined;
+    heartbeatClock: MonotonicClock | undefined;
 
     
     domainMapping : { [key: string]: string } = { };
@@ -71,6 +79,7 @@ export class KBEngineApp {
     private args: KBEngineArgs;
     private hostLifecycle: HostLifecycleAdapter;
     private hostPaused = false;
+    private heartbeatState: HeartbeatState;
 
     private userName: string = "test";
     private password: string = "123456";
@@ -115,9 +124,6 @@ export class KBEngineApp {
     private serverEntityDefMD5 = "@{KBE_SERVER_ENTITYDEF_MD5}";
     private clientVersion = "@{KBE_VERSION}";
     private clientScriptVersion = "@{KBE_SCRIPT_VERSION}";
-
-    private lastTickTime: number = 0;
-    private lastTickCBTime: number = 0;
 
     entities: { [id: number]: Entity } = {};
     private bufferedCreateEntityMessage: { [id: number]: MemoryStream } = {};
@@ -215,6 +221,7 @@ export class KBEngineApp {
         // An explicit factory takes precedence over channel selection so projects can integrate new runtimes and write deterministic tests.
         this.networkInterface.ConfigureTransport(args.webSocketTransportFactory || new DefaultWebSocketTransportFactory(args.channel));
         this.hostLifecycle = args.hostLifecycleAdapter || new DefaultHostLifecycleFactory(args.platform).create();
+        this.heartbeatState = new HeartbeatState(args.heartbeatClock ?? new DefaultMonotonicClock());
 
         this.portMapping = args.portMapping;
         this.domainMapping = args.domainMapping;
@@ -232,9 +239,6 @@ export class KBEngineApp {
             Messages.BindFixedMessage();
             // DataTypes.InitDatatypeMapping();
 
-            let now = new Date().getTime();
-            this.lastTickTime = now;
-            this.lastTickCBTime = now;
             this.hostLifecycle.start(
                 {
                     update: this.Update.bind(this),
@@ -294,11 +298,7 @@ export class KBEngineApp {
             return;
 
         this.hostPaused = false;
-        const now = new Date().getTime();
-        // 后台暂停不代表网络已断开；恢复时先刷新 ACK 基准并安排立即心跳，避免用暂停前时间误判超时。
-        // Background suspension does not prove a disconnect; refresh the ACK baseline and schedule an immediate heartbeat to avoid comparing stale timestamps.
-        this.lastTickCBTime = now;
-        this.lastTickTime = now - 15001;
+        this.heartbeatState.scheduleImmediate();
         this.ProcessOutEvents();
     }
 
@@ -395,10 +395,9 @@ export class KBEngineApp {
             return;
         }
 
-        let now = (new Date()).getTime();
-        //KBELog.DEBUG_MSG("KBEngineApp::SendTick...now(%d), this.lastTickTime(%d), this.lastTickCBTime(%d).", now, this.lastTickTime, this.lastTickCBTime);
-        if ((now - this.lastTickTime) / 1000 > 15) {
-            if (this.lastTickCBTime < this.lastTickTime) {
+        const now = this.heartbeatState.timestamp();
+        if (this.heartbeatState.isDue(now)) {
+            if (this.heartbeatState.replyPending) {
                 KBELog.ERROR_MSG("KBEngineApp::Update: Receive appTick timeout!");
                 // 心跳超时属于被动断线，必须显式通知业务层；登录切换、Reset 和 Destroy 仍使用默认静默关闭。
                 // A heartbeat timeout is a passive disconnect and must notify the application; login handoff, Reset, and Destroy keep using the silent default.
@@ -406,17 +405,18 @@ export class KBEngineApp {
                 return;
             }
 
-            let bundle = new Bundle();
-
-            if (this.currserver === "loginapp") {
-                bundle.NewMessage(Messages.messages["Loginapp_onClientActiveTick"]);
+            const messageName = this.currserver === "loginapp"
+                ? "Loginapp_onClientActiveTick"
+                : "Baseapp_onClientActiveTick";
+            const message = Messages.messages[messageName];
+            let sent = false;
+            if(message !== undefined)
+            {
+                const bundle = new Bundle();
+                bundle.NewMessage(message);
+                sent = bundle.Send(this.networkInterface);
             }
-            else {
-                bundle.NewMessage(Messages.messages["Baseapp_onClientActiveTick"]);
-            }
-            bundle.Send(this.networkInterface);
-
-            this.lastTickTime = now;
+            this.heartbeatState.markAttempt(now, sent);
         }
 
         // this.UpdatePlayerToServer();
@@ -459,11 +459,9 @@ export class KBEngineApp {
         this.spaceResPath = "";
         this.isLoadedGeometry = false;
 
-        // 对象实例化时用即时时间初始化，否则update会不断执行，然而此时可能刚连接上服务器，但还未登陆，没导入协议，有可能导致出错
-        // 如此初始化后会等待15s才会向服务器tick，时间已经足够服务器准备好
-        var dateObject = new Date();
-        this.lastTickTime = dateObject.getTime();
-        this.lastTickCBTime = dateObject.getTime();
+        // 重置连接状态后等待一个完整周期再发心跳，避免协议尚未导入时提前构造消息。
+        // Wait one full interval after resetting connection state so heartbeat messages are not built before protocol import completes.
+        this.heartbeatState.reset();
 
         // DataTypes.Reset();
 
@@ -506,13 +504,13 @@ export class KBEngineApp {
     private OnOpenLoginapp_login(event: MessageEvent) {
         KBELog.DEBUG_MSG("KBEngineApp::onOpenLoginapp_login:success to %s.", this.serverAddress);
         
-        this.lastTickCBTime = (new Date()).getTime();
-
         if (!this.networkInterface.IsGood)   // 有可能在连接过程中被关闭
         {
             KBELog.WARNING_MSG("KBEngineApp::onOpenLoginapp_login:network has been closed in connecting!");
             return;
         }
+
+        this.heartbeatState.reset();
 
         this.currserver = "loginapp";
         this.currstate = "login";
@@ -567,6 +565,7 @@ export class KBEngineApp {
         KBELog.DEBUG_MSG("KBEngineApp::onOpenLoginapp_resetpassword: successfully!");
         this.currserver = "loginapp";
         this.currstate = "resetpassword";
+        this.heartbeatState.reset();
 
         this.Resetpassword_loginapp(false);
    
@@ -586,6 +585,7 @@ export class KBEngineApp {
         KBELog.DEBUG_MSG("KBEngineApp::OnOpenLoginapp_createAccount: successfully!");
         this.currserver = "loginapp";
         this.currstate = "createAccount";
+        this.heartbeatState.reset();
 
         this.CreateAccount_loginapp(false);
     }
@@ -608,8 +608,7 @@ export class KBEngineApp {
     }
 
     ReloginBaseapp() {
-        this.lastTickTime = (new Date()).getTime();
-        this.lastTickCBTime = (new Date()).getTime();
+        this.heartbeatState.reset();
 
         if (this.networkInterface.IsGood)
             return;
@@ -624,6 +623,7 @@ export class KBEngineApp {
     OnReOpenBaseapp(event: MessageEvent) {
         KBELog.DEBUG_MSG("KBEngineApp::onReOpenBaseapp: successfully!");
         this.currserver = "baseapp";
+        this.heartbeatState.reset();
 
         let bundle = new Bundle();
         bundle.NewMessage(Messages.messages["Baseapp_reloginBaseapp"]);
@@ -633,7 +633,6 @@ export class KBEngineApp {
         bundle.WriteUint32(this.entity_id);
         bundle.Send(this.networkInterface);
 
-        this.lastTickCBTime = (new Date()).getTime();
     }
 
     Client_onImportClientMessages(stream: MemoryStream) {
@@ -701,8 +700,6 @@ export class KBEngineApp {
             this.serverScriptVersion + "), serverProtocolMD5(" + this.serverProtocolMD5 + "), serverEntityDefMD5(" +
             this.serverEntityDefMD5 + "), ctype(" + ctype + ")!");
 
-        this.lastTickCBTime = (new Date()).getTime();
-
         if(this.currserver == "baseapp")
         {
             this.Login_baseapp(false);
@@ -731,9 +728,8 @@ export class KBEngineApp {
      * 服务器心跳回调
      */
     Client_onAppActiveTickCB() {
-        let dateObject = new Date();
-        this.lastTickCBTime = dateObject.getTime();
-        KBELog.DEBUG_MSG("KBEngine::Client_onAppActiveTickCB.........lastTickCBTime:%d.", this.lastTickCBTime);
+        this.heartbeatState.markReply();
+        KBELog.DEBUG_MSG("KBEngine::Client_onAppActiveTickCB");
     }
 
     /**
@@ -884,9 +880,8 @@ export class KBEngineApp {
         KBELog.DEBUG_MSG("KBEngineApp::onOpenBaseapp: successfully!");
         this.currserver = "baseapp";
         this.currstate = "";
+        this.heartbeatState.reset();
         this.Hello();
-
-        this.lastTickCBTime = (new Date()).getTime();
     }
 
 
@@ -2173,17 +2168,23 @@ export class Bundle
         }
     }
 
-    Send(networkInterface: NetworkInterface)
+    Send(networkInterface: NetworkInterface): boolean
     {
         this.Fini(true);
 
+        let sent = true;
         for(let stream of this.streams)
         {
-            networkInterface.Send(stream.GetBuffer());
+            if(!networkInterface.Send(stream.GetBuffer()))
+            {
+                sent = false;
+                break;
+            }
         }
 
         this.streams = new Array<MemoryStream>();
         this.stream = new MemoryStream(MAX_BUFFER);
+        return sent;
     }
 
     CheckStream(len: number)

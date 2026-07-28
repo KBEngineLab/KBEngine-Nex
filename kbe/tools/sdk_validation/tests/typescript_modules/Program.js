@@ -34,6 +34,7 @@ function verifySourceDependencies(sdkPath)
     const dataTypesSource = readSource(sdkPath, "DataTypes.ts");
     const kbeTypesSource = readSource(sdkPath, "KBETypes.ts");
     const transportSource = readSource(sdkPath, "WebSocketTransport.ts");
+    const heartbeatSource = readSource(sdkPath, "HeartbeatState.ts");
     const aggregateImport = /from\s+["']\.\/KBEngine["']/;
 
     // 协议核心和网络实现不能反向依赖兼容聚合入口，否则 re-export 会重新形成运行时初始化环。
@@ -46,6 +47,7 @@ function verifySourceDependencies(sdkPath)
     assertCondition(!aggregateImport.test(dataTypesSource), "DataTypes.ts imports KBEngine.ts");
     assertCondition(!aggregateImport.test(kbeTypesSource), "KBETypes.ts imports KBEngine.ts");
     assertCondition(!aggregateImport.test(transportSource), "WebSocketTransport.ts imports KBEngine.ts");
+    assertCondition(!aggregateImport.test(heartbeatSource), "HeartbeatState.ts imports KBEngine.ts");
     assertCondition(!/export\s+class\s+MemoryStream\b/.test(engineSource), "KBEngine.ts still defines MemoryStream");
     assertCondition(!/export\s+class\s+NetworkInterface\b/.test(engineSource), "KBEngine.ts still defines NetworkInterface");
     assertCondition(!/export\s+namespace\s+DataTypes\b/.test(engineSource), "KBEngine.ts still defines DataTypes");
@@ -118,8 +120,11 @@ function createTransport()
         closed: [],
         released: false,
         sendError: undefined,
+        sendThrows: undefined,
         send(data, onError)
         {
+            if(this.sendThrows !== undefined)
+                throw this.sendThrows;
             this.sent.push(data);
             if(this.sendError !== undefined)
                 onError(this.sendError);
@@ -137,6 +142,28 @@ function createTransport()
             this.onClose = undefined;
         }
     };
+}
+
+function verifyBundleSendResult(compiledPath)
+{
+    const { Bundle } = loadModule(compiledPath, "KBEngine.js");
+    const message = { id: 1, msglen: 0 };
+    let acceptedCalls = 0;
+    const acceptedBundle = new Bundle();
+    acceptedBundle.NewMessage(message);
+    const accepted = acceptedBundle.Send({
+        Send(buffer)
+        {
+            acceptedCalls += 1;
+            return buffer.byteLength === 2;
+        }
+    });
+    assertCondition(accepted && acceptedCalls === 1, "Bundle did not propagate an accepted network submission");
+
+    const rejectedBundle = new Bundle();
+    rejectedBundle.NewMessage(message);
+    const rejected = rejectedBundle.Send({ Send: () => false });
+    assertCondition(!rejected, "Bundle did not propagate a rejected network submission");
 }
 
 function verifyTransportLifecycle(compiledPath)
@@ -162,11 +189,12 @@ function verifyTransportLifecycle(compiledPath)
     first.onOpen({});
     assertCondition(network.IsGood && opens === 1, "Custom transport open state was not observed");
 
-    network.Send(new ArrayBuffer(6));
-    assertCondition(first.sent.length === 1 && first.sent[0].byteLength === 6,
-        "NetworkInterface did not send through the configured transport");
+    const accepted = network.Send(new ArrayBuffer(6));
+    assertCondition(accepted && first.sent.length === 1 && first.sent[0].byteLength === 6,
+        "NetworkInterface did not report a successful synchronous transport submission");
     first.sendError = "send-failed";
-    network.Send(new ArrayBuffer(1));
+    const rejected = network.Send(new ArrayBuffer(1));
+    assertCondition(!rejected, "NetworkInterface accepted a synchronous transport send failure");
     network.Close();
     assertCondition(first.released && first.closed.length === 1 && !network.IsGood,
         "NetworkInterface did not release and close the active transport");
@@ -198,6 +226,7 @@ function verifyRuntimeIdentity(compiledPath)
     const dataTypes = loadModule(compiledPath, "DataTypes.js");
     const kbeTypes = loadModule(compiledPath, "KBETypes.js");
     const transport = loadModule(compiledPath, "WebSocketTransport.js");
+    const heartbeat = loadModule(compiledPath, "HeartbeatState.js");
 
     assertCondition(engine.MemoryStream === memory.MemoryStream, "MemoryStream re-export changed class identity");
     assertCondition(engine.NetworkInterface === network.default, "NetworkInterface re-export changed class identity");
@@ -205,6 +234,8 @@ function verifyRuntimeIdentity(compiledPath)
     assertCondition(engine.KBETypes === kbeTypes, "KBETypes compatibility re-export changed module identity");
     assertCondition(engine.KBEChannel === transport.KBEChannel, "KBEChannel compatibility re-export changed enum identity");
     assertCondition(engine.KBEPlatform === transport.KBEPlatform, "KBEPlatform compatibility re-export changed enum identity");
+    assertCondition(engine.HeartbeatState === heartbeat.HeartbeatState,
+        "HeartbeatState compatibility re-export changed class identity");
     assertCondition(engine.DataTypes.KB_INT64 === int64.KB_INT64, "KB_INT64 compatibility alias changed class identity");
     assertCondition(engine.DataTypes.KB_UINT64 === int64.KB_UINT64, "KB_UINT64 compatibility alias changed class identity");
 
@@ -249,6 +280,7 @@ function verifyAppDispatchLifecycle(compiledPath)
     let lifecycleCallbacks;
     let lifecycleIntervals;
     let lifecycleStops = 0;
+    let heartbeatNow = 1000;
     const originalDebug = console.debug;
     const originalWarn = console.warn;
     let app;
@@ -279,6 +311,7 @@ function verifyAppDispatchLifecycle(compiledPath)
                 lifecycleStops += 1;
             }
         };
+        args.heartbeatClock = { now: () => heartbeatNow };
         app = engine.KBEngineApp.Create(args);
         assertCondition(Messages.RequireDispatchTarget("Client_onAppActiveTickCB") === app,
             "KBEngineApp.Create did not bind the message dispatch target");
@@ -286,14 +319,33 @@ function verifyAppDispatchLifecycle(compiledPath)
             lifecycleIntervals.updatePlayerMS === args.syncPlayerMS && lifecycleIntervals.processEventsMS === 50,
             "KBEngineApp did not configure the injected host lifecycle adapter");
         lifecycleCallbacks.pause();
-        const resumeStart = Date.now();
+        heartbeatNow = 500000;
         lifecycleCallbacks.resume();
-        assertCondition(app.lastTickCBTime >= resumeStart && app.lastTickTime <= app.lastTickCBTime - 15000,
-            "Host resume did not reset the heartbeat baseline and schedule an immediate tick");
+        assertCondition(app.heartbeatState.isDue(heartbeatNow) && !app.heartbeatState.replyPending,
+            "Host resume did not clear pending state and schedule an immediate heartbeat");
         app.networkInterface.ConnectTo("ws://injected");
         assertCondition(injectedFactoryCalls === 1,
             "KBEngineArgs explicit transport factory did not override the selected channel");
-        app.networkInterface.Close();
+        injectedTransport.isOpen = true;
+        injectedTransport.sendThrows = "expected synchronous send failure";
+        lifecycleCallbacks.update();
+        assertCondition(!app.heartbeatState.replyPending && injectedTransport.sent.length === 0,
+            "A synchronously rejected heartbeat entered pending state");
+
+        injectedTransport.sendThrows = undefined;
+        heartbeatNow += 15001;
+        lifecycleCallbacks.update();
+        assertCondition(app.heartbeatState.replyPending && injectedTransport.sent.length === 1,
+            "An accepted heartbeat did not enter pending state");
+        app.Client_onAppActiveTickCB();
+        assertCondition(!app.heartbeatState.replyPending, "Heartbeat acknowledgement did not clear pending state");
+
+        heartbeatNow += 15001;
+        lifecycleCallbacks.update();
+        heartbeatNow += 15001;
+        lifecycleCallbacks.update();
+        assertCondition(injectedTransport.released && injectedTransport.closed.length === 1,
+            "An unanswered heartbeat did not close the transport exactly once");
     }
     finally
     {
@@ -413,8 +465,9 @@ function main()
     verifySchemaBinding(compiledPath);
     verifyMessageDispatch(compiledPath);
     verifyTransportLifecycle(compiledPath);
+    verifyBundleSendResult(compiledPath);
     verifyAppDispatchLifecycle(compiledPath);
-    console.log("TYPESCRIPT_MODULE_TEST_PASS root=true imports=true schema=true schema-bind=true memory=true network=true transport=true stale-transport=true int64=true roundtrip=true dispatch=true lifecycle=true app-lifecycle=true");
+    console.log("TYPESCRIPT_MODULE_TEST_PASS root=true imports=true schema=true schema-bind=true memory=true network=true transport=true stale-transport=true int64=true roundtrip=true dispatch=true lifecycle=true app-lifecycle=true heartbeat=true send-result=true");
 }
 
 try
