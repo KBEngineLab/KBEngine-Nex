@@ -41,6 +41,23 @@ add_test(NAME source.macos_sigar_contract
 )
 set_tests_properties(source.macos_sigar_contract PROPERTIES LABELS "macos;source")
 
+add_test(NAME source.python_triplet_matrix
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_CMAKE_ROOT=${CMAKE_SOURCE_DIR}/cmake"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyPythonTriplets.cmake"
+)
+set_tests_properties(source.python_triplet_matrix PROPERTIES LABELS "python;source")
+
+add_test(NAME source.python_triplet_rejects_universal
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_CMAKE_ROOT=${CMAKE_SOURCE_DIR}/cmake"
+        -DKBE_TEST_UNSUPPORTED_UNIVERSAL=ON
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyPythonTriplets.cmake"
+)
+set_tests_properties(source.python_triplet_rejects_universal PROPERTIES
+    LABELS "macos;python;source"
+)
+
 set(KBE_TEST_ASSETS "" CACHE PATH "Assets directory used by CMake integration tests")
 set(KBE_TEST_DATABASE_HOST "127.0.0.1" CACHE STRING "Database host used by CMake integration tests")
 set(KBE_TEST_DATABASE_USERNAME "" CACHE STRING "Database username used by CMake integration tests")

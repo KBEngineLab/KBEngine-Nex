@@ -1,30 +1,21 @@
 include_guard(GLOBAL)
+include(KbePythonTriplet)
 
 set(KBE_PYTHON_VERSION "3.12" CACHE STRING "Embedded Python major and minor version")
 
 # Python 使用独立的动态 triplet，避免主工程的静态依赖策略改变 CPython ABI 和第三方扩展加载方式。
 # Python uses an independent dynamic triplet so the main project's static dependency policy cannot alter the CPython ABI or extension loading behavior.
 if(NOT KBE_PYTHON_TRIPLET)
-    string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" _kbe_python_processor)
-    if(_kbe_python_processor MATCHES "^(arm64|aarch64)$" OR CMAKE_VS_PLATFORM_NAME STREQUAL "ARM64")
-        set(_kbe_python_arch "arm64")
-    elseif(_kbe_python_processor MATCHES "^(amd64|x86_64|x64)$" OR CMAKE_VS_PLATFORM_NAME STREQUAL "x64")
-        set(_kbe_python_arch "x64")
-    else()
-        message(FATAL_ERROR "Unsupported Python architecture: ${CMAKE_SYSTEM_PROCESSOR}")
-    endif()
-
-    if(WIN32)
-        set(_kbe_python_platform "windows")
-    elseif(APPLE)
-        set(_kbe_python_platform "osx")
-    elseif(UNIX)
-        set(_kbe_python_platform "linux")
-    else()
-        message(FATAL_ERROR "Unsupported Python platform: ${CMAKE_SYSTEM_NAME}")
-    endif()
-
-    set(KBE_PYTHON_TRIPLET "${_kbe_python_arch}-${_kbe_python_platform}" CACHE STRING "vcpkg triplet for the embedded Python runtime")
+    # macOS 交叉构建必须以目标 architecture 为准，不能沿用 Apple Silicon 主机处理器选择 Python ABI。
+    # macOS cross-builds must use the target architecture instead of selecting the Python ABI from the Apple Silicon host processor.
+    kbe_resolve_python_triplet(
+        _kbe_python_triplet
+        "${CMAKE_SYSTEM_NAME}"
+        "${CMAKE_SYSTEM_PROCESSOR}"
+        "${CMAKE_VS_PLATFORM_NAME}"
+        "${CMAKE_OSX_ARCHITECTURES}"
+    )
+    set(KBE_PYTHON_TRIPLET "${_kbe_python_triplet}" CACHE STRING "vcpkg triplet for the embedded Python runtime")
 endif()
 
 set(KBE_PYTHON_INSTALL_ROOT
