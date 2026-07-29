@@ -23,11 +23,47 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "scriptstdouterr.h"
 #include "py_macros.h"
 #include "helper/profile.h"
+#include <limits>
 
 namespace KBEngine{ namespace script {
 
 bool PyUrl::isInit = false;
-std::map<PyObject*, PyObjectPtr> PyUrl::pyCallbacks;
+std::map<const Network::Http::Request*, PyObjectPtr> PyUrl::pyCallbacks;
+
+namespace
+{
+bool parseHeaders(PyObject* pyHeaders, std::map<std::string, std::string>& headers)
+{
+	if (!PyDict_Check(pyHeaders))
+	{
+		PyErr_SetString(PyExc_TypeError, "KBEngine.urlopen: headers must be a dict[str, str]");
+		return false;
+	}
+
+	PyObject* key = NULL;
+	PyObject* value = NULL;
+	Py_ssize_t pos = 0;
+	while (PyDict_Next(pyHeaders, &pos, &key, &value))
+	{
+		if (!PyUnicode_Check(key) || !PyUnicode_Check(value))
+		{
+			PyErr_SetString(PyExc_TypeError, "KBEngine.urlopen: header names and values must be str");
+			return false;
+		}
+
+		// UTF-8转换仍可能因内存错误失败，不能把NULL传给std::string构造函数。
+		// UTF-8 conversion can still fail on allocation, so NULL must never reach a std::string constructor.
+		const char* headerName = PyUnicode_AsUTF8(key);
+		const char* headerValue = PyUnicode_AsUTF8(value);
+		if (!headerName || !headerValue)
+			return false;
+
+		headers[headerName] = headerValue;
+	}
+
+	return true;
+}
+}
 
 //-------------------------------------------------------------------------------------
 bool PyUrl::initialize(Script* pScript)
@@ -58,7 +94,18 @@ void PyUrl::onHttpCallback(bool success, const Network::Http::Request& pRequest,
 	if (!isInit)
 		return;
 
-	KBE_ASSERT(pRequest.getUserargs());
+	std::map<const Network::Http::Request*, PyObjectPtr>::iterator callbackIter =
+		pyCallbacks.find(&pRequest);
+	if (callbackIter == pyCallbacks.end())
+	{
+		ERROR_MSG("PyUrl::onHttpCallback: request callback is no longer registered.\n");
+		return;
+	}
+
+	// 本地强引用覆盖Python回调重入finalise()的情况，注册项可在调用前安全移除。
+	// A local strong reference covers reentrant finalise() calls, allowing the registry entry to be removed before invocation.
+	PyObjectPtr pyCallback = callbackIter->second;
+	pyCallbacks.erase(callbackIter);
 
 	// httpcode, data, headers, opt_success, url 
 	PyObject* pyargs = PyTuple_New(5);
@@ -69,7 +116,7 @@ void PyUrl::onHttpCallback(bool success, const Network::Http::Request& pRequest,
 	PyTuple_SET_ITEM(pyargs, 3, PyBool_FromLong(success));
 	PyTuple_SET_ITEM(pyargs, 4, PyUnicode_FromString(pRequest.url()));
 
-	PyObject* pyRet = PyObject_CallObject((PyObject*)pRequest.getUserargs(), pyargs);
+	PyObject* pyRet = PyObject_CallObject(pyCallback.get(), pyargs);
 	if (pyRet == NULL)
 	{
 		SCRIPT_ERROR_CHECK();
@@ -80,7 +127,6 @@ void PyUrl::onHttpCallback(bool success, const Network::Http::Request& pRequest,
 	}
 
 	Py_DECREF(pyargs);
-	pyCallbacks.erase((PyObject*)pRequest.getUserargs());
 }
 
 //-------------------------------------------------------------------------------------
@@ -89,37 +135,37 @@ PyObject* PyUrl::__py_urlopen(PyObject* self, PyObject* args)
 	int argCount = (int)PyTuple_Size(args);
 	PyObject* pyCallback = NULL;
 	char* surl = NULL;
-	int ret = 0;
 	char* postData = NULL;
 	Py_ssize_t postDataLength = 0;
 	std::map<std::string, std::string> map_headers;
 
-	if (argCount == 2)
+	if (argCount < 1 || argCount > 4)
 	{
-		ret = PyArg_ParseTuple(args, "s|O", &surl, &pyCallback);
+		PyErr_SetString(PyExc_TypeError, "KBEngine.urlopen expects 1 to 4 arguments");
+		return NULL;
+	}
+
+	if (argCount == 1)
+	{
+		if (!PyArg_ParseTuple(args, "s:urlopen", &surl))
+			return NULL;
+	}
+	else if (argCount == 2)
+	{
+		if (!PyArg_ParseTuple(args, "sO:urlopen", &surl, &pyCallback))
+			return NULL;
 	}
 	else if (argCount == 3)
 	{
 		PyObject* pyobj = NULL;
-		ret = PyArg_ParseTuple(args, "s|O|O", &surl, &pyCallback, &pyobj);
+		if (!PyArg_ParseTuple(args, "sOO:urlopen", &surl, &pyCallback, &pyobj))
+			return NULL;
 
 		// 检查是headers还是post data
 		if (PyDict_Check(pyobj))
 		{
-			PyObject *key, *value;
-			Py_ssize_t pos = 0;
-
-			while (PyDict_Next(pyobj, &pos, &key, &value))
-			{
-				if (!PyUnicode_Check(key) || !PyUnicode_Check(value))
-				{
-					PyErr_Format(PyExc_AssertionError, "KBEngine::urlopen: headers should be dict(keystr : valstr)!");
-					PyErr_PrintEx(0);
-					return NULL;
-				}
-
-				map_headers[PyUnicode_AsUTF8AndSize(key, NULL)] = PyUnicode_AsUTF8AndSize(value, NULL);
-			}
+			if (!parseHeaders(pyobj, map_headers))
+				return NULL;
 		}
 		else if (PyBytes_Check(pyobj))
 		{
@@ -131,8 +177,7 @@ PyObject* PyUrl::__py_urlopen(PyObject* self, PyObject* args)
 		}
 		else
 		{
-			PyErr_Format(PyExc_AssertionError, "KBEngine::urlopen: args3 is not postData(bytes) or callback(method)!");
-			PyErr_PrintEx(0);
+			PyErr_SetString(PyExc_TypeError, "KBEngine.urlopen: third argument must be post data bytes or a headers dict");
 			return NULL;
 		}
 	}
@@ -140,32 +185,11 @@ PyObject* PyUrl::__py_urlopen(PyObject* self, PyObject* args)
 	{
 		PyObject* pypost = NULL;
 		PyObject* pyheaders = NULL;
-		ret = PyArg_ParseTuple(args, "s|O|O|O", &surl, &pyCallback, &pypost, &pyheaders);
-
-		// 检查是headers还是post data
-		if (PyDict_Check(pyheaders))
-		{
-			PyObject *key, *value;
-			Py_ssize_t pos = 0;
-
-			while (PyDict_Next(pyheaders, &pos, &key, &value))
-			{
-				if (!PyUnicode_Check(key) || !PyUnicode_Check(value))
-				{
-					PyErr_Format(PyExc_AssertionError, "KBEngine::urlopen: headers should be dict(keystr : valstr)!");
-					PyErr_PrintEx(0);
-					return NULL;
-				}
-
-				map_headers[PyUnicode_AsUTF8AndSize(key, NULL)] = PyUnicode_AsUTF8AndSize(value, NULL);
-			}
-		}
-		else
-		{
-			PyErr_Format(PyExc_AssertionError, "KBEngine::urlopen: headers should be dict(keystr : valstr)!");
-			PyErr_PrintEx(0);
+		if (!PyArg_ParseTuple(args, "sOOO:urlopen", &surl, &pyCallback, &pypost, &pyheaders))
 			return NULL;
-		}
+
+		if (!parseHeaders(pyheaders, map_headers))
+			return NULL;
 
 		if (PyBytes_Check(pypost))
 		{
@@ -177,36 +201,29 @@ PyObject* PyUrl::__py_urlopen(PyObject* self, PyObject* args)
 		}
 		else
 		{
-			PyErr_Format(PyExc_AssertionError, "KBEngine::urlopen: POST data should be bytes!");
-			PyErr_PrintEx(0);
+			PyErr_SetString(PyExc_TypeError, "KBEngine.urlopen: POST data must be bytes");
 			return NULL;
 		}
-	}
-	else
-	{
-		ret = PyArg_ParseTuple(args, "s", &surl);
 	}
 
 	if (pyCallback && !PyCallable_Check(pyCallback))
 	{
-		PyErr_Format(PyExc_AssertionError, "KBEngine::urlopen: invalid callback!");
-		PyErr_PrintEx(0);
+		PyErr_SetString(PyExc_TypeError, "KBEngine.urlopen: callback must be callable");
 		return NULL;
 	}
 
-	if (surl == NULL || !ret)
+	// HTTP层使用32位长度，拒绝无法完整表达的数据，避免静默截断请求体。
+	// The HTTP layer uses a 32-bit length, so reject unrepresentable data instead of silently truncating the request body.
+	if (static_cast<uint64>(postDataLength) > std::numeric_limits<unsigned int>::max())
 	{
-		PyErr_Format(PyExc_AssertionError, "KBEngine::urlopen: args error!");
-		PyErr_PrintEx(0);
+		PyErr_SetString(PyExc_OverflowError, "KBEngine.urlopen: POST data exceeds the HTTP request size limit");
 		return NULL;
 	}
 
 	Network::Http::Request* pRequest = new Network::Http::Request();
-
 	if (pyCallback)
 	{
-		pyCallbacks[pyCallback] = PyObjectPtr(pyCallback);
-		pRequest->setUserargs(pyCallback);
+		pyCallbacks[pRequest] = PyObjectPtr(pyCallback);
 		pRequest->setCallback(onHttpCallback);
 	}
 
@@ -222,7 +239,8 @@ PyObject* PyUrl::__py_urlopen(PyObject* self, PyObject* args)
 
 	if (postDataLength > 0 && postData)
 	{
-		Network::Http::Request::Status result = pRequest->setPostData(postData, postDataLength);
+		Network::Http::Request::Status result = pRequest->setPostData(
+			postData, static_cast<unsigned int>(postDataLength));
 		if (Network::Http::Request::OK != result)
 		{
 			delete pRequest;

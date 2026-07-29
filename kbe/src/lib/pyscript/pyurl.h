@@ -45,7 +45,9 @@ public:
 
 private:
 	static bool	isInit; // 是否已经被初始化
-	static std::map<PyObject*, PyObjectPtr> pyCallbacks;
+	// 每个请求独立持有回调，允许同一个Python callable安全地服务多个并发请求。
+	// Each request retains its callback independently so one Python callable can safely serve concurrent requests.
+	static std::map<const Network::Http::Request*, PyObjectPtr> pyCallbacks;
 
 };
 
