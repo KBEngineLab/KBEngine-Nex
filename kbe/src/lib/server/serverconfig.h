@@ -149,6 +149,7 @@ typedef struct EngineComponentInfo
 		use_coordinate_system = true;
 		account_type = 3;
 		debugDBMgr = false;
+		enableRawDatabaseCommandBlacklist = false;
 
 		externalAddress[0] = '\0';
 		externalUdpPorts_min = -1;
@@ -258,6 +259,11 @@ typedef struct EngineComponentInfo
 
 	bool debugDBMgr;										// debug模式下可输出读写操作信息
 
+	// 原始数据库命令黑名单默认关闭，避免改变现有项目行为；启用后按数据库类型读取独立策略。
+	// The raw database command blacklist defaults to disabled for compatibility and uses a separate policy per backend when enabled.
+	bool enableRawDatabaseCommandBlacklist;
+	std::map<std::string, std::vector<std::string> > rawDatabaseCommandBlacklist;
+
 	bool isOnInitCallPropertysSetMethods;					// 机器人(bots)专用：在Entity初始化时是否触发属性的set_*事件
 } ENGINE_COMPONENT_INFO;
 
@@ -312,6 +318,8 @@ public:
 	INLINE DBInterfaceInfo* dbInterface(const std::string& name);
 	INLINE int dbInterfaceName2dbInterfaceIndex(const std::string& dbInterfaceName);
 	INLINE const char* dbInterfaceIndex2dbInterfaceName(size_t dbInterfaceIndex);
+	bool enableRawDatabaseCommandBlacklist() const;
+	const std::vector<std::string>& rawDatabaseCommandBlacklist(const std::string& dbType) const;
 
 private:
 	void _updateEmailInfos();

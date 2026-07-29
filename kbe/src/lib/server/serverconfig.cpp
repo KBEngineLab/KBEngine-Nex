@@ -35,6 +35,26 @@ KBE_SINGLETON_INIT(ServerConfig);
 
 static bool g_dbmgr_addDefaultAddress = true;
 
+static void loadRawDatabaseCommandBlacklist(XML* xml, TiXmlNode* rootNode, const char* dbType,
+	std::map<std::string, std::vector<std::string> >& blacklist)
+{
+	TiXmlNode* node = xml->enterNode(rootNode, dbType);
+	if (node == NULL)
+		return;
+
+	std::vector<std::string>& words = blacklist[strutil::toLower(dbType)];
+	words.clear();
+
+	std::vector<std::string> values;
+	strutil::kbe_splits(xml->getValStr(node), ",", values, false);
+	for (std::vector<std::string>::iterator iter = values.begin(); iter != values.end(); ++iter)
+	{
+		std::string word = strutil::toLower(strutil::kbe_trim(*iter));
+		if (!word.empty())
+			words.push_back(word);
+	}
+}
+
 //-------------------------------------------------------------------------------------
 ServerConfig::ServerConfig():
 	gameUpdateHertz_(10),
@@ -523,6 +543,25 @@ bool ServerConfig::loadConfig(std::string fileName)
 	rootNode = xml->getRootNode("cellapp");
 	if(rootNode != NULL)
 	{
+		// 黑名单位于 dbmgr 根节点而不是单个接口中，使同类型数据库接口共享一致的安全边界。
+		// The blacklist lives at the dbmgr root so every interface of the same backend shares one security boundary.
+		node = xml->enterNode(rootNode, "rawDatabaseCommandBlacklist");
+		_dbmgrInfo.enableRawDatabaseCommandBlacklist = false;
+		_dbmgrInfo.rawDatabaseCommandBlacklist.clear();
+		if (node != NULL)
+		{
+			TiXmlNode* childnode = xml->enterNode(node, "enable");
+			_dbmgrInfo.enableRawDatabaseCommandBlacklist =
+				childnode != NULL && xml->getValStr(childnode) == "true";
+
+			if (_dbmgrInfo.enableRawDatabaseCommandBlacklist)
+			{
+				loadRawDatabaseCommandBlacklist(xml.get(), node, "mysql", _dbmgrInfo.rawDatabaseCommandBlacklist);
+				loadRawDatabaseCommandBlacklist(xml.get(), node, "mongodb", _dbmgrInfo.rawDatabaseCommandBlacklist);
+				loadRawDatabaseCommandBlacklist(xml.get(), node, "postgresql", _dbmgrInfo.rawDatabaseCommandBlacklist);
+			}
+		}
+
 		node = xml->enterNode(rootNode, "internalInterface");	
 		if(node != NULL)
 			strncpy((char*)&_cellAppInfo.internalInterface, xml->getValStr(node).c_str(), MAX_NAME - 1);
@@ -1958,6 +1997,28 @@ void ServerConfig::updateInfos(bool isPrint, COMPONENT_TYPE componentType, COMPO
 		printf("%s", infostr.c_str());
 	}
 #endif
+}
+
+//-------------------------------------------------------------------------------------
+bool ServerConfig::enableRawDatabaseCommandBlacklist() const
+{
+	return _dbmgrInfo.enableRawDatabaseCommandBlacklist;
+}
+
+//-------------------------------------------------------------------------------------
+const std::vector<std::string>& ServerConfig::rawDatabaseCommandBlacklist(const std::string& dbType) const
+{
+	static const std::vector<std::string> emptyList;
+	if (!_dbmgrInfo.enableRawDatabaseCommandBlacklist)
+		return emptyList;
+
+	std::string normalizedType = strutil::toLower(strutil::kbe_trim(dbType));
+	if (normalizedType == "pgsql")
+		normalizedType = "postgresql";
+
+	std::map<std::string, std::vector<std::string> >::const_iterator iter =
+		_dbmgrInfo.rawDatabaseCommandBlacklist.find(normalizedType);
+	return iter == _dbmgrInfo.rawDatabaseCommandBlacklist.end() ? emptyList : iter->second;
 }
 
 //-------------------------------------------------------------------------------------		

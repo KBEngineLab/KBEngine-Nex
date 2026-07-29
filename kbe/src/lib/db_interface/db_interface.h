@@ -56,6 +56,14 @@ public:
 	db_numConnections_(1),
 	lastquery_()
 	{
+		memset(name_, 0, sizeof(name_));
+		memset(db_type_, 0, sizeof(db_type_));
+		memset(db_ip_, 0, sizeof(db_ip_));
+		memset(db_username_, 0, sizeof(db_username_));
+		memset(db_password_, 0, sizeof(db_password_));
+		memset(db_authSource_, 0, sizeof(db_authSource_));
+		memset(db_replicaSet_, 0, sizeof(db_replicaSet_));
+		memset(db_name_, 0, sizeof(db_name_));
 		strncpy(name_, name, MAX_NAME - 1);
 		int dbIndex = g_kbeSrvConfig.dbInterfaceName2dbInterfaceIndex(this->name());
 		KBE_ASSERT(dbIndex >= 0);
@@ -102,10 +110,15 @@ public:
 		return query(cmd.c_str(), (uint32)cmd.size(), printlog, result);
 	}
 
+	// 该检查只保护脚本直接提交的原始命令，内部参数化持久化语句不经过此策略。
+	// This check protects only script-submitted raw commands; internal parameterized persistence statements bypass this policy.
+	bool checkRawDatabaseCommandAllowed(const std::string& command, std::string& error) const;
+
 	/**
 		返回这个接口的名称
 	*/
 	const char* name() const { return name_; }
+	const char* dbType() const { return db_type_; }
 
 	/**
 		返回这个接口的索引

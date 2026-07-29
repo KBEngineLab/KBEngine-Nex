@@ -30,12 +30,72 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "server/serverconfig.h"
 #include "thread/threadpool.h"
 
+#include <cctype>
+
 namespace KBEngine { 
 KBE_SINGLETON_INIT(DBUtil);
 
 DBUtil g_DBUtil;
 
 DBUtil::DBThreadPoolMap DBUtil::pThreadPoolMaps_;
+
+namespace
+{
+bool isRawCommandBoundary(char value)
+{
+	return !std::isalnum(static_cast<unsigned char>(value)) && value != '_';
+}
+
+bool findBlacklistedRawCommand(const std::string& command,
+	const std::vector<std::string>& blacklist, std::string& hitWord)
+{
+	if (command.empty() || blacklist.empty())
+		return false;
+
+	const std::string normalizedCommand = strutil::toLower(command);
+	for (std::vector<std::string>::const_iterator iter = blacklist.begin(); iter != blacklist.end(); ++iter)
+	{
+		const std::string& word = *iter;
+		if (word.empty())
+			continue;
+
+		std::string::size_type position = 0;
+		while ((position = normalizedCommand.find(word, position)) != std::string::npos)
+		{
+			const std::string::size_type end = position + word.size();
+			const bool leftBoundary = position == 0 || isRawCommandBoundary(normalizedCommand[position - 1]);
+			const bool rightBoundary = end == normalizedCommand.size() || isRawCommandBoundary(normalizedCommand[end]);
+			if (leftBoundary && rightBoundary)
+			{
+				hitWord = word;
+				return true;
+			}
+
+			++position;
+		}
+	}
+
+	return false;
+}
+}
+
+//-------------------------------------------------------------------------------------
+bool DBInterface::checkRawDatabaseCommandAllowed(const std::string& command, std::string& error) const
+{
+	if (!g_kbeSrvConfig.enableRawDatabaseCommandBlacklist())
+		return true;
+
+	std::string hitWord;
+	if (!findBlacklistedRawCommand(command, g_kbeSrvConfig.rawDatabaseCommandBlacklist(dbType()), hitWord))
+		return true;
+
+	error = fmt::format("executeRawDatabaseCommand blocked by blacklist: dbInterface={}, dbType={}, hit={}",
+		name(), dbType(), hitWord);
+	// 不记录完整命令，避免账号、令牌或业务数据通过安全日志再次泄露。
+	// Do not log the full command because credentials, tokens, or business data could be leaked again through the security log.
+	WARNING_MSG(fmt::format("{}.\n", error));
+	return false;
+}
 
 //-------------------------------------------------------------------------------------
 DBUtil::DBUtil()

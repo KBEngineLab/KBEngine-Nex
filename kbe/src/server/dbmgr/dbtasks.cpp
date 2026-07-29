@@ -145,6 +145,9 @@ DBTaskExecuteRawDatabaseCommand::~DBTaskExecuteRawDatabaseCommand()
 //-------------------------------------------------------------------------------------
 bool DBTaskExecuteRawDatabaseCommand::db_thread_process()
 {
+	if (!pdbi_->checkRawDatabaseCommandAllowed(sdatas_, error_))
+		return false;
+
 	try
 	{
 		if (!pdbi_->query(sdatas_.data(), (uint32)sdatas_.size(), false, pExecret_))
@@ -192,6 +195,9 @@ DBTaskExecuteRawDatabaseCommandByEntity::~DBTaskExecuteRawDatabaseCommandByEntit
 //-------------------------------------------------------------------------------------
 bool DBTaskExecuteRawDatabaseCommandByEntity::db_thread_process()
 {
+	if (!pdbi_->checkRawDatabaseCommandAllowed(sdatas_, error_))
+		return false;
+
 	try
 	{
 		if (!pdbi_->query(sdatas_.data(), (uint32)sdatas_.size(), false, pExecret_))

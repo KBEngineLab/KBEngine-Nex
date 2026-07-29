@@ -288,6 +288,18 @@
 			（Interface address specified, configurable NIC/MAC/IP） 
 		-->
 		<internalInterface>  </internalInterface>
+
+		<!-- executeRawDatabaseCommand命令黑名单，只拦截脚本直接提交的原始数据库命令。
+			The executeRawDatabaseCommand blacklist applies only to raw commands submitted directly by scripts.
+			多个词使用英文逗号分隔，匹配不区分大小写，并按数据库后端分别加载。
+			Separate words with commas; matching is case-insensitive and loaded independently for each backend.
+		-->
+		<rawDatabaseCommandBlacklist>
+			<enable> false </enable>
+			<mysql>delete,drop,truncate,alter,rename,replace,grant,revoke,flush,lock,unlock,shutdown,load_file,load data,outfile,dumpfile,handler,optimize,repair,analyze,reset</mysql>
+			<mongodb>drop,dropDatabase,delete,deleteOne,deleteMany,remove,findAndModify,findOneAndDelete,findOneAndReplace,renameCollection,eval,mapReduce,createUser,updateUser,dropUser,grantRolesToUser,revokeRolesFromUser,shutdown,shutdownServer,fsync,auth,logout,createIndexes,dropIndexes</mongodb>
+			<postgresql>delete,drop,truncate,alter,rename,grant,revoke,copy,vacuum,reindex,cluster,analyze,discard,listen,notify,unlisten,lock,security label,comment,call,do,prepare,execute,deallocate</postgresql>
+		</rawDatabaseCommandBlacklist>
 		
 		<!-- Interfaces进程的地址（参考interfaces中地址配置）
 			(Address of Interfaces process)
