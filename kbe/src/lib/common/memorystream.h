@@ -25,6 +25,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "common/objectpool.h"
 #include "helper/debug_helper.h"
 #include "common/memorystream_converter.h"
+#include <type_traits>
 	
 namespace KBEngine{
 
@@ -379,7 +380,11 @@ public:
 
     size_t rpos() const { return rpos_; }
 
-    size_t rpos(int rpos)
+    // 有符号位置保留历史负值归零语义；无符号调用统一匹配下方的 size_t 重载。
+    // Signed positions preserve the legacy negative-to-zero behavior; unsigned callers resolve to the size_t overload below.
+    template<typename Position>
+    typename std::enable_if<std::is_integral<Position>::value && std::is_signed<Position>::value, size_t>::type
+    rpos(Position rpos)
     {
 		if(rpos < 0)
 			rpos = 0;
@@ -388,13 +393,29 @@ public:
         return rpos_;
     }
 
+    size_t rpos(size_t rpos)
+    {
+        rpos_ = rpos;
+        return rpos_;
+    }
+
     size_t wpos() const { return wpos_; }
 
-    size_t wpos(int wpos)
+    // 有符号写位置继续接受历史差值计算，无符号位置不再经过 int 窄化。
+    // Signed write positions continue to accept legacy delta calculations, while unsigned positions no longer narrow through int.
+    template<typename Position>
+    typename std::enable_if<std::is_integral<Position>::value && std::is_signed<Position>::value, size_t>::type
+    wpos(Position wpos)
     {
 		if(wpos < 0)
 			wpos = 0;
 
+        wpos_ = wpos;
+        return wpos_;
+    }
+
+    size_t wpos(size_t wpos)
+    {
         wpos_ = wpos;
         return wpos_;
     }
