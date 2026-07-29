@@ -1,3 +1,6 @@
-# Ignore everything in this directory 
-* 
-# Except this file !.gitignore 
+# 忽略构建阶段部署到公共脚本目录的 Python 运行时，仅保留受版本控制的引擎脚本。
+# Ignore the Python runtime deployed into the common script directory while keeping versioned engine scripts.
+*
+!.gitignore
+!PyScript/
+!PyScript/**

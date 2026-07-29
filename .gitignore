@@ -1,4 +1,4 @@
-# Local migration notes
+# Local migration notes. Keep these paths outside Git and exclude them from destructive git-clean commands.
 /迁移文档/
 /从1.x重建Nex迁移规划.md
 
@@ -56,9 +56,14 @@ venv/
 /kbe/src/build/
 /kbe/src/_objs/
 /kbe/src/ipch/
+/kbe/src/libs/
 /kbe/src/out/
+/kbe/src/triplets/
+/kbe/src/x64/
 /kbe/src/vcpkg_installed/
+/kbe/src/python-runtime/triplets/
 /kbe/src/python-runtime/vcpkg_installed/
+/kbe/src/python-runtime/x64/
 /kbe/src/lib/dependencies/apr/LibR/
 /kbe/src/lib/dependencies/apr/include/apr.h
 /kbe/src/lib/dependencies/apr/include/apr_escape_test_char.h

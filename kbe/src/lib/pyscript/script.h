@@ -35,6 +35,7 @@ namespace KBEngine{ namespace script{
 #define SCRIPT_PATH													\
 					L"../../res/scripts;"							\
 					L"../../res/scripts/common;"					\
+					L"../../res/scripts/common/PyScript;"			\
 					L"../../res/scripts/common/lib-dynload;"		\
 					L"../../res/scripts/common/DLLs;"				\
 					L"../../res/scripts/common/Lib;"				\
@@ -45,6 +46,7 @@ namespace KBEngine{ namespace script{
 #define SCRIPT_PATH													\
 					L"../../res/scripts;"							\
 					L"../../res/scripts/common;"					\
+					L"../../res/scripts/common/PyScript;"			\
 					L"../../res/scripts/common/lib-dynload;"		\
 					L"../../res/scripts/common/DLLs;"				\
 					L"../../res/scripts/common/Lib;"				\
