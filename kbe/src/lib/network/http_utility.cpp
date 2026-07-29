@@ -276,13 +276,21 @@ Request::Status Request::setFollowURL(int maxRedirs)
 }
 
 //-------------------------------------------------------------------------------------
-Request::Status Request::setPostData(const void* data, unsigned int size)
+Request::Status Request::setPostData(const void* data, size_t size)
 {
 	if (!data)
 	{
 		ERROR_MSG(fmt::format("Http::Request::setPostData: "
 				"data is NULL! size={}\n", size));
 
+		return INVALID_OPT;
+	}
+
+	// CURLOPT_POSTFIELDSIZE使用long，先验证平台原生上限，避免大请求长度在libcurl边界被截断。
+	// CURLOPT_POSTFIELDSIZE uses long; validate the platform-native limit before crossing into libcurl so large request lengths cannot be truncated.
+	if(size > static_cast<size_t>(std::numeric_limits<long>::max()))
+	{
+		ERROR_MSG(fmt::format("Http::Request::setPostData: data exceeds libcurl length limit! size={}\n", size));
 		return INVALID_OPT;
 	}
 
@@ -319,7 +327,7 @@ Request::Status Request::setPostData(const void* data, unsigned int size)
 		return INVALID_OPT;
 	}
 
-	curlCode = curl_easy_setopt((CURL*)pContext_, CURLOPT_POSTFIELDSIZE, size);
+	curlCode = curl_easy_setopt((CURL*)pContext_, CURLOPT_POSTFIELDSIZE, static_cast<long>(size));
 	if (CURLE_OK != curlCode)
 	{
 		ERROR_MSG(fmt::format("Http::Request::setPostData: "

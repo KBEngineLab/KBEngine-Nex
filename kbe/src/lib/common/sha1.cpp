@@ -133,7 +133,7 @@ bool KBE_SHA1::Result(unsigned *message_digest_array)
 *
 */
 void KBE_SHA1::Input(const unsigned char *message_array,
-	unsigned            length)
+	size_t              length)
 {
 	if (!length)
 	{
@@ -192,7 +192,7 @@ void KBE_SHA1::Input(const unsigned char *message_array,
 *
 */
 void KBE_SHA1::Input(const char  *message_array,
-	unsigned    length)
+	size_t       length)
 {
 	Input((unsigned char *)message_array, length);
 }

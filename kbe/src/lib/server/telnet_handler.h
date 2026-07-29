@@ -130,7 +130,7 @@ private:
 	std::string getHistoryCommand(bool isNextCommand);
 
 	std::deque<std::string> historyCommand_;
-	int8 historyCommandIndex_;
+	size_t historyCommandIndex_;
 
 	std::string command_;
 	Network::EndPoint* pEndPoint_;
@@ -138,7 +138,7 @@ private:
 
 	uint8 state_;
 
-	int32 currPos_;
+	size_t currPos_;
 
 	TelnetProfileHandler* pProfileHandler_;
 

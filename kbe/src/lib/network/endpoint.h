@@ -27,6 +27,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/address.h"
 #include "network/common.h"
 #include "openssl/ssl.h"
+#include <cstddef>
 
 namespace KBEngine { 
 namespace Network
@@ -87,11 +88,11 @@ public:
 
 	INLINE EndPoint* accept(u_int16_t * networkPort = NULL, u_int32_t * networkAddr = NULL, bool autosetflags = true);
 	
-	INLINE int send(const void * gramData, int gramSize);
+	INLINE int send(const void * gramData, size_t gramSize);
 	void send(Bundle * pBundle);
 	void sendto(Bundle * pBundle, u_int16_t networkPort, u_int32_t networkAddr = BROADCAST);
 
-	INLINE int recv(void * gramData, int gramSize);
+	INLINE int recv(void * gramData, size_t gramSize);
 	bool recvAll(void * gramData, int gramSize);
 	
 	INLINE uint32 getRTT();
@@ -122,13 +123,13 @@ public:
 	INLINE const char * c_str() const;
 	INLINE int getremotehostname(std::string * name) const;
 	
-	INLINE int sendto(void * gramData, int gramSize, u_int16_t networkPort, u_int32_t networkAddr = BROADCAST);
+	INLINE int sendto(void * gramData, size_t gramSize, u_int16_t networkPort, u_int32_t networkAddr = BROADCAST);
 	// peer EndPoint 已保存目标地址，sender 通过该重载避免重复拆装端口和 IP。
 	// A peer EndPoint already stores its destination, so this overload avoids repeatedly unpacking the port and IP in senders.
-	INLINE int sendto(void* gramData, int gramSize);
-	INLINE int sendto(void * gramData, int gramSize, struct sockaddr_in & sin);
-	INLINE int recvfrom(void * gramData, int gramSize, u_int16_t * networkPort, u_int32_t * networkAddr);
-	INLINE int recvfrom(void * gramData, int gramSize, struct sockaddr_in & sin);
+	INLINE int sendto(void* gramData, size_t gramSize);
+	INLINE int sendto(void * gramData, size_t gramSize, struct sockaddr_in & sin);
+	INLINE int recvfrom(void * gramData, size_t gramSize, u_int16_t * networkPort, u_int32_t * networkAddr);
+	INLINE int recvfrom(void * gramData, size_t gramSize, struct sockaddr_in & sin);
 	
 	INLINE const Address& addr() const;
 	INLINE void addr(const Address& newAddress);
@@ -170,6 +171,10 @@ public:
 	}
 
 protected:
+	// 底层socket和OpenSSL接口仍使用int长度，统一在系统调用边界拒绝超限缓冲区。
+	// Native socket and OpenSSL APIs still use int lengths, so reject oversized buffers once at the system-call boundary.
+	INLINE static bool toNativeSocketSize(size_t gramSize, int& nativeSize);
+
 	// 驱动一次非阻塞服务端握手，并把输出 BIO 中的数据收集到待发送队列。
 	// Advance the nonblocking server handshake once and collect output BIO bytes for transmission.
 	bool driveSSLHandshake();

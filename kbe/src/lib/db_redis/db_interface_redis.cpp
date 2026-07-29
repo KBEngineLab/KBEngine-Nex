@@ -284,7 +284,7 @@ bool DBInterfaceRedis::query(const std::string& cmd, redisReply** pRedisReply, b
 }
 
 //-------------------------------------------------------------------------------------
-bool DBInterfaceRedis::query(const char* cmd, uint32 size, bool printlog, MemoryStream * result)
+bool DBInterfaceRedis::query(const char* cmd, size_t size, bool printlog, MemoryStream * result)
 {
 	KBE_ASSERT(pRedisContext_);
 	redisReply* pRedisReply = (redisReply*)redisCommand(pRedisContext_, cmd);

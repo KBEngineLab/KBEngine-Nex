@@ -23,6 +23,22 @@ namespace KBEngine {
 namespace Network
 {
 
+INLINE bool EndPoint::toNativeSocketSize(size_t gramSize, int& nativeSize)
+{
+	if(gramSize > static_cast<size_t>(INT_MAX))
+	{
+#if KBE_PLATFORM == PLATFORM_WIN32
+		WSASetLastError(WSAEMSGSIZE);
+#else
+		errno = EMSGSIZE;
+#endif
+		return false;
+	}
+
+	nativeSize = static_cast<int>(gramSize);
+	return true;
+}
+
 INLINE EndPoint::EndPoint(u_int32_t networkAddr, u_int16_t networkPort):
 #if KBE_PLATFORM == PLATFORM_WIN32
 socket_(INVALID_SOCKET)
@@ -339,7 +355,7 @@ INLINE int EndPoint::getremotehostname(std::string * host) const
 	return ret;
 }
 
-INLINE int EndPoint::sendto(void * gramData, int gramSize,
+INLINE int EndPoint::sendto(void * gramData, size_t gramSize,
 	u_int16_t networkPort, u_int32_t networkAddr)
 {
 	sockaddr_in	sin;
@@ -350,19 +366,23 @@ INLINE int EndPoint::sendto(void * gramData, int gramSize,
 	return this->sendto(gramData, gramSize, sin);
 }
 
-INLINE int EndPoint::sendto(void* gramData, int gramSize)
+INLINE int EndPoint::sendto(void* gramData, size_t gramSize)
 {
 	return sendto(gramData, gramSize, address_.port, address_.ip);
 }
 
-INLINE int EndPoint::sendto(void * gramData, int gramSize,
+INLINE int EndPoint::sendto(void * gramData, size_t gramSize,
 	struct sockaddr_in & sin)
 {
-	return ::sendto(socket_, (char*)gramData, gramSize,
+	int nativeSize = 0;
+	if(!toNativeSocketSize(gramSize, nativeSize))
+		return -1;
+
+	return ::sendto(socket_, (char*)gramData, nativeSize,
 		0, (sockaddr*)&sin, sizeof(sin));
 }
 
-INLINE int EndPoint::recvfrom(void * gramData, int gramSize,
+INLINE int EndPoint::recvfrom(void * gramData, size_t gramSize,
 	u_int16_t * networkPort, u_int32_t * networkAddr)
 {
 	sockaddr_in sin;
@@ -377,11 +397,15 @@ INLINE int EndPoint::recvfrom(void * gramData, int gramSize,
 	return result;
 }
 
-INLINE int EndPoint::recvfrom(void * gramData, int gramSize,
+INLINE int EndPoint::recvfrom(void * gramData, size_t gramSize,
 	struct sockaddr_in & sin)
 {
+	int nativeSize = 0;
+	if(!toNativeSocketSize(gramSize, nativeSize))
+		return -1;
+
 	socklen_t		sinLen = sizeof(sin);
-	int ret = ::recvfrom(socket_, (char*)gramData, gramSize,
+	int ret = ::recvfrom(socket_, (char*)gramData, nativeSize,
 		0, (sockaddr*)&sin, &sinLen);
 
 	return ret;
@@ -443,20 +467,28 @@ INLINE EndPoint * EndPoint::accept(u_int16_t * networkPort, u_int32_t * networkA
 	return pNew;
 }
 
-INLINE int EndPoint::send(const void * gramData, int gramSize)
+INLINE int EndPoint::send(const void * gramData, size_t gramSize)
 {
-	if (isSSL())
-		return SSL_write(sslHandle_, (char*)gramData, gramSize);
+	int nativeSize = 0;
+	if(!toNativeSocketSize(gramSize, nativeSize))
+		return -1;
 
-	return ::send(socket_, (char*)gramData, gramSize, 0);
+	if (isSSL())
+		return SSL_write(sslHandle_, (char*)gramData, nativeSize);
+
+	return ::send(socket_, (char*)gramData, nativeSize, 0);
 }
 
-INLINE int EndPoint::recv(void * gramData, int gramSize)
+INLINE int EndPoint::recv(void * gramData, size_t gramSize)
 {
-	if (isSSL())
-		return SSL_read(sslHandle_, (char*)gramData, gramSize);
+	int nativeSize = 0;
+	if(!toNativeSocketSize(gramSize, nativeSize))
+		return -1;
 
-	return ::recv(socket_, (char*)gramData, gramSize, 0);
+	if (isSSL())
+		return SSL_read(sslHandle_, (char*)gramData, nativeSize);
+
+	return ::recv(socket_, (char*)gramData, nativeSize, 0);
 }
 
 #if KBE_PLATFORM == PLATFORM_UNIX

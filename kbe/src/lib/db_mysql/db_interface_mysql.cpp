@@ -35,10 +35,10 @@ static KBEUnordered_map< std::string, uint32 > g_querystatistics;
 static bool _g_installedWatcher = false;
 static bool _g_debug = false;
 
-static void querystatistics(const char* strCommand, uint32 size)
+static void querystatistics(const char* strCommand, size_t size)
 {
 	std::string op;
-	for(uint32 i=0; i<size; ++i)
+	for(size_t i = 0; i < size; ++i)
 	{
 		if(strCommand[i] == ' ')
 			break;
@@ -553,7 +553,7 @@ bool DBInterfaceMysql::dropEntityTableItemFromDB(const char* tableName, const ch
 }
 
 //-------------------------------------------------------------------------------------
-bool DBInterfaceMysql::query(const char* cmd, uint32 size, bool printlog, MemoryStream * result)
+bool DBInterfaceMysql::query(const char* cmd, size_t size, bool printlog, MemoryStream * result)
 {
 	if(pMysql_ == NULL)
 	{
@@ -577,7 +577,16 @@ bool DBInterfaceMysql::query(const char* cmd, uint32 size, bool printlog, Memory
 		DEBUG_MSG(fmt::format("DBInterfaceMysql::query({:p}): {}\n", (void*)this, lastquery_));
 	}
 
-    int nResult = mysql_real_query(pMysql_, cmd, size);  
+	// MySQL C API 的长度在Windows上是32位unsigned long，必须在原生调用边界显式拒绝超限SQL。
+	// The MySQL C API uses a 32-bit unsigned long on Windows, so reject oversized SQL explicitly at the native boundary.
+	if(size > static_cast<size_t>(ULONG_MAX))
+	{
+		if(printlog)
+			ERROR_MSG(fmt::format("DBInterfaceMysql::query: SQL length {} exceeds MySQL API limit {}.\n", size, ULONG_MAX));
+		return false;
+	}
+
+	int nResult = mysql_real_query(pMysql_, cmd, static_cast<unsigned long>(size));
 
     if(nResult != 0)  
     {

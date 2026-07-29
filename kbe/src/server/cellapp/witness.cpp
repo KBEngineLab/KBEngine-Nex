@@ -447,7 +447,8 @@ void Witness::onEnterView(ViewTrigger* pViewTrigger, Entity* pEntity)
 	pEntityRef->flags(pEntityRef->flags() | ENTITYREF_FLAG_ENTER_CLIENT_PENDING);
 	viewEntities_.push_back(pEntityRef);
 	viewEntities_map_[pEntityRef->id()] = pEntityRef;
-	pEntityRef->aliasID(viewEntities_map_.size() - 1);
+	KBE_ASSERT(viewEntities_map_.size() <= static_cast<size_t>(std::numeric_limits<int>::max()));
+	pEntityRef->aliasID(static_cast<int>(viewEntities_map_.size() - 1));
 	
 	pEntity->addWitnessed(pEntity_);
 	pSelfEntity->onEnteredView(pEntity);
@@ -978,7 +979,7 @@ void Witness::addUpdateToStream(Network::Bundle* pForwardBundle, uint32 flags, E
 {
 	Entity* otherEntity = pEntityRef->pEntity();
 
-	static uint8 type = g_kbeSrvConfig.getCellApp().entity_posdir_updates_type;
+	static uint16 type = g_kbeSrvConfig.getCellApp().entity_posdir_updates_type;
 	static uint16 threshold = g_kbeSrvConfig.getCellApp().entity_posdir_updates_smart_threshold;
 	
 	bool isOptimized = true;

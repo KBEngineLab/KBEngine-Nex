@@ -25,6 +25,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "common/objectpool.h"
 #include "helper/debug_helper.h"
 #include "common/memorystream_converter.h"
+#include <limits>
+#include <stdexcept>
 #include <type_traits>
 	
 namespace KBEngine{
@@ -575,9 +577,15 @@ public:
             data_.reserve(ressize);
     }
 
-    void appendBlob(const char *src, ArraySize cnt)
+    void appendBlob(const char *src, size_t cnt)
     {
-        (*this) << cnt;
+		// Blob长度属于线上协议的32位字段，必须在写入前拒绝本机size_t无法表示的值，避免静默截断后破坏后续消息边界。
+		// Blob length is a 32-bit wire field, so reject values that cannot be represented before writing to avoid silent truncation corrupting subsequent message boundaries.
+		if(cnt > static_cast<size_t>(std::numeric_limits<ArraySize>::max()))
+			throw std::length_error("MemoryStream blob exceeds ArraySize");
+
+		const ArraySize wireSize = static_cast<ArraySize>(cnt);
+        (*this) << wireSize;
 
 		if(cnt > 0)
 			append(src, cnt);
@@ -585,20 +593,12 @@ public:
 
 	void appendBlob(const std::string& datas)
     {
-		ArraySize len = (ArraySize)datas.size();
-		(*this) << len;
-
-		if(len > 0)
-			append(datas.data(), len);
+		appendBlob(datas.data(), datas.size());
     }
 
 	void appendBlob(const MemoryStream *stream)
 	{
-		ArraySize len = (ArraySize)stream->length();
-		(*this) << len;
-
-		if (len > 0)
-			append(*stream);
+		appendBlob(reinterpret_cast<const char*>(stream->data() + stream->rpos()), stream->length());
 	}
 
     void append(const std::string& str)
@@ -882,7 +882,10 @@ protected:
 template <typename T>
 inline MemoryStream &operator<<(MemoryStream &b, std::vector<T> v)
 {
-	uint32 vsize = v.size();
+	if(v.size() > static_cast<size_t>(std::numeric_limits<ArraySize>::max()))
+		throw std::length_error("MemoryStream vector exceeds ArraySize");
+
+	const ArraySize vsize = static_cast<ArraySize>(v.size());
     b << vsize;
     for (typename std::vector<T>::iterator i = v.begin(); i != v.end(); ++i)
     {
@@ -909,7 +912,10 @@ inline MemoryStream &operator>>(MemoryStream &b, std::vector<T> &v)
 template <typename T>
 inline MemoryStream &operator<<(MemoryStream &b, std::list<T> v)
 {
-	ArraySize vsize = v.size();
+	if(v.size() > static_cast<size_t>(std::numeric_limits<ArraySize>::max()))
+		throw std::length_error("MemoryStream list exceeds ArraySize");
+
+	const ArraySize vsize = static_cast<ArraySize>(v.size());
     b << vsize;
     for (typename std::list<T>::iterator i = v.begin(); i != v.end(); ++i)
     {
@@ -936,7 +942,10 @@ inline MemoryStream &operator>>(MemoryStream &b, std::list<T> &v)
 template <typename K, typename V>
 inline MemoryStream &operator<<(MemoryStream &b, std::map<K, V> &m)
 {
-	ArraySize vsize = m.size();
+	if(m.size() > static_cast<size_t>(std::numeric_limits<ArraySize>::max()))
+		throw std::length_error("MemoryStream map exceeds ArraySize");
+
+	const ArraySize vsize = static_cast<ArraySize>(m.size());
     b << vsize;
     for (typename std::map<K, V>::iterator i = m.begin(); i != m.end(); ++i)
     {

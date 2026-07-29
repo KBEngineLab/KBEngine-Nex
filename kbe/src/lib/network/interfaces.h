@@ -68,8 +68,8 @@ public:
 class NetworkStatsHandler
 {
 public:
-	virtual void onSendMessage(const MessageHandler& msgHandler, int size) = 0;
-	virtual void onRecvMessage(const MessageHandler& msgHandler, int size) = 0;
+	virtual void onSendMessage(const MessageHandler& msgHandler, uint32 size) = 0;
+	virtual void onRecvMessage(const MessageHandler& msgHandler, uint32 size) = 0;
 };
 
 

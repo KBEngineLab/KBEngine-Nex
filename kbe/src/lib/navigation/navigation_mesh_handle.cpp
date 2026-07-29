@@ -327,7 +327,7 @@ int NavMeshHandle::findRandomPointAroundCircle(int layer, const Position3D& cent
 			currpos.y = pt[1];
 			currpos.z = pt[2];
 
-			float src_len = sqrt(2) * squareSize;
+			float src_len = sqrtf(2.f) * squareSize;
 			float xx = centerPos.x - currpos.x;
 			float yy = centerPos.y - currpos.y;
 			float dist_len = sqrt(xx * xx + yy * yy);

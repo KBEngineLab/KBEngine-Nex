@@ -484,7 +484,7 @@ void CguiconsoleDlg::historyCommandCheck()
 		m_historyCommand.pop_front();
 
 	if(m_historyCommandIndex < 0)
-		m_historyCommandIndex = m_historyCommand.size() - 1;
+		m_historyCommandIndex = static_cast<int>(m_historyCommand.size()) - 1;
 
 	if(m_historyCommandIndex > (int)m_historyCommand.size() - 1)
 		m_historyCommandIndex = 0; 
@@ -564,7 +564,7 @@ void CguiconsoleDlg::commitPythonCommand(CString strCommand)
 
 	m_historyCommand.push_back(strCommand);
 	historyCommandCheck();
-	m_historyCommandIndex = m_historyCommand.size() - 1;
+	m_historyCommandIndex = static_cast<int>(m_historyCommand.size()) - 1;
 
 	CString strCommand1 = strCommand;
 
@@ -599,9 +599,7 @@ void CguiconsoleDlg::commitPythonCommand(CString strCommand)
 		else
 			(*pBundle).newMessage(BotsInterface::onExecScriptCommand);
 
-		ArraySize size = outcmd.size();
-		(*pBundle) << size;
-		(*pBundle).append(outcmd.data(), size);
+		(*pBundle).appendBlob(outcmd);
 		pChannel->send(pBundle);
 
 		CString str1, str2;

@@ -1120,7 +1120,7 @@ public:																										\
 		{																									\
 			ScriptTimers* scriptTimers = &pEntity_->scriptTimers();											\
 			int id = ScriptTimersUtil::getIDForHandle( scriptTimers, handle );								\
-			pEntity_->onTimer(id, intptr( pUser ));															\
+			pEntity_->onTimer(id, static_cast<int>(intptr(pUser)));												\
 		}																									\
 																											\
 		virtual void onRelease( TimerHandle handle, void * /*pUser*/ )										\
@@ -1155,7 +1155,7 @@ public:																										\
 																											\
 	static PyObject* __py_pyDelTimer(PyObject* self, PyObject* args)										\
 	{																										\
-		uint16 currargsSize = PyTuple_Size(args);															\
+		Py_ssize_t currargsSize = PyTuple_Size(args);													\
 		CLASS* pobj = static_cast<CLASS*>(self);															\
 																											\
 		if (currargsSize != 1)																				\

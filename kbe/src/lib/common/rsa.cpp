@@ -235,7 +235,7 @@ std::string KBE_RSA::encrypt(const std::string& instr)
 
 	char strencrypted[1024];
 	memset(strencrypted, 0, 1024);
-	strutil::bytes2string((unsigned char *)encrypted.data(), encrypted.size(), (unsigned char *)strencrypted, 1024);
+	strutil::bytes2string((unsigned char *)encrypted.data(), static_cast<int>(encrypted.size()), (unsigned char *)strencrypted, 1024);
 	return strencrypted;
 }
 
@@ -246,7 +246,14 @@ int KBE_RSA::encrypt(const std::string& instr, std::string& outCertifdata)
 
 	unsigned char* certifdata =(unsigned char*)calloc(RSA_size(static_cast<RSA*>(rsa_public)) + 1, sizeof(unsigned char));
 
-	int certifsize = RSA_public_encrypt(instr.size(),
+	if(instr.size() > static_cast<size_t>(std::numeric_limits<int>::max()))
+	{
+		ERROR_MSG("KBE_RSA::encrypt: input exceeds OpenSSL length limit.\n");
+		free(certifdata);
+		return -1;
+	}
+
+	int certifsize = RSA_public_encrypt(static_cast<int>(instr.size()),
 		(unsigned char*)instr.c_str(), certifdata, static_cast<RSA*>(rsa_public), RSA_PKCS1_OAEP_PADDING);
 
 	if (certifsize < 0)

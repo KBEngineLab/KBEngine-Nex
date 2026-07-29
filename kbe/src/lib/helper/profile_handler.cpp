@@ -395,7 +395,7 @@ void NetworkProfileHandler::sendStream(MemoryStream* s)
 }
 
 //-------------------------------------------------------------------------------------
-void NetworkProfileHandler::onSendMessage(const Network::MessageHandler& msgHandler, int size)
+void NetworkProfileHandler::onSendMessage(const Network::MessageHandler& msgHandler, uint32 size)
 {
 	NetworkProfileHandler::PROFILEVALS::iterator iter1 = profileVals_.find(msgHandler.name);
 	
@@ -420,7 +420,7 @@ void NetworkProfileHandler::onSendMessage(const Network::MessageHandler& msgHand
 }
 
 //-------------------------------------------------------------------------------------
-void NetworkProfileHandler::onRecvMessage(const Network::MessageHandler& msgHandler, int size)
+void NetworkProfileHandler::onRecvMessage(const Network::MessageHandler& msgHandler, uint32 size)
 {
 	NetworkProfileHandler::PROFILEVALS::iterator iter1 = profileVals_.find(msgHandler.name);
 	

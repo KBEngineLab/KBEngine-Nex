@@ -76,7 +76,7 @@ namespace KBEngine
 		*/
 		virtual bool checkErrors();
 
-		virtual bool query(const char* strCommand, uint32 size, bool printlog = true, MemoryStream* result = NULL);
+		virtual bool query(const char* strCommand, size_t size, bool printlog = true, MemoryStream* result = NULL);
 		bool executeFindCommand(MemoryStream* result, std::vector<std::string> strcmd, const char* tableName);
 		bool executeUpdateCommand(std::vector<std::string> strcmd, const char* tableName);
 		bool executeRemoveCommand(std::vector<std::string> strcmd, const char* tableName);

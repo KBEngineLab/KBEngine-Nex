@@ -130,7 +130,7 @@ public:
 	TimersT();
 	virtual ~TimersT();
 	
-	inline uint32 size() const	{ return timeQueue_.size(); }
+	inline size_t size() const	{ return timeQueue_.size(); }
 	inline bool empty() const	{ return timeQueue_.empty(); }
 	
 	int	process(TimeStamp now);

@@ -4362,7 +4362,7 @@ void Baseapp::forwardMessageToClientFromCellapp(Network::Channel* pChannel,
 	
 	static Network::MessageHandler* pMessageHandler = NULL;
 
-	int rpos = s.rpos();
+	size_t rpos = s.rpos();
 	Network::MessageID fmsgid = 0;
 	s >> fmsgid;
 

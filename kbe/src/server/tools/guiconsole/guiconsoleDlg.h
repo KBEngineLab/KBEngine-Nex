@@ -129,7 +129,7 @@ private:
 
 	bool m_isInit;
 	std::deque<CString> m_historyCommand;
-	int8 m_historyCommandIndex;
+	int m_historyCommandIndex;
 	bool m_isUsingHistroy;
 	CToolBar m_ToolBar;
 	CImageList m_ImageList;

@@ -162,8 +162,8 @@ public:
 	void timeout();
 	void sendStream(MemoryStream* s);
 
-	virtual void onSendMessage(const Network::MessageHandler& msgHandler, int size);
-	virtual void onRecvMessage(const Network::MessageHandler& msgHandler, int size);
+	virtual void onSendMessage(const Network::MessageHandler& msgHandler, uint32 size);
+	virtual void onRecvMessage(const Network::MessageHandler& msgHandler, uint32 size);
 
 private:
 	struct ProfileVal

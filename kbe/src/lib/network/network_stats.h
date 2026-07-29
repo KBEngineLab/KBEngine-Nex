@@ -65,7 +65,7 @@ public:
 	NetworkStats();
 	~NetworkStats();
 
-	void trackMessage(S_OP op, const MessageHandler& msgHandler, uint32 size);
+	void trackMessage(S_OP op, const MessageHandler& msgHandler, size_t size);
 
 	NetworkStats::STATS& stats(){ return stats_; }
 

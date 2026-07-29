@@ -512,7 +512,7 @@ namespace KBEngine {
 		return result;
 	}
 
-	bool DBInterfaceMongodb::query(const char* cmd, uint32 size, bool printlog, MemoryStream* result)
+	bool DBInterfaceMongodb::query(const char* cmd, size_t size, bool printlog, MemoryStream* result)
 	{
 		if (!cmd || size == 0)
 		{

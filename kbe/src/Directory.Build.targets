@@ -37,6 +37,26 @@
   </ItemGroup>
 
   <!--
+    vcpkg和vendored头文件作为外部系统边界编译，上游平台扩展警告不计入第一方零警告门禁。
+    Compile vcpkg and vendored headers as external system boundaries so upstream platform-extension warnings do not enter the first-party zero-warning gate.
+
+    源文件的单独隔离规则仍保留，这里补齐被KBEngine源文件include的第三方头文件。
+    Per-source isolation remains in place; this additionally covers third-party headers included by KBEngine translation units.
+  -->
+  <ItemDefinitionGroup Condition="Exists('$(MSBuildThisFileDirectory)lib\dependencies')">
+    <ClCompile>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <AdditionalOptions>/external:I"$(MSBuildThisFileDirectory)lib\dependencies" %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
+  <ItemDefinitionGroup Condition="Exists('$(KbeVcpkgIncludeDir)')">
+    <ClCompile>
+      <AdditionalOptions>/external:I"$(KbeVcpkgIncludeDir)" %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
+  <!--
     旧 vcxproj 在项目内部再次声明依赖路径，会把 Directory.Build.props 中的 vcpkg 路径挤到末尾。
     Legacy vcxproj files redeclare dependency paths inside each project and push the vcpkg paths from Directory.Build.props to the end.
 

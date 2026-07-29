@@ -1184,7 +1184,7 @@ void Dbmgr::queryEntity(Network::Channel* pChannel, uint16 dbInterfaceIndex, COM
 //-------------------------------------------------------------------------------------
 void Dbmgr::syncEntityStreamTemplate(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	int rpos = s.rpos();
+	size_t rpos = s.rpos();
 	EntityTables::ENTITY_TABLES_MAP::iterator iter = EntityTables::sEntityTables.begin();
 	for (; iter != EntityTables::sEntityTables.end(); ++iter)
 	{

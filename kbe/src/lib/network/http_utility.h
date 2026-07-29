@@ -127,7 +127,7 @@ namespace Http
 		/* example.com is redirected, so we tell libcurl to follow redirection */
 		Status setFollowURL(int maxRedirs);
 
-		Status setPostData(const void* data, unsigned int size);
+		Status setPostData(const void* data, size_t size);
 
 		Status setTimeout(uint32 time);
 

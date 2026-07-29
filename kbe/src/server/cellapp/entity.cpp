@@ -327,7 +327,7 @@ void Entity::onDestroy(bool callScript)
 //-------------------------------------------------------------------------------------
 PyObject* Entity::__py_pyDestroyEntity(PyObject* self, PyObject* args, PyObject * kwargs)
 {
-	uint16 currargsSize = PyTuple_Size(args);
+	Py_ssize_t currargsSize = PyTuple_Size(args);
 	Entity* pobj = static_cast<Entity*>(self);
 
 	if(pobj->initing())
@@ -1728,7 +1728,7 @@ void Entity::cancelController(uint32 id)
 //-------------------------------------------------------------------------------------
 PyObject* Entity::__py_pyCancelController(PyObject* self, PyObject* args)
 {
-	uint16 currargsSize = PyTuple_Size(args);
+	Py_ssize_t currargsSize = PyTuple_Size(args);
 	Entity* pobj = static_cast<Entity*>(self);
 	
 	if(!pobj->isReal())
@@ -2978,7 +2978,7 @@ uint32 Entity::moveToEntity(ENTITY_ID targetID, float velocity, float distance, 
 //-------------------------------------------------------------------------------------
 PyObject* Entity::__py_pyMoveToEntity(PyObject* self, PyObject* args)
 {
-	uint16 currargsSize = PyTuple_Size(args);
+	Py_ssize_t currargsSize = PyTuple_Size(args);
 	Entity* pobj = static_cast<Entity*>(self);
 
 	if (!pobj->isReal())
@@ -3339,7 +3339,7 @@ PyObject* Entity::entitiesInView(bool pending)
 //-------------------------------------------------------------------------------------
 PyObject* Entity::__py_pyEntitiesInRange(PyObject* self, PyObject* args)
 {
-	uint16 currargsSize = PyTuple_Size(args);
+	Py_ssize_t currargsSize = PyTuple_Size(args);
 	Entity* pobj = static_cast<Entity*>(self);
 
 	if (!pobj->isReal())
@@ -4380,7 +4380,8 @@ void Entity::createControllersFromStream(KBEngine::MemoryStream& s)
 //-------------------------------------------------------------------------------------
 void Entity::addWitnessToStream(KBEngine::MemoryStream& s)
 {
-	uint32 size = witnesses_count_;
+	KBE_ASSERT(witnesses_count_ <= static_cast<size_t>(std::numeric_limits<uint32>::max()));
+	const uint32 size = static_cast<uint32>(witnesses_count_);
 	s << size;
 
 	std::list<ENTITY_ID>::iterator iter = witnesses_.begin();
@@ -4556,7 +4557,8 @@ void Entity::onTimer(ScriptID timerID, int useraAgs)
 void Entity::addTimersToStream(KBEngine::MemoryStream& s)
 {
 	ScriptTimers::Map& map = scriptTimers_.map();
-	uint32 size = map.size();
+	KBE_ASSERT(map.size() <= static_cast<size_t>(std::numeric_limits<uint32>::max()));
+	const uint32 size = static_cast<uint32>(map.size());
 	s << size;
 
 	ScriptTimers::Map::const_iterator iter = map.begin();

@@ -415,7 +415,8 @@ void CLogWindow::pullLogs(KBEngine::Network::Address addr)
 
 		int8 count = 0;
 		std::vector<KBEngine::COMPONENT_TYPE> vec = getSelComponents();
-		count = vec.size();
+		KBE_ASSERT(vec.size() <= static_cast<size_t>(std::numeric_limits<int8>::max()));
+		count = static_cast<int8>(vec.size());
 		(*pBundle) << count;
 		std::vector<KBEngine::COMPONENT_TYPE>::iterator iter = vec.begin();
 		for(; iter != vec.end(); iter++)
@@ -646,7 +647,8 @@ void CLogWindow::updateSettingToServer()
 
 	int8 count = 0;
 	std::vector<KBEngine::COMPONENT_TYPE> vec = getSelComponents();
-	count = vec.size();
+	KBE_ASSERT(vec.size() <= static_cast<size_t>(std::numeric_limits<int8>::max()));
+	count = static_cast<int8>(vec.size());
 	(*pBundle) << count;
 	std::vector<KBEngine::COMPONENT_TYPE>::iterator iter = vec.begin();
 	for(; iter != vec.end(); iter++)

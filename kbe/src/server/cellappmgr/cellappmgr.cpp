@@ -356,7 +356,8 @@ void Cellappmgr::reqCreateCellEntityInNewSpace(Network::Channel* pChannel, Memor
 	(*pBundle).append(&s);
 	s.done();
 
-	uint32 cellappSize = cellapp_cids_.size();
+	KBE_ASSERT(cellapp_cids_.size() <= static_cast<size_t>(std::numeric_limits<uint32>::max()));
+	const uint32 cellappSize = static_cast<uint32>(cellapp_cids_.size());
 
 	if (cellappSize > 0)
 	{

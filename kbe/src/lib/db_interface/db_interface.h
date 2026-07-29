@@ -104,10 +104,10 @@ public:
 	/**
 		查询表
 	*/
-	virtual bool query(const char* cmd, uint32 size, bool printlog = true, MemoryStream * result = NULL) = 0;
+	virtual bool query(const char* cmd, size_t size, bool printlog = true, MemoryStream * result = NULL) = 0;
 	virtual bool query(const std::string& cmd, bool printlog = true, MemoryStream * result = NULL)
 	{
-		return query(cmd.c_str(), (uint32)cmd.size(), printlog, result);
+		return query(cmd.c_str(), cmd.size(), printlog, result);
 	}
 
 	// 该检查只保护脚本直接提交的原始命令，内部参数化持久化语句不经过此策略。

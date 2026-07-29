@@ -125,15 +125,11 @@ void GlobalDataServer::broadcastDataChanged(Network::Channel* pChannel, COMPONEN
 
 			
 			(*pBundle) << isDelete;
-			ArraySize slen = key.size();
-			(*pBundle) << slen;
-			(*pBundle).assign(key.data(), slen);
+			(*pBundle).appendBlob(key);
 
 			if(!isDelete)
 			{
-				slen = value.size();
-				(*pBundle) << slen;
-				(*pBundle).assign(value.data(), slen);
+				(*pBundle).appendBlob(value);
 			}
 
 			lpChannel->send(pBundle);
@@ -192,13 +188,8 @@ void GlobalDataServer::onGlobalDataClientLogon(Network::Channel* client, COMPONE
 
 		(*pBundle) << isDelete;
 
-		ArraySize slen = iter->first.size();
-		(*pBundle) << slen;
-		(*pBundle).assign(iter->first.data(), slen);
-
-		slen = iter->second.size();
-		(*pBundle) << slen;
-		(*pBundle).assign(iter->second.data(), slen);
+		(*pBundle).appendBlob(iter->first);
+		(*pBundle).appendBlob(iter->second);
 
 		client->send(pBundle);
 	}

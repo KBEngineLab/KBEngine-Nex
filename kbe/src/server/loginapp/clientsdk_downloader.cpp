@@ -192,7 +192,8 @@ bool ClientSDKDownloader::loadSDKDatas()
 			return false;
 
 		// 必须kbcmd进程已经结束
-		SystemInfo::PROCESS_INFOS sysinfos = SystemInfo::getSingleton().getProcessInfo(pid_);
+		KBE_ASSERT(pid_ <= static_cast<int64>(std::numeric_limits<uint32>::max()));
+		SystemInfo::PROCESS_INFOS sysinfos = SystemInfo::getSingleton().getProcessInfo(static_cast<uint32>(pid_));
 		if (!sysinfos.error)
 			return false;
 
@@ -264,8 +265,9 @@ bool ClientSDKDownloader::process()
 	{
 		Network::Bundle* pNewBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		pNewBundle->newMessage(ClientInterface::onImportClientSDK);
-		int remainingFiles = sdkFiles_.size();
-		(*pNewBundle) << (int)remainingFiles;
+		KBE_ASSERT(sdkFiles_.size() <= static_cast<size_t>(std::numeric_limits<int>::max()));
+		const int remainingFiles = static_cast<int>(sdkFiles_.size());
+		(*pNewBundle) << remainingFiles;
 
 		char* fileName = strutil::wchar2char(currSendFile_.c_str());
 		std::string sendFileName = fileName;

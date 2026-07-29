@@ -208,9 +208,9 @@ static PyObject* __py_genUUID64(PyObject *self, void *closure)
 //-------------------------------------------------------------------------------------
 PyObject * PyTuple_FromStringVector(const std::vector< std::string > & v)
 {
-	int sz = v.size();
+	const Py_ssize_t sz = static_cast<Py_ssize_t>(v.size());
 	PyObject * t = PyTuple_New( sz );
-	for (int i = 0; i < sz; ++i)
+	for (Py_ssize_t i = 0; i < sz; ++i)
 	{
 		PyTuple_SetItem( t, i, PyUnicode_FromString( v[i].c_str() ) );
 	}

@@ -59,7 +59,7 @@ protected:
 	bool init();
 
 	Key key_;
-	int keySize_;
+	size_t keySize_;
 	bool isGood_;
 
 	void * pBlowFishKey_;

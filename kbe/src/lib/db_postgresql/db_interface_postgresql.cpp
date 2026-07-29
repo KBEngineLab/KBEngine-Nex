@@ -36,7 +36,7 @@ static bool g_pgDebug = false;
 
 // 从 SQL 文本中取第一个操作词，用于 watcher 统计。
 // Extract the first SQL keyword for watcher statistics without parsing the full statement.
-static void querystatistics(const char* strCommand, uint32 size)
+static void querystatistics(const char* strCommand, size_t size)
 {
 	std::string op;
 	for (uint32 i = 0; i < size; ++i)
@@ -349,7 +349,7 @@ void DBInterfacePostgresql::updateLastError(PGresult* result)
 
 // 执行上层传入的 SQL，并按需要把结果写入 MemoryStream。
 // Execute caller-provided SQL and serialize results into MemoryStream when requested.
-bool DBInterfacePostgresql::query(const char* cmd, uint32 size, bool printlog, MemoryStream* result)
+bool DBInterfacePostgresql::query(const char* cmd, size_t size, bool printlog, MemoryStream* result)
 {
 	if (pConn_ == NULL)
 	{

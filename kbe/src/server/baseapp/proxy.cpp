@@ -570,7 +570,7 @@ PyObject* Proxy::pyGetClientEnabled()
 //-------------------------------------------------------------------------------------
 PyObject* Proxy::__py_pyStreamFileToClient(PyObject* self, PyObject* args)
 {
-	uint16 currargsSize = PyTuple_Size(args);
+	Py_ssize_t currargsSize = PyTuple_Size(args);
 	Proxy* pobj = static_cast<Proxy*>(self);
 
 	if(pobj->clientEntityCall() == NULL)
@@ -659,7 +659,7 @@ int16 Proxy::streamFileToClient(PyObjectPtr objptr,
 //-------------------------------------------------------------------------------------
 PyObject* Proxy::__py_pyStreamStringToClient(PyObject* self, PyObject* args)
 {
-	uint16 currargsSize = PyTuple_Size(args);
+	Py_ssize_t currargsSize = PyTuple_Size(args);
 	Proxy* pobj = static_cast<Proxy*>(self);
 
 	if(pobj->clientEntityCall() == NULL)

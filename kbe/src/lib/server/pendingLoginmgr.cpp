@@ -28,7 +28,15 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine { 
 
-#define OP_TIME_OUT_MAX 120 * stampsPerSecondD()
+namespace
+{
+// 频率在计时系统初始化后查询，使用整数刻度计算可避免double窄化并保持原有120秒超时语义。
+// Query the frequency after timer initialization and use integer stamps to avoid double narrowing while preserving the original 120-second timeout.
+uint64 pendingLoginTimeoutStamps()
+{
+	return uint64(120) * stampsPerSecond();
+}
+}
 
 //-------------------------------------------------------------------------------------
 PendingLoginMgr::PendingLoginMgr(Network::NetworkInterface & networkInterface) :
@@ -120,7 +128,7 @@ void PendingLoginMgr::removeNextTick(std::string& accountName)
 
 		// 下一tick处理时就超时了
 		TimeStamp curr = timestamp();
-		infos->lastProcessTime = curr - OP_TIME_OUT_MAX - 1;
+		infos->lastProcessTime = curr - pendingLoginTimeoutStamps() - 1;
 	}
 }
 
@@ -141,7 +149,7 @@ bool PendingLoginMgr::process()
 		PLInfos* infos = iter->second;
 		
 		TimeStamp curr = timestamp();
-		if(curr - infos->lastProcessTime >= OP_TIME_OUT_MAX)
+		if(curr - infos->lastProcessTime >= pendingLoginTimeoutStamps())
 		{
 			iter = pPLMap_.erase(iter);
 			DEBUG_MSG(fmt::format("PendingLoginMgr::process: [{1}] is timeout, currsize={0}.\n", 

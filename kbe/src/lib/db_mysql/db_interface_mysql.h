@@ -30,10 +30,22 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "db_interface/db_interface.h"
 
 #include "mysql/mysql.h"
+#include <limits>
+#include <stdexcept>
 // Windows构建由vcpkg的libmariadb端口提供头文件和自动链接信息，避免再次绑定仓库内的旧VS140库。
 // Windows builds obtain headers and auto-link metadata from the vcpkg libmariadb port to avoid rebinding the legacy VS140 libraries.
 
 namespace KBEngine { 
+
+// MariaDB/MySQL在Windows上使用32位unsigned long表示输入长度，该重载在唯一的原生边界完成校验。
+// MariaDB/MySQL uses a 32-bit unsigned long length on Windows; this overload validates once at the native boundary.
+inline unsigned long mysql_real_escape_string(MYSQL* mysql, char* destination, const char* source, size_t length)
+{
+	if(length > static_cast<size_t>(std::numeric_limits<unsigned long>::max()))
+		throw std::length_error("mysql_real_escape_string input exceeds unsigned long");
+
+	return ::mysql_real_escape_string(mysql, destination, source, static_cast<unsigned long>(length));
+}
 
 struct MYSQL_TABLE_FIELD
 {
@@ -92,7 +104,7 @@ public:
 	*/
 	virtual bool checkErrors();
 
-	virtual bool query(const char* strCommand, uint32 size, bool printlog = true, MemoryStream * result = NULL);
+	virtual bool query(const char* strCommand, size_t size, bool printlog = true, MemoryStream * result = NULL);
 
 	bool write_query_result(MemoryStream * result);
 

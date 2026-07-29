@@ -30,7 +30,7 @@ std::map<std::string, std::string> DataTypes::dataTypeSourceLowerName_;
 DataTypes::UID_DATATYPE_MAP DataTypes::uid_dataTypes_;
 DataTypes::DATATYPE_ORDERS DataTypes::dataTypesOrders_;
 
-static uint8 _g_baseTypeEndIndex = 0;
+static size_t _g_baseTypeEndIndex = 0;
 
 //-------------------------------------------------------------------------------------
 DataTypes::DataTypes()

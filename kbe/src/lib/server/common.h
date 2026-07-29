@@ -68,7 +68,8 @@ namespace KBEngine {
 	{																																	\
 		if(messageLength >= NETWORK_MESSAGE_MAX_SIZE)																					\
 		{																																\
-			Network::MessageLength1 ex_msg_length = messageLength;																		\
+			KBE_ASSERT(messageLength <= static_cast<size_t>(NETWORK_MESSAGE_MAX_SIZE1));										\
+			Network::MessageLength1 ex_msg_length = static_cast<Network::MessageLength1>(messageLength);								\
 			KBEngine::EndianConvert(ex_msg_length);																						\
 																																		\
 			Network::MessageLength msgLen = NETWORK_MESSAGE_MAX_SIZE;																	\
@@ -83,7 +84,7 @@ namespace KBEngine {
 		}																																\
 		else																															\
 		{																																\
-			Network::MessageLength msgLen = messageLength;																				\
+			Network::MessageLength msgLen = static_cast<Network::MessageLength>(messageLength);										\
 			KBEngine::EndianConvert(msgLen);																							\
 																																		\
 			memcpy(&pCurrPacket_##ACTIONNAME->data()[currMsgLengthPos_##ACTIONNAME], 													\

@@ -93,7 +93,8 @@ public:
 				// 如果当前这个item的dbid小于该表下最后一个记录的dbid大小，那么需要在itemDBIDs中指定的位置插入这个dbid，以保证从小到大的顺序
 				if (itemDBIDs.size() > 0 && itemDBIDs[itemDBIDs.size() - 1] > item_dbid)
 				{
-					for (fidx = itemDBIDs.size() - 1; fidx > 0; --fidx)
+					KBE_ASSERT(itemDBIDs.size() <= static_cast<size_t>(std::numeric_limits<int>::max()));
+					for (fidx = static_cast<int>(itemDBIDs.size()) - 1; fidx > 0; --fidx)
 					{
 						if (itemDBIDs[fidx] < item_dbid)
 							break;
@@ -208,7 +209,8 @@ public:
 				// 如果当前这个item的dbid小于该表下最后一个记录的dbid大小，那么需要在itemDBIDs中指定的位置插入这个dbid，以保证从小到大的顺序
 				if (itemDBIDs.size() > 0 && itemDBIDs[itemDBIDs.size() - 1] > item_dbid)
 				{
-					for (fidx = itemDBIDs.size() - 1; fidx > 0; --fidx)
+					KBE_ASSERT(itemDBIDs.size() <= static_cast<size_t>(std::numeric_limits<int>::max()));
+					for (fidx = static_cast<int>(itemDBIDs.size()) - 1; fidx > 0; --fidx)
 					{
 						if (itemDBIDs[fidx] < item_dbid)
 							break;

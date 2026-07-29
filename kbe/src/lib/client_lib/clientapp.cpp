@@ -762,7 +762,7 @@ void ClientApp::onAddSpaceGeometryMapping(SPACE_ID spaceID, std::string& respath
 //-------------------------------------------------------------------------------------
 PyObject* ClientApp::__py_getResFullPath(PyObject* self, PyObject* args)
 {
-	int argCount = PyTuple_Size(args);
+	Py_ssize_t argCount = PyTuple_Size(args);
 	if (argCount != 1)
 	{
 		PyErr_Format(PyExc_TypeError, "KBEngine::getResFullPath(): args error!");
@@ -789,7 +789,7 @@ PyObject* ClientApp::__py_getResFullPath(PyObject* self, PyObject* args)
 //-------------------------------------------------------------------------------------
 PyObject* ClientApp::__py_hasRes(PyObject* self, PyObject* args)
 {
-	int argCount = PyTuple_Size(args);
+	Py_ssize_t argCount = PyTuple_Size(args);
 	if (argCount != 1)
 	{
 		PyErr_Format(PyExc_TypeError, "KBEngine::hasRes(): args error!");
@@ -812,7 +812,7 @@ PyObject* ClientApp::__py_hasRes(PyObject* self, PyObject* args)
 //-------------------------------------------------------------------------------------
 PyObject* ClientApp::__py_kbeOpen(PyObject* self, PyObject* args)
 {
-	int argCount = PyTuple_Size(args);
+	Py_ssize_t argCount = PyTuple_Size(args);
 	if (argCount != 2)
 	{
 		PyErr_Format(PyExc_TypeError, "KBEngine::open(): args error!");
@@ -853,7 +853,7 @@ PyObject* ClientApp::__py_kbeOpen(PyObject* self, PyObject* args)
 //-------------------------------------------------------------------------------------
 PyObject* ClientApp::__py_matchPath(PyObject* self, PyObject* args)
 {
-	int argCount = PyTuple_Size(args);
+	Py_ssize_t argCount = PyTuple_Size(args);
 	if (argCount != 1)
 	{
 		PyErr_Format(PyExc_TypeError, "KBEngine::matchPath(): args error!");
@@ -877,7 +877,7 @@ PyObject* ClientApp::__py_matchPath(PyObject* self, PyObject* args)
 //-------------------------------------------------------------------------------------
 PyObject* ClientApp::__py_listPathRes(PyObject* self, PyObject* args)
 {
-	int argCount = PyTuple_Size(args);
+	Py_ssize_t argCount = PyTuple_Size(args);
 	if (argCount < 1 || argCount > 2)
 	{
 		PyErr_Format(PyExc_TypeError, "KBEngine::listPathRes(): args[path, pathargs=\'*.*\'] error!");

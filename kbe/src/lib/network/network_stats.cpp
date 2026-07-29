@@ -21,6 +21,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network_stats.h"
 #include "helper/watcher.h"
 #include "network/message_handler.h"
+#include <limits>
 
 namespace KBEngine { 
 
@@ -64,18 +65,28 @@ void NetworkStats::removeHandler(NetworkStatsHandler* pHandler)
 }
 
 //-------------------------------------------------------------------------------------
-void NetworkStats::trackMessage(S_OP op, const MessageHandler& msgHandler, uint32 size)
+void NetworkStats::trackMessage(S_OP op, const MessageHandler& msgHandler, size_t size)
 {
+	// 单条网络消息的协议长度最多为uint32，统计层在更新历史计数器前验证这一不变量。
+	// A protocol message is at most uint32 bytes, so validate that invariant before updating legacy statistics counters.
+	if(size > static_cast<size_t>(std::numeric_limits<uint32>::max()))
+	{
+		ERROR_MSG(fmt::format("NetworkStats::trackMessage: message '{}' size {} exceeds uint32.\n",
+			msgHandler.name, size));
+		return;
+	}
+
+	const uint32 messageSize = static_cast<uint32>(size);
 	MessageHandler* pMsgHandler = const_cast<MessageHandler*>(&msgHandler);
 
 	if(op == SEND)
 	{
-		pMsgHandler->send_size += size;
+		pMsgHandler->send_size += messageSize;
 		pMsgHandler->send_count++;
 	}
 	else
 	{
-		pMsgHandler->recv_size += size;
+		pMsgHandler->recv_size += messageSize;
 		pMsgHandler->recv_count++;
 	}
 
@@ -83,9 +94,9 @@ void NetworkStats::trackMessage(S_OP op, const MessageHandler& msgHandler, uint3
 	for(; iter != handlers_.end(); ++iter)
 	{
 		if(op == SEND)
-			(*iter)->onSendMessage(msgHandler, size);
+			(*iter)->onSendMessage(msgHandler, messageSize);
 		else
-			(*iter)->onRecvMessage(msgHandler, size);
+			(*iter)->onRecvMessage(msgHandler, messageSize);
 	}
 }
 

@@ -410,7 +410,7 @@ void Bundle::finiMessage(bool isSend)
 
 //-------------------------------------------------------------------------------------
 void Bundle::debugCurrentMessages(MessageID currMsgID, const Network::MessageHandler* pCurrMsgHandler,
-	Network::Packet* pCurrPacket, Network::Bundle::Packets& packets, Network::MessageLength1 currMsgLength,
+	Network::Packet* pCurrPacket, Network::Bundle::Packets& packets, size_t currMsgLength,
 	Network::Channel* pChannel)
 {
 	if (currMsgID == 0)
@@ -431,7 +431,7 @@ void Bundle::debugCurrentMessages(MessageID currMsgID, const Network::MessageHan
 	if (currMsgLength >= MemoryStream::MAX_SIZE)
 	{
 		DebugHelper::getSingleton().set_errorcolor();
-		printf("%s", fmt::format("ERROR: Bundle::debugCurrentMessages(): is too big, size=%d\n", currMsgLength).c_str());
+		printf("%s", fmt::format("ERROR: Bundle::debugCurrentMessages(): is too big, size={}\n", currMsgLength).c_str());
 		DebugHelper::getSingleton().set_normalcolor();
 		
 		return;

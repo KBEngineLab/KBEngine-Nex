@@ -101,7 +101,7 @@ public:
 	/**
 		查询表
 	*/
-	virtual bool query(const char* cmd, uint32 size, bool printlog = true, MemoryStream * result = NULL);
+	virtual bool query(const char* cmd, size_t size, bool printlog = true, MemoryStream * result = NULL);
 	bool query(const std::string& cmd, redisReply** pRedisReply, bool printlog = true);
 	bool query(bool printlog, const char* format, ...);
 	bool queryAppend(bool printlog, const char* format, ...);

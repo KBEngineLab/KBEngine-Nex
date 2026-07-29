@@ -218,25 +218,30 @@ void TelnetHandler::historyCommandCheck()
 	if(historyCommand_.size() > 50)
 		historyCommand_.pop_front();
 
-	if(historyCommandIndex_ < 0)
-		historyCommandIndex_ = historyCommand_.size() - 1;
+	if(historyCommand_.empty())
+	{
+		historyCommandIndex_ = 0;
+		return;
+	}
 
-	if(historyCommandIndex_ > (int)historyCommand_.size() - 1)
-		historyCommandIndex_ = 0; 
+	if(historyCommandIndex_ >= historyCommand_.size())
+		historyCommandIndex_ = 0;
 }
 
 //-------------------------------------------------------------------------------------
 std::string TelnetHandler::getHistoryCommand(bool isNextCommand)
 {
+	if(historyCommand_.empty())
+		return "";
+
+	// 历史索引与容器长度使用同一无符号宽度，向前浏览时显式环回以避免负数哨兵值。
+	// Keep history indices at the container's native width and wrap explicitly when browsing backward instead of using a negative sentinel.
 	if(isNextCommand)
-		historyCommandIndex_++;
+		historyCommandIndex_ = (historyCommandIndex_ + 1) % historyCommand_.size();
 	else
-		historyCommandIndex_--;
+		historyCommandIndex_ = historyCommandIndex_ == 0 ? historyCommand_.size() - 1 : historyCommandIndex_ - 1;
 
 	historyCommandCheck();
-
-	if(historyCommand_.size() == 0)
-		return "";
 
 	return historyCommand_[historyCommandIndex_];
 }
@@ -435,7 +440,7 @@ bool TelnetHandler::onRecvInput(const char *buffer, int size)
 				command_.insert(currPos_, vt100cmd);
 				currPos_ += vt100cmd.length();
 
-				if (currPos_ == (int32)command_.length())
+				if (currPos_ == command_.length())
 				{
 					pEndPoint_->send(vt100cmd.c_str(), vt100cmd.size());
 				}
@@ -485,7 +490,7 @@ bool TelnetHandler::onRecvInput(const char *buffer, int size)
 //-------------------------------------------------------------------------------------
 void TelnetHandler::checkAfterStr()
 {
-	if(currPos_ != (int32)command_.size())
+	if(currPos_ != command_.size())
 	{
 		std::string s = "";
 		s = command_.substr(currPos_, command_.size() - currPos_);
@@ -539,8 +544,8 @@ bool TelnetHandler::checkUDLR(const std::string &cmd)
 	}
 	else if (cmd.find(TELNET_CMD_RIGHT) != std::string::npos)	// 右
 	{
-		int cmdlen = strlen(TELNET_CMD_RIGHT);
-		if(currPos_ < (int)command_.size())
+		size_t cmdlen = strlen(TELNET_CMD_RIGHT);
+		if(currPos_ < command_.size())
 		{
 			currPos_++;
 			pEndPoint_->send(TELNET_CMD_RIGHT, cmdlen);
@@ -549,7 +554,7 @@ bool TelnetHandler::checkUDLR(const std::string &cmd)
 	}
 	else if (cmd.find(TELNET_CMD_LEFT) != std::string::npos)	// 左 
 	{
-		int cmdlen = strlen(TELNET_CMD_LEFT);
+		size_t cmdlen = strlen(TELNET_CMD_LEFT);
 		if(currPos_ > 0)
 		{
 			currPos_--;
@@ -569,7 +574,7 @@ bool TelnetHandler::checkUDLR(const std::string &cmd)
 	}
 	else if (cmd.find(TELNET_CMD_END) != std::string::npos)	    // 移动到行尾
 	{
-		if (currPos_ != (int32)command_.length())
+		if (currPos_ != command_.length())
 		{
 			std::string cmdstr = fmt::format("\033[{}C", command_.length() - currPos_);
 			pEndPoint_->send(cmdstr.c_str(), cmdstr.length());

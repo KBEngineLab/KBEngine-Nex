@@ -57,7 +57,7 @@ public:
 	void groupOrderID(COMPONENT_ORDER v) { groupOrderID_ = v; }
 	COMPONENT_ORDER groupOrderID() const { return groupOrderID_; }
 	
-	ENTITY_ID numSpaces() const { return spaces_.size(); }
+	size_t numSpaces() const { return spaces_.size(); }
 	Spaces& spaces() { return spaces_; }
 
 protected:

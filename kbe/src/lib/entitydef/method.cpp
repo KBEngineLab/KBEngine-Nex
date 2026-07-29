@@ -165,7 +165,8 @@ bool MethodDescription::checkArgs(PyObject* args)
 //-------------------------------------------------------------------------------------
 void MethodDescription::addToStream(MemoryStream* mstream, PyObject* args)
 {
-	uint8 argsSize = argTypes_.size();
+	KBE_ASSERT(argTypes_.size() <= static_cast<size_t>(std::numeric_limits<uint8>::max()));
+	const uint8 argsSize = static_cast<uint8>(argTypes_.size());
 	int offset = 0;
 
 	// 将utype放进去，方便对端识别这个方法

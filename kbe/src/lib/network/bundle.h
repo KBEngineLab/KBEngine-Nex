@@ -32,6 +32,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/tcp_packet.h"
 #include "network/udp_packet.h"
 #include "network/interface_defs.h"
+#include <limits>
+#include <stdexcept>
 
 namespace KBEngine { 
 namespace Network
@@ -157,14 +159,14 @@ public:
 	INLINE void currMsgPacketCount(uint32 v);
 	INLINE uint32 currMsgPacketCount() const;
 
-	INLINE void currMsgLength(MessageLength1 v);
+	INLINE void currMsgLength(size_t v);
 	INLINE MessageLength1 currMsgLength() const;
 
 	INLINE void currMsgLengthPos(size_t v);
 	INLINE size_t currMsgLengthPos() const;
 
 	static void debugCurrentMessages(MessageID currMsgID, const Network::MessageHandler* pCurrMsgHandler, 
-		Network::Packet* pCurrPacket, Network::Bundle::Packets& packets, Network::MessageLength1 currMsgLength,
+		Network::Packet* pCurrPacket, Network::Bundle::Packets& packets, size_t currMsgLength,
 		Network::Channel* pChannel);
 	
 protected:
@@ -306,13 +308,13 @@ public:
 		Packets::iterator iter = bundle.packets_.begin();
 		for(; iter!=bundle.packets_.end(); ++iter)
 		{
-			append((*iter)->data() + (*iter)->rpos(), (int)(*iter)->length());
+			append((*iter)->data() + (*iter)->rpos(), (*iter)->length());
 		}
 		
 		if(bundle.pCurrPacket_ == NULL)
 			return *this;
 
-		return append(bundle.pCurrPacket_->data() + bundle.pCurrPacket_->rpos(), (int)bundle.pCurrPacket_->length());
+		return append(bundle.pCurrPacket_->data() + bundle.pCurrPacket_->rpos(), bundle.pCurrPacket_->length());
 	}
 
 	Bundle &append(MemoryStream* s)
@@ -324,33 +326,38 @@ public:
 	Bundle &append(MemoryStream& s)
 	{
 		if(s.length() > 0)
-			return append(s.data() + s.rpos(), (int)s.length());
+			return append(s.data() + s.rpos(), s.length());
 
 		return *this;
 	}
 
 	Bundle &appendBlob(const std::string& str)
 	{
-		return appendBlob((const uint8 *)str.data(), (ArraySize)str.size());
+		return appendBlob((const uint8 *)str.data(), str.size());
 	}
 
-	Bundle &appendBlob(const char* str, ArraySize n)
+	Bundle &appendBlob(const char* str, size_t n)
 	{
 		return appendBlob((const uint8 *)str, n);
 	}
 
-	Bundle &appendBlob(const uint8 *str, ArraySize n)
+	Bundle &appendBlob(const uint8 *str, size_t n)
 	{
-		(*this) << n;
+		// Bundle沿用ArraySize线上格式，先校验本机长度再窄化，确保Nex 2.8协议字节不变且超大输入不会绕回。
+		// Bundle retains the ArraySize wire format; validate the native length before narrowing so Nex 2.8 bytes stay unchanged and oversized inputs cannot wrap.
+		if(n > static_cast<size_t>(std::numeric_limits<ArraySize>::max()))
+			throw std::length_error("Bundle blob exceeds ArraySize");
+
+		(*this) << static_cast<ArraySize>(n);
 		return assign((char*)str, n);
 	}
 
-	Bundle &append(const uint8 *str, int n)
+	Bundle &append(const uint8 *str, size_t n)
 	{
 		return assign((char*)str, n);
 	}
 
-	Bundle &append(const char *str, int n)
+	Bundle &append(const char *str, size_t n)
 	{
 		return assign(str, n);
 	}
@@ -466,17 +473,20 @@ public:
 		return (*this);
 	}
 	
-	Bundle &assign(const char *str, int n)
+	Bundle &assign(const char *str, size_t n)
 	{
-		int32 len = (int32)n;
-		int32 addtotalsize = 0;
+		size_t len = n;
+		size_t addtotalsize = 0;
 
 		while(len > 0)
 		{
-			int32 ilen = onPacketAppend(len, false);
+			// onPacketAppend沿用单包int32计数，每轮只传递其可表示的片段，整体Bundle仍可安全处理size_t输入。
+			// onPacketAppend retains an int32 per-packet count; pass only a representable chunk each round so the whole Bundle can safely consume size_t input.
+			const int32 requestSize = static_cast<int32>(std::min(len, static_cast<size_t>(std::numeric_limits<int32>::max())));
+			const int32 ilen = onPacketAppend(requestSize, false);
 			pCurrPacket_->append((uint8*)(str + addtotalsize), ilen);
-			addtotalsize += ilen;
-			len -= ilen;
+			addtotalsize += static_cast<size_t>(ilen);
+			len -= static_cast<size_t>(ilen);
 		}
 
 		return *this;

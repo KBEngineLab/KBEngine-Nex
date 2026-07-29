@@ -37,9 +37,14 @@ INLINE int Bundle::packetsSize() const
 	return (int)i;
 }
 
-INLINE void Bundle::currMsgLength(MessageLength1 v)
+INLINE void Bundle::currMsgLength(size_t v)
 {
-	currMsgLength_ = v;
+	// 当前消息长度最终写入固定宽度协议头，统一在setter拒绝越界，避免各调用点重复不安全窄化。
+	// The current message length is eventually written to a fixed-width protocol header; reject overflow in one setter instead of narrowing unsafely at every caller.
+	if(v > static_cast<size_t>(std::numeric_limits<MessageLength1>::max()))
+		throw std::length_error("Bundle message exceeds MessageLength1");
+
+	currMsgLength_ = static_cast<MessageLength1>(v);
 }
 
 INLINE MessageLength1 Bundle::currMsgLength() const 

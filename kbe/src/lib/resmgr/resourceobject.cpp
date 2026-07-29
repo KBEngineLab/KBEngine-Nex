@@ -97,7 +97,7 @@ uint32 FileObject::read(char* buf, uint32 limit)
 	}
 
 	update();
-	return fread(buf, sizeof(char), limit, fd_);
+	return static_cast<uint32>(fread(buf, sizeof(char), limit, fd_));
 }
 
 //-------------------------------------------------------------------------------------

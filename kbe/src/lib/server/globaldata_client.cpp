@@ -124,8 +124,6 @@ void GlobalDataClient::onDataChanged(PyObject* key, PyObject* value, bool isDele
 	Components::COMPONENTS& channels = Components::getSingleton().getComponents(serverComponentType_);
 	Components::COMPONENTS::iterator iter1 = channels.begin();
 	uint8 dataType = dataType_;
-	ArraySize slen = 0;
-
 	for(; iter1 != channels.end(); ++iter1)
 	{
 		Network::Channel* lpChannel = iter1->pChannel;
@@ -138,15 +136,11 @@ void GlobalDataClient::onDataChanged(PyObject* key, PyObject* value, bool isDele
 		(*pBundle) << dataType;
 		(*pBundle) << isDelete;
 
-		slen = skey.size();
-		(*pBundle) << slen;
-		(*pBundle).assign(skey.data(), slen);
+		(*pBundle).appendBlob(skey);
 
 		if(!isDelete)
 		{
-			slen = sval.size();
-			(*pBundle) << slen;
-			(*pBundle).assign(sval.data(), slen);
+			(*pBundle).appendBlob(sval);
 		}
 
 		(*pBundle) << g_componentType;

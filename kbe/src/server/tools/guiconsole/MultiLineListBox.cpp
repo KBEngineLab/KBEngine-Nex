@@ -104,10 +104,14 @@ int CMultiLineListBox::AddString(LPCTSTR pszText, COLORREF fgColor, COLORREF bgC
 	if(pListBoxFont != NULL)
 	{
 		CFont* pOldFont =  myDC.SelectObject(pListBoxFont); 
-		GetTextExtentPoint32(myDC.m_hDC, pszText, ::wcslen(pszText), &sSize);
+		const size_t textLength = ::wcslen(pszText);
+		if(textLength <= static_cast<size_t>(INT_MAX))
+		{
+			GetTextExtentPoint32(myDC.m_hDC, pszText, static_cast<int>(textLength), &sSize);
+			m_nMaxWidth = max(m_nMaxWidth, static_cast<int>(sSize.cx));
+			SetHorizontalExtent(m_nMaxWidth + 3);
+		}
 
-		m_nMaxWidth   =   max(m_nMaxWidth,   (int)sSize.cx); 
-		SetHorizontalExtent(m_nMaxWidth   +   3); 
 		myDC.SelectObject(pOldFont);   
 	}
 

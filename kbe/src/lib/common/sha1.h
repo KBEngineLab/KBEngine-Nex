@@ -25,9 +25,9 @@ public:
 		*  Provide input to SHA1
 		*/
 	void Input(const unsigned char *message_array,
-		unsigned            length);
+		size_t              length);
 	void Input(const char  *message_array,
-		unsigned    length);
+		size_t       length);
 	void Input(unsigned char message_element);
 	void Input(char message_element);
 	KBE_SHA1& operator<<(const char *message_array);
