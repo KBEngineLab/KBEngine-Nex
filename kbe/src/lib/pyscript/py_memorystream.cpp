@@ -64,6 +64,9 @@ PyMemoryStream::PyMemoryStream(PyTypeObject* pyType, bool isInitialised, bool re
 ScriptObject(pyType, isInitialised),
 readonly_(readonly)
 {
+	// 所有构造路径都必须参与同一追踪协议，确保统一析构不会产生负计数。
+	// Every construction path must join the same tracing protocol so unified destruction can never produce a negative count.
+	script::PyGC::incTracing("MemoryStream");
 }
 
 //-------------------------------------------------------------------------------------
@@ -105,6 +108,9 @@ readonly_(readonly)
 //-------------------------------------------------------------------------------------
 PyMemoryStream::~PyMemoryStream()
 {
+	// 与构造计数严格配对，否则长时间运行时GC诊断会把已释放对象持续报告为泄漏。
+	// Pair construction exactly so long-running GC diagnostics do not report released objects as persistent leaks.
+	script::PyGC::decTracing("MemoryStream");
 }
 
 //-------------------------------------------------------------------------------------
