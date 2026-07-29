@@ -33,6 +33,19 @@ namespace KBEngine {
 namespace Network
 {
 
+namespace
+{
+
+// WebSocketProtocol 在返回非错误帧前已将 payload 限制为 65535；集中转换可保持分片状态字段的既有 int32 ABI。
+// WebSocketProtocol caps payloads at 65535 before returning a non-error frame; centralizing the conversion preserves the existing int32 fragment-state ABI.
+inline int32 payloadLengthToFragmentSize(uint64 payloadLength)
+{
+	KBE_ASSERT(payloadLength <= NETWORK_MESSAGE_MAX_SIZE);
+	return static_cast<int32>(payloadLength);
+}
+
+}
+
 //-------------------------------------------------------------------------------------
 WebSocketPacketFilter::WebSocketPacketFilter(Channel* pChannel):
 	pFragmentDatasRemain_(0),
@@ -110,13 +123,13 @@ Reason WebSocketPacketFilter::send(Channel * pChannel, PacketSender& sender, Pac
 
 	websocket::WebSocketProtocol::makeFrame(frameType, pPacket, pRetTCPPacket);
 
-	int space = pPacket->length() - pRetTCPPacket->space();
-	if(space > 0)
+	if(pPacket->length() > pRetTCPPacket->space())
 	{
+		const size_t additionalSpace = pPacket->length() - pRetTCPPacket->space();
 		WARNING_MSG(fmt::format("WebSocketPacketFilter::send: no free space, buffer added:{}, total={}.\n",
-			space, pRetTCPPacket->size()));
+			additionalSpace, pRetTCPPacket->size()));
 
-		pRetTCPPacket->data_resize(pRetTCPPacket->size() + space);
+		pRetTCPPacket->data_resize(pRetTCPPacket->size() + additionalSpace);
 	}
 
 	(*pRetTCPPacket).append(pPacket->data() + pPacket->rpos(), pPacket->length());
@@ -153,10 +166,10 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 					pTCPPacket_->append(*(static_cast<MemoryStream*>(pPacket)));
 					pPacket->done();
 				}
-				else
+				else if(msg_frameType_ != websocket::WebSocketProtocol::ERROR_FRAME)
 				{
 					fragmentDatasFlag_ = FRAGMENT_MESSAGE_DATAS;
-					pFragmentDatasRemain_ = (int32)msg_payload_length_;
+					pFragmentDatasRemain_ = payloadLengthToFragmentSize(msg_payload_length_);
 				}
 			}
 			else
@@ -165,7 +178,7 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 
 				// 长度如果大于剩余读取长度，那么可以开始解析了
 				// 否则将包内存继续缓存
-				if((int32)pPacket->length() >= pFragmentDatasRemain_)
+				if(pPacket->length() >= static_cast<size_t>(pFragmentDatasRemain_))
 				{
 					size_t wpos = pPacket->wpos();
 					size_t rpos = pPacket->rpos();
@@ -192,7 +205,7 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 						pTCPPacket_->rpos(buffer_rpos);
 
 						// 当前包如果还有数据并且大于等于我们需要的数据，则继续下一循环立即解析
-						if ((int32)pPacket->length() >= pFragmentDatasRemain_)
+						if (pPacket->length() >= static_cast<size_t>(pFragmentDatasRemain_))
 							continue;
 					}
 					else
@@ -202,17 +215,17 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 						pTCPPacket_ = NULL;
 
 						// 是否有数据携带？如果没有则不进入data解析
-						if(msg_payload_length_ > 0)
+						if(msg_frameType_ != websocket::WebSocketProtocol::ERROR_FRAME && msg_payload_length_ > 0)
 						{
 							fragmentDatasFlag_ = FRAGMENT_MESSAGE_DATAS;
-							pFragmentDatasRemain_ = (int32)msg_payload_length_;
+							pFragmentDatasRemain_ = payloadLengthToFragmentSize(msg_payload_length_);
 						}
 					}
 				}
 				else
 				{
 					pTCPPacket_->append(*(static_cast<MemoryStream*>(pPacket)));
-					pFragmentDatasRemain_ -= pPacket->length();
+					pFragmentDatasRemain_ -= static_cast<int32>(pPacket->length());
 
 					pPacket->done();
 				}
@@ -288,7 +301,7 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 			if(pTCPPacket_ == NULL)
 				pTCPPacket_ = TCPPacket::createPoolObject(OBJECTPOOL_POINT);
 
-			if(pFragmentDatasRemain_ <= (int32)pPacket->length())
+			if(static_cast<size_t>(pFragmentDatasRemain_) <= pPacket->length())
 			{
 				pTCPPacket_->append(pPacket->data() + pPacket->rpos(), pFragmentDatasRemain_);
 				pPacket->read_skip((size_t)pFragmentDatasRemain_);
@@ -297,7 +310,7 @@ Reason WebSocketPacketFilter::recv(Channel * pChannel, PacketReceiver & receiver
 			else
 			{
 				pTCPPacket_->append(*(static_cast<MemoryStream*>(pPacket)));
-				pFragmentDatasRemain_ -= pPacket->length();
+				pFragmentDatasRemain_ -= static_cast<int32>(pPacket->length());
 				pPacket->done();
 			}
 
@@ -376,7 +389,10 @@ Reason WebSocketPacketFilter::onPing(Channel * pChannel, Packet* pPacket)
 		pPacket->read_skip((size_t)msg_payload_length_);
 	}
 
-	int sendSize = pPongPacket->length();
+	// RFC 6455 控制帧 payload 最大 125 字节，连同帧头也远小于底层 TLS API 的 int 上限。
+	// RFC 6455 control-frame payloads are capped at 125 bytes, so the framed packet remains far below the TLS API's int limit.
+	KBE_ASSERT(pPongPacket->length() <= NETWORK_MESSAGE_MAX_SIZE);
+	int sendSize = static_cast<int>(pPongPacket->length());
 	if (pChannel->pEndPoint()->usesSSLMemoryBIO())
 	{
 		// pong 已经是完整 WebSocket 控制帧，只需进行 TLS 编码并交给 IOCP，不能再经过 WebSocketPacketFilter 二次封帧。
