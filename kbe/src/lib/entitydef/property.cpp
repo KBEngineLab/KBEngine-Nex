@@ -135,17 +135,18 @@ PyObject* PropertyDescription::createFromPersistentStream(MemoryStream* mstream)
 }
 
 //-------------------------------------------------------------------------------------
-PropertyDescription* PropertyDescription::createDescription(ENTITY_PROPERTY_UID utype, 
-															std::string& dataTypeName, 
-															std::string& name, 
+PropertyDescription* PropertyDescription::createDescription(ENTITY_PROPERTY_UID utype,
+													std::string& dataTypeName,
+													std::string& name,
 															uint32 flags, 
 															bool isPersistent, 
 															DataType* dataType, 
 															bool isIdentifier, 
 															std::string indexType,
-															uint32 databaseLength, 
-															std::string& defaultStr, 
-															DETAIL_TYPE detailLevel)
+													uint32 databaseLength,
+													std::string& defaultStr,
+													DETAIL_TYPE detailLevel,
+													const std::string& descriptionStr)
 {
 	PropertyDescription* propertyDescription = NULL;
 	if(dataTypeName == "FIXED_DICT" || 
@@ -190,6 +191,10 @@ PropertyDescription* PropertyDescription::createDescription(ENTITY_PROPERTY_UID 
 														dataType, isIdentifier, indexType, databaseLength, 
 														defaultStr, detailLevel);
 	}
+
+	// 说明是存储层元数据，在统一工厂完成赋值可保持所有派生构造函数和现有调用点兼容。
+	// The description is storage metadata; assigning it in the common factory preserves every derived constructor and existing call site.
+	propertyDescription->descriptionStr_ = descriptionStr;
 
 	return propertyDescription;
 }

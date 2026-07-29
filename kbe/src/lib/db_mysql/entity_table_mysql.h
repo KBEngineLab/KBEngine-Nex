@@ -94,6 +94,10 @@ public:
 	virtual bool isSameKey(std::string key){ return key == db_item_name(); }
 
 protected:
+	// 在最终DDL生成点追加并转义字段说明，避免修改可复用的列类型模板。
+	// Appends and escapes the field description at the final DDL boundary without mutating the reusable column type template.
+	std::string columnTypeWithComment(DBInterface* pdbi, const std::string& itemDBType) const;
+
 	char db_item_name_[MAX_BUF];
 	enum_field_types mysqlItemtype_;
 };

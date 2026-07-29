@@ -66,14 +66,14 @@ bool sync_item_to_db(DBInterface* pdbi,
 
 	DEBUG_MSG(fmt::format("syncToDB(): {}->{}({}).\n", tableName, itemName, datatype));
 
-	char __sql_str__[MAX_BUF];
-
-	kbe_snprintf(__sql_str__, MAX_BUF, "ALTER TABLE `" ENTITY_TABLE_PERFIX "_%s` ADD `%s` %s;",
-		tableName, itemName, datatype);	
+	// 字段说明可能显著增加DDL长度，动态字符串避免固定缓冲区静默截断出无效SQL。
+	// Field descriptions can substantially extend DDL, so a dynamic string prevents fixed-buffer truncation from producing invalid SQL.
+	std::string sql = fmt::format("ALTER TABLE `" ENTITY_TABLE_PERFIX "_{}` ADD `{}` {};",
+		tableName, itemName, datatype);
 
 	try
 	{
-		pdbi->query(__sql_str__, strlen(__sql_str__), false);	
+		pdbi->query(sql.c_str(), static_cast<uint32>(sql.size()), false);
 	}
 	catch(...)
 	{
@@ -82,12 +82,12 @@ bool sync_item_to_db(DBInterface* pdbi,
 	unsigned int mysql_errorno = pdbi->getlasterror();
 	if (mysql_errorno == 1060/* Duplicate column name */)
 	{
-		kbe_snprintf(__sql_str__, MAX_BUF, "ALTER TABLE `" ENTITY_TABLE_PERFIX "_%s` MODIFY COLUMN `%s` %s;",	
+		sql = fmt::format("ALTER TABLE `" ENTITY_TABLE_PERFIX "_{}` MODIFY COLUMN `{}` {};",
 			tableName, itemName, datatype);
 
 		try
 		{
-			if(pdbi->query(__sql_str__, strlen(__sql_str__), false))
+			if(pdbi->query(sql.c_str(), static_cast<uint32>(sql.size()), false))
 			{
 				if(callback)
 					(*callback)(pdbi, tableName, itemName);
@@ -954,11 +954,12 @@ bool EntityTableItemMysql_VECTOR2::isSameKey(std::string key)
 //-------------------------------------------------------------------------------------
 bool EntityTableItemMysql_VECTOR2::syncToDB(DBInterface* pdbi, void* pData)
 {
-	if(!sync_item_to_db(pdbi, itemDBType_.c_str(), tableName_.c_str(), db_item_names_[0], 0, 
+	const std::string itemDBType = columnTypeWithComment(pdbi, itemDBType_);
+	if(!sync_item_to_db(pdbi, itemDBType.c_str(), tableName_.c_str(), db_item_names_[0], 0,
 		this->mysqlItemtype_, this->flags(), pData))
 		return false;
 
-	return sync_item_to_db(pdbi, itemDBType_.c_str(), tableName_.c_str(), db_item_names_[1], 0, 
+	return sync_item_to_db(pdbi, itemDBType.c_str(), tableName_.c_str(), db_item_names_[1], 0,
 		this->mysqlItemtype_, this->flags(), pData);
 }
 
@@ -1035,15 +1036,16 @@ bool EntityTableItemMysql_VECTOR3::isSameKey(std::string key)
 //-------------------------------------------------------------------------------------
 bool EntityTableItemMysql_VECTOR3::syncToDB(DBInterface* pdbi, void* pData)
 {
-	if(!sync_item_to_db(pdbi, itemDBType_.c_str(), tableName_.c_str(), db_item_names_[0], 0, 
+	const std::string itemDBType = columnTypeWithComment(pdbi, itemDBType_);
+	if(!sync_item_to_db(pdbi, itemDBType.c_str(), tableName_.c_str(), db_item_names_[0], 0,
 		this->mysqlItemtype_, this->flags(), pData))
 		return false;
 
-	if(!sync_item_to_db(pdbi, itemDBType_.c_str(), tableName_.c_str(), db_item_names_[1], 0, 
+	if(!sync_item_to_db(pdbi, itemDBType.c_str(), tableName_.c_str(), db_item_names_[1], 0,
 		this->mysqlItemtype_, this->flags(), pData))
 		return false;
 
-	return sync_item_to_db(pdbi, itemDBType_.c_str(), tableName_.c_str(), db_item_names_[2], 0, 
+	return sync_item_to_db(pdbi, itemDBType.c_str(), tableName_.c_str(), db_item_names_[2], 0,
 		this->mysqlItemtype_, this->flags(), pData);
 }
 
@@ -1118,16 +1120,17 @@ bool EntityTableItemMysql_VECTOR4::isSameKey(std::string key)
 //-------------------------------------------------------------------------------------
 bool EntityTableItemMysql_VECTOR4::syncToDB(DBInterface* pdbi, void* pData)
 {
-	if(!sync_item_to_db(pdbi, itemDBType_.c_str(), tableName_.c_str(), db_item_names_[0], 0, this->mysqlItemtype_, this->flags(), pData))
+	const std::string itemDBType = columnTypeWithComment(pdbi, itemDBType_);
+	if(!sync_item_to_db(pdbi, itemDBType.c_str(), tableName_.c_str(), db_item_names_[0], 0, this->mysqlItemtype_, this->flags(), pData))
 		return false;
 
-	if(!sync_item_to_db(pdbi, itemDBType_.c_str(), tableName_.c_str(), db_item_names_[1], 0, this->mysqlItemtype_, this->flags(), pData))
+	if(!sync_item_to_db(pdbi, itemDBType.c_str(), tableName_.c_str(), db_item_names_[1], 0, this->mysqlItemtype_, this->flags(), pData))
 		return false;
 
-	if(!sync_item_to_db(pdbi, itemDBType_.c_str(), tableName_.c_str(), db_item_names_[2], 0, this->mysqlItemtype_, this->flags(), pData))
+	if(!sync_item_to_db(pdbi, itemDBType.c_str(), tableName_.c_str(), db_item_names_[2], 0, this->mysqlItemtype_, this->flags(), pData))
 		return false;
 
-	return sync_item_to_db(pdbi, itemDBType_.c_str(), tableName_.c_str(), db_item_names_[3], 0, this->mysqlItemtype_, this->flags(), pData);
+	return sync_item_to_db(pdbi, itemDBType.c_str(), tableName_.c_str(), db_item_names_[3], 0, this->mysqlItemtype_, this->flags(), pData);
 }
 
 //-------------------------------------------------------------------------------------
@@ -1632,30 +1635,51 @@ bool EntityTableItemMysqlBase::initialize(const PropertyDescription* pPropertyDe
 }
 
 //-------------------------------------------------------------------------------------
+std::string EntityTableItemMysqlBase::columnTypeWithComment(DBInterface* pdbi,
+	const std::string& itemDBType) const
+{
+	if (!pPropertyDescription_ || !pPropertyDescription_->getDescriptionStr()[0])
+		return itemDBType;
+
+	const std::string description = pPropertyDescription_->getDescriptionStr();
+	std::vector<char> escapedDescription(description.size() * 2 + 1, '\0');
+	const unsigned long escapedLength = mysql_real_escape_string(
+		static_cast<DBInterfaceMysql*>(pdbi)->mysql(), &escapedDescription[0],
+		description.c_str(), static_cast<unsigned long>(description.size()));
+
+	// 转义必须使用当前连接的字符集规则；局部返回值保证重复同步不会永久改写itemDBType_模板。
+	// Escaping must follow the active connection character set; returning a local value keeps repeated synchronization from permanently rewriting itemDBType_.
+	return fmt::format("{} COMMENT '{}'", itemDBType,
+		std::string(&escapedDescription[0], escapedLength));
+}
+
+//-------------------------------------------------------------------------------------
 bool EntityTableItemMysql_DIGIT::syncToDB(DBInterface* pdbi, void* pData)
 {
+	std::string itemDBType = itemDBType_;
+
 	if(datalength_ == 0)
 	{
-		KBEngine::strutil::kbe_replace(itemDBType_, "(@DATALEN@)", "");
-		return sync_item_to_db(pdbi, itemDBType_.c_str(), tableName_.c_str(), 
+		KBEngine::strutil::kbe_replace(itemDBType, "(@DATALEN@)", "");
+		itemDBType = columnTypeWithComment(pdbi, itemDBType);
+		return sync_item_to_db(pdbi, itemDBType.c_str(), tableName_.c_str(),
 			db_item_name(), datalength_, this->mysqlItemtype_, this->flags(), pData);
 	}
 
 	uint32 length = pPropertyDescription_->getDatabaseLength();
-	char sql_str[SQL_BUF];
 
 	if (length <= 0)
 	{
-		KBEngine::strutil::kbe_replace(itemDBType_, "(@DATALEN@)", "");
-		kbe_snprintf(sql_str, SQL_BUF, "%s", itemDBType_.c_str());
+		KBEngine::strutil::kbe_replace(itemDBType, "(@DATALEN@)", "");
 	}
 	else
 	{
-		KBEngine::strutil::kbe_replace(itemDBType_, "@DATALEN@", fmt::format("{}", length).c_str());
-		kbe_snprintf(sql_str, SQL_BUF, "%s", itemDBType_.c_str());
+		KBEngine::strutil::kbe_replace(itemDBType, "@DATALEN@", fmt::format("{}", length).c_str());
 	}
 
-	return sync_item_to_db(pdbi, sql_str, tableName_.c_str(), db_item_name(), length, this->mysqlItemtype_, this->flags(), pData);
+	itemDBType = columnTypeWithComment(pdbi, itemDBType);
+	return sync_item_to_db(pdbi, itemDBType.c_str(), tableName_.c_str(), db_item_name(), length,
+		this->mysqlItemtype_, this->flags(), pData);
 }
 
 //-------------------------------------------------------------------------------------
@@ -1816,7 +1840,7 @@ void EntityTableItemMysql_DIGIT::getReadSqlItem(mysql::DBContext& context)
 bool EntityTableItemMysql_STRING::syncToDB(DBInterface* pdbi, void* pData)
 {
 	uint32 length = pPropertyDescription_->getDatabaseLength();
-	char sql_str[SQL_BUF];
+	std::string itemDBType = itemDBType_;
 
 	// 如果父表Item是个固定字典，那么需要判断当前item有无在固定字典中设置DatabaseLength
 	if (this->pParentTableItem() && this->pParentTableItem()->type() == TABLE_ITEM_TYPE_FIXEDDICT)
@@ -1830,10 +1854,10 @@ bool EntityTableItemMysql_STRING::syncToDB(DBInterface* pdbi, void* pData)
 		length = 255;
 	}
 
-	KBEngine::strutil::kbe_replace(itemDBType_, "@DATALEN@", fmt::format("{}", length).c_str());
-	kbe_snprintf(sql_str, SQL_BUF, "%s", itemDBType_.c_str());
+	KBEngine::strutil::kbe_replace(itemDBType, "@DATALEN@", fmt::format("{}", length).c_str());
+	itemDBType = columnTypeWithComment(pdbi, itemDBType);
 
-	return sync_item_to_db(pdbi, sql_str, tableName_.c_str(), db_item_name(), length, 
+	return sync_item_to_db(pdbi, itemDBType.c_str(), tableName_.c_str(), db_item_name(), length,
 		this->mysqlItemtype_, this->flags(), pData);
 }
 
@@ -1888,7 +1912,7 @@ void EntityTableItemMysql_STRING::getReadSqlItem(mysql::DBContext& context)
 bool EntityTableItemMysql_UNICODE::syncToDB(DBInterface* pdbi, void* pData)
 {
 	uint32 length = pPropertyDescription_->getDatabaseLength();
-	char sql_str[SQL_BUF];
+	std::string itemDBType = itemDBType_;
 
 	// 如果父表Item是个固定字典，那么需要判断当前item有无在固定字典中设置DatabaseLength
 	if (this->pParentTableItem() && this->pParentTableItem()->type() == TABLE_ITEM_TYPE_FIXEDDICT)
@@ -1902,10 +1926,10 @@ bool EntityTableItemMysql_UNICODE::syncToDB(DBInterface* pdbi, void* pData)
 		length = 255;
 	}
 
-	KBEngine::strutil::kbe_replace(itemDBType_, "@DATALEN@", fmt::format("{}", length).c_str());
-	kbe_snprintf(sql_str, SQL_BUF, "%s", itemDBType_.c_str());
+	KBEngine::strutil::kbe_replace(itemDBType, "@DATALEN@", fmt::format("{}", length).c_str());
+	itemDBType = columnTypeWithComment(pdbi, itemDBType);
 
-	return sync_item_to_db(pdbi, sql_str, tableName_.c_str(), db_item_name(), length, 
+	return sync_item_to_db(pdbi, itemDBType.c_str(), tableName_.c_str(), db_item_name(), length,
 		this->mysqlItemtype_, this->flags(), pData);
 }
 
@@ -1957,7 +1981,8 @@ void EntityTableItemMysql_UNICODE::getReadSqlItem(mysql::DBContext& context)
 //-------------------------------------------------------------------------------------
 bool EntityTableItemMysql_BLOB::syncToDB(DBInterface* pdbi, void* pData)
 {
-	return sync_item_to_db(pdbi, itemDBType_.c_str(), tableName_.c_str(), db_item_name(), 0, 
+	const std::string itemDBType = columnTypeWithComment(pdbi, itemDBType_);
+	return sync_item_to_db(pdbi, itemDBType.c_str(), tableName_.c_str(), db_item_name(), 0,
 		this->mysqlItemtype_, this->flags(), pData);
 }
 
@@ -2009,7 +2034,8 @@ void EntityTableItemMysql_BLOB::getReadSqlItem(mysql::DBContext& context)
 //-------------------------------------------------------------------------------------
 bool EntityTableItemMysql_PYTHON::syncToDB(DBInterface* pdbi, void* pData)
 {
-	return sync_item_to_db(pdbi, itemDBType_.c_str(), tableName_.c_str(), db_item_name(), 0, 
+	const std::string itemDBType = columnTypeWithComment(pdbi, itemDBType_);
+	return sync_item_to_db(pdbi, itemDBType.c_str(), tableName_.c_str(), db_item_name(), 0,
 		this->mysqlItemtype_, this->flags(), pData);
 }
 

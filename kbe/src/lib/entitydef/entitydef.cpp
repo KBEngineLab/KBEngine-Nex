@@ -946,6 +946,7 @@ bool EntityDef::loadDefPropertys(const std::string& moduleName,
 			std::string					strFlags;
 			std::string					strIdentifierNode;
 			std::string					defaultStr;
+			std::string					descriptionStr;
 			std::string					name = "";
 
 			name = xml->getKey(defPropertyNode);
@@ -1077,8 +1078,18 @@ bool EntityDef::loadDefPropertys(const std::string& moduleName,
 			{
 				defaultStr = xml->getValStr(defaultValNode);
 			}
-			
-			TiXmlNode* detailLevelNode = 
+
+			// Description只描述持久化字段，不改变属性类型、Utype或客户端协议摘要。
+			// Description documents the persistent field without changing its type, Utype, or client protocol digest.
+			TiXmlNode* descriptionNode =
+				xml->enterNode(defPropertyNode->FirstChild(), "Description");
+
+			if(descriptionNode)
+			{
+				descriptionStr = xml->getValStr(descriptionNode);
+			}
+
+			TiXmlNode* detailLevelNode =
 				xml->enterNode(defPropertyNode->FirstChild(), "DetailLevel");
 
 			if(detailLevelNode)
@@ -1169,9 +1180,9 @@ bool EntityDef::loadDefPropertys(const std::string& moduleName,
 			// 产生一个属性描述实例
 			PropertyDescription* propertyDescription = PropertyDescription::createDescription(futype, strType, 
 															name, flags, isPersistent, 
-															dataType, isIdentifier, indexType,
-															databaseLength, defaultStr, 
-															detailLevel);
+													dataType, isIdentifier, indexType,
+													databaseLength, defaultStr,
+													detailLevel, descriptionStr);
 
 			bool ret = true;
 

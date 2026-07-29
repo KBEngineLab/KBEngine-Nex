@@ -90,6 +90,12 @@ public:
 	*/
 	INLINE const char* getDefaultValStr(void) const;
 
+	/**
+		获取仅供工具和数据库使用的属性说明，该元数据不参与网络协议MD5。
+		Gets the property description used by tools and databases; this metadata does not participate in the network protocol MD5.
+	*/
+	INLINE const char* getDescriptionStr(void) const;
+
 	/** 
 		属性的数字类别， 用于网络上传输识别 
 	*/
@@ -143,7 +149,8 @@ public:
 		std::string indexType,
 		uint32 databaseLength,
 		std::string& defaultStr, 
-		DETAIL_TYPE detailLevel);
+		DETAIL_TYPE detailLevel,
+		const std::string& descriptionStr = std::string());
 	
 	/** 
 		脚本请求设置这个属性的值 
@@ -175,6 +182,9 @@ protected:
 	DETAIL_TYPE					detailLevel_;									// 这个属性的lod详情级别 看common中的:属性的lod广播级别范围的定义
 	int16						aliasID_;										// 别名id， 当暴露的方法或者广播的属性总个数小于255时， 我们不使用utype而使用1字节的aliasID来传输
 	std::string					indexType_;										// 属性的索引类别，UNIQUE, INDEX，分别对应无设置、唯一索引、普通索引
+	// 属性说明不参与协议摘要，使数据库注释可以独立维护而不影响客户端兼容性。
+	// Property descriptions stay outside the protocol digest so database comments can evolve without affecting client compatibility.
+	std::string					descriptionStr_;
 };
 
 class FixedDictDescription : public PropertyDescription

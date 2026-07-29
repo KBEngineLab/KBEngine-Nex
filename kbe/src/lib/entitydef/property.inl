@@ -56,6 +56,11 @@ INLINE const char* PropertyDescription::getDefaultValStr(void) const
 	return defaultValStr_.c_str(); 
 }
 
+INLINE const char* PropertyDescription::getDescriptionStr(void) const
+{
+	return descriptionStr_.c_str();
+}
+
 INLINE ENTITY_PROPERTY_UID PropertyDescription::getUType(void) const
 { 
 	return utype_; 
