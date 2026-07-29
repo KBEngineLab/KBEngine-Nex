@@ -1089,7 +1089,8 @@ void Entity::onClientDeath()
 {
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-	SCRIPT_OBJECT_CALL_ARGS0(this, const_cast<char*>("onClientDeath"), false);
+	CALL_COMPONENTS_AND_ENTITY_METHOD(this,
+		SCRIPT_OBJECT_CALL_ARGS0(pyTempObj, const_cast<char*>("onClientDeath"), GETERR));
 }
 
 //-------------------------------------------------------------------------------------
@@ -1099,6 +1100,9 @@ void Entity::onLoseCell(Network::Channel* pChannel, MemoryStream& s)
 		return;
 	
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
+	// onLoseCell 可以在脚本中销毁自身；外层引用覆盖回调后的标志检查和自动销毁分支。
+	// onLoseCell may destroy itself in script; the outer reference covers the subsequent flag check and automatic-destroy branch.
+	Py_INCREF(this);
 
 	S_RELEASE(cellEntityCall_);
 
@@ -1106,7 +1110,8 @@ void Entity::onLoseCell(Network::Channel* pChannel, MemoryStream& s)
 	isGetingCellData_ = false;
 	createdSpace_ = false;
 	
-	SCRIPT_OBJECT_CALL_ARGS0(this, const_cast<char*>("onLoseCell"), false);
+	CALL_COMPONENTS_AND_ENTITY_METHOD(this,
+		SCRIPT_OBJECT_CALL_ARGS0(pyTempObj, const_cast<char*>("onLoseCell"), GETERR));
 
 	if (!isDestroyed() && hasFlags(ENTITY_FLAGS_DESTROY_AFTER_GETCELL))
 	{
@@ -1115,6 +1120,8 @@ void Entity::onLoseCell(Network::Channel* pChannel, MemoryStream& s)
 
 		destroy();
 	}
+
+	Py_DECREF(this);
 }
 
 //-------------------------------------------------------------------------------------

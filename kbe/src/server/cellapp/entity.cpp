@@ -1305,29 +1305,27 @@ void Entity::onWriteToDB()
 	//DEBUG_MSG(fmt::format("{}::onWriteToDB(): {}.\n", 
 	//	this->scriptName(), this->id()));
 
-	SCRIPT_OBJECT_CALL_ARGS0(this, const_cast<char*>("onWriteToDB"), false);
+	CALL_ENTITY_AND_COMPONENTS_METHOD(this,
+		SCRIPT_OBJECT_CALL_ARGS0(pyTempObj, const_cast<char*>("onWriteToDB"), GETERR));
 }
 
 //-------------------------------------------------------------------------------------
-bool Entity::bufferOrExeCallback(const char * funcName, PyObject * funcArgs, bool notFoundIsOK)
+bool Entity::bufferOrExeCallback(const char* funcName, PyObject* funcArgs, bool notFoundIsOK)
 {
 	bool canBuffer = _scriptCallbacksBufferCount > 0;
 
 	PyObject* pyCallable = PyObject_GetAttrString(this, const_cast<char*>(funcName));
+	bool hasEntityCallable = pyCallable != NULL;
 
-	if (pyCallable == NULL)
+	if (!hasEntityCallable)
 	{
 		if (!notFoundIsOK)
 		{
-			ERROR_MSG(fmt::format("{}::bufferOrExeCallback({}): method({}) not found!\n",
+			ERROR_MSG(fmt::format("{}::bufferOrExeCallback({}): method({}) not found on entity!\n",
 				scriptName(), id(), funcName));
 		}
 
-		if (funcArgs)
-			Py_DECREF(funcArgs);
-
 		PyErr_Clear();
-		return false;
 	}
 
 	if (canBuffer)
@@ -1336,17 +1334,21 @@ bool Entity::bufferOrExeCallback(const char * funcName, PyObject * funcArgs, boo
 		pBufferedScriptCall->entityPtr = this;
 		pBufferedScriptCall->pyFuncArgs = funcArgs;
 		pBufferedScriptCall->pyCallable = pyCallable;
+		pBufferedScriptCall->funcName = funcName;
 		_scriptCallbacksBuffer.push_back(pBufferedScriptCall);
 		++_scriptCallbacksBufferNum;
+		return hasEntityCallable;
 	}
-	else
+
+	// owner 或组件回调都可能销毁 Entity；强引用必须覆盖完整分发过程。
+	// Either the owner or a component callback may destroy the Entity, so retain it for the entire dispatch.
+	Py_INCREF(this);
+
+	if (hasEntityCallable)
 	{
 		PyObject* pyResult = PyObject_CallObject(pyCallable, funcArgs);
 
 		Py_DECREF(pyCallable);
-
-		if (funcArgs)
-			Py_DECREF(funcArgs);
 
 		if (pyResult)
 		{
@@ -1359,7 +1361,51 @@ bool Entity::bufferOrExeCallback(const char * funcName, PyObject * funcArgs, boo
 		}
 	}
 
-	return true;
+	// owner 是否实现回调与组件是否实现回调相互独立，不能用 owner 的查找结果提前结束分发。
+	// Owner and component callback availability are independent, so an owner lookup miss must not terminate component dispatch.
+	ScriptDefModule::COMPONENTDESCRIPTION_MAP& componentDescrs = pScriptModule_->getComponentDescrs();
+	for (ScriptDefModule::COMPONENTDESCRIPTION_MAP::iterator iter = componentDescrs.begin();
+		iter != componentDescrs.end(); ++iter)
+	{
+		if (!iter->second->hasCell())
+			continue;
+
+		PyObject* pyComponent = PyObject_GetAttrString(this, iter->first.c_str());
+		if (!pyComponent)
+		{
+			SCRIPT_ERROR_CHECK();
+			continue;
+		}
+
+		PyObject* pyComponentCallable = PyObject_GetAttrString(pyComponent, const_cast<char*>(funcName));
+		if (!pyComponentCallable)
+		{
+			PyErr_Clear();
+			Py_DECREF(pyComponent);
+			continue;
+		}
+
+		PyObject* pyResult = PyObject_CallObject(pyComponentCallable, funcArgs);
+		Py_DECREF(pyComponentCallable);
+		Py_DECREF(pyComponent);
+
+		if (pyResult)
+		{
+			AsyncioHelper::submitCoroutine(pyResult);
+			Py_DECREF(pyResult);
+		}
+		else
+		{
+			PyErr_PrintEx(0);
+		}
+	}
+
+	if (funcArgs)
+		Py_DECREF(funcArgs);
+
+	Py_DECREF(this);
+
+	return hasEntityCallable;
 }
 
 //-------------------------------------------------------------------------------------
@@ -1381,19 +1427,65 @@ void Entity::bufferCallback(bool enable)
 				_scriptCallbacksBuffer.pop_front();
 				--_scriptCallbacksBufferNum;
 
-				PyObject* pyResult = PyObject_CallObject(pBufferedScriptCall->pyCallable, pBufferedScriptCall->pyFuncArgs);
-
-				if (pyResult)
+				if (pBufferedScriptCall->pyCallable)
 				{
-					AsyncioHelper::submitCoroutine(pyResult);
-					Py_DECREF(pyResult);
-				}
-				else
-				{
-					PyErr_PrintEx(0);
+					PyObject* pyResult = PyObject_CallObject(
+						pBufferedScriptCall->pyCallable, pBufferedScriptCall->pyFuncArgs);
+					if (pyResult)
+					{
+						AsyncioHelper::submitCoroutine(pyResult);
+						Py_DECREF(pyResult);
+					}
+					else
+					{
+						PyErr_PrintEx(0);
+					}
 				}
 
-				Py_DECREF(pBufferedScriptCall->pyCallable);
+				// 组件在回放时重新解析，确保使用当前仍挂载的组件对象，并保持与 owner 相同的缓冲顺序。
+				// Resolve components during replay so the currently attached objects run in the same buffered order as the owner.
+				ScriptDefModule::COMPONENTDESCRIPTION_MAP& componentDescrs =
+					pBufferedScriptCall->entityPtr->pScriptModule()->getComponentDescrs();
+				for (ScriptDefModule::COMPONENTDESCRIPTION_MAP::iterator iter = componentDescrs.begin();
+					iter != componentDescrs.end(); ++iter)
+				{
+					if (!iter->second->hasCell())
+						continue;
+
+					PyObject* pyComponent = PyObject_GetAttrString(
+						pBufferedScriptCall->entityPtr.get(), iter->first.c_str());
+					if (!pyComponent)
+					{
+						SCRIPT_ERROR_CHECK();
+						continue;
+					}
+
+					PyObject* pyComponentCallable = PyObject_GetAttrString(
+						pyComponent, pBufferedScriptCall->funcName.c_str());
+					if (pyComponentCallable)
+					{
+						PyObject* pyComponentResult = PyObject_CallObject(
+							pyComponentCallable, pBufferedScriptCall->pyFuncArgs);
+						Py_DECREF(pyComponentCallable);
+						if (pyComponentResult)
+						{
+							AsyncioHelper::submitCoroutine(pyComponentResult);
+							Py_DECREF(pyComponentResult);
+						}
+						else
+						{
+							PyErr_PrintEx(0);
+						}
+					}
+					else
+					{
+						PyErr_Clear();
+					}
+
+					Py_DECREF(pyComponent);
+				}
+
+				Py_XDECREF(pBufferedScriptCall->pyCallable);
 				if (pBufferedScriptCall->pyFuncArgs)
 					Py_DECREF(pBufferedScriptCall->pyFuncArgs);
 

@@ -623,6 +623,9 @@ private:
 		PyObject *		pyCallable;
 		// 可以为NULL， NULL说明没有参数
 		PyObject *		pyFuncArgs;
+		// 缓冲可能跨越多个 Tick，复制方法名可避免调用方临时字符串失效。
+		// Buffering may span multiple ticks, so copy the method name instead of retaining caller-owned storage.
+		std::string		funcName;
 	};
 
 	typedef std::list<BufferedScriptCall*>					BufferedScriptCallArray;
