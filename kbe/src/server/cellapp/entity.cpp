@@ -3828,6 +3828,19 @@ void Entity::teleport(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& di
 
 	Py_INCREF(this);
 
+	// 前置回调是同步决策点，必须在任何本地移动或跨进程迁移状态变更之前执行一次。
+	// The pre-teleport callback is a synchronous decision point and must run once before any local move or cross-process migration state change.
+	if (!onTeleport())
+	{
+		// 回调可能已经销毁实体；此时不得再次进入失败回调访问已销毁的脚本状态。
+		// The callback may already have destroyed the Entity, in which case the failure callback must not re-enter destroyed script state.
+		if (!isDestroyed())
+			onTeleportFailure();
+
+		Py_DECREF(this);
+		return;
+	}
+
 	// 如果为None则是entity自己想在本space上跳转到某位置
 	if(nearbyMBRef == Py_None)
 	{
@@ -3876,12 +3889,95 @@ void Entity::teleport(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& di
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::onTeleport()
+bool Entity::onTeleport()
 {
-	// 这个方法仅在base.teleport跳转之前被调用， cell.teleport是不会被调用的。
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-	bufferOrExeCallback(const_cast<char*>("onTeleport"), NULL);
+	bool allowed = true;
+
+	// 此回调必须同步返回拒绝结果，不能进入普通回调缓冲或异步协程提交路径。
+	// This callback must return its rejection decision synchronously, so it cannot use the regular callback buffer or coroutine submission path.
+	Py_INCREF(this);
+
+	PyObject* pyCallable = PyObject_GetAttrString(this, const_cast<char*>("onTeleport"));
+	if (pyCallable)
+	{
+		PyObject* pyResult = PyObject_CallObject(pyCallable, NULL);
+		Py_DECREF(pyCallable);
+
+		if (pyResult)
+		{
+			// 仅显式 False 拒绝传送；None 和其他返回值保持旧脚本的默认允许行为。
+			// Only an explicit False rejects teleportation; None and other values preserve the legacy default-allow behavior.
+			allowed = !PyBool_Check(pyResult) || pyResult == Py_True;
+			Py_DECREF(pyResult);
+		}
+		else
+		{
+			PyErr_PrintEx(0);
+		}
+	}
+	else
+	{
+		PyErr_Clear();
+	}
+
+	// owner 回调可能销毁实体，销毁后不得继续解析组件对象。
+	// The owner callback may destroy the Entity, after which component objects must not be resolved.
+	if (isDestroyed())
+		allowed = false;
+
+	if (allowed)
+	{
+		ScriptDefModule::COMPONENTDESCRIPTION_MAP& componentDescrs = pScriptModule_->getComponentDescrs();
+		for (ScriptDefModule::COMPONENTDESCRIPTION_MAP::iterator iter = componentDescrs.begin();
+			iter != componentDescrs.end(); ++iter)
+		{
+			if (!iter->second->hasCell())
+				continue;
+
+			PyObject* pyComponent = PyObject_GetAttrString(this, iter->first.c_str());
+			if (!pyComponent)
+			{
+				SCRIPT_ERROR_CHECK();
+				continue;
+			}
+
+			PyObject* pyComponentCallable = PyObject_GetAttrString(
+				pyComponent, const_cast<char*>("onTeleport"));
+			if (!pyComponentCallable)
+			{
+				PyErr_Clear();
+				Py_DECREF(pyComponent);
+				continue;
+			}
+
+			PyObject* pyComponentResult = PyObject_CallObject(pyComponentCallable, NULL);
+			Py_DECREF(pyComponentCallable);
+			Py_DECREF(pyComponent);
+
+			if (pyComponentResult)
+			{
+				allowed = !PyBool_Check(pyComponentResult) || pyComponentResult == Py_True;
+				Py_DECREF(pyComponentResult);
+			}
+			else
+			{
+				PyErr_PrintEx(0);
+			}
+
+			// 任一组件拒绝或销毁实体都立即停止，避免产生部分决策或访问失效组件。
+			// Stop immediately when a component rejects or destroys the Entity to avoid partial decisions or invalid component access.
+			if (!allowed || isDestroyed())
+			{
+				allowed = false;
+				break;
+			}
+		}
+	}
+
+	Py_DECREF(this);
+	return allowed;
 }
 
 //-------------------------------------------------------------------------------------

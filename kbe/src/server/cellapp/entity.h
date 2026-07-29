@@ -233,9 +233,10 @@ public:
 	void onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Direction3D& dir);
 
 	/**
-		传送成功和失败相关回调
+		传送前置决策以及成功、失败回调；onTeleport返回false时拒绝传送。
+		Pre-teleport decision and completion callbacks; returning false from onTeleport rejects the teleport.
 	*/
-	void onTeleport();
+	bool onTeleport();
 	void onTeleportFailure();
 	void onTeleportSuccess(PyObject* nearbyEntity, SPACE_ID lastSpaceID);
 	void onReqTeleportOtherAck(Network::Channel* pChannel, ENTITY_ID nearbyMBRefID, 
