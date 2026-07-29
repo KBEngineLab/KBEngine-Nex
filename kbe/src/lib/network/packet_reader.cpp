@@ -90,7 +90,7 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 				TRACE_MESSAGE_PACKET(true, pPacket1, pMsgHandler, pPacket1->length(), pChannel_->c_str(), false);
 				
 				// 用作调试时比对
-				uint32 rpos = pPacket1->rpos();
+				size_t rpos = pPacket1->rpos();
 				pPacket1->rpos(0);
 				TRACE_MESSAGE_PACKET(true, pPacket1, pMsgHandler, pPacket1->length(), pChannel_->c_str(), false);
 				pPacket1->rpos(rpos);
@@ -172,7 +172,7 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 				TRACE_MESSAGE_PACKET(true, pPacket1, pMsgHandler, pPacket1->length(), pChannel_->c_str(), false);
 
 				// 用作调试时比对
-				uint32 rpos = pPacket1->rpos();
+				size_t rpos = pPacket1->rpos();
 				pPacket1->rpos(0);
 				TRACE_MESSAGE_PACKET(true, pPacket1, pMsgHandler, pPacket1->length(), pChannel_->c_str(), false);
 				pPacket1->rpos(rpos);
@@ -240,11 +240,15 @@ void PacketReader::writeFragmentMessage(FragmentDataTypes fragmentDatasFlag, Pac
 	KBE_ASSERT(pFragmentDatas_ == NULL);
 
 	size_t opsize = pPacket->length();
-	pFragmentDatasRemain_ = datasize - opsize;
+	// 调用方只在当前包不足以填满协议字段时进入，因此转换前已经证明长度可由uint32表示。
+	// Callers enter only when the packet cannot fill the protocol field, so the length is proven to fit uint32 before conversion.
+	KBE_ASSERT(opsize < static_cast<size_t>(datasize));
+	const uint32 fragmentSize = static_cast<uint32>(opsize);
+	pFragmentDatasRemain_ = datasize - fragmentSize;
 	pFragmentDatas_ = new uint8[opsize + pFragmentDatasRemain_ + 1];
 
 	fragmentDatasFlag_ = fragmentDatasFlag;
-	pFragmentDatasWpos_ = opsize;
+	pFragmentDatasWpos_ = fragmentSize;
 
 	if(pPacket->length() > 0)
 	{
@@ -307,8 +311,11 @@ void PacketReader::mergeFragmentMessage(Packet* pPacket)
 	else
 	{
 		memcpy(pFragmentDatas_ + pFragmentDatasWpos_, pPacket->data(), opsize);
-		pFragmentDatasRemain_ -= opsize;
-		pFragmentDatasWpos_ += opsize;
+		// 当前分支已证明opsize小于32位剩余长度，单次转换后同时更新剩余量和写入位置。
+		// This branch proves opsize is below the 32-bit remainder; convert once to update both counters consistently.
+		const uint32 fragmentSize = static_cast<uint32>(opsize);
+		pFragmentDatasRemain_ -= fragmentSize;
+		pFragmentDatasWpos_ += fragmentSize;
 		pPacket->rpos(pPacket->rpos() + opsize);
 
 		//DEBUG_MSG(fmt::format("PacketReader::mergeFragmentMessage({}): channel[{:p}], fragmentDatasFlag={}, remainsize={}, currMsgID={}, currMsgLen={}.\n",
