@@ -753,8 +753,8 @@ bool KBEAccountTableMysql::updatePassword(DBInterface * pdbi, const std::string&
 		tbuf1, name.c_str(), name.size());
 
 	// 如果查询失败则返回存在， 避免可能产生的错误
-	if(!pdbi->query(fmt::format("update " KBE_TABLE_PERFIX "_accountinfos set password=\"{}\" where accountName like \"{}\"", 
-		password, tbuf1), false))
+	if(!pdbi->query(fmt::format("update " KBE_TABLE_PERFIX "_accountinfos set password='{}' where accountName like '{}'",
+		tbuf, tbuf1), false))
 	{
 		SAFE_RELEASE_ARRAY(tbuf);
 		SAFE_RELEASE_ARRAY(tbuf1);
@@ -780,12 +780,13 @@ bool KBEAccountTableMysql::logAccount(DBInterface * pdbi, ACCOUNT_INFOS& info)
 	sqlstr += tbuf;
 	sqlstr += "\",";
 
-	mysql_real_escape_string(static_cast<DBInterfaceMysql*>(pdbi)->mysql(), 
-		tbuf, info.password.c_str(), info.password.size());
-
-	sqlstr += "md5(\"";
-	sqlstr += tbuf;
-	sqlstr += "\"),";
+	// MySQL 9移除了服务端MD5函数；必须对原始密码字节求摘要，不能对SQL转义文本求摘要。
+	// MySQL 9 removed the server-side MD5 function; hash the original password bytes rather than their SQL-escaped representation.
+	const std::string passwordDigest = KBE_MD5::getDigest(
+		info.password.data(), static_cast<int>(info.password.size()));
+	sqlstr += "'";
+	sqlstr += passwordDigest;
+	sqlstr += "',";
 
 	mysql_real_escape_string(static_cast<DBInterfaceMysql*>(pdbi)->mysql(), 
 		tbuf, info.datas.data(), info.datas.size());
