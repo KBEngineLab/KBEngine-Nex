@@ -888,16 +888,23 @@ bool Components::updateComponentInfos(const Components::ComponentInfos* info)
 		}
 
 		int len = epListen.recv(packet.data(), recvsize);
+		if(len <= 0)
+		{
+			// 可读通知与实际读取之间可能发生关闭或暂时无数据，单次空读不足以证明组件已经失效。
+			// A close or temporary data gap may occur between readiness and recv; one empty read is insufficient evidence that the component is dead.
+			WARNING_MSG(fmt::format(
+				"Components::updateComponentInfos: query {}({}) at {} returned {}; keep component for the next health check.\n",
+				COMPONENT_NAME_EX(info->componentType), info->cid, info->pIntAddr->c_str(), len));
+			return true;
+		}
+
 		packet.wpos(len);
-		
+
 		if(recvsize != len)
 		{
 			WARNING_MSG(fmt::format("Components::updateComponentInfos: packet invalid(recvsize({}) != ctype_cid_len({}).\n" 
 				, len, recvsize));
 			
-			if(len == 0)
-				return false;
-
 			return true;
 		}
 
@@ -1286,15 +1293,16 @@ bool Components::findComponents()
 			int32 timeout = 1500000;
 			// 启动期间 Machine 可能正在处理集群状态查询；短暂超时属于正常重试，持续失败才升级为错误。
 			// Machine may be servicing a cluster-status query during startup; transient timeouts are normal retries, while persistent failures escalate.
-			bool showerr = count > 3;
+			const bool reportTimeout = count > 3;
 			MachineInterface::onBroadcastInterfaceArgs25 args;
 
 RESTART_RECV:
 
-			if(bhandler.receive(&args, 0, timeout, showerr))
+			// BundleBroadcast不了解当前目标和已缓存组件，由本层统一决定何时输出可诊断错误。
+			// BundleBroadcast does not know the current target or cached components, so this layer decides when a diagnostic error is warranted.
+			if(bhandler.receive(&args, 0, timeout, false))
 			{
 				bool isContinue = false;
-				showerr = false;
 				timeout = 1000000;
 
 				do
@@ -1373,9 +1381,11 @@ RESTART_RECV:
 				}
 				else
 				{
-					if(showerr)
+					if(reportTimeout)
 					{
-						ERROR_MSG("Components::findComponents: receive error!\n");
+						ERROR_MSG(fmt::format(
+							"Components::findComponents: no response while finding {} after {} attempts; retrying.\n",
+							COMPONENT_NAME_EX((COMPONENT_TYPE)findComponentType), count));
 					}
 
 					// 如果是这些辅助组件没找到则跳过
@@ -1537,6 +1547,9 @@ bool Components::process()
 			// 向局域网内广播UDP包，提交自己的身份
 			// Broadcast the component identity over UDP to the local network.
 			Network::BundleBroadcast bhandler(*pNetworkInterface(), 0);
+			// 身份探测只等待当前窗口；后续组件发现和注册会继续验证Machine及目标组件可达性。
+			// Identity probing waits for one window only; later discovery and registration continue validating Machine and target reachability.
+			bhandler.itry(0);
 
 			if (!bhandler.good())
 			{
@@ -1570,7 +1583,7 @@ bool Components::process()
 
 			// 等待返回信息，如果存在返回说明身份已经被使用，该进程不合法，程序接下来会退出
 			// 如果没有返回说明没有machine对此进程有意见，可以成功启动
-			int32 timeout = 500000;
+			int32 timeout = 100000;
 			MachineInterface::onBroadcastInterfaceArgs25 args;
 
 			if(bhandler.receive(&args, 0, timeout, false))
@@ -1618,7 +1631,10 @@ bool Components::process()
 
 		state_ = 1;
 
-		return true;
+		// 身份确认后立即启动第一轮发现，避免状态切换额外等待一秒。
+		// Start the first discovery round immediately after identity confirmation instead of waiting an extra second for the state transition.
+		if(!findComponents())
+			return true;
 	}
 	else
 	{
