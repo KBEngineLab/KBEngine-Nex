@@ -498,7 +498,9 @@ bool InterfacesHandler_Interfaces::reconnect()
 
 	if(pInterfacesChannel->pEndPoint()->connect() == -1)
 	{
-		struct timeval tv = { 0, 2000000 }; // 1000ms
+		// timeval要求微秒字段小于一秒；使用规范化的两秒值可避免POSIX select以EINVAL立即失败。
+		// timeval requires a sub-second microsecond field; a normalized two-second value prevents POSIX select from failing immediately with EINVAL.
+		struct timeval tv = { 2, 0 };
 		fd_set frds, fwds;
 		FD_ZERO( &frds );
 		FD_ZERO( &fwds );
