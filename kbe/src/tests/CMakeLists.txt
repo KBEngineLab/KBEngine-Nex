@@ -35,6 +35,9 @@ set_tests_properties(runtime.kbcmd_getuid PROPERTIES
 )
 
 set(KBE_TEST_ASSETS "" CACHE PATH "Assets directory used by CMake integration tests")
+set(KBE_TEST_DATABASE_HOST "127.0.0.1" CACHE STRING "Database host used by CMake integration tests")
+set(KBE_TEST_DATABASE_USERNAME "" CACHE STRING "Database username used by CMake integration tests")
+set(KBE_TEST_DATABASE_PASSWORD "" CACHE STRING "Database password used by CMake integration tests")
 if(KBE_TEST_ASSETS)
     cmake_path(ABSOLUTE_PATH KBE_TEST_ASSETS NORMALIZE OUTPUT_VARIABLE _kbe_test_assets)
     if(NOT EXISTS "${_kbe_test_assets}/res/server/kbengine.xml" AND NOT EXISTS "${_kbe_test_assets}/kbengine.xml")
@@ -90,5 +93,45 @@ if(KBE_TEST_ASSETS)
             RUN_SERIAL TRUE
             TIMEOUT 180
         )
+
+        if(KBE_TEST_DATABASE_USERNAME)
+            # 每个后端使用独立数据库和独立日志目录，避免测试改动课程项目正在使用的数据。
+            # Each backend uses an isolated database and log directory so tests cannot modify the course project's active data.
+            foreach(_kbe_database_spec IN ITEMS
+                "mysql::3306::kbe_cmake_mysql_test"
+                "mongodb::27017::kbe_cmake_mongodb_test"
+                "postgresql::5432::kbe_cmake_postgresql_test"
+            )
+                string(REPLACE "::" ";" _kbe_database_fields "${_kbe_database_spec}")
+                list(GET _kbe_database_fields 0 _kbe_database_type)
+                list(GET _kbe_database_fields 1 _kbe_database_port)
+                list(GET _kbe_database_fields 2 _kbe_database_name)
+
+                add_test(NAME "integration.database_${_kbe_database_type}"
+                    COMMAND powershell.exe
+                        -NoLogo
+                        -NoProfile
+                        -NonInteractive
+                        -ExecutionPolicy Bypass
+                        -File "${CMAKE_CURRENT_SOURCE_DIR}/powershell/Test-ServerCluster.ps1"
+                        -Components "${_kbe_cluster_components_arg}"
+                        -RepositoryRoot "${CMAKE_SOURCE_DIR}/../.."
+                        -AssetsRoot "${_kbe_test_assets}"
+                        -BinaryRoot "${CMAKE_BINARY_DIR}"
+                        -RunRoot "${CMAKE_BINARY_DIR}/Testing/database-${_kbe_database_type}-$<CONFIG>"
+                        -DatabaseType "${_kbe_database_type}"
+                        -DatabaseHost "${KBE_TEST_DATABASE_HOST}"
+                        -DatabasePort "${_kbe_database_port}"
+                        -DatabaseName "${_kbe_database_name}"
+                        -DatabaseUsername "${KBE_TEST_DATABASE_USERNAME}"
+                        -DatabasePassword "${KBE_TEST_DATABASE_PASSWORD}"
+                )
+                set_tests_properties("integration.database_${_kbe_database_type}" PROPERTIES
+                    LABELS "database;integration;runtime;server;${_kbe_database_type}"
+                    RUN_SERIAL TRUE
+                    TIMEOUT 240
+                )
+            endforeach()
+        endif()
     endif()
 endif()

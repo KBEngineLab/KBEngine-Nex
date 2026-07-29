@@ -14,6 +14,20 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$RunRoot,
 
+    [ValidateSet('mysql', 'mongodb', 'postgresql')]
+    [string]$DatabaseType,
+
+    [string]$DatabaseHost = '127.0.0.1',
+
+    [ValidateRange(1, 65535)]
+    [int]$DatabasePort,
+
+    [string]$DatabaseName,
+
+    [string]$DatabaseUsername,
+
+    [string]$DatabasePassword,
+
     [ValidateRange(10, 150)]
     [int]$StartupTimeoutSeconds = 90
 )
@@ -37,6 +51,113 @@ function Read-LogFile {
     }
 
     return Get-Content -LiteralPath $Path -Raw -ErrorAction Stop
+}
+
+function Read-ComponentOutput {
+    param(
+        [Parameter(Mandatory = $true)]$Entry,
+        [Parameter(Mandatory = $true)][string]$Root
+    )
+
+    $output = (Read-LogFile -Path $Entry.Stdout) + "`n" + (Read-LogFile -Path $Entry.Stderr)
+    $engineLogRoot = Join-Path $Root 'logs'
+    if (Test-Path -LiteralPath $engineLogRoot -PathType Container) {
+        foreach ($logPattern in @("$($Entry.Spec.Name)*.log", "logger_$($Entry.Spec.Name).log")) {
+            foreach ($engineLog in Get-ChildItem -LiteralPath $engineLogRoot -File -Filter $logPattern) {
+                $output += "`n" + (Read-LogFile -Path $engineLog.FullName)
+            }
+        }
+    }
+    return $output
+}
+
+function Read-AllRunLogs {
+    param(
+        [Parameter(Mandatory = $true)]$Entries,
+        [Parameter(Mandatory = $true)][string]$Root
+    )
+
+    $output = ''
+    foreach ($entry in $Entries) {
+        $output += "`n" + (Read-LogFile -Path $entry.Stdout)
+        $output += "`n" + (Read-LogFile -Path $entry.Stderr)
+    }
+
+    $engineLogRoot = Join-Path $Root 'logs'
+    if (Test-Path -LiteralPath $engineLogRoot -PathType Container) {
+        foreach ($engineLog in Get-ChildItem -LiteralPath $engineLogRoot -File -Filter '*.log') {
+            $output += "`n" + (Read-LogFile -Path $engineLog.FullName)
+        }
+    }
+    return $output
+}
+
+function Set-XmlElementValue {
+    param(
+        [Parameter(Mandatory = $true)][System.Xml.XmlElement]$Parent,
+        [Parameter(Mandatory = $true)][string]$Name,
+        [AllowEmptyString()][string]$Value
+    )
+
+    $element = $Parent.SelectSingleNode($Name)
+    if ($null -eq $element) {
+        $element = $Parent.OwnerDocument.CreateElement($Name)
+        [void]$Parent.AppendChild($element)
+    }
+    $element.InnerText = $Value
+}
+
+function New-DatabaseConfigOverlay {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourceAssets,
+        [Parameter(Mandatory = $true)][string]$DestinationRoot
+    )
+
+    $sourceConfig = Join-Path $SourceAssets 'res/server/kbengine.xml'
+    if (-not (Test-Path -LiteralPath $sourceConfig -PathType Leaf)) {
+        $sourceConfig = Join-Path $SourceAssets 'kbengine.xml'
+    }
+    if (-not (Test-Path -LiteralPath $sourceConfig -PathType Leaf)) {
+        throw "Assets do not contain a kbengine.xml database configuration: $SourceAssets"
+    }
+
+    $document = [System.Xml.XmlDocument]::new()
+    $document.PreserveWhitespace = $true
+    $document.Load($sourceConfig)
+    $database = $document.SelectSingleNode('/root/dbmgr/databaseInterfaces/default')
+    if ($null -eq $database) {
+        throw "Database interface 'default' is missing from $sourceConfig"
+    }
+
+    Set-XmlElementValue -Parent $database -Name 'type' -Value $DatabaseType
+    Set-XmlElementValue -Parent $database -Name 'host' -Value $DatabaseHost
+    Set-XmlElementValue -Parent $database -Name 'port' -Value ([string]$DatabasePort)
+    Set-XmlElementValue -Parent $database -Name 'databaseName' -Value $DatabaseName
+
+    $auth = $database.SelectSingleNode('auth')
+    if ($null -eq $auth) {
+        $auth = $document.CreateElement('auth')
+        [void]$database.AppendChild($auth)
+    }
+    Set-XmlElementValue -Parent $auth -Name 'username' -Value $DatabaseUsername
+    Set-XmlElementValue -Parent $auth -Name 'password' -Value $DatabasePassword
+    Set-XmlElementValue -Parent $auth -Name 'encrypt' -Value 'false'
+    Set-XmlElementValue -Parent $auth -Name 'authSource' -Value $(if ($DatabaseType -eq 'mongodb') { 'admin' } else { '' })
+
+    $configDirectory = Join-Path $DestinationRoot 'res/server'
+    New-Item -ItemType Directory -Path $configDirectory -Force | Out-Null
+    $destinationConfig = Join-Path $configDirectory 'kbengine.xml'
+    $settings = [System.Xml.XmlWriterSettings]::new()
+    $settings.Encoding = [System.Text.UTF8Encoding]::new($false)
+    $settings.Indent = $false
+    $writer = [System.Xml.XmlWriter]::Create($destinationConfig, $settings)
+    try {
+        $document.Save($writer)
+    } finally {
+        $writer.Dispose()
+    }
+
+    return (Join-Path $DestinationRoot 'res')
 }
 
 $repositoryPath = Get-NormalizedPath -Path $RepositoryRoot
@@ -79,13 +200,30 @@ if (Test-Path -LiteralPath $runPath) {
 }
 New-Item -ItemType Directory -Path $runPath -Force | Out-Null
 
+$resourceRoots = [System.Collections.Generic.List[string]]::new()
+$overlayPath = $null
+if ($DatabaseType) {
+    if ($DatabasePort -eq 0 -or [string]::IsNullOrWhiteSpace($DatabaseName) -or
+        [string]::IsNullOrWhiteSpace($DatabaseUsername)) {
+        throw 'DatabaseType requires DatabasePort, DatabaseName, and DatabaseUsername.'
+    }
+
+    # 覆盖文件只写入 Testing 目录，原始 assets 始终保持只读。
+    # The override is written only under Testing, keeping the source assets strictly read-only.
+    $overlayPath = New-DatabaseConfigOverlay -SourceAssets $assetsPath -DestinationRoot (Join-Path $runPath 'config-overlay')
+}
+if ($overlayPath) {
+    # Resmgr 使用首个匹配资源，覆盖目录必须先于原 assets。
+    # Resmgr uses the first matching resource, so the overlay must precede the source assets.
+    $resourceRoots.Add($overlayPath)
+}
+$resourceRoots.Add((Join-Path $repositoryPath 'kbe/res'))
+$resourceRoots.Add($assetsPath)
+$resourceRoots.Add((Join-Path $assetsPath 'scripts'))
+$resourceRoots.Add((Join-Path $assetsPath 'res'))
+
 $env:KBE_ROOT = $repositoryPath
-$env:KBE_RES_PATH = @(
-    Join-Path $repositoryPath 'kbe/res'
-    $assetsPath
-    Join-Path $assetsPath 'scripts'
-    Join-Path $assetsPath 'res'
-) -join ';'
+$env:KBE_RES_PATH = $resourceRoots -join ';'
 $env:KBE_BIN_PATH = Split-Path -Parent $componentSpecs[0].Executable
 
 $started = [System.Collections.Generic.List[object]]::new()
@@ -128,8 +266,8 @@ try {
                 throw "$($entry.Spec.Name) exited during startup with code $($entry.Process.ExitCode)."
             }
 
-            $stdout = Read-LogFile -Path $entry.Stdout
-            if ($stdout -notmatch "----\s+$([regex]::Escape($entry.Spec.Name))\s+is running\s+----") {
+            $componentOutput = Read-ComponentOutput -Entry $entry -Root $runPath
+            if ($componentOutput -notmatch "----\s+$([regex]::Escape($entry.Spec.Name))\s+is running\s+----") {
                 $allRunning = $false
             }
         }
@@ -142,34 +280,59 @@ try {
 
     if (-not $allRunning) {
         $pending = @($started | Where-Object {
-            (Read-LogFile -Path $_.Stdout) -notmatch "----\s+$([regex]::Escape($_.Spec.Name))\s+is running\s+----"
+            (Read-ComponentOutput -Entry $_ -Root $runPath) -notmatch "----\s+$([regex]::Escape($_.Spec.Name))\s+is running\s+----"
         } | ForEach-Object { $_.Spec.Name })
         throw "Components did not reach running state before timeout: $($pending -join ', ')."
     }
 
-    Start-Sleep -Seconds 5
+    $discoveryDeadline = [DateTime]::UtcNow.AddSeconds(30)
+    do {
+        $managersReady = $true
+        foreach ($managerName in @('baseappmgr', 'cellappmgr')) {
+            $manager = $started | Where-Object { $_.Spec.Name -eq $managerName }
+            if ((Read-ComponentOutput -Entry $manager -Root $runPath) -notmatch 'Found all the components!') {
+                $managersReady = $false
+            }
+        }
+        if ($managersReady) {
+            break
+        }
+        Start-Sleep -Milliseconds 250
+    } while ([DateTime]::UtcNow -lt $discoveryDeadline)
+
+    if (-not $managersReady) {
+        throw 'BaseAppMgr and CellAppMgr did not complete component discovery before timeout.'
+    }
+
     foreach ($entry in $started) {
         if ($entry.Process.HasExited) {
             throw "$($entry.Spec.Name) exited after reporting ready with code $($entry.Process.ExitCode)."
         }
 
-        $combinedLog = (Read-LogFile -Path $entry.Stdout) + "`n" + (Read-LogFile -Path $entry.Stderr)
-        if ($combinedLog -match '\[ERROR\]' -or
-            $combinedLog -match '\[FATAL\]' -or
-            $combinedLog -match 'Traceback \(most recent call last\)' -or
-            $combinedLog -match 'Unhandled exception') {
-            throw "$($entry.Spec.Name) emitted an error. See $($entry.Stdout) and $($entry.Stderr)."
+    }
+
+    # 组件注册 Logger 后会把正式日志写入 RunRoot/logs，验收必须覆盖该目录而非只看启动期 stdout。
+    # Components route formal logs into RunRoot/logs after Logger registration, so validation must inspect them as well as startup stdout.
+    $combinedLog = Read-AllRunLogs -Entries $started -Root $runPath
+    if ($combinedLog -match '\[ERROR\]' -or
+        $combinedLog -match '\[FATAL\]' -or
+        $combinedLog -match '(?m)^\s*(ERROR|FATAL)\s' -or
+        $combinedLog -match 'Traceback \(most recent call last\)' -or
+        $combinedLog -match 'Unhandled exception') {
+        throw "Server cluster emitted an error. See logs under $runPath."
+    }
+
+    if ($DatabaseType) {
+        $dbmgr = $started | Where-Object { $_.Spec.Name -eq 'dbmgr' }
+        $dbmgrOutput = Read-ComponentOutput -Entry $dbmgr -Root $runPath
+        $databasePattern = "(type|dbtype)=$([regex]::Escape($DatabaseType)).*(db|currdatabase)=$([regex]::Escape($DatabaseName)).*connected=(yes|true)"
+        if ($dbmgrOutput -notmatch $databasePattern) {
+            throw "DBMgr did not confirm the requested $DatabaseType database '$DatabaseName' as connected."
         }
     }
 
-    foreach ($managerName in @('baseappmgr', 'cellappmgr')) {
-        $manager = $started | Where-Object { $_.Spec.Name -eq $managerName }
-        if ((Read-LogFile -Path $manager.Stdout) -notmatch 'Found all the components!') {
-            throw "$managerName did not complete component discovery."
-        }
-    }
-
-    Write-Output "SERVER_CLUSTER_PASS components=$($started.Count)"
+    $databaseResult = if ($DatabaseType) { " database=$DatabaseType" } else { '' }
+    Write-Output "SERVER_CLUSTER_PASS components=$($started.Count)$databaseResult"
 }
 finally {
     # 只反向停止本次 Start-Process 返回的 PID，不按进程名清理其他开发或生产实例。

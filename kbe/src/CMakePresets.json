@@ -16,7 +16,9 @@
       "cacheVariables": {
         "VCPKG_TARGET_TRIPLET": "x64-windows-static",
         "VCPKG_INSTALLED_DIR": "${sourceDir}/vcpkg_installed",
-        "KBE_TEST_ASSETS": "$env{KBE_TEST_ASSETS}"
+        "KBE_TEST_ASSETS": "$env{KBE_TEST_ASSETS}",
+        "KBE_TEST_DATABASE_USERNAME": "$env{KBE_TEST_DATABASE_USERNAME}",
+        "KBE_TEST_DATABASE_PASSWORD": "$env{KBE_TEST_DATABASE_PASSWORD}"
       }
     }
   ],
