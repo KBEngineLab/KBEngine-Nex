@@ -84,7 +84,7 @@ public:
 	/**
 		帧解析相关
 	*/
-	static int makeFrame(FrameType frame_type, Packet* pInPacket, Packet* pOutPacket);
+	static size_t makeFrame(FrameType frame_type, Packet* pInPacket, Packet* pOutPacket);
 	static int getFrame(Packet* pPacket, uint8& msg_opcode, uint8& msg_fin, uint8& msg_masked, uint32& msg_mask, 
 		int32& msg_length_field, uint64& msg_payload_length, FrameType& frameType);
 

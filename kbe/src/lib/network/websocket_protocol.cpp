@@ -200,7 +200,7 @@ bool WebSocketProtocol::handshake(Network::Channel* pChannel, MemoryStream* s)
 }
 
 //-------------------------------------------------------------------------------------
-int WebSocketProtocol::makeFrame(WebSocketProtocol::FrameType frame_type, 
+size_t WebSocketProtocol::makeFrame(WebSocketProtocol::FrameType frame_type,
 	Packet * pInPacket, Packet * pOutPacket)
 {
 	uint64 size = pInPacket->length(); 
@@ -259,11 +259,10 @@ int WebSocketProtocol::getFrame(Packet * pPacket, uint8& msg_opcode, uint8& msg_
 
 	// 基础帧头只有两个字节；额外长度和 mask key 在各自分支继续做精确检查。
 	// The base frame header is two bytes; extended lengths and mask keys are checked precisely in their own branches.
-	int remainSize = 2 - pPacket->length();
-	if(remainSize > 0) 
+	if(pPacket->length() < 2)
 	{
 		frameType = INCOMPLETE_FRAME;
-		return remainSize;
+		return static_cast<int>(2 - pPacket->length());
 	}
 	
 	// 第一个字节, 最高位用于描述消息是否结束, 最低4位用于描述消息类型
@@ -292,11 +291,10 @@ int WebSocketProtocol::getFrame(Packet * pPacket, uint8& msg_opcode, uint8& msg_
 	else if(msg_length_field == 126) 
 	{ 
 		// 不足2字节，需要继续等待
-		remainSize = 2 - pPacket->length();
-		if(remainSize > 0) 
+		if(pPacket->length() < 2)
 		{
 			frameType = INCOMPLETE_FRAME;
-			return remainSize;
+			return static_cast<int>(2 - pPacket->length());
 		}
 	
 		uint8 bytedata1, bytedata2;
@@ -306,11 +304,10 @@ int WebSocketProtocol::getFrame(Packet * pPacket, uint8& msg_opcode, uint8& msg_
 	else if(msg_length_field == 127) 
 	{
 		// 不足8字节，需要继续等待
-		remainSize = 8 - pPacket->length();
-		if(remainSize > 0) 
+		if(pPacket->length() < 8)
 		{
 			frameType = INCOMPLETE_FRAME;
-			return remainSize;
+			return static_cast<int>(8 - pPacket->length());
 		}
 		
 		uint8 *pDatas = pPacket->data();
@@ -340,11 +337,10 @@ int WebSocketProtocol::getFrame(Packet * pPacket, uint8& msg_opcode, uint8& msg_
 	if(msg_masked) 
 	{
 		// 不足4字节，需要继续等待
-		remainSize = 4 - pPacket->length();
-		if(remainSize > 0) 
+		if(pPacket->length() < 4)
 		{
 			frameType = INCOMPLETE_FRAME;
-			return remainSize;
+			return static_cast<int>(4 - pPacket->length());
 		}
 		
 		(*pPacket) >> msg_mask;
