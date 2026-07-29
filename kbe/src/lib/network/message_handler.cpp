@@ -28,6 +28,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "helper/watcher.h"
 #include "xml/xml.h"
 #include "resmgr/resmgr.h"	
+#include <limits>
 
 namespace KBEngine { 
 namespace Network
@@ -36,6 +37,25 @@ Network::MessageHandlers* MessageHandlers::pMainMessageHandlers = 0;
 std::vector<MessageHandlers*>* g_pMessageHandlers;
 
 static Network::FixedMessages* g_fm;
+
+namespace
+{
+// 消息摘要格式历史上固定写入int32，因此保留字节格式并在累加前拒绝溢出。
+// The message digest format historically serializes int32, so preserve its bytes and reject overflow before accumulation.
+bool addDigestCount(int32& total, size_t count)
+{
+	const size_t maxCount = static_cast<size_t>(std::numeric_limits<int32>::max());
+	if(total < 0 || count > maxCount - static_cast<size_t>(total))
+	{
+		ERROR_MSG(fmt::format("MessageHandlers::getDigestStr(): digest item count exceeds int32, total={}, count={}.\n",
+			total, count));
+		return false;
+	}
+
+	total += static_cast<int32>(count);
+	return true;
+}
+}
 
 //-------------------------------------------------------------------------------------
 MessageHandlers::MessageHandlers(const std::string& name):
@@ -329,13 +349,17 @@ std::string MessageHandlers::getDigestStr()
 		}
 
 		std::vector<MessageHandlers*>& msgHandlers = messageHandlers();
-		isize += msgHandlers.size();
+		if(!addDigestCount(isize, msgHandlers.size()))
+			return "";
+
 		md5.append((void*)&isize, sizeof(int32));
 
 		std::vector<MessageHandlers*>::const_iterator rootiter = msgHandlers.begin();
 		for(; rootiter != msgHandlers.end(); ++rootiter)
 		{
-			isize += (*rootiter)->msgHandlers().size();
+			if(!addDigestCount(isize, (*rootiter)->msgHandlers().size()))
+				return "";
+
 			md5.append((void*)&isize, sizeof(int32));
 
 			MessageHandlerMap::const_iterator iter = (*rootiter)->msgHandlers().begin();
@@ -348,7 +372,10 @@ std::string MessageHandlers::getDigestStr()
 				md5.append((void*)&pMessageHandler->msgLen, sizeof(int32));
 				md5.append((void*)&pMessageHandler->exposed, sizeof(bool));
 	 
-				int32 argsize = pMessageHandler->pArgs->strArgsTypes.size();
+				int32 argsize = 0;
+				if(!addDigestCount(argsize, pMessageHandler->pArgs->strArgsTypes.size()))
+					return "";
+
 				md5.append((void*)&argsize, sizeof(int32));
 
 				int32 argstype = (int32)pMessageHandler->pArgs->type();

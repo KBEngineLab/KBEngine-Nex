@@ -32,7 +32,7 @@ KBE_MD5::KBE_MD5()
 }
 
 //-------------------------------------------------------------------------------------
-KBE_MD5::KBE_MD5(const void * data, int numBytes)
+KBE_MD5::KBE_MD5(const void * data, size_t numBytes)
 {
 	MD5_Init(&state_);
 	isFinal_ = false;
@@ -46,7 +46,7 @@ KBE_MD5::~KBE_MD5()
 }
 
 //-------------------------------------------------------------------------------------
-void KBE_MD5::append(const void * data, int numBytes)
+void KBE_MD5::append(const void * data, size_t numBytes)
 {
 	MD5_Update(&state_, (const unsigned char*)data, numBytes);
 }
@@ -105,7 +105,7 @@ bool KBE_MD5::operator<(const KBE_MD5 & other) const
 }
 
 //-------------------------------------------------------------------------------------
-std::string KBE_MD5::getDigest(const void * data, int numBytes)
+std::string KBE_MD5::getDigest(const void * data, size_t numBytes)
 {
 	KBE_MD5 md5 = KBE_MD5(data, numBytes);
 	return md5.getDigestStr();

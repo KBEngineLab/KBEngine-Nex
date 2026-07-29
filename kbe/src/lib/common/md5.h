@@ -22,6 +22,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #define KBENGINE_MD5_H
 
 #include "openssl/md5.h"
+#include <cstddef>
 #include <string>
 
 namespace KBEngine
@@ -34,10 +35,12 @@ class KBE_MD5
 {
 public:
 	KBE_MD5();
-	KBE_MD5(const void * data, int numBytes);
+	KBE_MD5(const void * data, size_t numBytes);
 	~KBE_MD5();
 
-	void append(const void * data, int numBytes);
+	// 长度与OpenSSL接口保持一致，避免大于INT_MAX的输入在封装层被截断。
+	// Match OpenSSL's size_t length so inputs larger than INT_MAX are not truncated by the wrapper.
+	void append(const void * data, size_t numBytes);
 	const unsigned char* getDigest();
 	std::string getDigestStr();
 
@@ -51,7 +54,7 @@ public:
 
 	bool operator<( const KBE_MD5 & other ) const;
 
-	static std::string getDigest(const void * data, int numBytes);
+	static std::string getDigest(const void * data, size_t numBytes);
 
 	bool isFinal() const{ return isFinal_; }
 
