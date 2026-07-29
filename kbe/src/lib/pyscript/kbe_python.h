@@ -22,6 +22,14 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #define KBE_PYTHON_H
 
 /*
+	使用带 # 的 Python 参数格式时必须采用 Py_ssize_t，否则 Python 3.12 会拒绝调用并抛出 SystemError。
+	Python argument formats containing # must use Py_ssize_t; otherwise Python 3.12 rejects the call with SystemError.
+*/
+#ifndef PY_SSIZE_T_CLEAN
+#	define PY_SSIZE_T_CLEAN
+#endif
+
+/*
 	KBE 的 Debug 配置仍使用 Python Release ABI；包含 CPython 头时临时隐藏 _DEBUG，避免头文件启用 Py_DEBUG 并自动链接 pythonXY_d.lib。
 	KBE Debug configurations still use Python's Release ABI; hide _DEBUG while including CPython headers so they neither enable Py_DEBUG nor auto-link pythonXY_d.lib.
 */

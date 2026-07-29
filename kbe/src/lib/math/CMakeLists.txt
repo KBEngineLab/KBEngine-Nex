@@ -13,3 +13,4 @@ add_library(math STATIC
 )
 
 kbe_configure_target(math)
+target_link_libraries(math PUBLIC common)

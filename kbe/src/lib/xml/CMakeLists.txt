@@ -7,3 +7,4 @@ add_library(xml STATIC
 )
 
 kbe_configure_target(xml)
+target_link_libraries(xml PUBLIC common)
