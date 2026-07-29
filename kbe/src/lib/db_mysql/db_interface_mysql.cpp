@@ -26,6 +26,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "thread/threadguard.h"
 #include "helper/watcher.h"
 #include "server/serverconfig.h"
+#include "resmgr/resmgr.h"
 
 namespace KBEngine { 
 
@@ -144,16 +145,77 @@ static void initializeWatcher()
 
 size_t DBInterfaceMysql::sql_max_allowed_packet_ = 0;
 //-------------------------------------------------------------------------------------
-DBInterfaceMysql::DBInterfaceMysql(const char* name, std::string characterSet, std::string collation) :
+DBInterfaceMysql::DBInterfaceMysql(const char* name, std::string characterSet, std::string collation,
+	const DBMysqlTLSInfo& tlsInfo) :
 DBInterface(name),
 pMysql_(NULL),
 hasLostConnection_(false),
 inTransaction_(false),
 lock_(NULL, false),
 characterSet_(characterSet),
-collation_(collation)
+collation_(collation),
+tlsInfo_(tlsInfo)
 {
 	lock_.pdbi(this);
+}
+
+//-------------------------------------------------------------------------------------
+bool DBInterfaceMysql::configureConnectionOptions()
+{
+	// Connector/C按my_bool读取这两个选项；使用精确类型可避免大端平台把整型首字节误判为false。
+	// Connector/C reads both options as my_bool; using the exact type prevents integer byte order from turning true into false on big-endian targets.
+	const my_bool sslEnabled = tlsInfo_.enabled ? 1 : 0;
+	const my_bool verifyServerCert = tlsInfo_.enabled && tlsInfo_.verifyServerCert ? 1 : 0;
+
+	if (mysql_options(mysql(), MYSQL_OPT_SSL_ENFORCE, &sslEnabled) != 0 ||
+		mysql_options(mysql(), MYSQL_OPT_SSL_VERIFY_SERVER_CERT, &verifyServerCert) != 0)
+	{
+		ERROR_MSG(fmt::format("DBInterfaceMysql::configureConnectionOptions: failed to configure TLS policy: {}.\n",
+			mysql_error(mysql())));
+		return false;
+	}
+
+	if (!tlsInfo_.enabled)
+		return true;
+
+	if (tlsInfo_.clientCertPath.empty() != tlsInfo_.clientKeyPath.empty())
+	{
+		ERROR_MSG("DBInterfaceMysql::configureConnectionOptions: sslCert and sslKey must be configured together.\n");
+		return false;
+	}
+
+	const std::string caPath = tlsInfo_.caPath.empty() ? std::string() :
+		Resmgr::getSingleton().matchRes(tlsInfo_.caPath);
+	const std::string certPath = tlsInfo_.clientCertPath.empty() ? std::string() :
+		Resmgr::getSingleton().matchRes(tlsInfo_.clientCertPath);
+	const std::string keyPath = tlsInfo_.clientKeyPath.empty() ? std::string() :
+		Resmgr::getSingleton().matchRes(tlsInfo_.clientKeyPath);
+
+	// 显式配置的文件必须存在，避免把路径错误延迟成难以定位的握手失败。
+	// Explicitly configured files must exist so path mistakes fail before an opaque TLS handshake error.
+	if ((!caPath.empty() && access(caPath.c_str(), 0) != 0) ||
+		(!certPath.empty() && access(certPath.c_str(), 0) != 0) ||
+		(!keyPath.empty() && access(keyPath.c_str(), 0) != 0))
+	{
+		ERROR_MSG(fmt::format(
+			"DBInterfaceMysql::configureConnectionOptions: TLS file not found, ca={}, cert={}, key={}.\n",
+			caPath, certPath, keyPath));
+		return false;
+	}
+
+	if ((!caPath.empty() && mysql_options(mysql(), MYSQL_OPT_SSL_CA, caPath.c_str()) != 0) ||
+		(!certPath.empty() && mysql_options(mysql(), MYSQL_OPT_SSL_CERT, certPath.c_str()) != 0) ||
+		(!keyPath.empty() && mysql_options(mysql(), MYSQL_OPT_SSL_KEY, keyPath.c_str()) != 0))
+	{
+		ERROR_MSG(fmt::format("DBInterfaceMysql::configureConnectionOptions: failed to configure TLS files: {}.\n",
+			mysql_error(mysql())));
+		return false;
+	}
+
+	INFO_MSG(fmt::format(
+		"DBInterfaceMysql::configureConnectionOptions: TLS required, verifyServerCert={}, ca={}, cert={}, key={}.\n",
+		tlsInfo_.verifyServerCert, caPath, certPath, keyPath));
+	return true;
 }
 
 //-------------------------------------------------------------------------------------
@@ -197,15 +259,35 @@ bool DBInterfaceMysql::attach(const char* databaseName)
 			ERROR_MSG("DBInterfaceMysql::attach: mysql_init error!\n");
 			return false;
 		}
+
+		if (!configureConnectionOptions())
+		{
+			detach();
+			return false;
+		}
 		
 		DEBUG_MSG(fmt::format("DBInterfaceMysql::attach: connect: {}:{} starting...\n", db_ip_, db_port_));
 
 		int ntry = 0;
+		const unsigned long clientFlags = tlsInfo_.enabled ? CLIENT_SSL : 0;
 
 __RECONNECT:
 		if(mysql_real_connect(mysql(), db_ip_, db_username_, 
-    		db_password_, db_name_, db_port_, NULL, 0)) // CLIENT_MULTI_STATEMENTS  
+			db_password_, db_name_, db_port_, NULL, clientFlags)) // CLIENT_MULTI_STATEMENTS
 		{
+			if (tlsInfo_.enabled)
+			{
+				const char* cipher = mysql_get_ssl_cipher(mysql());
+				if (!cipher || !cipher[0])
+				{
+					ERROR_MSG("DBInterfaceMysql::attach: TLS was required but no cipher was negotiated.\n");
+					detach();
+					return false;
+				}
+
+				INFO_MSG(fmt::format("DBInterfaceMysql::attach: TLS cipher={}.\n", cipher));
+			}
+
 			if(mysql_select_db(mysql(), db_name_) != 0)
 			{
 				ERROR_MSG(fmt::format("DBInterfaceMysql::attach: Could not set active db[{}]\n",
@@ -232,8 +314,14 @@ __RECONNECT:
 					return false;
 				}
 
+				if (!configureConnectionOptions())
+				{
+					detach();
+					return false;
+				}
+
 				if (mysql_real_connect(mysql(), db_ip_, db_username_,
-					db_password_, NULL, db_port_, NULL, 0)) // CLIENT_MULTI_STATEMENTS  
+					db_password_, NULL, db_port_, NULL, clientFlags)) // CLIENT_MULTI_STATEMENTS
 				{
 					this->createDatabaseIfNotExist();
 					if (mysql_select_db(mysql(), db_name_) != 0)

@@ -1104,6 +1104,32 @@ bool ServerConfig::loadConfig(std::string fileName)
 						{
 							missingFields.push_back("auth->encrypt");
 						}
+
+						// MySQL TLS块是可选配置，省略时保持现有明文连接行为。
+						// The MySQL TLS block is optional; omission preserves the existing plaintext connection behavior.
+						childnode = xml->enterNode(node, "MySQL");
+						if (childnode)
+						{
+							TiXmlNode* mysqlNode = xml->enterNode(childnode, "ssl");
+							if (mysqlNode)
+								pDBInfo->db_mysqlTLS.enabled = xml->getValStr(mysqlNode) == "true";
+
+							mysqlNode = xml->enterNode(childnode, "sslVerifyServerCert");
+							if (mysqlNode)
+								pDBInfo->db_mysqlTLS.verifyServerCert = xml->getValStr(mysqlNode) == "true";
+
+							mysqlNode = xml->enterNode(childnode, "sslCa");
+							if (mysqlNode)
+								pDBInfo->db_mysqlTLS.caPath = xml->getValStr(mysqlNode);
+
+							mysqlNode = xml->enterNode(childnode, "sslCert");
+							if (mysqlNode)
+								pDBInfo->db_mysqlTLS.clientCertPath = xml->getValStr(mysqlNode);
+
+							mysqlNode = xml->enterNode(childnode, "sslKey");
+							if (mysqlNode)
+								pDBInfo->db_mysqlTLS.clientKeyPath = xml->getValStr(mysqlNode);
+						}
 					}
 					else
 					{

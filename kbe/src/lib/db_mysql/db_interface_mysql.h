@@ -55,7 +55,8 @@ class DBException;
 class DBInterfaceMysql : public DBInterface
 {
 public:
-	DBInterfaceMysql(const char* name, std::string characterSet, std::string collation);
+	DBInterfaceMysql(const char* name, std::string characterSet, std::string collation,
+		const DBMysqlTLSInfo& tlsInfo);
 	virtual ~DBInterfaceMysql();
 
 	static bool initInterface(DBInterface* pdbi);
@@ -181,6 +182,10 @@ public:
 	static size_t sql_max_allowed_packet(){ return sql_max_allowed_packet_; }
 
 protected:
+	// 每个新MYSQL句柄都需要重新应用连接选项，包括数据库创建后的重连句柄。
+	// Every new MYSQL handle must receive the connection options, including handles recreated while creating a missing database.
+	bool configureConnectionOptions();
+
 	MYSQL* pMysql_;
 
 	bool hasLostConnection_;
@@ -191,6 +196,10 @@ protected:
 
 	std::string characterSet_;
 	std::string collation_;
+
+	// 连接对象保存配置快照，确保连接池线程和后续重连不依赖可变的全局配置。
+	// Each connection stores a configuration snapshot so pooled threads and reconnects do not depend on mutable global configuration.
+	DBMysqlTLSInfo tlsInfo_;
 
 	static size_t sql_max_allowed_packet_;
 };

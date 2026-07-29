@@ -97,6 +97,26 @@ struct EmailSendInfo
 	uint32 deadline;
 };
 
+struct DBMysqlTLSInfo
+{
+	DBMysqlTLSInfo() :
+		enabled(false),
+		verifyServerCert(true)
+	{
+	}
+
+	// TLS默认关闭以保持现有部署兼容；启用后默认验证服务端证书，避免静默降级为不可信连接。
+	// TLS stays disabled for existing deployments; once enabled, server certificates are verified by default to avoid silently accepting untrusted connections.
+	bool enabled;
+	bool verifyServerCert;
+
+	// 客户端证书和私钥必须成对配置，CA路径可以独立用于单向TLS验证。
+	// The client certificate and private key form a required pair, while the CA path may be used independently for one-way TLS verification.
+	std::string caPath;
+	std::string clientCertPath;
+	std::string clientKeyPath;
+};
+
 struct DBInterfaceInfo
 {
 	DBInterfaceInfo()
@@ -135,6 +155,9 @@ struct DBInterfaceInfo
 	uint16 db_numConnections;								// 数据库最大连接
 	std::string db_unicodeString_characterSet;				// 设置数据库字符集
 	std::string db_unicodeString_collation;
+	// MySQL专属TLS配置由MySQL适配层消费，其他数据库接口保持无感知。
+	// MySQL-specific TLS settings are consumed only by the MySQL adapter and remain invisible to other database backends.
+	DBMysqlTLSInfo db_mysqlTLS;
 };
 
 // 引擎组件信息结构体

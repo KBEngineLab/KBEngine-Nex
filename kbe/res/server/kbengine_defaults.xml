@@ -361,6 +361,20 @@
 						(is true, password is RSA)
 					-->
 					<encrypt> true </encrypt>
+
+					<MySQL>
+						<!-- MySQL连接是否启用并强制使用TLS。 -->
+						<!-- Enable and require TLS for MySQL connections. -->
+						<ssl> false </ssl>
+						<!-- 启用TLS时是否验证服务器证书。 -->
+						<!-- Verify the server certificate when TLS is enabled. -->
+						<sslVerifyServerCert> true </sslVerifyServerCert>
+						<!-- 可选CA和客户端证书路径；相对路径从KBE_RES_PATH解析。 -->
+						<!-- Optional CA and client certificate paths; relative paths are resolved from KBE_RES_PATH. -->
+						<sslCa>  </sslCa>
+						<sslCert>  </sslCert>
+						<sslKey>  </sslKey>
+					</MySQL>
 				</auth>
 
 				<!-- 数据库名称 
