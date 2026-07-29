@@ -14,6 +14,29 @@
   </ItemDefinitionGroup>
 
   <!--
+    vendored 依赖保持上游源码形态，其平台兼容警告不应淹没 KBEngine 自有代码的警告门禁。
+    Vendored dependencies retain their upstream source form, so their platform-compatibility warnings must not obscure the warning gate for KBEngine-owned code.
+
+    仅关闭依赖项目及被其他项目直接编译的依赖源文件警告；KBEngine 源文件仍使用项目原有警告级别。
+    Disable warnings only for dependency projects and dependency sources compiled by another project; KBEngine sources retain their configured warning level.
+  -->
+  <PropertyGroup>
+    <_KbeIsDependencyProject>$([System.String]::Copy('$(MSBuildProjectDirectory)').ToLowerInvariant().Contains('\dependencies\'))</_KbeIsDependencyProject>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup Condition="'$(_KbeIsDependencyProject)' == 'True'">
+    <ClCompile>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <ClCompile Update="..\dependencies\**\*.c;..\dependencies\**\*.cc;..\dependencies\**\*.cpp;..\dependencies\**\*.cxx">
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+    </ClCompile>
+  </ItemGroup>
+
+  <!--
     旧 vcxproj 在项目内部再次声明依赖路径，会把 Directory.Build.props 中的 vcpkg 路径挤到末尾。
     Legacy vcxproj files redeclare dependency paths inside each project and push the vcpkg paths from Directory.Build.props to the end.
 
