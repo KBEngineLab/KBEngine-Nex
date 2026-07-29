@@ -40,7 +40,7 @@ public:
 	KCPPacketReceiver(EndPoint & endpoint, NetworkInterface & networkInterface);
 	virtual ~KCPPacketReceiver();
 
-	bool processRecv(UDPPacket* pReceiveWindow);
+	bool processRecv(UDPPacket* pReceiveWindow) override;
 	virtual bool processRecv(bool expectingPacket);
 
 	virtual Reason processPacket(Channel* pChannel, Packet * pPacket);

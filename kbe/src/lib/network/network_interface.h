@@ -125,6 +125,7 @@ private:
 	virtual void handleTimeout(TimerHandle handle, void * arg);
 
 	void closeSocket();
+	void cleanupChannel(ChannelMap::iterator iter);
 	bool registerChannel(Channel* pChannel, bool replaceExistingAcceptedChannel);
 
 private:

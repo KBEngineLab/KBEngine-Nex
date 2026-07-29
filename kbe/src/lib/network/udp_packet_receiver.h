@@ -63,6 +63,7 @@ public:
 	}
 
 	virtual bool processRecv(bool expectingPacket);
+	virtual bool processRecv(UDPPacket* pReceiveWindow);
 
 protected:
 	PacketReceiver::RecvState checkSocketErrors(int len, bool expectingPacket);

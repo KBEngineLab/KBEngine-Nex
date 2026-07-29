@@ -182,13 +182,43 @@ bool UDPPacketReceiver::processRecv(bool expectingPacket)
 	
 	KBE_ASSERT(pSrcChannel != NULL);
 
+	if (pSrcChannel->isDestroyed())
+	{
+		UDPPacket::reclaimPoolObject(pChannelReceiveWindow);
+		return false;
+	}
+
 	if (pSrcChannel->condemn() > 0)
 	{
 		UDPPacket::reclaimPoolObject(pChannelReceiveWindow);
 		return false;
 	}
 
-	Reason ret = this->processPacket(pSrcChannel, pChannelReceiveWindow);
+	PacketReceiver* pPacketReceiver = pSrcChannel->pPacketReceiver();
+	if (pPacketReceiver == NULL || pPacketReceiver->type() != PacketReceiver::UDP_PACKET_RECEIVER)
+	{
+		ERROR_MSG(fmt::format("UDPPacketReceiver::processRecv: invalid packet receiver on channel {}.\n",
+			pSrcChannel->c_str()));
+		UDPPacket::reclaimPoolObject(pChannelReceiveWindow);
+		return false;
+	}
+
+	// listener 只负责按来源地址找到 Channel；协议解析必须交给该 Channel 的 receiver，才能保留各自的 KCP 控制块与过滤器状态。
+	// The listener only resolves the source Channel; protocol parsing belongs to that Channel's receiver so each KCP control block and filter state remains isolated.
+	return static_cast<UDPPacketReceiver*>(pPacketReceiver)->processRecv(pChannelReceiveWindow);
+}
+
+//-------------------------------------------------------------------------------------
+bool UDPPacketReceiver::processRecv(UDPPacket* pReceiveWindow)
+{
+	Channel* pChannel = getChannel();
+	if (pChannel == NULL || pChannel->isDestroyed() || pChannel->condemn() > 0)
+	{
+		UDPPacket::reclaimPoolObject(pReceiveWindow);
+		return false;
+	}
+
+	Reason ret = this->processPacket(pChannel, pReceiveWindow);
 
 	if(ret != REASON_SUCCESS)
 		this->dispatcher().errorReporter().reportException(ret, pEndpoint_->addr());

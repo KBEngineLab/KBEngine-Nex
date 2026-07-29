@@ -107,8 +107,9 @@ bool KCPPacketReceiver::processRecv(bool expectingPacket)
 bool KCPPacketReceiver::processRecv(UDPPacket* pReceiveWindow)
 {
 	Channel* pChannel = getChannel();
-	if (pChannel && pChannel->condemn() > 0)
+	if (pChannel == NULL || pChannel->isDestroyed() || pChannel->condemn() > 0)
 	{
+		UDPPacket::reclaimPoolObject(pReceiveWindow);
 		return false;
 	}
 

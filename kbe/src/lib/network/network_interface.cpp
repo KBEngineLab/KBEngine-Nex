@@ -151,6 +151,32 @@ void NetworkInterface::closeSocket()
 }
 
 //-------------------------------------------------------------------------------------
+void NetworkInterface::cleanupChannel(ChannelMap::iterator iter)
+{
+	Channel* pChannel = iter->second;
+	channelMap_.erase(iter);
+
+	if (pChannel == NULL)
+		return;
+
+	if (pChannel->isExternal())
+	{
+		KBE_ASSERT(numExtChannels_ > 0);
+		--numExtChannels_;
+	}
+
+	if (pChannelDeregisterHandler_)
+		pChannelDeregisterHandler_->onChannelDeregister(pChannel);
+
+	// map 和上层观察者必须先与 Channel 解耦，再销毁其 socket、poller completion 和 KCP timer，防止回调重新查到半销毁对象。
+	// Detach the map and upper-layer observer before releasing the socket, poller completions, and KCP timer so callbacks cannot rediscover a half-destroyed Channel.
+	if (!pChannel->isDestroyed())
+		pChannel->destroy();
+
+	Network::Channel::reclaimPoolObject(pChannel);
+}
+
+//-------------------------------------------------------------------------------------
 bool NetworkInterface::initialize(const char* pEndPointName, uint16 listeningPort_min, uint16 listeningPort_max,
 										const char * listeningInterface, EndPoint* pEP, ListenerReceiver* pLR, uint32 rbuffer, 
 										uint32 wbuffer, ProtocolType protocolType)
@@ -354,7 +380,16 @@ Channel * NetworkInterface::findChannel(const Address & addr)
 		return NULL;
 
 	ChannelMap::iterator iter = channelMap_.find(addr);
-	Channel * pChannel = (iter != channelMap_.end()) ? iter->second : NULL;
+	if (iter == channelMap_.end())
+		return NULL;
+
+	Channel* pChannel = iter->second;
+	if (pChannel != NULL && pChannel->isDestroyed())
+	{
+		cleanupChannel(iter);
+		return NULL;
+	}
+
 	return pChannel;
 }
 
@@ -362,10 +397,20 @@ Channel * NetworkInterface::findChannel(const Address & addr)
 Channel * NetworkInterface::findChannel(KBESOCKET fd)
 {
 	ChannelMap::iterator iter = channelMap_.begin();
-	for(; iter != channelMap_.end(); ++iter)
+	while (iter != channelMap_.end())
 	{
-		if(iter->second->pEndPoint() && *iter->second->pEndPoint() == fd)
-			return iter->second;
+		Channel* pChannel = iter->second;
+		if (pChannel != NULL && pChannel->isDestroyed())
+		{
+			ChannelMap::iterator current = iter++;
+			cleanupChannel(current);
+			continue;
+		}
+
+		if (pChannel != NULL && pChannel->pEndPoint() && *pChannel->pEndPoint() == fd)
+			return pChannel;
+
+		++iter;
 	}
 
 	return NULL;
@@ -394,24 +439,28 @@ bool NetworkInterface::registerChannel(Channel* pChannel, bool replaceExistingAc
 
 	if(pExisting)
 	{
-		if (!replaceExistingAcceptedChannel || pExisting == pChannel ||
-			pExisting->protocoltype() != PROTOCOL_TCP ||
-			pExisting->isDestroyed() || pExisting->pEndPoint() == NULL)
+		if (pExisting == pChannel)
+		{
+			CRITICAL_MSG(fmt::format("NetworkInterface::registerChannel: channel {} is already registered.\n",
+				pChannel->c_str()));
+			return false;
+		}
+
+		const bool endpointInvalid = pExisting->pEndPoint() == NULL || !pExisting->pEndPoint()->good();
+		const bool existingClosing = pExisting->isDestroyed() || pExisting->condemn() > 0 || endpointInvalid;
+		const bool acceptedTcpReplacement = replaceExistingAcceptedChannel &&
+			pExisting->protocoltype() == PROTOCOL_TCP;
+
+		if (!existingClosing && !acceptedTcpReplacement)
 		{
 			CRITICAL_MSG(fmt::format("NetworkInterface::registerChannel: channel {} is exist.\n",
 				pChannel->c_str()));
 			return false;
 		}
 
-		// TCP 内核不会让两条存活连接共享同一四元组；新 accept 成功证明旧 Channel 只是还没有消费终止 completion。
-		// The TCP stack cannot keep two live connections on one tuple; a successful new accept proves the old Channel is only waiting for its terminal completion to be consumed.
-		// 复用统一注销路径，保证上层回调、外部 Channel 计数和 IOCP 取消的顺序与普通断线一致。
-		// Reuse the normal deregistration path so callbacks, external-channel accounting, and IOCP cancellation retain their ordinary disconnect ordering.
-		if (!deregisterChannel(pExisting))
-			return false;
-
-		pExisting->destroy();
-		Network::Channel::reclaimPoolObject(pExisting);
+		// 同地址的新连接只替换已关闭状态，或由 accept 证明已经被内核复用四元组的旧 TCP 连接。
+		// A same-address connection replaces only a closing entry, or an old TCP connection whose tuple reuse is proven by a successful accept.
+		cleanupChannel(iter);
 	}
 
 	channelMap_[addr] = pChannel;
@@ -493,9 +542,14 @@ void NetworkInterface::processChannels(KBEngine::Network::MessageHandlers* pMsgH
 	{
 		Network::Channel* pChannel = iter->second;
 
-		if(pChannel->isDestroyed())
+		if(pChannel == NULL)
 		{
-			++iter;
+			iter = channelMap_.erase(iter);
+		}
+		else if(pChannel->isDestroyed())
+		{
+			ChannelMap::iterator current = iter++;
+			cleanupChannel(current);
 		}
 		else if(pChannel->condemn() > 0)
 		{
