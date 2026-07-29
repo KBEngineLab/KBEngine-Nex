@@ -26,6 +26,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 
 #include "helper/watcher.h"
+#include <type_traits>
 
 namespace KBEngine
 { 
@@ -34,6 +35,27 @@ KBE_SINGLETON_INIT(KBEngine::thread::ThreadPool);
 
 namespace thread
 {
+
+namespace
+{
+
+// 各平台的线程 ID 可能是指针或整数，按实际类型选择转换可同时覆盖 Windows、macOS、Linux 与 BSD。
+// Platform thread IDs may be pointers or integers; selecting by the actual type covers Windows, macOS, Linux, and BSD without truncation.
+template<typename ThreadId>
+inline typename std::enable_if<std::is_pointer<ThreadId>::value, uintptr_t>::type
+threadIdToLogValue(ThreadId threadId)
+{
+	return reinterpret_cast<uintptr_t>(threadId);
+}
+
+template<typename ThreadId>
+inline typename std::enable_if<std::is_integral<ThreadId>::value, uintptr_t>::type
+threadIdToLogValue(ThreadId threadId)
+{
+	return static_cast<uintptr_t>(threadId);
+}
+
+}
 
 int ThreadPool::timeout = 300;
 
@@ -443,7 +465,7 @@ bool ThreadPool::addFreeThread(TPThread* tptd)
 		THREAD_MUTEX_UNLOCK(threadStateList_mutex_);
 
 		ERROR_MSG(fmt::format("ThreadPool::addFreeThread: busyThreadList_ not found thread.{0}\n",
-		 (uint32)tptd->id()));
+			threadIdToLogValue(tptd->id())));
 		
 		delete tptd;
 		return false;
@@ -471,7 +493,7 @@ bool ThreadPool::addBusyThread(TPThread* tptd)
 		THREAD_MUTEX_UNLOCK(threadStateList_mutex_);
 		ERROR_MSG(fmt::format("ThreadPool::addBusyThread: freeThreadList_ not "
 				"found thread.{0}\n",
-					(uint32)tptd->id()));
+					threadIdToLogValue(tptd->id())));
 		
 		delete tptd;
 		return false;
@@ -501,7 +523,7 @@ bool ThreadPool::removeHangThread(TPThread* tptd)
 
 		INFO_MSG(fmt::format("ThreadPool::removeHangThread: thread.{0} is destroy. "
 			"currentFreeThreadCount:{1}, currentThreadCount:{2}\n",
-		(uint32)tptd->id(), currentFreeThreadCount_, currentThreadCount_));
+			threadIdToLogValue(tptd->id()), currentFreeThreadCount_, currentThreadCount_));
 		
 		SAFE_RELEASE(tptd);
 	}
@@ -510,7 +532,7 @@ bool ThreadPool::removeHangThread(TPThread* tptd)
 		THREAD_MUTEX_UNLOCK(threadStateList_mutex_);		
 		
 		ERROR_MSG(fmt::format("ThreadPool::removeHangThread: not found thread.{0}\n", 
-			(uint32)tptd->id()));
+			threadIdToLogValue(tptd->id())));
 		
 		return false;
 	}

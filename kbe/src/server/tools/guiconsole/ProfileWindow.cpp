@@ -49,7 +49,7 @@ BOOL CProfileWindow::OnInitDialog()
 
 	std::stringstream ss;
 	ss << KBEngine::genUUID64();
-	ss << (DWORD)this;
+	ss << reinterpret_cast<DWORD_PTR>(this);
 	profilename = ss.str();
 
 	int idx = 0;

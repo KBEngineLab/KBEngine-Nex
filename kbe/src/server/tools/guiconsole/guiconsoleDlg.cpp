@@ -1109,7 +1109,7 @@ void CguiconsoleDlg::updateTree()
 		tcitem.item.iImage = 0;
 		tcitem.item.iSelectedImage = 1;
 		HTREEITEM insertItem = m_tree.InsertItem(&tcitem);
-		m_tree.SetItemData(insertItem, (DWORD)&cinfos.cid);
+		m_tree.SetItemData(insertItem, reinterpret_cast<DWORD_PTR>(&cinfos.cid));
 		m_tree.Expand(hasUIDItem, TVE_EXPAND);
 		free(wbuf);
 

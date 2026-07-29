@@ -835,9 +835,9 @@ static long ssl_bio_callback(BIO *bio, int cmd, const char *argp, int argi, long
 
 bool EndPoint::setupSSL(int sslVersion, Packet* pPacket, bool useMemoryBIO)
 {
+#if (OPENSSL_VERSION_NUMBER < 0x1000207fL)
 	switch (sslVersion)
 	{
-#if (OPENSSL_VERSION_NUMBER <  0x1000207fL)
 #ifndef OPENSSL_NO_SSL2
 	case SSL2_VERSION:
 		sslContext_ = SSL_CTX_new(SSLv2_server_method());
@@ -857,11 +857,15 @@ bool EndPoint::setupSSL(int sslVersion, Packet* pPacket, bool useMemoryBIO)
 	case TLS1_2_VERSION:
 		sslContext_ = SSL_CTX_new(TLSv1_2_server_method());
 		break;
-#endif
 	default:
 		sslContext_ = SSL_CTX_new(SSLv23_server_method());
 		break;
 	};
+#else
+	// 新版 OpenSSL 已移除旧协议专用 method，统一入口会按安全配置协商受支持的 TLS 版本。
+	// Modern OpenSSL removes legacy protocol-specific methods; the unified entry point negotiates a supported TLS version under the configured policy.
+	sslContext_ = SSL_CTX_new(SSLv23_server_method());
+#endif
 
 	if (!sslContext_)
 	{
