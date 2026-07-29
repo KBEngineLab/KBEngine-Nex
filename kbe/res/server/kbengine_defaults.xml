@@ -210,6 +210,21 @@
 		(The callback: default timeout(seconds))
 	-->
 	<callback_timeout> 300.0 </callback_timeout>
+
+	<urlopen>
+		<!-- 整个请求的最大耗时；0表示不限制，单位为秒。 -->
+		<!-- Maximum duration for the complete request; zero means unlimited, in seconds. -->
+		<timeout> 10 </timeout>
+		<!-- 建立连接的最大耗时；0表示使用libcurl默认值，单位为秒。 -->
+		<!-- Maximum connection time; zero uses the libcurl default, in seconds. -->
+		<connectTimeout> 10 </connectTimeout>
+		<!-- 持续低速的判定时长；与lowSpeedLimit任一为0时关闭低速中止。 -->
+		<!-- Duration used to detect low throughput; zero here or in lowSpeedLimit disables low-speed aborts. -->
+		<lowSpeedTime> 5 </lowSpeedTime>
+		<!-- 低速阈值，单位为bytes/s。 -->
+		<!-- Low-throughput threshold in bytes/s. -->
+		<lowSpeedLimit> 30 </lowSpeedLimit>
+	</urlopen>
 	
 	<thread_pool>
 		<!-- 默认超时时间(秒) 

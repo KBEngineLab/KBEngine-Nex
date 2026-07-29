@@ -196,6 +196,32 @@ bool ServerConfig::loadConfig(std::string fileName)
 		if(callback_timeout_ < 5.f)
 			callback_timeout_ = 5.f;
 	}
+
+	rootNode = xml->getRootNode("urlopen");
+	if(rootNode != NULL)
+	{
+		// 所有值以秒或bytes/s表示；负值归零，0沿用libcurl的禁用或默认语义。
+		// Values are seconds or bytes/s; negatives clamp to zero, while zero keeps libcurl's disabled or default semantics.
+		TiXmlNode* childnode = xml->enterNode(rootNode, "timeout");
+		if(childnode)
+			Network::g_httpRequestTimeoutConfig.totalSeconds =
+				static_cast<uint32>(KBE_MAX(0, xml->getValInt(childnode)));
+
+		childnode = xml->enterNode(rootNode, "connectTimeout");
+		if(childnode)
+			Network::g_httpRequestTimeoutConfig.connectSeconds =
+				static_cast<uint32>(KBE_MAX(0, xml->getValInt(childnode)));
+
+		childnode = xml->enterNode(rootNode, "lowSpeedTime");
+		if(childnode)
+			Network::g_httpRequestTimeoutConfig.lowSpeedSeconds =
+				static_cast<uint32>(KBE_MAX(0, xml->getValInt(childnode)));
+
+		childnode = xml->enterNode(rootNode, "lowSpeedLimit");
+		if(childnode)
+			Network::g_httpRequestTimeoutConfig.lowSpeedBytesPerSecond =
+				static_cast<uint32>(KBE_MAX(0, xml->getValInt(childnode)));
+	}
 	
 	rootNode = xml->getRootNode("thread_pool");
 	if(rootNode != NULL)

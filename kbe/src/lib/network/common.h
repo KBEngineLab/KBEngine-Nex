@@ -80,6 +80,18 @@ extern const char* UDP_HELLO_ACK;
 extern std::string g_sslCertificate;
 extern std::string g_sslPrivateKey;
 
+struct HttpRequestTimeoutConfig
+{
+	uint32 totalSeconds;
+	uint32 connectSeconds;
+	uint32 lowSpeedSeconds;
+	uint32 lowSpeedBytesPerSecond;
+};
+
+// HTTP请求共享一份启动期只读配置，避免每个请求复制分散的默认常量。
+// HTTP requests share one startup-only configuration instead of duplicating scattered default constants.
+extern HttpRequestTimeoutConfig g_httpRequestTimeoutConfig;
+
 // 不做通道超时检查
 #define CLOSE_CHANNEL_INACTIVITIY_DETECTION()										\
 {																					\

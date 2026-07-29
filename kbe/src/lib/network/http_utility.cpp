@@ -97,15 +97,22 @@ Request::Request():
 	curl_easy_setopt((CURL*)pContext_, CURLOPT_NOPROGRESS, 1);
 	curl_easy_setopt((CURL*)pContext_, CURLOPT_NOSIGNAL, 1);
 
-	curl_easy_setopt((CURL*)pContext_, CURLOPT_CONNECTTIMEOUT_MS, 10000);
-	setTimeout(10);
+	const HttpRequestTimeoutConfig& timeoutConfig = Network::g_httpRequestTimeoutConfig;
+	// 秒级选项避免connectSeconds乘以1000后在Windows的32位long上溢出。
+	// The seconds-based option avoids overflowing Windows' 32-bit long when connectSeconds is multiplied by 1000.
+	curl_easy_setopt((CURL*)pContext_, CURLOPT_CONNECTTIMEOUT,
+		static_cast<long>(timeoutConfig.connectSeconds));
+	setTimeout(timeoutConfig.totalSeconds);
 
 	KBE_ASSERT(sizeof(error_) >= CURL_ERROR_SIZE);
 	curl_easy_setopt((CURL*)pContext_, CURLOPT_ERRORBUFFER, error_);
 
-	/* abort if slower than 30 bytes/sec during 5 seconds */
-	curl_easy_setopt((CURL*)pContext_, CURLOPT_LOW_SPEED_TIME, 5L);
-	curl_easy_setopt((CURL*)pContext_, CURLOPT_LOW_SPEED_LIMIT, 30L);
+	// 任一低速参数为0时libcurl不会触发低速中止，便于部署显式关闭该策略。
+	// A zero low-speed parameter prevents libcurl from aborting for low throughput, allowing deployments to disable the policy explicitly.
+	curl_easy_setopt((CURL*)pContext_, CURLOPT_LOW_SPEED_TIME,
+		static_cast<long>(timeoutConfig.lowSpeedSeconds));
+	curl_easy_setopt((CURL*)pContext_, CURLOPT_LOW_SPEED_LIMIT,
+		static_cast<long>(timeoutConfig.lowSpeedBytesPerSecond));
 }
 
 //-------------------------------------------------------------------------------------
@@ -442,7 +449,10 @@ Request::Status Request::setHeader(const std::map<std::string, std::string>& hea
 //-------------------------------------------------------------------------------------
 Request::Status Request::setTimeout(uint32 secs)
 {
-	CURLcode curlCode = curl_easy_setopt((CURL*)pContext_, CURLOPT_TIMEOUT, secs);
+	// curl_easy_setopt是可变参数API，必须传入文档要求的long，尤其要避免LP64平台读取错误宽度。
+	// curl_easy_setopt is variadic and requires the documented long type, especially to avoid width mismatches on LP64 platforms.
+	CURLcode curlCode = curl_easy_setopt((CURL*)pContext_, CURLOPT_TIMEOUT,
+		static_cast<long>(secs));
 	if (CURLE_OK != curlCode)
 	{
 		ERROR_MSG(fmt::format("Http::Request::setTimeout: "

@@ -89,6 +89,8 @@ uint32						g_extReSendRetries = 3;
 std::string					g_sslCertificate = "";
 std::string					g_sslPrivateKey = "";
 
+HttpRequestTimeoutConfig	g_httpRequestTimeoutConfig = { 10, 10, 5, 30 };
+
 bool initializeWatcher()
 {
 	WATCH_OBJECT("network/numPacketsSent", g_numPacketsSent);
