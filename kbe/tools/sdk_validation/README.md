@@ -17,6 +17,43 @@ PowerShell 7 is required because the runner uses modern .NET structured argument
 
 ## Usage
 
+### CTest integration
+
+默认 CMake 配置会注册当前机器具备依赖的离线 SDK 测试。测试清单由本工具目录维护，输出统一写入构建树的 `Testing/sdk-validation-<config>`，不会在源码夹具中产生 `bin`、`obj`、`x64` 或 `dist`。单独构建 `kbcmd` 会同步部署嵌入式 Python 动态库与标准库，随后可通过 `sdk` 标签运行全部已注册测试；完整服务验收仍构建 `kbe_runtime`。也可叠加 `offline`、`csharp`、`cxx`、`typescript`、`gdscript`、`release` 等标签缩小范围。
+
+The default CMake configuration registers offline SDK tests whose dependencies are available on the current machine. This tool directory owns the test manifest, and all output is written under `Testing/sdk-validation-<config>` in the build tree, so source fixtures do not receive `bin`, `obj`, `x64`, or `dist` directories. Building `kbcmd` alone also deploys the embedded Python libraries and standard library, after which every registered test can run through the `sdk` label; full server validation still builds `kbe_runtime`. Combine labels such as `offline`, `csharp`, `cxx`, `typescript`, `gdscript`, and `release` to narrow the set. Run preset commands from `kbe/src`, where `CMakePresets.json` is located.
+
+```powershell
+cmake --build --preset windows-vs2022-kbcmd-debug
+ctest --preset windows-vs2022-debug -L sdk
+
+cmake --build --preset windows-vs2022-kbcmd-release
+ctest --preset windows-vs2022-release -L sdk
+```
+
+PowerShell 7、.NET、Node.js 和 MSBuild 会自动发现，也可通过同名 CMake 缓存变量或环境变量覆盖。完整 Windows 候选门禁还需要 `KBE_TEST_ASSETS`、`KBE_SDK_TYPESCRIPT_EXECUTABLE` 与 `KBE_SDK_GODOT_EXECUTABLE`；当 assets 内存在 `kbeclient/typescript-component-e2e/node_modules/.bin/tsc.cmd` 时会自动复用该编译器。Godot 变量必须指向 console 可执行文件，而不是安装目录。
+
+PowerShell 7, .NET, Node.js, and MSBuild are discovered automatically and can be overridden through same-named CMake cache variables or environment variables. The full Windows candidate gate also requires `KBE_TEST_ASSETS`, `KBE_SDK_TYPESCRIPT_EXECUTABLE`, and `KBE_SDK_GODOT_EXECUTABLE`; when the assets contain `kbeclient/typescript-component-e2e/node_modules/.bin/tsc.cmd`, that compiler is reused automatically. The Godot variable must point to the console executable rather than its installation directory.
+
+```powershell
+$env:KBE_TEST_ASSETS = "D:/game/assets"
+$env:KBE_SDK_GODOT_EXECUTABLE = "D:/tools/Godot/Godot_console.exe"
+cmake --preset windows-vs2022
+ctest --preset windows-vs2022-release -L sdk -L release
+```
+
+在线四端 E2E 不会因本机恰好存在某份 assets 而自动启用。只有显式设置 `KBE_SDK_VALIDATION_MANIFEST` 时才注册 `sdk.e2e.manifest`，防止默认 CTest 修改或连接未知项目环境。清单路径不存在时，配置阶段直接失败。
+
+Online four-SDK E2E is never enabled merely because an assets tree happens to exist locally. `sdk.e2e.manifest` is registered only when `KBE_SDK_VALIDATION_MANIFEST` is set explicitly, preventing default CTest runs from modifying or connecting to an unknown project environment. Configuration fails immediately when the manifest path does not exist.
+
+```powershell
+$env:KBE_SDK_VALIDATION_MANIFEST = "D:/game/assets/sdk-validation.json"
+cmake --preset windows-vs2022
+ctest --preset windows-vs2022-release -R "^sdk\.e2e\.manifest$"
+```
+
+## Command-line usage
+
 从示例复制一份项目清单并修改资产、编译器和 E2E 工程路径。清单属于具体游戏项目，不应写入引擎仓库。
 
 Create a project manifest from the example and update the asset, compiler, and E2E project paths. A manifest belongs to a game project and should not be committed to the engine repository.

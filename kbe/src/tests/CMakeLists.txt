@@ -159,3 +159,10 @@ if(KBE_TEST_ASSETS)
         endif()
     endif()
 endif()
+
+# SDK 验证工具维护自己的测试和外部工具条件，主测试树只负责挂载，避免两处清单随 SDK 演进而漂移。
+# The SDK validation tool owns its tests and external-tool conditions; the main test tree only mounts it to avoid duplicated manifests drifting as SDKs evolve.
+add_subdirectory(
+    "${CMAKE_SOURCE_DIR}/../tools/sdk_validation"
+    "${CMAKE_BINARY_DIR}/tools/sdk_validation"
+)

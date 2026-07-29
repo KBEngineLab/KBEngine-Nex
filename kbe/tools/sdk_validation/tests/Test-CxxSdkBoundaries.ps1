@@ -10,8 +10,10 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../../../..")).Path
 $pythonAssets = (Resolve-Path (Join-Path $repoRoot "kbe/res/sdk_templates/server/python_assets")).Path
 $numericProject = (Resolve-Path (Join-Path $PSScriptRoot "cxx_numeric_boundary/CxxNumericBoundaryTest.vcxproj")).Path
-$numericExecutable = Join-Path $PSScriptRoot "cxx_numeric_boundary/x64/Release/CxxNumericBoundaryTest.exe"
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("kbe-cxx-sdk-boundaries-" + [Guid]::NewGuid().ToString("N"))
+$numericOutput = Join-Path $temporaryRoot "numeric/"
+$numericIntermediate = Join-Path $temporaryRoot "numeric-obj/"
+$numericExecutable = Join-Path $numericOutput "CxxNumericBoundaryTest.exe"
 
 if ([string]::IsNullOrWhiteSpace($KbcmdPath)) {
     $KbcmdPath = Join-Path $repoRoot "kbe/bin/server/kbcmd.exe"
@@ -89,7 +91,10 @@ try {
     Assert-Condition (Test-Path -LiteralPath $MSBuildPath -PathType Leaf) "MSBuild.exe was not found at $MSBuildPath."
     [System.IO.Directory]::CreateDirectory($temporaryRoot) | Out-Null
 
-    & $MSBuildPath $numericProject /m:1 /nr:false /t:Rebuild /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143 /v:minimal
+    # fixture 输出放入本轮临时目录，CTest 和手动执行都不会重新污染源码树。
+    # Fixture output stays in this run's temporary directory so neither CTest nor manual execution repollutes the source tree.
+    & $MSBuildPath $numericProject /m:1 /nr:false /t:Rebuild /p:Configuration=Release /p:Platform=x64 `
+        /p:PlatformToolset=v143 "/p:OutDir=$numericOutput" "/p:IntDir=$numericIntermediate" /v:minimal
     Assert-Condition ($LASTEXITCODE -eq 0) "The C++ numeric boundary fixture failed to build."
     $numericOutput = @(& $numericExecutable 2>&1)
     Assert-Condition ($LASTEXITCODE -eq 0) "The C++ numeric boundary fixture failed: $($numericOutput -join [Environment]::NewLine)"

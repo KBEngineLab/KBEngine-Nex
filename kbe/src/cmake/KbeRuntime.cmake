@@ -72,14 +72,47 @@ function(kbe_configure_runtime)
         )
     endforeach()
 
-    # 动态库按配置复制到可执行文件旁；copy_if_different 保持普通增量构建为常数级开销。
-    # Runtime libraries are copied beside each configuration's executables; copy_if_different keeps normal incremental builds constant-cost.
-    add_custom_target(kbe_runtime
+    # 运行库部署必须是可执行目标的前置依赖，保证单独构建任一组件也能直接启动，而不必额外构建聚合目标。
+    # Runtime deployment must precede executable targets so an individually built component can start without requiring a separate aggregate build.
+    add_custom_target(kbe_python_runtime_files
         ${_kbe_runtime_commands}
+        VERBATIM
+    )
+
+    set(_kbe_runtime_targets
+        machine
+        baseappmgr
+        cellappmgr
+        dbmgr
+        loginapp
+        baseapp
+        cellapp
+        bots
+        logger
+        interfaces
+        kbcmd
+    )
+    foreach(_kbe_runtime_target IN LISTS _kbe_runtime_targets)
+        if(NOT TARGET "${_kbe_runtime_target}")
+            message(FATAL_ERROR
+                "Runtime executable target does not exist: ${_kbe_runtime_target}")
+        endif()
+
+        # 动态库复制由共享目标执行一次，标准库使用 stamp 增量部署；并行构建不会同时写入同一运行时文件。
+        # A shared target copies dynamic libraries once while the stamped standard-library target deploys incrementally, avoiding concurrent writes during parallel builds.
+        add_dependencies("${_kbe_runtime_target}"
+            kbe_python_runtime_files
+            kbe_python_stdlib
+        )
+    endforeach()
+
+    # 聚合目标保留为完整运行时入口，但部署正确性不再依赖调用方必须记住构建该目标。
+    # The aggregate target remains the complete runtime entry point, while deployment correctness no longer depends on callers remembering to build it.
+    add_custom_target(kbe_runtime
         DEPENDS
             kbe_servers
+            kbe_python_runtime_files
             kbe_python_stdlib
-        VERBATIM
     )
 
     set(KBE_RUNTIME_BIN_DIR "${KBE_CMAKE_OUTPUT_ROOT}/bin/$<CONFIG>" CACHE INTERNAL "CMake server runtime binary directory" FORCE)
