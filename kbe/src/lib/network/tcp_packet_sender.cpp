@@ -33,6 +33,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/event_poller.h"
 #include "network/error_reporter.h"
 #include "network/tcp_packet.h"
+#include <limits>
 #include "network/udp_packet.h"
 
 namespace KBEngine { 
@@ -217,12 +218,32 @@ Reason TCPPacketSender::processFilterPacket(Channel* pChannel, Packet * pPacket,
 	}
 
 	EndPoint* pEndpoint = pChannel->pEndPoint();
+	const size_t packetLength = pPacket->length();
+	if(pPacket->sentSize > packetLength)
+	{
+		ERROR_MSG(fmt::format(
+			"TCPPacketSender::processFilterPacket: invalid send state, sentSize={}, packetLength={}, channel={}.\n",
+			pPacket->sentSize, packetLength, pChannel->c_str()));
+		return REASON_GENERAL_NETWORK;
+	}
+
+	const size_t remainingSize = packetLength - pPacket->sentSize;
+	if(remainingSize > static_cast<size_t>(std::numeric_limits<int>::max()))
+	{
+		// EndPoint 与完成模型的单次发送长度均为 int；拒绝异常超大 Packet，避免截断后错发或错误完成。
+		// EndPoint and completion backends use int-sized sends; reject an abnormal oversized Packet instead of truncating or completing it incorrectly.
+		ERROR_MSG(fmt::format(
+			"TCPPacketSender::processFilterPacket: remaining packet length exceeds socket API limit, remaining={}, channel={}.\n",
+			remainingSize, pChannel->c_str()));
+		return REASON_GENERAL_NETWORK;
+	}
+
+	const int remaining = static_cast<int>(remainingSize);
 	EventPoller* pPoller = this->dispatcher().pPoller();
 	if (pPoller != NULL && pPoller->supportsCompletion())
 	{
 		// Completion backends own a copy of the packet until WSASend completes, so the packet can leave the Channel queue now.
 		// 完成模型会在 WSASend 完成前持有 packet 副本，因此此处可以立即移出 Channel 队列。
-		const int remaining = pPacket->length() - pPacket->sentSize;
 		if (pEndpoint->usesSSLMemoryBIO())
 		{
 			// TLS record 序列号会在 SSL_write 时推进，因此加密或密文入队失败必须关闭连接，不能重放同一明文。
@@ -245,7 +266,7 @@ Reason TCPPacketSender::processFilterPacket(Channel* pChannel, Packet * pPacket,
 		return REASON_SUCCESS;
 	}
 
-	int len = pEndpoint->send(pPacket->data() + pPacket->sentSize, pPacket->length() - pPacket->sentSize);
+	int len = pEndpoint->send(pPacket->data() + pPacket->sentSize, remaining);
 
 	if(len > 0)
 	{
@@ -253,7 +274,7 @@ Reason TCPPacketSender::processFilterPacket(Channel* pChannel, Packet * pPacket,
 		// DEBUG_MSG(fmt::format("TCPPacketSender::processFilterPacket: sent={}, sentTotalSize={}.\n", len, pPacket->sentSize));
 	}
 
-	bool sentCompleted = pPacket->sentSize == pPacket->length();
+	bool sentCompleted = pPacket->sentSize == packetLength;
 	pChannel->onPacketSent(len, sentCompleted);
 
 	if (sentCompleted)
