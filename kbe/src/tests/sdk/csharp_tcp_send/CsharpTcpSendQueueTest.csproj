@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <KbeSdkTemplateRoot Condition="'$(KbeSdkTemplateRoot)' == ''">$(MSBuildThisFileDirectory)..\..\..\..\res\sdk_templates\client\csharp</KbeSdkTemplateRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(KbeSdkTemplateRoot)\MemoryStream.cs" Link="MemoryStream.cs" />
+    <Compile Include="$(KbeSdkTemplateRoot)\ObjectPool.cs" Link="ObjectPool.cs" />
+    <Compile Include="$(KbeSdkTemplateRoot)\Math.cs" Link="Math.cs" />
+    <Compile Include="$(KbeSdkTemplateRoot)\kblog\ILogProvider.cs" Link="kblog\ILogProvider.cs" />
+    <Compile Include="$(KbeSdkTemplateRoot)\kblog\KBELog.cs" Link="kblog\KBELog.cs" />
+    <Compile Include="$(KbeSdkTemplateRoot)\TcpSendQueue.cs" Link="TcpSendQueue.cs" />
+    <Compile Include="$(KbeSdkTemplateRoot)\TcpReceiveQueue.cs" Link="TcpReceiveQueue.cs" />
+    <Compile Include="$(KbeSdkTemplateRoot)\deps\KCP.cs" Link="KCP.cs" />
+  </ItemGroup>
+</Project>

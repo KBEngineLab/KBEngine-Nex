@@ -134,10 +134,3 @@ venv/
 logs/
 build.log
 kbe_temp_*
-
-# SDK validation test output
-/kbe/tools/sdk_validation/tests/csharp_*/bin/
-/kbe/tools/sdk_validation/tests/csharp_*/obj/
-/kbe/tools/sdk_validation/tests/cxx_*/x64/
-/kbe/tools/sdk_validation/tests/cxx_*/CxxTcpRe.*/
-/kbe/tools/sdk_validation/tests/typescript_*/dist/

@@ -423,8 +423,10 @@ int process_getuid(int argc, char* argv[])
 	}
 
 	setenv("UID", fmt::format("{}", getUserUID()).c_str(), 1);
-	printf("%s", fmt::format("{}", getUserUID()).c_str());
-	return getUserUID();
+	printf("%s\n", fmt::format("{}", getUserUID()).c_str());
+	// UID 是命令输出而不是进程状态；成功时返回零，调用方才能使用标准退出码判断执行结果。
+	// The UID is command output rather than process status; returning zero lets callers use standard exit-code semantics.
+	return 0;
 }
 
 int process_help(int argc, char* argv[])

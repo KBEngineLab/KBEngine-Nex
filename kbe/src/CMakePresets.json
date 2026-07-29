@@ -7,18 +7,82 @@
   },
   "configurePresets": [
     {
-      "name": "windows-vs2022",
-      "displayName": "Windows VS 2022 x64",
-      "generator": "Visual Studio 17 2022",
-      "architecture": "x64",
-      "binaryDir": "${sourceDir}/out/build/windows-vs2022",
+      "name": "windows-common",
+      "hidden": true,
       "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
       "cacheVariables": {
         "VCPKG_TARGET_TRIPLET": "x64-windows-static",
         "VCPKG_INSTALLED_DIR": "${sourceDir}/vcpkg_installed",
         "KBE_TEST_ASSETS": "$env{KBE_TEST_ASSETS}",
+        "KBE_TEST_SERVER_CLUSTER": "$env{KBE_TEST_SERVER_CLUSTER}",
+        "KBE_TEST_DATABASES": "$env{KBE_TEST_DATABASES}",
         "KBE_TEST_DATABASE_USERNAME": "$env{KBE_TEST_DATABASE_USERNAME}",
         "KBE_TEST_DATABASE_PASSWORD": "$env{KBE_TEST_DATABASE_PASSWORD}"
+      }
+    },
+    {
+      "name": "windows-vs2022",
+      "displayName": "Windows VS 2022 x64",
+      "inherits": "windows-common",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/out/build/windows-vs2022"
+    },
+    {
+      "name": "windows-ninja",
+      "displayName": "Windows Ninja Multi-Config with active MSVC",
+      "description": "Run from a Visual Studio developer shell; the active MSVC installation may be VS 2022 or newer.",
+      "inherits": "windows-common",
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/out/build/windows-ninja-multi",
+      "environment": {
+        "PATH": "$penv{PATH};$penv{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja"
+      },
+      "cacheVariables": {
+        "KBE_CMAKE_OUTPUT_ROOT": "${sourceDir}/out/cmake/windows-ninja"
+      }
+    },
+    {
+      "name": "unix-common",
+      "hidden": true,
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+      "cacheVariables": {
+        "VCPKG_INSTALLED_DIR": "${sourceDir}/vcpkg_installed",
+        "KBE_TEST_ASSETS": "$env{KBE_TEST_ASSETS}",
+        "KBE_TEST_SERVER_CLUSTER": "$env{KBE_TEST_SERVER_CLUSTER}",
+        "KBE_TEST_DATABASES": "$env{KBE_TEST_DATABASES}",
+        "KBE_TEST_DATABASE_USERNAME": "$env{KBE_TEST_DATABASE_USERNAME}",
+        "KBE_TEST_DATABASE_PASSWORD": "$env{KBE_TEST_DATABASE_PASSWORD}"
+      }
+    },
+    {
+      "name": "linux-ninja",
+      "displayName": "Linux Ninja Multi-Config",
+      "inherits": "unix-common",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/out/build/linux-ninja",
+      "cacheVariables": {
+        "KBE_CMAKE_OUTPUT_ROOT": "${sourceDir}/out/cmake/linux-ninja"
+      }
+    },
+    {
+      "name": "macos-ninja",
+      "displayName": "macOS Ninja Multi-Config",
+      "inherits": "unix-common",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/out/build/macos-ninja",
+      "cacheVariables": {
+        "KBE_CMAKE_OUTPUT_ROOT": "${sourceDir}/out/cmake/macos-ninja"
       }
     }
   ],
@@ -82,6 +146,54 @@
       "configurePreset": "windows-vs2022",
       "configuration": "Release",
       "targets": ["kbe_runtime"]
+    },
+    {
+      "name": "windows-vs2022-tests-debug",
+      "configurePreset": "windows-vs2022",
+      "configuration": "Debug",
+      "targets": ["kbe_tests"]
+    },
+    {
+      "name": "windows-vs2022-tests-release",
+      "configurePreset": "windows-vs2022",
+      "configuration": "Release",
+      "targets": ["kbe_tests"]
+    },
+    {
+      "name": "windows-ninja-tests-debug",
+      "configurePreset": "windows-ninja",
+      "configuration": "Debug",
+      "targets": ["kbe_tests"]
+    },
+    {
+      "name": "windows-ninja-tests-release",
+      "configurePreset": "windows-ninja",
+      "configuration": "Release",
+      "targets": ["kbe_tests"]
+    },
+    {
+      "name": "linux-tests-debug",
+      "configurePreset": "linux-ninja",
+      "configuration": "Debug",
+      "targets": ["kbe_tests"]
+    },
+    {
+      "name": "linux-tests-release",
+      "configurePreset": "linux-ninja",
+      "configuration": "Release",
+      "targets": ["kbe_tests"]
+    },
+    {
+      "name": "macos-tests-debug",
+      "configurePreset": "macos-ninja",
+      "configuration": "Debug",
+      "targets": ["kbe_tests"]
+    },
+    {
+      "name": "macos-tests-release",
+      "configurePreset": "macos-ninja",
+      "configuration": "Release",
+      "targets": ["kbe_tests"]
     }
   ],
   "testPresets": [
@@ -94,6 +206,42 @@
     {
       "name": "windows-vs2022-release",
       "configurePreset": "windows-vs2022",
+      "configuration": "Release",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "windows-ninja-debug",
+      "configurePreset": "windows-ninja",
+      "configuration": "Debug",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "windows-ninja-release",
+      "configurePreset": "windows-ninja",
+      "configuration": "Release",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "linux-debug",
+      "configurePreset": "linux-ninja",
+      "configuration": "Debug",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "linux-release",
+      "configurePreset": "linux-ninja",
+      "configuration": "Release",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "macos-debug",
+      "configurePreset": "macos-ninja",
+      "configuration": "Debug",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "macos-release",
+      "configurePreset": "macos-ninja",
       "configuration": "Release",
       "output": { "outputOnFailure": true }
     }

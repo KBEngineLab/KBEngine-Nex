@@ -1,14 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
 
-# 当前锁定的 vcpkg 基线仍包含声明 CMake 3.5 以下兼容策略的端口；CMake 4 会在依赖安装阶段中途失败。
-# The pinned vcpkg baseline still contains ports declaring pre-3.5 compatibility policies; CMake 4 fails partway through dependency installation.
-if(CMAKE_VERSION VERSION_GREATER_EQUAL 4.0)
-    message(FATAL_ERROR
-        "The current vcpkg baseline requires CMake 3.x. "
-        "On Windows, use the CMake 3.31 bundled with Visual Studio 2022."
-    )
-endif()
-
 # Preset 依赖 VCPKG_ROOT 展开工具链路径；环境变量为空时必须在 project() 触发自动依赖恢复前终止。
 # The preset expands VCPKG_ROOT into the toolchain path; an empty variable must fail before project() can trigger automatic dependency restoration.
 if(DEFINED CMAKE_TOOLCHAIN_FILE AND NOT EXISTS "${CMAKE_TOOLCHAIN_FILE}")
@@ -19,6 +10,11 @@ if(DEFINED CMAKE_TOOLCHAIN_FILE AND NOT EXISTS "${CMAKE_TOOLCHAIN_FILE}")
 endif()
 
 project(KBEngineNex VERSION 2.8.2 LANGUAGES C CXX)
+
+# 生成器文件夹只影响 IDE 展示，不改变目标名称、链接关系或命令行构建接口。
+# Generator folders affect only IDE presentation and do not change target names, linkage, or command-line build interfaces.
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "_CMake")
 
 # CMake 构建与现有 VS 工程并行存在；独立输出目录避免两套构建互相覆盖产物。
 # The CMake build coexists with the existing VS projects; isolated output directories prevent either build from overwriting the other.
@@ -122,4 +118,44 @@ kbe_configure_runtime()
 include(CTest)
 if(BUILD_TESTING)
     add_subdirectory(tests)
+endif()
+
+# 按职责组织生成的 Visual Studio solution；同一分组也会被支持 folder 的其他 IDE 生成器复用。
+# Organize the generated Visual Studio solution by responsibility; other IDE generators with folder support reuse the same grouping.
+function(kbe_set_target_folder folder_name)
+    foreach(_kbe_target IN LISTS ARGN)
+        if(TARGET "${_kbe_target}")
+            set_target_properties("${_kbe_target}" PROPERTIES FOLDER "${folder_name}")
+        endif()
+    endforeach()
+endfunction()
+
+kbe_set_target_folder("Engine/Core"
+    common math thread xml helper resmgr network pyscript entitydef
+)
+kbe_set_target_folder("Engine/Runtime"
+    client_lib navigation server kbe_build_options kbe_python_runtime
+)
+kbe_set_target_folder("Engine/Database"
+    db_interface db_mysql db_redis db_mongodb db_postgresql
+)
+kbe_set_target_folder("Engine/ThirdParty"
+    sigar jwsmtp tmxparser
+)
+kbe_set_target_folder("Server/Components"
+    machine baseappmgr cellappmgr dbmgr loginapp baseapp cellapp
+)
+kbe_set_target_folder("Server/Tools"
+    bots logger interfaces kbcmd
+)
+kbe_set_target_folder("Build/Aggregates"
+    kbe_core kbe_core_dependencies kbe_libraries kbe_servers
+    kbe_python_stdlib kbe_python_runtime_files kbe_runtime
+)
+
+if(BUILD_TESTING)
+    # 统一测试构建入口包含 CTest 所需运行时和编译型 fixture，避免先运行 CTest 才发现测试程序尚未生成。
+    # The unified test build entry includes the runtime and compiled fixtures required by CTest, avoiding late missing-executable failures.
+    add_custom_target(kbe_tests DEPENDS kbe_runtime kbe_sdk_tests)
+    kbe_set_target_folder("Build/Aggregates" kbe_tests)
 endif()
