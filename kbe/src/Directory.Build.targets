@@ -1,6 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project>
   <!--
+    解决方案与项目都允许并行构建，多个 cl.exe 可能同时写入同一项目 PDB；/FS 通过 MSVC 的串行写入协调器避免 C1041。
+    Solutions and projects both permit parallel builds, so multiple cl.exe processes may write one project PDB; /FS uses MSVC's serialized writer to prevent C1041.
+
+    该选项仅协调调试信息写入，不关闭并行编译，也不改变生成代码、ABI 或运行时行为。
+    This option only coordinates debug-information writes; it keeps parallel compilation enabled and does not change generated code, ABI, or runtime behavior.
+  -->
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
+  <!--
     旧 vcxproj 在项目内部再次声明依赖路径，会把 Directory.Build.props 中的 vcpkg 路径挤到末尾。
     Legacy vcxproj files redeclare dependency paths inside each project and push the vcpkg paths from Directory.Build.props to the end.
 
