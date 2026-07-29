@@ -439,19 +439,20 @@ void Bundle::debugCurrentMessages(MessageID currMsgID, const Network::MessageHan
 
 	MemoryStream* pMemoryStream = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 	
-	// 通过消息长度找到消息头，然后将消息内容输出
-	int msglen = currMsgLength;
+	// 包位置和长度均使用size_t，从消息协议长度扩展后再计算可避免64位平台上的窄化。
+	// Packet positions and lengths use size_t; widening the protocol length before arithmetic avoids narrowing on 64-bit platforms.
+	size_t msglen = static_cast<size_t>(currMsgLength);
 	if(pCurrPacket)
 	{
 		// 如果当前消息所有内容都在当前包中，直接输出内容即可
-		msglen -= pCurrPacket->length();
-		if(msglen <= 0)
+		if(pCurrPacket->length() >= msglen)
 		{
 			pMemoryStream->append(pCurrPacket->data() + pCurrPacket->wpos() - currMsgLength, currMsgLength);
 		}
 		else
 		{
-			int idx = 0;
+			msglen -= pCurrPacket->length();
+			size_t idx = 0;
 
 			Network::Bundle::Packets::reverse_iterator packiter = packets.rbegin();
 			for (; packiter != packets.rend(); ++packiter)
@@ -465,9 +466,9 @@ void Bundle::debugCurrentMessages(MessageID currMsgID, const Network::MessageHan
 					continue;
 
 				// 如果所有内容都在包中
-				if((int)pPacket->length() >= msglen)
+				if(pPacket->length() >= msglen)
 				{
-					int wpos = pPacket->length() - msglen;
+					size_t wpos = pPacket->length() - msglen;
 					pMemoryStream->append(pPacket->data() + wpos, msglen);
 					
 					for(size_t i = packets.size() - idx; i < packets.size(); ++i)
@@ -512,33 +513,38 @@ void Bundle::debugCurrentMessages(MessageID currMsgID, const Network::MessageHan
 //-------------------------------------------------------------------------------------
 bool Bundle::revokeMessage(int32 size)
 {
+	// 先保留负数输入的失败语义，再将已验证的长度扩展到包位置所用的size_t。
+	// Preserve failure semantics for negative input, then widen the validated length to the size_t used by packet positions.
+	const bool validSize = size >= 0;
+	size_t remaining = size > 0 ? static_cast<size_t>(size) : 0;
+
 	if(pCurrPacket_)
 	{
-		if(size >= (int32)pCurrPacket_->wpos())
+		if(remaining >= pCurrPacket_->wpos())
 		{
-			size -= pCurrPacket_->wpos();
+			remaining -= pCurrPacket_->wpos();
 			RECLAIM_PACKET(isTCPPacket_, pCurrPacket_);
 			pCurrPacket_ = NULL;
 		}
 		else
 		{
-			pCurrPacket_->wpos(pCurrPacket_->wpos() - size);
-			size = 0;
+			pCurrPacket_->wpos(pCurrPacket_->wpos() - remaining);
+			remaining = 0;
 		}
 	}
 	
-	while(size > 0 && packets_.size() > 0)
+	while(remaining > 0 && packets_.size() > 0)
 	{
 		Network::Packet* pPacket = packets_.back();
-		if(pPacket->wpos() > (size_t)size)
+		if(pPacket->wpos() > remaining)
 		{
-			pPacket->wpos(pPacket->wpos() - size);
-			size = 0;
+			pPacket->wpos(pPacket->wpos() - remaining);
+			remaining = 0;
 			break;
 		}
 		else
 		{
-			size -= pPacket->wpos();
+			remaining -= pPacket->wpos();
 			RECLAIM_PACKET(isTCPPacket_, pPacket);
 			packets_.pop_back();
 		}
@@ -559,7 +565,7 @@ bool Bundle::revokeMessage(int32 size)
 	currMsgLengthPos_ = 0;
 	pCurrMsgHandler_ = NULL;
 
-	return size == 0;
+	return validSize && remaining == 0;
 }
 
 //-------------------------------------------------------------------------------------
