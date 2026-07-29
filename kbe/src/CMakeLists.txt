@@ -35,6 +35,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(KbeBuildOptions)
 include(KbePythonRuntime)
+include(KbeRuntime)
 include(KbeServerTarget)
 
 find_package(fmt CONFIG REQUIRED)
@@ -115,3 +116,10 @@ add_custom_target(kbe_servers DEPENDS
     interfaces
     kbcmd
 )
+
+kbe_configure_runtime()
+
+include(CTest)
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()

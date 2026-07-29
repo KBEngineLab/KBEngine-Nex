@@ -15,7 +15,8 @@
       "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
       "cacheVariables": {
         "VCPKG_TARGET_TRIPLET": "x64-windows-static",
-        "VCPKG_INSTALLED_DIR": "${sourceDir}/vcpkg_installed"
+        "VCPKG_INSTALLED_DIR": "${sourceDir}/vcpkg_installed",
+        "KBE_TEST_ASSETS": "$env{KBE_TEST_ASSETS}"
       }
     }
   ],
@@ -55,6 +56,32 @@
       "configurePreset": "windows-vs2022",
       "configuration": "Release",
       "targets": ["kbe_servers"]
+    },
+    {
+      "name": "windows-vs2022-runtime-debug",
+      "configurePreset": "windows-vs2022",
+      "configuration": "Debug",
+      "targets": ["kbe_runtime"]
+    },
+    {
+      "name": "windows-vs2022-runtime-release",
+      "configurePreset": "windows-vs2022",
+      "configuration": "Release",
+      "targets": ["kbe_runtime"]
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-vs2022-debug",
+      "configurePreset": "windows-vs2022",
+      "configuration": "Debug",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "windows-vs2022-release",
+      "configurePreset": "windows-vs2022",
+      "configuration": "Release",
+      "output": { "outputOnFailure": true }
     }
   ]
 }
