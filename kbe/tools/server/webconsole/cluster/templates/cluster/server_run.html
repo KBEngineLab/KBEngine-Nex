@@ -1,0 +1,171 @@
+{% load static %}
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="/favicon.ico">
+
+    <title>{% block title %}KBEngine Web Console{% endblock %}</title>
+
+    <link href="/static/layui-v2.12.1/css/layui.css" rel="stylesheet">
+
+
+    <style>
+        .hide{
+            display:none;
+        }
+    </style>
+
+
+</head>
+
+<body>
+<div class="row placeholders" style="padding:20px;">
+    <div class="components-run-block">
+        <table class="layui-table" lay-size="sm">
+            <tbody>
+            <tr>
+                <th colspan="2" align="left">KBEngine组件将使用以下用户启动</th>
+            </tr>
+            <tr>
+                <td>用户名</td>
+                <td>{{ ext.system_username }}</td>
+            </tr>
+            <tr>
+                <td>用户ID</td>
+                <td>{{ ext.system_user_uid }}</td>
+            </tr>
+            <tr>
+                <td>kbe_root</td>
+                <td>{{ ext.kbe_root }}</td>
+            </tr>
+            <tr>
+                <td>kbe_res_path</td>
+                <td>{{ ext.kbe_res_path }}</td>
+            </tr>
+            <tr>
+                <td>kbe_bin_path</td>
+                <td>{{ ext.kbe_bin_path }}</td>
+            </tr>
+            </tbody>
+        </table>
+        <br/>
+        <form action="" class="layui-form" method="post" name="form1" id="form1">
+
+            <table class="layui-table" lay-size="sm">
+                <tbody>
+                <tr>
+                    <th colspan="2" align="left"> 启动</th>
+                </tr>
+                <tr>
+                    <td>组件名</td>
+                    <td>
+                        <select name="componentType" class="form-control" id="componentType">
+                            <option value="1" class="c_userid">dbmgr</option>
+                            <option value="2" class="c_userid">loginapp</option>
+                            <option value="3" class="c_userid">baseappmgr</option>
+                            <option value="4" class="c_userid">cellappmgr</option>
+                            <option value="5" selected class="c_userid">cellapp</option>
+                            <option value="6" class="c_userid">baseapp</option>
+                            <option value="10" class="c_userid">logger</option>
+                            <option value="11" class="c_userid">bots</option>
+                            <option value="13" class="c_userid">interfaces</option>
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <td>运行机器</td>
+                    <td>
+                        <select name="targetMachine" class="form-control" id="targetMachine">
+                            {% for machine in machines %}
+                            <option value="{{ machine.intaddr }}">{{ machine.intaddr }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    </td>
+                </tr>
+                <tr>
+                    <td>启动数量</td>
+                    <td>
+                        <input name="runNumber" type="number" id="runNumber" class="layui-input" value="1">
+                    </td>
+                </tr>
+                {% if error %}
+                <tr>
+                    <td colspan="2"><p class="text-danger">{{ error }}</p></td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td></td>
+                    <td>
+
+                        <div class="layui-btn layui-btn-primary layui-border-green  layui-btn-sm"
+                             onClick="run_components()">
+                            启动
+                        </div>
+                        <input name="run" type="hidden" id="run" value="1">
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </form>
+    </div>
+</div>
+<script src="/static/js/pytools.js"></script>
+<script src="/static/js/jquery-3.7.1.min.js"></script>
+<script src="/static/layui-v2.12.1/layui.js"></script>
+<script>
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                cookie = cookie.trim();
+                if (cookie.startsWith(name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    function run_components()
+    {
+
+        if($("#runNumber").val() <= 0) return alert("请输入启动数量");
+        layer.msg('运行中……', {icon: 16, time: 10000,shade:[0.3, '#000']});
+        $.ajax({
+            url : "/cluster/server_run/",
+            dataType : "json",
+            type:"POST",
+             headers: { "X-CSRFToken": getCookie("csrftoken") },
+            data : {
+                timestap : (new Date()).valueOf(),
+                componentType : $("#componentType").val() ,
+                targetMachine : $("#targetMachine").val() ,
+                runNumber : $("#runNumber").val() ,
+                run:true,
+            }
+        }).done(function(data, textStatus, jqXHR){
+            if (data.result == "ok"){
+                layer.alert( "启动成功", {
+                    title : "启动成功",
+                }, function(index){
+                    var index = parent.layer.getFrameIndex(window.name); //先得到当前iframe层的索引
+                    parent.layer.close(index);
+                });
+            } else{
+                layer.alert( data.message, {
+                    title : "启动失败",
+                });
+            }
+        });
+    };
+
+</script>
+
+</body>
+</html>

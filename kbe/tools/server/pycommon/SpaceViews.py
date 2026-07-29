@@ -40,7 +40,7 @@ class SpaceViewer(ServerApp.ServerApp):
 	"""
 	使用样例：
 	import sys
-	sys.path.append(r"F:\kbengine\kbe\tools\server")
+	sys.path.append(r"F:\\kbengine\\kbe\\tools\\server")
 	import pycommon.SpaceViews
 	import pycommon.Define
 	w = pycommon.SpaceViews.SpaceViewer(4)
@@ -57,12 +57,12 @@ class SpaceViewer(ServerApp.ServerApp):
 		self.SpaceViewerData = []
 		self.componentType = componentType
 		assert componentType in CMD_ID_querySpaceViewer
-		
+
 	def clearSpaceViewerData(self):
 		"""
 		"""
 		self.SpaceViewerData = []
-		
+
 	def requireQuerySpaceViewer(self):
 		"""
 		"""
@@ -90,7 +90,7 @@ class SpaceViewer(ServerApp.ServerApp):
 			CellAppCID = streamReader.readUint64()
 			SpacesSize = streamReader.readUint32()
 			cellapps["%s" % CellAppCID] = cellapp = { "SpacesSize":SpacesSize, "SpaceID":{}}
-			
+
 			for i in range(0, SpacesSize):
 				SpaceID = streamReader.readUint32()
 				SpacePath = streamReader.readString()
@@ -113,7 +113,7 @@ class CellAppMgrViewer(ServerApp.ServerApp):
 	获取CellAppMgr中space信息
 	使用样例：
 	import sys
-	sys.path.append(r"F:\kbengine\kbe\tools\server")
+	sys.path.append(r"F:\\kbengine\\kbe\\tools\\server")
 	import pycommon.CellViews
 	import pycommon.Define
 	w = pycommon.CellViews.CellAppMgrViewer(4,1)
@@ -129,13 +129,13 @@ class CellAppMgrViewer(ServerApp.ServerApp):
 		self.CellAppMgrViewerData = []
 		self.spaceID = spaceID
 		self.componentType = componentType
-		
-		
+
+
 	def clearCellAppMgrViewerData(self):
 		"""
 		"""
 		self.CellAppMgrViewerData = []
-		
+
 	def requireQueryCellAppMgrViewer(self):
 		"""
 		"""
@@ -171,7 +171,7 @@ class CellViewer(ServerApp.ServerApp):
 	获取cellapp中entity信息
 	使用样例：
 	import sys
-	sys.path.append(r"F:\kbengine\kbe\tools\server")
+	sys.path.append(r"F:\\kbengine\\kbe\\tools\\server")
 	import pycommon.CellViews
 	import pycommon.Define
 	w = pycommon.CellViews.CellViewer(4,5)
@@ -190,14 +190,14 @@ class CellViewer(ServerApp.ServerApp):
 		self.a = 0
 		self.list = {"componentType" : [], "componentID" : [], "type":[], "scriptModules_size":[], "UType":[], "Name":[],"spaceEntity":{}}
 		assert componentType in CMD_ID_querySpaceViewer
-		
+
 	def clearCellViewerData(self):
 		"""
 		"""
 		self.CellViewerData = []
 		self.list = {"componentType" : "", "componentID" :"", "type":"", "scriptModules_size":[], "UType":[], "Name":[],"spaceEntity":{}}
 
-		
+
 	def requireQueryCellViewer(self):
 		"""
 		"""
@@ -209,7 +209,7 @@ class CellViewer(ServerApp.ServerApp):
 		self.send(msg)
 
 	def onCellViewerMsg(self, streamReader):
-		""" 
+		"""
 		"""
 		componentType = streamReader.readInt32()
 		componentID = streamReader.readInt64()
@@ -224,11 +224,11 @@ class CellViewer(ServerApp.ServerApp):
 				if scriptModules_size != "" or scriptModules_size != None :
 					for i in range(0,scriptModules_size):
 						UType = streamReader.readUint16()
-						self.list["UType"].append(UType) 
+						self.list["UType"].append(UType)
 						if CPtype == 0:
 							Name = streamReader.readString()
 							self.list["Name"].append(Name)
-				self.a = self.a +1	
+				self.a = self.a +1
 			else:
 				viewerIter = streamReader.readInt32()
 				bools = streamReader.readBool()
@@ -258,4 +258,3 @@ class CellViewer(ServerApp.ServerApp):
 				else:
 					self.list["spaceEntity"]["%s" % viewerIter]["update"] = bools
 		self.CellViewerData = self.list
-

@@ -48,12 +48,12 @@ class ComponentStatus(ServerApp.ServerApp):
 		"""
 		"""
 		self.watchData = []
-		
+
 	def requireQueryCS(self):
 		CMD_queryAppsLoads = CMD_ID_queryAppsLoads[self.componentType]
 		msg = MessageStream.MessageStreamWriter(CMD_queryAppsLoads)
 		self.send(msg)
-		
+
 	def onComponentStatusMsg(self, streamReader):
 		if self.componentType == 3:
 			_d = {"componentID" : [], "load" : [], "numBases" : [], "numEntities" : [], "numProxices":[], "flags":[]}

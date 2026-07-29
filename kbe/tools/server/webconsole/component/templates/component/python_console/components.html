@@ -1,0 +1,297 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+{% block extrastyle %}
+<link href="{% static 'css/admin_style.css' %}" rel="stylesheet">
+{% endblock extrastyle %}
+
+
+{% block content %}
+
+<div class="row placeholders watcher-show-block">
+  <div><hr style=" height:1px;border:none;border-top:1px solid ;margin-bottom:20px;" /></div>
+  <table class="layui-table" lay-size="sm">
+      <thead>
+        <tr>
+          <th>Machine</th>
+          <th>组件名称</th>
+          <th>cid</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for comp in KBEComps %}
+        <tr>
+          <td>{{ comp.intaddr }}</td>
+          <td>{{ comp.fullname }}</td>
+          <td>{{ comp.componentID }}</td>
+<!--          <td><a href="#" onClick="connect_to('{{comp.componentType}}', '{{comp.intport}}', '{{ comp.intaddr }}','root','Watcher with {{ comp.fullname }} on {{ comp.intaddr }}:{{ comp.intport }}')">连接到控制台</a></td>-->
+          <td><a href="#" onClick="connectConsole('{{comp.consolePort}}', '{{ comp.intaddr }}','{{ comp.fullname }} on {{ comp.intaddr }}:{{ comp.consolePort }}')">连接到控制台</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <style>
+        #pythonConsole{
+            display:none !important;
+            padding: 20px;
+        }
+        .layui-layer-page {#pythonConsole{
+            display:block !important;
+            box-sizing: border-box;
+        }
+
+        .sr-only{
+            display:none;
+        }
+
+        #output_block_area{
+            width: 100%;
+            height: 55vh;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 10px;
+            box-sizing: border-box;
+            background: #e5e5e542;
+                    overflow: scroll;
+        }
+
+        #input_cmd_area,#input_cmd_line{
+            width:100%;
+        }
+
+        .data-view{
+            padding:0 20px;
+        }
+
+        @media (max-width: 767px) {
+            .list-tree-view{
+                height: 300px;
+            }
+
+
+            .data-view{
+                padding:0 0;
+                margin-top:20px;
+            }
+
+        }
+    </style>
+    <div id="pythonConsole" class="layui-form">
+        <div id="output_block_area"></div>
+        <br>
+        <div id="execute-block">
+            <span class="layui-btn layui-btn-sm" style="margin-right:0px;"  name="exec" id="exec" onClick="execute_cmd()">执行</span>
+            <span class="layui-btn layui-btn-sm layui-bg-blue" style="margin-right:10px;"  name="exec" id="exec" onClick="reconnect()">重新连接</span>
+            <input type="checkbox" name="isMultiline"  id="mutiline" onClick="console_input_toggle();" title="多行输入">
+        </div>
+
+        <br>
+        <div id="input-block">
+            <textarea name="textarea" rows="10" class="form-control sr-only layui-textarea" id="input_cmd_area"></textarea>
+            <input class="form-control layui-input" type="text" name="textfield" id="input_cmd_line">
+        </div>
+
+    </div>
+</div>
+{% endblock content %}
+
+{% block extrabody %}
+<script src="/static/js/pytools.js"></script>
+<script src="/static/js/jquery-3.7.1.min.js"></script>
+<script src="/static/js/kbengine.js"></script>
+<script>
+    let g_host = "";
+    let g_port = 0;
+    let connect_closed = false;
+
+    function reconnect(){
+        if (window.kbe_socket != null)
+            window.kbe_socket.close();
+
+        connect_to_app(g_host,g_port);
+    }
+
+    function connectConsole(port, host, title){
+        g_host = host;
+        g_port = port;
+
+
+        layer.open({
+            type: 1,
+            title:title,
+            resize:false,
+            move: false,
+            offset: 'r',
+            anim: 'slideLeft', // 从右往左
+            area: ['80%', '100%'],
+            shade: 0.1,
+            shadeClose: true,
+            id: 'ID-demo-layer-direction-r',
+            content: $("#pythonConsole"),
+            success:function(){
+                connect_to_app(host,port);
+            },
+            end: function(){
+                if (window.kbe_socket != null)
+                    window.kbe_socket.close();
+            }
+        });
+
+
+    }
+
+    function console_input_toggle()
+    {
+        var ismutiline = $("#mutiline").is(':checked');
+
+        var elem1 = $("#input_cmd_line");
+        var elem2 = $("#input_cmd_area");
+
+        if (!ismutiline) {
+            elem1.removeClass("sr-only");
+            elem2.addClass("sr-only");
+        } else {
+            elem1.addClass("sr-only");
+            elem2.removeClass("sr-only");
+        }
+    }
+
+
+    function execute_cmd()
+    {
+        if (connect_closed)
+        {
+            show_result("连接已关闭，请重新连接！！！\n",false);
+            // alert("连接已关闭，请重新连接！！！");
+            return;
+        }
+
+        var host = g_host;
+        var port = g_port;
+        var cmd = "";
+
+        if ($("#mutiline").is(':checked'))
+            cmd = $("#input_cmd_area").val();
+        else
+            cmd = $("#input_cmd_line").val();
+
+        cmd = cmd.replace("\r\n", "\n");
+        lastIdx = cmd.length - 1;
+        while (cmd[lastIdx] == "\n")
+        {
+            cmd = cmd.slice(0, -1)
+        }
+        if (cmd.length == 0)
+            return;
+
+        cmd += "\r\n";
+
+        window.kbe_socket.send( cmd );
+
+        $("#input_cmd_area").val("");
+        $("#input_cmd_line").val("");
+
+        //show_cmd( cmd );
+    }
+
+    function connect_to_app(host,port)
+    {
+
+
+        let wsurl = "ws://{{http_host}}/ws/python_console/process_cmd/"+"?port="+port+"&host="+host;
+        if (window.kbe_socket != null)
+            window.kbe_socket.close();
+
+        var list = "";
+        if (socket == null)
+            var socket = new WebSocket(wsurl);
+        else
+            socket = WebSocket(wsurl);
+
+        socket.onopen = function(evt) {
+            $('#output_block_area').append("<p> 连接成功！欢迎使用WebConsole python 控制台。<br>等待连接服务器.... </p>");
+            connect_closed = false;
+        };
+        socket.onclose = function(evt) {
+            $('#output_block_area').append("<p> 连接已关闭，请重新连接！！！ </p>");
+            connect_closed = true;
+        };
+        socket.onmessage = function(evt) {
+            show_result( evt.data, false );
+        };
+        socket.onerror = function(evt) {
+            $('#output_block_area').append("<p> 连接python 控制台失败！！！请刷新重试。 </p>");
+        };
+        window.kbe_socket = socket;
+        connect_closed = false;
+    }
+
+
+    function cleanANSI(str) {
+        // 去掉 ANSI 转义码
+        str = str.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '');
+        // 去掉 ASCII 控制字符，保留换行和制表
+        str = str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+        // 去掉 vt100 序列
+        str = str.replace(/\x18*vt100[\x00-\x1F]*/g, '');
+        return str;
+    }
+
+
+
+
+    function show_result(data, ignoreBlankLine)
+    {
+        var ds = data.replace(/\r\n/g, "\n");
+        ds = ds.replace("<", "&lt;");
+        //ds = ds.replace(">", "&gt;");
+        ds = KBEngine.filterConsoleCmd(ds);
+
+        ds = ds.replace(/\n/g, "<br>");
+        ds = ds.replace(/ /g, '&nbsp;');
+        $('#output_block_area').append(cleanANSI(ds));
+        // ds = ds.split("\n");
+
+
+        // for (var i = 0; i < ds.length; i++){}
+        // var em = $.data.lastEM;
+
+        // for (var i = 0; i < ds.length; i++)
+        // {
+        //     var d = ds[i];
+        //     if (ignoreBlankLine && d.length == 0)
+        //         continue;
+
+        //     if( KBEngine.filterConsoleCmd(d).indexOf("~] >>>")>0 || KBEngine.filterConsoleCmd(d).indexOf("~]#")>0 ){
+        //         $('#output_block_area').append($('<span>' + KBEngine.filterConsoleCmd(d) + '</span>'));
+        //     }else{
+        //         $('#output_block_area').append('<br>');
+        //     }
+
+
+        //     if ($.data.lastEM)
+        //     {
+        //         em.text(KBEngine.filterConsoleCmd(em.text() + d));
+        //         $.data.lastEM = null;
+        //     }
+        //     else
+        //     {
+        //         if( KBEngine.filterConsoleCmd(d).indexOf("~] >>>")>0 || KBEngine.filterConsoleCmd(d).indexOf("~]#")>0 )
+        //             em = $('<span style="color:red">' + KBEngine.filterConsoleCmd(d) + '</span>');
+        //         else
+        //             em = $('<span>' + KBEngine.filterConsoleCmd(d) + '</span>');
+        //         $('#output_block_area').append(em);
+        //         $('#output_block_area').append('<br>');
+        //     }
+        // }
+        // if (data[data.length - 1] != "\n")
+        //     $.data.lastEM = em;
+
+         // $('#output_block_area').scrollTop( $('#output_block_area').height());
+         $('#output_block_area').scrollTop( document.getElementById('output_block_area').scrollHeight);
+    }
+
+</script>
+
+{% endblock extrabody%}

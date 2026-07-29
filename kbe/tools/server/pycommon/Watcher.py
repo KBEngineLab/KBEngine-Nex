@@ -44,7 +44,7 @@ class Watcher(ServerApp.ServerApp):
 	"""
 	使用样例：
 	import sys
-	sys.path.append("x:\\kbengine\\kbe\\tools\\server")
+	sys.path.append(r"x:\\kbengine\\kbe\\tools\\server")
 	import pycommon.Watcher
 	import pycommon.Define
 	w = pycommon.Watcher.Watcher(pycommon.Define.CELLAPP_TYPE)
@@ -61,12 +61,12 @@ class Watcher(ServerApp.ServerApp):
 		self.watchData = []
 		self.componentType = componentType
 		assert componentType in CMD_ID_queryWatcher
-		
+
 	def clearWatchData(self):
 		"""
 		"""
 		self.watchData = []
-		
+
 	def requireQueryWatcher(self, path):
 		"""
 		"""
@@ -87,7 +87,7 @@ class Watcher(ServerApp.ServerApp):
 				id = streamReader.readUint16()
 				wtype = streamReader.readUint8()
 				fullpath = "%s%s%s" % (path, len(path) > 0 and "/" or "", name)
-				
+
 				if wtype == WATCHER_VALUE_TYPE_UINT8:
 					val = streamReader.readUint8()
 				elif wtype == WATCHER_VALUE_TYPE_UINT16:
@@ -118,12 +118,12 @@ class Watcher(ServerApp.ServerApp):
 					val = streamReader.readInt32()
 				else:
 					assert False, "not support!"
-				
+
 				#_w = { "fullpath" : fullpath, "id" : id, "val" : val }
-				
+
 				_d["path"] = path
 				_d["values"][name] = val
-		
+
 		else:
 			rootpath = streamReader.readString()
 			if rootpath == "/":

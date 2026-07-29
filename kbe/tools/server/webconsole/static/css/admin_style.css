@@ -1,0 +1,10 @@
+* {
+  outline: none;
+}
+.list-inline li {
+  display: inline-block;
+}
+.layui-table td,
+.layui-table th {
+  vertical-align: middle;
+}

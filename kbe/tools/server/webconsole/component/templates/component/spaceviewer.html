@@ -1,0 +1,282 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+{% block extrastyle %}
+<link href="{% static 'css/admin_style.css' %}" rel="stylesheet">
+
+<style>
+	.list-tree-view{
+		border: 1px solid var(--hairline-color);
+		height: 70vh;
+		overflow: auto;
+		padding: 10px 0px;max-width: 400px;
+	}
+
+	.space-viewer{
+		width:100%;height: 70vh;
+	}
+
+	@media (max-width: 767px) {
+		.list-tree-view{
+			height: auto;
+		}
+
+		.space-viewer{
+			height: 40vh;
+		}
+	}
+
+</style>
+{% endblock extrastyle %}
+
+
+{% block content %}
+{{componentName}} on {{intaddr}}:{{intport}}
+
+  <div id="err">{{err}}</div>
+	<input name="ws_url" type="hidden" id="ws_url" value="{{ ws_url|safe }}">
+	<input name="cell_ws_url" type="hidden" id="cell_ws_url" value="{{ cell_ws_url|safe }}">
+  <div style="    margin-top: 20px;"><hr style=" height:1px;border:none;border-top:1px solid;" /></div>
+	<div class="layui-row" style="    margin-top: 20px;">
+		<div  class="list-tree-view layui-col-md4" >
+			<div id="list-tree"></div>
+		</div>
+		<div class="layui-col-md8">
+			<div id="space-viewer"  class="space-viewer" ></div>
+		</div>
+
+	</div>
+{% endblock content %}
+
+{% block extrabody %}
+<script src="/static/js/pytools.js"></script>
+<script src="/static/js/jquery-3.7.1.min.js"></script>
+<script src="/static/js/echarts6.0.min.js"></script>
+
+<script>
+let timeTicket = null;
+
+var myChart = echarts.init(document.getElementById('space-viewer'));
+
+window.addEventListener('resize', function() {
+	myChart.resize();
+});
+var point_arr = []
+var cell_data = []
+
+
+window.onload = connect_to;
+
+function connect_to()
+{
+	var list = "", list1 = "", list2 = "";
+	var socket = new WebSocket($("#ws_url").val());
+    socket.onopen = function(evt) {};
+    socket.onclose = function(evt) {};
+    socket.onmessage = function(evt) {
+
+    var list_data = [];
+     console.log(evt.data);
+     obj_data = JSON.parse(evt.data);
+     for(var i in obj_data["cellapp"]){
+     {% for comp in kbeComps %}
+     if (i ==  {{comp.componentID}} )
+     var cell_name = "{{ comp.fullname }}";
+     {% endfor %}
+
+     //$(".list-tree").append(list);
+     var item_list = [];
+     for(var j in obj_data["cellapp"][i]["SpaceID"]){
+     item_list.push({
+     spread:true,
+     "id":j,
+     "title": obj_data["cellapp"][i]["SpaceID"][j]["SpacePath"],
+     "space":true,
+     "parentId":i
+     });
+     //list2 += '<li style="padding-left:5px;" class="space-'+i+'-'+j+'" spaceID='+j+' cellapp='+i+'>　<span onclick="show_result(this)"><a href="javascript:void(0);">'+obj_data["cellapp"][i]["SpaceID"][j]["SpacePath"]+'</a></span></li>';
+     }
+     //list1 = '<ul style="padding-left:0;" class="cellapp'+i+'"><span onclick="">'+cell_name+'</span>'+list2+'</ul>';
+     //list2 = ""
+     //list +=list1
+
+     list_data.push({
+     "title":cell_name,
+     spread:true,
+				"id":i,
+     children:item_list,
+				"space":false,
+     });
+
+
+
+     }
+
+
+     layui.use('tree', function(){
+			var tree = layui.tree;
+
+			//渲染
+			var inst1 = tree.render({
+				elem: '#list-tree' ,
+				onlyIconControl:true,
+				data:list_data,
+				click: function(obj){
+					if(obj.data.space){
+						show_result(obj.data.id,obj.data.parentId,obj.data.title);
+					}
+
+				}
+			});
+		});
+
+    };
+    socket.onerror = function(evt) {};
+    window.kbe_socket = socket;
+    $.data.connect_closed = false;
+}
+
+
+function show_space(title)
+{
+	point_arr = []
+	cell_data = []
+	var cell_socket = new WebSocket($("#cell_ws_url").val());
+    cell_socket.onopen = function(evt) {
+
+	  var data = cell_data;
+	  var option = {
+	    title: {
+	        text: title
+	    },
+		dataZoom: [
+        {
+            show: true,
+            realtime: true,
+            start: 0,
+            end: 100,
+        },
+        {
+            type: 'inside',
+            realtime: true,
+            start: 0,
+            end: 100,
+        }
+    ],
+
+	    xAxis: {
+	        splitLine: {
+	            lineStyle: {
+	                type: 'dashed'
+	            }
+	        }
+	    },
+	    yAxis: {
+	        splitLine: {
+	            lineStyle: {
+	                type: 'dashed'
+	            }
+	        },
+	        scale: true
+	    },
+	    series: [{
+	        name: 'CellEntity',
+	        data: cell_data,
+	        type: 'scatter',
+	        symbolSize: function (data) {
+	            return Math.sqrt(data[2]) / 5e2;
+	        },
+	        label: {
+	            emphasis: {
+	                show: true,
+	                formatter: function (param) {
+	                    return param.data[3];
+	                },
+	                position: 'top'
+	            }
+	        },
+	    }]
+	}
+	myChart.setOption(option, { notMerge: true, lazyUpdate: false });
+	myChart.resize();
+
+};
+
+timeTicket = setInterval(function () {
+
+// 转换成 ECharts 能识别的带 id 的格式
+const scatterData = cell_data.map((item, index) => ({
+    value: [item[0], item[1], item[2]],
+    label: { show: true, formatter: item[3] },
+    group: item[4],
+    id: item[3]  // 唯一 ID
+}));
+
+// 定义不同 group 的颜色
+// const groupColors = {
+//     2: '#ff7f50',
+//     5: '#87cefa',
+//     6: '#da70d6',
+//     7: '#32cd32',
+//     11: '#ffa500'
+// };
+
+// itemStyle: {
+ //            color: function(params) {
+ //                return groupColors[params.data.group] || '#888'; // 默认颜色
+ //            }
+ //        },
+
+    //实时更新重写数据
+    myChart.setOption({
+        series: [{
+          data: scatterData,
+
+        }]
+      });
+}, 500);
+
+
+
+    cell_socket.onclose = function(evt) {};
+    cell_socket.onmessage = function(evt) {
+    // console.log(evt.data);
+    obj_cell = JSON.parse(evt.data);
+    // console.log(obj_cell);
+    for( i in obj_cell["spaceEntity"]){
+    point_arr = [obj_cell["spaceEntity"][i]["position_X"],obj_cell["spaceEntity"][i]["position_Z"],40000000,i,obj_cell["spaceEntity"][i]["pEntity"]];
+    for (var j in cell_data )
+    if (cell_data[j][3] == i) {
+    cell_data.splice(j,1);
+    break;
+    }
+    if (obj_cell["spaceEntity"][i]["position_X"] != obj_cell["spaceEntity"][i]["position_Z"] != 0)
+    cell_data.push(point_arr);
+    };
+    cell_socket.onerror = function(evt) {};
+    window.kbe_cell_socket = cell_socket;
+    $.data.connect_closed = false;
+	}
+}
+
+function show_result(spaceID,cellappCPID,title)
+{
+	if(timeTicket!=null){
+		clearInterval(timeTicket);
+		timeTicket = null;
+	}
+	//var spaceID = $(obj).parent().attr("spaceID");
+	//var cellappCPID =  $(obj).parent().attr("cellapp");
+	{% for comp in kbeComps %}
+     if (cellappCPID ==  {{comp.componentID}} )
+     var host = "{{comp.intaddr}}";
+     var port = {{comp.intport}};
+     var cp = {{comp.componentType}};
+     {% endfor %}
+     var href = "ws://{{http_host}}/ws/space_viewer/cell_process_cmd/"+"?cp="+cp+"&port="+port+"&host="+host+"&spaceID="+spaceID;
+     $("#cell_ws_url").val(href);
+     show_space(title)
+}
+
+</script>
+
+{% endblock extrabody %}

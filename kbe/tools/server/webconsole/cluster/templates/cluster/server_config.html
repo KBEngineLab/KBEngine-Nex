@@ -1,0 +1,12 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+
+{% block content %}
+<div class="module">
+  <table class="table">
+    <tr><th>服务器名</th><th>状态</th><th>操作</th></tr>
+    <tr><td>BaseApp</td><td>运行中</td><td><button>重启</button></td></tr>
+    <tr><td>CellApp</td><td>停止</td><td><button>启动</button></td></tr>
+  </table>
+</div>
+{% endblock %}

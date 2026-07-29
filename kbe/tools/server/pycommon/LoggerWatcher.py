@@ -81,12 +81,12 @@ class LoggerWatcher:
 
 		msg = Define.BytesIO()
 		msg.write( struct.pack("=H", Logger_registerLogWatcher ) ) # command
-		msg.write( struct.pack("=H", struct.calcsize("=iIiiccB" + "i" * Define.COMPONENT_END_TYPE + "BB") ) ) # package len	
+		msg.write( struct.pack("=H", struct.calcsize("=iIiiccB" + "i" * Define.COMPONENT_END_TYPE + "BB") ) ) # package len
 		msg.write( struct.pack("=i", uid ) )
 		msg.write( struct.pack("=I",0xffffffff) ) # logtypes filter
 		# msg.write( struct.pack("=I",KBELOG_WARNING ) ) # logtypes filter
 		msg.write( struct.pack("=iicc", 0, 0, '\0'.encode(), '\0'.encode())) # globalOrder, groupOrder, date, keyStr
-		msg.write( struct.pack("=B" ,Define.COMPONENT_END_TYPE) ) # component type filter count 
+		msg.write( struct.pack("=B" ,Define.COMPONENT_END_TYPE) ) # component type filter count
 		msg.write( struct.pack("="+"i" * Define.COMPONENT_END_TYPE, *list(range(Define.COMPONENT_END_TYPE)))) # component type filter
 		msg.write( struct.pack("=BB", 0, 1 ) ) # isfind, first
 		self.socket.sendall( msg.getvalue() )
@@ -105,7 +105,7 @@ class LoggerWatcher:
 		msg.write( struct.pack("=I",logtype) ) # logtypes filter
 		# msg.write( struct.pack("=I",KBELOG_WARNING ) ) # logtypes filter
 		msg.write( struct.pack("=ii" + d1 + "sc" + d2 + "sc", globalOrder, groupOrder, searchDate.encode() ,'\0'.encode() , keystr.encode(), '\0'.encode() )) # globalOrder, groupOrder, date, keyStr
-		msg.write( struct.pack("=B" ,Define.COMPONENT_END_TYPE) ) # component type filter count 
+		msg.write( struct.pack("=B" ,Define.COMPONENT_END_TYPE) ) # component type filter count
 		msg.write( struct.pack("="+"i" * Define.COMPONENT_END_TYPE, *list(list(components_check)))) # component type filter
 		msg.write( struct.pack("=BB", 0, 1 ) ) # isfind, first
 		self.socket.sendall( msg.getvalue() )
@@ -135,15 +135,15 @@ class LoggerWatcher:
 		if type not in logName2type:
 			print( "invalid log type '%s'" % type )
 			return
-			
+
 		if not isinstance(logStr, bytes):
 			logStr = logStr.encode( "utf-8" )
-		
+
 		if logStr[-1] != '\n'.encode():
 			logStr += '\n'.encode()
-				
+
 		logSize = len( logStr )
-		
+
 		msg = Define.BytesIO()
 		msg.write( struct.pack("=H", Logger_writeLog ) ) # command
 		msg.write( struct.pack("=H", struct.calcsize("=iIiQiiqII") + logSize ) ) # package len
@@ -154,14 +154,14 @@ class LoggerWatcher:
 		msg.write( struct.pack("=qI", int(time.time()), 0) ) # time, kbetime
 		msg.write( struct.pack("=I", logSize) ) # log size
 		msg.write( logStr )
-		
+
 		#print(struct.calcsize("=iIiQiiqII") + logSize, len(msg.getvalue()))
 		self.socket.sendall( msg.getvalue() )
 
 	def parseLog( self, stream ):
 		"""
 		从数据流中分解日志
-		
+
 		@return: array of bytes
 		"""
 		self.msgBuffer += stream
@@ -173,19 +173,19 @@ class LoggerWatcher:
 			pos += 4
 			if buffLen < pos + dataLen:
 				self.msgBuffer = self.msgBuffer[pos - 4:]
-				return result 
-			
+				return result
+
 			if cmdID != CONSOLE_LOG_MSGID:
 				print( "Unknown command.(id = %s)" % cmdID )
 				pos += dataLen
 				continue
 
 			msgLen, = struct.unpack("=I", self.msgBuffer[pos:pos + 4])
-			pos += 4 
-		
+			pos += 4
+
 			result.append( self.msgBuffer[pos:pos + msgLen] )
 			pos += msgLen
-		
+
 		return result
 
 	def receiveLog( self, callbackFunc, loop = False ):
@@ -200,12 +200,12 @@ class LoggerWatcher:
 				if len( msg ) == 0:
 					print( "Receive 0 bytes, over! fileno '%s'" % self.socket.fileno() )
 					return
-			
+
 				ms = self.parseLog( msg )
 				if ms:
 					callbackFunc( ms )
 				continue
-			
+
 			if not loop:
 				break
 

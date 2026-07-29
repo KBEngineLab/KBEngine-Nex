@@ -1,0 +1,484 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+{% block extrastyle %}
+<link href="{% static 'css/admin_style.css' %}" rel="stylesheet">
+
+
+<style>
+  .hide{
+    display:none;
+  }
+</style>
+{% endblock extrastyle %}
+
+
+{% block content %}
+<div class="row placeholders console-show-block">
+  <table class="layui-table" lay-size="sm">
+      <thead>
+        <tr>
+          <th>Machine</th>
+          <th>组件名称</th>
+          <th>cid</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for comp in KBEComps %}
+        <tr>
+          <td>{{ comp.intaddr }}</td>
+          <td>{{ comp.fullname }}</td>
+          <td>{{ comp.componentID }}</td>
+          <td>
+            <ul class="list-inline">
+            <li><a href="#" onClick="connectProfile('{{comp.intaddr}}', '{{comp.consolePort}}', 'TickProfile with {{ comp.fullname }} on {{ comp.intaddr }}:{{ comp.consolePort }}','pytickprofile')">TickProfile</a>
+            </li>
+            <li>|</li>
+            <li>
+              <a href="#" onClick="connectProfile('{{comp.intaddr}}', '{{comp.consolePort}}', 'cprofile with {{ comp.fullname }} on {{ comp.intaddr }}:{{ comp.consolePort }}','cprofile')">cprofile</a>
+            </li>
+            <li>|</li>
+            <li>
+              <a href="#" onClick="connectProfile('{{comp.intaddr}}', '{{comp.consolePort}}', 'pyprofile with {{ comp.fullname }} on {{ comp.intaddr }}:{{ comp.consolePort }}','pyprofile')">pyprofile</a>
+            </li>
+            <li>|</li>
+            <li>
+              <a href="#" onClick="connectProfile('{{comp.intaddr}}', '{{comp.consolePort}}', 'eventprofile with {{ comp.fullname }} on {{ comp.intaddr }}:{{ comp.consolePort }}','eventprofile')">eventprofile</a>
+            </li>
+            <li>|</li>
+            <li>
+              <a href="#" onClick="connectProfile('{{comp.intaddr}}', '{{comp.consolePort}}', 'networkprofile with {{ comp.fullname }} on {{ comp.intaddr }}:{{ comp.consolePort }}','networkprofile')">networkprofile</a>
+            </li>
+            </ul>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+
+</div>
+
+
+<style>
+        #profileBox{
+            display:none !important;
+            padding: 20px;
+        }
+        .layui-layer-page #profileBox{
+            display:block !important;
+        }
+
+
+        @media (max-width: 767px) {
+
+
+        }
+    </style>
+  <div id="profileBox" >
+    <div class="layui-form">
+      <div class="layui-inline" style="margin-right: 1em">
+        <input  class="layui-input" type="text" name="second" id="second" placeholder="输入查询时长(单位：秒)" style="padding-left: 0.3em;padding-top: 0.2em;padding-bottom: 0.3em;" />
+        <div style="    font-size: 12px;color: #747474;">注：默认查询时长为10秒</div>
+      </div>
+      <div class="layui-inline" style="margin-right: 1em">
+          <input  class="layui-input" type="text" name="password" id="password" placeholder="输入密码" style="padding-left: 0.3em;padding-top: 0.2em;padding-bottom: 0.3em; " />
+          <div style="    font-size: 12px;color: #747474;">注：需要提供telnet密码，默认为pwd123456</div>
+      </div>
+
+      <style>
+        #output_block_area2 p{
+          margin:0;
+        }
+      </style>
+      <div style=" margin: 20px 0;display: flex;align-items: center;">
+          <input class="btn btn-default form-control onProfileBtn" type="button" name="exec" value="连接组件" id="exec" onClick="onProfile(this)" />
+          <span id="output_block_area2" class="form-control" style=" font-size: 12px;color: #747474;    margin-left: 20px;">
+          </span>
+      </div>
+    </div>
+
+
+    <div id="tottime" class="hide" style="width: 100%;height: 280px;"></div>
+    <div class="object-info hide" style="height: 80px"></div>
+    <table id="object-data" class="layui-table" lay-size="sm" >
+      <thead>
+        <tr>
+          <th scope="col" data-tablesaw-sortable-col data-tablesaw-priority="persist">ncalls</th>
+          <th scope="col" data-tablesaw-sortable-col data-tablesaw-priority="1">tottime</th>
+          <th scope="col" data-tablesaw-sortable-col data-tablesaw-priority="2">percall</th>
+          <th scope="col" data-tablesaw-sortable-col data-tablesaw-priority="3">cumtime</th>
+          <th scope="col" data-tablesaw-sortable-col data-tablesaw-priority="4">percall</th>
+          <th scope="col" data-tablesaw-sortable-col data-tablesaw-priority="5">filename:lineno(function)</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+    </table>
+    <table id="network-data" class="hide layui-table" lay-size="sm" >
+      <thead>
+        <tr>
+          <th scope="col" data-tablesaw-sortable-col data-tablesaw-priority="persist">name</th>
+          <th scope="col" data-tablesaw-sortable-col data-tablesaw-priority="1">sent#</th>
+          <th scope="col" data-tablesaw-sortable-col data-tablesaw-priority="2">size</th>
+          <th scope="col" data-tablesaw-sortable-col data-tablesaw-priority="3">avg</th>
+          <th scope="col" data-tablesaw-sortable-col data-tablesaw-priority="4">total#</th>
+          <th scope="col" data-tablesaw-sortable-col data-tablesaw-priority="5">totalsize</th>
+          <th scope="col" data-tablesaw-sortable-col data-tablesaw-priority="6">recv#</th>
+          <th scope="col" data-tablesaw-sortable-col data-tablesaw-priority="7">size</th>
+          <th scope="col" data-tablesaw-sortable-col data-tablesaw-priority="8">avg</th>
+          <th scope="col" data-tablesaw-sortable-col data-tablesaw-priority="9">total#</th>
+          <th scope="col" data-tablesaw-sortable-col data-tablesaw-priority="10">totalsize</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+    </table>
+    <table id="event-data" class="hide layui-table" lay-size="sm" >
+      <thead>
+        <tr>
+          <th>name</th>
+          <th>count</th>
+          <th>size</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+    </table>
+
+  </div>
+{% endblock content%}
+
+{% block extrabody %}
+
+<script src="/static/js/pytools.js"></script>
+<script src="/static/js/jquery-3.7.1.min.js"></script>
+<script src="/static/js/kbengine.js"></script>
+
+<script src="/static/js/echarts6.0.min.js"></script>
+<script>
+  let g_host = "";
+  let g_port = 0;
+  let g_cmd = "";
+        var myChart = null;
+  function initProfile(cmd)
+  {
+    $.data.profile_started = false;
+    $("#tottime").addClass("hide");
+    $(".object-info").addClass("hide");
+    $("#event-data").addClass("hide");
+    $("#network-data").addClass("hide");
+    if (cmd =="pytickprofile")
+    {
+      $("#tottime").removeClass("hide");
+      $(".object-info").removeClass("hide");
+    }
+
+    if (cmd =="eventprofile")
+    {
+      $("#event-data").removeClass("hide");
+      $("#object-data").addClass("hide");
+    }
+    if (cmd =="networkprofile")
+    {
+      $("#object-data").addClass("hide");
+      $("#network-data").removeClass("hide");
+    }
+  }
+
+    function connectProfile(host,port,  title, cmd){
+        g_host = host;
+        g_port = port;
+        g_cmd = cmd;
+        layer.open({
+            type: 1,
+            title:title,
+            resize:false,
+            move: false,
+            offset: 'r',
+            anim: 'slideLeft', // 从右往左
+            area: ['80%', '100%'],
+            shade: 0.1,
+            shadeClose: true,
+            id: 'ID-demo-layer-direction-r',
+            content: $("#profileBox"),
+            success:function(){
+              initProfile(cmd);
+            },
+            end: function(){
+            $.data.profile_started = false;
+              $('#network-data tbody').html("");
+              $('#event-data tbody').html("");
+              $('#object-data tbody').html("");
+              $(".onProfileBtn").val("连接组件");
+              $('#output_block_area2').html("");
+
+              if(myChart != null) myChart.dispose();
+              myChart = null;
+            }
+        });
+
+
+
+    }
+
+function onProfile(elm)
+{
+    var elmm = $(elm);
+    if (!$.data.profile_started)
+    {
+        ws_url = "ws://{{ http_host }}/ws/profile/process_cmd/?host="+g_host+"&port="+g_port+"&cmd="+g_cmd;
+        var sec = $("#second").val();
+        var password = $("#password").val();
+        if(sec == null || sec == "" || sec == 0){
+          sec = "10";
+        }
+
+        if(password == null || password == "") {
+          password = "pwd123456";
+        }
+
+        if (sec > 0 )
+        {
+          // sec = $("#second").val();
+
+          ws_url = ws_url + "&sec="+sec+"&password="+password;
+          elmm.val("断开连接");
+          $.data.profile_started = true;
+          KBEngine.resetPyTickProfileData();
+          connect_to_app(ws_url);
+          if (g_cmd != "pytickprofile")
+            show_data(sec);
+          else
+            show_echars();
+        }
+        else
+          alert("查询时间需大于等于0");
+    }
+    else
+    {
+        elmm.val("连接组件");
+        $.data.profile_started = false;
+        window.kbe_socket.close();
+    }
+}
+
+
+function connect_to_app(ws_url)
+{
+    var socket = new WebSocket(ws_url);
+    socket.onopen = function(evt) {
+        $('#output_block_area2').html("<p> 连接成功！欢迎使用WebConsole。</p>");
+       //if (g_cmd == 'pytickprofile')
+         // show_echars();
+    };
+    socket.onclose = function(evt) {
+        $('#output_block_area2').html("<p> 连接已关闭，请重新连接！！！ </p>");
+        $.data.connect_closed = true;
+        $.data.profile_started = false;
+    };
+    socket.onmessage = function(evt) {
+        //$('#output_block_area2').append('<span>' + evt.data + '</span> <br>');
+        show_result( evt.data );
+    };
+    socket.onerror = function(evt) {
+        //alert("websocket onerror: " + evt);
+        $('#output_block_area2').html("<p> 连接失败！！！请刷新重试。 </p>");
+        $.data.profile_started = false;
+    };
+    window.kbe_socket = socket;
+    $.data.connect_closed = false;
+}
+
+
+
+function show_result(data)
+{
+    KBEngine.parsePyTickProfileData(data,g_cmd);
+}
+
+  function show_data(sec)
+  {
+    var pytick_data = "";
+    var layer_time = sec*1000+1000;
+    layer.msg(
+      '运行中……',
+    {
+      icon: 16,
+      time: layer_time,
+      shade: [0.3,'#000']
+    });
+    setTimeout(data2tbody,layer_time);
+
+    function data2tbody()
+    {
+      for (var arr = 0; arr < $.data.pyTickProfileDatas.length; arr++)
+      {
+        if (arr>0)
+          if ($.data.pyTickProfileDatas[arr] == $.data.pyTickProfileDatas[arr-1])
+            continue;
+        if (g_cmd=="eventprofile")
+        {
+          if (arr>0)
+            pytick_data += '<tr><td>　</td><td></td><td></td></tr><tr><td style="color:red">'+$.data.pyTickProfileDatas[arr].title+'</td><td></td><td></td></tr>';
+          else
+            pytick_data += '<tr><td style="color:red">'+$.data.pyTickProfileDatas[arr].title+'</td><td></td><td></td></tr>';
+        }
+        for (var i = 0; i < $.data.pyTickProfileDatas[arr].lines.length; i++)
+        {
+          pytick_data += '<tr>';
+          for (var j = 0; j < $.data.pyTickProfileDatas[arr].lines[i].length; j++)
+            pytick_data +='<td>'+$.data.pyTickProfileDatas[arr].lines[i][j]+'</td>';
+          pytick_data += '</tr>';
+        }
+      }
+      if (g_cmd == "networkprofile")
+        $('#network-data tbody').html(pytick_data);
+      else if(g_cmd == "eventprofile")
+        $('#event-data tbody').html(pytick_data);
+      else
+        $('#object-data tbody').html(pytick_data);
+    }
+  }
+
+  function show_object_data(Array_num){
+
+    var res = "";
+    var info = $.data.pyTickProfileDatas[Array_num].title+'<br />'+'tottime : '+$.data.pyTickProfileDatas[Array_num].tottime+'<br />'+'totcall : '+$.data.pyTickProfileDatas[Array_num].totcall+'<hr>'
+
+    $('.object-info').html(info);
+    for (var i = 0; i < $.data.pyTickProfileDatas[Array_num].lines.length; i++) {
+      res += '<tr>';
+      for (var j = 0; j < 6; j++) {
+        res +='<td>'+$.data.pyTickProfileDatas[Array_num].lines[i][j]+'</td>';
+      }
+      res += '</tr>';
+    }
+
+    $('#object-data tbody').html(res);
+
+  }
+
+
+
+
+window.addEventListener('resize', function() {
+  if(myChart != null)
+	myChart.resize();
+});
+
+function show_echars(){
+  arr_x = new Array();
+  arr_y = new Array();
+  var start_num = 0;
+  var end_num = 100;
+  myChart = echarts.init(document.getElementById('tottime'));
+  var option = {
+    title : {
+        text: '组件Object响应时间',
+        x: 'center',
+        align: 'right'
+    },
+    grid: {
+        bottom: 80
+    },
+    tooltip : {
+        trigger: 'axis',
+        triggerOn:'click',
+        width:0,
+        formatter: function(params,ticket,callback) {
+          show_object_data(params[0].name);
+          return params[0].name+" : "+$.data.pyTickProfileDatas[params[0].name].tottime;
+         }
+    },
+    legend: {
+        data:['响应时间'],
+        x: 'left',
+        top:'5%',
+    },
+    dataZoom: [
+        {
+          show: true,
+          realtime: true,
+          start: 0,
+          end: 100,
+          zoomLock:true,
+          realtime:true
+        }
+    ],
+    xAxis : [
+        {
+            type : 'category',
+            boundaryGap: true,
+            axisLine: {onZero: false},
+            data : arr_x,
+        }
+    ],
+    yAxis: [
+        {
+            name: '响应时间',
+            type: 'value',
+        }
+    ],
+    series: [
+        {
+            name:'响应时间',
+            type:'bar',
+            hoverAnimation: false,
+            areaStyle: {
+                normal: {}
+            },
+            lineStyle: {
+                normal: {
+                    width: 1
+                }
+            },
+            data:arr_y,
+        }
+    ]
+};
+
+  myChart.setOption(option);
+
+  //实时获取dataZoom的状态
+  myChart.on("dataZoom",function(params){
+      start_num = params.start;
+      end_num = params.end;
+    })
+
+  //实时更新时间轴
+  timeTicket = setInterval(function () {
+    if(myChart == null ) clearInterval(timeTicket);
+    data_length = $.data.pyTickProfileDatas.length-1;
+
+    if (arr_x.length > 200)
+      start_num = end_num - (200/arr_x.length)*100;
+
+    for (var ii = 0; ii < data_length; ii++) {
+      arr_x[ii] = ii;
+      arr_y[ii] = $.data.pyTickProfileDatas[ii].tottime;
+      if ($.data.profile_started == false){
+        clearInterval(timeTicket);
+        break;
+      }
+    }
+
+    //实时更新重写数据
+    myChart.setOption({
+        dataZoom : [{
+         start:start_num,
+         end:end_num,
+        }],
+        xAxis : [{
+          data : arr_x
+        }],
+        series: [{
+          data: arr_y
+        }]
+      });
+    }, 1000);
+}
+
+</script>
+
+{% endblock extrabody %}

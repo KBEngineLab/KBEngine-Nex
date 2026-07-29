@@ -40,6 +40,9 @@ ehthumbs.db
 *.s
 *.pyc
 *.py[cod]
+__pycache__/
+.venv/
+venv/
 *.exe
 *.dll
 *.log
@@ -91,6 +94,7 @@ ehthumbs.db
 /kbe/res/scripts/common/DLLs/
 /kbe/tools/server/webconsole/pycommon/
 /kbe/tools/server/webconsole/*.pyc
+/kbe/tools/server/webconsole/db.sqlite3
 
 # Generated CPython build files
 /kbe/src/lib/python/Makefile.pre

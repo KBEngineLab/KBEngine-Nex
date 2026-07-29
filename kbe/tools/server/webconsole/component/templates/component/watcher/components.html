@@ -1,0 +1,247 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+{% block extrastyle %}
+<link href="{% static 'css/admin_style.css' %}" rel="stylesheet">
+{% endblock extrastyle %}
+
+
+{% block content %}
+
+<div class="row placeholders watcher-show-block">
+  <div><hr style=" height:1px;border:none;border-top:1px solid ;margin-bottom:20px;" /></div>
+  <table class="layui-table" lay-size="sm">
+      <thead>
+        <tr>
+          <th>Machine</th>
+          <th>组件名称</th>
+          <th>cid</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for comp in KBEComps %}
+        <tr>
+          <td>{{ comp.intaddr }}</td>
+          <td>{{ comp.fullname }}</td>
+          <td>{{ comp.componentID }}</td>
+<!--          <td><a href="#" onClick="connect_to('{{comp.componentType}}', '{{comp.intport}}', '{{ comp.intaddr }}','root','Watcher with {{ comp.fullname }} on {{ comp.intaddr }}:{{ comp.intport }}')">连接到控制台</a></td>-->
+          <td><a href="#" onClick="connectConsole('{{comp.componentType}}', '{{comp.intport}}', '{{ comp.intaddr }}','root','Watcher with {{ comp.fullname }} on {{ comp.intaddr }}:{{ comp.intport }}')">连接到控制台</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <style>
+        #watcherConsole{
+            display:none !important;
+            padding: 20px;
+        }
+        .layui-layer-page #watcherConsole{
+            display:block !important;
+        }
+
+        .list-tree-view{
+            border: 1px solid var(--hairline-color);
+            height: calc(100vh - 51px - 50px );
+            overflow: auto;
+            padding: 10px 0px;max-width: 400px;
+        }
+
+        .data-view{
+            padding:0 20px;
+        }
+
+        @media (max-width: 767px) {
+            .list-tree-view{
+                height: 300px;
+            }
+
+
+            .data-view{
+                padding:0 0;
+                margin-top:20px;
+            }
+
+        }
+    </style>
+    <div id="watcherConsole" >
+        <div class="layui-row">
+            <div class="list-tree-view layui-col-md4">
+                    <div id="list-tree"></div>
+<!--                    <li class="root" >-->
+<!--                    <span onclick="show_result(this)" key="root"><a href="javascript:void(0);">root</a></span>-->
+<!--                    </li>-->
+            </div>
+            <div class="layui-col-md8 data-view" >
+                <table class="layui-table watcher-info" lay-size="sm">
+                    <thead><tr><th>属性</th><th>变量</th></tr></thead><tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extrabody %}
+<script src="/static/js/pytools.js"></script>
+<script src="/static/js/jquery-3.7.1.min.js"></script>
+<script>
+    let tree = null;
+
+    let tree_list = [
+        {
+            spread:true,
+            "id":"root",
+            "title": "root",
+            "children":[]
+        }
+    ];
+
+
+
+
+    function connectConsole(cp, port, host, key, title){
+        layer.open({
+            type: 1,
+            title:title,
+            resize:false,
+            move: false,
+            offset: 'r',
+            anim: 'slideLeft', // 从右往左
+            area: ['80%', '100%'],
+            shade: 0.1,
+            shadeClose: true,
+            id: 'ID-demo-layer-direction-r',
+            content: $("#watcherConsole"),
+            end: function(){
+                if (window.kbe_socket != null)
+                    window.kbe_socket.close();
+                $(".watcher-info tbody").html("");
+            }
+        });
+
+
+        tree_list = [
+            {
+                spread:true,
+                "id":"root",
+                "title": "root",
+                "children":[]
+            }
+        ];
+
+        layui.use('tree', function(){
+            tree = layui.tree;
+
+            //渲染
+            var inst1 = tree.render({
+                elem: '#list-tree' ,
+                id: 'list-tree',
+                onlyIconControl:true,
+                data:tree_list,
+                click: function(obj){
+                    let treeItem = getTreeItemForID(tree_list,obj.data.id);
+                    console.log(obj.data.id);
+                    console.log(treeItem);
+                    show_result(host,port,cp,obj.data.id,treeItem);
+                }
+            });
+        });
+    }
+
+    function getTreeItemForID(treeList, id) {
+        for (const item of treeList) {
+            if (item.id === id) {
+                return item;
+            }
+            if (item.children && item.children.length > 0) {
+                const found = getTreeItemForID(item.children, id);
+                if (found) return found;
+            }
+        }
+        return null;
+    }
+
+
+    function connect_to_app(host,port,cp,key,wsurl,obj)
+    {
+        $.data.profile_started = false;
+        if (window.kbe_socket != null)
+            window.kbe_socket.close();
+
+        var list = "";
+        if (socket == null)
+            var socket = new WebSocket(wsurl);
+        else
+            socket = WebSocket(wsurl);
+
+        socket.onopen = function(evt) {};
+        socket.onclose = function(evt) {};
+        socket.onmessage = function(evt) {
+
+            var info = "";
+            var tree_childrens = [];
+            obj_data = evt.data.replace(/False/g,'\"False\"');
+            obj_data = obj_data.replace(/True/g,'\"True\"')
+            obj_data = JSON.parse(obj_data.replace(/'/g,'\"'));
+            if(evt.data != '[{\'type\': 0, \'keys\': [], \'values\': {}, \'path\': \'\'}]')
+            {
+                if (obj_data[0]["path"] == "root/network/messages")
+                {
+                    for (var x in obj_data[0]["keys"])
+                    {
+                        tree_childrens.push({
+                            "title":obj_data[0]["keys"][x],
+                            spread:true,
+                            "id":key+'/'+obj_data[0]["keys"][x],
+                            "children":[]
+                        });
+                    }
+
+                    obj['children'] = tree_childrens
+
+                }
+                else
+                {
+                    for (var y in obj_data[0]["values"])
+                        info += '<tr><td>'+y+':</td><td>'+obj_data[0]["values"][y]+'</td></tr>';
+                    $(".watcher-info tbody").html(info);
+
+                    if(obj_data[1]["keys"]){
+                        for (var x in obj_data[1]["keys"])
+                        {
+                            tree_childrens.push({
+                                "title":obj_data[1]["keys"][x],
+                                spread:true,
+                                "id":key+'/'+obj_data[1]["keys"][x],
+                                "children":[]
+                            });
+                        }
+
+                        obj['children'] = tree_childrens
+                    }
+                }
+            }
+
+            if(tree!=null){
+                tree.reload('list-tree', { // options
+                  data: tree_list
+                });
+            }
+        };
+        socket.onerror = function(evt) {};
+        window.kbe_socket = socket;
+        $.data.connect_closed = false;
+    }
+
+    function show_result(host,port,cp,key,obj)
+    {
+
+        let wsurl = "ws://{{http_host}}/ws/watcher/process_cmd/"+"?cp="+cp+"&port="+port+"&host="+host+"&key="+key;
+
+        connect_to_app(host,port,cp,key,wsurl,obj);
+    }
+
+</script>
+
+{% endblock extrabody%}

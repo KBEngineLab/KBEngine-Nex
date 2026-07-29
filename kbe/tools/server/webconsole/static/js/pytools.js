@@ -1,5 +1,5 @@
 /*!
- * 一些类似于思路来自于python的工具函数
+ * 一些锟斤拷锟斤拷锟斤拷思路锟斤拷锟斤拷锟斤拷python锟侥癸拷锟竭猴拷锟斤拷
  * write by penghuawei
  */
 
@@ -8,17 +8,17 @@ pytools = {
     {
         if (typeof step === 'undefined')
             step = 1;
-        
+
         if (typeof end === 'undefined')
         {
             end = first;
             first = 0;
         }
-        
+
         if (typeof first === 'undefined')
             return [];
-        
-        
+
+
         var v = [];
         for (var i = first; i < end; i++)
             v.push( i );
@@ -35,39 +35,38 @@ pytools = {
 
     lstrip : function( str1, str2 )
     {
-        var spl = str2; 
+        var spl = str2;
         var typeName = typeof str2;
         if (typeName === 'undefined' || typeName === 'null')
             spl = "^[\r\n\t ]*";
         else
             spl = "^[" + str2 + "]*";
-        
+
         return str1.replace(new RegExp(spl), "");
     },
 
     rstrip : function( str1, str2 )
     {
-        var spl = str2; 
+        var spl = str2;
         var typeName = typeof str2;
         if (typeName === 'undefined' || typeName === 'null')
             spl = "[\r\n\t ]*$";
         else
             spl = "[" + str2 + "]*$";
-        
+
         return str1.replace(new RegExp(spl), "");
     },
 
     strip : function( str1, str2 )
     {
-        var spl = str2; 
+        var spl = str2;
         var typeName = typeof str2;
         if (typeName === 'undefined' || typeName === 'null')
             spl = "^[\r\n\t ]*|[\r\n\t ]*$";
         else
             spl = "^[" + str2 + "]*" + "[" + str2 + "]*$";
-        
+
         return str1.replace(new RegExp(spl, "g"), "");
     },
 
 };
-

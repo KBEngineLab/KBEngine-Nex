@@ -1,0 +1,200 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+{% block extrastyle %}
+<link href="{% static 'css/admin_style.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="row placeholders">
+    <div>
+        <ul class="list-inline ">
+            <li>
+                <div class="layui-btn  layui-btn-sm layui-btn-primary" onClick="flush()">刷新</div>
+            </li>
+
+            <li>
+                <div class="layui-btn layui-btn-sm " onClick="run()">启动新组件</div>
+            </li>
+
+            <li>
+                <div class="layui-btn layui-btn-sm  layui-btn-danger"  onClick="shutdown()">停止服务器</div>
+            </li>
+
+            <li>
+                <div class="layui-btn layui-btn-sm  layui-btn-normal"  onClick="saveServerConfig()">保存当前服务器运行配置</div>
+            </li>
+
+        </ul>
+    </div>
+
+    <table  class="layui-table" lay-size="sm">
+        <thead>
+        <tr>
+            <th>Machine</th>
+            <th>组件名称</th>
+            <th>uid</th>
+            <th>pid</th>
+            <th>cid</th>
+            <th>gid</th>
+            <th>gus</th>
+            <th>CPU负载</th>
+            <th>内存消耗比</th>
+            <th>内存消耗数</th>
+            <th>实体数量</th>
+            <th>Proxy实体数量</th>
+            <th>客户端数量</th>
+            <th>操作</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for comp in KBEComps %}
+        <tr>
+            <td>{{ comp.intaddr }}</td>
+            <td>{{ comp.fullname }}</td>
+            <td>{{ comp.uid }}</td>
+            <td>{{ comp.pid }}</td>
+            <td>{{ comp.componentID }}</td>
+            <td>{{ comp.globalOrderID }}</td>
+            <td>{{ comp.genuuid_sections }}</td>
+            <td>{{ comp.cpu|floatformat:2 }}%</td>
+            <td>{{ comp.mem|floatformat:2 }}%</td>
+            <td>{% widthratio comp.usedmem 1048576 1.0 %}m</td>
+            <td>{{ comp.entities }}</td>
+            <td>{{ comp.proxies }}</td>
+            <td>{{ comp.clients }}</td>
+            <td nowrap="nowrap">
+                <button class="layui-btn layui-btn-warm layui-btn-xs " onclick="group_shutdown({{comp.componentType}},'{{comp.componentID}}')">
+                    STOP
+                </button>
+
+                <button class="layui-btn layui-btn-danger layui-btn-xs " onclick="group_kill({{comp.componentType}},'{{comp.componentID}}')">
+                    KILL
+                </button>
+            </td>
+
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+
+</div>
+{% endblock content %}
+
+
+{% block extrabody %}
+<script src="/static/js/pytools.js"></script>
+<script src="/static/js/jquery-3.7.1.min.js"></script>
+<script>
+
+    function saveServerConfig()
+    {
+        layer.prompt({
+            title: '请为这个配置起个名',
+            formType: 0 //prompt风格，支持0-2
+          },
+          function(data, index, elem){
+            $.ajax({
+                    url : "/cluster/server_save_config/",
+                    dataType : "json",
+                    data : { timestap : (new Date()).valueOf(), name : data }
+                }).done(function(data, textStatus, jqXHR){
+                        if (data.state == "success"){
+                            layer.close(index);
+                            layer.alert( "保存完成", {
+                                    title : "保存完成",
+                            });
+                        }else{
+                            layer.alert( data.message, {
+                                title : "保存失败",
+                            } );
+                        }
+
+                    });
+            });
+    }
+
+    function flush()
+    {
+        layer.load(2);
+        window.location.reload();
+    }
+
+    function shutdown()
+    {
+
+        href = "/cluster/server_shutdown/";
+        layer.open({
+            type: 2,
+            title: "停止服务器",
+            closeBtn: 1,
+            shade: [0.3,'#000'],
+            //shadeClose: true,
+            area: ['500px', '60%'],
+            scrollbar: false,
+            // skin: 'layui-layer-rim', //加上边框
+            content: href,
+            end: function (){
+                location.reload();
+            }
+        });
+    }
+
+    function group_shutdown(ct,cid){
+      href = "/cluster/"+ct+"/"+cid+"/stop";
+      layer.open({
+            type: 2,
+            title: "停止组件",
+            closeBtn: 1,
+            shade: [0.3,'#000'],
+            //shadeClose: true,
+            area: ['500px', '60%'],
+            scrollbar: false,
+            // skin: 'layui-layer-rim', //加上边框
+            content: href,
+            end: function (){
+                location.reload();
+            }
+        });
+    }
+    function group_kill(ct,cid){
+      href = "/cluster/"+ct+"/"+cid+"/kill";
+      layer.open({
+            type: 2,
+            title: "杀死进程",
+            closeBtn: 1,
+            shade: [0.3,'#000'],
+            //shadeClose: true,
+            area: ['500px', '60%'],
+            scrollbar: false,
+            // skin: 'layui-layer-rim', //加上边框
+            content: href,
+            end: function (){
+                location.reload();
+            }
+        });
+    }
+
+
+
+    function run(ct,cid){
+      href = "/cluster/server_run/";
+      layer.open({
+            type: 2,
+            title: "启动新组件",
+            closeBtn: 1,
+            shade: [0.3,'#000'],
+            //shadeClose: true,
+            area: ['600px', '600px'],
+            scrollbar: false,
+            // skin: 'layui-layer-rim', //加上边框
+            content: href,
+            end: function (){
+                location.reload();
+            }
+        });
+    }
+
+</script>
+
+{% endblock extrabody %}

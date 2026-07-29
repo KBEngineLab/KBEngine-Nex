@@ -1,0 +1,261 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+{% block extrastyle %}
+<link href="{% static 'css/admin_style.css' %}" rel="stylesheet">
+
+<style>
+    .hide{
+        display:none;
+    }
+</style>
+{% endblock extrastyle %}
+
+{% block content %}
+<div id="execute-block">
+    <input name="component_ip" type="hidden" id="component_ip" value="{{ request.GET.ip }}">
+    <input name="component_port" type="hidden" id="component_port" value="{{ request.GET.port }}">
+    <input name="ws_url" type="hidden" id="ws_url" value="{{ ws_url }}">
+    <input name="get-pull-state" type="hidden" id="get-pull-state" value="{{ pull_state }}">
+</div>
+
+
+<!--style="position: relative;height:70px;"-->
+<div style="margin-bottom:20px;">
+<!--    style="position: absolute;width: 100%;max-height: 70vh;background: white;"-->
+    <div class="layui-collapse" lay-accordion >
+        <div class="layui-colla-item">
+            <h2 class="layui-colla-title" style="margin:0;">设置</h2>
+<!--            layui-show-->
+            <div class="layui-colla-content  ">
+
+                <form id="info-filter" class="layui-form layui-form-pane" name="form-filter" method="post" action="" >
+                    {% csrf_token %}
+                        <div class="layui-row " style="padding: 1em 1em 1em 3em">
+                            <div class="layui-col-sm3" >
+                                <div><p>进程选择：</p></div>
+                                <p><input type="checkbox" lay-skin="primary" name="baseapp_check" title="baseapp" value="1" {% if baseapp_check == 6 %}checked{% endif %}/></p>
+                                <p><input type="checkbox" lay-skin="primary" name="baseappmgr_check" title="baseappmgr" value="1" {% if baseappmgr_check == 3 %}checked{% endif %}/></p>
+                                <p><input type="checkbox" lay-skin="primary" name="cellapp_check" title="cellapp" value="1" {% if cellapp_check == 5 %}checked{% endif %}/></p>
+                                <p><input type="checkbox" lay-skin="primary" name="dbmgr_check" title="dbmgr" value="1" {% if dbmgr_check == 1 %}checked{% endif %}/></p>
+                                <p><input type="checkbox" lay-skin="primary" name="loginapp_check" title="loginapp" value="1" {% if loginapp_check == 2 %}checked{% endif %}/></p>
+                            </div>
+
+                            <div class="layui-col-sm3" >
+                                <div><p>提示类型：</p></div>
+                                <div class="col-sm-6">
+                                    <p><input type="checkbox" lay-skin="primary" name="CRITICAL" title="CRITICAL" value="1" {% if CRITICAL_check == 1 %}checked{% endif %}/></p>
+                                    <p><input type="checkbox" lay-skin="primary" name="DEBUG" title="DEBUG" value="1" {% if DEBUG_check != 0 %}checked{% endif %}/></p>
+                                    <p><input type="checkbox" lay-skin="primary" name="ERROR" title="ERROR" value="1" {% if ERROR_check != 0 %}checked{% endif %}/></p>
+                                    <p><input type="checkbox" lay-skin="primary" name="INFO" title="INFO" value="1" {% if INFO_check != 0 %}checked{% endif %}/></p>
+                                    <p><input type="checkbox" lay-skin="primary" name="PRINT" title="PRINT" value="1" {% if PRINT_check != 0 %}checked{% endif %}/></p>
+                                    <p><input type="checkbox" lay-skin="primary" name="WARNING" title="WARNING" value="1" {% if WARNING_check != 0 %}checked{% endif %}/></p>
+                                </div>
+                            </div>
+
+                            <div class="layui-col-sm3" >
+                                <div><p>&nbsp;</p></div>
+
+                                <div class="col-sm-6">
+                                    <p><input type="checkbox" lay-skin="primary" name="S_DBG" title="S_DBG" value="1" {% if S_DBG_check != 0 %}checked{% endif %}/></p>
+                                    <p><input type="checkbox" lay-skin="primary" name="S_ERR" title="S_ERR" value="1" {% if S_ERR_check != 0 %}checked{% endif %}/></p>
+                                    <p><input type="checkbox" lay-skin="primary" name="S_INFO" title="S_INFO" value="1" {% if S_INFO_check != 0 %}checked{% endif %}/></p>
+                                    <p><input type="checkbox" lay-skin="primary" name="S_NORM" title="S_NORM" value="1" {% if S_NORM_check != 0 %}checked{% endif %}/></p>
+                                    <p><input type="checkbox" lay-skin="primary" name="S_WARN" title="S_WARN" value="1" {% if S_WARN_check != 0 %}checked{% endif %}/></p>
+
+                                </div>
+                            </div>
+                            <div class="layui-col-sm3" >
+                                <div><p>自定义搜索：</p></div>
+                                <div class="layui-form-item" pane>
+                                    <label class="layui-form-label">globalOrder</label>
+                                    <div class="layui-input-block">
+                                      <input class="layui-input" style="border:0;" type="text" name="globalOrder" value="{{ globalOrder|escape }}">
+                                    </div>
+                                </div>
+
+
+
+                                <div class="layui-form-item" pane>
+                                    <label class="layui-form-label">groupOrder</label>
+                                    <div class="layui-input-block">
+                                      <input class="layui-input"  style="border:0;" type="text" name="groupOrder" value="{{ groupOrder|escape }}">
+                                    </div>
+                                </div>
+                                <div class="layui-form-item" pane>
+                                    <label class="layui-form-label">date</label>
+                                    <div class="layui-input-block">
+                                      <input class="layui-input" style="border:0;" type="text" name="searchDate" value="{{ searchDate|escape }}">
+                                    </div>
+                                </div>
+
+                                <div class="layui-form-item" pane>
+                                    <label class="layui-form-label">keystr</label>
+                                    <div class="layui-input-block">
+                                      <input class="layui-input" style="border:0;"  type="text" name="keystr" value="{{ keystr|escape }}">
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <div class="layui-row  cmd-click col-sm-12" style="">
+                            <input name="pull_state" type="hidden" id="pull-state" value="0">
+                            {# <input id="pull-log" type="button" value="pull" onClick="submit_form()"> #}
+                            <input class="btn btn-default show-result" style="float: right;" type="submit" name="updata-log"
+                                   value="开始" id="updata-log" onClick="">
+                            <input class="btn btn-default show-result hide" style="float: right;" type="button"
+                                   name="updata-log" value="停止" id="close-log" onClick="stop_log()">
+                        </div>
+                    </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<div class="filter-menu form-group col-sm-12" style="margin-bottom:20px;">
+
+    <div class="filter-btn col-sm-12">
+        <div id="output_block_info" class="col-sm-6">{{ unlogger }}</div>
+    </div>
+</div>
+
+
+<!-- <div id="output_block_info"></div> -->
+<div  style="position: initial">
+    <pre id="output_block_area" class="layui-code" style="border:1px solid #eee;height:65vh; background: #f9f9f9;overflow: scroll;padding: 20px 20px;">
+    </pre>
+</div>
+
+{% endblock content %}
+
+{% block extrabody %}
+
+<script src="/static/js/jquery-3.7.1.min.js"></script>
+<script src="/static/js/pytools.js"></script>
+<script src="/static/js/kbengine.js"></script>
+
+
+
+<script>
+layui.use('code', function(){ //加载code模块
+  layui.code(); //引用code方法
+});
+    $(document).ready(function() {
+        console_input_toggle();
+     });
+
+    function stop_log(){
+      window.kbe_socket.close();
+      $("#updata-log").removeClass("hide");
+      $("#close-log").addClass("hide");
+    }
+
+    $(".click-slide").click(function(){
+        $(".info-filter").slideToggle();
+      })
+
+    function onProfile()
+    {
+
+        if (!$.data.profile_started)
+        {
+            $('#output_block_area').html(" ");
+            $.data.profile_started = true;
+            connect_to();
+        }
+        else
+        {
+            window.kbe_socket.close();
+            $.data.profile_started = false;
+        }
+    }
+
+    window.onload = function(){
+      if ($("#ws_url").val()=="")
+        alert("logger进程未运行");
+      if($("#get-pull-state").val("1"))
+      {
+        $("#pull-state").val("0");
+        $("#close-log").removeClass("hide");
+        $("#updata-log").addClass("hide");
+      }
+        onProfile();
+    }
+
+    window.onbeforeunload = function(){
+      window.kbe_socket.close();
+    }
+    // window.onunload = closePage;
+
+    function console_input_toggle()
+    {
+      var ismutiline = $("#mutiline").is(':checked');
+
+      var elem1 = $("#input_cmd_line");
+      var elem2 = $("#input_cmd_area");
+
+      if (!ismutiline) {
+            elem1.removeClass("sr-only");
+            elem2.addClass("sr-only");
+      } else {
+            elem1.addClass("sr-only");
+            elem2.removeClass("sr-only");
+      }
+
+        calcConsoleHeight();
+    }
+
+    function calcConsoleHeight()
+    {
+        var cnt = $("#output_block_area");
+        var h = $("body nav").outerHeight() + 165 + $("#execute-block").outerHeight() + $("#server-title").outerHeight();
+        if ($("#mutiline").is(':checked'))
+            h += $("#input_cmd_area").height();
+        else
+            h += $("#input_cmd_line").height();
+        var wh = $(window).height();
+
+        cnt.height( wh - h );
+    }
+
+    function connect_to()
+    {
+        var socket = new WebSocket($("#ws_url").val());
+        socket.onopen = function(evt) {
+
+          // $('#output_block_info').html("<p> 连接状态：已连接</p>");
+          // alert("连接成功");
+          // show_result( evt.data );
+        };
+        socket.onclose = function(evt) {
+            // $('#output_block_info').html("<p> 连接状态：已断开</p>");
+            // alert("连接已断开");
+            $.data.profile_started = false;
+            $.data.connect_closed = true;
+            stop_log();
+        };
+        socket.onmessage = function(evt) {
+            show_result( evt.data );
+        };
+        socket.onerror = function(evt) {
+            //alert("websocket onerror: " + evt);
+            // alert("连接错误");
+            // $('#output_block_info').html("<p> 连接状态：连接错误</p>");
+        };
+        window.kbe_socket = socket;
+        $.data.connect_closed = false;
+    }
+
+    function show_result( data )
+    {
+         $('#output_block_area').append( "<p>" + data + "</p>" );
+         $('#output_block_area').scrollTop( $('#output_block_area')[0].scrollHeight);
+    }
+
+</script>
+
+
+{% endblock extrabody %}
