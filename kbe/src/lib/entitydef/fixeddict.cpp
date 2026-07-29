@@ -281,7 +281,7 @@ void FixedDict::onInstallScript(PyObject* mod)
 }
 
 //-------------------------------------------------------------------------------------
-int FixedDict::mp_length(PyObject* self)
+Py_ssize_t FixedDict::mp_length(PyObject* self)
 {
 	return PyDict_Size(static_cast<FixedDict*>(self)->pyDict_);
 }

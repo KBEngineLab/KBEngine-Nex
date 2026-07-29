@@ -47,6 +47,8 @@ public:
 	static PyObject* __py_items(PyObject* self, PyObject* args);
 	static PyObject* __py_update(PyObject* self, PyObject* args);
 	static PyObject* __py_get(PyObject* self, PyObject* args);
+	static PyObject* __py_clear(PyObject* self, PyObject* args);
+	static PyObject* __py_pop(PyObject* self, PyObject* args);
 
 	static int seq_contains(PyObject* self, PyObject* value);
 
@@ -58,7 +60,7 @@ public:
 	static int mp_ass_subscript(PyObject* self, 
 		PyObject* key, PyObject* value);
 
-	static int mp_length(PyObject* self);
+	static Py_ssize_t mp_length(PyObject* self);
 
 	static PyObject* mp_keyiter(PyObject* self);
 	static PyObject* mp_iternextkey(PyObject* iter);

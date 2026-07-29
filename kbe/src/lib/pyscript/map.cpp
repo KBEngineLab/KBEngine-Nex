@@ -58,6 +58,8 @@ SCRIPT_METHOD_DECLARE("values",				values,				METH_VARARGS,		0)
 SCRIPT_METHOD_DECLARE("items",				items,				METH_VARARGS,		0)
 SCRIPT_METHOD_DECLARE("update",				update,				METH_VARARGS,		0)	
 SCRIPT_METHOD_DECLARE("get",				get,				METH_VARARGS,		0)	
+SCRIPT_METHOD_DECLARE("clear",				clear,				METH_VARARGS,		0)
+SCRIPT_METHOD_DECLARE("pop",				pop,				METH_VARARGS,		0)
 SCRIPT_METHOD_DECLARE_END()
 
 SCRIPT_MEMBER_DECLARE_BEGIN(Map)
@@ -81,7 +83,7 @@ Map::~Map()
 }
 
 //-------------------------------------------------------------------------------------
-int Map::mp_length(PyObject* self)
+Py_ssize_t Map::mp_length(PyObject* self)
 {
 	return PyDict_Size(static_cast<Map*>(self)->pyDict_);
 }
@@ -105,8 +107,13 @@ int Map::mp_ass_subscript(PyObject* self, PyObject* key, PyObject* value)
 
 	if (value == NULL)
 	{
-		lpScriptData->onDataChanged(key, value, true);
-		return PyDict_DelItem(lpScriptData->pyDict_, key);
+		// 只有本地删除成功后才能广播，避免缺失key产生虚假的远端删除事件。
+		// Broadcast only after local deletion succeeds so a missing key cannot produce a false remote delete event.
+		int result = PyDict_DelItem(lpScriptData->pyDict_, key);
+		if (result == 0)
+			lpScriptData->onDataChanged(key, value, true);
+
+		return result;
 	}
 	
 	lpScriptData->onDataChanged(key, value);
@@ -232,6 +239,90 @@ PyObject* Map::__py_update(PyObject* self, PyObject* args)
 
 	Py_DECREF(pyVal);
 	S_Return; 
+}
+
+//-------------------------------------------------------------------------------------
+PyObject* Map::__py_clear(PyObject* self, PyObject* args)
+{
+	if (!PyArg_ParseTuple(args, ":clear"))
+		return NULL;
+
+	Map* map = static_cast<Map*>(self);
+	PyObject* keys = PyDict_Keys(map->pyDict_);
+	if (!keys)
+		return NULL;
+
+	const Py_ssize_t keyCount = PyList_GET_SIZE(keys);
+	for (Py_ssize_t index = 0; index < keyCount; ++index)
+	{
+		PyObject* key = PyList_GET_ITEM(keys, index);
+
+		// 通过实际对象的mapping槽删除，使派生类同步或schema约束仍然生效。
+		// Delete through the concrete object's mapping slot so derived synchronization and schema rules remain active.
+		if (PyObject_DelItem(self, key) < 0)
+		{
+			Py_DECREF(keys);
+			return NULL;
+		}
+
+		int stillExists = PyDict_Contains(map->pyDict_, key);
+		if (stillExists != 0)
+		{
+			Py_DECREF(keys);
+			if (stillExists > 0)
+				PyErr_SetString(PyExc_TypeError, "mapping does not support item deletion");
+			return NULL;
+		}
+	}
+
+	Py_DECREF(keys);
+	Py_RETURN_NONE;
+}
+
+//-------------------------------------------------------------------------------------
+PyObject* Map::__py_pop(PyObject* self, PyObject* args)
+{
+	PyObject* key = NULL;
+	PyObject* defaultValue = NULL;
+	if (!PyArg_UnpackTuple(args, "pop", 1, 2, &key, &defaultValue))
+		return NULL;
+
+	Map* map = static_cast<Map*>(self);
+	PyObject* value = PyDict_GetItemWithError(map->pyDict_, key);
+	if (!value)
+	{
+		if (PyErr_Occurred())
+			return NULL;
+
+		if (defaultValue)
+		{
+			Py_INCREF(defaultValue);
+			return defaultValue;
+		}
+
+		PyErr_SetObject(PyExc_KeyError, key);
+		return NULL;
+	}
+
+	// 返回值必须跨越字典删除存活，删除本身仍通过派生类mapping槽完成。
+	// The returned value must survive dictionary removal, while deletion still passes through the derived mapping slot.
+	Py_INCREF(value);
+	if (PyObject_DelItem(self, key) < 0)
+	{
+		Py_DECREF(value);
+		return NULL;
+	}
+
+	int stillExists = PyDict_Contains(map->pyDict_, key);
+	if (stillExists != 0)
+	{
+		Py_DECREF(value);
+		if (stillExists > 0)
+			PyErr_SetString(PyExc_TypeError, "mapping does not support item deletion");
+		return NULL;
+	}
+
+	return value;
 }
 
 //-------------------------------------------------------------------------------------
