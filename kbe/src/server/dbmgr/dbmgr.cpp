@@ -33,6 +33,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/message_handler.h"
 #include "thread/threadpool.h"
 #include "server/components.h"
+#include "server/asyncio_helper.h"
 #include "server/plugin_runtime.h"
 #include "server/telnet_server.h"
 #include "db_interface/db_interface.h"
@@ -322,18 +323,6 @@ bool Dbmgr::initializeEnd()
 	INFO_MSG(fmt::format("Dbmgr::initializeEnd: digest({})\n", 
 		EntityDef::md5().getDigestStr()));
 	
-	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
-
-	// 所有脚本都加载完毕
-	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
-										const_cast<char*>("onDBMgrReady"), 
-										const_cast<char*>(""));
-
-	if(pyResult != NULL)
-		Py_DECREF(pyResult);
-	else
-		SCRIPT_ERROR_CHECK();
-
 	pTelnetServer_ = new TelnetServer(&this->dispatcher(), &this->networkInterface());
 	pTelnetServer_->pScript(&this->getScript());
 
@@ -345,6 +334,27 @@ bool Dbmgr::initializeEnd()
 	
 	if (!ret || !initInterfacesHandler() || !initDB())
 		return false;
+
+	// ready 回调可能立即执行数据库操作，因此只能在所有数据库接口成功初始化后公开服务状态。
+	// The ready callback may issue database operations immediately, so service readiness is exposed only after every database interface initializes successfully.
+	{
+		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
+
+		PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(),
+			const_cast<char*>("onDBMgrReady"), const_cast<char*>(""));
+
+		if (pyResult)
+		{
+			// 与其他应用 ready 回调一致，允许脚本返回 coroutine 交给主循环调度。
+			// Match the other application-ready callbacks by submitting a returned coroutine to the main-loop scheduler.
+			AsyncioHelper::submitCoroutine(pyResult);
+			Py_DECREF(pyResult);
+		}
+		else
+		{
+			SCRIPT_ERROR_CHECK();
+		}
+	}
 
 	return PluginRuntime::instance().onComponentReady(true);
 }
