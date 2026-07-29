@@ -34,6 +34,13 @@ set_tests_properties(runtime.kbcmd_getuid PROPERTIES
     ENVIRONMENT "KBE_ROOT=${CMAKE_SOURCE_DIR}/../..;KBE_RES_PATH=${CMAKE_SOURCE_DIR}/../res;KBE_BIN_PATH=$<TARGET_FILE_DIR:kbcmd>"
 )
 
+add_test(NAME source.macos_sigar_contract
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_SIGAR_ROOT=${CMAKE_SOURCE_DIR}/lib/dependencies/sigar"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyMacOSSigar.cmake"
+)
+set_tests_properties(source.macos_sigar_contract PROPERTIES LABELS "macos;source")
+
 set(KBE_TEST_ASSETS "" CACHE PATH "Assets directory used by CMake integration tests")
 set(KBE_TEST_DATABASE_HOST "127.0.0.1" CACHE STRING "Database host used by CMake integration tests")
 set(KBE_TEST_DATABASE_USERNAME "" CACHE STRING "Database username used by CMake integration tests")

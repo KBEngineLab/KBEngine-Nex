@@ -14,7 +14,10 @@ if(WIN32)
         win32/wmi.cpp
     )
 elseif(APPLE)
-    message(FATAL_ERROR "The macOS sigar source must be migrated before building helper on macOS.")
+    set(KBE_SIGAR_PLATFORM_DIR macos)
+    set(KBE_SIGAR_SOURCES
+        macos/sigar_macos.c
+    )
 else()
     set(KBE_SIGAR_PLATFORM_DIR linux)
     set(KBE_SIGAR_SOURCES
