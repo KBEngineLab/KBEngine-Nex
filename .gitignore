@@ -134,3 +134,6 @@ venv/
 logs/
 build.log
 kbe_temp_*
+
+# Performance Lab generated runs / 性能实验室生成的运行结果
+/kbe/src/out/performance-runs/

@@ -1,0 +1,12 @@
+{
+  "name": "baseline",
+  "duration_seconds": 1800,
+  "bots": 500,
+  "connect_rate_per_second": 25,
+  "operation_mix": {
+    "login": 0.1,
+    "heartbeat": 0.6,
+    "movement": 0.3
+  },
+  "thresholds": "../thresholds.json"
+}

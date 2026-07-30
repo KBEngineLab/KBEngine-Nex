@@ -1,0 +1,12 @@
+{
+  "name": "smoke",
+  "duration_seconds": 300,
+  "bots": 50,
+  "connect_rate_per_second": 10,
+  "operation_mix": {
+    "login": 0.2,
+    "heartbeat": 0.6,
+    "movement": 0.2
+  },
+  "thresholds": "../thresholds.json"
+}

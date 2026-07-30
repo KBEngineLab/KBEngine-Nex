@@ -1,0 +1,8 @@
+{
+  "success_rate_min_percent": 99.0,
+  "request_latency_p99_max_ms": 200.0,
+  "tick_p99_max_ms": 50.0,
+  "blocker_consecutive_samples": 10,
+  "max_unexpected_entity_destroyed": 0,
+  "max_protocol_errors": 0
+}

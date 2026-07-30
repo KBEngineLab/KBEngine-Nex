@@ -1,0 +1,12 @@
+{
+  "name": "stress",
+  "duration_seconds": 1800,
+  "bots": 2000,
+  "connect_rate_per_second": 50,
+  "operation_mix": {
+    "login": 0.1,
+    "heartbeat": 0.5,
+    "movement": 0.4
+  },
+  "thresholds": "../thresholds.json"
+}
