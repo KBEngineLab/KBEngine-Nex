@@ -617,6 +617,10 @@ private:
 	void _sendBaseTeleportResult(ENTITY_ID sourceEntityID, COMPONENT_ID sourceBaseAppID, 
 		SPACE_ID spaceID, SPACE_ID lastSpaceID, bool fromCellTeleport);
 
+	/** 通知当前观察者在下一批次同步本实体的易变数据。 */
+	/** Notifies current observers to synchronize this entity's volatile data in the next batch. */
+	void markWitnessesVolatileDataDirty();
+
 private:
 	struct BufferedScriptCall
 	{

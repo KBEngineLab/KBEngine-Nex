@@ -161,6 +161,11 @@ bool Cellapp::initializeWatcher()
 	WATCH_OBJECT("load", this, &Cellapp::_getLoad);
 	WATCH_OBJECT("spaceSize", &KBEngine::getUsername);
 	WATCH_OBJECT("stats/runningTime", &runningTime);
+	WATCH_OBJECT("witness/active", &Witness::activeCount);
+	WATCH_OBJECT("witness/dirtyQueued", &Witness::dirtyQueuedCount);
+	WATCH_OBJECT("witness/fullScans", &Witness::fullScanCount);
+	WATCH_OBJECT("witness/dirtyProcessed", &Witness::dirtyProcessedCount);
+	WATCH_OBJECT("witness/maxQueueDepth", &Witness::maxQueueDepth);
 	return EntityApp<Entity>::initializeWatcher() && WatchObjectPool::initWatchPools();
 }
 

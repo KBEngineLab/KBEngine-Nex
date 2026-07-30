@@ -24,6 +24,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 // common include
 #include "updatable.h"
 #include "entityref.h"
+#include "witness_dirty_queue.h"
 #include "helper/debug_helper.h"
 #include "common/common.h"
 #include "common/objectpool.h"
@@ -193,6 +194,16 @@ public:
 	*/
 	void resetViewEntities();
 
+	/** 标记可见实体的易变数据需要在下一个更新批次同步。 */
+	/** Marks a visible entity's volatile data for synchronization in the next update batch. */
+	void markViewEntityVolatileDirty(ENTITY_ID entityID);
+
+	static uint64 activeCount();
+	static uint64 dirtyQueuedCount();
+	static uint64 fullScanCount();
+	static uint64 dirtyProcessedCount();
+	static uint64 maxQueueDepth();
+
 private:
 	/**
 		如果view中entity数量小于256则只发送索引位置
@@ -203,6 +214,12 @@ private:
 		当update执行时view列表有改变的时候需要更新entityRef的aliasID
 	*/
 	void updateEntitiesAliasID();
+	void requireFullScan();
+	void clearVolatileDirtyQueue();
+	void initializeEntityRefLifecycle(EntityRef* pEntityRef);
+	void queueEntityRefVolatile(EntityRef* pEntityRef);
+	bool needsAdditionalVolatileUpdate(Entity* pEntity);
+	void processVolatileDirtyQueue(Network::Bundle* pSendBundle);
 		
 private:
 	Entity*									pEntity_;
@@ -222,6 +239,9 @@ private:
 	Direction3D								lastBaseDir_;
 
 	uint16									clientViewSize_;
+	bool									fullScanRequired_;
+	uint64									nextEntityRefGeneration_;
+	WitnessDirtyQueue						volatileDirtyQueue_;
 };
 
 }

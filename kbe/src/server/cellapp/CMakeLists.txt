@@ -44,6 +44,7 @@ kbe_add_server_executable(cellapp KBE_CELLAPP
         updatables.cpp
         watch_obj_pools.cpp
         witness.cpp
+        witness_dirty_queue.h
         witnessed_timeout_handler.cpp
     DEFINITIONS
         USE_PYTHON

@@ -2069,6 +2069,8 @@ void Entity::onPositionChanged()
 
 	posChangedTime_ = g_kbetime;
 
+	markWitnessesVolatileDataDirty();
+
 	if (this->pEntityCoordinateNode())
 	{
 		Entity::bufferCallback(true);
@@ -2115,6 +2117,22 @@ void Entity::onDirectionChanged()
 		return;
 
 	dirChangedTime_ = g_kbetime;
+
+	markWitnessesVolatileDataDirty();
+}
+
+//-------------------------------------------------------------------------------------
+void Entity::markWitnessesVolatileDataDirty()
+{
+	// Witness 仅保存实体 ID；变化时重新解析观察者可避免跨 Entity/Witness 生命周期持有悬空指针。
+	// Witnesses are stored by entity ID; resolving observers on change avoids retaining dangling pointers across Entity/Witness lifetimes.
+	std::list<ENTITY_ID>::const_iterator witnessIter = witnesses_.begin();
+	for (; witnessIter != witnesses_.end(); ++witnessIter)
+	{
+		Entity* pWitnessEntity = Cellapp::getSingleton().findEntity(*witnessIter);
+		if (pWitnessEntity && pWitnessEntity->pWitness())
+			pWitnessEntity->pWitness()->markViewEntityVolatileDirty(id());
+	}
 }
 
 //-------------------------------------------------------------------------------------

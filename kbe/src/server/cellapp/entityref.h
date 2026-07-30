@@ -56,7 +56,8 @@ public:
 	{
 		size_t bytes = sizeof(id_)
 			+ sizeof(aliasID_) + sizeof(pEntity_)
-			+ sizeof(flags_);
+			+ sizeof(flags_) + sizeof(generation_)
+			+ sizeof(volatileQueued_);
 
 		return bytes;
 	}
@@ -73,6 +74,12 @@ public:
 	int aliasID() const { return aliasID_; }
 	void aliasID(int id) { aliasID_ = id; }
 
+	uint64 generation() const { return generation_; }
+	void generation(uint64 value) { generation_ = value; }
+	bool volatileQueued() const { return volatileQueued_; }
+	bool& volatileQueuedRef() { return volatileQueued_; }
+	void volatileQueued(bool value) { volatileQueued_ = value; }
+
 	void addToStream(KBEngine::MemoryStream& s);
 	void createFromStream(KBEngine::MemoryStream& s);
 
@@ -81,6 +88,8 @@ private:
 	int aliasID_;
 	Entity* pEntity_;
 	uint32 flags_;
+	uint64 generation_;
+	bool volatileQueued_;
 };
 
 }
