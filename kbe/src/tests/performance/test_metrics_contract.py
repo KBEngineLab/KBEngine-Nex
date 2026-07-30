@@ -9,9 +9,14 @@ if __package__ in (None, ""):
 
 from performance.metrics import JsonlRecorder
 from performance.report import build_summary, load_events, validate_event
+from performance.watcher_metrics import parse_target
 
 
 def main() -> int:
+    target = parse_target("BOTS_TYPE=127.0.0.1:11000:root/bots/network/poller")
+    assert target.component_type == "BOTS_TYPE"
+    assert target.port == 11000
+    assert target.path.endswith("poller")
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / "raw.jsonl"
         with JsonlRecorder(path, "test-run", "contract") as recorder:

@@ -16,6 +16,7 @@ from .log_metrics import IncrementalLogCollector
 from .metrics import JsonlRecorder, LatencyHistogram
 from .process_metrics import ProcessCollector
 from .report import build_summary, load_events, write_report
+from .watcher_metrics import WatcherCollector, parse_target
 
 
 def parse_args() -> argparse.Namespace:
@@ -26,6 +27,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--duration", type=float)
     parser.add_argument("--sample-interval", type=float, default=1.0)
     parser.add_argument("--command", help="Command line to run the workload")
+    parser.add_argument("--tools-root", type=Path, help="kbe/tools/server root for Watcher queries")
+    parser.add_argument("--watcher-target", action="append", default=[], metavar="TYPE=HOST:PORT:PATH")
     return parser.parse_args()
 
 
@@ -41,6 +44,8 @@ def main() -> int:
     process = start_command(args.command)
     process_collector = ProcessCollector(process.pid) if process else None
     log_collector = IncrementalLogCollector(args.log_root) if args.log_root else None
+    watcher_collector = WatcherCollector(args.tools_root) if args.tools_root and args.watcher_target else None
+    watcher_targets = [parse_target(value) for value in args.watcher_target]
     events_path = output / "raw.jsonl"
     try:
         with JsonlRecorder(events_path, run_id, name) as recorder:
@@ -58,6 +63,16 @@ def main() -> int:
                 if log_collector:
                     for metric, value in log_collector.sample().items():
                         recorder.record("logs", "all", f"log.{metric}.count", value, "count")
+                if watcher_collector:
+                    for target in watcher_targets:
+                        try:
+                            values = watcher_collector.query(target)
+                        except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
+                            recorder.record("watcher", target.component_type, "query.error.count", 1, "count", {"kind": "counter", "error": type(exc).__name__})
+                            continue
+                        for metric, value in values.items():
+                            if isinstance(value, (int, float)):
+                                recorder.record("watcher", target.component_type, metric, value, "")
                 recorder.flush()
                 time.sleep(interval)
     finally:

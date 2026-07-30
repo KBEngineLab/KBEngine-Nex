@@ -12,5 +12,14 @@ python -B -m performance.run --scenario performance/scenarios/smoke.json --durat
 The runner writes `raw.jsonl`, `summary.json`, and `report.md` below `kbe/src/out/performance-runs/`.
 运行器会在 `kbe/src/out/performance-runs/` 下生成 `raw.jsonl`、`summary.json` 和 `report.md`。
 
+Watcher sampling is opt-in and runs from the controller process:
+Watcher 采样默认关闭，并且由控制器进程执行：
+
+```powershell
+python -B -m performance.run --scenario performance/scenarios/baseline.json `
+  --tools-root ../../tools/server `
+  --watcher-target BOTS_TYPE=127.0.0.1:11000:root/bots/network/poller
+```
+
 Database scenarios are intentionally excluded from this phase.
 本阶段明确不包含数据库场景。
