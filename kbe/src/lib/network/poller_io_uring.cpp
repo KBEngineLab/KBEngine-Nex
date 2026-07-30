@@ -66,6 +66,7 @@ IoUringPoller::IoUringContext::IoUringContext(KBESOCKET fdArg, KBESOCKET socketA
 	operation(operationArg),
 	generation(generationArg),
 	data(),
+	tcpSendData(),
 	addr(),
 	addrLen(sizeof(addr)),
 	iov(),
@@ -642,17 +643,19 @@ bool IoUringPoller::armTcpSend(KBESOCKET fd, SocketState& state)
 
 	IoUringContext* context = new IoUringContext(fd, state.socket, SOCKET_KIND_TCP, OP_TCP_SEND, state.generation);
 	trackContext(context);
-	if (!popTcpSendBatch(state, IO_URING_TCP_SEND_BATCH_BYTES, context->data))
+	bool copied = false;
+	if (!popTcpSendBatch(state, IO_URING_TCP_SEND_BATCH_BYTES, context->tcpSendData, copied))
 	{
 		untrackContext(context);
 		delete context;
 		return true;
 	}
+	(void)copied;
 
 	sqe->opcode = IORING_OP_SEND;
 	sqe->fd = fd;
-	sqe->addr = reinterpret_cast<uint64>(context->data.data());
-	sqe->len = static_cast<unsigned>(context->data.size());
+	sqe->addr = reinterpret_cast<uint64>(context->tcpSendData.data());
+	sqe->len = static_cast<unsigned>(context->tcpSendData.size());
 	sqe->user_data = reinterpret_cast<uint64>(context);
 	state.pPendingWriteContext = context;
 	state.writeArmed = true;
@@ -775,10 +778,13 @@ void IoUringPoller::handleCompletion(IoUringContext& context, int result)
 	{
 		// result==0 表示对端有序关闭，也要作为一个零字节 completion 入队。
 		// 零字节 completion 不增加 pending bytes，因此公共层还会用 item 数限制它。
-		std::vector<char> data;
 		if (result > 0)
 		{
-			data.assign(context.data.begin(), context.data.begin() + result);
+			context.data.resize(static_cast<size_t>(result));
+		}
+		else
+		{
+			context.data.clear();
 		}
 
 		if (result < 0 && errorCode == EAGAIN)
@@ -798,7 +804,7 @@ void IoUringPoller::handleCompletion(IoUringContext& context, int result)
 				state->registeredRead = false;
 			}
 
-			if (pushTcpReceivedData(fd, data, result == 0, errorCode))
+			if (pushTcpReceivedData(fd, context.data, result == 0, errorCode))
 			{
 				this->triggerRead(fd);
 			}
@@ -808,8 +814,8 @@ void IoUringPoller::handleCompletion(IoUringContext& context, int result)
 	{
 		if (result > 0)
 		{
-			std::vector<char> data(context.data.begin(), context.data.begin() + result);
-			if (pushUdpReceivedData(fd, data, context.addr, 0))
+			context.data.resize(static_cast<size_t>(result));
+			if (pushUdpReceivedData(fd, context.data, context.addr, 0))
 			{
 				this->triggerRead(fd);
 			}
@@ -843,10 +849,9 @@ void IoUringPoller::handleCompletion(IoUringContext& context, int result)
 			}
 			return;
 		}
-		else if (static_cast<size_t>(result) < context.data.size())
+		else if (static_cast<size_t>(result) < context.tcpSendData.size())
 		{
-			std::vector<char> remaining(context.data.begin() + result, context.data.end());
-			pushTcpSendFront(*state, remaining);
+			pushTcpSendFront(*state, context.tcpSendData, static_cast<size_t>(result));
 		}
 
 		if (!state->pendingTcpSends.empty())

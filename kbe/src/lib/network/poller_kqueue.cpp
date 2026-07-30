@@ -582,21 +582,15 @@ int KqueuePoller::flushPendingSends(KBESOCKET fd, SocketState& state)
 	int count = 0;
 	while (!state.pendingTcpSends.empty())
 	{
-		std::vector<char>& front = state.pendingTcpSends.front();
-		int ret = static_cast<int>(::send(state.socket, front.data(), front.size(), 0));
+		int ret = static_cast<int>(::send(state.socket, state.pendingTcpSends.frontData(),
+			state.pendingTcpSends.frontSize(), 0));
 		if (ret > 0)
 		{
 			const size_t sent = static_cast<size_t>(ret);
-			state.pendingTcpSendBytes -= sent;
-			if (sent == front.size())
-			{
-				state.pendingTcpSends.pop_front();
-			}
-			else
-			{
-				front.erase(front.begin(), front.begin() + sent);
+			const bool completedChunk = sent == state.pendingTcpSends.frontSize();
+			state.pendingTcpSends.consumeFront(sent);
+			if (!completedChunk)
 				break;
-			}
 			++count;
 			continue;
 		}

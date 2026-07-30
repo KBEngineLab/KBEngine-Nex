@@ -57,6 +57,7 @@ IocpPoller::IocpContext::IocpContext(KBESOCKET fdArg, KBESOCKET socketArg, Socke
 	buffer(),
 	flags(0),
 	data(),
+	tcpSendData(),
 	acceptSocket(INVALID_SOCKET),
 	acceptBuffer(),
 	udpAddr(),
@@ -181,7 +182,7 @@ bool IocpPoller::ensureAssociated(SocketState& state, KBESOCKET fd)
 		const DWORD errorCode = GetLastError();
 		ERROR_MSG(fmt::format("IocpPoller::ensureAssociated: CreateIoCompletionPort failed for fd {}, socket={}, kind={}, registeredRead={}, tcpPendingBytes={}, udpPendingBytes={}: {}\n",
 			fd, static_cast<uint64>(state.socket), static_cast<int>(state.kind), state.registeredRead,
-			state.pendingTcpSendBytes, state.pendingUdpSendBytes, kbe_strerror(errorCode)));
+			state.pendingTcpSends.pendingBytes(), state.pendingUdpSendBytes, kbe_strerror(errorCode)));
 		// 日志转发可能执行其他 Winsock 调用；恢复原错误码，确保发送器能正确区分背压和失效连接。
 		// Log forwarding may execute other Winsock calls; restore the original code so the sender can classify backpressure versus failure.
 		WSASetLastError(static_cast<int>(errorCode));
@@ -296,14 +297,16 @@ bool IocpPoller::armTcpSend(KBESOCKET fd, SocketState& state)
 	// 合并多个小包为一次 WSASend，减少 IOCP completion 数量。
 	// 不能无限合并，否则一次 completion 回调可能占用过久，也会增加
 	// 断线时被取消的 outstanding buffer 大小。
-	if (!popTcpSendBatch(state, IOCP_TCP_SEND_BATCH_BYTES, pContext->data))
+	bool copied = false;
+	if (!popTcpSendBatch(state, IOCP_TCP_SEND_BATCH_BYTES, pContext->tcpSendData, copied))
 	{
 		delete pContext;
 		return true;
 	}
+	(void)copied;
 
-	pContext->buffer.buf = pContext->data.data();
-	pContext->buffer.len = static_cast<ULONG>(pContext->data.size());
+	pContext->buffer.buf = pContext->tcpSendData.data();
+	pContext->buffer.len = static_cast<ULONG>(pContext->tcpSendData.size());
 
 	DWORD bytes = 0;
 	int ret = WSASend(state.socket, &pContext->buffer, 1, &bytes, 0, &pContext->overlapped, NULL);
@@ -324,7 +327,7 @@ bool IocpPoller::armTcpSend(KBESOCKET fd, SocketState& state)
 
 	// WSASend did not take ownership of the buffer; restore the batch before retrying later.
 	// WSASend 未接管缓冲区所有权，失败时先恢复 batch，等待后续轮次重试。
-	pushTcpSendFront(state, pContext->data);
+	pushTcpSendFront(state, pContext->tcpSendData, 0);
 	delete pContext;
 	return false;
 }
@@ -843,10 +846,13 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 			// 通过原有 PacketReader/Channel 逻辑解析消息。
 			// bytesTransferred==0 是有序断开，也会入队为零字节 completion；
 			// 公共层用 item 上限限制这类空 completion，防止错误/断开风暴。
-			std::vector<char> data;
 			if (success && bytesTransferred > 0)
 			{
-				data.assign(pContext->data.begin(), pContext->data.begin() + bytesTransferred);
+				pContext->data.resize(static_cast<size_t>(bytesTransferred));
+			}
+			else
+			{
+				pContext->data.clear();
 			}
 
 			if (!success && errorCode != 0)
@@ -865,7 +871,7 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 				pState->registeredRead = false;
 			}
 
-			const bool queued = pushTcpReceivedData(fd, data, success && bytesTransferred == 0, success ? 0 : socketErrorCode);
+			const bool queued = pushTcpReceivedData(fd, pContext->data, success && bytesTransferred == 0, success ? 0 : socketErrorCode);
 			if (queued)
 			{
 				this->triggerRead(fd);
@@ -874,7 +880,7 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 			{
 				// Never discard TCP bytes silently; turn a full handoff queue into a deterministic channel error.
 				// TCP 字节不能静默丢弃；交接队列满时转成确定性的 channel 错误。
-				if (pushTcpReceivedData(fd, data, false, WSAENOBUFS))
+				if (pushTcpReceivedData(fd, pContext->data, false, WSAENOBUFS))
 				{
 					this->triggerRead(fd);
 				}
@@ -890,8 +896,8 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 
 		if (success && bytesTransferred > 0)
 		{
-			std::vector<char> data(pContext->data.begin(), pContext->data.begin() + bytesTransferred);
-			if (pushUdpReceivedData(fd, data, pContext->udpAddr, 0))
+			pContext->data.resize(static_cast<size_t>(bytesTransferred));
+			if (pushUdpReceivedData(fd, pContext->data, pContext->udpAddr, 0))
 			{
 				this->triggerRead(fd);
 			}
@@ -923,12 +929,11 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 			return;
 		}
 
-		if (success && bytesTransferred < pContext->data.size())
+		if (success && bytesTransferred < pContext->tcpSendData.size())
 		{
 			// WSASend completion 允许只完成部分字节。
 			// 未发送完的数据必须放回队首，保持 TCP 字节流顺序。
-			std::vector<char> remaining(pContext->data.begin() + bytesTransferred, pContext->data.end());
-			pushTcpSendFront(*pState, remaining);
+			pushTcpSendFront(*pState, pContext->tcpSendData, static_cast<size_t>(bytesTransferred));
 		}
 
 		if (!pState->pendingTcpSends.empty())

@@ -5,6 +5,7 @@
 
 #include "event_poller.h"
 #include "completion_rearm_queue.h"
+#include "completion_tcp_send_queue.h"
 
 #include <deque>
 #include <memory>
@@ -97,8 +98,7 @@ protected:
 		void* pPendingReadContext;
 		void* pPendingWriteContext;
 		// TCP 发送队列保存上层已交给 poller、但尚未完成发送的数据。
-		std::deque<std::vector<char> > pendingTcpSends;
-		size_t pendingTcpSendBytes;
+		CompletionTcpSendQueue pendingTcpSends;
 		std::deque<PendingUdpSend> pendingUdpSends;
 		size_t pendingUdpSendBytes;
 		// 接收 completion 队列字节数用于 kqueue readiness adapter 背压和诊断。
@@ -162,14 +162,14 @@ protected:
 
 	// 从 TCP 发送队列头部取出一个有界 batch。
 	// completion 后端都会把多个小包合并成一次系统发送，以减少 completion 数量；
-	// 但合并时必须保持字节流顺序，并正确扣减 pendingTcpSendBytes。
+	// 但合并时必须保持字节流顺序，并正确扣减队列内部 pending bytes。
 	// 如果队首包只取走一部分，剩余内容继续留在队首，下一次发送接着发。
-	bool popTcpSendBatch(SocketState& state, size_t maxBytes, std::vector<char>& batch);
+	bool popTcpSendBatch(SocketState& state, size_t maxBytes, CompletionTcpSendBuffer& batch, bool& copied);
 
 	// 把一次部分完成的 TCP send 剩余字节放回队首。
 	// WSASend/io_uring send 都可能只完成部分字节；剩余数据必须插回队首，
 	// 否则后续排队数据会越过它，破坏 TCP 字节流顺序。
-	void pushTcpSendFront(SocketState& state, std::vector<char>& data);
+	bool pushTcpSendFront(SocketState& state, CompletionTcpSendBuffer& data, size_t consumedBytes);
 
 	// 判断 accept/recv 队列是否还有容量。
 	// 这些水位主要服务 kqueue readiness adapter：kqueue 需要先把 readiness 数据读到

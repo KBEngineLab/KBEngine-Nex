@@ -41,7 +41,6 @@ CompletionPoller::SocketState::SocketState(KBESOCKET socketArg) :
 	pPendingReadContext(NULL),
 	pPendingWriteContext(NULL),
 	pendingTcpSends(),
-	pendingTcpSendBytes(0),
 	pendingUdpSends(),
 	pendingUdpSendBytes(0),
 	pendingTcpReceiveBytes(0),
@@ -208,7 +207,7 @@ bool CompletionPoller::queueTcpSend(KBESOCKET fd, const void* data, int len)
 		state.kind = SOCKET_KIND_TCP;
 	}
 
-	if (state.pendingTcpSendBytes + static_cast<size_t>(len) > COMPLETION_TCP_SEND_BACKLOG_BYTES)
+	if (!state.pendingTcpSends.push(data, static_cast<size_t>(len), COMPLETION_TCP_SEND_BACKLOG_BYTES))
 	{
 #if KBE_PLATFORM == PLATFORM_WIN32
 		WSASetLastError(WSAEWOULDBLOCK);
@@ -218,9 +217,6 @@ bool CompletionPoller::queueTcpSend(KBESOCKET fd, const void* data, int len)
 		return false;
 	}
 
-	std::vector<char> sendData(static_cast<const char*>(data), static_cast<const char*>(data) + len);
-	state.pendingTcpSendBytes += sendData.size();
-	state.pendingTcpSends.push_back(std::move(sendData));
 	return true;
 }
 
@@ -269,7 +265,7 @@ bool CompletionPoller::hasPendingSend(KBESOCKET fd) const
 
 	const SocketState& state = *iter->second;
 	return state.writeArmed || state.pPendingWriteContext != NULL || !state.pendingTcpSends.empty() ||
-		state.pendingTcpSendBytes > 0 || !state.pendingUdpSends.empty() || state.pendingUdpSendBytes > 0;
+		state.pendingTcpSends.pendingBytes() > 0 || !state.pendingUdpSends.empty() || state.pendingUdpSendBytes > 0;
 }
 
 //-------------------------------------------------------------------------------------
@@ -527,59 +523,24 @@ void CompletionPoller::clearPendingSends(SocketState& state)
 	// 之前多个后端各自写一遍 clear + 归零，未来一旦新增队列字段很容易漏改；
 	// 这里集中处理，保证 TCP/UDP 两条发送路径的状态始终同步。
 	state.pendingTcpSends.clear();
-	state.pendingTcpSendBytes = 0;
 	state.pendingUdpSends.clear();
 	state.pendingUdpSendBytes = 0;
 }
 
 //-------------------------------------------------------------------------------------
-bool CompletionPoller::popTcpSendBatch(SocketState& state, size_t maxBytes, std::vector<char>& batch)
+bool CompletionPoller::popTcpSendBatch(SocketState& state, size_t maxBytes, CompletionTcpSendBuffer& batch, bool& copied)
 {
-	// maxBytes 是一次异步发送允许持有的最大用户态缓冲。
-	// 设上限可以减少 completion 数量，同时避免断线/取消时单个 outstanding buffer 过大。
-	batch.clear();
-	if (maxBytes == 0 || state.pendingTcpSends.empty())
-	{
-		return false;
-	}
-
-	size_t batchBytes = 0;
-	while (!state.pendingTcpSends.empty() && batchBytes < maxBytes)
-	{
-		std::vector<char>& front = state.pendingTcpSends.front();
-		const size_t bytesToAppend = std::min(front.size(), maxBytes - batchBytes);
-		batch.insert(batch.end(), front.begin(), front.begin() + bytesToAppend);
-		batchBytes += bytesToAppend;
-		state.pendingTcpSendBytes -= bytesToAppend;
-
-		if (bytesToAppend == front.size())
-		{
-			state.pendingTcpSends.pop_front();
-		}
-		else
-		{
-			// 只取走队首的一部分时，把未发送的尾部留在队首。
-			// 这一步仍然是 O(n) 移动，但只发生在 batch 边界，且比复制整个队列简单可靠。
-			front.erase(front.begin(), front.begin() + bytesToAppend);
-			break;
-		}
-	}
-
-	return !batch.empty();
+	// 队列统一处理所有权转移、合批和 offset，三个后端不再各自复制或移动发送尾部。
+	// The queue centralizes ownership transfer, batching, and offsets so the three backends no longer copy or shift send tails independently.
+	return state.pendingTcpSends.popBatch(maxBytes, batch, copied);
 }
 
 //-------------------------------------------------------------------------------------
-void CompletionPoller::pushTcpSendFront(SocketState& state, std::vector<char>& data)
+bool CompletionPoller::pushTcpSendFront(SocketState& state, CompletionTcpSendBuffer& data, size_t consumedBytes)
 {
-	// 部分发送完成后的剩余字节必须回到队首，保证后续数据不会乱序。
-	// 使用 swap/move 语义转移 buffer，避免把可能较大的剩余包再复制一遍。
-	if (data.empty())
-	{
-		return;
-	}
-
-	state.pendingTcpSendBytes += data.size();
-	state.pendingTcpSends.push_front(std::move(data));
+	// 只推进 offset 并转移原 buffer，部分发送不会再分配和复制剩余尾部。
+	// Advance only an offset and transfer the original buffer so partial sends no longer allocate and copy the remaining tail.
+	return state.pendingTcpSends.restore(data, consumedBytes);
 }
 
 //-------------------------------------------------------------------------------------
@@ -726,7 +687,7 @@ void CompletionPoller::cleanupStateIfUnused(KBESOCKET fd)
 		state.pPendingReadContext != NULL || state.pPendingWriteContext != NULL ||
 		state.pendingTcpReceiveBytes > 0 || state.pendingUdpReceiveBytes > 0 ||
 		tcpReceivedItemCount(fd) > 0 || udpReceivedItemCount(fd) > 0 ||
-		!state.pendingTcpSends.empty() || state.pendingTcpSendBytes > 0 ||
+		!state.pendingTcpSends.empty() || state.pendingTcpSends.pendingBytes() > 0 ||
 		!state.pendingUdpSends.empty() || state.pendingUdpSendBytes > 0 || this->findForWrite(fd) != NULL)
 	{
 		return;

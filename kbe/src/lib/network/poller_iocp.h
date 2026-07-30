@@ -75,6 +75,7 @@ private:
 		WSABUF buffer;
 		DWORD flags;
 		std::vector<char> data;
+		CompletionTcpSendBuffer tcpSendData;
 		KBESOCKET acceptSocket;
 		char acceptBuffer[(sizeof(sockaddr_in) + 16) * 2];
 		sockaddr_in udpAddr;

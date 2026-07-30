@@ -68,6 +68,7 @@ private:
 		Operation operation;
 		uint64 generation;
 		std::vector<char> data;
+		CompletionTcpSendBuffer tcpSendData;
 		sockaddr_in addr;
 		socklen_t addrLen;
 		iovec iov;
