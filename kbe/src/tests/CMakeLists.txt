@@ -185,3 +185,4 @@ endif()
 # SDK regressions belong to the source test tree; external project acceptance and release workflows must not become implicit engine CTest dependencies.
 add_subdirectory(sdk)
 add_subdirectory(network)
+add_subdirectory(common)

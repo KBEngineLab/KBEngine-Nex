@@ -65,8 +65,14 @@ size_t MemoryStream::getPoolObjectBytes()
 //-------------------------------------------------------------------------------------
 void MemoryStream::onReclaimObject()
 {
-	if(data_.capacity() > DEFAULT_SIZE * 2)
-		data_.reserve(DEFAULT_SIZE);
+	if(data_.capacity() > MAX_RETAINED_CAPACITY)
+	{
+		// reserve 不能缩容；交换新缓冲才能确定性释放高水位，同时恢复对象池流的默认小容量起点。
+		// reserve cannot shrink; swapping with a fresh buffer deterministically releases the high-water allocation and restores the pool stream's small default starting capacity.
+		std::vector<uint8> compact;
+		compact.reserve(DEFAULT_SIZE);
+		data_.swap(compact);
+	}
 
 	clear(false);
 }

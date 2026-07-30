@@ -128,6 +128,9 @@ public:
 	virtual void onReclaimObject();
 
     const static size_t DEFAULT_SIZE = 0x100;
+	// 常规网络包约为 1.5 KiB；保留 64 KiB 可覆盖中小序列化，同时阻止偶发大消息长期占住对象池内存。
+	// Regular network packets are about 1.5 KiB; retaining 64 KiB covers small and medium serialization while preventing occasional large messages from pinning pool memory.
+	const static size_t MAX_RETAINED_CAPACITY = 64 * 1024;
 	const static size_t MAX_SIZE = 10000000;
 
     MemoryStream(): rpos_(0), wpos_(0)
@@ -542,6 +545,10 @@ public:
 	
 	// vector的大小
     virtual size_t size() const { return data_.size(); }
+
+	// 暴露容量用于池内存观测和确定性回归测试，不参与任何线上协议编码。
+	// Expose capacity for pool-memory observability and deterministic regression tests; it does not participate in wire encoding.
+	size_t capacity() const { return data_.capacity(); }
 
 	// vector是否为空
     virtual bool empty() const { return data_.empty(); }

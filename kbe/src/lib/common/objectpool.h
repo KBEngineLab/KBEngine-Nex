@@ -41,8 +41,20 @@ namespace KBEngine{
 // 每5分钟检查一次瘦身
 #define OBJECT_POOL_REDUCING_TIME_OUT	300 * stampsPerSecondD()
 
-// 追踪对象分配处
-#define OBJECTPOOL_POINT fmt::format("{}#{}", __FUNCTION__, __LINE__).c_str() 
+// 分配点追踪会格式化字符串并维护有序映射，只在诊断构建启用，避免 Release 的高频池操作承担该成本。
+// Allocation-point tracing formats strings and maintains an ordered map, so it is enabled only in diagnostic builds to keep that cost out of hot Release pool operations.
+#if defined(_DEBUG)
+#define KBE_OBJECTPOOL_TRACK_ALLOCATION_POINTS 1
+#define OBJECTPOOL_POINT fmt::format("{}#{}", __FUNCTION__, __LINE__)
+#else
+#define KBE_OBJECTPOOL_TRACK_ALLOCATION_POINTS 0
+inline const std::string& objectPoolUnknownPoint()
+{
+	static const std::string point;
+	return point;
+}
+#define OBJECTPOOL_POINT KBEngine::objectPoolUnknownPoint()
+#endif
 
 template< typename T >
 class SmartPoolObject;
@@ -68,7 +80,9 @@ template< typename T, typename THREADMUTEX = KBEngine::thread::ThreadMutexNull >
 class ObjectPool
 {
 public:
-	typedef std::list<T*> OBJECTS;
+	// 空闲对象只需要常数时间取放和遍历观测；连续指针栈可消除每个 list 节点的分配与指针跳转。
+	// Free objects need only constant-time take/return and watcher iteration; a contiguous pointer stack removes per-list-node allocations and pointer chasing.
+	typedef std::vector<T*> OBJECTS;
 
 	ObjectPool(std::string name):
 		objects_(),
@@ -141,6 +155,8 @@ public:
 
 	void assignObjs(unsigned int preAssignVal = OBJECT_POOL_INIT_SIZE)
 	{
+		objects_.reserve(objects_.size() + preAssignVal);
+
 		for(unsigned int i=0; i<preAssignVal; ++i)
 		{
 			T* t = new T();
@@ -163,11 +179,13 @@ public:
 		{
 			if(obj_count_ > 0)
 			{
-				T* t = static_cast<T*>(*objects_.begin());
-				objects_.pop_front();
+				T* t = static_cast<T*>(objects_.back());
+				objects_.pop_back();
 				--obj_count_;
+			#if KBE_OBJECTPOOL_TRACK_ALLOCATION_POINTS
 				incLogPoint(logPoint);
 				t->poolObjectCreatePoint(logPoint);
+			#endif
 				t->onEabledPoolObject();
 				t->isEnabledPoolObject(true);
 				pMutex_->unlockMutex();
@@ -272,12 +290,20 @@ public:
 
 	void incLogPoint(const std::string& logPoint)
 	{
+	#if KBE_OBJECTPOOL_TRACK_ALLOCATION_POINTS
 		++logPoints_[logPoint].count;
+	#else
+		(void)logPoint;
+	#endif
 	}
 
 	void decLogPoint(const std::string& logPoint)
 	{
+	#if KBE_OBJECTPOOL_TRACK_ALLOCATION_POINTS
 		--logPoints_[logPoint].count;
+	#else
+		(void)logPoint;
+	#endif
 	}
 
 protected:
@@ -288,12 +314,16 @@ protected:
 	{
 		if(obj != NULL)
 		{
+		#if KBE_OBJECTPOOL_TRACK_ALLOCATION_POINTS
 			decLogPoint(obj->poolObjectCreatePoint());
+		#endif
 
 			// 先重置状态
 			obj->onReclaimObject();
 			obj->isEnabledPoolObject(false);
+		#if KBE_OBJECTPOOL_TRACK_ALLOCATION_POINTS
 			obj->poolObjectCreatePoint("");
+		#endif
 
 			if(size() >= max_ || isDestroyed_)
 			{
@@ -324,8 +354,8 @@ protected:
 
 			while (reducing-- > 0)
 			{
-				T* t = static_cast<T*>(*objects_.begin());
-				objects_.pop_front();
+				T* t = static_cast<T*>(objects_.back());
+				objects_.pop_back();
 				delete t;
 
 				--obj_count_;
@@ -408,12 +438,20 @@ public:
 
 	void poolObjectCreatePoint(const std::string& logPoint)
 	{
+	#if KBE_OBJECTPOOL_TRACK_ALLOCATION_POINTS
 		poolObjectCreatePoint_ = logPoint;
+	#else
+		(void)logPoint;
+	#endif
 	}
 
 	const std::string& poolObjectCreatePoint() const
 	{
+	#if KBE_OBJECTPOOL_TRACK_ALLOCATION_POINTS
 		return poolObjectCreatePoint_;
+	#else
+		return objectPoolUnknownPoint();
+	#endif
 	}
 
 protected:
@@ -421,8 +459,11 @@ protected:
 	// 池对象是否处于激活（从池中已经取出）状态
 	bool isEnabledPoolObject_;
 
-	// 记录对象创建的位置
+	// Release 对象不携带未使用的 std::string；Debug 仍保留泄漏定位所需的创建位置。
+	// Release objects do not carry an unused std::string; Debug retains the creation point required for leak diagnosis.
+	#if KBE_OBJECTPOOL_TRACK_ALLOCATION_POINTS
 	std::string poolObjectCreatePoint_;
+	#endif
 };
 
 template< typename T >
