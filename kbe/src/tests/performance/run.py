@@ -58,7 +58,7 @@ def main() -> int:
         write_scenario_metadata(output, scenario, configured_bots)
     elif args.command and configured_bots > 0:
         raise ValueError("--assets-root is required when starting a scenario with Bots")
-    process = start_command(args.command, environment)
+    process = start_command(args.command, environment, output)
     process_collector = ProcessCollector(process.pid) if process else None
     log_collector = IncrementalLogCollector(args.log_root) if args.log_root else None
     watcher_collector = WatcherCollector(args.tools_root) if args.tools_root and args.watcher_target else None
@@ -100,13 +100,23 @@ def main() -> int:
     return 0
 
 
-def start_command(command: str | None, environment: dict[str, str] | None = None) -> subprocess.Popen[bytes] | None:
+def start_command(
+    command: str | None,
+    environment: dict[str, str] | None = None,
+    working_directory: Path | None = None,
+) -> subprocess.Popen[bytes] | None:
     if not command:
         return None
     args = shlex.split(command, posix=os.name != "nt")
     if not args:
         return None
-    return subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=environment)
+    return subprocess.Popen(
+        args,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        env=environment,
+        cwd=working_directory,
+    )
 
 
 def _repository_root() -> Path:
