@@ -54,6 +54,7 @@ NetworkInterface::NetworkInterface(Network::EventDispatcher * pDispatcher,
 	channelMaintenance_(),
 	channelTickEpoch_(0),
 	pDispatcher_(pDispatcher),
+	kcpUpdateScheduler_(*pDispatcher),
 	pExtListenerReceiver_(NULL),
 	pExtUdpListenerReceiver_(NULL),
 	pIntListenerReceiver_(NULL),
@@ -654,6 +655,17 @@ KBE_POLLER_METRIC(pollerReceiveOwnershipTransfers, receiveOwnershipTransferCount
 KBE_POLLER_METRIC(pollerReceiveTransferredBytes, receiveOwnershipTransferredBytes)
 
 #undef KBE_POLLER_METRIC
+
+//-------------------------------------------------------------------------------------
+uint64 NetworkInterface::kcpScheduledChannelCount() const { return kcpUpdateScheduler_.scheduledChannelCount(); }
+uint64 NetworkInterface::kcpSchedulerHeapEntryCount() const { return kcpUpdateScheduler_.heapEntryCount(); }
+uint64 NetworkInterface::kcpScheduleRequestCount() const { return kcpUpdateScheduler_.scheduleRequestCount(); }
+uint64 NetworkInterface::kcpEarlierReplacementCount() const { return kcpUpdateScheduler_.earlierReplacementCount(); }
+uint64 NetworkInterface::kcpStaleDiscardCount() const { return kcpUpdateScheduler_.staleDiscardCount(); }
+uint64 NetworkInterface::kcpSchedulerCompactionCount() const { return kcpUpdateScheduler_.compactionCount(); }
+uint64 NetworkInterface::kcpUpdateCallCount() const { return kcpUpdateScheduler_.updateCallCount(); }
+uint64 NetworkInterface::kcpTimerWakeupCount() const { return kcpUpdateScheduler_.timerWakeupCount(); }
+uint64 NetworkInterface::kcpTimerRearmCount() const { return kcpUpdateScheduler_.timerRearmCount(); }
 
 //-------------------------------------------------------------------------------------
 uint32 NetworkInterface::numExternalTcpChannels() const

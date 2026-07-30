@@ -217,6 +217,17 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/poller/tcpSendBatchCopiedBytes", &networkInterface_, &Network::NetworkInterface::pollerTcpSendBatchCopiedBytes);
 	WATCH_OBJECT("network/poller/receiveOwnershipTransfers", &networkInterface_, &Network::NetworkInterface::pollerReceiveOwnershipTransfers);
 	WATCH_OBJECT("network/poller/receiveTransferredBytes", &networkInterface_, &Network::NetworkInterface::pollerReceiveTransferredBytes);
+	// Compare active channels, heap entries, wakeups, and updates together to quantify scheduler aggregation without assuming aligned deadlines.
+	// 联合观察活动 Channel、堆项、唤醒和更新次数，用于量化调度聚合效果，不假设各 Channel 截止时间天然对齐。
+	WATCH_OBJECT("network/kcp/scheduledChannels", &networkInterface_, &Network::NetworkInterface::kcpScheduledChannelCount);
+	WATCH_OBJECT("network/kcp/heapEntries", &networkInterface_, &Network::NetworkInterface::kcpSchedulerHeapEntryCount);
+	WATCH_OBJECT("network/kcp/scheduleRequests", &networkInterface_, &Network::NetworkInterface::kcpScheduleRequestCount);
+	WATCH_OBJECT("network/kcp/earlierReplacements", &networkInterface_, &Network::NetworkInterface::kcpEarlierReplacementCount);
+	WATCH_OBJECT("network/kcp/staleDiscards", &networkInterface_, &Network::NetworkInterface::kcpStaleDiscardCount);
+	WATCH_OBJECT("network/kcp/compactions", &networkInterface_, &Network::NetworkInterface::kcpSchedulerCompactionCount);
+	WATCH_OBJECT("network/kcp/updateCalls", &networkInterface_, &Network::NetworkInterface::kcpUpdateCallCount);
+	WATCH_OBJECT("network/kcp/timerWakeups", &networkInterface_, &Network::NetworkInterface::kcpTimerWakeupCount);
+	WATCH_OBJECT("network/kcp/timerRearms", &networkInterface_, &Network::NetworkInterface::kcpTimerRearmCount);
 
 	return Network::initializeWatcher() && Resmgr::getSingleton().initializeWatcher() &&
 		threadPool_.initializeWatcher() && WatchPool::initWatchPools();

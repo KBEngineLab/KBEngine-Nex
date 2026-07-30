@@ -27,6 +27,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "common/timer.h"
 #include "helper/debug_helper.h"
 #include "network/endpoint.h"
+#include "network/kcp_update_scheduler.h"
 
 namespace KBEngine { 
 namespace Network
@@ -135,6 +136,15 @@ public:
 	uint64 pollerTcpSendBatchCopiedBytes() const;
 	uint64 pollerReceiveOwnershipTransfers() const;
 	uint64 pollerReceiveTransferredBytes() const;
+	uint64 kcpScheduledChannelCount() const;
+	uint64 kcpSchedulerHeapEntryCount() const;
+	uint64 kcpScheduleRequestCount() const;
+	uint64 kcpEarlierReplacementCount() const;
+	uint64 kcpStaleDiscardCount() const;
+	uint64 kcpSchedulerCompactionCount() const;
+	uint64 kcpUpdateCallCount() const;
+	uint64 kcpTimerWakeupCount() const;
+	uint64 kcpTimerRearmCount() const;
 
 private:
 	friend class Channel;
@@ -160,6 +170,7 @@ private:
 	uint64									channelTickEpoch_;
 
 	EventDispatcher *						pDispatcher_;
+	KcpUpdateScheduler					kcpUpdateScheduler_;
 	
 	ListenerReceiver *						pExtListenerReceiver_;
 	ListenerReceiver *						pExtUdpListenerReceiver_;

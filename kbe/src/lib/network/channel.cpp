@@ -92,8 +92,7 @@ size_t Channel::getPoolObjectBytes()
 		+ sizeof(flags_) + sizeof(numPacketsSent_) + sizeof(numPacketsReceived_) + sizeof(numBytesSent_) + sizeof(numBytesReceived_)
 		+ sizeof(lastTickBytesReceived_) + sizeof(lastTickBytesSent_) + sizeof(lastTickEpoch_) + sizeof(pFilter_) + sizeof(pEndPoint_) + sizeof(pPacketReceiver_) + sizeof(pPacketSender_)
 		+ sizeof(proxyID_) + strextra_.size() + sizeof(channelType_)
-		+ sizeof(componentID_) + sizeof(pMsgHandlers_) + sizeof(pKCP_) + sizeof(kcpUpdateTimerHandle_) +
-		sizeof(hasSetNextKcpUpdate_) + condemnReason_.size();
+		+ sizeof(componentID_) + sizeof(pMsgHandlers_) + sizeof(pKCP_) + condemnReason_.size();
 
 	return bytes;
 }
@@ -149,8 +148,6 @@ Channel::Channel(NetworkInterface & networkInterface,
 	pMsgHandlers_(NULL),
 	flags_(0),
 	pKCP_(NULL),
-	kcpUpdateTimerHandle_(),
-	hasSetNextKcpUpdate_(false),
 	condemnReason_(),
 	tlsDetectionPrefix_(),
 	gracefulCloseStarted_(false),
@@ -195,8 +192,6 @@ Channel::Channel():
 	pMsgHandlers_(NULL),
 	flags_(0),
 	pKCP_(NULL),
-	kcpUpdateTimerHandle_(),
-	hasSetNextKcpUpdate_(false),
 	condemnReason_(),
 	tlsDetectionPrefix_(),
 	gracefulCloseStarted_(false),
@@ -416,10 +411,9 @@ bool Channel::initKcp()
 //-------------------------------------------------------------------------------------
 void Channel::finaliseKcp()
 {
-	if (kcpUpdateTimerHandle_.isSet())
-		kcpUpdateTimerHandle_.cancel();
+	if (pNetworkInterface_)
+		pNetworkInterface_->kcpUpdateScheduler_.cancel(*this);
 
-	hasSetNextKcpUpdate_ = false;
 	if (pKCP_)
 	{
 		ikcp_release(pKCP_);
@@ -440,20 +434,16 @@ int Channel::kcpOutput(const char* buffer, int length, ikcpcb* kcp, void* user)
 //-------------------------------------------------------------------------------------
 void Channel::scheduleKcpUpdate(int64 microseconds)
 {
-	if (!pKCP_ || isDestroyed())
+	if (!pKCP_ || isDestroyed() || !pNetworkInterface_)
 		return;
 
-	// 同一 dispatcher tick 内的多次发送只安排一次立即更新，防止频繁取消和重建 timer。
-	// Multiple sends in one dispatcher tick schedule only one immediate update, avoiding repeated timer cancellation and allocation.
-	if (microseconds <= 0 && hasSetNextKcpUpdate_)
-		return;
+	pNetworkInterface_->kcpUpdateScheduler_.schedule(*this, microseconds > 0 ? microseconds : 1);
+}
 
-	if (kcpUpdateTimerHandle_.isSet())
-		kcpUpdateTimerHandle_.cancel();
-
-	hasSetNextKcpUpdate_ = microseconds <= 0;
-	kcpUpdateTimerHandle_ = dispatcher().addTimer(microseconds > 0 ? microseconds : 1, this,
-		reinterpret_cast<void*>(TIMEOUT_KCP_UPDATE));
+//-------------------------------------------------------------------------------------
+bool Channel::hasKcpUpdateTimer() const
+{
+	return pNetworkInterface_ != NULL && pNetworkInterface_->kcpUpdateScheduler_.isScheduled(*this);
 }
 
 //-------------------------------------------------------------------------------------
@@ -462,11 +452,13 @@ void Channel::updateKcp()
 	if (!pKCP_ || isDestroyed())
 		return;
 
-	hasSetNextKcpUpdate_ = false;
 	const IUINT32 current = static_cast<IUINT32>(kbe_clock());
 	ikcp_update(pKCP_, current);
 	const IUINT32 next = ikcp_check(pKCP_, current);
-	const IUINT32 delay = next > current ? next - current : 1;
+	// KCP uses wrapping 32-bit milliseconds; signed subtraction preserves ordering across the roughly 49-day wrap boundary.
+	// KCP 使用会回绕的 32 位毫秒时钟；有符号差值可在约 49 天回绕边界保持正确顺序。
+	const IINT32 checkedDelay = static_cast<IINT32>(next - current);
+	const IUINT32 delay = checkedDelay > 0 ? static_cast<IUINT32>(checkedDelay) : 1;
 	scheduleKcpUpdate(static_cast<int64>(delay) * 1000);
 }
 
@@ -675,11 +667,6 @@ void Channel::handleTimeout(TimerHandle, void * arg)
 				this->networkInterface().onChannelTimeOut(this);
 			}
 
-			break;
-		}
-		case TIMEOUT_KCP_UPDATE:
-		{
-			updateKcp();
 			break;
 		}
 		default:

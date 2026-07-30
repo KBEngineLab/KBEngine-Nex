@@ -16,6 +16,8 @@ add_library(network STATIC
     http_utility.cpp
     interface_defs.cpp
     ikcp.c
+    kcp_update_queue.cpp
+    kcp_update_scheduler.cpp
     kcp_packet_reader.cpp
     kcp_packet_receiver.cpp
     kcp_packet_sender.cpp

@@ -46,9 +46,11 @@ class NetworkInterface;
 class MessageHandlers;
 class PacketReader;
 class PacketSender;
+class KcpUpdateScheduler;
 
 class Channel : public TimerHandler, public PoolObject
 {
+	friend class KcpUpdateScheduler;
 public:
 	typedef KBEShared_ptr< SmartPoolObject< Channel > > SmartPoolObjectPtr;
 	static SmartPoolObjectPtr createSmartPoolObj(const std::string& logPoint);
@@ -161,9 +163,9 @@ public:
 	void delayedSend();
 
 	ikcpcb* pKCP() const { return pKCP_; }
-	// 资源验收必须读取 Channel 实际持有的 timer handle，不能用 KCP Channel 数量推断，避免取消延迟被误报为已回收。
-	// Resource validation must inspect the timer handle actually owned by the Channel instead of inferring it from KCP channel count, so delayed cancellation cannot be reported as reclaimed.
-	bool hasKcpUpdateTimer() const { return kcpUpdateTimerHandle_.isSet(); }
+	// 资源验收读取调度器里的实际 active 项，不能只用 KCP Channel 数量推断。
+	// Resource validation reads the scheduler's active entry instead of inferring it only from KCP Channel count.
+	bool hasKcpUpdateTimer() const;
 	void scheduleKcpUpdate(int64 microseconds = 0);
 
 
@@ -276,8 +278,7 @@ private:
 
 	enum TimeOutType
 	{
-		TIMEOUT_INACTIVITY_CHECK,
-		TIMEOUT_KCP_UPDATE
+		TIMEOUT_INACTIVITY_CHECK
 	};
 
 	virtual void handleTimeout(TimerHandle, void * pUser);
@@ -340,8 +341,6 @@ private:
 
 	uint32						flags_;
 	ikcpcb*						pKCP_;
-	TimerHandle					kcpUpdateTimerHandle_;
-	bool						hasSetNextKcpUpdate_;
 
 	std::string					condemnReason_;
 	// 只缓存不足以判定 TLS record header 的前 1-2 字节，避免首个 completion 过短时误判原生协议。
