@@ -404,8 +404,6 @@ void Witness::onEnterView(ViewTrigger* pViewTrigger, Entity* pEntity)
 	 if (pViewHysteresisAreaTrigger_ == pViewTrigger)
 		return;
 
-	requireFullScan();
-
 	// 先增加一个引用，避免实体在回调中被销毁造成后续判断出错
 	Py_INCREF(pEntity);
 
@@ -459,6 +457,7 @@ void Witness::onEnterView(ViewTrigger* pViewTrigger, Entity* pEntity)
 			pEntityRef->flags(ENTITYREF_FLAG_ENTER_CLIENT_PENDING);
 			pEntityRef->pEntity(pEntity);
 			initializeEntityRefLifecycle(pEntityRef);
+			queueEntityRefVolatile(pEntityRef);
 			pEntity->addWitnessed(pEntity_);
 			pSelfEntity->onEnteredView(pEntity);
 		}
@@ -480,6 +479,7 @@ void Witness::onEnterView(ViewTrigger* pViewTrigger, Entity* pEntity)
 	synchronizeViewEntityMetrics();
 	KBE_ASSERT(viewEntities_map_.size() <= static_cast<size_t>(std::numeric_limits<int>::max()));
 	pEntityRef->aliasID(static_cast<int>(viewEntities_map_.size() - 1));
+	queueEntityRefVolatile(pEntityRef);
 	
 	pEntity->addWitnessed(pEntity_);
 	pSelfEntity->onEnteredView(pEntity);
@@ -505,7 +505,6 @@ void Witness::onLeaveView(ViewTrigger* pViewTrigger, Entity* pEntity)
 //-------------------------------------------------------------------------------------
 void Witness::_onLeaveView(EntityRef* pEntityRef)
 {
-	requireFullScan();
 	//DEBUG_MSG(fmt::format("Witness::onLeaveView: {} entity={}\n", 
 	//	pEntity_->id(), pEntityRef->id()));
 
@@ -520,6 +519,7 @@ void Witness::_onLeaveView(EntityRef* pEntityRef)
 		pEntityRef->pEntity()->delWitnessed(pEntity_);
 
 	pEntityRef->pEntity(NULL);
+	queueEntityRefVolatile(pEntityRef);
 }
 
 //-------------------------------------------------------------------------------------
@@ -829,7 +829,11 @@ void Witness::initializeEntityRefLifecycle(EntityRef* pEntityRef)
 //-------------------------------------------------------------------------------------
 void Witness::queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue)
 {
-	if (!pEntityRef || pEntityRef->flags() != ENTITYREF_FLAG_NORMAL)
+	// 同一队列同时承载结构事件和易变数据事件。generation + queued 去重保证
+	// Enter/Leave 与移动更新按发生顺序处理，同时避免同一 EntityRef 在单 Tick 内重复膨胀。
+	// The same queue carries structural and volatile-data events. Generation plus queued deduplication
+	// preserves Enter/Leave and movement ordering without allowing one EntityRef to grow the queue repeatedly in a tick.
+	if (!pEntityRef || pEntityRef->flags() == ENTITYREF_FLAG_UNKONWN)
 		return;
 
 	if (volatileDirtyQueue_.enqueue(pEntityRef->id(), pEntityRef->generation(), pEntityRef->volatileQueuedRef()))
@@ -851,7 +855,98 @@ bool Witness::needsAdditionalVolatileUpdate(Entity* pEntity)
 }
 
 //-------------------------------------------------------------------------------------
-void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
+bool Witness::processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pEntityRef, uint16 additionalUpdates)
+{
+	if ((pEntityRef->flags() & ENTITYREF_FLAG_ENTER_CLIENT_PENDING) > 0)
+	{
+		// 进入通知必须重新按 ID 查找实体；脚本回调可能已经销毁原对象，不能使用缓存指针。
+		// Enter notification must resolve the entity by ID because script callbacks may have destroyed the cached object.
+		Entity* pOtherEntity = Cellapp::getSingleton().findEntity(pEntityRef->id());
+		if (pOtherEntity == NULL)
+			return false;
+
+		pEntityRef->removeflags(ENTITYREF_FLAG_ENTER_CLIENT_PENDING);
+
+		MemoryStream* pStream = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
+		pOtherEntity->addPositionAndDirectionToStream(*pStream, true);
+		pOtherEntity->addClientDataToStream(pStream, true);
+
+		ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onUpdatePropertys, updatePropertys);
+		(*pSendBundle) << pOtherEntity->id();
+		(*pSendBundle).append(*pStream);
+		MemoryStream::reclaimPoolObject(pStream);
+		ENTITY_MESSAGE_FORWARD_CLIENT_END(pSendBundle, ClientInterface::onUpdatePropertys, updatePropertys);
+
+		ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onEntityEnterWorld, entityEnterWorld);
+		(*pSendBundle) << pOtherEntity->id();
+		pOtherEntity->pScriptModule()->addSmartUTypeToBundle(pSendBundle);
+		if (!pOtherEntity->isOnGround())
+			(*pSendBundle) << pOtherEntity->isOnGround();
+		ENTITY_MESSAGE_FORWARD_CLIENT_END(pSendBundle, ClientInterface::onEntityEnterWorld, entityEnterWorld);
+
+		pEntityRef->flags(ENTITYREF_FLAG_NORMAL);
+		KBE_ASSERT(clientViewSize_ != 65535);
+		++clientViewSize_;
+
+		if (additionalUpdates > 0 && needsAdditionalVolatileUpdate(pOtherEntity))
+			queueEntityRefVolatile(pEntityRef, true);
+
+		return true;
+	}
+
+	if ((pEntityRef->flags() & ENTITYREF_FLAG_LEAVE_CLIENT_PENDING) > 0)
+	{
+		pEntityRef->removeflags(ENTITYREF_FLAG_LEAVE_CLIENT_PENDING);
+		if ((pEntityRef->flags() & ENTITYREF_FLAG_NORMAL) > 0)
+		{
+			ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onEntityLeaveWorldOptimized, leaveWorld);
+			_addViewEntityIDToBundle(pSendBundle, pEntityRef);
+			ENTITY_MESSAGE_FORWARD_CLIENT_END(pSendBundle, ClientInterface::onEntityLeaveWorldOptimized, leaveWorld);
+
+			KBE_ASSERT(clientViewSize_ > 0);
+			--clientViewSize_;
+		}
+
+		return false;
+	}
+
+	Entity* pOtherEntity = pEntityRef->pEntity();
+	if (pOtherEntity == NULL)
+	{
+		KBE_ASSERT(clientViewSize_ > 0);
+		--clientViewSize_;
+		return false;
+	}
+
+	KBE_ASSERT(pEntityRef->flags() == ENTITYREF_FLAG_NORMAL);
+	const uint32 flags = getEntityVolatileDataUpdateFlags(pOtherEntity);
+	addUpdateToStream(pSendBundle, flags, pEntityRef);
+	if (additionalUpdates > 0 && flags != UPDATE_FLAG_NULL)
+		queueEntityRefVolatile(pEntityRef, true);
+
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
+void Witness::removeViewEntityRef(EntityRef* pEntityRef)
+{
+	viewEntities_map_.erase(pEntityRef->id());
+	for (VIEW_ENTITIES::iterator iter = viewEntities_.begin(); iter != viewEntities_.end(); ++iter)
+	{
+		if (*iter == pEntityRef)
+		{
+			viewEntities_.erase(iter);
+			break;
+		}
+	}
+
+	EntityRef::reclaimPoolObject(pEntityRef);
+	synchronizeViewEntityMetrics();
+	updateEntitiesAliasID();
+}
+
+//-------------------------------------------------------------------------------------
+void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle, uint16 additionalUpdates)
 {
 	const size_t batchSize = volatileDirtyQueue_.batchSize();
 	for (size_t i = 0; i < batchSize; ++i)
@@ -870,19 +965,10 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 
 		EntityRef* pEntityRef = iter->second;
 		pEntityRef->volatileQueued(false);
-		if (pEntityRef->flags() != ENTITYREF_FLAG_NORMAL || !pEntityRef->pEntity())
-		{
-			g_witnessLoadMetrics.recordStateSkip();
-			continue;
-		}
-
-		Entity* pOtherEntity = pEntityRef->pEntity();
-		const uint32 flags = getEntityVolatileDataUpdateFlags(pOtherEntity);
-		addUpdateToStream(pSendBundle, flags, pEntityRef);
+		const bool retained = processEntityRefUpdate(pSendBundle, pEntityRef, additionalUpdates);
 		g_witnessLoadMetrics.recordDirtyProcessed();
-
-		if (flags != UPDATE_FLAG_NULL)
-			queueEntityRefVolatile(pEntityRef, true);
+		if (!retained)
+			removeViewEntityRef(pEntityRef);
 	}
 }
 
@@ -1015,100 +1101,17 @@ bool Witness::update()
 			{
 				++scannedEntities;
 				EntityRef* pEntityRef = (*iter);
-
-				if((pEntityRef->flags() & ENTITYREF_FLAG_ENTER_CLIENT_PENDING) > 0)
-				{
-					// 这里使用id查找一下， 避免entity在进入View时的回调里被意外销毁
-					Entity* otherEntity = Cellapp::getSingleton().findEntity(pEntityRef->id());
-					if(otherEntity == NULL)
-					{
-						pEntityRef->pEntity(NULL);
-						_onLeaveView(pEntityRef);
-						viewEntities_map_.erase(pEntityRef->id());
-						EntityRef::reclaimPoolObject(pEntityRef);
-						iter = viewEntities_.erase(iter);
-						updateEntitiesAliasID();
-						continue;
-					}
-				
-					pEntityRef->removeflags(ENTITYREF_FLAG_ENTER_CLIENT_PENDING);
-
-					MemoryStream* s1 = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
-					otherEntity->addPositionAndDirectionToStream(*s1, true);
-					otherEntity->addClientDataToStream(s1, true);
-				
-					ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onUpdatePropertys, updatePropertys);
-					(*pSendBundle) << otherEntity->id();
-					(*pSendBundle).append(*s1);
-					MemoryStream::reclaimPoolObject(s1);
-					ENTITY_MESSAGE_FORWARD_CLIENT_END(pSendBundle, ClientInterface::onUpdatePropertys, updatePropertys);
-				
-					ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onEntityEnterWorld, entityEnterWorld);
-					(*pSendBundle) << otherEntity->id();
-					otherEntity->pScriptModule()->addSmartUTypeToBundle(pSendBundle);
-					if(!otherEntity->isOnGround())
-						(*pSendBundle) << otherEntity->isOnGround();
-
-					ENTITY_MESSAGE_FORWARD_CLIENT_END(pSendBundle, ClientInterface::onEntityEnterWorld, entityEnterWorld);
-
-					pEntityRef->flags(ENTITYREF_FLAG_NORMAL);
-
-					KBE_ASSERT(clientViewSize_ != 65535);
-
-					++clientViewSize_;
-					if (additionalUpdates > 0 && needsAdditionalVolatileUpdate(otherEntity))
-						queueEntityRefVolatile(pEntityRef, true);
-				}
-				else if((pEntityRef->flags() & ENTITYREF_FLAG_LEAVE_CLIENT_PENDING) > 0)
-				{
-					pEntityRef->removeflags(ENTITYREF_FLAG_LEAVE_CLIENT_PENDING);
-
-					if((pEntityRef->flags() & ENTITYREF_FLAG_NORMAL) > 0)
-					{
-						ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onEntityLeaveWorldOptimized, leaveWorld);
-						_addViewEntityIDToBundle(pSendBundle, pEntityRef);
-						ENTITY_MESSAGE_FORWARD_CLIENT_END(pSendBundle, ClientInterface::onEntityLeaveWorldOptimized, leaveWorld);
-					
-						KBE_ASSERT(clientViewSize_ > 0);
-						--clientViewSize_;
-					}
-
-					viewEntities_map_.erase(pEntityRef->id());
-					EntityRef::reclaimPoolObject(pEntityRef);
-					iter = viewEntities_.erase(iter);
-					updateEntitiesAliasID();
-					continue;
-				}
-				else
-				{
-					Entity* otherEntity = pEntityRef->pEntity();
-					if(otherEntity == NULL)
-					{
-						viewEntities_map_.erase(pEntityRef->id());
-						EntityRef::reclaimPoolObject(pEntityRef);
-						iter = viewEntities_.erase(iter);
-						KBE_ASSERT(clientViewSize_ > 0);
-						--clientViewSize_;
-						updateEntitiesAliasID();
-						continue;
-					}
-				
-					KBE_ASSERT(pEntityRef->flags() == ENTITYREF_FLAG_NORMAL);
-				
-					const uint32 flags = getEntityVolatileDataUpdateFlags(otherEntity);
-					addUpdateToStream(pSendBundle, flags, pEntityRef);
-					if (additionalUpdates > 0 && flags != UPDATE_FLAG_NULL)
-						queueEntityRefVolatile(pEntityRef, true);
-				}
-
 				++iter;
+				pEntityRef->volatileQueued(false);
+				if (!processEntityRefUpdate(pSendBundle, pEntityRef, additionalUpdates))
+					removeViewEntityRef(pEntityRef);
 			}
 			synchronizeViewEntityMetrics();
 			g_witnessLoadMetrics.recordFullScan(scannedEntities);
 		}
 		else
 		{
-			processVolatileDirtyQueue(pSendBundle);
+			processVolatileDirtyQueue(pSendBundle, additionalUpdates);
 		}
 
 		size_t pSendBundleMessageLength = pSendBundle->currMsgLength();

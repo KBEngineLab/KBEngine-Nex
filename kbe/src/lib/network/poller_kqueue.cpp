@@ -590,7 +590,10 @@ int KqueuePoller::flushPendingSends(KBESOCKET fd, SocketState& state)
 			const bool completedChunk = sent == state.pendingTcpSends.frontSize();
 			state.pendingTcpSends.consumeFront(sent);
 			if (!completedChunk)
+			{
+				++tcpPartialSendCount_;
 				break;
+			}
 			++count;
 			continue;
 		}

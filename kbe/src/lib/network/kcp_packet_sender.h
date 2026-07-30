@@ -55,6 +55,9 @@ public:
 protected:
 	virtual void onSent(Packet* pPacket);
 	virtual Reason processFilterPacket(Channel* pChannel, Packet * pPacket, int userarg);
+	// KCP 背压表示发送窗口或底层队列暂时饱和，必须保留 Channel 并等待后续重试。
+	// KCP backpressure means the send window or lower queue is temporarily full; keep the Channel and retry later.
+	virtual bool closeOnSustainedBackpressure() const { return false; }
 
 };
 }

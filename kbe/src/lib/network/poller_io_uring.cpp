@@ -885,6 +885,7 @@ void IoUringPoller::handleCompletion(IoUringContext& context, int result)
 		else if (static_cast<size_t>(result) < context.tcpSendData.size())
 		{
 			pushTcpSendFront(*state, context.tcpSendData, static_cast<size_t>(result));
+			++tcpPartialSendCount_;
 		}
 
 		if (!state->pendingTcpSends.empty())

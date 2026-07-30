@@ -32,9 +32,18 @@ private:
 class CompletionTcpSendQueue
 {
 public:
+	enum PushResult
+	{
+		PUSH_ACCEPTED = 0,
+		PUSH_BACKPRESSURED,
+		PUSH_OVERSIZED,
+		PUSH_INVALID
+	};
+
 	CompletionTcpSendQueue();
 
 	bool push(const void* data, size_t length, size_t maxPendingBytes);
+	PushResult pushResult(const void* data, size_t length, size_t maxPendingBytes);
 	bool popBatch(size_t maxBytes, CompletionTcpSendBuffer& batch, bool& copied);
 	bool restore(CompletionTcpSendBuffer& buffer, size_t consumedBytes);
 	bool consumeFront(size_t consumedBytes);

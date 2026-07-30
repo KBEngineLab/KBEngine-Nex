@@ -157,7 +157,7 @@ bool UDPPacketSender::processSend(Channel* pChannel, int userarg)
 			{
 				const bool backpressureExpired = sendBackpressure_.recordBlocked(
 					timestamp(), UDP_SEND_BACKPRESSURE_TIMEOUT_STAMPS);
-				if (pChannel->isExternal())
+				if (pChannel->isExternal() && closeOnSustainedBackpressure())
 				{
 					if (backpressureExpired)
 					{
@@ -167,10 +167,10 @@ bool UDPPacketSender::processSend(Channel* pChannel, int userarg)
 						onGetError(pChannel, "UDPPacketSender::processSend: sustained send backpressure");
 					}
 				}
-				else
+				else if (pChannel->isInternal())
 				{
-					this->dispatcher().errorReporter().reportException(reason, pEndpoint_->addr(),
-						fmt::format("UDPPacketSender::processSend(internal, {})", sendBackpressure_.rejectionCount()).c_str());
+					// 资源不足是可恢复状态；记录错误会再次走内部网络，形成背压反馈环。
+					// Resource exhaustion is recoverable; reporting it over the internal network would create a backpressure feedback loop.
 				}
 			}
 			else

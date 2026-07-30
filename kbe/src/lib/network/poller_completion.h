@@ -57,6 +57,11 @@ public:
 	uint64 tcpSendOwnershipTransferCount() const override;
 	uint64 tcpSendBatchCopyCount() const override;
 	uint64 tcpSendBatchCopiedBytes() const override;
+	uint64 tcpSendBacklogBytes() const override;
+	uint64 tcpSendBacklogPeakBytes() const override;
+	uint64 tcpSendBackpressureCount() const override;
+	uint64 tcpSendOversizedRejectCount() const override;
+	uint64 tcpPartialSendCount() const override;
 	uint64 receiveOwnershipTransferCount() const override;
 	uint64 receiveOwnershipTransferredBytes() const override;
 	uint64 udpSendBacklogBytes() const override;
@@ -232,6 +237,10 @@ protected:
 	uint64 tcpSendOwnershipTransferCount_;
 	uint64 tcpSendBatchCopyCount_;
 	uint64 tcpSendBatchCopiedBytes_;
+	uint64 tcpSendBacklogPeakBytes_;
+	uint64 tcpSendBackpressureCount_;
+	uint64 tcpSendOversizedRejectCount_;
+	uint64 tcpPartialSendCount_;
 	uint64 receiveOwnershipTransferCount_;
 	uint64 receiveOwnershipTransferredBytes_;
 	uint64 udpSendBacklogPeakBytes_;

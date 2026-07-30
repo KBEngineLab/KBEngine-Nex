@@ -215,6 +215,11 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/poller/tcpSendOwnershipTransfers", &networkInterface_, &Network::NetworkInterface::pollerTcpSendOwnershipTransfers);
 	WATCH_OBJECT("network/poller/tcpSendBatchCopies", &networkInterface_, &Network::NetworkInterface::pollerTcpSendBatchCopies);
 	WATCH_OBJECT("network/poller/tcpSendBatchCopiedBytes", &networkInterface_, &Network::NetworkInterface::pollerTcpSendBatchCopiedBytes);
+	WATCH_OBJECT("network/poller/tcpSendBacklogBytes", &networkInterface_, &Network::NetworkInterface::pollerTcpSendBacklogBytes);
+	WATCH_OBJECT("network/poller/tcpSendBacklogPeakBytes", &networkInterface_, &Network::NetworkInterface::pollerTcpSendBacklogPeakBytes);
+	WATCH_OBJECT("network/poller/tcpSendBackpressure", &networkInterface_, &Network::NetworkInterface::pollerTcpSendBackpressureCount);
+	WATCH_OBJECT("network/poller/tcpSendOversizedRejects", &networkInterface_, &Network::NetworkInterface::pollerTcpSendOversizedRejectCount);
+	WATCH_OBJECT("network/poller/tcpPartialSends", &networkInterface_, &Network::NetworkInterface::pollerTcpPartialSendCount);
 	WATCH_OBJECT("network/poller/receiveOwnershipTransfers", &networkInterface_, &Network::NetworkInterface::pollerReceiveOwnershipTransfers);
 	WATCH_OBJECT("network/poller/receiveTransferredBytes", &networkInterface_, &Network::NetworkInterface::pollerReceiveTransferredBytes);
 	WATCH_OBJECT("network/poller/udpSendBacklogBytes", &networkInterface_, &Network::NetworkInterface::pollerUdpSendBacklogBytes);

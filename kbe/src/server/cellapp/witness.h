@@ -228,7 +228,9 @@ private:
 	void initializeEntityRefLifecycle(EntityRef* pEntityRef);
 	void queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue = false);
 	bool needsAdditionalVolatileUpdate(Entity* pEntity);
-	void processVolatileDirtyQueue(Network::Bundle* pSendBundle);
+	bool processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pEntityRef, uint16 additionalUpdates);
+	void removeViewEntityRef(EntityRef* pEntityRef);
+	void processVolatileDirtyQueue(Network::Bundle* pSendBundle, uint16 additionalUpdates);
 		
 private:
 	Entity*									pEntity_;

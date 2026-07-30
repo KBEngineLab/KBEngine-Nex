@@ -259,6 +259,11 @@ uint64 EventPoller::contextPeakOutstandingCount() const { return 0; }
 uint64 EventPoller::tcpSendOwnershipTransferCount() const { return 0; }
 uint64 EventPoller::tcpSendBatchCopyCount() const { return 0; }
 uint64 EventPoller::tcpSendBatchCopiedBytes() const { return 0; }
+uint64 EventPoller::tcpSendBacklogBytes() const { return 0; }
+uint64 EventPoller::tcpSendBacklogPeakBytes() const { return 0; }
+uint64 EventPoller::tcpSendBackpressureCount() const { return 0; }
+uint64 EventPoller::tcpSendOversizedRejectCount() const { return 0; }
+uint64 EventPoller::tcpPartialSendCount() const { return 0; }
 uint64 EventPoller::receiveOwnershipTransferCount() const { return 0; }
 uint64 EventPoller::receiveOwnershipTransferredBytes() const { return 0; }
 uint64 EventPoller::udpSendBacklogBytes() const { return 0; }

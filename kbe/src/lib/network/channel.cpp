@@ -842,6 +842,17 @@ void Channel::stopSend()
 void Channel::onSendCompleted()
 {
 	KBE_ASSERT(bundles_.size() == 0 && sending());
+
+	EventPoller* pPoller = pNetworkInterface_->dispatcher().pPoller();
+	if (pPoller != NULL && pPoller->supportsCompletion() && pPoller->hasPendingSend(*pEndPoint_))
+	{
+		// Bundle 已经交给 completion poller 并不代表 TCP 字节已经完成发送。
+		// 保持写 handler 和 FLAG_SENDING，等 outstanding/queued 字节真正排空后，poller 会再次触发完成通知。
+		// Handing Bundles to a completion poller does not mean their TCP bytes have completed.
+		// Keep the write handler and FLAG_SENDING until the poller drains outstanding and queued bytes and notifies us again.
+		return;
+	}
+
 	stopSend();
 }
 

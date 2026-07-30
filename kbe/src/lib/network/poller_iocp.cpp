@@ -988,6 +988,7 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 			// WSASend completion 允许只完成部分字节。
 			// 未发送完的数据必须放回队首，保持 TCP 字节流顺序。
 			pushTcpSendFront(*pState, pContext->tcpSendData, static_cast<size_t>(bytesTransferred));
+			++tcpPartialSendCount_;
 		}
 
 		if (!pState->pendingTcpSends.empty())

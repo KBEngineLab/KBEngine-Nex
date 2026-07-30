@@ -54,14 +54,32 @@ CompletionTcpSendQueue::CompletionTcpSendQueue() :
 
 bool CompletionTcpSendQueue::push(const void* data, size_t length, size_t maxPendingBytes)
 {
+	return pushResult(data, length, maxPendingBytes) == PUSH_ACCEPTED;
+}
+
+CompletionTcpSendQueue::PushResult CompletionTcpSendQueue::pushResult(
+	const void* data, size_t length, size_t maxPendingBytes)
+{
 	if (length == 0)
 	{
-		return true;
+		return PUSH_ACCEPTED;
 	}
 
-	if (data == NULL || length > maxPendingBytes || pendingBytes_ > maxPendingBytes - length)
+	if (data == NULL)
 	{
-		return false;
+		return PUSH_INVALID;
+	}
+
+	// 单块超过队列硬上限时，等待 drain 永远不会让它变得可入队，必须与瞬时背压分开报告。
+	// A chunk above the hard queue limit can never fit after draining, so report it separately from transient backpressure.
+	if (length > maxPendingBytes)
+	{
+		return PUSH_OVERSIZED;
+	}
+
+	if (pendingBytes_ > maxPendingBytes - length)
+	{
+		return PUSH_BACKPRESSURED;
 	}
 
 	CompletionTcpSendBuffer buffer;
@@ -69,7 +87,7 @@ bool CompletionTcpSendQueue::push(const void* data, size_t length, size_t maxPen
 	buffer.storage_.assign(first, first + length);
 	buffers_.push_back(std::move(buffer));
 	pendingBytes_ += length;
-	return true;
+	return PUSH_ACCEPTED;
 }
 
 bool CompletionTcpSendQueue::popBatch(size_t maxBytes, CompletionTcpSendBuffer& batch, bool& copied)

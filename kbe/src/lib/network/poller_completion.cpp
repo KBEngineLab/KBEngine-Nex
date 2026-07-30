@@ -65,6 +65,10 @@ CompletionPoller::CompletionPoller() :
 	tcpSendOwnershipTransferCount_(0),
 	tcpSendBatchCopyCount_(0),
 	tcpSendBatchCopiedBytes_(0),
+	tcpSendBacklogPeakBytes_(0),
+	tcpSendBackpressureCount_(0),
+	tcpSendOversizedRejectCount_(0),
+	tcpPartialSendCount_(0),
 	receiveOwnershipTransferCount_(0),
 	receiveOwnershipTransferredBytes_(0),
 	udpSendBacklogPeakBytes_(0),
@@ -214,15 +218,30 @@ bool CompletionPoller::queueTcpSend(KBESOCKET fd, const void* data, int len)
 		state.kind = SOCKET_KIND_TCP;
 	}
 
-	if (!state.pendingTcpSends.push(data, static_cast<size_t>(len), COMPLETION_TCP_SEND_BACKLOG_BYTES))
+	const CompletionTcpSendQueue::PushResult result = state.pendingTcpSends.pushResult(
+		data, static_cast<size_t>(len), COMPLETION_TCP_SEND_BACKLOG_BYTES);
+	if (result != CompletionTcpSendQueue::PUSH_ACCEPTED)
 	{
+		if (result == CompletionTcpSendQueue::PUSH_BACKPRESSURED)
+		{
+			++tcpSendBackpressureCount_;
+		}
+		else if (result == CompletionTcpSendQueue::PUSH_OVERSIZED)
+		{
+			++tcpSendOversizedRejectCount_;
+		}
 #if KBE_PLATFORM == PLATFORM_WIN32
-		WSASetLastError(WSAEWOULDBLOCK);
+		WSASetLastError(result == CompletionTcpSendQueue::PUSH_INVALID ? WSAEINVAL :
+			(result == CompletionTcpSendQueue::PUSH_OVERSIZED ? WSAEMSGSIZE : WSAEWOULDBLOCK));
 #else
-		errno = EAGAIN;
+		errno = result == CompletionTcpSendQueue::PUSH_INVALID ? EINVAL :
+			(result == CompletionTcpSendQueue::PUSH_OVERSIZED ? EMSGSIZE : EAGAIN);
 #endif
 		return false;
 	}
+
+	tcpSendBacklogPeakBytes_ = std::max<uint64>(tcpSendBacklogPeakBytes_,
+		static_cast<uint64>(state.pendingTcpSends.pendingBytes()));
 
 	return true;
 }
@@ -301,6 +320,19 @@ uint64 CompletionPoller::rearmRetryCount() const
 uint64 CompletionPoller::tcpSendOwnershipTransferCount() const { return tcpSendOwnershipTransferCount_; }
 uint64 CompletionPoller::tcpSendBatchCopyCount() const { return tcpSendBatchCopyCount_; }
 uint64 CompletionPoller::tcpSendBatchCopiedBytes() const { return tcpSendBatchCopiedBytes_; }
+uint64 CompletionPoller::tcpSendBacklogBytes() const
+{
+	uint64 bytes = 0;
+	for (SocketStates::const_iterator iter = socketStates_.begin(); iter != socketStates_.end(); ++iter)
+	{
+		bytes += static_cast<uint64>(iter->second->pendingTcpSends.pendingBytes());
+	}
+	return bytes;
+}
+uint64 CompletionPoller::tcpSendBacklogPeakBytes() const { return tcpSendBacklogPeakBytes_; }
+uint64 CompletionPoller::tcpSendBackpressureCount() const { return tcpSendBackpressureCount_; }
+uint64 CompletionPoller::tcpSendOversizedRejectCount() const { return tcpSendOversizedRejectCount_; }
+uint64 CompletionPoller::tcpPartialSendCount() const { return tcpPartialSendCount_; }
 uint64 CompletionPoller::receiveOwnershipTransferCount() const { return receiveOwnershipTransferCount_; }
 uint64 CompletionPoller::receiveOwnershipTransferredBytes() const { return receiveOwnershipTransferredBytes_; }
 uint64 CompletionPoller::udpSendBacklogBytes() const

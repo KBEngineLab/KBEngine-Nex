@@ -66,6 +66,9 @@ protected:
 	virtual void onGetError(Channel* pChannel, const std::string& err);
 	virtual void onSent(Packet* pPacket);
 	virtual Reason processFilterPacket(Channel* pChannel, Packet * pPacket, int userarg);
+	// 普通 UDP 没有可靠重传层，长期无法发送时仍允许关闭；KCP 由自身窗口和重传机制负责恢复，不能因暂时背压断开。
+	// Plain UDP has no reliable retransmission layer and may still close after a prolonged stall; KCP must rely on its own window and retransmission instead of disconnecting on temporary backpressure.
+	virtual bool closeOnSustainedBackpressure() const { return true; }
 
 protected:
 	UdpSendBackpressure sendBackpressure_;

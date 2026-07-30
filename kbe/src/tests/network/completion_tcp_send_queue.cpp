@@ -114,10 +114,41 @@ bool testPartialCompletionRestore()
 bool testBacklogLimit()
 {
 	KBEngine::Network::CompletionTcpSendQueue queue;
-	return require(queue.push("1234", 4, 4), "exact backlog limit was rejected") &&
-		require(!queue.push("5", 1, 4), "backlog overflow was accepted") &&
+	return require(queue.pushResult("1234", 4, 4) == KBEngine::Network::CompletionTcpSendQueue::PUSH_ACCEPTED,
+			"exact backlog limit was rejected") &&
+		require(queue.pushResult("5", 1, 4) == KBEngine::Network::CompletionTcpSendQueue::PUSH_BACKPRESSURED,
+			"backlog overflow was not classified as transient backpressure") &&
+		require(queue.pushResult("12345", 5, 4) == KBEngine::Network::CompletionTcpSendQueue::PUSH_OVERSIZED,
+			"oversized chunk was not classified as permanently unqueueable") &&
+		require(queue.pushResult(NULL, 1, 4) == KBEngine::Network::CompletionTcpSendQueue::PUSH_INVALID,
+			"null payload was not classified as invalid") &&
 		require(queue.pendingBytes() == 4 && queue.frontSize() == 4,
 			"rejected backlog push changed queue state");
+}
+
+bool testDrainRetryOrdering()
+{
+	KBEngine::Network::CompletionTcpSendQueue queue;
+	if (!require(queue.push("first", 5, 8), "drain fixture first push failed") ||
+		!require(queue.pushResult("next", 4, 8) == KBEngine::Network::CompletionTcpSendQueue::PUSH_BACKPRESSURED,
+			"drain fixture did not enter backpressure"))
+	{
+		return false;
+	}
+
+	KBEngine::Network::CompletionTcpSendBuffer first;
+	bool copied = false;
+	if (!require(queue.popBatch(8, first, copied), "drain fixture pop failed") ||
+		!require(queue.push("next", 4, 8), "retry after drain failed") ||
+		!require(queue.restore(first, 2), "partial first batch restore failed"))
+	{
+		return false;
+	}
+
+	KBEngine::Network::CompletionTcpSendBuffer ordered;
+	return require(queue.popBatch(8, ordered, copied), "drain fixture ordered pop failed") &&
+		require(bufferText(ordered) == "rstnext", "retry crossed the partially sent stream prefix") &&
+		require(queue.empty() && queue.pendingBytes() == 0, "drain fixture did not empty");
 }
 }
 
@@ -126,7 +157,8 @@ int main()
 	if (!testSingleBufferOwnershipTransfer() ||
 		!testCoalescingAndBoundaries() ||
 		!testPartialCompletionRestore() ||
-		!testBacklogLimit())
+		!testBacklogLimit() ||
+		!testDrainRetryOrdering())
 	{
 		return EXIT_FAILURE;
 	}
