@@ -438,6 +438,11 @@
 		<id>41008</id>
 		<descr>watcher数据查询</descr>
 	</Logger::queryWatcher>
+
+	<Bots::queryWatcher>
+		<id>41009</id>
+		<descr>watcher数据查询</descr>
+	</Bots::queryWatcher>
 	
 	<Baseappmgr::queryAppsLoads>
 		<id>50001</id>

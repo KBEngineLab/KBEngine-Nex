@@ -58,6 +58,16 @@ set_tests_properties(source.python_triplet_rejects_universal PROPERTIES
     LABELS "macos;python;source"
 )
 
+add_test(NAME source.watcher_protocol_contract
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_MESSAGES_FIXED=${CMAKE_SOURCE_DIR}/../res/server/messages_fixed_defaults.xml"
+        "-DKBE_WATCHER_CLIENT=${CMAKE_SOURCE_DIR}/../tools/server/pycommon/Watcher.py"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyWatcherProtocol.cmake"
+)
+set_tests_properties(source.watcher_protocol_contract PROPERTIES
+    LABELS "network;source;watcher"
+)
+
 set(KBE_TEST_ASSETS "" CACHE PATH "Assets directory used by CMake integration tests")
 option(KBE_TEST_SERVER_CLUSTER "Enable the server cluster integration test" OFF)
 set(KBE_TEST_DATABASE_HOST "127.0.0.1" CACHE STRING "Database host used by CMake integration tests")
