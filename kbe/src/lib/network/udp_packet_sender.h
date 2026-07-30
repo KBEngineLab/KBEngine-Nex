@@ -29,6 +29,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/interfaces.h"
 #include "network/tcp_packet.h"
 #include "network/packet_sender.h"
+#include "network/udp_send_backpressure.h"
 
 namespace KBEngine {
 namespace Network
@@ -67,7 +68,7 @@ protected:
 	virtual Reason processFilterPacket(Channel* pChannel, Packet * pPacket, int userarg);
 
 protected:
-	uint8 sendfailCount_;
+	UdpSendBackpressure sendBackpressure_;
 
 };
 }

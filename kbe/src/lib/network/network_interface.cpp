@@ -653,6 +653,9 @@ KBE_POLLER_METRIC(pollerTcpSendBatchCopies, tcpSendBatchCopyCount)
 KBE_POLLER_METRIC(pollerTcpSendBatchCopiedBytes, tcpSendBatchCopiedBytes)
 KBE_POLLER_METRIC(pollerReceiveOwnershipTransfers, receiveOwnershipTransferCount)
 KBE_POLLER_METRIC(pollerReceiveTransferredBytes, receiveOwnershipTransferredBytes)
+KBE_POLLER_METRIC(pollerUdpSendBacklogBytes, udpSendBacklogBytes)
+KBE_POLLER_METRIC(pollerUdpSendBacklogPeakBytes, udpSendBacklogPeakBytes)
+KBE_POLLER_METRIC(pollerUdpSendBackpressureCount, udpSendBackpressureCount)
 
 #undef KBE_POLLER_METRIC
 

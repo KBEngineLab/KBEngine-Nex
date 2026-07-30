@@ -136,6 +136,9 @@ public:
 	uint64 pollerTcpSendBatchCopiedBytes() const;
 	uint64 pollerReceiveOwnershipTransfers() const;
 	uint64 pollerReceiveTransferredBytes() const;
+	uint64 pollerUdpSendBacklogBytes() const;
+	uint64 pollerUdpSendBacklogPeakBytes() const;
+	uint64 pollerUdpSendBackpressureCount() const;
 	uint64 kcpScheduledChannelCount() const;
 	uint64 kcpSchedulerHeapEntryCount() const;
 	uint64 kcpScheduleRequestCount() const;

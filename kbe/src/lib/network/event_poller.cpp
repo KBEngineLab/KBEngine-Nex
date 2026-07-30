@@ -261,6 +261,9 @@ uint64 EventPoller::tcpSendBatchCopyCount() const { return 0; }
 uint64 EventPoller::tcpSendBatchCopiedBytes() const { return 0; }
 uint64 EventPoller::receiveOwnershipTransferCount() const { return 0; }
 uint64 EventPoller::receiveOwnershipTransferredBytes() const { return 0; }
+uint64 EventPoller::udpSendBacklogBytes() const { return 0; }
+uint64 EventPoller::udpSendBacklogPeakBytes() const { return 0; }
+uint64 EventPoller::udpSendBackpressureCount() const { return 0; }
 
 //-------------------------------------------------------------------------------------
 const char* EventPoller::defaultIOModelName()

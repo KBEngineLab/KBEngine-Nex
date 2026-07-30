@@ -59,6 +59,9 @@ public:
 	uint64 tcpSendBatchCopiedBytes() const override;
 	uint64 receiveOwnershipTransferCount() const override;
 	uint64 receiveOwnershipTransferredBytes() const override;
+	uint64 udpSendBacklogBytes() const override;
+	uint64 udpSendBacklogPeakBytes() const override;
+	uint64 udpSendBackpressureCount() const override;
 
 protected:
 	enum SocketKind
@@ -231,6 +234,8 @@ protected:
 	uint64 tcpSendBatchCopiedBytes_;
 	uint64 receiveOwnershipTransferCount_;
 	uint64 receiveOwnershipTransferredBytes_;
+	uint64 udpSendBacklogPeakBytes_;
+	uint64 udpSendBackpressureCount_;
 };
 
 }

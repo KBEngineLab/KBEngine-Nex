@@ -217,6 +217,9 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/poller/tcpSendBatchCopiedBytes", &networkInterface_, &Network::NetworkInterface::pollerTcpSendBatchCopiedBytes);
 	WATCH_OBJECT("network/poller/receiveOwnershipTransfers", &networkInterface_, &Network::NetworkInterface::pollerReceiveOwnershipTransfers);
 	WATCH_OBJECT("network/poller/receiveTransferredBytes", &networkInterface_, &Network::NetworkInterface::pollerReceiveTransferredBytes);
+	WATCH_OBJECT("network/poller/udpSendBacklogBytes", &networkInterface_, &Network::NetworkInterface::pollerUdpSendBacklogBytes);
+	WATCH_OBJECT("network/poller/udpSendBacklogPeakBytes", &networkInterface_, &Network::NetworkInterface::pollerUdpSendBacklogPeakBytes);
+	WATCH_OBJECT("network/poller/udpSendBackpressure", &networkInterface_, &Network::NetworkInterface::pollerUdpSendBackpressureCount);
 	// Compare active channels, heap entries, wakeups, and updates together to quantify scheduler aggregation without assuming aligned deadlines.
 	// 联合观察活动 Channel、堆项、唤醒和更新次数，用于量化调度聚合效果，不假设各 Channel 截止时间天然对齐。
 	WATCH_OBJECT("network/kcp/scheduledChannels", &networkInterface_, &Network::NetworkInterface::kcpScheduledChannelCount);

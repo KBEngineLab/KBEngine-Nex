@@ -37,6 +37,12 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine {
 namespace Network
 {
+namespace
+{
+// completion 队列短时拥塞不代表客户端失联；仅在五秒完全无发送进展后才关闭外部连接。
+// A short completion-queue burst does not mean the client is gone; close an external peer only after five seconds without send progress.
+const uint64 UDP_SEND_BACKPRESSURE_TIMEOUT_STAMPS = 5 * stampsPerSecond();
+}
 
 //-------------------------------------------------------------------------------------
 static ObjectPool<UDPPacketSender> _g_objPool("UDPPacketSender");
@@ -60,7 +66,7 @@ void UDPPacketSender::reclaimPoolObject(UDPPacketSender* obj)
 //-------------------------------------------------------------------------------------
 void UDPPacketSender::onReclaimObject()
 {
-	sendfailCount_ = 0;
+	sendBackpressure_ = UdpSendBackpressure();
 }
 
 //-------------------------------------------------------------------------------------
@@ -82,7 +88,7 @@ UDPPacketSender::SmartPoolObjectPtr UDPPacketSender::createSmartPoolObj(const st
 UDPPacketSender::UDPPacketSender(EndPoint & endpoint,
 	   NetworkInterface & networkInterface	) :
 	PacketSender(endpoint, networkInterface),
-	sendfailCount_(0)
+	sendBackpressure_()
 {
 }
 
@@ -131,14 +137,16 @@ bool UDPPacketSender::processSend(Channel* pChannel, int userarg)
 			if (reason != REASON_SUCCESS)
 				break;
 			else
+			{
 				onSent(pPacket);
+				sendBackpressure_.recordProgress();
+			}
 		}
 
 		if (reason == REASON_SUCCESS)
 		{
 			pakcets.clear();
 			Network::Bundle::reclaimPoolObject((*iter));
-			sendfailCount_ = 0;
 		}
 		else
 		{
@@ -147,23 +155,22 @@ bool UDPPacketSender::processSend(Channel* pChannel, int userarg)
 
 			if (reason == REASON_RESOURCE_UNAVAILABLE)
 			{
-				// 外部连接采用有界重试，防止失联客户端永久占用队列；内部连接保留错误报告供运维定位。
-				// External peers use bounded retries to avoid retaining queues forever; internal peers keep error reports for operations diagnosis.
-				++sendfailCount_;
+				const bool backpressureExpired = sendBackpressure_.recordBlocked(
+					timestamp(), UDP_SEND_BACKPRESSURE_TIMEOUT_STAMPS);
 				if (pChannel->isExternal())
 				{
-					if (sendfailCount_ >= 10)
+					if (backpressureExpired)
 					{
-						WARNING_MSG(fmt::format("UDPPacketSender::processSend: closing external udp/kcp channel after {} send retries, addr={}\n",
-							(int)sendfailCount_, pEndpoint_->addr().c_str()));
+						WARNING_MSG(fmt::format("UDPPacketSender::processSend: closing external udp/kcp channel after sustained send backpressure, rejections={}, addr={}\n",
+							sendBackpressure_.rejectionCount(), pEndpoint_->addr().c_str()));
 
-						onGetError(pChannel, "UDPPacketSender::processSend: sendfailCount >= 10");
+						onGetError(pChannel, "UDPPacketSender::processSend: sustained send backpressure");
 					}
 				}
 				else
 				{
 					this->dispatcher().errorReporter().reportException(reason, pEndpoint_->addr(),
-						fmt::format("UDPPacketSender::processSend(internal, {})", (int)sendfailCount_).c_str());
+						fmt::format("UDPPacketSender::processSend(internal, {})", sendBackpressure_.rejectionCount()).c_str());
 				}
 			}
 			else

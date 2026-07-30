@@ -66,7 +66,9 @@ CompletionPoller::CompletionPoller() :
 	tcpSendBatchCopyCount_(0),
 	tcpSendBatchCopiedBytes_(0),
 	receiveOwnershipTransferCount_(0),
-	receiveOwnershipTransferredBytes_(0)
+	receiveOwnershipTransferredBytes_(0),
+	udpSendBacklogPeakBytes_(0),
+	udpSendBackpressureCount_(0)
 {
 }
 
@@ -241,6 +243,7 @@ bool CompletionPoller::queueUdpSend(KBESOCKET fd, const void* data, int len, con
 	pending.data.assign(static_cast<const char*>(data), static_cast<const char*>(data) + len);
 	if (state.pendingUdpSendBytes + pending.data.size() > COMPLETION_UDP_SEND_BACKLOG_BYTES)
 	{
+		++udpSendBackpressureCount_;
 #if KBE_PLATFORM == PLATFORM_WIN32
 		WSASetLastError(WSAEWOULDBLOCK);
 #else
@@ -255,6 +258,9 @@ bool CompletionPoller::queueUdpSend(KBESOCKET fd, const void* data, int len, con
 	pending.dstAddr.sin_port = dstAddr.port;
 	state.pendingUdpSendBytes += pending.data.size();
 	state.pendingUdpSends.push_back(std::move(pending));
+	// 峰值在入队热路径只比较当前 socket，避免每个数据报扫描全部 fd；UDP listener 的 KCP Channel 本就共享该 socket。
+	// Compare only the current socket on the enqueue hot path to avoid scanning every fd per datagram; listener KCP Channels already share that socket.
+	udpSendBacklogPeakBytes_ = std::max<uint64>(udpSendBacklogPeakBytes_, static_cast<uint64>(state.pendingUdpSendBytes));
 	return true;
 }
 
@@ -297,6 +303,17 @@ uint64 CompletionPoller::tcpSendBatchCopyCount() const { return tcpSendBatchCopy
 uint64 CompletionPoller::tcpSendBatchCopiedBytes() const { return tcpSendBatchCopiedBytes_; }
 uint64 CompletionPoller::receiveOwnershipTransferCount() const { return receiveOwnershipTransferCount_; }
 uint64 CompletionPoller::receiveOwnershipTransferredBytes() const { return receiveOwnershipTransferredBytes_; }
+uint64 CompletionPoller::udpSendBacklogBytes() const
+{
+	uint64 bytes = 0;
+	for (SocketStates::const_iterator iter = socketStates_.begin(); iter != socketStates_.end(); ++iter)
+	{
+		bytes += static_cast<uint64>(iter->second->pendingUdpSendBytes);
+	}
+	return bytes;
+}
+uint64 CompletionPoller::udpSendBacklogPeakBytes() const { return udpSendBacklogPeakBytes_; }
+uint64 CompletionPoller::udpSendBackpressureCount() const { return udpSendBackpressureCount_; }
 
 //-------------------------------------------------------------------------------------
 void CompletionPoller::requestRearm(KBESOCKET fd, uint8 flags)

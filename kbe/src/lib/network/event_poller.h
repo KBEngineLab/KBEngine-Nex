@@ -124,6 +124,9 @@ public:
 	virtual uint64 tcpSendBatchCopiedBytes() const;
 	virtual uint64 receiveOwnershipTransferCount() const;
 	virtual uint64 receiveOwnershipTransferredBytes() const;
+	virtual uint64 udpSendBacklogBytes() const;
+	virtual uint64 udpSendBacklogPeakBytes() const;
+	virtual uint64 udpSendBackpressureCount() const;
 
 	void clearSpareTime()		{spareTime_ = 0;}
 	uint64 spareTime() const	{return spareTime_;}
