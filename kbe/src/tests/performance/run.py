@@ -12,6 +12,7 @@ import time
 import uuid
 from pathlib import Path
 
+from .assets import build_environment, create_config_overlay, write_scenario_metadata
 from .log_metrics import IncrementalLogCollector
 from .metrics import JsonlRecorder, LatencyHistogram
 from .process_metrics import ProcessCollector
@@ -27,6 +28,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--duration", type=float)
     parser.add_argument("--sample-interval", type=float, default=1.0)
     parser.add_argument("--command", help="Command line to run the workload")
+    parser.add_argument("--assets-root", type=Path, help="Read-only game assets used for the isolated config overlay")
+    parser.add_argument("--bots", type=int, help="Override the scenario Bots count")
     parser.add_argument("--tools-root", type=Path, help="kbe/tools/server root for Watcher queries")
     parser.add_argument("--watcher-target", action="append", default=[], metavar="TYPE=HOST:PORT:PATH")
     return parser.parse_args()
@@ -37,11 +40,25 @@ def main() -> int:
     scenario = json.loads(args.scenario.read_text(encoding="utf-8"))
     name = str(scenario["name"])
     duration = float(args.duration if args.duration is not None else scenario.get("duration_seconds", 30))
+    configured_bots = int(args.bots if args.bots is not None else scenario.get("bots", 0))
     interval = max(float(args.sample_interval), 0.1)
     run_id = f"{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
     output = args.output_root / f"{name}-{run_id}"
     output.mkdir(parents=True, exist_ok=True)
-    process = start_command(args.command)
+    environment = None
+    if args.assets_root:
+        create_config_overlay(
+            args.assets_root,
+            output,
+            configured_bots,
+            float(scenario.get("bots_tick_time", 0.1)),
+            int(scenario["bots_tick_count"]) if "bots_tick_count" in scenario else None,
+        )
+        environment = build_environment(_repository_root(), args.assets_root, output)
+        write_scenario_metadata(output, scenario, configured_bots)
+    elif args.command and configured_bots > 0:
+        raise ValueError("--assets-root is required when starting a scenario with Bots")
+    process = start_command(args.command, environment)
     process_collector = ProcessCollector(process.pid) if process else None
     log_collector = IncrementalLogCollector(args.log_root) if args.log_root else None
     watcher_collector = WatcherCollector(args.tools_root) if args.tools_root and args.watcher_target else None
@@ -83,13 +100,17 @@ def main() -> int:
     return 0
 
 
-def start_command(command: str | None) -> subprocess.Popen[bytes] | None:
+def start_command(command: str | None, environment: dict[str, str] | None = None) -> subprocess.Popen[bytes] | None:
     if not command:
         return None
     args = shlex.split(command, posix=os.name != "nt")
     if not args:
         return None
-    return subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=environment)
+
+
+def _repository_root() -> Path:
+    return Path(__file__).resolve().parents[4]
 
 
 def stop_process(process: subprocess.Popen[bytes] | None) -> None:

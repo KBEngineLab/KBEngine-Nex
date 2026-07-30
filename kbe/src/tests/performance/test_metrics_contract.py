@@ -3,10 +3,12 @@
 import tempfile
 import sys
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from performance.assets import create_config_overlay
 from performance.metrics import JsonlRecorder
 from performance.report import build_summary, load_events, validate_event
 from performance.watcher_metrics import parse_target
@@ -18,6 +20,13 @@ def main() -> int:
     assert target.port == 11000
     assert target.path.endswith("poller")
     with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        assets = root / "assets/res/server"
+        assets.mkdir(parents=True)
+        (assets / "kbengine.xml").write_text("<root><bots /></root>\n", encoding="utf-8")
+        overlay = create_config_overlay(root / "assets", root / "run", 500)
+        xml_root = ET.parse(overlay).getroot()
+        assert xml_root.findtext("./bots/defaultAddBots/totalCount") == "500"
         path = Path(directory) / "raw.jsonl"
         with JsonlRecorder(path, "test-run", "contract") as recorder:
             for latency in (10, 20, 30, 40, 100):

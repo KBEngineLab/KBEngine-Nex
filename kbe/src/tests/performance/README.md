@@ -17,9 +17,13 @@ Watcher 采样默认关闭，并且由控制器进程执行：
 
 ```powershell
 python -B -m performance.run --scenario performance/scenarios/baseline.json `
+  --assets-root D:\path\to\assets `
   --tools-root ../../tools/server `
   --watcher-target BOTS_TYPE=127.0.0.1:11000:root/bots/network/poller
 ```
+
+The scenario `bots` value sets `bots/defaultAddBots/totalCount` in the isolated overlay.
+场景中的 `bots` 值会写入隔离覆盖层的 `bots/defaultAddBots/totalCount`。
 
 Database scenarios are intentionally excluded from this phase.
 本阶段明确不包含数据库场景。
