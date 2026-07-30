@@ -50,7 +50,9 @@ uint32 g_rudp_intReadPacketsQueueSize = 65535;
 uint32 g_rudp_extWritePacketsQueueSize = 65535;
 uint32 g_rudp_extReadPacketsQueueSize = 65535;
 uint32 g_rudp_tickInterval = 10;
-uint32 g_rudp_minRTO = 10;
+// 500 通道 completion 排队会轻易超过 10ms；50ms 下限可抑制伪重传，fast resend 仍负责真实丢包的快速恢复。
+// Completion queuing across 500 channels easily exceeds 10ms; a 50ms floor suppresses spurious retransmits while fast resend still recovers real loss quickly.
+uint32 g_rudp_minRTO = 50;
 uint32 g_rudp_missAcksResend = 1;
 uint32 g_rudp_mtu = 0;
 bool g_rudp_congestionControl = false;

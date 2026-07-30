@@ -119,6 +119,11 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/totals/removedClients", this, &Bots::totalRemovedClients);
 	WATCH_OBJECT("bots/tick/lastMicros", this, &Bots::lastBotsTickMicros);
 	WATCH_OBJECT("bots/tick/maxMicros", this, &Bots::maxBotsTickMicros);
+	// Bots 不经过 ServerApp 的 Watcher 初始化，必须显式暴露客户端 ACK 共用的 UDP completion 队列。
+	// Bots bypasses ServerApp watcher initialization, so explicitly expose the UDP completion queue shared by client ACKs.
+	WATCH_OBJECT("bots/network/poller/udpSendBacklogBytes", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBacklogBytes);
+	WATCH_OBJECT("bots/network/poller/udpSendBacklogPeakBytes", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBacklogPeakBytes);
+	WATCH_OBJECT("bots/network/poller/udpSendBackpressure", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBackpressureCount);
 	return WatchPool::initWatchPools();
 }
 

@@ -182,7 +182,7 @@
 				<external> 128 </external>
 			</writePacketsQueueSize>
 			<tickInterval> 10 </tickInterval>
-			<minRTO> 10 </minRTO>
+			<minRTO> 50 </minRTO>
 			<missAcksResend> 2 </missAcksResend>
 			<mtu> 0 </mtu>
 			<congestionControl> false </congestionControl>

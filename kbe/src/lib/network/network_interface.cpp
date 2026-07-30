@@ -20,6 +20,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include "network_interface.h"
+#include "kcp_send_state.h"
 #ifndef CODE_INLINE
 #include "network_interface.inl"
 #endif
@@ -691,6 +692,58 @@ uint64 NetworkInterface::kcpPendingSegmentCount() const
 }
 
 //-------------------------------------------------------------------------------------
+uint64 NetworkInterface::kcpQueuedSegmentCount() const
+{
+	uint64 queuedSegments = 0;
+	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
+	{
+		const Channel* pChannel = iter->second;
+		if (pChannel != NULL && pChannel->pKCP() != NULL)
+			queuedSegments += static_cast<uint64>(pChannel->pKCP()->nsnd_que);
+	}
+	return queuedSegments;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 NetworkInterface::kcpUnackedSegmentCount() const
+{
+	uint64 unackedSegments = 0;
+	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
+	{
+		const Channel* pChannel = iter->second;
+		if (pChannel != NULL && pChannel->pKCP() != NULL)
+			unackedSegments += static_cast<uint64>(pChannel->pKCP()->nsnd_buf);
+	}
+	return unackedSegments;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 NetworkInterface::kcpAcknowledgedSegmentCount() const
+{
+	uint64 acknowledgedSegments = 0;
+	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
+	{
+		const Channel* pChannel = iter->second;
+		if (pChannel != NULL && pChannel->pKCP() != NULL)
+			acknowledgedSegments += static_cast<uint64>(pChannel->pKCP()->snd_una);
+	}
+	return acknowledgedSegments;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 NetworkInterface::kcpRetransmissionCount() const
+{
+	uint64 retransmissions = 0;
+	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
+	{
+		const Channel* pChannel = iter->second;
+		if (pChannel != NULL && pChannel->pKCP() != NULL)
+			retransmissions += static_cast<uint64>(pChannel->pKCP()->xmit);
+	}
+	return retransmissions;
+}
+
+//-------------------------------------------------------------------------------------
 uint64 NetworkInterface::kcpMaxPendingSegmentsPerChannel() const
 {
 	uint64 maxPendingSegments = 0;
@@ -714,12 +767,41 @@ uint64 NetworkInterface::kcpSendWindowBlockedChannelCount() const
 	{
 		const Channel* pChannel = iter->second;
 		const ikcpcb* pKcp = pChannel != NULL ? pChannel->pKCP() : NULL;
-		// 与 KCPPacketSender 的 admission 水位保持一致，避免 watcher 和真实背压策略使用不同定义。
-		// Match KCPPacketSender's admission watermark so the watcher and actual backpressure policy use one definition.
-		if (pKcp != NULL && ikcp_waitsnd(pKcp) > static_cast<int>(pKcp->snd_wnd * 2))
+		if (pKcp != NULL && KcpSendState(pKcp->nsnd_que, pKcp->nsnd_buf,
+			pKcp->snd_wnd, pKcp->rmt_wnd, pKcp->cwnd, pKcp->nocwnd == 0).isWindowBlocked())
 			++blockedChannels;
 	}
 	return blockedChannels;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 NetworkInterface::kcpAdmissionLimitedChannelCount() const
+{
+	uint64 limitedChannels = 0;
+	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
+	{
+		const Channel* pChannel = iter->second;
+		const ikcpcb* pKcp = pChannel != NULL ? pChannel->pKCP() : NULL;
+		if (pKcp != NULL && KcpSendState(pKcp->nsnd_que, pKcp->nsnd_buf,
+			pKcp->snd_wnd, pKcp->rmt_wnd, pKcp->cwnd, pKcp->nocwnd == 0).isAdmissionLimited())
+		{
+			++limitedChannels;
+		}
+	}
+	return limitedChannels;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 NetworkInterface::kcpRemoteWindowZeroChannelCount() const
+{
+	uint64 zeroWindowChannels = 0;
+	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
+	{
+		const Channel* pChannel = iter->second;
+		if (pChannel != NULL && pChannel->pKCP() != NULL && pChannel->pKCP()->rmt_wnd == 0)
+			++zeroWindowChannels;
+	}
+	return zeroWindowChannels;
 }
 
 //-------------------------------------------------------------------------------------
