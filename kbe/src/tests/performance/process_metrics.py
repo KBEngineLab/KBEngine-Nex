@@ -74,3 +74,53 @@ class ProcessCollector:
         self._previous_time = now
         return ProcessSample(cpu_percent, working_set, threads)
 
+
+class ProcessGroupCollector:
+    """Sample multiple owned processes with one OS query per interval.
+    每个采样周期只执行一次系统查询，避免进程数放大控制器开销。
+    """
+
+    def __init__(self, processes: dict[str, int]):
+        self._collectors = {name: ProcessCollector(pid) for name, pid in processes.items()}
+
+    def sample(self) -> dict[str, ProcessSample]:
+        if os.name != "nt":
+            return {
+                name: sample
+                for name, collector in self._collectors.items()
+                if (sample := collector.sample()) is not None
+            }
+        if not self._collectors:
+            return {}
+        pids = ",".join(str(collector.pid) for collector in self._collectors.values())
+        command = (
+            f"Get-Process -Id {pids} | "
+            "Select-Object Id,CPU,WorkingSet64,@{Name='ThreadCount';Expression={$_.Threads.Count}} | "
+            "ConvertTo-Json -Compress"
+        )
+        try:
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
+                capture_output=True,
+                text=True,
+                timeout=3,
+                check=True,
+            )
+            rows = json.loads(result.stdout)
+            if isinstance(rows, dict):
+                rows = [rows]
+            by_pid = {int(row["Id"]): row for row in rows}
+        except (OSError, ValueError, subprocess.SubprocessError, json.JSONDecodeError, KeyError):
+            return {}
+        samples: dict[str, ProcessSample] = {}
+        for name, collector in self._collectors.items():
+            row = by_pid.get(collector.pid)
+            if row is None:
+                continue
+            samples[name] = collector._finish(
+                float(row.get("CPU") or 0.0),
+                int(row.get("WorkingSet64") or 0),
+                int(row.get("ThreadCount") or 0),
+            )
+        return samples
+

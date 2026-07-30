@@ -124,6 +124,21 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/network/poller/udpSendBacklogBytes", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBacklogBytes);
 	WATCH_OBJECT("bots/network/poller/udpSendBacklogPeakBytes", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBacklogPeakBytes);
 	WATCH_OBJECT("bots/network/poller/udpSendBackpressure", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBackpressureCount);
+	// 聚合目录只复用现有 getter，使性能控制器一次请求取得关键快照，避免高负载时串行查询多个目录放大主线程等待。
+	// The aggregate directory reuses existing getters so one controller request obtains the critical snapshot without serial main-thread waits.
+	WATCH_OBJECT("bots/performance/clientsTotal", this, &Bots::numClients);
+	WATCH_OBJECT("bots/performance/clientsKcp", this, &Bots::numKcpClients);
+	WATCH_OBJECT("bots/performance/clientsTcp", this, &Bots::numTcpClients);
+	WATCH_OBJECT("bots/performance/clientsDestroyed", this, &Bots::numDestroyedClients);
+	WATCH_OBJECT("bots/performance/kcpHandshakeSuccesses", this, &Bots::totalKcpHandshakeSuccesses);
+	WATCH_OBJECT("bots/performance/tcpFallbacks", this, &Bots::totalTcpFallbacks);
+	WATCH_OBJECT("bots/performance/networkErrors", this, &Bots::totalNetworkErrors);
+	WATCH_OBJECT("bots/performance/removedClients", this, &Bots::totalRemovedClients);
+	WATCH_OBJECT("bots/performance/tickLastMicros", this, &Bots::lastBotsTickMicros);
+	WATCH_OBJECT("bots/performance/tickMaxMicros", this, &Bots::maxBotsTickMicros);
+	WATCH_OBJECT("bots/performance/udpSendBacklogBytes", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBacklogBytes);
+	WATCH_OBJECT("bots/performance/udpSendBacklogPeakBytes", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBacklogPeakBytes);
+	WATCH_OBJECT("bots/performance/udpSendBackpressure", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBackpressureCount);
 	return WatchPool::initWatchPools();
 }
 

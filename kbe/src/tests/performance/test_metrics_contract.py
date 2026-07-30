@@ -8,10 +8,11 @@ import xml.etree.ElementTree as ET
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from performance.assets import create_config_overlay
+from performance.assets import create_config_overlay, resolve_bots_schedule, resolve_fixture_root
+from performance.log_metrics import IncrementalLogCollector
 from performance.metrics import JsonlRecorder
 from performance.report import build_summary, load_events, validate_event
-from performance.watcher_metrics import parse_target
+from performance.watcher_metrics import parse_target, resolve_target
 
 
 def main() -> int:
@@ -19,14 +20,38 @@ def main() -> int:
     assert target.component_type == "BOTS_TYPE"
     assert target.port == 11000
     assert target.path.endswith("poller")
+    discovered = parse_target("BOTS_TYPE=@bots:root/bots")
+    assert discovered.component_name == "bots"
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
+        fixture = resolve_fixture_root("network-baseline")
+        assert fixture is not None and (fixture / "entity_defs/Avatar.def").is_file()
+        tick_time, tick_count = resolve_bots_schedule({"connect_rate_per_second": 25}, 500)
+        assert tick_time == 0.08 and tick_count == 2
+        assert resolve_bots_schedule({}, 500) == (0.1, 50)
+        log_root = root / "logs"
+        log_root.mkdir()
+        (log_root / "machine.log").write_text(
+            "componentType:bots, intaddr:127.0.0.1, intport:13501\n",
+            encoding="utf-8",
+        )
+        resolved = resolve_target(discovered, [log_root])
+        assert resolved.host == "127.0.0.1" and resolved.port == 13501
         assets = root / "assets/res/server"
         assets.mkdir(parents=True)
         (assets / "kbengine.xml").write_text("<root><bots /></root>\n", encoding="utf-8")
-        overlay = create_config_overlay(root / "assets", root / "run", 500)
+        overlay = create_config_overlay(root / "assets", root / "run", 500, external_receive_messages=1024, external_receive_bytes=1048576)
         xml_root = ET.parse(overlay).getroot()
         assert xml_root.findtext("./bots/defaultAddBots/totalCount") == "500"
+        assert xml_root.findtext("./channelCommon/windowOverflow/receive/messages/external") == "1024"
+        assert xml_root.findtext("./channelCommon/windowOverflow/receive/bytes/external") == "1048576"
+        log_path = root / "streamed.log"
+        log_path.write_text("ordinary line\nWARNING split across chunks\nERROR final\n", encoding="utf-8")
+        log_collector = IncrementalLogCollector(root)
+        log_collector.READ_CHUNK_CHARS = 7
+        log_counts = log_collector.sample()
+        assert log_counts["warning"] == 1 and log_counts["error"] == 1
+        assert log_collector.sample()["warning"] == 0
         path = Path(directory) / "raw.jsonl"
         with JsonlRecorder(path, "test-run", "contract") as recorder:
             for latency in (10, 20, 30, 40, 100):
@@ -42,6 +67,17 @@ def main() -> int:
         assert summary["requests"]["success"] == 4
         assert summary["requests"]["failures"] == 1
         assert summary["counters"]["request.slow.count"] == 1
+        assert summary["quality"]["status"] == "BLOCKER"
+        recorder_path = root / "samples.jsonl"
+        with JsonlRecorder(recorder_path, "test-run", "contract") as recorder:
+            recorder.record_sample("watcher", "BOTS_TYPE", "bots/tick/lastMicros", 1000, "micros")
+            recorder.record_sample("watcher", "BOTS_TYPE", "bots/tick/lastMicros", 3000, "micros")
+            recorder.record_sample("watcher", "BOTS_TYPE", "bots/performance/tickMaxMicros", 100000, "micros")
+        sampled = build_summary(load_events(recorder_path), {"tick_p99_max_ms": 2.0})
+        assert sampled["samples"]["watcher.BOTS_TYPE.bots/tick/lastMicros"]["count"] == 2
+        assert sampled["samples"]["watcher.BOTS_TYPE.bots/tick/lastMicros"]["p99"] > 2000
+        assert sampled["quality"]["status"] == "SLOW"
+        assert all("tickMaxMicros" not in item for item in sampled["quality"]["slow"])
     print("PERFORMANCE_METRICS_CONTRACT_TEST_PASS")
     return 0
 

@@ -1,0 +1,16 @@
+<root>
+    <Volatile>
+        <position />
+        <yaw />
+        <pitch />
+        <roll />
+    </Volatile>
+    <Properties />
+    <ClientMethods />
+    <BaseMethods>
+        <createCell>
+            <Arg>ENTITYCALL</Arg>
+        </createCell>
+    </BaseMethods>
+    <CellMethods />
+</root>

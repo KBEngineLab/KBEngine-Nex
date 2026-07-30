@@ -1,0 +1,10 @@
+<root>
+    <Properties />
+    <ClientMethods />
+    <BaseMethods>
+        <loginToSpace>
+            <Arg>ENTITYCALL</Arg>
+        </loginToSpace>
+    </BaseMethods>
+    <CellMethods />
+</root>

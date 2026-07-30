@@ -32,8 +32,15 @@ def validate_event(event: dict[str, Any]) -> None:
         raise ValueError(f"unsupported metric schema: {event['schema_version']}")
 
 
-def build_summary(events: Iterable[dict[str, Any]]) -> dict[str, Any]:
+def build_summary(
+    events: Iterable[dict[str, Any]],
+    thresholds: dict[str, Any] | None = None,
+    readiness: dict[str, Any] | None = None,
+    configured_bots: int = 0,
+) -> dict[str, Any]:
     latency: dict[str, LatencyHistogram] = defaultdict(LatencyHistogram)
+    samples: dict[str, LatencyHistogram] = defaultdict(LatencyHistogram)
+    sample_units: dict[str, str] = {}
     counters: Counter[str] = Counter()
     gauges: dict[str, float] = {}
     metadata: dict[str, str] = {}
@@ -43,6 +50,10 @@ def build_summary(events: Iterable[dict[str, Any]]) -> dict[str, Any]:
         operation = str(tags.get("operation", "default"))
         if metric == "request.latency":
             latency[operation].observe(float(event["value"]))
+        elif tags.get("kind") == "sample":
+            sample_key = f"{event['component']}.{event['instance']}.{metric}"
+            samples[sample_key].observe(float(event["value"]))
+            sample_units.setdefault(sample_key, str(event.get("unit", "")))
         elif metric.startswith("log.") or tags.get("kind") == "counter":
             counters[metric] += int(float(event["value"]))
         elif isinstance(event["value"], (int, float)):
@@ -52,9 +63,13 @@ def build_summary(events: Iterable[dict[str, Any]]) -> dict[str, Any]:
     success = counters.get("request.success.count", 0)
     failures = counters.get("request.error.count", 0) + counters.get("request.timeout.count", 0)
     total_requests = success + failures
-    return {
+    summary = {
         **metadata,
         "latency": {operation: histogram.summary() for operation, histogram in sorted(latency.items())},
+        "samples": {
+            name: {**histogram.distribution(), "unit": sample_units.get(name, "")}
+            for name, histogram in sorted(samples.items())
+        },
         "counters": dict(sorted(counters.items())),
         "gauges": dict(sorted(gauges.items())),
         "requests": {
@@ -64,6 +79,100 @@ def build_summary(events: Iterable[dict[str, Any]]) -> dict[str, Any]:
             "success_rate_percent": (success / total_requests * 100.0) if total_requests else 0.0,
         },
     }
+    summary["quality"] = evaluate_quality(
+        summary,
+        thresholds or {},
+        readiness or {},
+        configured_bots,
+    )
+    return summary
+
+
+def evaluate_quality(
+    summary: dict[str, Any],
+    thresholds: dict[str, Any],
+    readiness: dict[str, Any],
+    configured_bots: int,
+) -> dict[str, Any]:
+    """Classify observed results without hiding missing business traffic.
+    按观测结果分类；没有请求事件时明确保持 UNKNOWN，而不是伪造成功率。
+    """
+    blockers: list[str] = []
+    slow: list[str] = []
+    request_result = summary.get("requests", {})
+    minimum_success = float(thresholds.get("success_rate_min_percent", 99.0))
+    if request_result.get("total", 0) and request_result.get("success_rate_percent", 0.0) < minimum_success:
+        blockers.append(f"request success rate below {minimum_success:.3f}%")
+    process_exits = int(summary.get("counters", {}).get("process.exit.count", 0))
+    if process_exits > 0:
+        blockers.append(f"workload process exits={process_exits}")
+    readiness_failures = int(summary.get("counters", {}).get("readiness.failure.count", 0))
+    if readiness_failures > 0:
+        blockers.append(f"workload readiness failures={readiness_failures}")
+    max_protocol_errors = int(thresholds.get("max_protocol_errors", 0))
+    protocol_errors = sum(
+        value
+        for metric, value in summary.get("counters", {}).items()
+        if "protocol" in metric.lower() or "not_found_msgid" in metric.lower()
+    )
+    if protocol_errors > max_protocol_errors:
+        blockers.append(f"protocol errors={protocol_errors} > {max_protocol_errors}")
+    max_destroyed = int(thresholds.get("max_unexpected_entity_destroyed", 0))
+    destroyed = sum(value for metric, value in summary.get("counters", {}).items() if "destroy" in metric.lower())
+    destroyed += sum(
+        int(values["max"])
+        for metric, values in summary.get("samples", {}).items()
+        if "destroy" in metric.lower()
+    )
+    if destroyed > max_destroyed:
+        blockers.append(f"destroyed entities={destroyed} > {max_destroyed}")
+    network_errors = sum(
+        int(values["max"])
+        for metric, values in summary.get("samples", {}).items()
+        if "networkerrors" in metric.lower()
+    )
+    if network_errors > 0:
+        blockers.append(f"Bots network errors={network_errors}")
+    max_log_errors = int(thresholds.get("max_log_errors", 0))
+    log_errors = int(summary.get("counters", {}).get("log.error.count", 0))
+    if log_errors > max_log_errors:
+        blockers.append(f"log errors={log_errors} > {max_log_errors}")
+    for metric in ("log.resource_unavailable.count", "log.abnormal_exit.count"):
+        value = int(summary.get("counters", {}).get(metric, 0))
+        if value > 0:
+            blockers.append(f"{metric}={value}")
+    for metric, expected in readiness.items():
+        expected_value = configured_bots if expected == "$bots" else expected
+        matches = [
+            values
+            for name, values in summary.get("samples", {}).items()
+            if name.endswith(f".{metric}")
+        ]
+        if not matches:
+            blockers.append(f"readiness metric was not sampled: {metric}")
+        elif any(values["min"] != expected_value for values in matches):
+            minimum = min(values["min"] for values in matches)
+            blockers.append(f"readiness metric dropped: {metric} min={minimum}, expected={expected_value}")
+
+    p99_limit = float(thresholds.get("request_latency_p99_max_ms", 0.0))
+    if p99_limit > 0:
+        for operation, values in summary.get("latency", {}).items():
+            if values["p99_ms"] > p99_limit:
+                slow.append(f"{operation} p99={values['p99_ms']:.2f}ms > {p99_limit:.2f}ms")
+    tick_limit = float(thresholds.get("tick_p99_max_ms", 0.0))
+    if tick_limit > 0:
+        for name, values in summary.get("samples", {}).items():
+            metric_leaf = name.rsplit("/", 1)[-1].lower()
+            # 累计 tickMaxMicros 包含就绪与预热阶段，不能伪装成测量窗口分位数；质量门只读取逐次 Tick 样本。
+            # Cumulative tickMaxMicros includes readiness and warmup, so only per-tick samples may drive the window P99 gate.
+            is_tick_sample = "tick" in name.lower() and metric_leaf in ("lastmicros", "ticklastmicros")
+            if is_tick_sample and values.get("unit") == "micros" and values["p99"] / 1000.0 > tick_limit:
+                slow.append(f"{name} p99={values['p99'] / 1000.0:.2f}ms > {tick_limit:.2f}ms")
+
+    status = "BLOCKER" if blockers else "SLOW" if slow else "PASS"
+    if not request_result.get("total", 0) and not blockers and not slow:
+        status = "UNKNOWN"
+    return {"status": status, "blockers": blockers, "slow": slow}
 
 
 def write_report(summary: dict[str, Any], json_path: Path, markdown_path: Path) -> None:
@@ -90,6 +199,17 @@ def write_report(summary: dict[str, Any], json_path: Path, markdown_path: Path) 
         lines.append(
             "| {0} | {count} | {p50_ms:.2f} | {p95_ms:.2f} | {p99_ms:.2f} | {p999_ms:.2f} | {max_ms:.2f} |".format(operation, **values)
         )
+    lines.extend(["", "## Quality", "", f"- Status: `{summary.get('quality', {}).get('status', 'UNKNOWN')}`"])
+    if summary.get("failure"):
+        lines.append(f"- Failure phase: `{summary['failure'].get('phase', '')}`")
+        lines.append(f"- Failure: {summary['failure'].get('message', '')}")
+    for item in summary.get("quality", {}).get("blockers", []):
+        lines.append(f"- BLOCKER: {item}")
+    for item in summary.get("quality", {}).get("slow", []):
+        lines.append(f"- SLOW: {item}")
+    lines.extend(["", "## Samples", "", "| Metric | Count | Min | P99 | Max | Unit |", "| --- | ---: | ---: | ---: | ---: | --- |"])
+    for metric, values in summary.get("samples", {}).items():
+        lines.append(f"| `{metric}` | {values['count']} | {values['min']:.2f} | {values['p99']:.2f} | {values['max']:.2f} | {values['unit']} |")
     lines.extend(["", "## Counters", "", "| Metric | Value |", "| --- | ---: |"])
     for metric, value in summary.get("counters", {}).items():
         lines.append(f"| `{metric}` | {value} |")

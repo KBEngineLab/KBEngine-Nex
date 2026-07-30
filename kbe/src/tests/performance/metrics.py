@@ -88,11 +88,26 @@ class JsonlRecorder:
         tags = {"operation": operation}
         if error_code:
             tags["error_code"] = error_code
-        self.record("bots", instance, "request.latency", latency, "ms", tags)
+        self.record(component, instance, "request.latency", latency, "ms", tags)
         result_metric = "request.success.count" if success else "request.error.count"
-        self.record("bots", instance, result_metric, 1, "count", {"kind": "counter", **tags})
+        self.record(component, instance, result_metric, 1, "count", {"kind": "counter", **tags})
         if slow_threshold_ms is not None and latency > slow_threshold_ms:
-            self.record("bots", instance, "request.slow.count", 1, "count", {"kind": "counter", **tags})
+            self.record(component, instance, "request.slow.count", 1, "count", {"kind": "counter", **tags})
+
+    def record_sample(
+        self,
+        component: str,
+        instance: str,
+        metric: str,
+        value: float | int,
+        unit: str = "",
+        tags: dict[str, str] | None = None,
+    ) -> None:
+        """Record a time-series sample without treating it as a final gauge.
+        将时间序列样本写入事件流，避免报告只保留最后一次采样值。
+        """
+        sample_tags = {"kind": "sample", **(tags or {})}
+        self.record(component, instance, metric, value, unit, sample_tags)
 
     def close(self) -> None:
         self._stream.close()
@@ -145,6 +160,21 @@ class LatencyHistogram:
             "p99_ms": self.percentile(99),
             "p999_ms": self.percentile(99.9),
             "max_ms": max(self._samples, default=0.0),
+        }
+
+    def distribution(self) -> dict[str, float | int]:
+        """Return a unit-neutral distribution for CPU, bytes, counts, or time.
+        返回可用于 CPU、字节、计数或时间的单位无关分布。
+        """
+        return {
+            "count": self.count,
+            "sampled": len(self._samples),
+            "p50": self.percentile(50),
+            "p95": self.percentile(95),
+            "p99": self.percentile(99),
+            "p999": self.percentile(99.9),
+            "min": min(self._samples, default=0.0),
+            "max": max(self._samples, default=0.0),
         }
 
 

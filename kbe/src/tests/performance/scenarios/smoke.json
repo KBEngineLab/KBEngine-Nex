@@ -1,8 +1,17 @@
 {
   "name": "smoke",
+  "fixture": "network-baseline",
   "duration_seconds": 300,
   "bots": 50,
   "connect_rate_per_second": 10,
+  "warmup_seconds": 5,
+  "external_receive_messages": 1024,
+  "external_receive_bytes": 1048576,
+  "readiness": {
+    "root/bots/performance/clientsTotal": "$bots",
+    "root/bots/performance/clientsKcp": "$bots",
+    "root/witness/active": "$bots"
+  },
   "operation_mix": {
     "login": 0.2,
     "heartbeat": 0.6,

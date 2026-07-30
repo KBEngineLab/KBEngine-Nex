@@ -12,12 +12,29 @@ import time
 import uuid
 from pathlib import Path
 
-from .assets import build_environment, create_config_overlay, write_scenario_metadata
+from .assets import (
+    build_environment,
+    create_config_overlay,
+    resolve_bots_schedule,
+    resolve_fixture_root,
+    write_scenario_metadata,
+)
+from .cluster import PerformanceCluster
 from .log_metrics import IncrementalLogCollector
-from .metrics import JsonlRecorder, LatencyHistogram
-from .process_metrics import ProcessCollector
+from .metrics import JsonlRecorder, monotonic_milliseconds
+from .process_metrics import ProcessGroupCollector
 from .report import build_summary, load_events, write_report
-from .watcher_metrics import WatcherCollector, parse_target
+from .watcher_metrics import WatcherCollector, WatcherTarget, parse_target, resolve_target
+
+
+class WorkloadReadinessError(RuntimeError):
+    """Readiness failure carrying the last complete Watcher snapshot.
+    携带最后一份完整 Watcher 快照的就绪失败。
+    """
+
+    def __init__(self, message: str, observed: dict[str, object] | None = None):
+        super().__init__(message)
+        self.observed = dict(observed or {})
 
 
 def parse_args() -> argparse.Namespace:
@@ -31,13 +48,35 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--assets-root", type=Path, help="Read-only game assets used for the isolated config overlay")
     parser.add_argument("--bots", type=int, help="Override the scenario Bots count")
     parser.add_argument("--tools-root", type=Path, help="kbe/tools/server root for Watcher queries")
-    parser.add_argument("--watcher-target", action="append", default=[], metavar="TYPE=HOST:PORT:PATH")
+    parser.add_argument("--watcher-target", action="append", default=[], metavar="TYPE=HOST:PORT:PATH|TYPE=@COMPONENT:PATH")
+    parser.add_argument("--watcher-timeout", type=float, default=2.0)
+    parser.add_argument("--workload-ready-timeout", type=float, default=60.0)
+    parser.add_argument("--thresholds", type=Path, help="Quality thresholds JSON; defaults to the scenario reference")
+    parser.add_argument("--start-cluster", action="store_true", help="Start and own an isolated nine-component server cluster")
+    parser.add_argument("--cluster-components", help="Pipe-separated NAME::EXE::CID::GUS component specification")
+    parser.add_argument("--cluster-binary-root", type=Path, help="CMake build root used for isolated cluster runtime files")
+    parser.add_argument("--cluster-startup-timeout", type=int, default=90)
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    # 子进程切换到隔离目录前冻结所有用户路径，避免相对 KBE_RES_PATH 随 cwd 失效。
+    # Freeze every user path before child processes change cwd so relative KBE_RES_PATH entries remain valid.
+    args.scenario = args.scenario.resolve()
+    args.output_root = args.output_root.resolve()
+    if args.assets_root:
+        args.assets_root = args.assets_root.resolve()
+    if args.tools_root:
+        args.tools_root = args.tools_root.resolve()
+    if args.log_root:
+        args.log_root = args.log_root.resolve()
+    if args.thresholds:
+        args.thresholds = args.thresholds.resolve()
+    if args.cluster_binary_root:
+        args.cluster_binary_root = args.cluster_binary_root.resolve()
     scenario = json.loads(args.scenario.read_text(encoding="utf-8"))
+    fixture_root = resolve_fixture_root(str(scenario["fixture"])) if scenario.get("fixture") else None
     name = str(scenario["name"])
     duration = float(args.duration if args.duration is not None else scenario.get("duration_seconds", 30))
     configured_bots = int(args.bots if args.bots is not None else scenario.get("bots", 0))
@@ -47,57 +86,161 @@ def main() -> int:
     output.mkdir(parents=True, exist_ok=True)
     environment = None
     if args.assets_root:
+        bots_tick_time, bots_tick_count = resolve_bots_schedule(scenario, configured_bots)
         create_config_overlay(
             args.assets_root,
             output,
             configured_bots,
-            float(scenario.get("bots_tick_time", 0.1)),
-            int(scenario["bots_tick_count"]) if "bots_tick_count" in scenario else None,
+            bots_tick_time,
+            bots_tick_count,
+            int(scenario["external_receive_messages"]) if "external_receive_messages" in scenario else None,
+            int(scenario["external_receive_bytes"]) if "external_receive_bytes" in scenario else None,
         )
-        environment = build_environment(_repository_root(), args.assets_root, output)
-        write_scenario_metadata(output, scenario, configured_bots)
+        environment = build_environment(_repository_root(), args.assets_root, output, fixture_root)
+        scenario_metadata = dict(scenario)
+        scenario_metadata["effective_bots_tick_time"] = bots_tick_time
+        scenario_metadata["effective_bots_tick_count"] = bots_tick_count
+        write_scenario_metadata(output, scenario_metadata, configured_bots)
     elif args.command and configured_bots > 0:
         raise ValueError("--assets-root is required when starting a scenario with Bots")
-    process = start_command(args.command, environment, output)
-    process_collector = ProcessCollector(process.pid) if process else None
-    log_collector = IncrementalLogCollector(args.log_root) if args.log_root else None
-    watcher_collector = WatcherCollector(args.tools_root) if args.tools_root and args.watcher_target else None
+    cluster = None
+    owned_processes: dict[str, int] = {}
+    if args.start_cluster:
+        if not args.assets_root or not args.cluster_components or not args.cluster_binary_root:
+            raise ValueError("--start-cluster requires --assets-root, --cluster-components and --cluster-binary-root")
+        cluster = PerformanceCluster(
+            _repository_root(),
+            args.assets_root,
+            args.cluster_binary_root,
+            args.cluster_binary_root / "Testing" / f"performance-cluster-{run_id}",
+            args.cluster_components,
+            output / "config-overlay/res",
+            fixture_root,
+            args.cluster_startup_timeout,
+        )
+        owned_processes.update({f"cluster:{item.name}": item.pid for item in cluster.start()})
+    try:
+        process = start_command(args.command, environment, output)
+    except Exception:
+        if cluster is not None:
+            cluster.stop()
+        raise
+    if process:
+        owned_processes["workload"] = process.pid
+    process_collector = ProcessGroupCollector(owned_processes) if owned_processes else None
+    log_roots = {output.resolve()}
+    if args.log_root:
+        log_roots.add(args.log_root.resolve())
+    if cluster is not None:
+        log_roots.add((cluster.run_root / "server/logs").resolve())
+    log_collectors = [IncrementalLogCollector(path) for path in sorted(log_roots)]
+    watcher_collector = WatcherCollector(args.tools_root, args.watcher_timeout) if args.tools_root and args.watcher_target else None
     watcher_targets = [parse_target(value) for value in args.watcher_target]
     events_path = output / "raw.jsonl"
-    try:
-        with JsonlRecorder(events_path, run_id, name) as recorder:
+    readiness_failure: WorkloadReadinessError | None = None
+    with JsonlRecorder(events_path, run_id, name) as recorder:
+        try:
+            watcher_targets = wait_for_workload_ready(
+                process,
+                watcher_collector,
+                watcher_targets,
+                list(log_roots),
+                max(float(args.workload_ready_timeout), 1.0),
+                dict(scenario.get("readiness", {})),
+                configured_bots,
+            )
+            wait_for_warmup(process, max(float(scenario.get("warmup_seconds", 0.0)), 0.0))
             started = time.monotonic()
+            next_sample = started
             while time.monotonic() - started < duration:
                 if process and process.poll() is not None:
-                    recorder.record("runner", "workload", "process.exit.count", 1, "count")
+                    recorder.record("runner", "workload", "process.exit.count", 1, "count", {"kind": "counter"})
                     break
                 if process_collector:
-                    sample = process_collector.sample()
-                    if sample:
-                        recorder.record("process", str(process.pid), "cpu.percent", sample.cpu_percent, "%")
-                        recorder.record("process", str(process.pid), "memory.working_set", sample.working_set_bytes, "bytes")
-                        recorder.record("process", str(process.pid), "threads.active", sample.thread_count, "count")
-                if log_collector:
-                    for metric, value in log_collector.sample().items():
-                        recorder.record("logs", "all", f"log.{metric}.count", value, "count")
+                    record_process_samples(recorder, process_collector)
                 if watcher_collector:
                     for target in watcher_targets:
+                        request_started_ms = monotonic_milliseconds()
+                        operation = f"watcher:{target.component_type}:{target.path}"
                         try:
                             values = watcher_collector.query(target)
                         except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
+                            recorder.record_request_latency(
+                                "watcher",
+                                target.component_type,
+                                operation,
+                                request_started_ms,
+                                monotonic_milliseconds(),
+                                False,
+                                type(exc).__name__,
+                                float(scenario.get("slow_request_threshold_ms", 0.0)) or None,
+                            )
                             recorder.record("watcher", target.component_type, "query.error.count", 1, "count", {"kind": "counter", "error": type(exc).__name__})
                             continue
+                        recorder.record_request_latency(
+                            "watcher",
+                            target.component_type,
+                            operation,
+                            request_started_ms,
+                            monotonic_milliseconds(),
+                            True,
+                            slow_threshold_ms=float(scenario.get("slow_request_threshold_ms", 0.0)) or None,
+                        )
                         for metric, value in values.items():
                             if isinstance(value, (int, float)):
-                                recorder.record("watcher", target.component_type, metric, value, "")
+                                metric_name = f"{target.path}/{metric}".replace("//", "/")
+                                recorder.record_sample(
+                                    "watcher",
+                                    target.component_type,
+                                    metric_name,
+                                    value,
+                                    watcher_unit(metric_name),
+                                )
                 recorder.flush()
-                time.sleep(interval)
-    finally:
-        stop_process(process)
-    summary = build_summary(load_events(events_path))
+                next_sample += interval
+                delay = next_sample - time.monotonic()
+                if delay > 0:
+                    time.sleep(delay)
+                elif delay < -interval:
+                    next_sample = time.monotonic()
+        except WorkloadReadinessError as exc:
+            readiness_failure = exc
+            recorder.record(
+                "runner",
+                "workload",
+                "readiness.failure.count",
+                1,
+                "count",
+                {"kind": "counter", "error": type(exc).__name__},
+            )
+            for metric, value in sorted(exc.observed.items()):
+                if isinstance(value, (int, float)):
+                    recorder.record_sample("readiness", "workload", metric, value, watcher_unit(metric))
+            if process_collector:
+                record_process_samples(recorder, process_collector)
+        finally:
+            # 先停止本轮进程再读取日志，保证文件内容闭合且扫描开销不污染测量窗口。
+            # Stop owned processes before reading logs so files are complete and scan cost cannot perturb the measured window.
+            stop_process(process)
+            process = None
+            if cluster is not None:
+                cluster.stop()
+                cluster = None
+            for log_collector in log_collectors:
+                for metric, value in log_collector.sample().items():
+                    recorder.record("logs", str(log_collector.root), f"log.{metric}.count", value, "count")
+            recorder.flush()
+    summary = build_summary(
+        load_events(events_path),
+        load_thresholds(args.scenario, scenario, args.thresholds),
+        dict(scenario.get("readiness", {})),
+        configured_bots,
+    )
+    if readiness_failure is not None:
+        summary["failure"] = {"phase": "readiness", "message": str(readiness_failure)}
     write_report(summary, output / "summary.json", output / "report.md")
     print(json.dumps({"run_id": run_id, "output": str(output), "summary": summary}, ensure_ascii=True))
-    return 0
+    return 1 if readiness_failure is not None else 0
 
 
 def start_command(
@@ -110,17 +253,118 @@ def start_command(
     args = shlex.split(command, posix=os.name != "nt")
     if not args:
         return None
-    return subprocess.Popen(
-        args,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        env=environment,
-        cwd=working_directory,
-    )
+    stdout_handle = None
+    stderr_handle = None
+    if working_directory is not None:
+        stdout_handle = (working_directory / "workload.stdout.log").open("wb")
+        stderr_handle = (working_directory / "workload.stderr.log").open("wb")
+    try:
+        return subprocess.Popen(
+            args,
+            stdout=stdout_handle or subprocess.DEVNULL,
+            stderr=stderr_handle or subprocess.DEVNULL,
+            env=environment,
+            cwd=working_directory,
+        )
+    finally:
+        if stdout_handle is not None:
+            stdout_handle.close()
+        if stderr_handle is not None:
+            stderr_handle.close()
 
 
 def _repository_root() -> Path:
     return Path(__file__).resolve().parents[4]
+
+
+def load_thresholds(scenario_path: Path, scenario: dict[str, object], explicit: Path | None) -> dict[str, object]:
+    path = explicit
+    if path is None and scenario.get("thresholds"):
+        path = scenario_path.parent / str(scenario["thresholds"])
+    if path is None:
+        return {}
+    return json.loads(path.resolve().read_text(encoding="utf-8"))
+
+
+def watcher_unit(metric: str) -> str:
+    lowered = metric.lower()
+    if lowered.endswith("micros"):
+        return "micros"
+    if "bytes" in lowered:
+        return "bytes"
+    if any(token in lowered for token in ("count", "total", "clients", "destroyed", "errors")):
+        return "count"
+    return ""
+
+
+def record_process_samples(recorder: JsonlRecorder, collector: ProcessGroupCollector) -> None:
+    """Record one batch obtained by the collector's single OS query.
+    记录采集器通过一次系统查询取得的一批进程快照。
+    """
+    for process_name, sample in collector.sample().items():
+        recorder.record_sample("process", process_name, "cpu.percent", sample.cpu_percent, "%")
+        recorder.record_sample("process", process_name, "memory.working_set", sample.working_set_bytes, "bytes")
+        recorder.record_sample("process", process_name, "threads.active", sample.thread_count, "count")
+
+
+def wait_for_workload_ready(
+    process: subprocess.Popen[bytes] | None,
+    watcher_collector: WatcherCollector | None,
+    watcher_targets: list[WatcherTarget],
+    log_roots: list[Path],
+    timeout_seconds: float,
+    readiness: dict[str, object],
+    configured_bots: int,
+) -> list[WatcherTarget]:
+    """Exclude process and Watcher startup from the measured request window.
+    将进程和 Watcher 启动期排除在请求成功率与延迟窗口之外。
+    """
+    if process is None or watcher_collector is None or not watcher_targets:
+        return watcher_targets
+    deadline = time.monotonic() + timeout_seconds
+    last_error: Exception | None = None
+    last_observed: dict[str, object] = {}
+    while time.monotonic() < deadline:
+        result = process.poll()
+        if result is not None:
+            raise WorkloadReadinessError(
+                f"workload exited before readiness with code {result}",
+                last_observed,
+            )
+        try:
+            resolved_targets = [resolve_target(target, log_roots) for target in watcher_targets]
+            observed: dict[str, object] = {}
+            for target in resolved_targets:
+                values = watcher_collector.query(target)
+                observed.update(
+                    {
+                        f"{target.path}/{metric}".replace("//", "/"): value
+                        for metric, value in values.items()
+                    }
+                )
+            last_observed = observed
+            for metric, expected in readiness.items():
+                expected_value = configured_bots if expected == "$bots" else expected
+                if observed.get(metric) != expected_value:
+                    raise RuntimeError(
+                        f"readiness {metric}={observed.get(metric)!r}, expected={expected_value!r}"
+                    )
+            return resolved_targets
+        except (LookupError, OSError, RuntimeError, TimeoutError, ValueError) as exc:
+            last_error = exc
+            time.sleep(0.25)
+    raise WorkloadReadinessError(
+        f"workload readiness timed out after {timeout_seconds:.1f}s: {last_error}",
+        last_observed,
+    )
+
+
+def wait_for_warmup(process: subprocess.Popen[bytes] | None, seconds: float) -> None:
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if process is not None and process.poll() is not None:
+            raise RuntimeError(f"workload exited during warmup with code {process.returncode}")
+        time.sleep(min(0.25, max(deadline - time.monotonic(), 0.0)))
 
 
 def stop_process(process: subprocess.Popen[bytes] | None) -> None:

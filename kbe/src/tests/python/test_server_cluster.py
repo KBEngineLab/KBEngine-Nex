@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import json
 import os
 from pathlib import Path
 import re
@@ -25,6 +26,14 @@ def parse_arguments():
     parser.add_argument("--components", required=True)
     parser.add_argument("--repository-root", type=Path, required=True)
     parser.add_argument("--assets-root", type=Path, required=True)
+    parser.add_argument("--config-overlay", type=Path)
+    parser.add_argument(
+        "--resource-overlay",
+        action="append",
+        default=[],
+        type=Path,
+        help="Prepend a read-only resource root before the game assets",
+    )
     parser.add_argument("--binary-root", type=Path, required=True)
     parser.add_argument("--run-root", type=Path, required=True)
     parser.add_argument("--database-type", choices=("mysql", "mongodb", "postgresql"))
@@ -34,6 +43,11 @@ def parse_arguments():
     parser.add_argument("--database-username")
     parser.add_argument("--database-password", default="")
     parser.add_argument("--startup-timeout-seconds", type=int, default=90)
+    parser.add_argument(
+        "--hold-until-file",
+        type=Path,
+        help="Keep the ready cluster alive until this file exists; used by external test controllers",
+    )
     args = parser.parse_args()
 
     if not 10 <= args.startup_timeout_seconds <= 150:
@@ -43,6 +57,8 @@ def parse_arguments():
             parser.error("--database-port must be between 1 and 65535")
         if not args.database_name or not args.database_username:
             parser.error("database tests require --database-name and --database-username")
+    if args.database_type and args.config_overlay:
+        parser.error("--database-type and --config-overlay cannot be combined")
     return args
 
 
@@ -208,9 +224,43 @@ def stop_processes(entries):
             entry["stderr_handle"].close()
 
 
+def write_component_manifest(entries, run_root):
+    """Publish owned child PIDs so an external controller can sample only this cluster.
+    发布本轮子进程 PID，使外部控制器只采样自己启动的集群。
+    """
+    manifest = [
+        {"name": entry["spec"]["name"], "pid": entry["process"].pid}
+        for entry in entries
+    ]
+    (run_root / "components.json").write_text(
+        json.dumps(manifest, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def hold_ready_cluster(entries, stop_file):
+    stop_file = normalized(stop_file)
+    while not stop_file.exists():
+        for entry in entries:
+            result = entry["process"].poll()
+            if result is not None:
+                raise RuntimeError(
+                    f"{entry['spec']['name']} exited while cluster was held with code {result}"
+                )
+        time.sleep(0.25)
+
+
 def run_cluster(args):
     args.repository_root = normalized(args.repository_root)
     args.assets_root = normalized(args.assets_root)
+    if args.config_overlay:
+        args.config_overlay = normalized(args.config_overlay)
+        if not (args.config_overlay / "server/kbengine.xml").is_file():
+            raise RuntimeError(f"config overlay does not contain server/kbengine.xml: {args.config_overlay}")
+    args.resource_overlay = [normalized(path) for path in args.resource_overlay]
+    for path in args.resource_overlay:
+        if not path.is_dir():
+            raise RuntimeError(f"resource overlay does not exist: {path}")
     args.binary_root = normalized(args.binary_root)
     args.run_root = normalized(args.run_root)
     require_owned_run_root(args.run_root, args.binary_root)
@@ -221,6 +271,9 @@ def run_cluster(args):
     args.run_root.mkdir(parents=True)
 
     resource_roots = []
+    if args.config_overlay:
+        resource_roots.append(args.config_overlay)
+    resource_roots.extend(args.resource_overlay)
     if args.database_type:
         # 数据库覆盖只写构建树并排在原 assets 前面，保证源资产只读且覆盖项优先命中。
         # The database overlay stays in the build tree and precedes source assets, keeping them read-only while giving overrides priority.
@@ -310,6 +363,10 @@ def run_cluster(args):
 
         database_result = f" database={args.database_type}" if args.database_type else ""
         print(f"SERVER_CLUSTER_PASS components={len(entries)}{database_result}", flush=True)
+        write_component_manifest(entries, args.run_root)
+        if args.hold_until_file:
+            print(f"SERVER_CLUSTER_READY stop_file={normalized(args.hold_until_file)}", flush=True)
+            hold_ready_cluster(entries, args.hold_until_file)
     finally:
         stop_processes(entries)
 

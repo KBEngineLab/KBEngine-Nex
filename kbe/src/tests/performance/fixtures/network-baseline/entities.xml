@@ -1,0 +1,6 @@
+<root>
+    <!-- This fixture intentionally models only the connection-to-Witness lifecycle. -->
+    <Account hasClient="true" />
+    <Avatar hasCell="true" hasBase="true" hasClient="true" />
+    <Space hasCell="true" hasBase="true" />
+</root>

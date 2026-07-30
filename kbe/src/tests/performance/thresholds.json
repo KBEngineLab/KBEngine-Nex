@@ -3,6 +3,7 @@
   "request_latency_p99_max_ms": 200.0,
   "tick_p99_max_ms": 50.0,
   "blocker_consecutive_samples": 10,
+  "max_log_errors": 0,
   "max_unexpected_entity_destroyed": 0,
   "max_protocol_errors": 0
 }

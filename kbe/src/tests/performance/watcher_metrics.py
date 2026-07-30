@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import time
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -15,16 +16,53 @@ class WatcherTarget:
     host: str
     port: int
     path: str
+    component_name: str = ""
 
 
 def parse_target(value: str) -> WatcherTarget:
-    """Parse TYPE=HOST:PORT:PATH. / 解析 TYPE=HOST:PORT:PATH。"""
+    """Parse TYPE=HOST:PORT:PATH or TYPE=@COMPONENT:PATH.
+    解析 TYPE=HOST:PORT:PATH 或 TYPE=@COMPONENT:PATH。
+    """
     try:
         component_type, endpoint = value.split("=", 1)
+        if endpoint.startswith("@"):
+            component_name, path = endpoint[1:].split(":", 1)
+            if not component_name or not path:
+                raise ValueError
+            return WatcherTarget(component_type, "", 0, path, component_name)
         host, port, path = endpoint.split(":", 2)
         return WatcherTarget(component_type, host, int(port), path)
     except (ValueError, TypeError) as exc:
-        raise ValueError("watcher target must be TYPE=HOST:PORT:PATH") from exc
+        raise ValueError("watcher target must be TYPE=HOST:PORT:PATH or TYPE=@COMPONENT:PATH") from exc
+
+
+def resolve_target(target: WatcherTarget, log_roots: list[Path]) -> WatcherTarget:
+    """Resolve a component's ephemeral internal endpoint from owned logs.
+    从本轮自有日志解析组件的临时内部端点。
+    """
+    if not target.component_name:
+        return target
+    pattern = re.compile(
+        rf"componentType:{re.escape(target.component_name)}(?:,|\s).*?intaddr:([^,]+), intport:(\d+)",
+        re.IGNORECASE,
+    )
+    for root in log_roots:
+        if not root.exists():
+            continue
+        for path in root.rglob("*.log"):
+            try:
+                match = pattern.search(path.read_text(encoding="utf-8", errors="replace"))
+            except OSError:
+                continue
+            if match:
+                return WatcherTarget(
+                    target.component_type,
+                    match.group(1).strip(),
+                    int(match.group(2)),
+                    target.path,
+                    target.component_name,
+                )
+    raise LookupError(f"component endpoint is not available yet: {target.component_name}")
 
 
 class WatcherCollector:

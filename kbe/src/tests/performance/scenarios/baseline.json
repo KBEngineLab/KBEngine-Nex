@@ -1,8 +1,18 @@
 {
   "name": "baseline",
+  "fixture": "network-baseline",
   "duration_seconds": 1800,
   "bots": 500,
   "connect_rate_per_second": 25,
+  "slow_request_threshold_ms": 200,
+  "warmup_seconds": 15,
+  "external_receive_messages": 1024,
+  "external_receive_bytes": 1048576,
+  "readiness": {
+    "root/bots/performance/clientsTotal": "$bots",
+    "root/bots/performance/clientsKcp": "$bots",
+    "root/witness/active": "$bots"
+  },
   "operation_mix": {
     "login": 0.1,
     "heartbeat": 0.6,
