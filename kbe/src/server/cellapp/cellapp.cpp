@@ -173,6 +173,9 @@ bool Cellapp::initializeWatcher()
 	WATCH_OBJECT("witness/dirtyRequeues", &Witness::dirtyRequeueCount);
 	WATCH_OBJECT("witness/staleDiscards", &Witness::staleDiscardCount);
 	WATCH_OBJECT("witness/stateSkips", &Witness::stateSkipCount);
+	WATCH_OBJECT("witness/volatileBytesSent", &Witness::volatileBytesSentCount);
+	WATCH_OBJECT("witness/volatileBudgetDeferred", &Witness::volatileBudgetDeferredCount);
+	WATCH_OBJECT("witness/volatileBudgetExhaustions", &Witness::volatileBudgetExhaustionCount);
 	return EntityApp<Entity>::initializeWatcher() && WatchObjectPool::initWatchPools();
 }
 

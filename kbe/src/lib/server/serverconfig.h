@@ -180,6 +180,7 @@ typedef struct EngineComponentInfo
 
 		isOnInitCallPropertysSetMethods = true;
 		forceInternalLogin = false;
+		witness_volatile_bytes_per_tick = 512;
 	}
 
 	~EngineComponentInfo()
@@ -207,6 +208,9 @@ typedef struct EngineComponentInfo
 	bool use_coordinate_system;								// 是否使用坐标系统 如果为false, view, trap, move等功能将不再维护
 	bool coordinateSystem_hasY;								// 范围管理器是管理Y轴， 注：有y轴则view、trap等功能有了高度， 但y轴的管理会带来一定的消耗
 	uint16 entity_posdir_additional_updates;				// 实体位置停止发生改变后，引擎继续向客户端更新tick次的位置信息，为0则总是更新。
+	// 每个 Witness 每 Tick 的位置方向字节预算，零表示不限制。
+	// Per-Witness position and direction byte budget per tick; zero means unlimited.
+	uint32 witness_volatile_bytes_per_tick;
 	uint16 entity_posdir_updates_type;						// 实体位置更新方式，0：非优化高精度同步, 1:优化同步, 2:智能选择模式
 	uint16 entity_posdir_updates_smart_threshold;			// 实体位置更新智能模式下的同屏人数阈值
 

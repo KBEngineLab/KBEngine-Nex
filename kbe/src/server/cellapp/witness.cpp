@@ -19,6 +19,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "witness.h"
+#include "witness_volatile_budget.h"
 #include "entity.h"	
 #include "profile.h"
 #include "cellapp.h"
@@ -849,13 +850,20 @@ void Witness::markViewEntityVolatileDirty(ENTITY_ID entityID)
 }
 
 //-------------------------------------------------------------------------------------
-bool Witness::needsAdditionalVolatileUpdate(Entity* pEntity)
+bool Witness::needsVolatileUpdate(Entity* pEntity)
 {
 	return getEntityVolatileDataUpdateFlags(pEntity) != UPDATE_FLAG_NULL;
 }
 
 //-------------------------------------------------------------------------------------
-bool Witness::processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pEntityRef, uint16 additionalUpdates)
+bool Witness::isStructuralUpdate(const EntityRef* pEntityRef) const
+{
+	const uint32 structuralFlags = ENTITYREF_FLAG_ENTER_CLIENT_PENDING | ENTITYREF_FLAG_LEAVE_CLIENT_PENDING;
+	return (pEntityRef->flags() & structuralFlags) != 0;
+}
+
+//-------------------------------------------------------------------------------------
+bool Witness::processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pEntityRef)
 {
 	if ((pEntityRef->flags() & ENTITYREF_FLAG_ENTER_CLIENT_PENDING) > 0)
 	{
@@ -888,7 +896,7 @@ bool Witness::processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pE
 		KBE_ASSERT(clientViewSize_ != 65535);
 		++clientViewSize_;
 
-		if (additionalUpdates > 0 && needsAdditionalVolatileUpdate(pOtherEntity))
+		if (needsVolatileUpdate(pOtherEntity))
 			queueEntityRefVolatile(pEntityRef, true);
 
 		return true;
@@ -921,7 +929,7 @@ bool Witness::processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pE
 	KBE_ASSERT(pEntityRef->flags() == ENTITYREF_FLAG_NORMAL);
 	const uint32 flags = getEntityVolatileDataUpdateFlags(pOtherEntity);
 	addUpdateToStream(pSendBundle, flags, pEntityRef);
-	if (additionalUpdates > 0 && flags != UPDATE_FLAG_NULL)
+	if (flags != UPDATE_FLAG_NULL)
 		queueEntityRefVolatile(pEntityRef, true);
 
 	return true;
@@ -946,8 +954,10 @@ void Witness::removeViewEntityRef(EntityRef* pEntityRef)
 }
 
 //-------------------------------------------------------------------------------------
-void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle, uint16 additionalUpdates)
+void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 {
+	WitnessVolatileBudget budget(g_kbeSrvConfig.getCellApp().witness_volatile_bytes_per_tick);
+	bool exhaustionRecorded = false;
 	const size_t batchSize = volatileDirtyQueue_.batchSize();
 	for (size_t i = 0; i < batchSize; ++i)
 	{
@@ -965,11 +975,35 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle, uint16 add
 
 		EntityRef* pEntityRef = iter->second;
 		pEntityRef->volatileQueued(false);
-		const bool retained = processEntityRefUpdate(pSendBundle, pEntityRef, additionalUpdates);
+		const bool structuralUpdate = isStructuralUpdate(pEntityRef);
+		if (!budget.canSend(structuralUpdate))
+		{
+			// Tick 快照仍继续向后检查结构消息；普通易变更新回队后会在下 Tick 读取实体最新状态。
+			// Continue scanning the tick snapshot for structural messages; deferred volatile entries read the entity's latest state next tick.
+			queueEntityRefVolatile(pEntityRef, true);
+			g_witnessLoadMetrics.recordVolatileBudgetDeferred();
+			if (!exhaustionRecorded)
+			{
+				g_witnessLoadMetrics.recordVolatileBudgetExhaustion();
+				exhaustionRecorded = true;
+			}
+			continue;
+		}
+
+		// 外层实体转发消息尚未完成时 packetsLength() 只反映分包边界，currMsgLength() 才是连续增长的真实编码字节数。
+		// While the outer entity-forward message is open, packetsLength() reflects packet boundaries; currMsgLength() is the continuously growing encoded byte count.
+		const size_t beforeBytes = static_cast<size_t>(pSendBundle->currMsgLength());
+		const bool retained = processEntityRefUpdate(pSendBundle, pEntityRef);
+		if (!structuralUpdate)
+		{
+			budget.recordBundleGrowth(beforeBytes, static_cast<size_t>(pSendBundle->currMsgLength()));
+		}
 		g_witnessLoadMetrics.recordDirtyProcessed();
 		if (!retained)
 			removeViewEntityRef(pEntityRef);
 	}
+
+	g_witnessLoadMetrics.recordVolatileBytes(budget.bytesSent());
 }
 
 //-------------------------------------------------------------------------------------
@@ -1045,6 +1079,24 @@ uint64 Witness::stateSkipCount()
 }
 
 //-------------------------------------------------------------------------------------
+uint64 Witness::volatileBytesSentCount()
+{
+	return g_witnessLoadMetrics.volatileBytesSent();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::volatileBudgetDeferredCount()
+{
+	return g_witnessLoadMetrics.volatileBudgetDeferred();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::volatileBudgetExhaustionCount()
+{
+	return g_witnessLoadMetrics.volatileBudgetExhaustions();
+}
+
+//-------------------------------------------------------------------------------------
 bool Witness::update()
 {
 	SCOPED_PROFILE(CLIENT_UPDATE_PROFILE);
@@ -1087,8 +1139,7 @@ bool Witness::update()
 		NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pEntity_->id(), (*pSendBundle));
 		addBaseDataToStream(pSendBundle);
 
-		const uint16 additionalUpdates = g_kbeSrvConfig.getCellApp().entity_posdir_additional_updates;
-		const bool performFullScan = fullScanRequired_ || additionalUpdates == 0;
+		const bool performFullScan = fullScanRequired_;
 		if (performFullScan)
 		{
 			// 在扫描前消费标志，使回调重入产生的新结构变化能够保留到下一 Tick。
@@ -1103,7 +1154,7 @@ bool Witness::update()
 				EntityRef* pEntityRef = (*iter);
 				++iter;
 				pEntityRef->volatileQueued(false);
-				if (!processEntityRefUpdate(pSendBundle, pEntityRef, additionalUpdates))
+				if (!processEntityRefUpdate(pSendBundle, pEntityRef))
 					removeViewEntityRef(pEntityRef);
 			}
 			synchronizeViewEntityMetrics();
@@ -1111,7 +1162,7 @@ bool Witness::update()
 		}
 		else
 		{
-			processVolatileDirtyQueue(pSendBundle, additionalUpdates);
+			processVolatileDirtyQueue(pSendBundle);
 		}
 
 		size_t pSendBundleMessageLength = pSendBundle->currMsgLength();

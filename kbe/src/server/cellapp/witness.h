@@ -211,6 +211,9 @@ public:
 	static uint64 dirtyRequeueCount();
 	static uint64 staleDiscardCount();
 	static uint64 stateSkipCount();
+	static uint64 volatileBytesSentCount();
+	static uint64 volatileBudgetDeferredCount();
+	static uint64 volatileBudgetExhaustionCount();
 
 private:
 	/**
@@ -227,10 +230,11 @@ private:
 	void synchronizeViewEntityMetrics();
 	void initializeEntityRefLifecycle(EntityRef* pEntityRef);
 	void queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue = false);
-	bool needsAdditionalVolatileUpdate(Entity* pEntity);
-	bool processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pEntityRef, uint16 additionalUpdates);
+	bool needsVolatileUpdate(Entity* pEntity);
+	bool isStructuralUpdate(const EntityRef* pEntityRef) const;
+	bool processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pEntityRef);
 	void removeViewEntityRef(EntityRef* pEntityRef);
-	void processVolatileDirtyQueue(Network::Bundle* pSendBundle, uint16 additionalUpdates);
+	void processVolatileDirtyQueue(Network::Bundle* pSendBundle);
 		
 private:
 	Entity*									pEntity_;

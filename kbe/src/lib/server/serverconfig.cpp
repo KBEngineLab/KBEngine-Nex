@@ -704,6 +704,12 @@ bool ServerConfig::loadConfig(std::string fileName)
 				_cellAppInfo.entity_posdir_additional_updates = xml->getValInt(childnode);
 			}
 
+			childnode = xml->enterNode(node, "witness_volatile_bytes_per_tick");
+			if (childnode)
+			{
+				_cellAppInfo.witness_volatile_bytes_per_tick = xml->getValInt(childnode);
+			}
+
 			childnode = xml->enterNode(node, "entity_posdir_updates");
 			if (childnode)
 			{

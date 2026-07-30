@@ -64,7 +64,7 @@ public:
 
 	void flags(uint32 v) { flags_ = v; }
 	void removeflags(uint32 v) { flags_ &= ~v; }
-	uint32 flags() { return flags_; }
+	uint32 flags() const { return flags_; }
 	
 	Entity* pEntity() const { return pEntity_; }
 	void pEntity(Entity* e);

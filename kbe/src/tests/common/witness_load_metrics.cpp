@@ -42,6 +42,9 @@ bool testQueueAttribution()
 	metrics.recordDirtyProcessed();
 	metrics.recordStaleDiscard();
 	metrics.recordStateSkip();
+	metrics.recordVolatileBytes(37);
+	metrics.recordVolatileBudgetDeferred();
+	metrics.recordVolatileBudgetExhaustion();
 
 	return require(metrics.dirtyQueued() == 1, "current dirty queue depth was not maintained") &&
 		require(metrics.dirtyEnqueued() == 2, "cumulative enqueue count was not maintained") &&
@@ -49,7 +52,10 @@ bool testQueueAttribution()
 		require(metrics.maxQueueDepth() == 2, "maximum queue depth was not retained") &&
 		require(metrics.dirtyProcessed() == 1, "processed count was not maintained") &&
 		require(metrics.staleDiscards() == 1, "stale discard was not attributed") &&
-		require(metrics.stateSkips() == 1, "state skip was not attributed");
+		require(metrics.stateSkips() == 1, "state skip was not attributed") &&
+		require(metrics.volatileBytesSent() == 37, "volatile byte count was not accumulated") &&
+		require(metrics.volatileBudgetDeferred() == 1, "deferred volatile update was not attributed") &&
+		require(metrics.volatileBudgetExhaustions() == 1, "budget exhaustion was not attributed");
 }
 
 bool testFullScanWorkAccounting()

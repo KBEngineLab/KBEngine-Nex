@@ -571,6 +571,11 @@
 				If 0, then always update)
 			-->
 			<entity_posdir_additional_updates> 2 </entity_posdir_additional_updates>
+
+			<!-- 每个 Witness 每 Tick 最多发送的位置与方向字节数，结构消息不受限制，0 表示关闭预算。
+				Maximum position and direction bytes sent per Witness per tick. Structural messages are exempt; 0 disables the budget.
+			-->
+			<witness_volatile_bytes_per_tick> 512 </witness_volatile_bytes_per_tick>
 						
 			<!-- 实体位置更新方式，
 				0：直接同步高精度浮点数据，View范围无限制。 

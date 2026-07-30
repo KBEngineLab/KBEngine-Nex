@@ -61,6 +61,9 @@ public:
 	void recordDirtyProcessed() { ++dirtyProcessed_; }
 	void recordStaleDiscard() { ++staleDiscards_; }
 	void recordStateSkip() { ++stateSkips_; }
+	void recordVolatileBytes(std::uint64_t bytes) { volatileBytesSent_ += bytes; }
+	void recordVolatileBudgetDeferred() { ++volatileBudgetDeferred_; }
+	void recordVolatileBudgetExhaustion() { ++volatileBudgetExhaustions_; }
 
 	std::uint64_t viewEntities() const { return viewEntities_; }
 	std::uint64_t maxViewEntities() const { return maxViewEntities_; }
@@ -73,6 +76,9 @@ public:
 	std::uint64_t maxQueueDepth() const { return maxQueueDepth_; }
 	std::uint64_t staleDiscards() const { return staleDiscards_; }
 	std::uint64_t stateSkips() const { return stateSkips_; }
+	std::uint64_t volatileBytesSent() const { return volatileBytesSent_; }
+	std::uint64_t volatileBudgetDeferred() const { return volatileBudgetDeferred_; }
+	std::uint64_t volatileBudgetExhaustions() const { return volatileBudgetExhaustions_; }
 
 private:
 	std::uint64_t viewEntities_ = 0;
@@ -86,6 +92,9 @@ private:
 	std::uint64_t maxQueueDepth_ = 0;
 	std::uint64_t staleDiscards_ = 0;
 	std::uint64_t stateSkips_ = 0;
+	std::uint64_t volatileBytesSent_ = 0;
+	std::uint64_t volatileBudgetDeferred_ = 0;
+	std::uint64_t volatileBudgetExhaustions_ = 0;
 };
 
 }
