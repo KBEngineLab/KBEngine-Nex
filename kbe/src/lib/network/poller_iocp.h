@@ -4,6 +4,7 @@
 #define KBE_IOCP_POLLER_H
 
 #include "poller_completion.h"
+#include "completion_context_pool.h"
 
 #if KBE_PLATFORM == PLATFORM_WIN32
 
@@ -30,6 +31,11 @@ public:
 
 	// IOCP 入队后立即尝试投递 WSASendTo，避免 UDP/KCP 发送只滞留在队列里。
 	bool queueUdpSend(KBESOCKET fd, const void* data, int len, const Address& dstAddr) override;
+	uint64 contextAllocationCount() const override;
+	uint64 contextReuseCount() const override;
+	uint64 contextOutstandingCount() const override;
+	uint64 contextCachedCount() const override;
+	uint64 contextPeakOutstandingCount() const override;
 
 protected:
 	// 将 fd 绑定到 IOCP 并投递读侧 completion。
@@ -59,7 +65,8 @@ private:
 
 	struct IocpContext
 	{
-		IocpContext(KBESOCKET fdArg, KBESOCKET socketArg, SocketKind kindArg, Operation operationArg, uint64 generationArg);
+		IocpContext();
+		void reset(KBESOCKET fdArg, KBESOCKET socketArg, SocketKind kindArg, Operation operationArg, uint64 generationArg);
 
 		// 每一次异步调用都拥有独立的 OVERLAPPED 和数据缓冲。
 		// 完成回调回来前，buffer 必须一直有效，所以不能使用栈内存。
@@ -109,6 +116,8 @@ private:
 	// 从 outstanding 表移除并释放一个已经完成的上下文。
 	// Remove and release a context only after its completion has been dequeued.
 	void releaseContext(IocpContext& context);
+	IocpContext* acquireContext(KBESOCKET fd, KBESOCKET socket, SocketKind kind, Operation operation, uint64 generation);
+	void recycleContext(IocpContext* context);
 	// 析构前取消并排空所有 outstanding IO，防止内核访问已释放的 OVERLAPPED。
 	// Cancel and drain all outstanding IO before destruction so the kernel cannot access freed OVERLAPPED memory.
 	void cancelAndDrainContexts();
@@ -117,6 +126,7 @@ private:
 
 	typedef std::map<LPOVERLAPPED, IocpContext*> OutstandingContexts;
 	OutstandingContexts outstandingContexts_;
+	CompletionContextPool<IocpContext> contextPool_;
 	HANDLE completionPort_;
 	uint64 lastCompletionBudgetWarningTime_;
 };

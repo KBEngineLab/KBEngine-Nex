@@ -4,6 +4,7 @@
 #define KBE_IO_URING_POLLER_H
 
 #include "poller_completion.h"
+#include "completion_context_pool.h"
 
 #if defined(__linux__)
 
@@ -33,6 +34,11 @@ public:
 	// 发送入队后立即尝试投递 SQE，减少必须等下一轮 tick 才开始发送的延迟。
 	bool queueTcpSend(KBESOCKET fd, const void* data, int len) override;
 	bool queueUdpSend(KBESOCKET fd, const void* data, int len, const Address& dstAddr) override;
+	uint64 contextAllocationCount() const override;
+	uint64 contextReuseCount() const override;
+	uint64 contextOutstandingCount() const override;
+	uint64 contextCachedCount() const override;
+	uint64 contextPeakOutstandingCount() const override;
 
 protected:
 	// 注册读侧时投递 accept/recv/recvmsg completion。
@@ -60,7 +66,8 @@ private:
 	struct IoUringContext
 	{
 		// 每个 SQE 绑定一个 context，CQE 回来前所有缓冲和 msghdr 必须保持有效。
-		IoUringContext(KBESOCKET fdArg, KBESOCKET socketArg, SocketKind kindArg, Operation operationArg, uint64 generationArg);
+		IoUringContext();
+		void reset(KBESOCKET fdArg, KBESOCKET socketArg, SocketKind kindArg, Operation operationArg, uint64 generationArg);
 
 		KBESOCKET fd;
 		KBESOCKET socket;
@@ -150,10 +157,13 @@ private:
 	// outstandingContexts_ 则覆盖所有尚未收到 CQE 的请求，包括注销后等待迟到 CQE 的旧请求。
 	void trackContext(IoUringContext* context);
 	void untrackContext(IoUringContext* context);
+	IoUringContext* acquireContext(KBESOCKET fd, KBESOCKET socket, SocketKind kind, Operation operation, uint64 generation);
+	void recycleContext(IoUringContext* context);
 
 	int ringFd_;
 	Ring ring_;
 	std::set<IoUringContext*> outstandingContexts_;
+	CompletionContextPool<IoUringContext> contextPool_;
 	uint64 lastCompletionBudgetWarningTime_;
 	unsigned lastSqDropped_;
 	unsigned lastCqOverflow_;

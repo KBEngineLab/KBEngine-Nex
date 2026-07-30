@@ -125,6 +125,16 @@ public:
 	uint32 pendingPollerRearms() const;
 	uint64 pollerRearmAttempts() const;
 	uint64 pollerRearmRetries() const;
+	uint64 pollerContextAllocations() const;
+	uint64 pollerContextReuses() const;
+	uint64 pollerContextsOutstanding() const;
+	uint64 pollerContextsCached() const;
+	uint64 pollerContextsPeakOutstanding() const;
+	uint64 pollerTcpSendOwnershipTransfers() const;
+	uint64 pollerTcpSendBatchCopies() const;
+	uint64 pollerTcpSendBatchCopiedBytes() const;
+	uint64 pollerReceiveOwnershipTransfers() const;
+	uint64 pollerReceiveTransferredBytes() const;
 
 private:
 	friend class Channel;

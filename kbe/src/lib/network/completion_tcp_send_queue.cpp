@@ -35,6 +35,17 @@ bool CompletionTcpSendBuffer::empty() const
 	return size() == 0;
 }
 
+//-------------------------------------------------------------------------------------
+void CompletionTcpSendBuffer::reset(size_t maxRetainedCapacity)
+{
+	storage_.clear();
+	offset_ = 0;
+	if (storage_.capacity() > maxRetainedCapacity)
+	{
+		std::vector<char>().swap(storage_);
+	}
+}
+
 CompletionTcpSendQueue::CompletionTcpSendQueue() :
 	buffers_(),
 	pendingBytes_(0)

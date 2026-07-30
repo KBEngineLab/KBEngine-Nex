@@ -633,6 +633,29 @@ uint64 NetworkInterface::pollerRearmRetries() const
 }
 
 //-------------------------------------------------------------------------------------
+#define KBE_POLLER_METRIC(methodName, pollerMethod) \
+	uint64 NetworkInterface::methodName() const \
+	{ \
+		EventPoller* pPoller = pDispatcher_ != NULL ? pDispatcher_->pPoller() : NULL; \
+		return pPoller != NULL ? pPoller->pollerMethod() : 0; \
+	}
+
+// These accessors keep watcher registration independent from concrete poller types and never scan socket state.
+// 这些访问器让 watcher 注册不依赖具体 poller 类型，并且查询时绝不扫描 socket 状态。
+KBE_POLLER_METRIC(pollerContextAllocations, contextAllocationCount)
+KBE_POLLER_METRIC(pollerContextReuses, contextReuseCount)
+KBE_POLLER_METRIC(pollerContextsOutstanding, contextOutstandingCount)
+KBE_POLLER_METRIC(pollerContextsCached, contextCachedCount)
+KBE_POLLER_METRIC(pollerContextsPeakOutstanding, contextPeakOutstandingCount)
+KBE_POLLER_METRIC(pollerTcpSendOwnershipTransfers, tcpSendOwnershipTransferCount)
+KBE_POLLER_METRIC(pollerTcpSendBatchCopies, tcpSendBatchCopyCount)
+KBE_POLLER_METRIC(pollerTcpSendBatchCopiedBytes, tcpSendBatchCopiedBytes)
+KBE_POLLER_METRIC(pollerReceiveOwnershipTransfers, receiveOwnershipTransferCount)
+KBE_POLLER_METRIC(pollerReceiveTransferredBytes, receiveOwnershipTransferredBytes)
+
+#undef KBE_POLLER_METRIC
+
+//-------------------------------------------------------------------------------------
 uint32 NetworkInterface::numExternalTcpChannels() const
 {
 	uint32 count = 0;

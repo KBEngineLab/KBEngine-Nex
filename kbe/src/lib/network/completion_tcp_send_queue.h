@@ -20,6 +20,7 @@ public:
 	const char* data() const;
 	size_t size() const;
 	bool empty() const;
+	void reset(size_t maxRetainedCapacity);
 
 private:
 	friend class CompletionTcpSendQueue;

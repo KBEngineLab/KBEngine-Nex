@@ -54,6 +54,11 @@ public:
 	uint32 pendingRearmCount() const override;
 	uint64 rearmAttemptCount() const override;
 	uint64 rearmRetryCount() const override;
+	uint64 tcpSendOwnershipTransferCount() const override;
+	uint64 tcpSendBatchCopyCount() const override;
+	uint64 tcpSendBatchCopiedBytes() const override;
+	uint64 receiveOwnershipTransferCount() const override;
+	uint64 receiveOwnershipTransferredBytes() const override;
 
 protected:
 	enum SocketKind
@@ -221,6 +226,11 @@ protected:
 	CompletionRearmQueue rearmQueue_;
 	uint64 rearmAttemptCount_;
 	uint64 rearmRetryCount_;
+	uint64 tcpSendOwnershipTransferCount_;
+	uint64 tcpSendBatchCopyCount_;
+	uint64 tcpSendBatchCopiedBytes_;
+	uint64 receiveOwnershipTransferCount_;
+	uint64 receiveOwnershipTransferredBytes_;
 };
 
 }

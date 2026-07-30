@@ -25,6 +25,7 @@ namespace Network
 namespace
 {
 const size_t IO_URING_TCP_SEND_BATCH_BYTES = 64 * 1024;
+const size_t COMPLETION_CONTEXT_RETAINED_BUFFER_BYTES = 64 * 1024;
 const uint64 COMPLETION_BUDGET_WARNING_INTERVAL = 10 * stampsPerSecond();
 const uint32 COMPLETION_BUDGET_WARNING_MULTIPLIER = 10;
 
@@ -59,12 +60,12 @@ inline int ioUringEnter(int ringFd, unsigned toSubmit, unsigned minComplete, uns
 }
 
 //-------------------------------------------------------------------------------------
-IoUringPoller::IoUringContext::IoUringContext(KBESOCKET fdArg, KBESOCKET socketArg, SocketKind kindArg, Operation operationArg, uint64 generationArg) :
-	fd(fdArg),
-	socket(socketArg),
-	kind(kindArg),
-	operation(operationArg),
-	generation(generationArg),
+IoUringPoller::IoUringContext::IoUringContext() :
+	fd(-1),
+	socket(-1),
+	kind(SOCKET_KIND_UNKNOWN),
+	operation(OP_ACCEPT),
+	generation(0),
 	data(),
 	tcpSendData(),
 	addr(),
@@ -73,6 +74,30 @@ IoUringPoller::IoUringContext::IoUringContext(KBESOCKET fdArg, KBESOCKET socketA
 	msg()
 {
 	memset(&addr, 0, sizeof(addr));
+	memset(&iov, 0, sizeof(iov));
+	memset(&msg, 0, sizeof(msg));
+	msg.msg_name = &addr;
+	msg.msg_namelen = addrLen;
+}
+
+//-------------------------------------------------------------------------------------
+void IoUringPoller::IoUringContext::reset(KBESOCKET fdArg, KBESOCKET socketArg, SocketKind kindArg, Operation operationArg, uint64 generationArg)
+{
+	// Rebuild every pointer-bearing kernel structure after buffers may have moved or changed capacity.
+	// 缓冲可能移动或改变容量，因此复用时必须重建所有包含指针的内核结构。
+	fd = fdArg;
+	socket = socketArg;
+	kind = kindArg;
+	operation = operationArg;
+	generation = generationArg;
+	data.clear();
+	if (data.capacity() > COMPLETION_CONTEXT_RETAINED_BUFFER_BYTES)
+	{
+		std::vector<char>().swap(data);
+	}
+	tcpSendData.reset(COMPLETION_CONTEXT_RETAINED_BUFFER_BYTES);
+	memset(&addr, 0, sizeof(addr));
+	addrLen = sizeof(addr);
 	memset(&iov, 0, sizeof(iov));
 	memset(&msg, 0, sizeof(msg));
 	msg.msg_name = &addr;
@@ -112,6 +137,7 @@ IoUringPoller::IoUringPoller(uint32 entries) :
 	ringFd_(-1),
 	ring_(),
 	outstandingContexts_(),
+	contextPool_(entries),
 	lastCompletionBudgetWarningTime_(0),
 	lastSqDropped_(0),
 	lastCqOverflow_(0)
@@ -133,7 +159,7 @@ IoUringPoller::~IoUringPoller()
 		// ring 销毁后，仍未返回 CQE 的 user_data 不会再交给 handleCompletion。
 		// outstandingContexts_ 覆盖了当前请求和注销后等待迟到 CQE 的旧请求，
 		// 因此析构时可以一次性回收所有 context/buffer。
-		delete context;
+		contextPool_.discard(context);
 	}
 	outstandingContexts_.clear();
 
@@ -145,6 +171,13 @@ IoUringPoller::~IoUringPoller()
 		item.second->writeArmed = false;
 	}
 }
+
+//-------------------------------------------------------------------------------------
+uint64 IoUringPoller::contextAllocationCount() const { return contextPool_.allocationCount(); }
+uint64 IoUringPoller::contextReuseCount() const { return contextPool_.reuseCount(); }
+uint64 IoUringPoller::contextOutstandingCount() const { return contextPool_.outstandingCount(); }
+uint64 IoUringPoller::contextCachedCount() const { return contextPool_.cachedCount(); }
+uint64 IoUringPoller::contextPeakOutstandingCount() const { return contextPool_.peakOutstandingCount(); }
 
 //-------------------------------------------------------------------------------------
 int IoUringPoller::toTimeoutMilliseconds(double maxWait)
@@ -564,7 +597,7 @@ bool IoUringPoller::armAccept(KBESOCKET fd, SocketState& state)
 		return false;
 	}
 
-	IoUringContext* context = new IoUringContext(fd, state.socket, SOCKET_KIND_LISTENER, OP_ACCEPT, state.generation);
+	IoUringContext* context = acquireContext(fd, state.socket, SOCKET_KIND_LISTENER, OP_ACCEPT, state.generation);
 	trackContext(context);
 	sqe->opcode = IORING_OP_ACCEPT;
 	sqe->fd = fd;
@@ -587,7 +620,7 @@ bool IoUringPoller::armTcpRead(KBESOCKET fd, SocketState& state)
 		return false;
 	}
 
-	IoUringContext* context = new IoUringContext(fd, state.socket, SOCKET_KIND_TCP, OP_TCP_RECV, state.generation);
+	IoUringContext* context = acquireContext(fd, state.socket, SOCKET_KIND_TCP, OP_TCP_RECV, state.generation);
 	trackContext(context);
 	context->data.resize(PACKET_MAX_SIZE_TCP);
 	sqe->opcode = IORING_OP_RECV;
@@ -610,7 +643,7 @@ bool IoUringPoller::armUdpRead(KBESOCKET fd, SocketState& state)
 		return false;
 	}
 
-	IoUringContext* context = new IoUringContext(fd, state.socket, SOCKET_KIND_UDP, OP_UDP_RECV, state.generation);
+	IoUringContext* context = acquireContext(fd, state.socket, SOCKET_KIND_UDP, OP_UDP_RECV, state.generation);
 	trackContext(context);
 	context->data.resize(PACKET_MAX_SIZE_UDP);
 	context->iov.iov_base = context->data.data();
@@ -641,13 +674,13 @@ bool IoUringPoller::armTcpSend(KBESOCKET fd, SocketState& state)
 		return false;
 	}
 
-	IoUringContext* context = new IoUringContext(fd, state.socket, SOCKET_KIND_TCP, OP_TCP_SEND, state.generation);
+	IoUringContext* context = acquireContext(fd, state.socket, SOCKET_KIND_TCP, OP_TCP_SEND, state.generation);
 	trackContext(context);
 	bool copied = false;
 	if (!popTcpSendBatch(state, IO_URING_TCP_SEND_BATCH_BYTES, context->tcpSendData, copied))
 	{
 		untrackContext(context);
-		delete context;
+		recycleContext(context);
 		return true;
 	}
 	(void)copied;
@@ -681,7 +714,7 @@ bool IoUringPoller::armUdpSend(KBESOCKET fd, SocketState& state)
 	state.pendingUdpSends.pop_front();
 	state.pendingUdpSendBytes -= pending.data.size();
 
-	IoUringContext* context = new IoUringContext(fd, state.socket, SOCKET_KIND_UDP, OP_UDP_SEND, state.generation);
+	IoUringContext* context = acquireContext(fd, state.socket, SOCKET_KIND_UDP, OP_UDP_SEND, state.generation);
 	trackContext(context);
 	context->data.swap(pending.data);
 	context->addr = pending.dstAddr;
@@ -741,7 +774,7 @@ void IoUringPoller::handleCompletion(IoUringContext& context, int result)
 		}
 
 		untrackContext(&context);
-		delete &context;
+		recycleContext(&context);
 		return;
 	}
 
@@ -840,7 +873,7 @@ void IoUringPoller::handleCompletion(IoUringContext& context, int result)
 			}
 
 			untrackContext(&context);
-			delete &context;
+			recycleContext(&context);
 
 			auto currentIter = socketStates_.find(fd);
 			if (currentIter != socketStates_.end() && !currentIter->second->registeredRead)
@@ -884,7 +917,7 @@ void IoUringPoller::handleCompletion(IoUringContext& context, int result)
 	}
 
 	untrackContext(&context);
-	delete &context;
+	recycleContext(&context);
 
 	auto currentIter = socketStates_.find(fd);
 	if (currentIter != socketStates_.end())
@@ -919,12 +952,29 @@ void IoUringPoller::trackContext(IoUringContext* context)
 //-------------------------------------------------------------------------------------
 void IoUringPoller::untrackContext(IoUringContext* context)
 {
-	// CQE 已经回到用户态并即将 delete context 时，从兜底集合移除。
+	// CQE 已经回到用户态并即将回收 context 时，从兜底集合移除。
+	// Remove the context from the fallback set after its CQE reaches user space and before recycling it.
 	// erase(NULL) 没有意义，这里显式判断能避免把异常路径写得晦涩。
 	if (context != NULL)
 	{
 		outstandingContexts_.erase(context);
 	}
+}
+
+//-------------------------------------------------------------------------------------
+IoUringPoller::IoUringContext* IoUringPoller::acquireContext(KBESOCKET fd, KBESOCKET socket, SocketKind kind, Operation operation, uint64 generation)
+{
+	IoUringContext* context = contextPool_.acquire();
+	context->reset(fd, socket, kind, operation, generation);
+	return context;
+}
+
+//-------------------------------------------------------------------------------------
+void IoUringPoller::recycleContext(IoUringContext* context)
+{
+	// The caller must consume the CQE and untrack user_data before making this storage reusable.
+	// 调用方必须先消费 CQE 并移除 user_data 跟踪，之后这块存储才可复用。
+	contextPool_.release(context);
 }
 
 //-------------------------------------------------------------------------------------

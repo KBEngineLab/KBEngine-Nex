@@ -251,6 +251,18 @@ uint64 EventPoller::rearmRetryCount() const
 }
 
 //-------------------------------------------------------------------------------------
+uint64 EventPoller::contextAllocationCount() const { return 0; }
+uint64 EventPoller::contextReuseCount() const { return 0; }
+uint64 EventPoller::contextOutstandingCount() const { return 0; }
+uint64 EventPoller::contextCachedCount() const { return 0; }
+uint64 EventPoller::contextPeakOutstandingCount() const { return 0; }
+uint64 EventPoller::tcpSendOwnershipTransferCount() const { return 0; }
+uint64 EventPoller::tcpSendBatchCopyCount() const { return 0; }
+uint64 EventPoller::tcpSendBatchCopiedBytes() const { return 0; }
+uint64 EventPoller::receiveOwnershipTransferCount() const { return 0; }
+uint64 EventPoller::receiveOwnershipTransferredBytes() const { return 0; }
+
+//-------------------------------------------------------------------------------------
 const char* EventPoller::defaultIOModelName()
 {
 #if KBE_PLATFORM == PLATFORM_WIN32

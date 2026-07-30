@@ -61,7 +61,12 @@ CompletionPoller::CompletionPoller() :
 	udpReceived_(),
 	rearmQueue_(),
 	rearmAttemptCount_(0),
-	rearmRetryCount_(0)
+	rearmRetryCount_(0),
+	tcpSendOwnershipTransferCount_(0),
+	tcpSendBatchCopyCount_(0),
+	tcpSendBatchCopiedBytes_(0),
+	receiveOwnershipTransferCount_(0),
+	receiveOwnershipTransferredBytes_(0)
 {
 }
 
@@ -287,6 +292,13 @@ uint64 CompletionPoller::rearmRetryCount() const
 }
 
 //-------------------------------------------------------------------------------------
+uint64 CompletionPoller::tcpSendOwnershipTransferCount() const { return tcpSendOwnershipTransferCount_; }
+uint64 CompletionPoller::tcpSendBatchCopyCount() const { return tcpSendBatchCopyCount_; }
+uint64 CompletionPoller::tcpSendBatchCopiedBytes() const { return tcpSendBatchCopiedBytes_; }
+uint64 CompletionPoller::receiveOwnershipTransferCount() const { return receiveOwnershipTransferCount_; }
+uint64 CompletionPoller::receiveOwnershipTransferredBytes() const { return receiveOwnershipTransferredBytes_; }
+
+//-------------------------------------------------------------------------------------
 void CompletionPoller::requestRearm(KBESOCKET fd, uint8 flags)
 {
 	rearmQueue_.request(fd, flags);
@@ -440,6 +452,8 @@ bool CompletionPoller::pushTcpReceivedData(KBESOCKET fd, std::vector<char>& data
 	}
 
 	TcpCompletionData item;
+	++receiveOwnershipTransferCount_;
+	receiveOwnershipTransferredBytes_ += data.size();
 	item.payload.swap(data);
 	item.disconnected = disconnected;
 	item.errorCode = errorCode;
@@ -472,6 +486,8 @@ bool CompletionPoller::pushUdpReceivedData(KBESOCKET fd, std::vector<char>& data
 
 	state.pendingUdpReceiveBytes += data.size();
 	UdpCompletionData item;
+	++receiveOwnershipTransferCount_;
+	receiveOwnershipTransferredBytes_ += data.size();
 	item.payload.swap(data);
 	item.srcAddr.ip = srcAddr.sin_addr.s_addr;
 	item.srcAddr.port = srcAddr.sin_port;
@@ -532,7 +548,22 @@ bool CompletionPoller::popTcpSendBatch(SocketState& state, size_t maxBytes, Comp
 {
 	// 队列统一处理所有权转移、合批和 offset，三个后端不再各自复制或移动发送尾部。
 	// The queue centralizes ownership transfer, batching, and offsets so the three backends no longer copy or shift send tails independently.
-	return state.pendingTcpSends.popBatch(maxBytes, batch, copied);
+	if (!state.pendingTcpSends.popBatch(maxBytes, batch, copied))
+	{
+		return false;
+	}
+
+	if (copied)
+	{
+		++tcpSendBatchCopyCount_;
+		tcpSendBatchCopiedBytes_ += batch.size();
+	}
+	else
+	{
+		++tcpSendOwnershipTransferCount_;
+	}
+
+	return true;
 }
 
 //-------------------------------------------------------------------------------------

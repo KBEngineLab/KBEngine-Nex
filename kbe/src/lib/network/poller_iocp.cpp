@@ -19,6 +19,8 @@ namespace Network
 namespace
 {
 const size_t IOCP_TCP_SEND_BATCH_BYTES = 64 * 1024;
+const size_t COMPLETION_CONTEXT_CACHE_LIMIT = 256;
+const size_t COMPLETION_CONTEXT_RETAINED_BUFFER_BYTES = 64 * 1024;
 // 析构排空设置有限等待，避免异常驱动或损坏的 socket 让进程永久卡住；超时对象保留到进程退出以保证内核访问安全。
 // Bound destructor draining so a faulty driver or socket cannot hang shutdown forever; timed-out storage survives until process exit for kernel safety.
 const DWORD IOCP_SHUTDOWN_DRAIN_TIMEOUT_MS = 5000;
@@ -47,13 +49,13 @@ inline DWORD toTimeoutMilliseconds(double maxWait)
 }
 }
 
-IocpPoller::IocpContext::IocpContext(KBESOCKET fdArg, KBESOCKET socketArg, SocketKind kindArg, Operation operationArg, uint64 generationArg) :
+IocpPoller::IocpContext::IocpContext() :
 	overlapped(),
-	fd(fdArg),
-	socket(socketArg),
-	kind(kindArg),
-	operation(operationArg),
-	generation(generationArg),
+	fd(INVALID_SOCKET),
+	socket(INVALID_SOCKET),
+	kind(SOCKET_KIND_UNKNOWN),
+	operation(OP_ACCEPT),
+	generation(0),
 	buffer(),
 	flags(0),
 	data(),
@@ -70,9 +72,35 @@ IocpPoller::IocpContext::IocpContext(KBESOCKET fdArg, KBESOCKET socketArg, Socke
 }
 
 //-------------------------------------------------------------------------------------
+void IocpPoller::IocpContext::reset(KBESOCKET fdArg, KBESOCKET socketArg, SocketKind kindArg, Operation operationArg, uint64 generationArg)
+{
+	// Every kernel-visible field is rebuilt before reuse; vector capacity is retained only within the bounded context budget.
+	// 每次复用前都重建所有内核可见字段；vector 容量只在有界 context 预算内保留。
+	memset(&overlapped, 0, sizeof(overlapped));
+	fd = fdArg;
+	socket = socketArg;
+	kind = kindArg;
+	operation = operationArg;
+	generation = generationArg;
+	memset(&buffer, 0, sizeof(buffer));
+	flags = 0;
+	data.clear();
+	if (data.capacity() > COMPLETION_CONTEXT_RETAINED_BUFFER_BYTES)
+	{
+		std::vector<char>().swap(data);
+	}
+	tcpSendData.reset(COMPLETION_CONTEXT_RETAINED_BUFFER_BYTES);
+	acceptSocket = INVALID_SOCKET;
+	memset(acceptBuffer, 0, sizeof(acceptBuffer));
+	memset(&udpAddr, 0, sizeof(udpAddr));
+	udpAddrLen = sizeof(udpAddr);
+}
+
+//-------------------------------------------------------------------------------------
 IocpPoller::IocpPoller() :
 	CompletionPoller(),
 	outstandingContexts_(),
+	contextPool_(COMPLETION_CONTEXT_CACHE_LIMIT),
 	completionPort_(CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0)),
 	lastCompletionBudgetWarningTime_(0)
 {
@@ -82,6 +110,13 @@ IocpPoller::IocpPoller() :
 			kbe_strerror(GetLastError())));
 	}
 }
+
+//-------------------------------------------------------------------------------------
+uint64 IocpPoller::contextAllocationCount() const { return contextPool_.allocationCount(); }
+uint64 IocpPoller::contextReuseCount() const { return contextPool_.reuseCount(); }
+uint64 IocpPoller::contextOutstandingCount() const { return contextPool_.outstandingCount(); }
+uint64 IocpPoller::contextCachedCount() const { return contextPool_.cachedCount(); }
+uint64 IocpPoller::contextPeakOutstandingCount() const { return contextPool_.peakOutstandingCount(); }
 
 //-------------------------------------------------------------------------------------
 IocpPoller::~IocpPoller()
@@ -220,7 +255,7 @@ bool IocpPoller::loadAcceptEx(SocketState& state)
 //-------------------------------------------------------------------------------------
 bool IocpPoller::armTcpRead(KBESOCKET fd, SocketState& state)
 {
-	IocpContext* pContext = new IocpContext(fd, state.socket, SOCKET_KIND_TCP, OP_TCP_RECV, state.generation);
+	IocpContext* pContext = acquireContext(fd, state.socket, SOCKET_KIND_TCP, OP_TCP_RECV, state.generation);
 	pContext->data.resize(PACKET_MAX_SIZE_TCP);
 	pContext->buffer.buf = pContext->data.data();
 	pContext->buffer.len = static_cast<ULONG>(pContext->data.size());
@@ -243,14 +278,14 @@ bool IocpPoller::armTcpRead(KBESOCKET fd, SocketState& state)
 		return true;
 	}
 
-	delete pContext;
+	recycleContext(pContext);
 	return false;
 }
 
 //-------------------------------------------------------------------------------------
 bool IocpPoller::armUdpRead(KBESOCKET fd, SocketState& state)
 {
-	IocpContext* pContext = new IocpContext(fd, state.socket, SOCKET_KIND_UDP, OP_UDP_RECV, state.generation);
+	IocpContext* pContext = acquireContext(fd, state.socket, SOCKET_KIND_UDP, OP_UDP_RECV, state.generation);
 	pContext->flags = 0;
 	pContext->data.resize(PACKET_MAX_SIZE_UDP);
 	pContext->buffer.buf = pContext->data.data();
@@ -276,7 +311,7 @@ bool IocpPoller::armUdpRead(KBESOCKET fd, SocketState& state)
 		return true;
 	}
 
-	delete pContext;
+	recycleContext(pContext);
 	return false;
 }
 
@@ -293,14 +328,14 @@ bool IocpPoller::armTcpSend(KBESOCKET fd, SocketState& state)
 		return false;
 	}
 
-	IocpContext* pContext = new IocpContext(fd, state.socket, SOCKET_KIND_TCP, OP_TCP_SEND, state.generation);
+	IocpContext* pContext = acquireContext(fd, state.socket, SOCKET_KIND_TCP, OP_TCP_SEND, state.generation);
 	// 合并多个小包为一次 WSASend，减少 IOCP completion 数量。
 	// 不能无限合并，否则一次 completion 回调可能占用过久，也会增加
 	// 断线时被取消的 outstanding buffer 大小。
 	bool copied = false;
 	if (!popTcpSendBatch(state, IOCP_TCP_SEND_BATCH_BYTES, pContext->tcpSendData, copied))
 	{
-		delete pContext;
+		recycleContext(pContext);
 		return true;
 	}
 	(void)copied;
@@ -328,7 +363,7 @@ bool IocpPoller::armTcpSend(KBESOCKET fd, SocketState& state)
 	// WSASend did not take ownership of the buffer; restore the batch before retrying later.
 	// WSASend 未接管缓冲区所有权，失败时先恢复 batch，等待后续轮次重试。
 	pushTcpSendFront(state, pContext->tcpSendData, 0);
-	delete pContext;
+	recycleContext(pContext);
 	return false;
 }
 
@@ -345,7 +380,7 @@ bool IocpPoller::armUdpSend(KBESOCKET fd, SocketState& state)
 		return false;
 	}
 
-	IocpContext* pContext = new IocpContext(fd, state.socket, SOCKET_KIND_UDP, OP_UDP_SEND, state.generation);
+	IocpContext* pContext = acquireContext(fd, state.socket, SOCKET_KIND_UDP, OP_UDP_SEND, state.generation);
 	PendingUdpSend pending = std::move(state.pendingUdpSends.front());
 	state.pendingUdpSends.pop_front();
 	state.pendingUdpSendBytes -= pending.data.size();
@@ -379,7 +414,7 @@ bool IocpPoller::armUdpSend(KBESOCKET fd, SocketState& state)
 	pending.data.swap(pContext->data);
 	state.pendingUdpSendBytes += pending.data.size();
 	state.pendingUdpSends.push_front(std::move(pending));
-	delete pContext;
+	recycleContext(pContext);
 	return false;
 }
 
@@ -391,14 +426,14 @@ bool IocpPoller::armAccept(KBESOCKET fd, SocketState& state)
 		return false;
 	}
 
-	IocpContext* pContext = new IocpContext(fd, state.socket, SOCKET_KIND_LISTENER, OP_ACCEPT, state.generation);
+	IocpContext* pContext = acquireContext(fd, state.socket, SOCKET_KIND_LISTENER, OP_ACCEPT, state.generation);
 
 	pContext->acceptSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
 	if (pContext->acceptSocket == INVALID_SOCKET)
 	{
 		ERROR_MSG(fmt::format("IocpPoller::armAccept: WSASocket failed: {}\n",
 			kbe_strerror(WSAGetLastError())));
-		delete pContext;
+		recycleContext(pContext);
 		return false;
 	}
 
@@ -427,7 +462,7 @@ bool IocpPoller::armAccept(KBESOCKET fd, SocketState& state)
 	WARNING_MSG(fmt::format("IocpPoller::armAccept: AcceptEx failed on fd {}: {}\n",
 		fd, kbe_strerror(wsaErr)));
 	cleanupContext(*pContext);
-	delete pContext;
+	recycleContext(pContext);
 	return false;
 }
 
@@ -687,11 +722,30 @@ void IocpPoller::cleanupContext(IocpContext& context)
 }
 
 //-------------------------------------------------------------------------------------
+IocpPoller::IocpContext* IocpPoller::acquireContext(KBESOCKET fd, KBESOCKET socket, SocketKind kind, Operation operation, uint64 generation)
+{
+	IocpContext* context = contextPool_.acquire();
+	context->reset(fd, socket, kind, operation, generation);
+	return context;
+}
+
+//-------------------------------------------------------------------------------------
+void IocpPoller::recycleContext(IocpContext* context)
+{
+	if (context == NULL)
+	{
+		return;
+	}
+
+	cleanupContext(*context);
+	contextPool_.release(context);
+}
+
+//-------------------------------------------------------------------------------------
 void IocpPoller::releaseContext(IocpContext& context)
 {
 	outstandingContexts_.erase(&context.overlapped);
-	cleanupContext(context);
-	delete &context;
+	recycleContext(&context);
 }
 
 //-------------------------------------------------------------------------------------

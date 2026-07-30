@@ -205,6 +205,18 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/poller/pendingRearms", &networkInterface_, &Network::NetworkInterface::pendingPollerRearms);
 	WATCH_OBJECT("network/poller/rearmAttempts", &networkInterface_, &Network::NetworkInterface::pollerRearmAttempts);
 	WATCH_OBJECT("network/poller/rearmRetries", &networkInterface_, &Network::NetworkInterface::pollerRearmRetries);
+	// Context and ownership counters distinguish allocator pressure from unavoidable multi-buffer coalescing without a socket-state scan.
+	// context 与所有权指标用于区分分配器压力和不可避免的多缓冲合批，查询过程不扫描 socket 状态。
+	WATCH_OBJECT("network/poller/contextAllocations", &networkInterface_, &Network::NetworkInterface::pollerContextAllocations);
+	WATCH_OBJECT("network/poller/contextReuses", &networkInterface_, &Network::NetworkInterface::pollerContextReuses);
+	WATCH_OBJECT("network/poller/contextsOutstanding", &networkInterface_, &Network::NetworkInterface::pollerContextsOutstanding);
+	WATCH_OBJECT("network/poller/contextsCached", &networkInterface_, &Network::NetworkInterface::pollerContextsCached);
+	WATCH_OBJECT("network/poller/contextsPeakOutstanding", &networkInterface_, &Network::NetworkInterface::pollerContextsPeakOutstanding);
+	WATCH_OBJECT("network/poller/tcpSendOwnershipTransfers", &networkInterface_, &Network::NetworkInterface::pollerTcpSendOwnershipTransfers);
+	WATCH_OBJECT("network/poller/tcpSendBatchCopies", &networkInterface_, &Network::NetworkInterface::pollerTcpSendBatchCopies);
+	WATCH_OBJECT("network/poller/tcpSendBatchCopiedBytes", &networkInterface_, &Network::NetworkInterface::pollerTcpSendBatchCopiedBytes);
+	WATCH_OBJECT("network/poller/receiveOwnershipTransfers", &networkInterface_, &Network::NetworkInterface::pollerReceiveOwnershipTransfers);
+	WATCH_OBJECT("network/poller/receiveTransferredBytes", &networkInterface_, &Network::NetworkInterface::pollerReceiveTransferredBytes);
 
 	return Network::initializeWatcher() && Resmgr::getSingleton().initializeWatcher() &&
 		threadPool_.initializeWatcher() && WatchPool::initWatchPools();

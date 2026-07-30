@@ -114,6 +114,16 @@ public:
 	virtual uint32 pendingRearmCount() const;
 	virtual uint64 rearmAttemptCount() const;
 	virtual uint64 rearmRetryCount() const;
+	virtual uint64 contextAllocationCount() const;
+	virtual uint64 contextReuseCount() const;
+	virtual uint64 contextOutstandingCount() const;
+	virtual uint64 contextCachedCount() const;
+	virtual uint64 contextPeakOutstandingCount() const;
+	virtual uint64 tcpSendOwnershipTransferCount() const;
+	virtual uint64 tcpSendBatchCopyCount() const;
+	virtual uint64 tcpSendBatchCopiedBytes() const;
+	virtual uint64 receiveOwnershipTransferCount() const;
+	virtual uint64 receiveOwnershipTransferredBytes() const;
 
 	void clearSpareTime()		{spareTime_ = 0;}
 	uint64 spareTime() const	{return spareTime_;}
