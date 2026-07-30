@@ -158,21 +158,10 @@ bool TCPPacketSender::processSend(Channel* pChannel, int userarg)
 				*/
 
 				++sendfailCount_;
-				// 内部 completion 队列暂满是正常的流控状态，不能通过 errorReporter 再发送一条内部 TCP 错误，
-				// 否则错误日志会反过来占满同一条链路，形成背压放大回路。
-				// A temporarily full internal completion queue is normal flow control. Do not send another internal TCP
-				// error through errorReporter, or logging will consume the same link and amplify the backpressure loop.
-				if (!pChannel->isExternal())
-					return false;
-
-				// 外部连接仍在连续失败超过阈值后通知上层。
-				// External channels retain the existing notification after repeated failures.
-				if (sendfailCount_ >= 10)
-				{
-					onGetError(pChannel, "TCPPacketSender::processSend: sendfailCount >= 10");
-					this->dispatcher().errorReporter().reportException(reason, pEndpoint_->addr(),
-						fmt::format("TCPPacketSender::processSend(external, sendfailCount({}) >= 10)", (int)sendfailCount_).c_str());
-				}
+				// completion 队列暂满是正常的流控状态，不能因为重试次数达到阈值就断开连接。
+				// A full completion queue is normal flow control; never disconnect merely because retries reached a threshold.
+				// 真正的 socket 错误会在下面的非 RESOURCE_UNAVAILABLE 分支中负责断开。
+				// Actual socket errors are handled by the non-RESOURCE_UNAVAILABLE branch below.
 			}
 			else
 			{
