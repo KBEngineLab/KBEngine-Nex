@@ -36,6 +36,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/interfaces.h"
 #include "network/message_handler.h"
 
+#include <algorithm>
+
 namespace KBEngine { 
 namespace Network
 {
@@ -674,6 +676,51 @@ uint64 NetworkInterface::kcpSchedulerCompactionCount() const { return kcpUpdateS
 uint64 NetworkInterface::kcpUpdateCallCount() const { return kcpUpdateScheduler_.updateCallCount(); }
 uint64 NetworkInterface::kcpTimerWakeupCount() const { return kcpUpdateScheduler_.timerWakeupCount(); }
 uint64 NetworkInterface::kcpTimerRearmCount() const { return kcpUpdateScheduler_.timerRearmCount(); }
+
+//-------------------------------------------------------------------------------------
+uint64 NetworkInterface::kcpPendingSegmentCount() const
+{
+	uint64 pendingSegments = 0;
+	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
+	{
+		const Channel* pChannel = iter->second;
+		if (pChannel != NULL && pChannel->pKCP() != NULL)
+			pendingSegments += static_cast<uint64>(ikcp_waitsnd(pChannel->pKCP()));
+	}
+	return pendingSegments;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 NetworkInterface::kcpMaxPendingSegmentsPerChannel() const
+{
+	uint64 maxPendingSegments = 0;
+	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
+	{
+		const Channel* pChannel = iter->second;
+		if (pChannel != NULL && pChannel->pKCP() != NULL)
+		{
+			maxPendingSegments = std::max<uint64>(maxPendingSegments,
+				static_cast<uint64>(ikcp_waitsnd(pChannel->pKCP())));
+		}
+	}
+	return maxPendingSegments;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 NetworkInterface::kcpSendWindowBlockedChannelCount() const
+{
+	uint64 blockedChannels = 0;
+	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
+	{
+		const Channel* pChannel = iter->second;
+		const ikcpcb* pKcp = pChannel != NULL ? pChannel->pKCP() : NULL;
+		// 与 KCPPacketSender 的 admission 水位保持一致，避免 watcher 和真实背压策略使用不同定义。
+		// Match KCPPacketSender's admission watermark so the watcher and actual backpressure policy use one definition.
+		if (pKcp != NULL && ikcp_waitsnd(pKcp) > static_cast<int>(pKcp->snd_wnd * 2))
+			++blockedChannels;
+	}
+	return blockedChannels;
+}
 
 //-------------------------------------------------------------------------------------
 uint32 NetworkInterface::numExternalTcpChannels() const

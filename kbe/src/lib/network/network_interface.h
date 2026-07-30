@@ -153,6 +153,9 @@ public:
 	uint64 kcpUpdateCallCount() const;
 	uint64 kcpTimerWakeupCount() const;
 	uint64 kcpTimerRearmCount() const;
+	uint64 kcpPendingSegmentCount() const;
+	uint64 kcpMaxPendingSegmentsPerChannel() const;
+	uint64 kcpSendWindowBlockedChannelCount() const;
 
 private:
 	friend class Channel;

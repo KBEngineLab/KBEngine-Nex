@@ -236,6 +236,11 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/kcp/updateCalls", &networkInterface_, &Network::NetworkInterface::kcpUpdateCallCount);
 	WATCH_OBJECT("network/kcp/timerWakeups", &networkInterface_, &Network::NetworkInterface::kcpTimerWakeupCount);
 	WATCH_OBJECT("network/kcp/timerRearms", &networkInterface_, &Network::NetworkInterface::kcpTimerRearmCount);
+	// waitsnd 指标区分 KCP 自身积压和 completion UDP 队列积压，避免只根据 4 MiB socket backlog 推断根因。
+	// The waitsnd metrics separate KCP-owned backlog from the completion UDP queue instead of inferring the cause from a 4 MiB socket backlog alone.
+	WATCH_OBJECT("network/kcp/pendingSegments", &networkInterface_, &Network::NetworkInterface::kcpPendingSegmentCount);
+	WATCH_OBJECT("network/kcp/maxPendingSegmentsPerChannel", &networkInterface_, &Network::NetworkInterface::kcpMaxPendingSegmentsPerChannel);
+	WATCH_OBJECT("network/kcp/sendWindowBlockedChannels", &networkInterface_, &Network::NetworkInterface::kcpSendWindowBlockedChannelCount);
 
 	return Network::initializeWatcher() && Resmgr::getSingleton().initializeWatcher() &&
 		threadPool_.initializeWatcher() && WatchPool::initWatchPools();
