@@ -286,6 +286,7 @@ private:
 	bool initKcp();
 	void finaliseKcp();
 	void updateKcp();
+	void prepareTickCounters();
 	static int kcpOutput(const char* buffer, int length, ikcpcb* kcp, void* user);
 
 private:
@@ -315,6 +316,7 @@ private:
 	uint32						numBytesReceived_;
 	uint32						lastTickBytesReceived_;
 	uint32						lastTickBytesSent_;
+	uint64						lastTickEpoch_;
 
 	PacketFilterPtr				pFilter_;
 	

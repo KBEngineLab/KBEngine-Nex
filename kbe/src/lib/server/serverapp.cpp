@@ -197,6 +197,9 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/channels/externalUdp", &networkInterface_, &Network::NetworkInterface::numExternalUdpChannels);
 	WATCH_OBJECT("network/channels/externalKcpControlBlocks", &networkInterface_, &Network::NetworkInterface::numExternalKcpControlBlocks);
 	WATCH_OBJECT("network/channels/externalKcpUpdateTimers", &networkInterface_, &Network::NetworkInterface::numExternalKcpUpdateTimers);
+	// 关闭维护队列应远小于总 Channel 数，持续增长表示优雅关闭或回收流程没有收敛。
+	// The close-maintenance queue should remain far smaller than the Channel population; sustained growth exposes a stalled close or reclamation path.
+	WATCH_OBJECT("network/channels/pendingMaintenance", &networkInterface_, &Network::NetworkInterface::pendingChannelMaintenanceCount);
 
 	return Network::initializeWatcher() && Resmgr::getSingleton().initializeWatcher() &&
 		threadPool_.initializeWatcher() && WatchPool::initWatchPools();

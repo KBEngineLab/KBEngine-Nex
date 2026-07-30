@@ -50,6 +50,8 @@ NetworkInterface::NetworkInterface(Network::EventDispatcher * pDispatcher,
 	extUdpEndpoint_(),
 	intEndpoint_(),
 	channelMap_(),
+	channelMaintenance_(),
+	channelTickEpoch_(0),
 	pDispatcher_(pDispatcher),
 	pExtListenerReceiver_(NULL),
 	pExtUdpListenerReceiver_(NULL),
@@ -113,6 +115,7 @@ NetworkInterface::~NetworkInterface()
 	}
 
 	channelMap_.clear();
+	channelMaintenance_.clear();
 
 	this->closeSocket();
 
@@ -153,6 +156,7 @@ void NetworkInterface::closeSocket()
 //-------------------------------------------------------------------------------------
 void NetworkInterface::cleanupChannel(ChannelMap::iterator iter)
 {
+	cancelChannelMaintenance(iter->first);
 	Channel* pChannel = iter->second;
 	channelMap_.erase(iter);
 
@@ -464,6 +468,8 @@ bool NetworkInterface::registerChannel(Channel* pChannel, bool replaceExistingAc
 	}
 
 	channelMap_[addr] = pChannel;
+	if (pChannel->isDestroyed() || pChannel->condemn() > 0)
+		requestChannelMaintenance(pChannel);
 
 	if(pChannel->isExternal())
 		numExtChannels_++;
@@ -485,6 +491,7 @@ bool NetworkInterface::deregisterAllChannels()
 	}
 
 	channelMap_.clear();
+	channelMaintenance_.clear();
 	numExtChannels_ = 0;
 
 	return true;
@@ -495,6 +502,7 @@ bool NetworkInterface::deregisterChannel(Channel* pChannel)
 {
 	const Address & addr = pChannel->addr();
 	KBE_ASSERT(pChannel->pEndPoint() != NULL);
+	cancelChannelMaintenance(addr);
 
 	if(pChannel->isExternal())
 		numExtChannels_--;
@@ -537,41 +545,69 @@ void NetworkInterface::onChannelTimeOut(Channel * pChannel)
 //-------------------------------------------------------------------------------------
 void NetworkInterface::processChannels(KBEngine::Network::MessageHandlers* pMsgHandlers)
 {
-	ChannelMap::iterator iter = channelMap_.begin();
-	for(; iter != channelMap_.end(); )
+	(void)pMsgHandlers;
+
+	// epoch 在旧 Tick 结束处前进；之后首次活动的 Channel 会自行清零计数器。
+	// Advance the epoch at the old tick boundary; each Channel resets its counters on its first later activity.
+	if (++channelTickEpoch_ == 0)
+		++channelTickEpoch_;
+
+	ChannelMaintenanceSet pending;
+	pending.swap(channelMaintenance_);
+	ChannelMaintenanceSet::const_iterator pendingIter = pending.begin();
+	for (; pendingIter != pending.end(); ++pendingIter)
 	{
+		ChannelMap::iterator iter = channelMap_.find(*pendingIter);
+		if (iter == channelMap_.end())
+			continue;
+
 		Network::Channel* pChannel = iter->second;
 
 		if(pChannel == NULL)
 		{
-			iter = channelMap_.erase(iter);
+			channelMap_.erase(iter);
 		}
 		else if(pChannel->isDestroyed())
 		{
-			ChannelMap::iterator current = iter++;
-			cleanupChannel(current);
+			cleanupChannel(iter);
 		}
 		else if(pChannel->condemn() > 0)
 		{
-			++iter;
-
 			if (pChannel->condemn() == Network::Channel::FLAG_CONDEMN_AND_WAIT_DESTROY && !pChannel->processGracefulClose())
 			{
-				pChannel->updateTick(pMsgHandlers);
+				// 优雅关闭需要在后续 Tick 继续推进，但不能恢复全 Channel 扫描。
+				// Graceful close must progress on later ticks without restoring a scan of every Channel.
+				channelMaintenance_.insert(*pendingIter);
 			}
 			else
 			{
-				deregisterChannel(pChannel);
-				pChannel->destroy();
-				Network::Channel::reclaimPoolObject(pChannel);
+				cleanupChannel(iter);
 			}
 		}
-		else
-		{
-			pChannel->updateTick(pMsgHandlers);
-			++iter;
-		}
 	}
+}
+
+//-------------------------------------------------------------------------------------
+void NetworkInterface::requestChannelMaintenance(Channel* pChannel)
+{
+	if (pChannel == NULL || pChannel->pEndPoint() == NULL)
+		return;
+
+	ChannelMap::iterator iter = channelMap_.find(pChannel->addr());
+	if (iter != channelMap_.end() && iter->second == pChannel)
+		channelMaintenance_.insert(iter->first);
+}
+
+//-------------------------------------------------------------------------------------
+void NetworkInterface::cancelChannelMaintenance(const Address& address)
+{
+	channelMaintenance_.erase(address);
+}
+
+//-------------------------------------------------------------------------------------
+uint32 NetworkInterface::pendingChannelMaintenanceCount() const
+{
+	return static_cast<uint32>(channelMaintenance_.size());
 }
 
 //-------------------------------------------------------------------------------------

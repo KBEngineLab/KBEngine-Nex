@@ -90,7 +90,7 @@ size_t Channel::getPoolObjectBytes()
 		sizeof(id_) + sizeof(inactivityTimerHandle_) + sizeof(inactivityExceptionPeriod_) + 
 		sizeof(lastReceivedTime_) + sizeof(lastTickBufferedReceives_) + sizeof(pPacketReader_) + (bundles_.size() * sizeof(Bundle*)) +
 		+ sizeof(flags_) + sizeof(numPacketsSent_) + sizeof(numPacketsReceived_) + sizeof(numBytesSent_) + sizeof(numBytesReceived_)
-		+ sizeof(lastTickBytesReceived_) + sizeof(lastTickBytesSent_) + sizeof(pFilter_) + sizeof(pEndPoint_) + sizeof(pPacketReceiver_) + sizeof(pPacketSender_)
+		+ sizeof(lastTickBytesReceived_) + sizeof(lastTickBytesSent_) + sizeof(lastTickEpoch_) + sizeof(pFilter_) + sizeof(pEndPoint_) + sizeof(pPacketReceiver_) + sizeof(pPacketSender_)
 		+ sizeof(proxyID_) + strextra_.size() + sizeof(channelType_)
 		+ sizeof(componentID_) + sizeof(pMsgHandlers_) + sizeof(pKCP_) + sizeof(kcpUpdateTimerHandle_) +
 		sizeof(hasSetNextKcpUpdate_) + condemnReason_.size();
@@ -137,6 +137,7 @@ Channel::Channel(NetworkInterface & networkInterface,
 	numBytesReceived_(0),
 	lastTickBytesReceived_(0),
 	lastTickBytesSent_(0),
+	lastTickEpoch_(0),
 	pFilter_(pFilter),
 	pEndPoint_(NULL),
 	pPacketReceiver_(NULL),
@@ -182,6 +183,7 @@ Channel::Channel():
 	numBytesReceived_(0),
 	lastTickBytesReceived_(0),
 	lastTickBytesSent_(0),
+	lastTickEpoch_(0),
 	pFilter_(NULL),
 	pEndPoint_(NULL),
 	pPacketReceiver_(NULL),
@@ -535,6 +537,9 @@ void Channel::destroy()
 		return;
 	}
 
+	if (pNetworkInterface_)
+		pNetworkInterface_->requestChannelMaintenance(this);
+
 	clearState();
 	flags_ |= FLAG_DESTROYED;
 }
@@ -556,6 +561,7 @@ void Channel::clearState( bool warnOnDiscard /*=false*/ )
 	lastTickBytesReceived_ = 0;
 	lastTickBytesSent_ = 0;
 	lastTickBufferedReceives_ = 0;
+	lastTickEpoch_ = pNetworkInterface_ ? pNetworkInterface_->channelTickEpoch() : 0;
 	proxyID_ = 0;
 	strextra_ = "";
 	channelType_ = CHANNEL_NORMAL;
@@ -855,6 +861,8 @@ void Channel::onSendCompleted()
 //-------------------------------------------------------------------------------------
 void Channel::onPacketSent(int bytes, bool sentCompleted)
 {
+	prepareTickCounters();
+
 	if(sentCompleted)
 	{
 		++numPacketsSent_;
@@ -893,6 +901,8 @@ void Channel::onPacketSent(int bytes, bool sentCompleted)
 //-------------------------------------------------------------------------------------
 void Channel::onPacketReceived(int bytes)
 {
+	prepareTickCounters();
+
 	lastReceivedTime_ = timestamp();
 	++numPacketsReceived_;
 	++g_numPacketsReceived;
@@ -929,6 +939,8 @@ void Channel::onPacketReceived(int bytes)
 //-------------------------------------------------------------------------------------
 void Channel::addReceiveWindow(Packet* pPacket)
 {
+	prepareTickCounters();
+
 	++lastTickBufferedReceives_;
 
 	if(Network::g_receiveWindowMessagesOverflowCritical > 0 && lastTickBufferedReceives_ > Network::g_receiveWindowMessagesOverflowCritical)
@@ -975,6 +987,9 @@ void Channel::condemn(const std::string& reason, bool waitSendCompletedDestroy)
 		condemnReason_ = reason;
 
 	flags_ |= (waitSendCompletedDestroy ? FLAG_CONDEMN_AND_WAIT_DESTROY : FLAG_CONDEMN);
+	if (pNetworkInterface_)
+		pNetworkInterface_->requestChannelMaintenance(this);
+
 	if (waitSendCompletedDestroy && gracefulCloseDeadline_ == 0)
 		gracefulCloseDeadline_ = timestamp() + GRACEFUL_CLOSE_TIMEOUT_STAMPS;
 }
@@ -1308,9 +1323,29 @@ bool Channel::processGracefulClose()
 //-------------------------------------------------------------------------------------
 void Channel::updateTick(KBEngine::Network::MessageHandlers* pMsgHandlers)
 {
+	(void)pMsgHandlers;
 	lastTickBytesReceived_ = 0;
 	lastTickBytesSent_ = 0;
 	lastTickBufferedReceives_ = 0;
+	lastTickEpoch_ = pNetworkInterface_ ? pNetworkInterface_->channelTickEpoch() : 0;
+}
+
+//-------------------------------------------------------------------------------------
+void Channel::prepareTickCounters()
+{
+	if (pNetworkInterface_ == NULL)
+		return;
+
+	const uint64 currentEpoch = pNetworkInterface_->channelTickEpoch();
+	if (lastTickEpoch_ == currentEpoch)
+		return;
+
+	// 只在本 Tick 首次活动时写 Channel cache line，空闲连接不再被主循环触碰。
+	// Touch the Channel cache line only on its first activity in this tick; idle connections remain untouched by the main loop.
+	lastTickBytesReceived_ = 0;
+	lastTickBytesSent_ = 0;
+	lastTickBufferedReceives_ = 0;
+	lastTickEpoch_ = currentEpoch;
 }
 
 //-------------------------------------------------------------------------------------

@@ -46,6 +46,7 @@ class NetworkInterface : public TimerHandler
 {
 public:
 	typedef std::map<Address, Channel *>	ChannelMap;
+	typedef std::set<Address>			ChannelMaintenanceSet;
 	
 	NetworkInterface(EventDispatcher * pDispatcher,
 		int32 extlisteningPort_min = -1, int32 extlisteningPort_max = -1, const char * extlisteningInterface = "",
@@ -120,18 +121,30 @@ public:
 	uint32 numExternalUdpChannels() const;
 	uint32 numExternalKcpControlBlocks() const;
 	uint32 numExternalKcpUpdateTimers() const;
+	uint32 pendingChannelMaintenanceCount() const;
 
 private:
+	friend class Channel;
+
 	virtual void handleTimeout(TimerHandle handle, void * arg);
 
 	void closeSocket();
 	void cleanupChannel(ChannelMap::iterator iter);
 	bool registerChannel(Channel* pChannel, bool replaceExistingAcceptedChannel);
+	void requestChannelMaintenance(Channel* pChannel);
+	void cancelChannelMaintenance(const Address& address);
+	uint64 channelTickEpoch() const { return channelTickEpoch_; }
 
 private:
 	EndPoint								extEndpoint_, extUdpEndpoint_, intEndpoint_;
 
 	ChannelMap								channelMap_;
+	// 只有进入关闭生命周期的 Channel 才需要每 Tick 推进，正常空闲连接不参与该集合。
+	// Only channels in their closing lifecycle require per-tick progress; ordinary idle connections never enter this set.
+	ChannelMaintenanceSet					channelMaintenance_;
+	// Tick epoch 让 Channel 在首次收发时懒清零窗口计数，避免为全部连接执行无效写入。
+	// The tick epoch lets a Channel lazily reset window counters on first activity, avoiding writes to every connection.
+	uint64									channelTickEpoch_;
 
 	EventDispatcher *						pDispatcher_;
 	
