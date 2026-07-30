@@ -381,9 +381,8 @@ bool IocpPoller::armUdpSend(KBESOCKET fd, SocketState& state)
 	}
 
 	IocpContext* pContext = acquireContext(fd, state.socket, SOCKET_KIND_UDP, OP_UDP_SEND, state.generation);
-	PendingUdpSend pending = std::move(state.pendingUdpSends.front());
-	state.pendingUdpSends.pop_front();
-	state.pendingUdpSendBytes -= pending.data.size();
+	PendingUdpSend pending;
+	dequeueUdpSend(state, pending);
 	pContext->data.swap(pending.data);
 	pContext->udpAddr = pending.dstAddr;
 	pContext->udpAddrLen = sizeof(pContext->udpAddr);
@@ -412,8 +411,7 @@ bool IocpPoller::armUdpSend(KBESOCKET fd, SocketState& state)
 	// WSASendTo did not take ownership of the datagram; put it back at the queue front.
 	// WSASendTo 未接管数据报所有权，将其放回队首等待后续重试。
 	pending.data.swap(pContext->data);
-	state.pendingUdpSendBytes += pending.data.size();
-	state.pendingUdpSends.push_front(std::move(pending));
+	restoreUdpSendFront(state, std::move(pending));
 	recycleContext(pContext);
 	return false;
 }

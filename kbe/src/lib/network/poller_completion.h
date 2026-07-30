@@ -6,6 +6,7 @@
 #include "event_poller.h"
 #include "completion_rearm_queue.h"
 #include "completion_tcp_send_queue.h"
+#include "completion_udp_send_budget.h"
 
 #include <deque>
 #include <memory>
@@ -114,6 +115,7 @@ protected:
 		CompletionTcpSendQueue pendingTcpSends;
 		std::deque<PendingUdpSend> pendingUdpSends;
 		size_t pendingUdpSendBytes;
+		CompletionUdpSendBudget pendingUdpSendBudget;
 		// 接收 completion 队列字节数用于 kqueue readiness adapter 背压和诊断。
 		// 注意断开、错误这类 completion 可能没有 data，不能只靠 bytes 判断队列为空；
 		// cleanupStateIfUnused 还会同时检查 map/deque 里的 item 数。
@@ -183,6 +185,12 @@ protected:
 	// WSASend/io_uring send 都可能只完成部分字节；剩余数据必须插回队首，
 	// 否则后续排队数据会越过它，破坏 TCP 字节流顺序。
 	bool pushTcpSendFront(SocketState& state, CompletionTcpSendBuffer& data, size_t consumedBytes);
+
+	// 统一维护 UDP 队列的总字节数和目标地址字节数，供 IOCP/io_uring/kqueue 共享。
+	// Keep aggregate and per-destination UDP queue bytes in one place for IOCP, io_uring, and kqueue.
+	void dequeueUdpSend(SocketState& state, PendingUdpSend& pending);
+	void restoreUdpSendFront(SocketState& state, PendingUdpSend&& pending);
+	uint64 udpDestinationKey(const sockaddr_in& address) const;
 
 	// 判断 accept/recv 队列是否还有容量。
 	// 这些水位主要服务 kqueue readiness adapter：kqueue 需要先把 readiness 数据读到

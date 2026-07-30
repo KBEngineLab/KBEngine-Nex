@@ -629,15 +629,15 @@ int KqueuePoller::flushPendingSends(KBESOCKET fd, SocketState& state)
 			{
 				WARNING_MSG(fmt::format("KqueuePoller::flushPendingSends: udp sendto failed on fd {}: {}\n",
 					fd, kbe_strerror()));
-				state.pendingUdpSendBytes -= pending.data.size();
-				state.pendingUdpSends.pop_front();
+				PendingUdpSend failed;
+				dequeueUdpSend(state, failed);
 				++count;
 			}
 			break;
 		}
 
-		state.pendingUdpSendBytes -= pending.data.size();
-		state.pendingUdpSends.pop_front();
+		PendingUdpSend sent;
+		dequeueUdpSend(state, sent);
 		++count;
 	}
 

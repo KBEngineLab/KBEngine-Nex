@@ -6,6 +6,7 @@ add_library(network STATIC
     common.cpp
     completion_rearm_queue.cpp
     completion_tcp_send_queue.cpp
+    completion_udp_send_budget.cpp
     delayed_channels.cpp
     encryption_filter.cpp
     endpoint.cpp

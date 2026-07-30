@@ -16,6 +16,7 @@ namespace
 {
 const size_t COMPLETION_TCP_SEND_BACKLOG_BYTES = 1024 * 1024;
 const size_t COMPLETION_UDP_SEND_BACKLOG_BYTES = 4 * 1024 * 1024;
+const size_t COMPLETION_UDP_DESTINATION_BACKLOG_BYTES = 128 * 1024;
 const size_t COMPLETION_TCP_RECV_BACKLOG_BYTES = 1024 * 1024;
 const size_t COMPLETION_UDP_RECV_BACKLOG_BYTES = 4 * 1024 * 1024;
 // accept 队列也必须有界。登录风暴下 listener 可能比 NetworkInterface 注册 Channel 更快，
@@ -43,6 +44,7 @@ CompletionPoller::SocketState::SocketState(KBESOCKET socketArg) :
 	pendingTcpSends(),
 	pendingUdpSends(),
 	pendingUdpSendBytes(0),
+	pendingUdpSendBudget(),
 	pendingTcpReceiveBytes(0),
 	pendingUdpReceiveBytes(0)
 #if KBE_PLATFORM == PLATFORM_WIN32
@@ -260,6 +262,11 @@ bool CompletionPoller::queueUdpSend(KBESOCKET fd, const void* data, int len, con
 
 	PendingUdpSend pending;
 	pending.data.assign(static_cast<const char*>(data), static_cast<const char*>(data) + len);
+	memset(&pending.dstAddr, 0, sizeof(pending.dstAddr));
+	pending.dstAddr.sin_family = AF_INET;
+	pending.dstAddr.sin_addr.s_addr = dstAddr.ip;
+	pending.dstAddr.sin_port = dstAddr.port;
+	const uint64 destination = udpDestinationKey(pending.dstAddr);
 	if (state.pendingUdpSendBytes + pending.data.size() > COMPLETION_UDP_SEND_BACKLOG_BYTES)
 	{
 		++udpSendBackpressureCount_;
@@ -270,11 +277,16 @@ bool CompletionPoller::queueUdpSend(KBESOCKET fd, const void* data, int len, con
 #endif
 		return false;
 	}
-
-	memset(&pending.dstAddr, 0, sizeof(pending.dstAddr));
-	pending.dstAddr.sin_family = AF_INET;
-	pending.dstAddr.sin_addr.s_addr = dstAddr.ip;
-	pending.dstAddr.sin_port = dstAddr.port;
+	if (!state.pendingUdpSendBudget.tryReserve(destination, pending.data.size(), COMPLETION_UDP_DESTINATION_BACKLOG_BYTES))
+	{
+		++udpSendBackpressureCount_;
+#if KBE_PLATFORM == PLATFORM_WIN32
+		WSASetLastError(WSAEWOULDBLOCK);
+#else
+		errno = EAGAIN;
+#endif
+		return false;
+	}
 	state.pendingUdpSendBytes += pending.data.size();
 	state.pendingUdpSends.push_back(std::move(pending));
 	// 峰值在入队热路径只比较当前 socket，避免每个数据报扫描全部 fd；UDP listener 的 KCP Channel 本就共享该 socket。
@@ -590,6 +602,7 @@ void CompletionPoller::clearPendingSends(SocketState& state)
 	state.pendingTcpSends.clear();
 	state.pendingUdpSends.clear();
 	state.pendingUdpSendBytes = 0;
+	state.pendingUdpSendBudget.clear();
 }
 
 //-------------------------------------------------------------------------------------
@@ -621,6 +634,32 @@ bool CompletionPoller::pushTcpSendFront(SocketState& state, CompletionTcpSendBuf
 	// 只推进 offset 并转移原 buffer，部分发送不会再分配和复制剩余尾部。
 	// Advance only an offset and transfer the original buffer so partial sends no longer allocate and copy the remaining tail.
 	return state.pendingTcpSends.restore(data, consumedBytes);
+}
+
+//-------------------------------------------------------------------------------------
+uint64 CompletionPoller::udpDestinationKey(const sockaddr_in& address) const
+{
+	return (static_cast<uint64>(address.sin_addr.s_addr) << 16) | static_cast<uint64>(address.sin_port);
+}
+
+//-------------------------------------------------------------------------------------
+void CompletionPoller::dequeueUdpSend(SocketState& state, PendingUdpSend& pending)
+{
+	KBE_ASSERT(!state.pendingUdpSends.empty());
+	pending = std::move(state.pendingUdpSends.front());
+	state.pendingUdpSends.pop_front();
+	state.pendingUdpSendBytes -= pending.data.size();
+	const uint64 destination = udpDestinationKey(pending.dstAddr);
+	state.pendingUdpSendBudget.release(destination, pending.data.size());
+}
+
+//-------------------------------------------------------------------------------------
+void CompletionPoller::restoreUdpSendFront(SocketState& state, PendingUdpSend&& pending)
+{
+	const uint64 destination = udpDestinationKey(pending.dstAddr);
+	state.pendingUdpSendBytes += pending.data.size();
+	state.pendingUdpSendBudget.restore(destination, pending.data.size());
+	state.pendingUdpSends.push_front(std::move(pending));
 }
 
 //-------------------------------------------------------------------------------------

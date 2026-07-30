@@ -710,9 +710,8 @@ bool IoUringPoller::armUdpSend(KBESOCKET fd, SocketState& state)
 		return false;
 	}
 
-	PendingUdpSend pending = std::move(state.pendingUdpSends.front());
-	state.pendingUdpSends.pop_front();
-	state.pendingUdpSendBytes -= pending.data.size();
+	PendingUdpSend pending;
+	dequeueUdpSend(state, pending);
 
 	IoUringContext* context = acquireContext(fd, state.socket, SOCKET_KIND_UDP, OP_UDP_SEND, state.generation);
 	trackContext(context);
