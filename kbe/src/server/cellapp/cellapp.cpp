@@ -164,8 +164,15 @@ bool Cellapp::initializeWatcher()
 	WATCH_OBJECT("witness/active", &Witness::activeCount);
 	WATCH_OBJECT("witness/dirtyQueued", &Witness::dirtyQueuedCount);
 	WATCH_OBJECT("witness/fullScans", &Witness::fullScanCount);
+	WATCH_OBJECT("witness/fullScanEntities", &Witness::fullScanEntityCount);
 	WATCH_OBJECT("witness/dirtyProcessed", &Witness::dirtyProcessedCount);
 	WATCH_OBJECT("witness/maxQueueDepth", &Witness::maxQueueDepth);
+	WATCH_OBJECT("witness/viewEntities", &Witness::viewEntityCount);
+	WATCH_OBJECT("witness/maxViewEntities", &Witness::maxViewEntityCount);
+	WATCH_OBJECT("witness/dirtyEnqueued", &Witness::dirtyEnqueuedCount);
+	WATCH_OBJECT("witness/dirtyRequeues", &Witness::dirtyRequeueCount);
+	WATCH_OBJECT("witness/staleDiscards", &Witness::staleDiscardCount);
+	WATCH_OBJECT("witness/stateSkips", &Witness::stateSkipCount);
 	return EntityApp<Entity>::initializeWatcher() && WatchObjectPool::initWatchPools();
 }
 

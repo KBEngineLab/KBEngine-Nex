@@ -53,10 +53,7 @@ namespace KBEngine{
 namespace
 {
 uint64 g_witnessActiveCount = 0;
-uint64 g_witnessDirtyQueuedCount = 0;
-uint64 g_witnessFullScanCount = 0;
-uint64 g_witnessDirtyProcessedCount = 0;
-uint64 g_witnessMaxQueueDepth = 0;
+WitnessLoadMetrics g_witnessLoadMetrics;
 }
 
 //-------------------------------------------------------------------------------------
@@ -70,6 +67,7 @@ viewEntities_(),
 viewEntities_map_(),
 clientViewSize_(0),
 fullScanRequired_(true),
+trackedViewEntityCount_(0),
 nextEntityRefGeneration_(1),
 volatileDirtyQueue_()
 {
@@ -133,6 +131,7 @@ void Witness::createFromStream(KBEngine::MemoryStream& s)
 		viewEntities_map_[pEntityRef->id()] = pEntityRef;
 		pEntityRef->aliasID(i);
 	}
+	synchronizeViewEntityMetrics();
 
 	setViewRadius(viewRadius_, viewHysteresisArea_);
 
@@ -255,6 +254,7 @@ void Witness::clear(Entity* pEntity)
 
 	viewEntities_.clear();
 	viewEntities_map_.clear();
+	synchronizeViewEntityMetrics();
 	clearVolatileDirtyQueue();
 	fullScanRequired_ = true;
 	KBE_ASSERT(g_witnessActiveCount > 0);
@@ -300,6 +300,7 @@ Witness::SmartPoolObjectPtr Witness::createSmartPoolObj(const std::string& logPo
 //-------------------------------------------------------------------------------------
 void Witness::onReclaimObject()
 {
+	synchronizeViewEntityMetrics();
 	clearVolatileDirtyQueue();
 	fullScanRequired_ = true;
 	nextEntityRefGeneration_ = 1;
@@ -476,6 +477,7 @@ void Witness::onEnterView(ViewTrigger* pViewTrigger, Entity* pEntity)
 	pEntityRef->flags(pEntityRef->flags() | ENTITYREF_FLAG_ENTER_CLIENT_PENDING);
 	viewEntities_.push_back(pEntityRef);
 	viewEntities_map_[pEntityRef->id()] = pEntityRef;
+	synchronizeViewEntityMetrics();
 	KBE_ASSERT(viewEntities_map_.size() <= static_cast<size_t>(std::numeric_limits<int>::max()));
 	pEntityRef->aliasID(static_cast<int>(viewEntities_map_.size() - 1));
 	
@@ -539,6 +541,7 @@ void Witness::resetViewEntities()
 		(*iter)->flags(ENTITYREF_FLAG_ENTER_CLIENT_PENDING);
 		++iter;
 	}
+	synchronizeViewEntityMetrics();
 	
 	updateEntitiesAliasID();
 }
@@ -603,6 +606,7 @@ void Witness::onLeaveSpace(Space* pSpace)
 
 	viewEntities_.clear();
 	viewEntities_map_.clear();
+	synchronizeViewEntityMetrics();
 	clearVolatileDirtyQueue();
 	fullScanRequired_ = true;
 
@@ -800,9 +804,14 @@ void Witness::clearVolatileDirtyQueue()
 		(*iter)->volatileQueued(false);
 
 	const size_t queuedCount = volatileDirtyQueue_.size();
-	KBE_ASSERT(g_witnessDirtyQueuedCount >= queuedCount);
-	g_witnessDirtyQueuedCount -= queuedCount;
+	g_witnessLoadMetrics.recordDirtyDequeued(queuedCount);
 	volatileDirtyQueue_.clear();
+}
+
+//-------------------------------------------------------------------------------------
+void Witness::synchronizeViewEntityMetrics()
+{
+	g_witnessLoadMetrics.synchronizeViewCount(trackedViewEntityCount_, viewEntities_.size());
 }
 
 //-------------------------------------------------------------------------------------
@@ -818,17 +827,13 @@ void Witness::initializeEntityRefLifecycle(EntityRef* pEntityRef)
 }
 
 //-------------------------------------------------------------------------------------
-void Witness::queueEntityRefVolatile(EntityRef* pEntityRef)
+void Witness::queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue)
 {
 	if (!pEntityRef || pEntityRef->flags() != ENTITYREF_FLAG_NORMAL)
 		return;
 
 	if (volatileDirtyQueue_.enqueue(pEntityRef->id(), pEntityRef->generation(), pEntityRef->volatileQueuedRef()))
-	{
-		++g_witnessDirtyQueuedCount;
-		if (volatileDirtyQueue_.size() > g_witnessMaxQueueDepth)
-			g_witnessMaxQueueDepth = volatileDirtyQueue_.size();
-	}
+		g_witnessLoadMetrics.recordDirtyEnqueued(volatileDirtyQueue_.size(), requeue);
 }
 
 //-------------------------------------------------------------------------------------
@@ -854,25 +859,30 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 		WitnessDirtyQueue::Entry entry;
 		if (!volatileDirtyQueue_.pop(entry))
 			break;
-		KBE_ASSERT(g_witnessDirtyQueuedCount > 0);
-		--g_witnessDirtyQueuedCount;
+		g_witnessLoadMetrics.recordDirtyDequeued();
 
 		VIEW_ENTITIES_MAP::iterator iter = viewEntities_map_.find(entry.entityID);
 		if (iter == viewEntities_map_.end() || iter->second->generation() != entry.generation)
+		{
+			g_witnessLoadMetrics.recordStaleDiscard();
 			continue;
+		}
 
 		EntityRef* pEntityRef = iter->second;
 		pEntityRef->volatileQueued(false);
 		if (pEntityRef->flags() != ENTITYREF_FLAG_NORMAL || !pEntityRef->pEntity())
+		{
+			g_witnessLoadMetrics.recordStateSkip();
 			continue;
+		}
 
 		Entity* pOtherEntity = pEntityRef->pEntity();
 		const uint32 flags = getEntityVolatileDataUpdateFlags(pOtherEntity);
 		addUpdateToStream(pSendBundle, flags, pEntityRef);
-		++g_witnessDirtyProcessedCount;
+		g_witnessLoadMetrics.recordDirtyProcessed();
 
 		if (flags != UPDATE_FLAG_NULL)
-			queueEntityRefVolatile(pEntityRef);
+			queueEntityRefVolatile(pEntityRef, true);
 	}
 }
 
@@ -885,25 +895,67 @@ uint64 Witness::activeCount()
 //-------------------------------------------------------------------------------------
 uint64 Witness::dirtyQueuedCount()
 {
-	return g_witnessDirtyQueuedCount;
+	return g_witnessLoadMetrics.dirtyQueued();
 }
 
 //-------------------------------------------------------------------------------------
 uint64 Witness::fullScanCount()
 {
-	return g_witnessFullScanCount;
+	return g_witnessLoadMetrics.fullScans();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::fullScanEntityCount()
+{
+	return g_witnessLoadMetrics.fullScanEntities();
 }
 
 //-------------------------------------------------------------------------------------
 uint64 Witness::dirtyProcessedCount()
 {
-	return g_witnessDirtyProcessedCount;
+	return g_witnessLoadMetrics.dirtyProcessed();
 }
 
 //-------------------------------------------------------------------------------------
 uint64 Witness::maxQueueDepth()
 {
-	return g_witnessMaxQueueDepth;
+	return g_witnessLoadMetrics.maxQueueDepth();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::viewEntityCount()
+{
+	return g_witnessLoadMetrics.viewEntities();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::maxViewEntityCount()
+{
+	return g_witnessLoadMetrics.maxViewEntities();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::dirtyEnqueuedCount()
+{
+	return g_witnessLoadMetrics.dirtyEnqueued();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::dirtyRequeueCount()
+{
+	return g_witnessLoadMetrics.dirtyRequeues();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::staleDiscardCount()
+{
+	return g_witnessLoadMetrics.staleDiscards();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::stateSkipCount()
+{
+	return g_witnessLoadMetrics.stateSkips();
 }
 
 //-------------------------------------------------------------------------------------
@@ -953,14 +1005,15 @@ bool Witness::update()
 		const bool performFullScan = fullScanRequired_ || additionalUpdates == 0;
 		if (performFullScan)
 		{
-			++g_witnessFullScanCount;
 			// 在扫描前消费标志，使回调重入产生的新结构变化能够保留到下一 Tick。
 			// Consume the flag before scanning so structural changes caused by callback re-entry remain scheduled for the next tick.
 			fullScanRequired_ = false;
 			clearVolatileDirtyQueue();
+			size_t scannedEntities = 0;
 			VIEW_ENTITIES::iterator iter = viewEntities_.begin();
 			for(; iter != viewEntities_.end(); )
 			{
+				++scannedEntities;
 				EntityRef* pEntityRef = (*iter);
 
 				if((pEntityRef->flags() & ENTITYREF_FLAG_ENTER_CLIENT_PENDING) > 0)
@@ -1004,7 +1057,7 @@ bool Witness::update()
 
 					++clientViewSize_;
 					if (additionalUpdates > 0 && needsAdditionalVolatileUpdate(otherEntity))
-						queueEntityRefVolatile(pEntityRef);
+						queueEntityRefVolatile(pEntityRef, true);
 				}
 				else if((pEntityRef->flags() & ENTITYREF_FLAG_LEAVE_CLIENT_PENDING) > 0)
 				{
@@ -1045,11 +1098,13 @@ bool Witness::update()
 					const uint32 flags = getEntityVolatileDataUpdateFlags(otherEntity);
 					addUpdateToStream(pSendBundle, flags, pEntityRef);
 					if (additionalUpdates > 0 && flags != UPDATE_FLAG_NULL)
-						queueEntityRefVolatile(pEntityRef);
+						queueEntityRefVolatile(pEntityRef, true);
 				}
 
 				++iter;
 			}
+			synchronizeViewEntityMetrics();
+			g_witnessLoadMetrics.recordFullScan(scannedEntities);
 		}
 		else
 		{

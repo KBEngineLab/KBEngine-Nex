@@ -25,6 +25,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "updatable.h"
 #include "entityref.h"
 #include "witness_dirty_queue.h"
+#include "witness_load_metrics.h"
 #include "helper/debug_helper.h"
 #include "common/common.h"
 #include "common/objectpool.h"
@@ -201,8 +202,15 @@ public:
 	static uint64 activeCount();
 	static uint64 dirtyQueuedCount();
 	static uint64 fullScanCount();
+	static uint64 fullScanEntityCount();
 	static uint64 dirtyProcessedCount();
 	static uint64 maxQueueDepth();
+	static uint64 viewEntityCount();
+	static uint64 maxViewEntityCount();
+	static uint64 dirtyEnqueuedCount();
+	static uint64 dirtyRequeueCount();
+	static uint64 staleDiscardCount();
+	static uint64 stateSkipCount();
 
 private:
 	/**
@@ -216,8 +224,9 @@ private:
 	void updateEntitiesAliasID();
 	void requireFullScan();
 	void clearVolatileDirtyQueue();
+	void synchronizeViewEntityMetrics();
 	void initializeEntityRefLifecycle(EntityRef* pEntityRef);
-	void queueEntityRefVolatile(EntityRef* pEntityRef);
+	void queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue = false);
 	bool needsAdditionalVolatileUpdate(Entity* pEntity);
 	void processVolatileDirtyQueue(Network::Bundle* pSendBundle);
 		
@@ -240,6 +249,7 @@ private:
 
 	uint16									clientViewSize_;
 	bool									fullScanRequired_;
+	size_t								trackedViewEntityCount_;
 	uint64									nextEntityRefGeneration_;
 	WitnessDirtyQueue						volatileDirtyQueue_;
 };
