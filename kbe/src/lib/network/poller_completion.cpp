@@ -59,7 +59,10 @@ CompletionPoller::CompletionPoller() :
 	socketStates_(),
 	acceptedSockets_(),
 	tcpReceived_(),
-	udpReceived_()
+	udpReceived_(),
+	rearmQueue_(),
+	rearmAttemptCount_(0),
+	rearmRetryCount_(0)
 {
 }
 
@@ -267,6 +270,60 @@ bool CompletionPoller::hasPendingSend(KBESOCKET fd) const
 	const SocketState& state = *iter->second;
 	return state.writeArmed || state.pPendingWriteContext != NULL || !state.pendingTcpSends.empty() ||
 		state.pendingTcpSendBytes > 0 || !state.pendingUdpSends.empty() || state.pendingUdpSendBytes > 0;
+}
+
+//-------------------------------------------------------------------------------------
+uint32 CompletionPoller::pendingRearmCount() const
+{
+	return static_cast<uint32>(rearmQueue_.size());
+}
+
+//-------------------------------------------------------------------------------------
+uint64 CompletionPoller::rearmAttemptCount() const
+{
+	return rearmAttemptCount_;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 CompletionPoller::rearmRetryCount() const
+{
+	return rearmRetryCount_;
+}
+
+//-------------------------------------------------------------------------------------
+void CompletionPoller::requestRearm(KBESOCKET fd, uint8 flags)
+{
+	rearmQueue_.request(fd, flags);
+}
+
+//-------------------------------------------------------------------------------------
+void CompletionPoller::cancelRearm(KBESOCKET fd, uint8 flags)
+{
+	rearmQueue_.cancel(fd, flags);
+}
+
+//-------------------------------------------------------------------------------------
+bool CompletionPoller::takeRearmRequest(KBESOCKET& fd, uint8& flags)
+{
+	return rearmQueue_.take(fd, flags);
+}
+
+//-------------------------------------------------------------------------------------
+size_t CompletionPoller::rearmBatchSize() const
+{
+	// 调用方只处理本轮开始时存在的请求；本轮失败重新入队后必须等下一轮，避免忙循环。
+	// Process only requests present at the start of this round; failed submissions wait for the next round to prevent a busy loop.
+	return rearmQueue_.size();
+}
+
+//-------------------------------------------------------------------------------------
+void CompletionPoller::recordRearmAttempt(bool retryRequired)
+{
+	++rearmAttemptCount_;
+	if (retryRequired)
+	{
+		++rearmRetryCount_;
+	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -682,6 +739,7 @@ void CompletionPoller::cleanupStateIfUnused(KBESOCKET fd)
 		acceptedSockets_.erase(acceptedIter);
 	}
 
+	cancelRearm(fd);
 	socketStates_.erase(iter);
 }
 

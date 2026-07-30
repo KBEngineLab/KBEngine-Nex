@@ -26,6 +26,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "network/address.h"
 #include "network/event_dispatcher.h"
+#include "network/event_poller.h"
 #include "network/packet_receiver.h"
 #include "network/listener_receiver.h"
 #include "network/listener_udp_receiver.h"
@@ -608,6 +609,27 @@ void NetworkInterface::cancelChannelMaintenance(const Address& address)
 uint32 NetworkInterface::pendingChannelMaintenanceCount() const
 {
 	return static_cast<uint32>(channelMaintenance_.size());
+}
+
+//-------------------------------------------------------------------------------------
+uint32 NetworkInterface::pendingPollerRearms() const
+{
+	EventPoller* pPoller = pDispatcher_ != NULL ? pDispatcher_->pPoller() : NULL;
+	return pPoller != NULL ? pPoller->pendingRearmCount() : 0;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 NetworkInterface::pollerRearmAttempts() const
+{
+	EventPoller* pPoller = pDispatcher_ != NULL ? pDispatcher_->pPoller() : NULL;
+	return pPoller != NULL ? pPoller->rearmAttemptCount() : 0;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 NetworkInterface::pollerRearmRetries() const
+{
+	EventPoller* pPoller = pDispatcher_ != NULL ? pDispatcher_->pPoller() : NULL;
+	return pPoller != NULL ? pPoller->rearmRetryCount() : 0;
 }
 
 //-------------------------------------------------------------------------------------

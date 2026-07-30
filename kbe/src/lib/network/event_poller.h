@@ -109,6 +109,12 @@ public:
 	// Report whether a socket still has pending completion-backend sends to avoid duplicate write registration.
 	virtual bool hasPendingSend(KBESOCKET fd) const;
 
+	// 返回 completion 后端重新投递队列的诊断指标；readiness 后端始终返回 0。
+	// Return diagnostic counters for the completion rearm queue; readiness backends always report zero.
+	virtual uint32 pendingRearmCount() const;
+	virtual uint64 rearmAttemptCount() const;
+	virtual uint64 rearmRetryCount() const;
+
 	void clearSpareTime()		{spareTime_ = 0;}
 	uint64 spareTime() const	{return spareTime_;}
 

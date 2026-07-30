@@ -122,6 +122,9 @@ public:
 	uint32 numExternalKcpControlBlocks() const;
 	uint32 numExternalKcpUpdateTimers() const;
 	uint32 pendingChannelMaintenanceCount() const;
+	uint32 pendingPollerRearms() const;
+	uint64 pollerRearmAttempts() const;
+	uint64 pollerRearmRetries() const;
 
 private:
 	friend class Channel;

@@ -122,6 +122,9 @@ private:
 
 	// 投递指定 fd 的读侧请求。
 	bool ensureReadArmed(KBESOCKET fd, SocketState& state);
+	// 处理上一轮因 SQ 容量或暂时性错误未能投递的 fd。
+	// Process descriptors that could not be submitted in the previous round because of SQ capacity or transient errors.
+	void processRearmRequests();
 
 	// 投递 accept completion。
 	bool armAccept(KBESOCKET fd, SocketState& state);

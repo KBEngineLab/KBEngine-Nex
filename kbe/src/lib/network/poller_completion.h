@@ -4,6 +4,7 @@
 #define KBE_COMPLETION_POLLER_H
 
 #include "event_poller.h"
+#include "completion_rearm_queue.h"
 
 #include <deque>
 #include <memory>
@@ -49,6 +50,9 @@ public:
 
 	// 查询指定 fd 是否还有未完成或待投递的发送数据。
 	bool hasPendingSend(KBESOCKET fd) const override;
+	uint32 pendingRearmCount() const override;
+	uint64 rearmAttemptCount() const override;
+	uint64 rearmRetryCount() const override;
 
 protected:
 	enum SocketKind
@@ -106,6 +110,14 @@ protected:
 		// AcceptEx 函数指针随监听 socket 缓存在共享状态里。
 		LPFN_ACCEPTEX acceptExFn;
 #endif
+	};
+
+	enum RearmFlags
+	{
+		REARM_NONE = CompletionRearmQueue::NONE,
+		REARM_READ = CompletionRearmQueue::READ,
+		REARM_WRITE = CompletionRearmQueue::WRITE,
+		REARM_ALL = CompletionRearmQueue::ALL
 	};
 
 	typedef std::unique_ptr<SocketState> SocketStatePtr;
@@ -194,10 +206,21 @@ protected:
 	// 清理一个不再有注册、pending IO 和排队数据的 fd 状态。
 	void cleanupStateIfUnused(KBESOCKET fd);
 
+	// 失败的读写投递按 fd 合并后进入 FIFO；轮转重试避免 SQ/驱动资源紧张时低编号 fd 长期抢占。
+	// Merge failed read/write submissions by fd into a FIFO so rotation prevents low-numbered descriptors from monopolizing scarce SQ or driver resources.
+	void requestRearm(KBESOCKET fd, uint8 flags);
+	void cancelRearm(KBESOCKET fd, uint8 flags = REARM_ALL);
+	bool takeRearmRequest(KBESOCKET& fd, uint8& flags);
+	size_t rearmBatchSize() const;
+	void recordRearmAttempt(bool retryRequired);
+
 	SocketStates socketStates_;
 	AcceptedSocketMap acceptedSockets_;
 	TcpReceivedMap tcpReceived_;
 	UdpReceivedMap udpReceived_;
+	CompletionRearmQueue rearmQueue_;
+	uint64 rearmAttemptCount_;
+	uint64 rearmRetryCount_;
 };
 
 }

@@ -141,7 +141,10 @@ bool IocpPoller::queueTcpSend(KBESOCKET fd, const void* data, int len)
 
 	// Once the shared queue accepts bytes, ownership has moved to the poller even if the first WSASend attempt fails.
 	// 共享队列接受字节后，数据所有权已经转移给 poller，即使首次 WSASend 投递失败也由后端继续重试。
-	armTcpSend(fd, state);
+	if (!armTcpSend(fd, state))
+	{
+		requestRearm(fd, REARM_WRITE);
+	}
 	return true;
 }
 
@@ -157,7 +160,10 @@ bool IocpPoller::queueUdpSend(KBESOCKET fd, const void* data, int len, const Add
 	SocketState& state = socketStateForFd(fd);
 	// Once the shared queue accepts a datagram, later completion rounds own its retry lifecycle.
 	// 共享队列接受数据报后，后续 completion 轮次负责其重试生命周期。
-	armUdpSend(fd, state);
+	if (!armUdpSend(fd, state))
+	{
+		requestRearm(fd, REARM_WRITE);
+	}
 	return true;
 }
 
@@ -483,6 +489,65 @@ bool IocpPoller::ensureReadArmed(KBESOCKET fd, SocketState& state)
 }
 
 //-------------------------------------------------------------------------------------
+void IocpPoller::processRearmRequests()
+{
+	const size_t requestCount = rearmBatchSize();
+	for (size_t i = 0; i < requestCount; ++i)
+	{
+		KBESOCKET fd = INVALID_SOCKET;
+		uint8 flags = REARM_NONE;
+		if (!takeRearmRequest(fd, flags))
+		{
+			break;
+		}
+
+		SocketStates::iterator iter = socketStates_.find(fd);
+		if (iter == socketStates_.end())
+		{
+			continue;
+		}
+
+		SocketState& state = *iter->second;
+		if ((flags & REARM_READ) != 0 && state.registeredRead && state.pPendingReadContext == NULL)
+		{
+			const bool armed = ensureReadArmed(fd, state) && state.pPendingReadContext != NULL;
+			recordRearmAttempt(!armed);
+			if (!armed && state.registeredRead)
+			{
+				requestRearm(fd, REARM_READ);
+			}
+		}
+
+		if ((flags & REARM_WRITE) != 0 && state.pPendingWriteContext == NULL)
+		{
+			bool attempted = false;
+			bool armed = true;
+			if (!state.pendingTcpSends.empty())
+			{
+				attempted = true;
+				armed = armTcpSend(fd, state);
+			}
+			else if (!state.pendingUdpSends.empty())
+			{
+				attempted = true;
+				armed = armUdpSend(fd, state);
+			}
+
+			const bool retryRequired = !armed &&
+				(!state.pendingTcpSends.empty() || !state.pendingUdpSends.empty());
+			if (attempted)
+			{
+				recordRearmAttempt(retryRequired);
+			}
+			if (retryRequired)
+			{
+				requestRearm(fd, REARM_WRITE);
+			}
+		}
+	}
+}
+
+//-------------------------------------------------------------------------------------
 bool IocpPoller::doRegisterForRead(KBESOCKET fd)
 {
 	auto iter = socketStates_.find(fd);
@@ -517,6 +582,12 @@ bool IocpPoller::doRegisterForRead(KBESOCKET fd)
 		iter->second->registeredRead = false;
 		cleanupStateIfUnused(fd);
 	}
+	else if (iter->second->pPendingReadContext == NULL)
+	{
+		// connect/listen 前的 1.x 注册会被延迟；只登记该 fd，而不是依赖全表轮询发现它。
+		// A 1.x registration before connect/listen is deferred; enqueue this fd instead of rediscovering it through a full-table poll.
+		requestRearm(fd, REARM_READ);
+	}
 
 	return armed;
 }
@@ -539,6 +610,7 @@ bool IocpPoller::doDeregisterForRead(KBESOCKET fd)
 
 	SocketState& state = *iter->second;
 	state.registeredRead = false;
+	cancelRearm(fd, REARM_READ);
 	clearReceivedData(fd);
 
 	// 读注销表示 channel/socket 生命周期结束，读写 outstanding IO 都要取消。
@@ -577,6 +649,7 @@ bool IocpPoller::doDeregisterForWrite(KBESOCKET fd)
 
 	SocketState& state = *iter->second;
 	clearPendingSends(state);
+	cancelRearm(fd, REARM_WRITE);
 
 	// 写注销只停止发送队列，不能清 tcpReceived_/udpReceived_。
 	// completion 线程在 handleCompletion 中会先把 recv 数据入队再 triggerRead；
@@ -860,7 +933,10 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 
 		if (!pState->pendingTcpSends.empty())
 		{
-			armTcpSend(fd, *pState);
+			if (!armTcpSend(fd, *pState))
+			{
+				requestRearm(fd, REARM_WRITE);
+			}
 		}
 		else if (this->findForWrite(fd) != NULL)
 		{
@@ -879,7 +955,10 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 
 		if (!pState->pendingUdpSends.empty())
 		{
-			armUdpSend(fd, *pState);
+			if (!armUdpSend(fd, *pState))
+			{
+				requestRearm(fd, REARM_WRITE);
+			}
 		}
 	}
 
@@ -893,7 +972,10 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 		{
 			// completion 回调可能销毁 channel 或重新注册 fd。
 			// 因此重挂 read 前必须重新查当前 state，而不是继续使用旧指针。
-			ensureReadArmed(fd, currentState);
+			if (!ensureReadArmed(fd, currentState) || currentState.pPendingReadContext == NULL)
+			{
+				requestRearm(fd, REARM_READ);
+			}
 		}
 		else if (!currentState.registeredRead)
 		{
@@ -912,23 +994,7 @@ int IocpPoller::processPendingEvents(double maxWait)
 		return 0;
 	}
 
-	for (auto& item : socketStates_)
-	{
-		if (item.second->registeredRead && item.second->pPendingReadContext == NULL)
-		{
-			ensureReadArmed(item.first, *item.second);
-		}
-
-		if (!item.second->pendingTcpSends.empty() && item.second->pPendingWriteContext == NULL)
-		{
-			armTcpSend(item.first, *item.second);
-		}
-
-		if (!item.second->pendingUdpSends.empty() && item.second->pPendingWriteContext == NULL)
-		{
-			armUdpSend(item.first, *item.second);
-		}
-	}
+	processRearmRequests();
 
 	DWORD timeoutMs = toTimeoutMilliseconds(maxWait);
 

@@ -233,6 +233,24 @@ bool EventPoller::hasPendingSend(KBESOCKET fd) const
 }
 
 //-------------------------------------------------------------------------------------
+uint32 EventPoller::pendingRearmCount() const
+{
+	return 0;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 EventPoller::rearmAttemptCount() const
+{
+	return 0;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 EventPoller::rearmRetryCount() const
+{
+	return 0;
+}
+
+//-------------------------------------------------------------------------------------
 const char* EventPoller::defaultIOModelName()
 {
 #if KBE_PLATFORM == PLATFORM_WIN32

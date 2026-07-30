@@ -200,6 +200,11 @@ bool ServerApp::initializeWatcher()
 	// 关闭维护队列应远小于总 Channel 数，持续增长表示优雅关闭或回收流程没有收敛。
 	// The close-maintenance queue should remain far smaller than the Channel population; sustained growth exposes a stalled close or reclamation path.
 	WATCH_OBJECT("network/channels/pendingMaintenance", &networkInterface_, &Network::NetworkInterface::pendingChannelMaintenanceCount);
+	// completion 重投递队列应只包含暂时失败项；持续非零或 retry 快速增长表示 SQ/驱动资源或 socket 生命周期异常。
+	// The completion rearm queue should contain only transient failures; sustained backlog or rapidly growing retries signals SQ/driver pressure or a socket lifecycle fault.
+	WATCH_OBJECT("network/poller/pendingRearms", &networkInterface_, &Network::NetworkInterface::pendingPollerRearms);
+	WATCH_OBJECT("network/poller/rearmAttempts", &networkInterface_, &Network::NetworkInterface::pollerRearmAttempts);
+	WATCH_OBJECT("network/poller/rearmRetries", &networkInterface_, &Network::NetworkInterface::pollerRearmRetries);
 
 	return Network::initializeWatcher() && Resmgr::getSingleton().initializeWatcher() &&
 		threadPool_.initializeWatcher() && WatchPool::initWatchPools();

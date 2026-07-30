@@ -85,6 +85,9 @@ private:
 	bool ensureAssociated(SocketState& state, KBESOCKET fd);
 	// 根据 socket 类型投递 accept/recv/recvfrom。
 	bool ensureReadArmed(KBESOCKET fd, SocketState& state);
+	// 只重试此前投递失败或尚未就绪的 fd，避免每轮扫描完整 socketStates_。
+	// Retry only descriptors whose submission failed or was deferred, avoiding a full socketStates_ scan each round.
+	void processRearmRequests();
 	// 投递一次 TCP WSARecv。
 	bool armTcpRead(KBESOCKET fd, SocketState& state);
 	// 投递一次 UDP WSARecvFrom。

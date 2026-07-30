@@ -373,7 +373,10 @@ bool IoUringPoller::queueTcpSend(KBESOCKET fd, const void* data, int len)
 	SocketState& state = socketStateForFd(fd);
 	if (!state.writeArmed)
 	{
-		armTcpSend(fd, state);
+		if (!armTcpSend(fd, state))
+		{
+			requestRearm(fd, REARM_WRITE);
+		}
 		submitSqes();
 	}
 
@@ -398,7 +401,10 @@ bool IoUringPoller::queueUdpSend(KBESOCKET fd, const void* data, int len, const 
 	SocketState& state = socketStateForFd(fd);
 	if (!state.writeArmed)
 	{
-		armUdpSend(fd, state);
+		if (!armUdpSend(fd, state))
+		{
+			requestRearm(fd, REARM_WRITE);
+		}
 		submitSqes();
 	}
 
@@ -431,6 +437,7 @@ bool IoUringPoller::doDeregisterForRead(KBESOCKET fd)
 
 	SocketState& state = *iter->second;
 	state.registeredRead = false;
+	cancelRearm(fd, REARM_READ);
 	state.readArmed = false;
 	state.pPendingReadContext = NULL;
 	++state.generation;
@@ -451,6 +458,7 @@ bool IoUringPoller::doDeregisterForWrite(KBESOCKET fd)
 
 	SocketState& state = *iter->second;
 	clearPendingSends(state);
+	cancelRearm(fd, REARM_WRITE);
 	state.writeArmed = false;
 	state.pPendingWriteContext = NULL;
 	cleanupStateIfUnused(fd);
@@ -483,6 +491,65 @@ bool IoUringPoller::ensureReadArmed(KBESOCKET fd, SocketState& state)
 		return armTcpRead(fd, state);
 	default:
 		return false;
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void IoUringPoller::processRearmRequests()
+{
+	const size_t requestCount = rearmBatchSize();
+	for (size_t i = 0; i < requestCount; ++i)
+	{
+		KBESOCKET fd = -1;
+		uint8 flags = REARM_NONE;
+		if (!takeRearmRequest(fd, flags))
+		{
+			break;
+		}
+
+		SocketStates::iterator iter = socketStates_.find(fd);
+		if (iter == socketStates_.end())
+		{
+			continue;
+		}
+
+		SocketState& state = *iter->second;
+		if ((flags & REARM_READ) != 0 && state.registeredRead && !state.readArmed)
+		{
+			const bool armed = ensureReadArmed(fd, state) && state.readArmed;
+			recordRearmAttempt(!armed);
+			if (!armed && state.registeredRead)
+			{
+				requestRearm(fd, REARM_READ);
+			}
+		}
+
+		if ((flags & REARM_WRITE) != 0 && !state.writeArmed)
+		{
+			bool attempted = false;
+			bool armed = true;
+			if (!state.pendingTcpSends.empty())
+			{
+				attempted = true;
+				armed = armTcpSend(fd, state);
+			}
+			else if (!state.pendingUdpSends.empty())
+			{
+				attempted = true;
+				armed = armUdpSend(fd, state);
+			}
+
+			const bool retryRequired = !armed &&
+				(!state.pendingTcpSends.empty() || !state.pendingUdpSends.empty());
+			if (attempted)
+			{
+				recordRearmAttempt(retryRequired);
+			}
+			if (retryRequired)
+			{
+				requestRearm(fd, REARM_WRITE);
+			}
+		}
 	}
 }
 
@@ -784,7 +851,10 @@ void IoUringPoller::handleCompletion(IoUringContext& context, int result)
 
 		if (!state->pendingTcpSends.empty())
 		{
-			armTcpSend(fd, *state);
+			if (!armTcpSend(fd, *state))
+			{
+				requestRearm(fd, REARM_WRITE);
+			}
 		}
 		else if (this->findForWrite(fd) != NULL)
 		{
@@ -801,7 +871,10 @@ void IoUringPoller::handleCompletion(IoUringContext& context, int result)
 
 		if (!state->pendingUdpSends.empty())
 		{
-			armUdpSend(fd, *state);
+			if (!armUdpSend(fd, *state))
+			{
+				requestRearm(fd, REARM_WRITE);
+			}
 		}
 	}
 
@@ -814,7 +887,10 @@ void IoUringPoller::handleCompletion(IoUringContext& context, int result)
 		SocketState& currentState = *currentIter->second;
 		if (currentState.registeredRead && !currentState.readArmed)
 		{
-			ensureReadArmed(fd, currentState);
+			if (!ensureReadArmed(fd, currentState))
+			{
+				requestRearm(fd, REARM_READ);
+			}
 		}
 		else if (!currentState.registeredRead)
 		{
@@ -855,25 +931,9 @@ int IoUringPoller::processPendingEvents(double maxWait)
 		return 0;
 	}
 
-	// 先把未挂起的读写请求补投递，再进入内核等待 CQE。
-	for (auto& item : socketStates_)
-	{
-		SocketState& state = *item.second;
-		if (state.registeredRead && !state.readArmed)
-		{
-			ensureReadArmed(item.first, state);
-		}
-
-		if (!state.pendingTcpSends.empty() && !state.writeArmed)
-		{
-			armTcpSend(item.first, state);
-		}
-
-		if (!state.pendingUdpSends.empty() && !state.writeArmed)
-		{
-			armUdpSend(item.first, state);
-		}
-	}
+	// 只处理上一轮明确登记的失败项；普通空闲连接不再参与主循环维护。
+	// Process only failures explicitly queued by the previous round; ordinary idle sockets leave the main loop untouched.
+	processRearmRequests();
 
 	int timeoutMs = toTimeoutMilliseconds(maxWait);
 

@@ -4,6 +4,7 @@ add_library(network STATIC
     bundle_broadcast.cpp
     channel.cpp
     common.cpp
+    completion_rearm_queue.cpp
     delayed_channels.cpp
     encryption_filter.cpp
     endpoint.cpp
