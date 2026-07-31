@@ -153,6 +153,7 @@ foreach(_kbe_required IN ITEMS
 	"Dbmgr::entityAutoLoad: rejected dbInterfaceIndex="
 	"Dbmgr::queryEntity: rejected componentID="
 	"findBoundBaseappSource(pChannel, componentID)"
+	"Dbmgr::onEntityOffline: rejected componentID="
 	"Security::isValidPersistentEntityID"
 	"Security::isValidDatabaseQueryMode"
 	"validateBaseappEntityCreationSource"

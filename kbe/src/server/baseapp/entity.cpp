@@ -213,6 +213,7 @@ void Entity::eraseEntityLog()
 		(*pBundle).newMessage(DbmgrInterface::onEntityOffline);
 		(*pBundle) << this->dbid();
 		(*pBundle) << this->pScriptModule()->getUType();
+		(*pBundle) << g_componentID;
 		(*pBundle) << dbInterfaceIndex();
 
 		Components::COMPONENTS& cts = Components::getSingleton().getComponents(DBMGR_TYPE);

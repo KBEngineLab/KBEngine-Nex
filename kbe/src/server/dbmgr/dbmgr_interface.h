@@ -110,9 +110,10 @@ NETWORK_INTERFACE_DECLARE_BEGIN(DbmgrInterface)
 									ENTITY_ID,						entityID)
 		
 	// baseapp上entity下线。
-	DBMGR_MESSAGE_DECLARE_ARGS3(onEntityOffline,					NETWORK_FIXED_MESSAGE,
+	DBMGR_MESSAGE_DECLARE_ARGS4(onEntityOffline,					NETWORK_FIXED_MESSAGE,
 									DBID,							dbid,
 									uint16,							sid,
+									COMPONENT_ID,						componentID,
 									uint16,							dbInterfaceIndex)
 
 	// 请求擦除客户端请求任务。

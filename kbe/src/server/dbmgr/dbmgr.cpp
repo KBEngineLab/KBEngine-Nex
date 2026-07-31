@@ -945,10 +945,15 @@ void Dbmgr::onAccountOnline(Network::Channel* pChannel,
 }
 
 //-------------------------------------------------------------------------------------
-void Dbmgr::onEntityOffline(Network::Channel* pChannel, DBID dbid, ENTITY_SCRIPT_UID sid, uint16 dbInterfaceIndex)
+void Dbmgr::onEntityOffline(Network::Channel* pChannel, DBID dbid, ENTITY_SCRIPT_UID sid,
+	COMPONENT_ID componentID, uint16 dbInterfaceIndex)
 {
-	if (!isExpectedIngressSource(BASEAPP_TYPE, pChannel, "Dbmgr::onEntityOffline"))
+	if (findBoundBaseappSource(pChannel, componentID) == NULL)
+	{
+		WARNING_MSG(fmt::format("Dbmgr::onEntityOffline: rejected componentID={}, dbid={}, addr={}.\n",
+			componentID, dbid, pChannel != NULL ? pChannel->c_str() : "none"));
 		return;
+	}
 
 	if (!Security::isValidPersistentEntityID(dbid))
 	{

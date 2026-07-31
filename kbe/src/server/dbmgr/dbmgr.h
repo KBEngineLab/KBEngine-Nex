@@ -151,7 +151,8 @@ public:
 	/** 网络接口
 		entity-baseapp下线了
 	*/
-	void onEntityOffline(Network::Channel* pChannel, DBID dbid, ENTITY_SCRIPT_UID sid, uint16 dbInterfaceIndex);
+	void onEntityOffline(Network::Channel* pChannel, DBID dbid, ENTITY_SCRIPT_UID sid,
+		COMPONENT_ID componentID, uint16 dbInterfaceIndex);
 
 	/** 网络接口
 		执行数据库查询
