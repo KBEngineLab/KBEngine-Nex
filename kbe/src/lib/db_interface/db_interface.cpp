@@ -77,6 +77,32 @@ bool findBlacklistedRawCommand(const std::string& command,
 
 	return false;
 }
+
+bool validateSystemTables(EntityTables& entityTables, const std::string& dbInterfaceName)
+{
+	// DBTask 将这些表视为后端初始化不变量，因此应在任务线程使用前统一失败。
+	// DBTask treats these tables as backend initialization invariants, so fail before worker tasks can use them.
+	const char* requiredSystemTables[] =
+	{
+		KBE_TABLE_PERFIX "_accountinfos",
+		KBE_TABLE_PERFIX "_entitylog",
+		KBE_TABLE_PERFIX "_email_verification",
+		KBE_TABLE_PERFIX "_serverlog"
+	};
+
+	for (size_t i = 0; i < sizeof(requiredSystemTables) / sizeof(requiredSystemTables[0]); ++i)
+	{
+		if (entityTables.findKBETable(requiredSystemTables[i]) == NULL)
+		{
+			ERROR_MSG(fmt::format(
+				"DBUtil::initInterface: missing system table, dbInterface={}, table={}\n",
+				dbInterfaceName, requiredSystemTables[i]));
+			return false;
+		}
+	}
+
+	return true;
+}
 }
 
 //-------------------------------------------------------------------------------------
@@ -343,6 +369,9 @@ bool DBUtil::initInterface(DBInterface* pdbi)
 		if (!pDBInfo->isPure)
 			ret = entityTables.syncToDB(pdbi);
 	}
+
+	if (ret)
+		ret = validateSystemTables(entityTables, pdbi->name());
 
 	return ret;
 }

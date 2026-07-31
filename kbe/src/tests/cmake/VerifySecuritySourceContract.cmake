@@ -71,6 +71,7 @@ file(READ "${KBE_SOURCE_ROOT}/lib/server/serverapp.cpp" _kbe_serverapp)
 file(READ "${KBE_SOURCE_ROOT}/lib/server/serverapp.h" _kbe_serverapp_header)
 file(READ "${KBE_SOURCE_ROOT}/lib/server/globaldata_server.cpp" _kbe_globaldata_server)
 file(READ "${KBE_SOURCE_ROOT}/lib/server/globaldata_client.cpp" _kbe_globaldata_client)
+file(READ "${KBE_SOURCE_ROOT}/lib/db_interface/db_interface.cpp" _kbe_db_interface)
 
 # Network-derived component IDs must use the fail-closed guard instead of a
 # nullable dereference, assertion, or map insertion. 网络组件 ID 必须经过拒绝式守卫，
@@ -109,6 +110,20 @@ foreach(_kbe_required IN ITEMS
 		"${_kbe_required}" _kbe_required_position)
 	if(_kbe_required_position EQUAL -1)
 		message(FATAL_ERROR "GlobalData unavailable-channel guard is missing: ${_kbe_required}")
+	endif()
+endforeach()
+
+foreach(_kbe_required IN ITEMS
+	"validateSystemTables"
+	"DBUtil::initInterface: missing system table"
+	"KBE_TABLE_PERFIX \"_accountinfos\""
+	"KBE_TABLE_PERFIX \"_entitylog\""
+	"KBE_TABLE_PERFIX \"_email_verification\""
+	"KBE_TABLE_PERFIX \"_serverlog\""
+)
+	string(FIND "${_kbe_db_interface}" "${_kbe_required}" _kbe_required_position)
+	if(_kbe_required_position EQUAL -1)
+		message(FATAL_ERROR "DB system-table initialization guard is missing: ${_kbe_required}")
 	endif()
 endforeach()
 
