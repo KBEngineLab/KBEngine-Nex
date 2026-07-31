@@ -221,6 +221,13 @@ foreach(_kbe_required IN ITEMS
 	"Dbmgr::syncEntityStreamTemplate"
 	"Dbmgr::syncEntityStreamTemplate: rejected missing account table"
 	"isAllowedRawDatabaseSource"
+	"validateEntityScriptType(\"Dbmgr::onEntityOffline\""
+	"validateEntityScriptType(\"Dbmgr::writeEntity\""
+	"validateEntityScriptType(\"Dbmgr::removeEntity\""
+	"validateEntityScriptType(\"Dbmgr::entityAutoLoad\""
+	"validateEntityScriptType(\"Dbmgr::deleteEntityByDBID\""
+	"validateEntityScriptType(\"Dbmgr::lookUpEntityByDBID\""
+	"validateEntityScriptType(\"Dbmgr::queryEntity\""
 )
 	string(FIND "${_kbe_cellapp}\n${_kbe_cellappmgr}\n${_kbe_dbmgr}\n${_kbe_interfaces_handler}"
 		"${_kbe_required}" _kbe_required_position)

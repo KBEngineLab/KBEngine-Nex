@@ -110,6 +110,36 @@ bool isAllowedRawDatabaseSource(Network::Channel* pChannel,
 
 	return findBoundComponentSource(pChannel, componentType, componentID) != NULL;
 }
+
+bool validateEntityScriptType(const char* operation, ENTITY_SCRIPT_UID scriptType)
+{
+	// 网络入口使用无日志范围检查，避免无效 UID 先触发 EntityDef 的错误日志。
+	// Network ingress uses a silent range check so invalid UIDs do not first trigger EntityDef error logging.
+	const EntityDef::SCRIPT_MODULES& modules = EntityDef::getScriptModules();
+	if (scriptType > 0 && scriptType <= modules.size() && modules[scriptType - 1] != NULL)
+		return true;
+
+	WARNING_MSG(fmt::format("{}: rejected entity script type ID={}.\n",
+		operation, scriptType));
+	return false;
+}
+
+bool validateEntityScriptType(const char* operation, const std::string& scriptType)
+{
+	const EntityDef::SCRIPT_MODULES& modules = EntityDef::getScriptModules();
+	for (EntityDef::SCRIPT_MODULES::const_iterator iter = modules.begin();
+		iter != modules.end(); ++iter)
+	{
+		if (*iter != NULL && scriptType == (*iter)->getName())
+			return true;
+	}
+
+	// 名称来自网络载荷，仅记录长度以防止控制字符或超长值污染日志。
+	// The name comes from the network payload; log only its size to prevent control-character or oversized log injection.
+	WARNING_MSG(fmt::format("{}: rejected entity script type, nameSize={}.\n",
+		operation, scriptType.size()));
+	return false;
+}
 }
 
 ServerConfig g_serverConfig;
@@ -971,6 +1001,9 @@ void Dbmgr::onEntityOffline(Network::Channel* pChannel, DBID dbid, ENTITY_SCRIPT
 		return;
 	}
 
+	if (!validateEntityScriptType("Dbmgr::onEntityOffline", sid))
+		return;
+
 	Buffered_DBTasks* pBuffered_DBTasks = findBufferedDBTask(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex));
 	if (!pBuffered_DBTasks)
 	{
@@ -1265,10 +1298,28 @@ void Dbmgr::writeEntity(Network::Channel* pChannel,
 
 	s >> componentID >> eid >> entityDBID >> dbInterfaceIndex;
 
-	if (findBoundBaseappSource(pChannel, componentID) == NULL)
+	if (findBoundBaseappSource(pChannel, componentID) == NULL || eid <= 0 ||
+		(entityDBID != 0 && !Security::isValidPersistentEntityID(entityDBID)))
 	{
-		WARNING_MSG(fmt::format("Dbmgr::writeEntity: rejected unbound componentID={}, addr={}.\n",
-			componentID, pChannel->c_str()));
+		WARNING_MSG(fmt::format("Dbmgr::writeEntity: rejected componentID={}, entityID={}, entityDBID={}, addr={}.\n",
+			componentID, eid, entityDBID, pChannel->c_str()));
+		s.done();
+		return;
+	}
+
+	const size_t entityPayloadPosition = s.rpos();
+	ENTITY_SCRIPT_UID sid = 0;
+	if (s.length() < sizeof(sid))
+	{
+		WARNING_MSG("Dbmgr::writeEntity: rejected missing entity script type.\n");
+		s.done();
+		return;
+	}
+
+	s >> sid;
+	s.rpos(entityPayloadPosition);
+	if (!validateEntityScriptType("Dbmgr::writeEntity", sid))
+	{
 		s.done();
 		return;
 	}
@@ -1297,10 +1348,27 @@ void Dbmgr::removeEntity(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 
 	s >> dbInterfaceIndex >> componentID >> eid >> entityDBID;
 	if (findBoundBaseappSource(pChannel, componentID) == NULL ||
-		!Security::isValidPersistentEntityID(entityDBID))
+		!Security::isValidPersistentEntityID(entityDBID) || eid <= 0)
 	{
 		WARNING_MSG(fmt::format("Dbmgr::removeEntity: rejected componentID={}, entityDBID={}, addr={}.\n",
 			componentID, entityDBID, pChannel->c_str()));
+		s.done();
+		return;
+	}
+
+	const size_t entityPayloadPosition = s.rpos();
+	ENTITY_SCRIPT_UID sid = 0;
+	if (s.length() < sizeof(sid))
+	{
+		WARNING_MSG("Dbmgr::removeEntity: rejected missing entity script type.\n");
+		s.done();
+		return;
+	}
+
+	s >> sid;
+	s.rpos(entityPayloadPosition);
+	if (!validateEntityScriptType("Dbmgr::removeEntity", sid))
+	{
 		s.done();
 		return;
 	}
@@ -1339,6 +1407,12 @@ void Dbmgr::entityAutoLoad(Network::Channel* pChannel, KBEngine::MemoryStream& s
 		return;
 	}
 
+	if (!validateEntityScriptType("Dbmgr::entityAutoLoad", entityType))
+	{
+		s.done();
+		return;
+	}
+
 	thread::ThreadPool* pThreadPool =
 		DBUtil::pThreadPool(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex));
 	if (pThreadPool == NULL)
@@ -1364,7 +1438,8 @@ void Dbmgr::deleteEntityByDBID(Network::Channel* pChannel, KBEngine::MemoryStrea
 
 	s >> dbInterfaceIndex >> componentID >> entityDBID >> callbackID >> sid;
 	if (findBoundBaseappSource(pChannel, componentID) == NULL ||
-		!Security::isValidPersistentEntityID(entityDBID))
+		!Security::isValidPersistentEntityID(entityDBID) ||
+		!validateEntityScriptType("Dbmgr::deleteEntityByDBID", sid))
 	{
 		WARNING_MSG(fmt::format("Dbmgr::deleteEntityByDBID: rejected componentID={}, entityDBID={}, addr={}.\n",
 			componentID, entityDBID, pChannel->c_str()));
@@ -1398,7 +1473,8 @@ void Dbmgr::lookUpEntityByDBID(Network::Channel* pChannel, KBEngine::MemoryStrea
 
 	s >> dbInterfaceIndex >> componentID >> entityDBID >> callbackID >> sid;
 	if (findBoundBaseappSource(pChannel, componentID) == NULL ||
-		!Security::isValidPersistentEntityID(entityDBID))
+		!Security::isValidPersistentEntityID(entityDBID) ||
+		!validateEntityScriptType("Dbmgr::lookUpEntityByDBID", sid))
 	{
 		WARNING_MSG(fmt::format("Dbmgr::lookUpEntityByDBID: rejected componentID={}, entityDBID={}, addr={}.\n",
 			componentID, entityDBID, pChannel->c_str()));
@@ -1431,7 +1507,8 @@ void Dbmgr::queryEntity(Network::Channel* pChannel, uint16 dbInterfaceIndex, COM
 	// 防止一个已注册 BaseApp 把查询结果路由到另一个 BaseApp。
 	if (findBoundBaseappSource(pChannel, componentID) == NULL ||
 		!Security::isValidPersistentEntityID(dbid) ||
-		!Security::isValidDatabaseQueryMode(queryMode) || entityID <= 0)
+		!Security::isValidDatabaseQueryMode(queryMode) || entityID <= 0 ||
+		!validateEntityScriptType("Dbmgr::queryEntity", entityType))
 	{
 		WARNING_MSG(fmt::format("Dbmgr::queryEntity: rejected componentID={}, queryMode={}, dbid={}, entityID={}, addr={}.\n",
 			componentID, queryMode, dbid, entityID, pChannel->c_str()));
