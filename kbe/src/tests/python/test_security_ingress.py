@@ -19,6 +19,11 @@ COMPONENT_IDS = {
     "cellapp": 8001,
 }
 
+REGISTERED_PROBE_COMPONENT_IDS = {
+    "dbmgr-registered-wrong-component-type": 9001,
+    "dbmgr-registered-sender-channel-mismatch": 9002,
+}
+
 PROBES = (
     (
         "dbmgr-invalid-global-data-type",
@@ -91,6 +96,22 @@ PROBES = (
         "DBMGR_TYPE",
         "Dbmgr::syncEntityStreamTemplate",
         r"Dbmgr::syncEntityStreamTemplate: rejected sourceType=baseapp",
+    ),
+    (
+        "dbmgr-registered-wrong-component-type",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::onReqAllocEntityID",
+        r"Dbmgr::onReqAllocEntityID: rejected componentType=13, componentID=9001",
+    ),
+    (
+        "dbmgr-registered-sender-channel-mismatch",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::queryAccount",
+        r"Dbmgr::queryAccount: rejected componentID=7001, entityID=4242",
     ),
     (
         "baseappmgr-zero-forward",
@@ -332,6 +353,10 @@ def probe_body(probe_case):
         return struct.pack("=iHQiII", -1, 0, 7001, 6, 0, 0)
     if probe_case == "dbmgr-unregistered-stream-template":
         return b""
+    if probe_case == "dbmgr-registered-wrong-component-type":
+        return struct.pack("=iQ", 13, 9001)
+    if probe_case == "dbmgr-registered-sender-channel-mismatch":
+        return b"a\0b\0" + struct.pack("=BQiQIH", 0, 7001, 4242, 0, 0, 0)
     if probe_case == "baseappmgr-zero-forward":
         return struct.pack("=QQ", 0, 7001)
     if probe_case == "baseappmgr-spoofed-update":
@@ -353,6 +378,31 @@ def probe_body(probe_case):
     raise RuntimeError(f"unsupported probe case: {probe_case}")
 
 
+def message_frame(message_id, message_length, body, message_name):
+    frame = struct.pack("=H", message_id)
+    if message_length == -1:
+        if len(body) > 65534:
+            raise RuntimeError(f"probe body is too large: {message_name}")
+        frame += struct.pack("=H", len(body))
+    elif message_length != len(body):
+        raise RuntimeError(
+            f"probe contract mismatch for {message_name}: "
+            f"target={message_length} body={len(body)}"
+        )
+    return frame + body
+
+
+def registered_probe_body(component_id):
+    # 注册为 Interfaces 可验证类型与 Channel 绑定，同时避免触发 EntityApp 发现广播。
+    # Register as Interfaces to exercise type/channel binding without EntityApp discovery broadcasts.
+    return (
+        struct.pack("=i", 0)
+        + b"security-probe\0"
+        + struct.pack("=iQiiIHIH", 13, component_id, 0, 0, 0, 0, 0, 0)
+        + b"\0"
+    )
+
+
 def run_probe(
     args,
     probe_case,
@@ -364,22 +414,65 @@ def run_probe(
     message_id, message_length = query_message_contract(
         args.repository_root, component_type_name, contract_endpoint, message_name
     )
-    body = probe_body(probe_case)
-    frame = struct.pack("=H", message_id)
-    if message_length == -1:
-        if len(body) > 65534:
-            raise RuntimeError(f"probe body is too large: {probe_case}")
-        frame += struct.pack("=H", len(body))
-    elif message_length != len(body):
-        raise RuntimeError(
-            f"probe contract mismatch for {message_name}: target={message_length} body={len(body)}"
-        )
-    frame += body
+    frame = message_frame(message_id, message_length, probe_body(probe_case), message_name)
 
     with socket.create_connection(ingress_endpoint, timeout=5) as connection:
         connection.sendall(frame)
         connection.shutdown(socket.SHUT_WR)
         time.sleep(0.05)
+
+
+def run_registered_probe(
+    args,
+    process,
+    run_root,
+    controller_stdout,
+    controller_stderr,
+    probe_case,
+    component_type_name,
+    message_name,
+    contract_endpoint,
+    ingress_endpoint,
+    rejection_pattern,
+):
+    registration_id, registration_length = query_message_contract(
+        args.repository_root, component_type_name, contract_endpoint, "Dbmgr::onRegisterNewApp"
+    )
+    message_id, message_length = query_message_contract(
+        args.repository_root, component_type_name, contract_endpoint, message_name
+    )
+    component_id = REGISTERED_PROBE_COMPONENT_IDS[probe_case]
+    registration_frame = message_frame(
+        registration_id,
+        registration_length,
+        registered_probe_body(component_id),
+        "Dbmgr::onRegisterNewApp",
+    )
+    probe_frame = message_frame(
+        message_id, message_length, probe_body(probe_case), message_name
+    )
+
+    with socket.create_connection(ingress_endpoint, timeout=5) as connection:
+        connection.sendall(registration_frame)
+        wait_for_text(
+            process,
+            run_root,
+            controller_stdout,
+            controller_stderr,
+            rf"ServerApp::onRegisterNewApp:.*componentType:interfaces.*componentID:{component_id}",
+            10,
+            f"registration marker for {probe_case}",
+        )
+        connection.sendall(probe_frame)
+        wait_for_text(
+            process,
+            run_root,
+            controller_stdout,
+            controller_stderr,
+            rejection_pattern,
+            10,
+            f"rejection marker for {probe_case}",
+        )
 
 
 def run_test(args):
@@ -456,6 +549,22 @@ def run_test(args):
             message_name,
             rejection_pattern,
         ) in PROBES:
+            if endpoint_kind == "registered-internal":
+                run_registered_probe(
+                    args,
+                    process,
+                    args.run_root,
+                    controller_stdout,
+                    controller_stderr,
+                    probe_case,
+                    component_type,
+                    message_name,
+                    internal_endpoints[component_name],
+                    internal_endpoints[component_name],
+                    rejection_pattern,
+                )
+                continue
+
             run_probe(
                 args,
                 probe_case,
