@@ -85,6 +85,7 @@ set(_kbe_forbidden_routing_literals
 	"bufferedDBTasksMaps_[g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex)]"
 	"findBestInterfacesHandler()->"
 	"KBE_ASSERT(pInterfacesChannel)"
+	"KBE_ASSERT(addr_ != Network::Address::NONE)"
 	"Dbmgr::accountBindMail: username={}"
 )
 foreach(_kbe_forbidden IN LISTS _kbe_forbidden_routing_literals)
@@ -134,6 +135,7 @@ foreach(_kbe_required IN ITEMS
 	"Cellapp::_onCreateCellEntityFromBaseapp: rejected unavailable space"
 	"findOrReconnectChannel"
 	"Interfaces Channel unavailable after reconnect"
+	"reconnect: rejected missing Interfaces address"
 	"isExpectedIngressSource(LOGINAPP_TYPE"
 	"isExpectedIngressSource(BASEAPP_TYPE"
 	"isExpectedIngressSource(INTERFACES_TYPE"

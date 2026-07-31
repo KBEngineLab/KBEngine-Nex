@@ -450,8 +450,6 @@ void InterfacesHandler_Interfaces::onLoginAccountCB(KBEngine::MemoryStream& s)
 //-------------------------------------------------------------------------------------
 bool InterfacesHandler_Interfaces::initialize()
 {
-	KBE_ASSERT(addr_ != Network::Address::NONE);
-
 	Network::Channel* pInterfacesChannel = Dbmgr::getSingleton().networkInterface().findChannel(addr_);
 	if(pInterfacesChannel && !pInterfacesChannel->isDestroyed())
 		return true;
@@ -462,7 +460,11 @@ bool InterfacesHandler_Interfaces::initialize()
 //-------------------------------------------------------------------------------------
 bool InterfacesHandler_Interfaces::reconnect()
 {
-	KBE_ASSERT(addr_ != Network::Address::NONE);
+	if (addr_ == Network::Address::NONE)
+	{
+		ERROR_MSG("InterfacesHandler_Interfaces::reconnect: rejected missing Interfaces address.\n");
+		return false;
+	}
 
 	Network::Channel* pInterfacesChannel = Dbmgr::getSingleton().networkInterface().findChannel(addr_);
 
