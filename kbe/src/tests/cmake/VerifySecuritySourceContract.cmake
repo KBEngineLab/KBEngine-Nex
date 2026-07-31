@@ -156,6 +156,7 @@ foreach(_kbe_required IN ITEMS
 	"Dbmgr::queryEntity: rejected componentID="
 	"findBoundBaseappSource(pChannel, componentID)"
 	"Dbmgr::onEntityOffline: rejected componentID="
+	"rejected under-consumed message"
 	"Security::isValidPersistentEntityID"
 	"Security::isValidDatabaseQueryMode"
 	"validateBaseappEntityCreationSource"

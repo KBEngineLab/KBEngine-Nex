@@ -2012,10 +2012,10 @@ void Cellapp::forwardEntityMessageToCellappFromClient(Network::Channel* pChannel
 		{
 			if(frpos != s.rpos())
 			{
-				CRITICAL_MSG(fmt::format("Cellapp::forwardEntityMessageToCellappFromClient[{}]: rpos({}) invalid, expect={}. msgID={}, msglen={}.\n",
+				ERROR_MSG(fmt::format("Cellapp::forwardEntityMessageToCellappFromClient[{}]: rejected under-consumed message, rpos={}, expect={}, msgID={}, msglen={}.\n",
 					pMsgHandler->name.c_str(), s.rpos(), frpos, currMsgID, currMsgLen));
-
-				s.rpos((int)frpos);
+				s.done();
+				return;
 			}
 		}
 
