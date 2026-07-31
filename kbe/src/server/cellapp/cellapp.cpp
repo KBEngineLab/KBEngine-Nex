@@ -885,10 +885,17 @@ void Cellapp::reqWriteToDBFromBaseapp(Network::Channel* pChannel, KBEngine::Memo
 }
 
 //-------------------------------------------------------------------------------------
-void Cellapp::onDbmgrInitCompleted(Network::Channel* pChannel, 
-		GAME_TIME gametime, ENTITY_ID startID, ENTITY_ID endID, COMPONENT_ORDER 
+void Cellapp::onDbmgrInitCompleted(Network::Channel* pChannel,
+		GAME_TIME gametime, ENTITY_ID startID, ENTITY_ID endID, COMPONENT_ORDER
 		startGlobalOrder, COMPONENT_ORDER startGroupOrder, const std::string& digest)
 {
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Cellapp::onDbmgrInitCompleted: rejected non-DBMgr source, addr={}.\n",
+			pChannel->c_str()));
+		return;
+	}
+
 	EntityApp<Entity>::onDbmgrInitCompleted(pChannel, gametime, startID, endID, startGlobalOrder, startGroupOrder, digest);
 	
 	// 再次同步自己的新信息(startGlobalOrder, startGroupOrder等)到machine
@@ -907,6 +914,13 @@ void Cellapp::onDbmgrInitCompleted(Network::Channel* pChannel,
 //-------------------------------------------------------------------------------------
 void Cellapp::onBroadcastCellAppDataChanged(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Cellapp::onBroadcastCellAppDataChanged: rejected non-DBMgr source, addr={}.\n",
+			pChannel->c_str()));
+		s.done();
+		return;
+	}
 
 	std::string key, value;
 	bool isDelete;

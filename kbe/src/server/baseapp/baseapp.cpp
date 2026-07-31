@@ -3722,13 +3722,17 @@ void Baseapp::onChargeCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 }
 
 //-------------------------------------------------------------------------------------
-void Baseapp::onDbmgrInitCompleted(Network::Channel* pChannel, 
-		GAME_TIME gametime, ENTITY_ID startID, ENTITY_ID endID, 
-		COMPONENT_ORDER startGlobalOrder, COMPONENT_ORDER startGroupOrder, 
+void Baseapp::onDbmgrInitCompleted(Network::Channel* pChannel,
+		GAME_TIME gametime, ENTITY_ID startID, ENTITY_ID endID,
+		COMPONENT_ORDER startGlobalOrder, COMPONENT_ORDER startGroupOrder,
 		const std::string& digest)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Baseapp::onDbmgrInitCompleted: rejected non-DBMgr source, addr={}.\n",
+			pChannel->c_str()));
 		return;
+	}
 
 	EntityApp<Entity>::onDbmgrInitCompleted(pChannel, gametime, startID, endID, 
 		startGlobalOrder, startGroupOrder, digest);
@@ -3764,8 +3768,13 @@ void Baseapp::onDbmgrInitCompleted(Network::Channel* pChannel,
 //-------------------------------------------------------------------------------------
 void Baseapp::onBroadcastBaseAppDataChanged(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Baseapp::onBroadcastBaseAppDataChanged: rejected non-DBMgr source, addr={}.\n",
+			pChannel->c_str()));
+		s.done();
 		return;
+	}
 
 	std::string key, value;
 	bool isDelete;
@@ -3825,8 +3834,10 @@ void Baseapp::onBroadcastBaseAppDataChanged(Network::Channel* pChannel, KBEngine
 //-------------------------------------------------------------------------------------
 void Baseapp::registerPendingLogin(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(BASEAPPMGR_TYPE, pChannel))
 	{
+		WARNING_MSG(fmt::format("Baseapp::registerPendingLogin: rejected non-BaseAppMgr source, addr={}.\n",
+			pChannel->c_str()));
 		s.done();
 		return;
 	}

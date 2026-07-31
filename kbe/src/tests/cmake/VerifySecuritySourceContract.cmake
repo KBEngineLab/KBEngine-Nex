@@ -65,6 +65,8 @@ file(READ "${KBE_SOURCE_ROOT}/server/cellapp/cellapp.cpp" _kbe_cellapp)
 file(READ "${KBE_SOURCE_ROOT}/server/cellappmgr/cellappmgr.cpp" _kbe_cellappmgr)
 file(READ "${KBE_SOURCE_ROOT}/server/dbmgr/dbmgr.cpp" _kbe_dbmgr)
 file(READ "${KBE_SOURCE_ROOT}/server/dbmgr/interfaces_handler.cpp" _kbe_interfaces_handler)
+file(READ "${KBE_SOURCE_ROOT}/server/loginapp/loginapp.cpp" _kbe_loginapp)
+file(READ "${KBE_SOURCE_ROOT}/lib/server/entity_app.h" _kbe_entity_app)
 file(READ "${KBE_SOURCE_ROOT}/lib/server/serverapp.cpp" _kbe_serverapp)
 
 # Network-derived component IDs must use the fail-closed guard instead of a
@@ -91,6 +93,22 @@ foreach(_kbe_forbidden IN LISTS _kbe_forbidden_routing_literals)
     if(NOT _kbe_forbidden_position EQUAL -1)
         message(FATAL_ERROR "Component routing contract regressed: ${_kbe_forbidden}")
     endif()
+endforeach()
+
+foreach(_kbe_required IN ITEMS
+	"Baseapp::onDbmgrInitCompleted: rejected non-DBMgr source"
+	"Baseapp::onBroadcastBaseAppDataChanged: rejected non-DBMgr source"
+	"Baseapp::registerPendingLogin: rejected non-BaseAppMgr source"
+	"Cellapp::onDbmgrInitCompleted: rejected non-DBMgr source"
+	"Cellapp::onBroadcastCellAppDataChanged: rejected non-DBMgr source"
+	"Loginapp::onDbmgrInitCompleted: rejected non-DBMgr source"
+	"EntityApp::onBroadcastGlobalDataChanged: rejected non-DBMgr source"
+)
+	string(FIND "${_kbe_baseapp}\n${_kbe_cellapp}\n${_kbe_loginapp}\n${_kbe_entity_app}"
+		"${_kbe_required}" _kbe_required_position)
+	if(_kbe_required_position EQUAL -1)
+		message(FATAL_ERROR "Initialization or global-data source guard is missing: ${_kbe_required}")
+	endif()
 endforeach()
 
 foreach(_kbe_required IN ITEMS

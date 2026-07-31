@@ -1299,8 +1299,13 @@ void EntityApp<E>::onDbmgrInitCompleted(Network::Channel* pChannel,
 template<class E>
 void EntityApp<E>::onBroadcastGlobalDataChanged(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("EntityApp::onBroadcastGlobalDataChanged: rejected non-DBMgr source, addr={}.\n",
+			pChannel->c_str()));
+		s.done();
 		return;
+	}
 	
 	std::string key, value;
 	bool isDelete;

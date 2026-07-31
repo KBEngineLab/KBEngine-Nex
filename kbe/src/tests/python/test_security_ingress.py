@@ -17,6 +17,7 @@ COMPONENT_IDS = {
     "cellappmgr": 6000,
     "baseapp": 7001,
     "cellapp": 8001,
+    "loginapp": 9000,
 }
 
 REGISTERED_PROBE_COMPONENT_IDS = {
@@ -170,6 +171,38 @@ PROBES = (
         r"onCreateEntityAnywhereCallback: rejected unbound sourceComponent\(7001\)",
     ),
     (
+        "baseapp-spoofed-dbmgr-init",
+        "baseapp",
+        "internal",
+        "BASEAPP_TYPE",
+        "Baseapp::onDbmgrInitCompleted",
+        r"Baseapp::onDbmgrInitCompleted: rejected non-DBMgr source",
+    ),
+    (
+        "baseapp-spoofed-global-data",
+        "baseapp",
+        "internal",
+        "BASEAPP_TYPE",
+        "Baseapp::onBroadcastGlobalDataChanged",
+        r"EntityApp::onBroadcastGlobalDataChanged: rejected non-DBMgr source",
+    ),
+    (
+        "baseapp-spoofed-baseapp-data",
+        "baseapp",
+        "internal",
+        "BASEAPP_TYPE",
+        "Baseapp::onBroadcastBaseAppDataChanged",
+        r"Baseapp::onBroadcastBaseAppDataChanged: rejected non-DBMgr source",
+    ),
+    (
+        "baseapp-spoofed-pending-login",
+        "baseapp",
+        "internal",
+        "BASEAPP_TYPE",
+        "Baseapp::registerPendingLogin",
+        r"Baseapp::registerPendingLogin: rejected non-BaseAppMgr source",
+    ),
+    (
         "baseapp-spoofed-entity-app-discovery",
         "baseapp",
         "internal",
@@ -184,6 +217,30 @@ PROBES = (
         "CELLAPP_TYPE",
         "Cellapp::reqTeleportToCellAppCB",
         r"reqTeleportToCellAppCB: rejected unbound targetCellappID=8001",
+    ),
+    (
+        "cellapp-spoofed-dbmgr-init",
+        "cellapp",
+        "internal",
+        "CELLAPP_TYPE",
+        "Cellapp::onDbmgrInitCompleted",
+        r"Cellapp::onDbmgrInitCompleted: rejected non-DBMgr source",
+    ),
+    (
+        "cellapp-spoofed-global-data",
+        "cellapp",
+        "internal",
+        "CELLAPP_TYPE",
+        "Cellapp::onBroadcastGlobalDataChanged",
+        r"EntityApp::onBroadcastGlobalDataChanged: rejected non-DBMgr source",
+    ),
+    (
+        "cellapp-spoofed-cellapp-data",
+        "cellapp",
+        "internal",
+        "CELLAPP_TYPE",
+        "Cellapp::onBroadcastCellAppDataChanged",
+        r"Cellapp::onBroadcastCellAppDataChanged: rejected non-DBMgr source",
     ),
     (
         "baseapp-unbound-account-request",
@@ -218,6 +275,14 @@ PROBES = (
         "CELLAPP_TYPE",
         "Cellapp::onGetEntityAppFromDbmgr",
         r"Cellapp::onGetEntityAppFromDbmgr: rejected non-DBMgr source",
+    ),
+    (
+        "loginapp-spoofed-dbmgr-init",
+        "loginapp",
+        "internal",
+        "LOGINAPP_TYPE",
+        "Loginapp::onDbmgrInitCompleted",
+        r"Loginapp::onDbmgrInitCompleted: rejected non-DBMgr source",
     ),
 )
 
@@ -404,6 +469,20 @@ def probe_body(probe_case):
     if probe_case == "baseapp-spoofed-callback":
         return struct.pack("=I", 1) + b"Account\0" + struct.pack("=iQ", 1, 7001)
     if probe_case in {
+        "baseapp-spoofed-dbmgr-init",
+        "cellapp-spoofed-dbmgr-init",
+    }:
+        return struct.pack("=Iiiii", 0, 1, 2, 1, 1) + b"invalid\0"
+    if probe_case in {
+        "baseapp-spoofed-global-data",
+        "baseapp-spoofed-baseapp-data",
+        "cellapp-spoofed-global-data",
+        "cellapp-spoofed-cellapp-data",
+    }:
+        return struct.pack("=BI", 1, 0)
+    if probe_case == "baseapp-spoofed-pending-login":
+        return b""
+    if probe_case in {
         "baseapp-spoofed-entity-app-discovery",
         "cellapp-spoofed-entity-app-discovery",
     }:
@@ -421,6 +500,8 @@ def probe_body(probe_case):
         return struct.pack("=ii", 1, 2)
     if probe_case == "cellapp-spoofed-entity-create":
         return struct.pack("=i", 1) + b"Account\0" + struct.pack("=iQBB", 2, 7001, 0, 0)
+    if probe_case == "loginapp-spoofed-dbmgr-init":
+        return struct.pack("=ii", 1, 1) + b"invalid\0"
     raise RuntimeError(f"unsupported probe case: {probe_case}")
 
 

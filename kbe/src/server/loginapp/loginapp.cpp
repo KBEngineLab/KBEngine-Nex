@@ -274,11 +274,15 @@ void Loginapp::onSignalled(int sigNum)
 }
 
 //-------------------------------------------------------------------------------------
-void Loginapp::onDbmgrInitCompleted(Network::Channel* pChannel, COMPONENT_ORDER startGlobalOrder, 
+void Loginapp::onDbmgrInitCompleted(Network::Channel* pChannel, COMPONENT_ORDER startGlobalOrder,
 	COMPONENT_ORDER startGroupOrder, const std::string& digest)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Loginapp::onDbmgrInitCompleted: rejected non-DBMgr source, addr={}.\n",
+			pChannel->c_str()));
 		return;
+	}
 
 	INFO_MSG(fmt::format("Loginapp::onDbmgrInitCompleted:startGlobalOrder={0}, startGroupOrder={1}, digest={2}.\n",
 		startGlobalOrder, startGroupOrder, digest));
