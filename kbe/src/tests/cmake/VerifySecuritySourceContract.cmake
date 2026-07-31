@@ -158,6 +158,8 @@ foreach(_kbe_required IN ITEMS
 	"{}: rejected componentID="
 	"\"Cellapp::onCreateCellEntityFromBaseapp\""
 	"Cellapp::_onCreateCellEntityFromBaseapp: rejected unavailable space"
+	"Cellappmgr::reqCreateCellEntityInNewSpace: rejected unbound BaseApp"
+	"Cellappmgr::reqRestoreSpaceInCell: rejected unbound BaseApp"
 	"findOrReconnectChannel"
 	"Interfaces Channel unavailable after reconnect"
 	"reconnect: rejected missing Interfaces address"
@@ -170,7 +172,7 @@ foreach(_kbe_required IN ITEMS
 	"Dbmgr::syncEntityStreamTemplate"
 	"isAllowedRawDatabaseSource"
 )
-	string(FIND "${_kbe_cellapp}\n${_kbe_dbmgr}\n${_kbe_interfaces_handler}"
+	string(FIND "${_kbe_cellapp}\n${_kbe_cellappmgr}\n${_kbe_dbmgr}\n${_kbe_interfaces_handler}"
 		"${_kbe_required}" _kbe_required_position)
 	if(_kbe_required_position EQUAL -1)
 		message(FATAL_ERROR "Database or Cell creation ingress guard is missing: ${_kbe_required}")
@@ -225,7 +227,8 @@ endforeach()
 foreach(_kbe_required IN ITEMS
     "Security::isBoundClientEntity"
     "sourceEntity->baseEntityCall()->componentID() == sourceComponent->cid"
-    "Security::isAuthorizedClientCellTarget"
+	"Security::isAuthorizedClientCellTarget"
+	"Security::isBoundBidirectionalComponentSource"
 	"forwardEntityMessageToCellappFromClient: rejected unregistered"
 	"forwardEntityMessageToCellappFromClient: rejected unbound"
 )

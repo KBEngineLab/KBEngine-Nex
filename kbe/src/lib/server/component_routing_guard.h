@@ -49,6 +49,29 @@ bool isBoundComponentSource(COMPONENT_ID componentID, ComponentInfosT* infos,
 		concreteComponentChannel(componentID, infos) == sourceChannel;
 }
 
+/** Verify a peer on either side of the engine's historical dual connection.
+ *  验证引擎历史双连接中任一方向上的对端身份。
+ *
+ * EntityApps keep one inbound Channel registered in ComponentInfos while also
+ * creating an outbound Channel whose component ID is assigned locally during
+ * connectComponent(). Replies can arrive on that outbound Channel. The second
+ * binding is safe only because it is local connection state, not a packet field.
+ * EntityApp 在 ComponentInfos 中保存一条入站 Channel，同时还会主动建立一条由
+ * connectComponent() 在本地写入组件 ID 的出站 Channel。响应可从该出站 Channel
+ * 返回；第二种绑定之所以可信，是因为它来自本地连接状态而非网络载荷字段。
+ */
+template<typename ComponentInfosT>
+bool isBoundBidirectionalComponentSource(COMPONENT_ID componentID,
+	ComponentInfosT* infos, const Network::Channel* sourceChannel,
+	COMPONENT_ID locallyBoundChannelComponentID) noexcept
+{
+	if (componentID == 0 || infos == NULL || sourceChannel == NULL)
+		return false;
+
+	return isBoundComponentSource(componentID, infos, sourceChannel) ||
+		locallyBoundChannelComponentID == componentID;
+}
+
 /** Verify both the registered component type and the concrete source Channel.
  *  同时验证已注册组件类型和具体来源 Channel。
  */

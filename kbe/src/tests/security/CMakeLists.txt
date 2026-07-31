@@ -98,5 +98,25 @@ if(KBE_TEST_SERVER_CLUSTER)
 			RUN_SERIAL TRUE
 			TIMEOUT 240
 		)
+
+		add_test(NAME security.authenticated_cell_rpc_relationship
+			COMMAND "${Python3_EXECUTABLE}" -B
+				"${CMAKE_SOURCE_DIR}/tests/python/test_authenticated_cell_rpc.py"
+				--cluster-script "${CMAKE_SOURCE_DIR}/tests/python/test_server_cluster.py"
+				--probe-script "${CMAKE_CURRENT_SOURCE_DIR}/authenticated_cell_rpc_probe.js"
+				--resource-overlay "${CMAKE_CURRENT_SOURCE_DIR}/fixtures/cell-rpc"
+				--node-executable "${KBE_SDK_NODE_EXECUTABLE}"
+				--components "${_kbe_cluster_components_arg}"
+				--repository-root "${CMAKE_SOURCE_DIR}/../.."
+				--assets-root "${_kbe_test_assets}"
+				--binary-root "${CMAKE_BINARY_DIR}"
+				--run-root "${CMAKE_BINARY_DIR}/Testing/security-authenticated-cell-rpc-$<CONFIG>"
+		)
+		set_tests_properties(security.authenticated_cell_rpc_relationship PROPERTIES
+			LABELS "security;integration;network;runtime;server;authenticated;cell-rpc"
+			PASS_REGULAR_EXPRESSION "SECURITY_AUTHENTICATED_CELL_RPC_PASS"
+			RUN_SERIAL TRUE
+			TIMEOUT 300
+		)
 	endif()
 endif()

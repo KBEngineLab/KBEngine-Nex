@@ -63,6 +63,28 @@ bool testPayloadSenderMustMatchChannel()
 			"wrong source component type was accepted");
 }
 
+bool testLocallyBoundReverseChannelIsAccepted()
+{
+	char registeredStorage = 0;
+	char reverseStorage = 0;
+	auto* registered = reinterpret_cast<KBEngine::Network::Channel*>(&registeredStorage);
+	auto* reverse = reinterpret_cast<KBEngine::Network::Channel*>(&reverseStorage);
+	FakeComponentInfos component{registered, KBEngine::BASEAPP_TYPE, 7};
+
+	return require(KBEngine::Security::isBoundBidirectionalComponentSource(
+			7, &component, registered, 0),
+		"registered inbound Channel was rejected by the dual-connection guard") &&
+		require(KBEngine::Security::isBoundBidirectionalComponentSource(
+			7, &component, reverse, 7),
+		"locally bound reverse Channel was rejected") &&
+		require(!KBEngine::Security::isBoundBidirectionalComponentSource(
+			7, &component, reverse, 8),
+		"reverse Channel bound to another component was accepted") &&
+		require(!KBEngine::Security::isBoundBidirectionalComponentSource(
+			7, &component, reverse, 0),
+		"unbound reverse Channel was accepted");
+}
+
 bool testMalformedMetricsFailClosed()
 {
 	return require(KBEngine::Security::isValidComponentMetric(0.f),
@@ -99,6 +121,7 @@ int main()
 {
 	if (!testMutatedTargetsFailClosed() ||
 		!testPayloadSenderMustMatchChannel() ||
+		!testLocallyBoundReverseChannelIsAccepted() ||
 		!testMalformedMetricsFailClosed() ||
 		!testMalformedDatabaseRequestsFailClosed())
 		return EXIT_FAILURE;

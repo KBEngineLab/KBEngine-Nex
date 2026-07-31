@@ -62,16 +62,27 @@ namespace
 {
 Components::ComponentInfos* validateBaseappEntityCreationSource(
 	Network::Channel* pChannel, COMPONENT_ID componentID,
-	const std::string& entityType, bool hasClient, const char* operation)
+	const std::string& entityType, bool hasClient, bool allowCellappmgrRelay,
+	const char* operation)
 {
+	Components& components = Components::getSingleton();
 	Components::ComponentInfos* sourceInfos = componentID == 0 ? NULL :
-		Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
+		components.findComponent(BASEAPP_TYPE, componentID);
+	Components::ComponentInfos* channelInfos = components.findComponent(pChannel);
+	if (channelInfos == NULL && pChannel != NULL && pChannel->componentID() != 0)
+		channelInfos = components.findComponent(pChannel->componentID());
 	ScriptDefModule* scriptModule = EntityDef::findScriptModule(entityType.c_str());
 	const bool validScriptModule = scriptModule != NULL && scriptModule->hasCell() &&
 		(!hasClient || scriptModule->hasClient());
+	const bool validDirectSource = sourceInfos != NULL &&
+		Security::isBoundBidirectionalComponentSource(componentID, sourceInfos,
+			pChannel, pChannel != NULL ? pChannel->componentID() : 0);
+	const bool validRelay = allowCellappmgrRelay && channelInfos != NULL &&
+		channelInfos->componentType == CELLAPPMGR_TYPE &&
+		Security::isBoundBidirectionalComponentSource(channelInfos->cid, channelInfos,
+			pChannel, pChannel != NULL ? pChannel->componentID() : 0);
 	const bool validChannel = pChannel != NULL && !pChannel->isExternal() &&
-		!pChannel->isDestroyed() &&
-		Security::isBoundComponentSource(componentID, sourceInfos, pChannel);
+		!pChannel->isDestroyed() && (validDirectSource || validRelay);
 	if (!validChannel || !validScriptModule)
 	{
 		WARNING_MSG(fmt::format("{}: rejected componentID={}, entityType={}, hasClient={}, addr={}.\n",
@@ -993,7 +1004,7 @@ void Cellapp::onCreateCellEntityInNewSpaceFromBaseapp(Network::Channel* pChannel
 	s >> hasClient;
 
 	Components::ComponentInfos* cinfos = validateBaseappEntityCreationSource(
-		pChannel, componentID, entityType, hasClient,
+		pChannel, componentID, entityType, hasClient, true,
 		"Cellapp::onCreateCellEntityInNewSpaceFromBaseapp");
 	if (cinfos == NULL)
 	{
@@ -1118,7 +1129,7 @@ void Cellapp::onRestoreSpaceInCellFromBaseapp(Network::Channel* pChannel, KBEngi
 	s >> hasClient;
 
 	Components::ComponentInfos* cinfos = validateBaseappEntityCreationSource(
-		pChannel, componentID, entityType, hasClient,
+		pChannel, componentID, entityType, hasClient, true,
 		"Cellapp::onRestoreSpaceInCellFromBaseapp");
 	if (cinfos == NULL)
 	{
@@ -1245,7 +1256,7 @@ void Cellapp::onCreateCellEntityFromBaseapp(Network::Channel* pChannel, KBEngine
 	s >> inRescore;
 
 	Components::ComponentInfos* cinfos = validateBaseappEntityCreationSource(
-		pChannel, componentID, entityType, hasClient,
+		pChannel, componentID, entityType, hasClient, false,
 		"Cellapp::onCreateCellEntityFromBaseapp");
 	if (cinfos == NULL)
 	{
@@ -1566,9 +1577,15 @@ void Cellapp::onRemoteCallMethodFromClient(Network::Channel* pChannel, KBEngine:
 
 	s >> srcEntityID >> targetID;
 
-	Components::ComponentInfos* sourceComponent = Components::getSingleton().findComponent(pChannel);
-	const bool fromBaseapp = Security::isExpectedComponentSource(BASEAPP_TYPE, sourceComponent, pChannel);
-	const bool fromCellapp = Security::isExpectedComponentSource(CELLAPP_TYPE, sourceComponent, pChannel);
+	Components& components = Components::getSingleton();
+	Components::ComponentInfos* sourceComponent = components.findComponent(pChannel);
+	if (sourceComponent == NULL && pChannel != NULL && pChannel->componentID() != 0)
+		sourceComponent = components.findComponent(pChannel->componentID());
+	const bool sourceBound = sourceComponent != NULL &&
+		Security::isBoundBidirectionalComponentSource(sourceComponent->cid,
+			sourceComponent, pChannel, pChannel != NULL ? pChannel->componentID() : 0);
+	const bool fromBaseapp = sourceBound && sourceComponent->componentType == BASEAPP_TYPE;
+	const bool fromCellapp = sourceBound && sourceComponent->componentType == CELLAPP_TYPE;
 	if (!fromBaseapp && !fromCellapp)
 	{
 		WARNING_MSG(fmt::format("Cellapp::onRemoteCallMethodFromClient: rejected unregistered source Channel, "
@@ -1852,9 +1869,15 @@ void Cellapp::forwardEntityMessageToCellappFromClient(Network::Channel* pChannel
 
 	s >> srcEntityID;
 
-	Components::ComponentInfos* sourceComponent = Components::getSingleton().findComponent(pChannel);
-	const bool fromBaseapp = Security::isExpectedComponentSource(BASEAPP_TYPE, sourceComponent, pChannel);
-	const bool fromCellapp = Security::isExpectedComponentSource(CELLAPP_TYPE, sourceComponent, pChannel);
+	Components& components = Components::getSingleton();
+	Components::ComponentInfos* sourceComponent = components.findComponent(pChannel);
+	if (sourceComponent == NULL && pChannel != NULL && pChannel->componentID() != 0)
+		sourceComponent = components.findComponent(pChannel->componentID());
+	const bool sourceBound = sourceComponent != NULL &&
+		Security::isBoundBidirectionalComponentSource(sourceComponent->cid,
+			sourceComponent, pChannel, pChannel != NULL ? pChannel->componentID() : 0);
+	const bool fromBaseapp = sourceBound && sourceComponent->componentType == BASEAPP_TYPE;
+	const bool fromCellapp = sourceBound && sourceComponent->componentType == CELLAPP_TYPE;
 	if (!fromBaseapp && !fromCellapp)
 	{
 		WARNING_MSG(fmt::format("Cellapp::forwardEntityMessageToCellappFromClient: rejected unregistered "

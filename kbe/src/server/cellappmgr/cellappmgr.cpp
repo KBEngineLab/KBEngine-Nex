@@ -385,6 +385,18 @@ void Cellappmgr::reqCreateCellEntityInNewSpace(Network::Channel* pChannel, Memor
 	s >> componentID;
 	s >> hasClient;
 
+	Components::ComponentInfos* sourceInfos = componentID == 0 ? NULL :
+		Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
+	if (pChannel == NULL || pChannel->isExternal() || pChannel->isDestroyed() ||
+		!Security::isBoundBidirectionalComponentSource(componentID, sourceInfos,
+			pChannel, pChannel != NULL ? pChannel->componentID() : 0))
+	{
+		WARNING_MSG(fmt::format("Cellappmgr::reqCreateCellEntityInNewSpace: rejected unbound BaseApp componentID={}, addr={}.\n", componentID,
+			pChannel != NULL ? pChannel->c_str() : "none"));
+		s.done();
+		return;
+	}
+
 	static SPACE_ID spaceID = 1;
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
@@ -473,6 +485,18 @@ void Cellappmgr::reqRestoreSpaceInCell(Network::Channel* pChannel, MemoryStream&
 	s >> componentID;
 	s >> spaceID;
 	s >> hasClient;
+
+	Components::ComponentInfos* sourceInfos = componentID == 0 ? NULL :
+		Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
+	if (pChannel == NULL || pChannel->isExternal() || pChannel->isDestroyed() ||
+		!Security::isBoundBidirectionalComponentSource(componentID, sourceInfos,
+			pChannel, pChannel != NULL ? pChannel->componentID() : 0))
+	{
+		WARNING_MSG(fmt::format("Cellappmgr::reqRestoreSpaceInCell: rejected unbound BaseApp componentID={}, addr={}.\n", componentID,
+			pChannel != NULL ? pChannel->c_str() : "none"));
+		s.done();
+		return;
+	}
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(CellappInterface::onRestoreSpaceInCellFromBaseapp);
