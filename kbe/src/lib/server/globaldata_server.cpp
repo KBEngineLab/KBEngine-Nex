@@ -83,7 +83,12 @@ void GlobalDataServer::broadcastDataChanged(Network::Channel* pChannel, COMPONEN
 		for(; iter1 != channels.end(); ++iter1)
 		{
 			Network::Channel* lpChannel = iter1->pChannel;
-			KBE_ASSERT(lpChannel != NULL);
+			if (lpChannel == NULL || lpChannel->isDestroyed())
+			{
+				WARNING_MSG(fmt::format("GlobalDataServer::broadcastDataChanged: skipped unavailable componentType={}, componentID={}.\n",
+					iter1->componentType, iter1->cid));
+				continue;
+			}
 
 			if(pChannel == lpChannel)
 				continue;
