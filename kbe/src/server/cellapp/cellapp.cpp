@@ -93,6 +93,33 @@ Components::ComponentInfos* validateBaseappEntityCreationSource(
 
 	return sourceInfos;
 }
+
+bool bindClientStateForCreatedEntity(Entity* entity, const char* operation)
+{
+	if (entity == NULL || entity->baseEntityCall() == NULL || entity->hasWitness())
+	{
+		ERROR_MSG(fmt::format("{}: rejected invalid client binding state, entityID={}.\n",
+			operation, entity != NULL ? entity->id() : 0));
+		return false;
+	}
+
+	PyObject* clientEntityCall = PyObject_GetAttrString(entity->baseEntityCall(), "client");
+	if (clientEntityCall == NULL || clientEntityCall == Py_None ||
+		!PyObject_TypeCheck(clientEntityCall, EntityCall::getScriptType()))
+	{
+		ERROR_MSG(fmt::format("{}: rejected missing client EntityCall, entityID={}.\n",
+			operation, entity->id()));
+		Py_XDECREF(clientEntityCall);
+		SCRIPT_ERROR_CHECK();
+		return false;
+	}
+
+	// PyObject_GetAttrString returns a new reference; the Entity owns it after binding.
+	// PyObject_GetAttrString 返回新引用，绑定后由 Entity 持有该引用。
+	entity->clientEntityCall(static_cast<EntityCall*>(clientEntityCall));
+	entity->setWitness(Witness::createPoolObject(OBJECTPOOL_POINT));
+	return true;
+}
 }
 
 //-------------------------------------------------------------------------------------
@@ -1048,16 +1075,15 @@ void Cellapp::onCreateCellEntityInNewSpaceFromBaseapp(Network::Channel* pChannel
 		
 		if (hasClient)
 		{
-			KBE_ASSERT(e->baseEntityCall() != NULL && !e->hasWitness());
-			PyObject* clientEntityCall = PyObject_GetAttrString(e->baseEntityCall(), "client");
-			KBE_ASSERT(clientEntityCall != Py_None);
-
-			EntityCall* client = static_cast<EntityCall*>(clientEntityCall);
-			// Py_INCREF(clientEntityCall); 这里不需要增加引用， 因为每次都会产生一个新的对象
-
-			// 为了能够让entity.__init__中能够修改属性立刻能广播到客户端我们需要提前设置这些
-			e->clientEntityCall(client);
-			e->setWitness(Witness::createPoolObject(OBJECTPOOL_POINT));
+			if (!bindClientStateForCreatedEntity(e,
+				"Cellapp::onCreateCellEntityInNewSpaceFromBaseapp"))
+			{
+				Py_XDECREF(cellData);
+				destroyEntity(e->id(), false);
+				Spaces::destroySpace(spaceID, entitycallEntityID);
+				s.done();
+				return;
+			}
 		}
 
 		// 此处baseapp可能还有没初始化过来， 所以有一定概率是为None的
@@ -1164,16 +1190,15 @@ void Cellapp::onRestoreSpaceInCellFromBaseapp(Network::Channel* pChannel, KBEngi
 		
 		if (hasClient)
 		{
-			KBE_ASSERT(e->baseEntityCall() != NULL && !e->hasWitness());
-			PyObject* clientEntityCall = PyObject_GetAttrString(e->baseEntityCall(), "client");
-			KBE_ASSERT(clientEntityCall != Py_None);
-
-			EntityCall* client = static_cast<EntityCall*>(clientEntityCall);
-			// Py_INCREF(clientEntityCall); 这里不需要增加引用， 因为每次都会产生一个新的对象
-
-			// 为了能够让entity.__init__中能够修改属性立刻能广播到客户端我们需要提前设置这些
-			e->clientEntityCall(client);
-			e->setWitness(Witness::createPoolObject(OBJECTPOOL_POINT));
+			if (!bindClientStateForCreatedEntity(e,
+				"Cellapp::onRestoreSpaceInCellFromBaseapp"))
+			{
+				Py_XDECREF(cellData);
+				destroyEntity(e->id(), false);
+				Spaces::destroySpace(spaceID, entitycallEntityID);
+				s.done();
+				return;
+			}
 		}
 
 		// 此处baseapp可能还有没初始化过来， 所以有一定概率是为None的
@@ -1328,12 +1353,6 @@ void Cellapp::_onCreateCellEntityFromBaseapp(std::string& entityType, ENTITY_ID 
 	Space* space = Spaces::findSpace(spaceID);
 	if(space != NULL && space->isGood())
 	{
-		// 告知baseapp， entity的cell创建了
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-		pBundle->newMessage(BaseappInterface::onEntityGetCell);
-		BaseappInterface::onEntityGetCellArgs3::staticAddToBundle(*pBundle, entityID, componentID_, spaceID);
-		cinfos->pChannel->send(pBundle);
-
 		// 解包cellData信息.
 		PyObject* cellData = NULL;
 	
@@ -1343,6 +1362,10 @@ void Cellapp::_onCreateCellEntityFromBaseapp(std::string& entityType, ENTITY_ID 
 		if(e == NULL)
 		{
 			Py_XDECREF(cellData);
+			Network::Bundle* pFailureBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+			pFailureBundle->newMessage(BaseappInterface::onCreateCellFailure);
+			BaseappInterface::onCreateCellFailureArgs1::staticAddToBundle(*pFailureBundle, entityID);
+			cinfos->pChannel->send(pFailureBundle);
 			return;
 		}
 
@@ -1361,17 +1384,25 @@ void Cellapp::_onCreateCellEntityFromBaseapp(std::string& entityType, ENTITY_ID 
 
 		if(hasClient)
 		{
-			KBE_ASSERT(e->baseEntityCall() != NULL && !e->hasWitness());
-			PyObject* clientEntityCall = PyObject_GetAttrString(e->baseEntityCall(), "client");
-			KBE_ASSERT(clientEntityCall != Py_None);
-
-			EntityCall* client = static_cast<EntityCall*>(clientEntityCall);	
-			// Py_INCREF(clientEntityCall); 这里不需要增加引用， 因为每次都会产生一个新的对象
-
-			// 为了能够让entity.__init__中能够修改属性立刻能广播到客户端我们需要提前设置这些
-			e->clientEntityCall(client);
-			e->setWitness(Witness::createPoolObject(OBJECTPOOL_POINT));
+			if (!bindClientStateForCreatedEntity(e,
+				"Cellapp::_onCreateCellEntityFromBaseapp"))
+			{
+				Py_XDECREF(cellData);
+				destroyEntity(e->id(), false);
+				Network::Bundle* pFailureBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+				pFailureBundle->newMessage(BaseappInterface::onCreateCellFailure);
+				BaseappInterface::onCreateCellFailureArgs1::staticAddToBundle(*pFailureBundle, entityID);
+				cinfos->pChannel->send(pFailureBundle);
+				return;
+			}
 		}
+
+		// Only acknowledge success after all client-facing state is valid.
+		// 只有客户端相关状态全部有效后才向 BaseApp 确认创建成功。
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		pBundle->newMessage(BaseappInterface::onEntityGetCell);
+		BaseappInterface::onEntityGetCellArgs3::staticAddToBundle(*pBundle, entityID, componentID_, spaceID);
+		cinfos->pChannel->send(pBundle);
 
 		space->addEntity(e);
 
