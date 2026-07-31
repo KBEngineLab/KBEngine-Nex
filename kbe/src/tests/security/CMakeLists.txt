@@ -78,4 +78,25 @@ if(KBE_TEST_SERVER_CLUSTER)
 		RUN_SERIAL TRUE
 		TIMEOUT 240
 	)
+
+	if(KBE_SDK_NODE_EXECUTABLE)
+		add_test(NAME security.authenticated_client_ingress
+			COMMAND "${Python3_EXECUTABLE}" -B
+				"${CMAKE_SOURCE_DIR}/tests/python/test_authenticated_client_ingress.py"
+				--cluster-script "${CMAKE_SOURCE_DIR}/tests/python/test_server_cluster.py"
+				--probe-script "${CMAKE_CURRENT_SOURCE_DIR}/authenticated_client_probe.js"
+				--node-executable "${KBE_SDK_NODE_EXECUTABLE}"
+				--components "${_kbe_cluster_components_arg}"
+				--repository-root "${CMAKE_SOURCE_DIR}/../.."
+				--assets-root "${_kbe_test_assets}"
+				--binary-root "${CMAKE_BINARY_DIR}"
+				--run-root "${CMAKE_BINARY_DIR}/Testing/security-authenticated-client-$<CONFIG>"
+		)
+		set_tests_properties(security.authenticated_client_ingress PROPERTIES
+			LABELS "security;integration;network;runtime;server;authenticated"
+			PASS_REGULAR_EXPRESSION "SECURITY_AUTHENTICATED_CLIENT_INGRESS_PASS"
+			RUN_SERIAL TRUE
+			TIMEOUT 240
+		)
+	endif()
 endif()

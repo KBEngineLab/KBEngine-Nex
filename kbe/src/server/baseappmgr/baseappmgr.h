@@ -53,6 +53,12 @@ public:
 	
 	virtual void onChannelDeregister(Network::Channel * pChannel);
 	virtual void onAddComponent(const Components::ComponentInfos* pInfos);
+	virtual void onRegisterNewApp(Network::Channel* pChannel,
+		int32 uid, std::string& username,
+		COMPONENT_TYPE componentType, COMPONENT_ID componentID,
+		COMPONENT_ORDER globalorderID, COMPONENT_ORDER grouporderID,
+		uint32 intaddr, uint16 intport, uint32 extaddr, uint16 extport,
+		std::string& extaddrEx);
 
 	void handleTimeout(TimerHandle handle, void * arg);
 	void handleGameTick();

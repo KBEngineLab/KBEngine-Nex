@@ -180,6 +180,32 @@ void Baseappmgr::onAddComponent(const Components::ComponentInfos* pInfos)
 }
 
 //-------------------------------------------------------------------------------------
+void Baseappmgr::onRegisterNewApp(Network::Channel* pChannel,
+	int32 uid, std::string& username,
+	COMPONENT_TYPE componentType, COMPONENT_ID componentID,
+	COMPONENT_ORDER globalorderID, COMPONENT_ORDER grouporderID,
+	uint32 intaddr, uint16 intport, uint32 extaddr, uint16 extport,
+	std::string& extaddrEx)
+{
+	if (!registerNewApp(pChannel, uid, username, componentType, componentID,
+		globalorderID, grouporderID, intaddr, intport, extaddr, extport, extaddrEx))
+	{
+		return;
+	}
+
+	// Runtime state is created only after component identity and Channel binding
+	// succeed. This preserves fail-closed updates without relying on map[].
+	// 仅在组件身份与 Channel 绑定成功后创建运行状态，既保持拒绝式更新，
+	// 也不再依赖网络载荷触发 map[] 隐式插入。
+	if (componentType == BASEAPP_TYPE && baseapps_.find(componentID) == baseapps_.end())
+	{
+		baseapps_.insert(std::make_pair(componentID, Baseapp()));
+		INFO_MSG(fmt::format("Baseappmgr::onRegisterNewApp: added registered BaseApp({}).\n",
+			componentID));
+	}
+}
+
+//-------------------------------------------------------------------------------------
 bool Baseappmgr::initializeBegin()
 {
 	return true;

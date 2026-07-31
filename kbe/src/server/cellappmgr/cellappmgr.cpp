@@ -102,6 +102,30 @@ bool Cellappmgr::run()
 }
 
 //-------------------------------------------------------------------------------------
+void Cellappmgr::onRegisterNewApp(Network::Channel* pChannel,
+	int32 uid, std::string& username,
+	COMPONENT_TYPE componentType, COMPONENT_ID componentID,
+	COMPONENT_ORDER globalorderID, COMPONENT_ORDER grouporderID,
+	uint32 intaddr, uint16 intport, uint32 extaddr, uint16 extport,
+	std::string& extaddrEx)
+{
+	if (!registerNewApp(pChannel, uid, username, componentType, componentID,
+		globalorderID, grouporderID, intaddr, intport, extaddr, extport, extaddrEx))
+	{
+		return;
+	}
+
+	// Create manager state only for an authenticated CellApp registration.
+	// 只为已完成身份与 Channel 绑定的 CellApp 注册创建管理器运行状态。
+	if (componentType == CELLAPP_TYPE && cellapps_.find(componentID) == cellapps_.end())
+	{
+		cellapps_.insert(std::make_pair(componentID, Cellapp()));
+		INFO_MSG(fmt::format("Cellappmgr::onRegisterNewApp: added registered CellApp({}).\n",
+			componentID));
+	}
+}
+
+//-------------------------------------------------------------------------------------
 std::map< COMPONENT_ID, Cellapp >& Cellappmgr::cellapps()
 {
 	return cellapps_;

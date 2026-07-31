@@ -183,6 +183,8 @@ foreach(_kbe_required IN ITEMS
     "findComponentChannel(BASEAPP_TYPE"
     "findComponentChannel(CELLAPP_TYPE"
     "Security::isValidComponentMetric"
+	"Baseappmgr::onRegisterNewApp: added registered BaseApp"
+	"Cellappmgr::onRegisterNewApp: added registered CellApp"
 )
     string(FIND "${_kbe_baseapp}\n${_kbe_baseappmgr}\n${_kbe_cellappmgr}"
         "${_kbe_required}" _kbe_required_position)
