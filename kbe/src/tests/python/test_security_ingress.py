@@ -22,6 +22,7 @@ PROBES = (
     (
         "baseappmgr-zero-forward",
         "baseappmgr",
+        "internal",
         "BASEAPPMGR_TYPE",
         "Baseappmgr::forwardMessage",
         r"Baseappmgr::forwardMessage: rejected unbound senderComponent\(0\)",
@@ -29,6 +30,7 @@ PROBES = (
     (
         "baseappmgr-spoofed-update",
         "baseappmgr",
+        "internal",
         "BASEAPPMGR_TYPE",
         "Baseappmgr::updateBaseapp",
         r"Baseappmgr::updateBaseapp: rejected componentID\(7001\)",
@@ -36,6 +38,7 @@ PROBES = (
     (
         "cellappmgr-zero-forward",
         "cellappmgr",
+        "internal",
         "CELLAPPMGR_TYPE",
         "Cellappmgr::forwardMessage",
         r"Cellappmgr::forwardMessage: rejected unbound senderComponent\(0\)",
@@ -43,6 +46,7 @@ PROBES = (
     (
         "cellappmgr-spoofed-update",
         "cellappmgr",
+        "internal",
         "CELLAPPMGR_TYPE",
         "Cellappmgr::updateCellapp",
         r"Cellappmgr::updateCellapp: rejected componentID\(8001\)",
@@ -50,6 +54,7 @@ PROBES = (
     (
         "baseapp-spoofed-callback",
         "baseapp",
+        "internal",
         "BASEAPP_TYPE",
         "Baseapp::onCreateEntityAnywhereCallback",
         r"onCreateEntityAnywhereCallback: rejected unbound sourceComponent\(7001\)",
@@ -57,9 +62,27 @@ PROBES = (
     (
         "cellapp-spoofed-teleport",
         "cellapp",
+        "internal",
         "CELLAPP_TYPE",
         "Cellapp::reqTeleportToCellAppCB",
         r"reqTeleportToCellAppCB: rejected unbound targetCellappID=8001",
+    ),
+    (
+        "baseapp-unbound-account-request",
+        "baseapp",
+        "external",
+        "BASEAPP_TYPE",
+        "Baseapp::reqAccountBindEmail",
+        r"Baseapp::reqAccountBindEmail: rejected unbound entity, requested=1, proxyID=0",
+    ),
+    (
+        "cellapp-unregistered-cell-rpc",
+        "cellapp",
+        "internal",
+        "CELLAPP_TYPE",
+        "Cellapp::onRemoteCallMethodFromClient",
+        r"Cellapp::onRemoteCallMethodFromClient: rejected unregistered source Channel, "
+        r"srcEntityID=1, targetID=2",
     ),
 )
 
@@ -135,6 +158,24 @@ def find_endpoint(log_text, component_name):
     return host, port
 
 
+def find_external_endpoint(log_text, component_name):
+    component_id = COMPONENT_IDS[component_name]
+    pattern = re.compile(
+        rf"componentID:{component_id}\b[^\r\n]*?extaddr:([^,\s]+),\s*extport:(\d+)",
+        re.IGNORECASE,
+    )
+    match = pattern.search(log_text)
+    if not match:
+        raise RuntimeError(
+            f"external endpoint for {component_name}({component_id}) was not published"
+        )
+    host = match.group(1)
+    port = int(match.group(2))
+    if host.lower() == "nonsupport" or not 1 <= port <= 65535:
+        raise RuntimeError(f"invalid external endpoint for {component_name}: {host}:{port}")
+    return host, port
+
+
 def flatten_values(values):
     result = {}
     for key, value in values.items():
@@ -203,12 +244,23 @@ def probe_body(probe_case):
         return struct.pack("=I", 1) + b"Account\0" + struct.pack("=iQ", 1, 7001)
     if probe_case == "cellapp-spoofed-teleport":
         return struct.pack("=QQQib", 8001, 8001, 7001, 1, 0)
+    if probe_case == "baseapp-unbound-account-request":
+        return struct.pack("=i", 1) + b"invalid\0security@example.invalid\0"
+    if probe_case == "cellapp-unregistered-cell-rpc":
+        return struct.pack("=ii", 1, 2)
     raise RuntimeError(f"unsupported probe case: {probe_case}")
 
 
-def run_probe(args, probe_case, component_type_name, message_name, endpoint):
+def run_probe(
+    args,
+    probe_case,
+    component_type_name,
+    message_name,
+    contract_endpoint,
+    ingress_endpoint,
+):
     message_id, message_length = query_message_contract(
-        args.repository_root, component_type_name, endpoint, message_name
+        args.repository_root, component_type_name, contract_endpoint, message_name
     )
     body = probe_body(probe_case)
     frame = struct.pack("=H", message_id)
@@ -222,7 +274,7 @@ def run_probe(args, probe_case, component_type_name, message_name, endpoint):
         )
     frame += body
 
-    with socket.create_connection(endpoint, timeout=5) as connection:
+    with socket.create_connection(ingress_endpoint, timeout=5) as connection:
         connection.sendall(frame)
         connection.shutdown(socket.SHUT_WR)
         time.sleep(0.05)
@@ -286,17 +338,33 @@ def run_test(args):
             "cluster readiness",
         )
 
-        endpoints = {
+        internal_endpoints = {
             component_name: find_endpoint(ready_logs, component_name)
             for component_name in COMPONENT_IDS
         }
-        for probe_case, component_name, component_type, message_name, rejection_pattern in PROBES:
+        external_endpoints = {
+            component_name: find_external_endpoint(ready_logs, component_name)
+            for component_name in {probe[1] for probe in PROBES if probe[2] == "external"}
+        }
+        for (
+            probe_case,
+            component_name,
+            endpoint_kind,
+            component_type,
+            message_name,
+            rejection_pattern,
+        ) in PROBES:
             run_probe(
                 args,
                 probe_case,
                 component_type,
                 message_name,
-                endpoints[component_name],
+                internal_endpoints[component_name],
+                (
+                    external_endpoints[component_name]
+                    if endpoint_kind == "external"
+                    else internal_endpoints[component_name]
+                ),
             )
             wait_for_text(
                 process,
