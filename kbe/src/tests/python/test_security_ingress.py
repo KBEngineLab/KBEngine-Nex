@@ -37,6 +37,30 @@ PROBES = (
         r"Dbmgr::removeEntity: rejected componentID=7001, entityDBID=0",
     ),
     (
+        "dbmgr-unregistered-create-account",
+        "dbmgr",
+        "internal",
+        "DBMGR_TYPE",
+        "Dbmgr::reqCreateAccount",
+        r"Dbmgr::reqCreateAccount: rejected sourceType=loginapp",
+    ),
+    (
+        "dbmgr-unregistered-interfaces-callback",
+        "dbmgr",
+        "internal",
+        "DBMGR_TYPE",
+        "Dbmgr::onCreateAccountCBFromInterfaces",
+        r"Dbmgr::onCreateAccountCBFromInterfaces: rejected sourceType=interfaces",
+    ),
+    (
+        "dbmgr-unregistered-charge",
+        "dbmgr",
+        "internal",
+        "DBMGR_TYPE",
+        "Dbmgr::charge",
+        r"Dbmgr::charge: rejected sourceType=baseapp",
+    ),
+    (
         "baseappmgr-zero-forward",
         "baseappmgr",
         "internal",
@@ -262,6 +286,12 @@ def probe_body(probe_case):
         return struct.pack("=BBIi", 255, 1, 0, 6)
     if probe_case == "dbmgr-zero-entity-dbid":
         return struct.pack("=HQiQ", 0, 7001, 1, 0)
+    if probe_case in {
+        "dbmgr-unregistered-create-account",
+        "dbmgr-unregistered-interfaces-callback",
+        "dbmgr-unregistered-charge",
+    }:
+        return b""
     if probe_case == "baseappmgr-zero-forward":
         return struct.pack("=QQ", 0, 7001)
     if probe_case == "baseappmgr-spoofed-update":

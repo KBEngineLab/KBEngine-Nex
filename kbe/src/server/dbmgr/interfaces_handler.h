@@ -33,6 +33,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{ 
 
 namespace Network{
+	class Channel;
 	class EndPoint;
 }
 
@@ -148,6 +149,8 @@ public:
 	virtual bool process();
 
 protected:
+	Network::Channel* findOrReconnectChannel(const char* operation);
+
 	Network::Address addr_;
 
 };

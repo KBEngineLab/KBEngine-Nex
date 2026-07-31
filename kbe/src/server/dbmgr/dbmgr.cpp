@@ -62,6 +62,30 @@ Components::ComponentInfos* findBoundBaseappSource(Network::Channel* pChannel,
 	return Security::isBoundComponentSource(componentID, sourceInfos, pChannel) ?
 		sourceInfos : NULL;
 }
+
+bool isExpectedIngressSource(COMPONENT_TYPE expectedType, Network::Channel* pChannel,
+	const char* operation)
+{
+	if (Components::getSingleton().isExpectedComponentChannel(expectedType, pChannel))
+		return true;
+
+	WARNING_MSG(fmt::format("{}: rejected sourceType={}, addr={}.\n",
+		operation, COMPONENT_NAME_EX(expectedType),
+		pChannel != NULL ? pChannel->c_str() : "none"));
+	return false;
+}
+
+InterfacesHandler* findInterfacesHandlerOrWarn(const char* operation)
+{
+	InterfacesHandler* pHandler = Dbmgr::getSingleton().findBestInterfacesHandler();
+	if (pHandler == NULL)
+	{
+		ERROR_MSG(fmt::format("{}: no initialized Interfaces handler is available.\n",
+			operation));
+	}
+
+	return pHandler;
+}
 }
 
 ServerConfig g_serverConfig;
@@ -747,6 +771,12 @@ void Dbmgr::onBroadcastGlobalDataChanged(Network::Channel* pChannel, KBEngine::M
 //-------------------------------------------------------------------------------------
 void Dbmgr::reqCreateAccount(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (!isExpectedIngressSource(LOGINAPP_TYPE, pChannel, "Dbmgr::reqCreateAccount"))
+	{
+		s.done();
+		return;
+	}
+
 	std::string registerName, password, datas;
 	uint8 uatype = 0;
 
@@ -759,19 +789,41 @@ void Dbmgr::reqCreateAccount(Network::Channel* pChannel, KBEngine::MemoryStream&
 		return;
 	}
 
-	findBestInterfacesHandler()->createAccount(pChannel, registerName, password, datas, ACCOUNT_TYPE(uatype));
-	numCreatedAccount_++;
+	InterfacesHandler* pHandler = findInterfacesHandlerOrWarn("Dbmgr::reqCreateAccount");
+	if (pHandler != NULL &&
+		pHandler->createAccount(pChannel, registerName, password, datas, ACCOUNT_TYPE(uatype)))
+	{
+		numCreatedAccount_++;
+	}
 }
 
 //-------------------------------------------------------------------------------------
 void Dbmgr::onCreateAccountCBFromInterfaces(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	findBestInterfacesHandler()->onCreateAccountCB(s);
+	if (!isExpectedIngressSource(INTERFACES_TYPE, pChannel,
+		"Dbmgr::onCreateAccountCBFromInterfaces"))
+	{
+		s.done();
+		return;
+	}
+
+	InterfacesHandler* pHandler =
+		findInterfacesHandlerOrWarn("Dbmgr::onCreateAccountCBFromInterfaces");
+	if (pHandler != NULL)
+		pHandler->onCreateAccountCB(s);
+	else
+		s.done();
 }
 
 //-------------------------------------------------------------------------------------
-void Dbmgr::onAccountLogin(Network::Channel* pChannel, KBEngine::MemoryStream& s) 
+void Dbmgr::onAccountLogin(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (!isExpectedIngressSource(LOGINAPP_TYPE, pChannel, "Dbmgr::onAccountLogin"))
+	{
+		s.done();
+		return;
+	}
+
 	std::string loginName, password, datas;
 	s >> loginName >> password;
 	s.readBlob(datas);
@@ -782,13 +834,27 @@ void Dbmgr::onAccountLogin(Network::Channel* pChannel, KBEngine::MemoryStream& s
 		return;
 	}
 
-	findBestInterfacesHandler()->loginAccount(pChannel, loginName, password, datas);
+	InterfacesHandler* pHandler = findInterfacesHandlerOrWarn("Dbmgr::onAccountLogin");
+	if (pHandler != NULL)
+		pHandler->loginAccount(pChannel, loginName, password, datas);
 }
 
 //-------------------------------------------------------------------------------------
-void Dbmgr::onLoginAccountCBBFromInterfaces(Network::Channel* pChannel, KBEngine::MemoryStream& s) 
+void Dbmgr::onLoginAccountCBBFromInterfaces(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	findBestInterfacesHandler()->onLoginAccountCB(s);
+	if (!isExpectedIngressSource(INTERFACES_TYPE, pChannel,
+		"Dbmgr::onLoginAccountCBBFromInterfaces"))
+	{
+		s.done();
+		return;
+	}
+
+	InterfacesHandler* pHandler =
+		findInterfacesHandlerOrWarn("Dbmgr::onLoginAccountCBBFromInterfaces");
+	if (pHandler != NULL)
+		pHandler->onLoginAccountCB(s);
+	else
+		s.done();
 }
 
 //-------------------------------------------------------------------------------------
@@ -1324,18 +1390,41 @@ void Dbmgr::syncEntityStreamTemplate(Network::Channel* pChannel, KBEngine::Memor
 //-------------------------------------------------------------------------------------
 void Dbmgr::charge(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	findBestInterfacesHandler()->charge(pChannel, s);
+	if (!isExpectedIngressSource(BASEAPP_TYPE, pChannel, "Dbmgr::charge"))
+	{
+		s.done();
+		return;
+	}
+
+	InterfacesHandler* pHandler = findInterfacesHandlerOrWarn("Dbmgr::charge");
+	if (pHandler != NULL)
+		pHandler->charge(pChannel, s);
+	else
+		s.done();
 }
 
 //-------------------------------------------------------------------------------------
 void Dbmgr::onChargeCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	findBestInterfacesHandler()->onChargeCB(s);
+	if (!isExpectedIngressSource(INTERFACES_TYPE, pChannel, "Dbmgr::onChargeCB"))
+	{
+		s.done();
+		return;
+	}
+
+	InterfacesHandler* pHandler = findInterfacesHandlerOrWarn("Dbmgr::onChargeCB");
+	if (pHandler != NULL)
+		pHandler->onChargeCB(s);
+	else
+		s.done();
 }
 
 //-------------------------------------------------------------------------------------
 void Dbmgr::eraseClientReq(Network::Channel* pChannel, std::string& logkey)
 {
+	if (!isExpectedIngressSource(LOGINAPP_TYPE, pChannel, "Dbmgr::eraseClientReq"))
+		return;
+
 	std::vector<InterfacesHandler*>::iterator iter = pInterfacesHandlers_.begin();
 	for (; iter != pInterfacesHandlers_.end(); ++iter)
 		(*iter)->eraseClientReq(pChannel, logkey);
@@ -1344,48 +1433,81 @@ void Dbmgr::eraseClientReq(Network::Channel* pChannel, std::string& logkey)
 //-------------------------------------------------------------------------------------
 void Dbmgr::accountActivate(Network::Channel* pChannel, std::string& scode)
 {
+	if (!isExpectedIngressSource(LOGINAPP_TYPE, pChannel, "Dbmgr::accountActivate"))
+		return;
+
 	INFO_MSG("Dbmgr::accountActivate: request received.\n");
-	findBestInterfacesHandler()->accountActivate(pChannel, scode);
+	InterfacesHandler* pHandler = findInterfacesHandlerOrWarn("Dbmgr::accountActivate");
+	if (pHandler != NULL)
+		pHandler->accountActivate(pChannel, scode);
 }
 
 //-------------------------------------------------------------------------------------
 void Dbmgr::accountReqResetPassword(Network::Channel* pChannel, std::string& accountName)
 {
+	if (!isExpectedIngressSource(LOGINAPP_TYPE, pChannel,
+		"Dbmgr::accountReqResetPassword"))
+	{
+		return;
+	}
+
 	INFO_MSG(fmt::format("Dbmgr::accountReqResetPassword: accountNameSize={}.\n", accountName.size()));
-	findBestInterfacesHandler()->accountReqResetPassword(pChannel, accountName);
+	InterfacesHandler* pHandler = findInterfacesHandlerOrWarn("Dbmgr::accountReqResetPassword");
+	if (pHandler != NULL)
+		pHandler->accountReqResetPassword(pChannel, accountName);
 }
 
 //-------------------------------------------------------------------------------------
 void Dbmgr::accountResetPassword(Network::Channel* pChannel, std::string& accountName, std::string& newpassword, std::string& code)
 {
+	if (!isExpectedIngressSource(LOGINAPP_TYPE, pChannel, "Dbmgr::accountResetPassword"))
+		return;
+
 	INFO_MSG(fmt::format("Dbmgr::accountResetPassword: accountNameSize={}.\n", accountName.size()));
-	findBestInterfacesHandler()->accountResetPassword(pChannel, accountName, newpassword, code);
+	InterfacesHandler* pHandler = findInterfacesHandlerOrWarn("Dbmgr::accountResetPassword");
+	if (pHandler != NULL)
+		pHandler->accountResetPassword(pChannel, accountName, newpassword, code);
 }
 
 //-------------------------------------------------------------------------------------
-void Dbmgr::accountReqBindMail(Network::Channel* pChannel, ENTITY_ID entityID, std::string& accountName, 
+void Dbmgr::accountReqBindMail(Network::Channel* pChannel, ENTITY_ID entityID, std::string& accountName,
 							   std::string& password, std::string& email)
 {
+	if (!isExpectedIngressSource(BASEAPP_TYPE, pChannel, "Dbmgr::accountReqBindMail"))
+		return;
+
 	// This path handles both account identifiers and destination email addresses;
 	// never persist either value in logs. 此路径同时处理账户标识和目标邮箱，日志不得保留其内容。
 	INFO_MSG(fmt::format("Dbmgr::accountReqBindMail: accountNameSize={}, emailSize={}.\n",
 		accountName.size(), email.size()));
-	findBestInterfacesHandler()->accountReqBindMail(pChannel, entityID, accountName, password, email);
+	InterfacesHandler* pHandler = findInterfacesHandlerOrWarn("Dbmgr::accountReqBindMail");
+	if (pHandler != NULL)
+		pHandler->accountReqBindMail(pChannel, entityID, accountName, password, email);
 }
 
 //-------------------------------------------------------------------------------------
 void Dbmgr::accountBindMail(Network::Channel* pChannel, std::string& username, std::string& scode)
 {
-	INFO_MSG(fmt::format("Dbmgr::accountBindMail: username={}.\n", username));
-	findBestInterfacesHandler()->accountBindMail(pChannel, username, scode);
+	if (!isExpectedIngressSource(LOGINAPP_TYPE, pChannel, "Dbmgr::accountBindMail"))
+		return;
+
+	INFO_MSG(fmt::format("Dbmgr::accountBindMail: usernameSize={}.\n", username.size()));
+	InterfacesHandler* pHandler = findInterfacesHandlerOrWarn("Dbmgr::accountBindMail");
+	if (pHandler != NULL)
+		pHandler->accountBindMail(pChannel, username, scode);
 }
 
 //-------------------------------------------------------------------------------------
-void Dbmgr::accountNewPassword(Network::Channel* pChannel, ENTITY_ID entityID, std::string& accountName, 
+void Dbmgr::accountNewPassword(Network::Channel* pChannel, ENTITY_ID entityID, std::string& accountName,
 							   std::string& password, std::string& newpassword)
 {
+	if (!isExpectedIngressSource(BASEAPP_TYPE, pChannel, "Dbmgr::accountNewPassword"))
+		return;
+
 	INFO_MSG(fmt::format("Dbmgr::accountNewPassword: accountNameSize={}.\n", accountName.size()));
-	findBestInterfacesHandler()->accountNewPassword(pChannel, entityID, accountName, password, newpassword);
+	InterfacesHandler* pHandler = findInterfacesHandlerOrWarn("Dbmgr::accountNewPassword");
+	if (pHandler != NULL)
+		pHandler->accountNewPassword(pChannel, entityID, accountName, password, newpassword);
 }
 
 //-------------------------------------------------------------------------------------
