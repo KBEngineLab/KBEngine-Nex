@@ -422,8 +422,22 @@ void ServerApp::onRegisterNewApp(Network::Channel* pChannel, int32 uid, std::str
 						COMPONENT_TYPE componentType, COMPONENT_ID componentID, COMPONENT_ORDER globalorderID, COMPONENT_ORDER grouporderID,
 						uint32 intaddr, uint16 intport, uint32 extaddr, uint16 extport, std::string& extaddrEx)
 {
-	if(pChannel->isExternal())
-		return;
+	registerNewApp(pChannel, uid, username, componentType, componentID,
+		globalorderID, grouporderID, intaddr, intport, extaddr, extport, extaddrEx);
+}
+
+//-------------------------------------------------------------------------------------
+bool ServerApp::registerNewApp(Network::Channel* pChannel, int32 uid, std::string& username,
+						COMPONENT_TYPE componentType, COMPONENT_ID componentID, COMPONENT_ORDER globalorderID, COMPONENT_ORDER grouporderID,
+						uint32 intaddr, uint16 intport, uint32 extaddr, uint16 extport, std::string& extaddrEx)
+{
+	if (pChannel == NULL || pChannel->isExternal() || !VALID_COMPONENT(componentType) ||
+		componentID == 0 || uid != KBEngine::getUserUID())
+	{
+		WARNING_MSG(fmt::format("ServerApp::registerNewApp: rejected uid={}, componentType={}, componentID={}, addr={}.\n",
+			uid, componentType, componentID, pChannel != NULL ? pChannel->c_str() : "none"));
+		return false;
+	}
 
 	INFO_MSG(fmt::format("ServerApp::onRegisterNewApp: uid:{0}, username:{1}, componentType:{2}, "
 			"componentID:{3}, globalorderID={9}, grouporderID={10}, intaddr:{4}, intport:{5}, extaddr:{6}, extport:{7},  from {8}.\n",
@@ -439,19 +453,33 @@ void ServerApp::onRegisterNewApp(Network::Channel* pChannel, int32 uid, std::str
 			((int32)globalorderID),
 			((int32)grouporderID)));
 
-	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent((
-		KBEngine::COMPONENT_TYPE)componentType, uid, componentID);
+	Components& components = Components::getSingleton();
+	Components::ComponentInfos* idOwner = components.findComponent(componentID);
+	if (idOwner != NULL && idOwner->componentType != componentType)
+	{
+		WARNING_MSG(fmt::format("ServerApp::registerNewApp: rejected componentID conflict, requestedType={}, existingType={}, componentID={}, addr={}.\n",
+			componentType, idOwner->componentType, componentID, pChannel->c_str()));
+		return false;
+	}
 
-	pChannel->componentID(componentID);
+	Components::ComponentInfos* cinfos = components.findComponent(componentType, uid, componentID);
 
 	if(cinfos == NULL)
 	{
-		Components::getSingleton().addComponent(uid, username.c_str(), 
+		components.addComponent(uid, username.c_str(),
 			(KBEngine::COMPONENT_TYPE)componentType, componentID, globalorderID, grouporderID, 0, intaddr, intport, extaddr, extport, extaddrEx, 0,
 			0.f, 0.f, 0, 0, 0, 0, 0, pChannel);
 	}
 	else
 	{
+		if (cinfos->pChannel != NULL && cinfos->pChannel != pChannel &&
+			!cinfos->pChannel->isDestroyed())
+		{
+			WARNING_MSG(fmt::format("ServerApp::registerNewApp: rejected live binding replacement, componentType={}, componentID={}, addr={}.\n",
+				componentType, componentID, pChannel->c_str()));
+			return false;
+		}
+
 		if (!(cinfos->pIntAddr->ip == intaddr && cinfos->pIntAddr->port == intport))
 		{
 			ERROR_MSG(fmt::format("ServerApp::onRegisterNewApp: error component(uid:{}, username:{}, componentType:{}, componentID:{}, from {})!\n",
@@ -459,11 +487,22 @@ void ServerApp::onRegisterNewApp(Network::Channel* pChannel, int32 uid, std::str
 				username.c_str(),
 				COMPONENT_NAME_EX((COMPONENT_TYPE)componentType), componentID, pChannel->c_str()));
 
-			return;
+			return false;
 		}
 
 		cinfos->pChannel = pChannel;
 	}
+
+	cinfos = components.findComponent(componentType, uid, componentID);
+	if (cinfos == NULL || cinfos->pChannel != pChannel)
+	{
+		WARNING_MSG(fmt::format("ServerApp::registerNewApp: rejected unbound registration, componentType={}, componentID={}, addr={}.\n",
+			componentType, componentID, pChannel->c_str()));
+		return false;
+	}
+
+	pChannel->componentID(componentID);
+	return true;
 }
 
 //-------------------------------------------------------------------------------------

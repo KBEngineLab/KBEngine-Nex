@@ -629,8 +629,14 @@ void Dbmgr::onRegisterNewApp(Network::Channel* pChannel, int32 uid, std::string&
 	if(pChannel->isExternal())
 		return;
 
-	ServerApp::onRegisterNewApp(pChannel, uid, username, componentType, componentID, globalorderID, grouporderID,
-						intaddr, intport, extaddr, extport, extaddrEx);
+	if (!isGameServerComponentType(componentType) ||
+		!ServerApp::registerNewApp(pChannel, uid, username, componentType, componentID,
+			globalorderID, grouporderID, intaddr, intport, extaddr, extport, extaddrEx))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::onRegisterNewApp: rejected registration componentType={}, componentID={}, uid={}, addr={}.\n",
+			componentType, componentID, uid, pChannel != NULL ? pChannel->c_str() : "none"));
+		return;
+	}
 
 	KBEngine::COMPONENT_TYPE tcomponentType = (KBEngine::COMPONENT_TYPE)componentType;
 	

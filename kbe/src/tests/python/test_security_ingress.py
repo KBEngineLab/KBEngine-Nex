@@ -15,6 +15,7 @@ COMPONENT_IDS = {
     "dbmgr": 4000,
     "baseappmgr": 5000,
     "cellappmgr": 6000,
+    "interfaces": 3000,
     "baseapp": 7001,
     "cellapp": 8001,
     "loginapp": 9000,
@@ -97,6 +98,22 @@ PROBES = (
         "DBMGR_TYPE",
         "Dbmgr::syncEntityStreamTemplate",
         r"Dbmgr::syncEntityStreamTemplate: rejected sourceType=baseapp",
+    ),
+    (
+        "dbmgr-registration-zero-id",
+        "dbmgr",
+        "internal",
+        "DBMGR_TYPE",
+        "Dbmgr::onRegisterNewApp",
+        r"Dbmgr::onRegisterNewApp: rejected registration componentType=13, componentID=0",
+    ),
+    (
+        "dbmgr-registration-live-binding-conflict",
+        "dbmgr",
+        "internal",
+        "DBMGR_TYPE",
+        "Dbmgr::onRegisterNewApp",
+        r"Dbmgr::onRegisterNewApp: rejected registration componentType=13, componentID=3000",
     ),
     (
         "dbmgr-registered-wrong-component-type",
@@ -376,6 +393,19 @@ def find_external_endpoint(log_text, component_name):
     return host, port
 
 
+def find_component_uid(log_text, component_name):
+    component_id = COMPONENT_IDS[component_name]
+    pattern = re.compile(
+        rf"ServerApp::onRegisterNewApp:\s*uid:(-?\d+).*?"
+        rf"componentType:{component_name}.*?componentID:{component_id}\b",
+        re.IGNORECASE,
+    )
+    match = pattern.search(log_text)
+    if not match:
+        raise RuntimeError(f"uid for {component_name}({component_id}) was not published")
+    return int(match.group(1))
+
+
 def flatten_values(values):
     result = {}
     for key, value in values.items():
@@ -431,7 +461,7 @@ def query_message_contract(repository_root, component_type_name, endpoint, messa
         sys.path.pop(0)
 
 
-def probe_body(probe_case):
+def probe_body(probe_case, component_uid):
     if probe_case == "dbmgr-invalid-global-data-type":
         return struct.pack("=BBIi", 255, 1, 0, 6)
     if probe_case == "dbmgr-zero-entity-dbid":
@@ -450,6 +480,10 @@ def probe_body(probe_case):
         return struct.pack("=iHQiII", -1, 0, 7001, 6, 0, 0)
     if probe_case == "dbmgr-unregistered-stream-template":
         return b""
+    if probe_case == "dbmgr-registration-zero-id":
+        return component_registration_body(component_uid, 13, 0)
+    if probe_case == "dbmgr-registration-live-binding-conflict":
+        return component_registration_body(component_uid, 13, 3000)
     if probe_case == "dbmgr-registered-wrong-component-type":
         return struct.pack("=iQ", 13, 9001)
     if probe_case == "dbmgr-registered-sender-channel-mismatch":
@@ -519,15 +553,21 @@ def message_frame(message_id, message_length, body, message_name):
     return frame + body
 
 
-def registered_probe_body(component_id):
-    # 注册为 Interfaces 可验证类型与 Channel 绑定，同时避免触发 EntityApp 发现广播。
-    # Register as Interfaces to exercise type/channel binding without EntityApp discovery broadcasts.
+def component_registration_body(component_uid, component_type, component_id):
     return (
-        struct.pack("=i", 0)
+        struct.pack("=i", component_uid)
         + b"security-probe\0"
-        + struct.pack("=iQiiIHIH", 13, component_id, 0, 0, 0, 0, 0, 0)
+        + struct.pack(
+            "=iQiiIHIH", component_type, component_id, 0, 0, 0, 0, 0, 0
+        )
         + b"\0"
     )
+
+
+def registered_probe_body(component_uid, component_id):
+    # 注册为 Interfaces 可验证类型与 Channel 绑定，同时避免触发 EntityApp 发现广播。
+    # Register as Interfaces to exercise type/channel binding without EntityApp discovery broadcasts.
+    return component_registration_body(component_uid, 13, component_id)
 
 
 def run_probe(
@@ -537,11 +577,14 @@ def run_probe(
     message_name,
     contract_endpoint,
     ingress_endpoint,
+    component_uid,
 ):
     message_id, message_length = query_message_contract(
         args.repository_root, component_type_name, contract_endpoint, message_name
     )
-    frame = message_frame(message_id, message_length, probe_body(probe_case), message_name)
+    frame = message_frame(
+        message_id, message_length, probe_body(probe_case, component_uid), message_name
+    )
 
     with socket.create_connection(ingress_endpoint, timeout=5) as connection:
         connection.sendall(frame)
@@ -561,6 +604,7 @@ def run_registered_probe(
     contract_endpoint,
     ingress_endpoint,
     rejection_pattern,
+    component_uid,
 ):
     registration_id, registration_length = query_message_contract(
         args.repository_root, component_type_name, contract_endpoint, "Dbmgr::onRegisterNewApp"
@@ -572,11 +616,11 @@ def run_registered_probe(
     registration_frame = message_frame(
         registration_id,
         registration_length,
-        registered_probe_body(component_id),
+        registered_probe_body(component_uid, component_id),
         "Dbmgr::onRegisterNewApp",
     )
     probe_frame = message_frame(
-        message_id, message_length, probe_body(probe_case), message_name
+        message_id, message_length, probe_body(probe_case, component_uid), message_name
     )
 
     with socket.create_connection(ingress_endpoint, timeout=5) as connection:
@@ -668,6 +712,7 @@ def run_test(args):
             component_name: find_external_endpoint(ready_logs, component_name)
             for component_name in {probe[1] for probe in PROBES if probe[2] == "external"}
         }
+        component_uid = find_component_uid(ready_logs, "baseapp")
         for (
             probe_case,
             component_name,
@@ -689,6 +734,7 @@ def run_test(args):
                     internal_endpoints[component_name],
                     internal_endpoints[component_name],
                     rejection_pattern,
+                    component_uid,
                 )
                 continue
 
@@ -703,6 +749,7 @@ def run_test(args):
                     if endpoint_kind == "external"
                     else internal_endpoints[component_name]
                 ),
+                component_uid,
             )
             wait_for_text(
                 process,

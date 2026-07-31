@@ -68,6 +68,7 @@ file(READ "${KBE_SOURCE_ROOT}/server/dbmgr/interfaces_handler.cpp" _kbe_interfac
 file(READ "${KBE_SOURCE_ROOT}/server/loginapp/loginapp.cpp" _kbe_loginapp)
 file(READ "${KBE_SOURCE_ROOT}/lib/server/entity_app.h" _kbe_entity_app)
 file(READ "${KBE_SOURCE_ROOT}/lib/server/serverapp.cpp" _kbe_serverapp)
+file(READ "${KBE_SOURCE_ROOT}/lib/server/serverapp.h" _kbe_serverapp_header)
 
 # Network-derived component IDs must use the fail-closed guard instead of a
 # nullable dereference, assertion, or map insertion. 网络组件 ID 必须经过拒绝式守卫，
@@ -94,6 +95,30 @@ foreach(_kbe_forbidden IN LISTS _kbe_forbidden_routing_literals)
     if(NOT _kbe_forbidden_position EQUAL -1)
         message(FATAL_ERROR "Component routing contract regressed: ${_kbe_forbidden}")
     endif()
+endforeach()
+
+foreach(_kbe_required IN ITEMS
+	"bool registerNewApp(Network::Channel* pChannel"
+	"ServerApp::registerNewApp: rejected uid="
+	"ServerApp::registerNewApp: rejected componentID conflict"
+	"ServerApp::registerNewApp: rejected live binding replacement"
+	"rejected unbound registration"
+)
+	string(FIND "${_kbe_serverapp_header}\n${_kbe_serverapp}"
+		"${_kbe_required}" _kbe_required_position)
+	if(_kbe_required_position EQUAL -1)
+		message(FATAL_ERROR "Component registration guard is missing: ${_kbe_required}")
+	endif()
+endforeach()
+
+foreach(_kbe_required IN ITEMS
+	"!ServerApp::registerNewApp"
+	"Dbmgr::onRegisterNewApp: rejected registration"
+)
+	string(FIND "${_kbe_dbmgr}" "${_kbe_required}" _kbe_required_position)
+	if(_kbe_required_position EQUAL -1)
+		message(FATAL_ERROR "DBMgr registration result guard is missing: ${_kbe_required}")
+	endif()
 endforeach()
 
 foreach(_kbe_required IN ITEMS

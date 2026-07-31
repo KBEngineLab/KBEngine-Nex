@@ -196,6 +196,18 @@ public:
 	virtual void startProfile_(Network::Channel* pChannel, std::string profileName, int8 profileType, uint32 timelen);
 		
 protected:
+	/**
+	 * Register a component and report whether the Channel became its authoritative binding.
+	 * 注册组件并返回该 Channel 是否确实成为组件表中的权威绑定。
+	 */
+	bool registerNewApp(Network::Channel* pChannel,
+		int32 uid,
+		std::string& username,
+		COMPONENT_TYPE componentType, COMPONENT_ID componentID,
+		COMPONENT_ORDER globalorderID, COMPONENT_ORDER grouporderID,
+		uint32 intaddr, uint16 intport, uint32 extaddr, uint16 extport,
+		std::string& extaddrEx);
+
 	COMPONENT_TYPE											componentType_;
 	COMPONENT_ID											componentID_;									// 本组件的ID
 
