@@ -140,6 +140,8 @@ endforeach()
 foreach(_kbe_required IN ITEMS
 	"ServerApp::reqKillServer: rejected componentType="
 	"ServerApp::onAppActiveTick: rejected componentType="
+	"void ServerApp::reqCloseServer(Network::Channel* pChannel, MemoryStream& s)"
+	"void ServerApp::queryWatcher(Network::Channel* pChannel, MemoryStream& s)"
 	"Security::isBoundComponentSource(componentID, sourceInfos, pChannel)"
 )
 	string(FIND "${_kbe_serverapp}" "${_kbe_required}" _kbe_required_position)
