@@ -170,6 +170,14 @@ PROBES = (
         r"onCreateEntityAnywhereCallback: rejected unbound sourceComponent\(7001\)",
     ),
     (
+        "baseapp-spoofed-entity-app-discovery",
+        "baseapp",
+        "internal",
+        "BASEAPP_TYPE",
+        "Baseapp::onGetEntityAppFromDbmgr",
+        r"Baseapp::onGetEntityAppFromDbmgr: rejected non-DBMgr source",
+    ),
+    (
         "cellapp-spoofed-teleport",
         "cellapp",
         "internal",
@@ -202,6 +210,14 @@ PROBES = (
         "Cellapp::onCreateCellEntityFromBaseapp",
         r"Cellapp::onCreateCellEntityFromBaseapp: rejected componentID=7001, "
         r"entityType=Account, hasClient=false",
+    ),
+    (
+        "cellapp-spoofed-entity-app-discovery",
+        "cellapp",
+        "internal",
+        "CELLAPP_TYPE",
+        "Cellapp::onGetEntityAppFromDbmgr",
+        r"Cellapp::onGetEntityAppFromDbmgr: rejected non-DBMgr source",
     ),
 )
 
@@ -387,6 +403,16 @@ def probe_body(probe_case):
         return struct.pack("=QifI", 8001, 0, float("nan"), 0)
     if probe_case == "baseapp-spoofed-callback":
         return struct.pack("=I", 1) + b"Account\0" + struct.pack("=iQ", 1, 7001)
+    if probe_case in {
+        "baseapp-spoofed-entity-app-discovery",
+        "cellapp-spoofed-entity-app-discovery",
+    }:
+        return (
+            struct.pack("=i", 0)
+            + b"security-probe\0"
+            + struct.pack("=iQiiIHIH", 6, 9003, 0, 0, 0, 0, 0, 0)
+            + b"\0"
+        )
     if probe_case == "cellapp-spoofed-teleport":
         return struct.pack("=QQQib", 8001, 8001, 7001, 1, 0)
     if probe_case == "baseapp-unbound-account-request":

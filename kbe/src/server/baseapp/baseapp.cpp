@@ -860,12 +860,23 @@ void Baseapp::onChannelDeregister(Network::Channel * pChannel)
 }
 
 //-------------------------------------------------------------------------------------
-void Baseapp::onGetEntityAppFromDbmgr(Network::Channel* pChannel, int32 uid, std::string& username, 
+void Baseapp::onGetEntityAppFromDbmgr(Network::Channel* pChannel, int32 uid, std::string& username,
 						COMPONENT_TYPE componentType, COMPONENT_ID componentID, COMPONENT_ORDER globalorderID, COMPONENT_ORDER grouporderID,
 						uint32 intaddr, uint16 intport, uint32 extaddr, uint16 extport, std::string& extaddrEx)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Baseapp::onGetEntityAppFromDbmgr: rejected non-DBMgr source, addr={}.\n",
+			pChannel != NULL ? pChannel->c_str() : "none"));
 		return;
+	}
+
+	if ((componentType != BASEAPP_TYPE && componentType != CELLAPP_TYPE) || componentID == 0)
+	{
+		WARNING_MSG(fmt::format("Baseapp::onGetEntityAppFromDbmgr: rejected componentType={}, componentID={}, addr={}.\n",
+			componentType, componentID, pChannel->c_str()));
+		return;
+	}
 
 	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent((
 		KBEngine::COMPONENT_TYPE)componentType, uid, componentID);
@@ -899,7 +910,6 @@ void Baseapp::onGetEntityAppFromDbmgr(Network::Channel* pChannel, int32 uid, std
 									intaddr, intport, extaddr, extport, extaddrEx);
 
 	KBEngine::COMPONENT_TYPE tcomponentType = (KBEngine::COMPONENT_TYPE)componentType;
-	KBE_ASSERT(Components::getSingleton().getDbmgr() != NULL);
 	
 	cinfos = 
 		Components::getSingleton().findComponent(tcomponentType, uid, componentID);
@@ -968,8 +978,8 @@ void Baseapp::onGetEntityAppFromDbmgr(Network::Channel* pChannel, int32 uid, std
 			this->networkInterface().extaddr().ip, this->networkInterface().extaddr().port, g_kbeSrvConfig.getConfig().externalAddress);
 		break;
 	default:
-		KBE_ASSERT(false && "no support!\n");
-		break;
+		Network::Bundle::reclaimPoolObject(pBundle);
+		return;
 	};
 	
 	cinfos->pChannel->send(pBundle);

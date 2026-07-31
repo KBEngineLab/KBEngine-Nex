@@ -160,6 +160,18 @@ foreach(_kbe_required IN ITEMS
     endif()
 endforeach()
 
+foreach(_kbe_required IN ITEMS
+	"Baseapp::onGetEntityAppFromDbmgr: rejected non-DBMgr source"
+	"Cellapp::onGetEntityAppFromDbmgr: rejected non-DBMgr source"
+	"onGetEntityAppFromDbmgr: rejected componentType="
+)
+	string(FIND "${_kbe_baseapp}\n${_kbe_cellapp}"
+		"${_kbe_required}" _kbe_required_position)
+	if(_kbe_required_position EQUAL -1)
+		message(FATAL_ERROR "EntityApp discovery source guard is missing: ${_kbe_required}")
+	endif()
+endforeach()
+
 # Client account and Cell RPC identities must remain bound to authenticated
 # runtime state rather than packet-carried entity IDs. 客户端账户与 Cell RPC
 # 身份必须绑定认证后的运行时状态，不能回退为信任封包中的实体 ID。
