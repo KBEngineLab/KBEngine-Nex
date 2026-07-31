@@ -51,16 +51,25 @@ namespace KBEngine{
 
 namespace
 {
+Components::ComponentInfos* findBoundComponentSource(Network::Channel* pChannel,
+	COMPONENT_TYPE componentType, COMPONENT_ID componentID)
+{
+	if (pChannel == NULL || pChannel->isExternal() || pChannel->isDestroyed() ||
+		componentID == 0)
+	{
+		return NULL;
+	}
+
+	Components::ComponentInfos* sourceInfos =
+		Components::getSingleton().findComponent(componentType, componentID);
+	return Security::isBoundComponentSource(componentID, sourceInfos, pChannel) ?
+		sourceInfos : NULL;
+}
+
 Components::ComponentInfos* findBoundBaseappSource(Network::Channel* pChannel,
 	COMPONENT_ID componentID)
 {
-	if (pChannel == NULL || pChannel->isExternal() || pChannel->isDestroyed())
-		return NULL;
-
-	Components::ComponentInfos* sourceInfos = componentID == 0 ? NULL :
-		Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
-	return Security::isBoundComponentSource(componentID, sourceInfos, pChannel) ?
-		sourceInfos : NULL;
+	return findBoundComponentSource(pChannel, BASEAPP_TYPE, componentID);
 }
 
 bool isExpectedIngressSource(COMPONENT_TYPE expectedType, Network::Channel* pChannel,
@@ -85,6 +94,21 @@ InterfacesHandler* findInterfacesHandlerOrWarn(const char* operation)
 	}
 
 	return pHandler;
+}
+
+bool isAllowedRawDatabaseSource(Network::Channel* pChannel,
+	COMPONENT_TYPE componentType, COMPONENT_ID componentID)
+{
+	if (pChannel == NULL)
+		return componentType == DBMGR_TYPE && componentID == g_componentID;
+
+	if (componentType != BASEAPP_TYPE && componentType != CELLAPP_TYPE &&
+		componentType != INTERFACES_TYPE)
+	{
+		return false;
+	}
+
+	return findBoundComponentSource(pChannel, componentType, componentID) != NULL;
 }
 }
 
@@ -575,6 +599,13 @@ InterfacesHandler* Dbmgr::findBestInterfacesHandler()
 void Dbmgr::onReqAllocEntityID(Network::Channel* pChannel, COMPONENT_ORDER componentType, COMPONENT_ID componentID)
 {
 	KBEngine::COMPONENT_TYPE ct = static_cast<KBEngine::COMPONENT_TYPE>(componentType);
+	if ((ct != BASEAPP_TYPE && ct != CELLAPP_TYPE) ||
+		findBoundComponentSource(pChannel, ct, componentID) == NULL)
+	{
+		WARNING_MSG(fmt::format("Dbmgr::onReqAllocEntityID: rejected componentType={}, componentID={}, addr={}.\n",
+			componentType, componentID, pChannel != NULL ? pChannel->c_str() : "none"));
+		return;
+	}
 
 	// 获取一个id段 并传输给IDClient
 	std::pair<ENTITY_ID, ENTITY_ID> idRange = idServer_.allocRange();
@@ -858,7 +889,7 @@ void Dbmgr::onLoginAccountCBBFromInterfaces(Network::Channel* pChannel, KBEngine
 }
 
 //-------------------------------------------------------------------------------------
-void Dbmgr::queryAccount(Network::Channel* pChannel, 
+void Dbmgr::queryAccount(Network::Channel* pChannel,
 						 std::string& accountName, 
 						 std::string& password,
 						 bool needCheckPassword,
@@ -868,6 +899,13 @@ void Dbmgr::queryAccount(Network::Channel* pChannel,
 						 uint32 ip, 
 						 uint16 port)
 {
+	if (findBoundBaseappSource(pChannel, componentID) == NULL || entityID <= 0)
+	{
+		WARNING_MSG(fmt::format("Dbmgr::queryAccount: rejected componentID={}, entityID={}, addr={}.\n",
+			componentID, entityID, pChannel != NULL ? pChannel->c_str() : "none"));
+		return;
+	}
+
 	if(accountName.size() == 0)
 	{
 		ERROR_MSG("Dbmgr::queryAccount: accountName is empty.\n");
@@ -903,6 +941,16 @@ void Dbmgr::onAccountOnline(Network::Channel* pChannel,
 //-------------------------------------------------------------------------------------
 void Dbmgr::onEntityOffline(Network::Channel* pChannel, DBID dbid, ENTITY_SCRIPT_UID sid, uint16 dbInterfaceIndex)
 {
+	if (!isExpectedIngressSource(BASEAPP_TYPE, pChannel, "Dbmgr::onEntityOffline"))
+		return;
+
+	if (!Security::isValidPersistentEntityID(dbid))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::onEntityOffline: rejected dbid={}, addr={}.\n",
+			dbid, pChannel != NULL ? pChannel->c_str() : "none"));
+		return;
+	}
+
 	Buffered_DBTasks* pBuffered_DBTasks = findBufferedDBTask(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex));
 	if (!pBuffered_DBTasks)
 	{
@@ -922,6 +970,21 @@ void Dbmgr::executeRawDatabaseCommand(Network::Channel* pChannel,
 
 	uint16 dbInterfaceIndex = 0;
 	s >> dbInterfaceIndex;
+
+	size_t sourcePayloadPosition = s.rpos();
+	COMPONENT_ID sourceComponentID = 0;
+	COMPONENT_TYPE sourceComponentType = UNKNOWN_COMPONENT_TYPE;
+	s >> sourceComponentID >> sourceComponentType;
+	s.rpos(sourcePayloadPosition);
+	if (!isAllowedRawDatabaseSource(
+		pChannel, sourceComponentType, sourceComponentID))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::executeRawDatabaseCommand: rejected componentType={}, componentID={}, addr={}.\n",
+			sourceComponentType, sourceComponentID,
+			pChannel != NULL ? pChannel->c_str() : "local"));
+		s.done();
+		return;
+	}
 
 	std::string dbInterfaceName = g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex);
 	if (dbInterfaceName.size() == 0)
@@ -1371,6 +1434,13 @@ void Dbmgr::queryEntity(Network::Channel* pChannel, uint16 dbInterfaceIndex, COM
 //-------------------------------------------------------------------------------------
 void Dbmgr::syncEntityStreamTemplate(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (!isExpectedIngressSource(BASEAPP_TYPE, pChannel,
+		"Dbmgr::syncEntityStreamTemplate"))
+	{
+		s.done();
+		return;
+	}
+
 	size_t rpos = s.rpos();
 	EntityTables::ENTITY_TABLES_MAP::iterator iter = EntityTables::sEntityTables.begin();
 	for (; iter != EntityTables::sEntityTables.end(); ++iter)

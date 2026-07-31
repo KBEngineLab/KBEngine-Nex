@@ -61,6 +61,38 @@ PROBES = (
         r"Dbmgr::charge: rejected sourceType=baseapp",
     ),
     (
+        "dbmgr-spoofed-id-allocation",
+        "dbmgr",
+        "internal",
+        "DBMGR_TYPE",
+        "Dbmgr::onReqAllocEntityID",
+        r"Dbmgr::onReqAllocEntityID: rejected componentType=6, componentID=7001",
+    ),
+    (
+        "dbmgr-spoofed-account-query",
+        "dbmgr",
+        "internal",
+        "DBMGR_TYPE",
+        "Dbmgr::queryAccount",
+        r"Dbmgr::queryAccount: rejected componentID=7001, entityID=1",
+    ),
+    (
+        "dbmgr-spoofed-raw-database-command",
+        "dbmgr",
+        "internal",
+        "DBMGR_TYPE",
+        "Dbmgr::executeRawDatabaseCommand",
+        r"Dbmgr::executeRawDatabaseCommand: rejected componentType=6, componentID=7001",
+    ),
+    (
+        "dbmgr-unregistered-stream-template",
+        "dbmgr",
+        "internal",
+        "DBMGR_TYPE",
+        "Dbmgr::syncEntityStreamTemplate",
+        r"Dbmgr::syncEntityStreamTemplate: rejected sourceType=baseapp",
+    ),
+    (
         "baseappmgr-zero-forward",
         "baseappmgr",
         "internal",
@@ -291,6 +323,14 @@ def probe_body(probe_case):
         "dbmgr-unregistered-interfaces-callback",
         "dbmgr-unregistered-charge",
     }:
+        return b""
+    if probe_case == "dbmgr-spoofed-id-allocation":
+        return struct.pack("=iQ", 6, 7001)
+    if probe_case == "dbmgr-spoofed-account-query":
+        return b"a\0b\0" + struct.pack("=BQiQIH", 0, 7001, 1, 0, 0, 0)
+    if probe_case == "dbmgr-spoofed-raw-database-command":
+        return struct.pack("=iHQiII", -1, 0, 7001, 6, 0, 0)
+    if probe_case == "dbmgr-unregistered-stream-template":
         return b""
     if probe_case == "baseappmgr-zero-forward":
         return struct.pack("=QQ", 0, 7001)

@@ -107,6 +107,11 @@ foreach(_kbe_required IN ITEMS
 	"isExpectedIngressSource(LOGINAPP_TYPE"
 	"isExpectedIngressSource(BASEAPP_TYPE"
 	"isExpectedIngressSource(INTERFACES_TYPE"
+	"Dbmgr::onReqAllocEntityID: rejected componentType="
+	"Dbmgr::queryAccount: rejected componentID="
+	"Dbmgr::executeRawDatabaseCommand: rejected componentType="
+	"Dbmgr::syncEntityStreamTemplate"
+	"isAllowedRawDatabaseSource"
 )
 	string(FIND "${_kbe_cellapp}\n${_kbe_dbmgr}\n${_kbe_interfaces_handler}"
 		"${_kbe_required}" _kbe_required_position)
