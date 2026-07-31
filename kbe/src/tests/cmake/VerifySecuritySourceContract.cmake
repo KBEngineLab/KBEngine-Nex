@@ -65,6 +65,7 @@ file(READ "${KBE_SOURCE_ROOT}/server/cellapp/cellapp.cpp" _kbe_cellapp)
 file(READ "${KBE_SOURCE_ROOT}/server/cellappmgr/cellappmgr.cpp" _kbe_cellappmgr)
 file(READ "${KBE_SOURCE_ROOT}/server/dbmgr/dbmgr.cpp" _kbe_dbmgr)
 file(READ "${KBE_SOURCE_ROOT}/server/dbmgr/interfaces_handler.cpp" _kbe_interfaces_handler)
+file(READ "${KBE_SOURCE_ROOT}/lib/server/serverapp.cpp" _kbe_serverapp)
 
 # Network-derived component IDs must use the fail-closed guard instead of a
 # nullable dereference, assertion, or map insertion. 网络组件 ID 必须经过拒绝式守卫，
@@ -90,6 +91,17 @@ foreach(_kbe_forbidden IN LISTS _kbe_forbidden_routing_literals)
     if(NOT _kbe_forbidden_position EQUAL -1)
         message(FATAL_ERROR "Component routing contract regressed: ${_kbe_forbidden}")
     endif()
+endforeach()
+
+foreach(_kbe_required IN ITEMS
+	"ServerApp::reqKillServer: rejected componentType="
+	"ServerApp::onAppActiveTick: rejected componentType="
+	"Security::isBoundComponentSource(componentID, sourceInfos, pChannel)"
+)
+	string(FIND "${_kbe_serverapp}" "${_kbe_required}" _kbe_required_position)
+	if(_kbe_required_position EQUAL -1)
+		message(FATAL_ERROR "Server control source guard is missing: ${_kbe_required}")
+	endif()
 endforeach()
 
 foreach(_kbe_required IN ITEMS

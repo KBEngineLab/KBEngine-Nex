@@ -24,6 +24,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "server/shutdowner.h"
 #include "server/serverconfig.h"
 #include "server/components.h"
+#include "server/component_routing_guard.h"
 #include "network/channel.h"
 #include "network/bundle.h"
 #include "network/common.h"
@@ -469,7 +470,10 @@ void ServerApp::onRegisterNewApp(Network::Channel* pChannel, int32 uid, std::str
 void ServerApp::reqKillServer(Network::Channel* pChannel, MemoryStream& s)
 {
 	if(pChannel->isExternal())
+	{
+		s.done();
 		return;
+	}
 
 	COMPONENT_ID componentID;
 	COMPONENT_TYPE componentType;
@@ -479,13 +483,28 @@ void ServerApp::reqKillServer(Network::Channel* pChannel, MemoryStream& s)
 
 	s >> componentID >> componentType >> username >> uid >> reason;
 
-	INFO_MSG(fmt::format("ServerApp::reqKillServer: requester(uid:{}, username:{}, componentType:{}, "
-				"componentID:{}, reason:{}, from {})\n",
+	Components::ComponentInfos* sourceInfos = NULL;
+	if (componentType == BASEAPP_TYPE || componentType == CELLAPP_TYPE)
+	{
+		sourceInfos = Components::getSingleton().findComponent(
+			componentType, uid, componentID);
+	}
+
+	if (!Security::isBoundComponentSource(componentID, sourceInfos, pChannel))
+	{
+		WARNING_MSG(fmt::format("ServerApp::reqKillServer: rejected componentType={}, componentID={}, uid={}, usernameSize={}, reasonSize={}, addr={}.\n",
+			componentType, componentID, uid, username.size(), reason.size(), pChannel->c_str()));
+		s.done();
+		return;
+	}
+
+	INFO_MSG(fmt::format("ServerApp::reqKillServer: requester(uid:{}, usernameSize:{}, componentType:{}, "
+				"componentID:{}, reasonSize:{}, from {})\n",
 				uid, 
-				username, 
+				username.size(),
 				COMPONENT_NAME_EX((COMPONENT_TYPE)componentType),
 				componentID,
-				reason,
+				reason.size(),
 				pChannel->c_str()));
 
 	CRITICAL_MSG("The application was killed!\n");
@@ -494,27 +513,33 @@ void ServerApp::reqKillServer(Network::Channel* pChannel, MemoryStream& s)
 //-------------------------------------------------------------------------------------
 void ServerApp::onAppActiveTick(Network::Channel* pChannel, COMPONENT_TYPE componentType, COMPONENT_ID componentID)
 {
-	if(componentType != CLIENT_TYPE)
-		if(pChannel->isExternal())
-			return;
-	
-	pChannel->updateLastReceivedTime();
-	
-	if(componentType != CONSOLE_TYPE && componentType != CLIENT_TYPE)
+	if (componentType == CLIENT_TYPE)
 	{
-		Components::ComponentInfos* cinfos = 
-			Components::getSingleton().findComponent(componentType, KBEngine::getUserUID(), componentID);
-
-		if(cinfos == NULL || cinfos->pChannel == NULL)
-		{
-			ERROR_MSG(fmt::format("ServerApp::onAppActiveTick[{:p}]: {}:{} not found.\n", 
-				(void*)pChannel, COMPONENT_NAME_EX(componentType), componentID));
-
-			return;
-		}
-
-		cinfos->pChannel->updateLastReceivedTime();
+		pChannel->updateLastReceivedTime();
+		return;
 	}
+
+	if (pChannel->isExternal())
+		return;
+
+	if (componentType == CONSOLE_TYPE)
+	{
+		pChannel->updateLastReceivedTime();
+		return;
+	}
+
+	// A packet may only refresh the component represented by its own Channel.
+	// 心跳封包只能刷新其实际 Channel 所绑定的组件，不能替其他组件续命。
+	Components::ComponentInfos* sourceInfos = Components::getSingleton().findComponent(
+		componentType, KBEngine::getUserUID(), componentID);
+	if (!Security::isBoundComponentSource(componentID, sourceInfos, pChannel))
+	{
+		WARNING_MSG(fmt::format("ServerApp::onAppActiveTick: rejected componentType={}, componentID={}, addr={}.\n",
+			componentType, componentID, pChannel->c_str()));
+		return;
+	}
+
+	pChannel->updateLastReceivedTime();
 
 	//DEBUG_MSG(fmt::format("ServerApp::onAppActiveTick[{:p}]: {}:{} lastReceivedTime:{} at {}.\n",
 	//	(void*)pChannel, COMPONENT_NAME_EX(componentType), componentID, pChannel->lastReceivedTime(), pChannel->c_str()));

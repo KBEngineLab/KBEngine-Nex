@@ -114,6 +114,22 @@ PROBES = (
         r"Dbmgr::queryAccount: rejected componentID=7001, entityID=4242",
     ),
     (
+        "dbmgr-spoofed-active-tick",
+        "dbmgr",
+        "internal",
+        "DBMGR_TYPE",
+        "Dbmgr::onAppActiveTick",
+        r"ServerApp::onAppActiveTick: rejected componentType=6, componentID=7001",
+    ),
+    (
+        "dbmgr-spoofed-kill-request",
+        "dbmgr",
+        "internal",
+        "DBMGR_TYPE",
+        "Dbmgr::reqKillServer",
+        r"ServerApp::reqKillServer: rejected componentType=6, componentID=7001",
+    ),
+    (
         "baseappmgr-zero-forward",
         "baseappmgr",
         "internal",
@@ -357,6 +373,10 @@ def probe_body(probe_case):
         return struct.pack("=iQ", 13, 9001)
     if probe_case == "dbmgr-registered-sender-channel-mismatch":
         return b"a\0b\0" + struct.pack("=BQiQIH", 0, 7001, 4242, 0, 0, 0)
+    if probe_case == "dbmgr-spoofed-active-tick":
+        return struct.pack("=iQ", 6, 7001)
+    if probe_case == "dbmgr-spoofed-kill-request":
+        return struct.pack("=Qi", 7001, 6) + b"security-probe\0" + struct.pack("=i", 0) + b"probe\0"
     if probe_case == "baseappmgr-zero-forward":
         return struct.pack("=QQ", 0, 7001)
     if probe_case == "baseappmgr-spoofed-update":
