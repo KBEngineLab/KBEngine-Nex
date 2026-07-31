@@ -24,6 +24,7 @@ COMPONENT_IDS = {
 REGISTERED_PROBE_COMPONENT_IDS = {
     "dbmgr-registered-wrong-component-type": 9001,
     "dbmgr-registered-sender-channel-mismatch": 9002,
+    "dbmgr-registered-invalid-entity-type": 9003,
 }
 
 PROBES = (
@@ -310,6 +311,16 @@ PROBES = (
         "Loginapp::onDbmgrInitCompleted",
         r"Loginapp::onDbmgrInitCompleted: rejected non-DBMgr source",
     ),
+    # BaseApp registration broadcasts discovery state, so keep this stateful probe last.
+    # BaseApp 注册会广播发现状态，因此这个有状态探针必须放在最后。
+    (
+        "dbmgr-registered-invalid-entity-type",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::entityAutoLoad",
+        r"Dbmgr::entityAutoLoad: rejected entity script type ID=65535",
+    ),
 )
 
 
@@ -497,6 +508,8 @@ def probe_body(probe_case, component_uid):
         return struct.pack("=iQ", 13, 9001)
     if probe_case == "dbmgr-registered-sender-channel-mismatch":
         return b"a\0b\0" + struct.pack("=BQiQIH", 0, 7001, 4242, 0, 0, 0)
+    if probe_case == "dbmgr-registered-invalid-entity-type":
+        return struct.pack("=HQHii", 0, 9003, 65535, 0, 0)
     if probe_case == "dbmgr-spoofed-active-tick":
         return struct.pack("=iQ", 6, 7001)
     if probe_case == "dbmgr-spoofed-kill-request":
@@ -575,10 +588,10 @@ def component_registration_body(component_uid, component_type, component_id):
     )
 
 
-def registered_probe_body(component_uid, component_id):
-    # 注册为 Interfaces 可验证类型与 Channel 绑定，同时避免触发 EntityApp 发现广播。
-    # Register as Interfaces to exercise type/channel binding without EntityApp discovery broadcasts.
-    return component_registration_body(component_uid, 13, component_id)
+def registered_probe_component_type(probe_case):
+    if probe_case == "dbmgr-registered-invalid-entity-type":
+        return 6
+    return 13
 
 
 def run_probe(
@@ -624,10 +637,11 @@ def run_registered_probe(
         args.repository_root, component_type_name, contract_endpoint, message_name
     )
     component_id = REGISTERED_PROBE_COMPONENT_IDS[probe_case]
+    component_type = registered_probe_component_type(probe_case)
     registration_frame = message_frame(
         registration_id,
         registration_length,
-        registered_probe_body(component_uid, component_id),
+        component_registration_body(component_uid, component_type, component_id),
         "Dbmgr::onRegisterNewApp",
     )
     probe_frame = message_frame(
@@ -641,7 +655,7 @@ def run_registered_probe(
             run_root,
             controller_stdout,
             controller_stderr,
-            rf"ServerApp::onRegisterNewApp:.*componentType:interfaces.*componentID:{component_id}",
+            rf"ServerApp::onRegisterNewApp:.*componentType:{'baseapp' if component_type == 6 else 'interfaces'}.*componentID:{component_id}",
             10,
             f"registration marker for {probe_case}",
         )
