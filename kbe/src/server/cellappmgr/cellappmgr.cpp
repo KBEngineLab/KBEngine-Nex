@@ -20,6 +20,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include "cellappmgr.h"
+#include "server/component_routing_guard.h"
 #include "cellappmgr_interface.h"
 #include "network/common.h"
 #include "network/tcp_packet.h"
@@ -235,12 +236,29 @@ void Cellappmgr::forwardMessage(Network::Channel* pChannel, MemoryStream& s)
 	COMPONENT_ID sender_componentID, forward_componentID;
 
 	s >> sender_componentID >> forward_componentID;
-	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(forward_componentID);
-	KBE_ASSERT(cinfos != NULL && cinfos->pChannel != NULL);
+	Components& components = Components::getSingleton();
+	Components::ComponentInfos* senderInfos = components.findComponent(CELLAPP_TYPE, sender_componentID);
+	if (pChannel == NULL || pChannel->isExternal() ||
+		!Security::isBoundComponentSource(sender_componentID, senderInfos, pChannel))
+	{
+		WARNING_MSG(fmt::format("Cellappmgr::forwardMessage: rejected unbound senderComponent({}), channel={}!\n",
+			sender_componentID, (pChannel != NULL ? pChannel->c_str() : "null")));
+		s.done();
+		return;
+	}
+
+	Network::Channel* pTargetChannel = components.findComponentChannel(CELLAPP_TYPE, forward_componentID);
+	if (pTargetChannel == NULL)
+	{
+		WARNING_MSG(fmt::format("Cellappmgr::forwardMessage: rejected unavailable targetComponent({})!\n",
+			forward_componentID));
+		s.done();
+		return;
+	}
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).append((char*)s.data() + s.rpos(), (int)s.length());
-	cinfos->pChannel->send(pBundle);
+	pTargetChannel->send(pBundle);
 	s.done();
 }
 
@@ -473,15 +491,26 @@ void Cellappmgr::reqRestoreSpaceInCell(Network::Channel* pChannel, MemoryStream&
 void Cellappmgr::updateCellapp(Network::Channel* pChannel, COMPONENT_ID componentID, 
 	ENTITY_ID numEntities, float load, uint32 flags)
 {
-	Cellapp& cellapp = getCellapp(componentID);
+	Components& components = Components::getSingleton();
+	Components::ComponentInfos* sourceInfos =
+		componentID == 0 ? NULL : components.findComponent(CELLAPP_TYPE, componentID);
+	std::map<COMPONENT_ID, Cellapp>::iterator cellappIter = cellapps_.find(componentID);
+	if (pChannel == NULL || pChannel->isExternal() ||
+		!Security::isBoundComponentSource(componentID, sourceInfos, pChannel) ||
+		cellappIter == cellapps_.end() || !Security::isValidComponentMetric(load))
+	{
+		WARNING_MSG(fmt::format("Cellappmgr::updateCellapp: rejected componentID({}), load({})!\n",
+			componentID, load));
+		return;
+	}
+
+	Cellapp& cellapp = cellappIter->second;
 	
 	cellapp.load(load);
 	cellapp.numEntities(numEntities);
 	cellapp.flags(flags);
 
-	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(componentID);
-	if (cinfos)
-		cinfos->appFlags = flags;
+	sourceInfos->appFlags = flags;
 	
 	updateBestCellapp();
 }
@@ -490,18 +519,28 @@ void Cellappmgr::updateCellapp(Network::Channel* pChannel, COMPONENT_ID componen
 void Cellappmgr::onCellappInitProgress(Network::Channel* pChannel, COMPONENT_ID cid, float progress, 
 	COMPONENT_ORDER componentGlobalOrder, COMPONENT_ORDER componentGroupOrder)
 {
+	Components& components = Components::getSingleton();
+	Components::ComponentInfos* sourceInfos =
+		cid == 0 ? NULL : components.findComponent(CELLAPP_TYPE, cid);
+	std::map<COMPONENT_ID, Cellapp>::iterator cellappIter = cellapps_.find(cid);
+	if (pChannel == NULL || pChannel->isExternal() ||
+		!Security::isBoundComponentSource(cid, sourceInfos, pChannel) ||
+		cellappIter == cellapps_.end() || !Security::isValidComponentMetric(progress))
+	{
+		WARNING_MSG(fmt::format("Cellappmgr::onCellappInitProgress: rejected cid({}), progress({})!\n",
+			cid, progress));
+		return;
+	}
+
 	if(progress > 1.f)
 	{
 		INFO_MSG(fmt::format("Cellappmgr::onCellappInitProgress: cid={0}, progress={1}.\n",
 			cid , (progress > 1.f ? 1.f : progress)));
 
-		Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(cid);
-		if(cinfos)
-			cinfos->state = COMPONENT_STATE_RUN;
+		sourceInfos->state = COMPONENT_STATE_RUN;
 	}
 
-	KBE_ASSERT(cellapps_.find(cid) != cellapps_.end());
-	Cellapp& cellapp = getCellapp(cid);
+	Cellapp& cellapp = cellappIter->second;
 
 	cellapp.globalOrderID(componentGlobalOrder);
 	cellapp.groupOrderID(componentGroupOrder);

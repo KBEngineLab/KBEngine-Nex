@@ -34,6 +34,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/tcp_packet.h"
 #include "network/udp_packet.h"
 #include "network/network_stats.h"
+#include "server/client_request_guard.h"
+#include "server/component_routing_guard.h"
 #include "server/components.h"
 #include "server/telnet_server.h"
 #include "server/py_file_descriptor.h"
@@ -677,6 +679,14 @@ void Cellapp::executeRawDatabaseCommand(const char* datas, uint32 size, PyObject
 //-------------------------------------------------------------------------------------
 void Cellapp::onExecuteRawDatabaseCommandCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Cellapp::onExecuteRawDatabaseCommandCB: rejected non-DBMgr source, addr={}.\n",
+			pChannel->c_str()));
+		s.done();
+		return;
+	}
+
 	std::string err;
 	CALLBACK_ID callbackID = 0;
 	uint32 nrows = 0;
@@ -1471,7 +1481,18 @@ void Cellapp::onRemoteCallMethodFromClient(Network::Channel* pChannel, KBEngine:
 
 	s >> srcEntityID >> targetID;
 
-	KBEngine::Entity* e = KBEngine::Cellapp::getSingleton().findEntity(targetID);		
+	Components::ComponentInfos* sourceComponent = Components::getSingleton().findComponent(pChannel);
+	const bool fromBaseapp = Security::isExpectedComponentSource(BASEAPP_TYPE, sourceComponent, pChannel);
+	const bool fromCellapp = Security::isExpectedComponentSource(CELLAPP_TYPE, sourceComponent, pChannel);
+	if (!fromBaseapp && !fromCellapp)
+	{
+		WARNING_MSG(fmt::format("Cellapp::onRemoteCallMethodFromClient: rejected unregistered source Channel, "
+			"srcEntityID={}, targetID={}, addr={}.\n", srcEntityID, targetID, pChannel->c_str()));
+		s.done();
+		return;
+	}
+
+	KBEngine::Entity* e = KBEngine::Cellapp::getSingleton().findEntity(targetID);
 
 	if(e == NULL)
 	{	
@@ -1480,6 +1501,38 @@ void Cellapp::onRemoteCallMethodFromClient(Network::Channel* pChannel, KBEngine:
 		
 		s.done();
 		return;
+	}
+
+	// BaseApp is the authenticated client boundary. Bind that concrete Channel to
+	// the source Entity and enforce the engine-level relationship before any
+	// Ghost forwarding. Registered CellApp sources are continuations of a request
+	// already admitted at the originating real Cell.
+	// BaseApp 是客户端认证边界。Ghost 转发前必须把具体 Channel 绑定到来源实体，
+	// 并执行引擎级关系授权；已注册 CellApp 来源仅承接起始 real Cell 已放行的请求。
+	if (fromBaseapp)
+	{
+		KBEngine::Entity* sourceEntity = KBEngine::Cellapp::getSingleton().findEntity(srcEntityID);
+		const bool sourceBoundToChannel = sourceEntity != NULL && sourceEntity->isReal() &&
+			sourceEntity->baseEntityCall() != NULL &&
+			sourceEntity->baseEntityCall()->componentID() == sourceComponent->cid;
+
+		const bool controlledBySource = e->controlledBy() != NULL &&
+			e->controlledBy()->id() == srcEntityID;
+		const bool inSourceView = sourceEntity != NULL && sourceEntity->pWitness() != NULL &&
+			sourceEntity->pWitness()->entityInView(targetID);
+
+		if (!sourceBoundToChannel ||
+			!Security::isAuthorizedClientCellTarget(srcEntityID, targetID,
+				sourceEntity != NULL ? sourceEntity->spaceID() : 0, e->spaceID(),
+				controlledBySource, inSourceView))
+		{
+			WARNING_MSG(fmt::format("Cellapp::onRemoteCallMethodFromClient: rejected unauthorized target, "
+				"srcEntityID={}, targetID={}, sourceSpaceID={}, targetSpaceID={}, baseappID={}.\n",
+				srcEntityID, targetID, sourceEntity != NULL ? sourceEntity->spaceID() : 0,
+				e->spaceID(), sourceComponent->cid));
+			s.done();
+			return;
+		}
 	}
 
 	// 这个方法呼叫如果不是这个proxy自己的方法则必须呼叫的entity和proxy的cellEntity在一个space中。
@@ -2069,12 +2122,24 @@ void Cellapp::reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s
 
 	s >> sourceCellappID >> targetCellappID >> entityBaseappID >> teleportEntityID >> success;
 
+	Components::ComponentInfos* targetCellapp =
+		Components::getSingleton().findComponent(CELLAPP_TYPE, targetCellappID);
+	if (!Security::isBoundComponentSource(targetCellappID, targetCellapp, pChannel))
+	{
+		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellAppCB: rejected unbound targetCellappID={}, addr={}.\n",
+			targetCellappID, pChannel->c_str()));
+		s.done();
+		return;
+	}
+
 	// 正常情况下， 应该传送结果返回时传送前的实体应该在当前cell上， 如果到其他cellapp上了， 说明在此期间被迁移走了
 	// 此时被迁移很可能会有问题
 	if (sourceCellappID != g_componentID)
 	{
-		ERROR_MSG(fmt::format("Cellapp::reqTeleportToCellAppCB(): sourceCellappID={} != currCellappID={}, targetCellappID={}\n", 
+		ERROR_MSG(fmt::format("Cellapp::reqTeleportToCellAppCB(): sourceCellappID={} != currCellappID={}, targetCellappID={}\n",
 			sourceCellappID, g_componentID, targetCellappID));
+		s.done();
+		return;
 	}
 
 	// 传送成功，我们销毁这个entity
@@ -2087,7 +2152,7 @@ void Cellapp::reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s
 	// 实体可能没有base部分，那么不需要通知baseapp
 	if (entityBaseappID > 0)
 	{
-		Components::ComponentInfos* pInfos = Components::getSingleton().findComponent(entityBaseappID);
+		Components::ComponentInfos* pInfos = Components::getSingleton().findComponent(BASEAPP_TYPE, entityBaseappID);
 		if (pInfos && pInfos->pChannel)
 		{
 			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);

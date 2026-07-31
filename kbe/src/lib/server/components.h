@@ -144,6 +144,22 @@ public:
 	Components::ComponentInfos* findComponent(Network::Channel * pChannel);
 	Components::ComponentInfos* findComponent(Network::Address* pAddress);
 
+	/**
+	 * Resolve a concrete component target for message routing.
+	 * 解析用于消息路由的确定组件目标。
+	 *
+	 * findComponent(type, 0) intentionally means "any component" for discovery.
+	 * A component ID read from a packet must never inherit that wildcard behavior.
+	 * findComponent(type, 0) 在服务发现中表示“任意组件”；来自封包的组件 ID
+	 * 不能继承该通配语义，否则伪造的 0 会被路由到第一个在线组件。
+	 */
+	Network::Channel* findComponentChannel(COMPONENT_TYPE componentType, COMPONENT_ID componentID);
+
+	/** Verify that a source Channel is registered as the expected component type.
+	 *  验证来源 Channel 已注册为预期组件类型。
+	 */
+	bool isExpectedComponentChannel(COMPONENT_TYPE componentType, Network::Channel* pChannel);
+
 	/** 
 		通过进程id寻找本地组件
 	*/

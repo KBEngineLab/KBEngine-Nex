@@ -497,24 +497,22 @@ bool KBEEmailVerificationTableRedis::activateAccount(DBInterface * pdbi, const s
 
 	if(logtime > 0 && time(NULL) - logtime > g_kbeSrvConfig.emailAtivationInfo_.deadline)
 	{
-		ERROR_MSG(fmt::format("KBEEmailVerificationTableMysql::activateAccount({}): is expired! {} > {}.\n", 
-				code, (time(NULL) - logtime), g_kbeSrvConfig.emailAtivationInfo_.deadline));
+		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::activateAccount: verification expired! {} > {}.\n",
+				(time(NULL) - logtime), g_kbeSrvConfig.emailAtivationInfo_.deadline));
 
 		return false;
 	}
 
 	if(info.name.size() == 0)
 	{
-		ERROR_MSG(fmt::format("KBEEmailVerificationTableMysql::activateAccount({}): name is NULL.\n", 
-				code));
+		ERROR_MSG("KBEEmailVerificationTableRedis::activateAccount: name is NULL.\n");
 
 		return false;
 	}
 	
 	if((int)KBEEmailVerificationTable::V_TYPE_CREATEACCOUNT != type)
 	{
-		ERROR_MSG(fmt::format("KBEEmailVerificationTableMysql::activateAccount({}): type({}) error!\n", 
-				code, type));
+		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::activateAccount: type({}) error!\n", type));
 
 		return false;
 	}
@@ -533,8 +531,8 @@ bool KBEEmailVerificationTableRedis::activateAccount(DBInterface * pdbi, const s
 
 	if((info.flags & ACCOUNT_FLAG_NOT_ACTIVATED) <= 0)
 	{
-		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::activateAccount({}): Has been activated, flags={}.\n", 
-				code, info.flags));
+		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::activateAccount: account has been activated, flags={}.\n",
+				info.flags));
 
 		return false;
 	}
@@ -543,15 +541,15 @@ bool KBEEmailVerificationTableRedis::activateAccount(DBInterface * pdbi, const s
 
 	if(!pTable->setFlagsDeadline(pdbi, info.name, info.flags, info.deadline))
 	{
-		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::activateAccount({}): set deadline error({})!\n", 
-				code, pdbi->getstrerror()));
+		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::activateAccount: set deadline error({})!\n",
+				pdbi->getstrerror()));
 		return false;
 	}
 
 	if(!pTable->updatePassword(pdbi, info.name, password))
 	{
-		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::activateAccount({}): update password error({})!\n", 
-				code, pdbi->getstrerror()));
+		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::activateAccount: update password error({})!\n",
+				pdbi->getstrerror()));
 
 		return false;
 	}
@@ -576,8 +574,8 @@ bool KBEEmailVerificationTableRedis::activateAccount(DBInterface * pdbi, const s
 	if(!pdbi->query(fmt::format("HSET " KBE_TABLE_PERFIX "_accountinfos:{} entityDBID {}", 
 		info.name, info.dbid), false))
 	{
-		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::activateAccount({}): update " KBE_TABLE_PERFIX "_accountinfos error({})!\n", 
-				code, pdbi->getstrerror()));
+		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::activateAccount: update " KBE_TABLE_PERFIX "_accountinfos error({})!\n",
+				pdbi->getstrerror()));
 
 		return false;
 	}
@@ -597,8 +595,8 @@ bool KBEEmailVerificationTableRedis::bindEMail(DBInterface * pdbi, const std::st
 
 	if (!pdbi->query(fmt::format("HMGET " KBE_TABLE_PERFIX "_email_verification:{} accountName type, datas logtime", code), false))
 	{
-		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::bindEMail({}): cmd({}) is failed({})!\n", 
-				code, pdbi->lastquery(), pdbi->getstrerror()));
+		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::bindEMail: query failed({})!\n",
+				pdbi->getstrerror()));
 	}	
 
 	uint64 logtime = 1;
@@ -623,32 +621,30 @@ bool KBEEmailVerificationTableRedis::bindEMail(DBInterface * pdbi, const std::st
 
 	if(logtime > 0 && time(NULL) - logtime > g_kbeSrvConfig.emailBindInfo_.deadline)
 	{
-		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::bindEMail({}): is expired! {} > {}.\n", 
-				code, (time(NULL) - logtime), g_kbeSrvConfig.emailBindInfo_.deadline));
+		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::bindEMail: verification expired! {} > {}.\n",
+				(time(NULL) - logtime), g_kbeSrvConfig.emailBindInfo_.deadline));
 
 		return false;
 	}
 
 	if(qname.size() == 0 || qemail.size() == 0)
 	{
-		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::bindEMail({}): name or email is NULL.\n", 
-				code));
+		ERROR_MSG("KBEEmailVerificationTableRedis::bindEMail: name or email is NULL.\n");
 
 		return false;
 	}
 	
 	if(qemail != name)
 	{
-		WARNING_MSG(fmt::format("KBEEmailVerificationTableRedis::bindEMail: code({}) username({}:{}, {}) not match.\n" 
-			, code, name, qname, qemail));
+		WARNING_MSG(fmt::format("KBEEmailVerificationTableRedis::bindEMail: username({}:{}, {}) not match.\n",
+			name, qname, qemail));
 
 		return false;
 	}
 
 	if((int)KBEEmailVerificationTable::V_TYPE_BIND_MAIL != type)
 	{
-		ERROR_MSG(fmt::format("KBEEmailVerificationTableMysql::bindEMail({}): type({}) error!\n", 
-				code, type));
+		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::bindEMail: type({}) error!\n", type));
 
 		return false;
 	}
@@ -661,8 +657,8 @@ bool KBEEmailVerificationTableRedis::bindEMail(DBInterface * pdbi, const std::st
 	if(!pdbi->query(fmt::format("HSET " KBE_TABLE_PERFIX "_accountinfos:{} email {}", 
 		qname, qemail), false))
 	{
-		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::bindEMail({}): update " KBE_TABLE_PERFIX "_accountinfos({}) error({})!\n", 
-				code, qname, pdbi->getstrerror()));
+		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::bindEMail: update " KBE_TABLE_PERFIX "_accountinfos({}) error({})!\n",
+				qname, pdbi->getstrerror()));
 
 		return false;
 	}
@@ -683,8 +679,8 @@ bool KBEEmailVerificationTableRedis::resetpassword(DBInterface * pdbi, const std
 
 	if (!pdbi->query(fmt::format("HMGET " KBE_TABLE_PERFIX "_email_verification:{} accountName type, datas logtime", code), false))
 	{
-		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::bindEMail({}): cmd({}) is failed({})!\n", 
-				code, pdbi->lastquery(), pdbi->getstrerror()));
+		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::bindEMail: query failed({})!\n",
+				pdbi->getstrerror()));
 	}	
 
 	uint64 logtime = 1;
@@ -709,32 +705,30 @@ bool KBEEmailVerificationTableRedis::resetpassword(DBInterface * pdbi, const std
 
 	if(logtime > 0 && time(NULL) - logtime > g_kbeSrvConfig.emailResetPasswordInfo_.deadline)
 	{
-		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::resetpassword({}): is expired! {} > {}.\n", 
-				code, (time(NULL) - logtime), g_kbeSrvConfig.emailResetPasswordInfo_.deadline));
+		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::resetpassword: verification expired! {} > {}.\n",
+				(time(NULL) - logtime), g_kbeSrvConfig.emailResetPasswordInfo_.deadline));
 
 		return false;
 	}
 
 	if(qname.size() == 0 || password.size() == 0)
 	{
-		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::resetpassword({}): name or password is NULL.\n", 
-				code));
+		ERROR_MSG("KBEEmailVerificationTableRedis::resetpassword: name or password is NULL.\n");
 
 		return false;
 	}
 
 	if(qname != name)
 	{
-		WARNING_MSG(fmt::format("KBEEmailVerificationTableRedis::resetpassword: code({}) username({} != {}) not match.\n" 
-			, code, name, qname));
+		WARNING_MSG(fmt::format("KBEEmailVerificationTableRedis::resetpassword: username({} != {}) not match.\n",
+			name, qname));
 
 		return false;
 	}
 
 	if((int)KBEEmailVerificationTable::V_TYPE_RESETPASSWORD != type)
 	{
-		ERROR_MSG(fmt::format("KBEEmailVerificationTableMysql::resetpassword({}): type({}) error!\n", 
-				code, type));
+		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::resetpassword: type({}) error!\n", type));
 
 		return false;
 	}
@@ -745,8 +739,8 @@ bool KBEEmailVerificationTableRedis::resetpassword(DBInterface * pdbi, const std
 
 	if(!pTable->updatePassword(pdbi, qname, KBE_MD5::getDigest(password.data(), password.length())))
 	{
-		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::resetpassword({}): update accountName({}) password error({})!\n", 
-				code, qname, pdbi->getstrerror()));
+		ERROR_MSG(fmt::format("KBEEmailVerificationTableRedis::resetpassword: update accountName({}) password error({})!\n",
+				qname, pdbi->getstrerror()));
 
 		return false;
 	}

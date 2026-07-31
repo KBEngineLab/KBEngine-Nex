@@ -583,26 +583,14 @@ void ServerApp::hello(Network::Channel* pChannel, MemoryStream& s)
 	s >> verInfo >> scriptVerInfo;
 	s.readBlob(encryptedKey);
 
-	char buf[MAX_BUF];
-	std::string encryptedKey_str;
-
-	if (encryptedKey.size() > 3 && encryptedKey.size() <= 65535)
+	const size_t encryptedKeyBytes = encryptedKey.size();
+	if (encryptedKeyBytes <= 3 || encryptedKeyBytes > 65535)
 	{
-		for (int i = 0; i < (int)encryptedKey.size(); ++i)
-		{
-			memset(buf, 0, MAX_BUF);
-			kbe_snprintf(buf, MAX_BUF / 2, "%02hhX ", (unsigned char)encryptedKey.data()[i]);
-			encryptedKey_str += buf;
-		}
-	}
-	else
-	{
-		encryptedKey = "";
-		encryptedKey_str = "None";
+		encryptedKey.clear();
 	}
 
-	INFO_MSG(fmt::format("ServerApp::onHello: verInfo={}, scriptVerInfo={}, encryptedKey={}, addr:{}\n", 
-		verInfo, scriptVerInfo, encryptedKey_str, pChannel->c_str()));
+	INFO_MSG(fmt::format("ServerApp::onHello: verInfo={}, scriptVerInfo={}, encryptedKeyBytes={}, addr:{}\n",
+		verInfo, scriptVerInfo, encryptedKeyBytes, pChannel->c_str()));
 
 	if(verInfo != KBEVersion::versionString())
 		onVersionNotMatch(pChannel);

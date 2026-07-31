@@ -20,6 +20,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include "baseapp.h"
+#include "server/client_request_guard.h"
+#include "server/component_routing_guard.h"
 #include "proxy.h"
 #include "entity.h"
 #include "space.h"
@@ -1284,8 +1286,13 @@ void Baseapp::createEntityFromDBID(const char* entityType, DBID dbid, PyObject* 
 //-------------------------------------------------------------------------------------
 void Baseapp::onCreateEntityFromDBIDCallback(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Baseapp::onCreateEntityFromDBIDCallback: rejected non-DBMgr source, addr={}.\n",
+			pChannel->c_str()));
+		s.done();
 		return;
+	}
 	
 	std::string entityType;
 	DBID dbid;
@@ -1319,7 +1326,8 @@ void Baseapp::onCreateEntityFromDBIDCallback(Network::Channel* pChannel, KBEngin
 			"dbInterfaceIndex={}, entityType={}, dbid={}, callbackID={}, success={}, entityID={}, wasActive={}, wasActiveCID={}, wasActiveEntityID={}!\n",
 			createToComponentID, g_componentID, dbInterfaceIndex, entityType, dbid, callbackID, success, entityID, wasActive, wasActiveCID, wasActiveEntityID));
 
-		KBE_ASSERT(false);
+		s.done();
+		return;
 	}
 
 	if(!success)
@@ -1395,7 +1403,12 @@ void Baseapp::onCreateEntityFromDBIDCallback(Network::Channel* pChannel, KBEngin
 
 	// 持久化流可能直接构造组件对象，解析前必须恢复目标实体和 Base 域上下文。
 	// Persistent streams may construct components directly, so restore the target entity and Base domain before parsing.
-	KBE_ASSERT(entityID > 0);
+	if (entityID <= 0)
+	{
+		ERROR_MSG(fmt::format("Baseapp::onCreateEntityFromDBID: invalid entityID={} from DBMgr.\n", entityID));
+		s.done();
+		return;
+	}
 	EntityDef::context().currEntityID = entityID;
 	EntityDef::context().currComponentType = BASEAPP_TYPE;
 	PyObject* pyDict = createDictDataFromPersistentStream(s, entityType.c_str());
@@ -1620,8 +1633,13 @@ void Baseapp::createEntityAnywhereFromDBID(const char* entityType, DBID dbid, Py
 //-------------------------------------------------------------------------------------
 void Baseapp::onGetCreateEntityAnywhereFromDBIDBestBaseappID(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(BASEAPPMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Baseapp::onGetCreateEntityAnywhereFromDBIDBestBaseappID: rejected non-BaseAppMgr source, addr={}.\n",
+			pChannel->c_str()));
+		s.done();
 		return;
+	}
 	
 	COMPONENT_ID targetComponentID;
 	s >> targetComponentID;
@@ -1671,8 +1689,13 @@ void Baseapp::onGetCreateEntityAnywhereFromDBIDBestBaseappID(Network::Channel* p
 //-------------------------------------------------------------------------------------
 void Baseapp::onCreateEntityAnywhereFromDBIDCallback(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Baseapp::onCreateEntityAnywhereFromDBIDCallback: rejected non-DBMgr source, addr={}.\n",
+			pChannel->c_str()));
+		s.done();
 		return;
+	}
 	
 	size_t currpos = s.rpos();
 
@@ -1808,8 +1831,13 @@ void Baseapp::onCreateEntityAnywhereFromDBIDCallback(Network::Channel* pChannel,
 //-------------------------------------------------------------------------------------
 void Baseapp::createEntityAnywhereFromDBIDOtherBaseapp(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(BASEAPPMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Baseapp::createEntityAnywhereFromDBIDOtherBaseapp: rejected non-BaseAppMgr source, addr={}.\n",
+			pChannel->c_str()));
+		s.done();
 		return;
+	}
 	
 	std::string entityType;
 	DBID dbid;
@@ -1837,10 +1865,16 @@ void Baseapp::createEntityAnywhereFromDBIDOtherBaseapp(Network::Channel* pChanne
 			"sourceBaseappID={}, dbInterfaceIndex={}, entityType={}, dbid={}, callbackID={}, success={}, entityID={}, wasActive={}!\n",
 			createToComponentID, g_componentID, sourceBaseappID, dbInterfaceIndex, entityType, dbid, callbackID, success, entityID, wasActive));
 
-		KBE_ASSERT(false);
+		s.done();
+		return;
 	}
 
-	KBE_ASSERT(entityID > 0);
+	if (entityID <= 0)
+	{
+		ERROR_MSG(fmt::format("Baseapp::createEntityAnywhereFromDBIDOtherBaseapp: invalid entityID={}.\n", entityID));
+		s.done();
+		return;
+	}
 	EntityDef::context().currEntityID = entityID;
 	EntityDef::context().currComponentType = BASEAPP_TYPE;
 	PyObject* pyDict = createDictDataFromPersistentStream(s, entityType.c_str());
@@ -1877,7 +1911,7 @@ void Baseapp::createEntityAnywhereFromDBIDOtherBaseapp(Network::Channel* pChanne
 	// 是否本地组件就是发起源， 如果是直接在本地调用回调
 	if(g_componentID == sourceBaseappID)
 	{
-		onCreateEntityAnywhereFromDBIDOtherBaseappCallback(pChannel, g_componentID, entityType, static_cast<Entity*>(e)->id(), callbackID, dbid);
+		onCreateEntityAnywhereFromDBIDOtherBaseappCallback(NULL, g_componentID, entityType, static_cast<Entity*>(e)->id(), callbackID, dbid);
 	}
 	else
 	{
@@ -1905,11 +1939,20 @@ void Baseapp::createEntityAnywhereFromDBIDOtherBaseapp(Network::Channel* pChanne
 }
 
 //-------------------------------------------------------------------------------------
-void Baseapp::onCreateEntityAnywhereFromDBIDOtherBaseappCallback(Network::Channel* pChannel, COMPONENT_ID createByBaseappID, 
-															   std::string entityType, ENTITY_ID createdEntityID, CALLBACK_ID callbackID, DBID dbid)
+void Baseapp::onCreateEntityAnywhereFromDBIDOtherBaseappCallback(Network::Channel* pChannel, COMPONENT_ID createByBaseappID,
+														   std::string entityType, ENTITY_ID createdEntityID, CALLBACK_ID callbackID, DBID dbid)
 {
-	if(pChannel->isExternal())
-		return;
+	if (pChannel != NULL)
+	{
+		Components::ComponentInfos* sourceInfos =
+			Components::getSingleton().findComponent(BASEAPP_TYPE, createByBaseappID);
+		if (!Security::isBoundComponentSource(createByBaseappID, sourceInfos, pChannel))
+		{
+			WARNING_MSG(fmt::format("Baseapp::onCreateEntityAnywhereFromDBIDOtherBaseappCallback: "
+				"rejected unbound createByBaseappID={}, addr={}.\n", createByBaseappID, pChannel->c_str()));
+			return;
+		}
+	}
 	
 	if(callbackID > 0)
 	{
@@ -2153,8 +2196,13 @@ void Baseapp::createEntityRemotelyFromDBID(const char* entityType, DBID dbid, CO
 //-------------------------------------------------------------------------------------
 void Baseapp::onCreateEntityRemotelyFromDBIDCallback(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Baseapp::onCreateEntityRemotelyFromDBIDCallback: rejected non-DBMgr source, addr={}.\n",
+			pChannel->c_str()));
+		s.done();
 		return;
+	}
 	
 	size_t currpos = s.rpos();
 
@@ -2290,8 +2338,13 @@ void Baseapp::onCreateEntityRemotelyFromDBIDCallback(Network::Channel* pChannel,
 //-------------------------------------------------------------------------------------
 void Baseapp::createEntityRemotelyFromDBIDOtherBaseapp(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(BASEAPPMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Baseapp::createEntityRemotelyFromDBIDOtherBaseapp: rejected non-BaseAppMgr source, addr={}.\n",
+			pChannel->c_str()));
+		s.done();
 		return;
+	}
 	
 	std::string entityType;
 	DBID dbid;
@@ -2319,10 +2372,16 @@ void Baseapp::createEntityRemotelyFromDBIDOtherBaseapp(Network::Channel* pChanne
 			"sourceBaseappID={}, dbInterfaceIndex={}, entityType={}, dbid={}, callbackID={}, success={}, entityID={}, wasActive={}!\n",
 			createToComponentID, g_componentID, sourceBaseappID, dbInterfaceIndex, entityType, dbid, callbackID, success, entityID, wasActive));
 
-		KBE_ASSERT(false);
+		s.done();
+		return;
 	}
 
-	KBE_ASSERT(entityID > 0);
+	if (entityID <= 0)
+	{
+		ERROR_MSG(fmt::format("Baseapp::createEntityRemotelyFromDBIDOtherBaseapp: invalid entityID={}.\n", entityID));
+		s.done();
+		return;
+	}
 	EntityDef::context().currEntityID = entityID;
 	EntityDef::context().currComponentType = BASEAPP_TYPE;
 	PyObject* pyDict = createDictDataFromPersistentStream(s, entityType.c_str());
@@ -2359,7 +2418,7 @@ void Baseapp::createEntityRemotelyFromDBIDOtherBaseapp(Network::Channel* pChanne
 	// 是否本地组件就是发起源， 如果是直接在本地调用回调
 	if(g_componentID == sourceBaseappID)
 	{
-		onCreateEntityRemotelyFromDBIDOtherBaseappCallback(pChannel, g_componentID, entityType, static_cast<Entity*>(e)->id(), callbackID, dbid);
+		onCreateEntityRemotelyFromDBIDOtherBaseappCallback(NULL, g_componentID, entityType, static_cast<Entity*>(e)->id(), callbackID, dbid);
 	}
 	else
 	{
@@ -2387,11 +2446,20 @@ void Baseapp::createEntityRemotelyFromDBIDOtherBaseapp(Network::Channel* pChanne
 }
 
 //-------------------------------------------------------------------------------------
-void Baseapp::onCreateEntityRemotelyFromDBIDOtherBaseappCallback(Network::Channel* pChannel, COMPONENT_ID createByBaseappID, 
-															   std::string entityType, ENTITY_ID createdEntityID, CALLBACK_ID callbackID, DBID dbid)
+void Baseapp::onCreateEntityRemotelyFromDBIDOtherBaseappCallback(Network::Channel* pChannel, COMPONENT_ID createByBaseappID,
+														   std::string entityType, ENTITY_ID createdEntityID, CALLBACK_ID callbackID, DBID dbid)
 {
-	if(pChannel->isExternal())
-		return;
+	if (pChannel != NULL)
+	{
+		Components::ComponentInfos* sourceInfos =
+			Components::getSingleton().findComponent(BASEAPP_TYPE, createByBaseappID);
+		if (!Security::isBoundComponentSource(createByBaseappID, sourceInfos, pChannel))
+		{
+			WARNING_MSG(fmt::format("Baseapp::onCreateEntityRemotelyFromDBIDOtherBaseappCallback: "
+				"rejected unbound createByBaseappID={}, addr={}.\n", createByBaseappID, pChannel->c_str()));
+			return;
+		}
+	}
 	
 	if(callbackID > 0)
 	{
@@ -2667,7 +2735,7 @@ void Baseapp::onCreateEntityAnywhere(Network::Channel* pChannel, MemoryStream& s
 	// 如果不是在发起创建entity的baseapp上创建则需要转发回调到发起方
 	if(componentID != componentID_)
 	{
-		Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(componentID);
+		Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
 		if(cinfos == NULL || cinfos->pChannel == NULL)
 		{
 			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
@@ -2722,7 +2790,7 @@ void Baseapp::onCreateEntityAnywhereCallback(Network::Channel* pChannel, KBEngin
 }
 
 //-------------------------------------------------------------------------------------
-void Baseapp::_onCreateEntityAnywhereCallback(Network::Channel* pChannel, CALLBACK_ID callbackID, 
+void Baseapp::_onCreateEntityAnywhereCallback(Network::Channel* pChannel, CALLBACK_ID callbackID,
 	std::string& entityType, ENTITY_ID eid, COMPONENT_ID componentID)
 {
 	if(callbackID == 0)
@@ -2734,6 +2802,20 @@ void Baseapp::_onCreateEntityAnywhereCallback(Network::Channel* pChannel, CALLBA
 		return;
 	}
 
+	if (pChannel != NULL)
+	{
+		Components::ComponentInfos* sourceInfos =
+			Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
+		if (!Security::isBoundComponentSource(componentID, sourceInfos, pChannel))
+		{
+			WARNING_MSG(fmt::format("Baseapp::onCreateEntityAnywhereCallback: rejected unbound sourceComponent({}), channel={}!\n",
+				componentID, pChannel->c_str()));
+			return;
+		}
+	}
+
+	// Validate the callback source before take(); an invalid packet must not consume
+	// the legitimate pending callback. 在 take() 前校验来源，非法封包不得消费合法回调。
 	PyObjectPtr pyCallback = callbackMgr().take(callbackID);
 	PyObject* pyargs = PyTuple_New(1);
 
@@ -2750,8 +2832,6 @@ void Baseapp::_onCreateEntityAnywhereCallback(Network::Channel* pChannel, CALLBA
 		}
 		
 		// 如果entity属于另一个baseapp创建则设置它的entitycall
-		Network::Channel* pOtherBaseappChannel = Components::getSingleton().findComponent(componentID)->pChannel;
-		KBE_ASSERT(pOtherBaseappChannel != NULL);
 		PyObject* mb = static_cast<EntityCall*>(new EntityCall(sm, NULL, componentID, eid, ENTITYCALL_TYPE_BASE));
 		PyTuple_SET_ITEM(pyargs, 0, mb);
 		
@@ -2901,7 +2981,7 @@ void Baseapp::onCreateEntityRemotely(Network::Channel* pChannel, MemoryStream& s
 	// 如果不是在发起创建entity的baseapp上创建则需要转发回调到发起方
 	if (reqComponentID != componentID_)
 	{
-		Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(reqComponentID);
+		Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(BASEAPP_TYPE, reqComponentID);
 		if (cinfos == NULL || cinfos->pChannel == NULL)
 		{
 			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
@@ -2968,6 +3048,20 @@ void Baseapp::_onCreateEntityRemotelyCallback(Network::Channel* pChannel, CALLBA
 		return;
 	}
 
+	if (pChannel != NULL)
+	{
+		Components::ComponentInfos* sourceInfos =
+			Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
+		if (!Security::isBoundComponentSource(componentID, sourceInfos, pChannel))
+		{
+			WARNING_MSG(fmt::format("Baseapp::onCreateEntityRemotelyCallback: rejected unbound sourceComponent({}), channel={}!\n",
+				componentID, pChannel->c_str()));
+			return;
+		}
+	}
+
+	// Validate the callback source before take(); an invalid packet must not consume
+	// the legitimate pending callback. 在 take() 前校验来源，非法封包不得消费合法回调。
 	PyObjectPtr pyCallback = callbackMgr().take(callbackID);
 	PyObject* pyargs = PyTuple_New(1);
 
@@ -2984,8 +3078,6 @@ void Baseapp::_onCreateEntityRemotelyCallback(Network::Channel* pChannel, CALLBA
 		}
 
 		// 如果entity属于另一个baseapp创建则设置它的entitycall
-		Network::Channel* pOtherBaseappChannel = Components::getSingleton().findComponent(componentID)->pChannel;
-		KBE_ASSERT(pOtherBaseappChannel != NULL);
 		PyObject* mb = static_cast<EntityCall*>(new EntityCall(sm, NULL, componentID, eid, ENTITYCALL_TYPE_BASE));
 		PyTuple_SET_ITEM(pyargs, 0, mb);
 
@@ -3297,8 +3389,13 @@ void Baseapp::executeRawDatabaseCommand(const char* datas, uint32 size, PyObject
 //-------------------------------------------------------------------------------------
 void Baseapp::onExecuteRawDatabaseCommandCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Baseapp::onExecuteRawDatabaseCommandCB: rejected non-DBMgr source, addr={}.\n",
+			pChannel->c_str()));
+		s.done();
 		return;
+	}
 	
 	std::string err;
 	CALLBACK_ID callbackID = 0;
@@ -3511,9 +3608,8 @@ void Baseapp::charge(std::string chargeID, DBID dbid, const std::string& datas, 
 	CALLBACK_ID callbackID = callbackMgr().save(pycallback, uint64(g_kbeSrvConfig.interfaces_orders_timeout_ + 
 		g_kbeSrvConfig.callback_timeout_));
 
-	INFO_MSG(fmt::format("Baseapp::charge: chargeID={0}, dbid={3}, datas={1}, pycallback={2}.\n", 
+	INFO_MSG(fmt::format("Baseapp::charge: chargeID={0}, dbid={2}, pycallback={1}.\n",
 		chargeID,
-		datas,
 		callbackID,
 		dbid));
 
@@ -3540,8 +3636,13 @@ void Baseapp::charge(std::string chargeID, DBID dbid, const std::string& datas, 
 //-------------------------------------------------------------------------------------
 void Baseapp::onChargeCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Baseapp::onChargeCB: rejected non-DBMgr source, addr={}.\n",
+			pChannel->c_str()));
+		s.done();
 		return;
+	}
 	
 	std::string chargeID;
 	CALLBACK_ID callbackID;
@@ -3555,9 +3656,8 @@ void Baseapp::onChargeCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 	s >> callbackID;
 	s >> retcode;
 
-	INFO_MSG(fmt::format("Baseapp::onChargeCB: chargeID={0}, dbid={3}, datas={1}, pycallback={2}.\n", 
+	INFO_MSG(fmt::format("Baseapp::onChargeCB: chargeID={0}, dbid={2}, pycallback={1}.\n",
 		chargeID,
-		datas,
 		callbackID,
 		dbid));
 
@@ -3987,7 +4087,7 @@ void Baseapp::loginBaseapp(Network::Channel* pChannel,
 //-------------------------------------------------------------------------------------
 void Baseapp::logoutBaseapp(Network::Channel* pChannel, uint64 key, ENTITY_ID entityID)
 {
-	INFO_MSG(fmt::format("Baseapp::logoutBaseapp: key={}, entityID={}.\n", key, entityID));
+	INFO_MSG(fmt::format("Baseapp::logoutBaseapp: entityID={}.\n", entityID));
 
 	Entity* pEntity = findEntity(entityID);
 	if (pEntity == NULL || !PyObject_TypeCheck(pEntity, Proxy::getScriptType()) || pEntity->isDestroyed())
@@ -4013,8 +4113,8 @@ void Baseapp::reloginBaseapp(Network::Channel* pChannel, std::string& accountNam
 							 std::string& password, uint64 key, ENTITY_ID entityID)
 {
 	accountName = KBEngine::strutil::kbe_trim(accountName);
-	INFO_MSG(fmt::format("Baseapp::reloginBaseapp: accountName={}, key={}, entityID={}.\n",
-		accountName, key, entityID));
+	INFO_MSG(fmt::format("Baseapp::reloginBaseapp: accountName={}, entityID={}.\n",
+		accountName, entityID));
 
 	Entity* pEntity = findEntity(entityID);
 	if(pEntity == NULL)
@@ -4056,9 +4156,9 @@ void Baseapp::reloginBaseapp(Network::Channel* pChannel, std::string& accountNam
 	{
 		Network::Channel* pMBChannel = entityClientEntityCall->getChannel();
 
-		WARNING_MSG(fmt::format("Baseapp::reloginBaseapp: accountName={}, key={}, "
+		WARNING_MSG(fmt::format("Baseapp::reloginBaseapp: accountName={}, "
 			"entityID={}, ClientEntityCall({}) is exist, will be kicked out!\n",
-			accountName, key, entityID, 
+			accountName, entityID,
 			(pMBChannel ? pMBChannel->c_str() : "unknown")));
 		
 		if(pMBChannel)
@@ -4123,8 +4223,13 @@ void Baseapp::kickChannel(Network::Channel* pChannel, SERVER_ERROR_CODE failedco
 //-------------------------------------------------------------------------------------
 void Baseapp::onQueryAccountCBFromDbmgr(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Baseapp::onQueryAccountCBFromDbmgr: rejected non-DBMgr source, addr={}.\n",
+			pChannel->c_str()));
+		s.done();
 		return;
+	}
 
 	std::string accountName;
 	std::string password;
@@ -4136,6 +4241,13 @@ void Baseapp::onQueryAccountCBFromDbmgr(Network::Channel* pChannel, KBEngine::Me
 	uint16 dbInterfaceIndex;
 
 	s >> dbInterfaceIndex >> accountName >> password >> dbid >> success >> entityID >> flags >> deadline;
+	if (entityID <= 0)
+	{
+		ERROR_MSG(fmt::format("Baseapp::onQueryAccountCBFromDbmgr: invalid entityID={} for account={}.\n",
+			entityID, accountName));
+		s.done();
+		return;
+	}
 
 	PendingLoginMgr::PLInfos* ptinfos = pendingLoginMgr_.remove(accountName);
 	if(ptinfos == NULL)
@@ -4185,7 +4297,6 @@ void Baseapp::onQueryAccountCBFromDbmgr(Network::Channel* pChannel, KBEngine::Me
 	pEntity->setLoginDatas(ptinfos->datas);
 	pEntity->setCreateDatas(bindatas);
 
-	KBE_ASSERT(entityID > 0);
 	EntityDef::context().currEntityID = entityID;
 	EntityDef::context().currComponentType = BASEAPP_TYPE;
 	PyObject* pyDict = createDictDataFromPersistentStream(s, g_serverConfig.getDBMgr().dbAccountEntityScriptType);
@@ -4230,8 +4341,8 @@ void Baseapp::onQueryAccountCBFromDbmgr(Network::Channel* pChannel, KBEngine::Me
 		*/
 	}
 
-	INFO_MSG(fmt::format("Baseapp::onQueryAccountCBFromDbmgr: user={}, uuid={}, entityID={}, flags={}, deadline={}.\n",
-		accountName, pEntity->rndUUID(), pEntity->id(), flags, deadline));
+	INFO_MSG(fmt::format("Baseapp::onQueryAccountCBFromDbmgr: user={}, entityID={}, flags={}, deadline={}.\n",
+		accountName, pEntity->id(), flags, deadline));
 
 	SAFE_RELEASE(ptinfos);
 
@@ -4787,11 +4898,15 @@ void Baseapp::onCellWriteToDBCompleted(Network::Channel* pChannel, KBEngine::Mem
 }
 
 //-------------------------------------------------------------------------------------
-void Baseapp::onWriteToDBCallback(Network::Channel* pChannel, ENTITY_ID eid, 
+void Baseapp::onWriteToDBCallback(Network::Channel* pChannel, ENTITY_ID eid,
 	DBID entityDBID, uint16 dbInterfaceIndex, CALLBACK_ID callbackID, bool success)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Baseapp::onWriteToDBCallback: rejected non-DBMgr source, addr={}.\n",
+			pChannel->c_str()));
 		return;
+	}
 
 	Entity* pEntity = pEntities_->find(eid);
 	if(pEntity == NULL)
@@ -4819,8 +4934,13 @@ void Baseapp::onClientActiveTick(Network::Channel* pChannel)
 //-------------------------------------------------------------------------------------
 void Baseapp::onEntityAutoLoadCBFromDBMgr(Network::Channel* pChannel, MemoryStream& s)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Baseapp::onEntityAutoLoadCBFromDBMgr: rejected non-DBMgr source, addr={}.\n",
+			pChannel->c_str()));
+		s.done();
 		return;
+	}
 
 	pInitProgressHandler_->onEntityAutoLoadCBFromDBMgr(pChannel, s);
 }
@@ -5284,8 +5404,13 @@ PyObject* Baseapp::__py_deleteEntityByDBID(PyObject* self, PyObject* args)
 //-------------------------------------------------------------------------------------
 void Baseapp::deleteEntityByDBIDCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Baseapp::deleteEntityByDBIDCB: rejected non-DBMgr source, addr={}.\n",
+			pChannel->c_str()));
+		s.done();
 		return;
+	}
 	
 	ENTITY_ID entityID = 0;
 	COMPONENT_ID entityInAppID = 0;
@@ -5461,8 +5586,13 @@ PyObject* Baseapp::__py_lookUpEntityByDBID(PyObject* self, PyObject* args)
 //-------------------------------------------------------------------------------------
 void Baseapp::lookUpEntityByDBIDCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Baseapp::lookUpEntityByDBIDCB: rejected non-DBMgr source, addr={}.\n",
+			pChannel->c_str()));
+		s.done();
 		return;
+	}
 	
 	ENTITY_ID entityID = 0;
 	COMPONENT_ID entityInAppID = 0;
@@ -5535,6 +5665,24 @@ void Baseapp::lookUpEntityByDBIDCB(Network::Channel* pChannel, KBEngine::MemoryS
 //-------------------------------------------------------------------------------------
 void Baseapp::reqAccountBindEmail(Network::Channel* pChannel, ENTITY_ID entityID, std::string& password, std::string& email)
 {
+	// 账户身份只能来自已认证 Channel；载荷 ID 仅用于协议兼容，不能决定操作对象。
+	// Account identity comes only from the authenticated Channel; the payload ID is retained for wire compatibility.
+	if (pChannel->isInternal() || !Security::isBoundClientEntity(pChannel->proxyID(), entityID))
+	{
+		WARNING_MSG(fmt::format("Baseapp::reqAccountBindEmail: rejected unbound entity, requested={}, proxyID={}, addr={}!\n",
+			entityID, pChannel->proxyID(), pChannel->c_str()));
+
+		if (pChannel->isExternal())
+		{
+			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+			(*pBundle).newMessage(ClientInterface::onReqAccountBindEmailCB);
+			(*pBundle) << static_cast<SERVER_ERROR_CODE>(SERVER_ERR_OP_FAILED);
+			pChannel->send(pBundle);
+		}
+
+		return;
+	}
+
 	Entity* pEntity = pEntities_->find(entityID);
 	if(pEntity == NULL)
 	{
@@ -5576,7 +5724,7 @@ void Baseapp::reqAccountBindEmail(Network::Channel* pChannel, ENTITY_ID entityID
 		return;
 	}
 			
-	INFO_MSG(fmt::format("Baseapp::reqAccountBindEmail: accountName={}, entityID={}, email={}!\n", accountName, entityID, email));
+	INFO_MSG(fmt::format("Baseapp::reqAccountBindEmail: accountName={}, entityID={}!\n", accountName, entityID));
 
 	Components::ComponentInfos* dbmgrinfos = Components::getSingleton().getDbmgr();
 	if(dbmgrinfos == NULL || dbmgrinfos->pChannel == NULL || dbmgrinfos->cid == 0)
@@ -5602,8 +5750,12 @@ void Baseapp::reqAccountBindEmail(Network::Channel* pChannel, ENTITY_ID entityID
 void Baseapp::onReqAccountBindEmailCBFromDBMgr(Network::Channel* pChannel, ENTITY_ID entityID, std::string& accountName, std::string& email,
 	SERVER_ERROR_CODE failedcode, std::string& code)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Baseapp::onReqAccountBindEmailCBFromDBMgr: rejected non-DBMgr source, addr={}.\n",
+			pChannel->c_str()));
 		return;
+	}
 	
 	INFO_MSG(fmt::format("Baseapp::onReqAccountBindEmailCBFromDBMgr: {}({}) failedcode={}!\n", 
 		accountName, entityID, failedcode));
@@ -5646,8 +5798,12 @@ void Baseapp::onReqAccountBindEmailCBFromDBMgr(Network::Channel* pChannel, ENTIT
 void Baseapp::onReqAccountBindEmailCBFromBaseappmgr(Network::Channel* pChannel, ENTITY_ID entityID, std::string& accountName, std::string& email,
 	SERVER_ERROR_CODE failedcode, std::string& code, std::string& loginappCBHost, uint16 loginappCBPort)
 {
-	if (pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(BASEAPPMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Baseapp::onReqAccountBindEmailCBFromBaseappmgr: rejected non-BaseAppMgr source, addr={}.\n",
+			pChannel->c_str()));
 		return;
+	}
 
 	INFO_MSG(fmt::format("Baseapp::onReqAccountBindEmailCBFromBaseappmgr: {}({}) failedcode={}!\n",
 		accountName, entityID, failedcode));
@@ -5673,9 +5829,27 @@ void Baseapp::onReqAccountBindEmailCBFromBaseappmgr(Network::Channel* pChannel, 
 }
 
 //-------------------------------------------------------------------------------------
-void Baseapp::reqAccountNewPassword(Network::Channel* pChannel, ENTITY_ID entityID, 
+void Baseapp::reqAccountNewPassword(Network::Channel* pChannel, ENTITY_ID entityID,
 									std::string& oldpassworld, std::string& newpassword)
 {
+	// 改密与邮箱绑定共享同一主体约束，避免客户端用其他在线实体 ID 发起账户操作。
+	// Password changes share the same principal binding so another online entity ID cannot be substituted.
+	if (pChannel->isInternal() || !Security::isBoundClientEntity(pChannel->proxyID(), entityID))
+	{
+		WARNING_MSG(fmt::format("Baseapp::reqAccountNewPassword: rejected unbound entity, requested={}, proxyID={}, addr={}!\n",
+			entityID, pChannel->proxyID(), pChannel->c_str()));
+
+		if (pChannel->isExternal())
+		{
+			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+			(*pBundle).newMessage(ClientInterface::onReqAccountNewPasswordCB);
+			(*pBundle) << static_cast<SERVER_ERROR_CODE>(SERVER_ERR_OP_FAILED);
+			pChannel->send(pBundle);
+		}
+
+		return;
+	}
+
 	Entity* pEntity = pEntities_->find(entityID);
 	if(pEntity == NULL)
 	{
@@ -5731,8 +5905,12 @@ void Baseapp::reqAccountNewPassword(Network::Channel* pChannel, ENTITY_ID entity
 void Baseapp::onReqAccountNewPasswordCB(Network::Channel* pChannel, ENTITY_ID entityID, std::string& accountName,
 	SERVER_ERROR_CODE failedcode)
 {
-	if(pChannel->isExternal())
+	if (!Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format("Baseapp::onReqAccountNewPasswordCB: rejected non-DBMgr source, addr={}.\n",
+			pChannel->c_str()));
 		return;
+	}
 	
 	INFO_MSG(fmt::format("Baseapp::onReqAccountNewPasswordCB: {}({}) failedcode={}!\n", 
 		accountName, entityID, failedcode));

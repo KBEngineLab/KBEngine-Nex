@@ -964,7 +964,7 @@ namespace KBEngine {
 		uint64 logtime = 1;
 		if (!find_email_verification(pdbi, (int8)KBEEmailVerificationTable::V_TYPE_CREATEACCOUNT, "code", code, info.name, datas, logtime))
 		{
-			ERROR_MSG(fmt::format("KBEEmailVerificationTableMongodb::activateAccount({}): code is invalid.\n", code));
+			ERROR_MSG("KBEEmailVerificationTableMongodb::activateAccount: verification code is invalid.\n");
 			return false;
 		}
 
@@ -972,14 +972,14 @@ namespace KBEngine {
 
 		if (logtime > 0 && time(NULL) - logtime > g_kbeSrvConfig.emailAtivationInfo_.deadline)
 		{
-			ERROR_MSG(fmt::format("KBEEmailVerificationTableMongodb::activateAccount({}): is expired! {} > {}.\n",
-				code, (time(NULL) - logtime), g_kbeSrvConfig.emailAtivationInfo_.deadline));
+			ERROR_MSG(fmt::format("KBEEmailVerificationTableMongodb::activateAccount: verification expired! {} > {}.\n",
+				(time(NULL) - logtime), g_kbeSrvConfig.emailAtivationInfo_.deadline));
 			return false;
 		}
 
 		if (info.name.empty())
 		{
-			ERROR_MSG(fmt::format("KBEEmailVerificationTableMongodb::activateAccount({}): name is NULL.\n", code));
+			ERROR_MSG("KBEEmailVerificationTableMongodb::activateAccount: name is NULL.\n");
 			return false;
 		}
 
@@ -994,7 +994,7 @@ namespace KBEngine {
 
 		if ((info.flags & ACCOUNT_FLAG_NOT_ACTIVATED) <= 0)
 		{
-			ERROR_MSG(fmt::format("KBEEmailVerificationTableMongodb::activateAccount({}): Has been activated, flags={}.\n", code, info.flags));
+			ERROR_MSG(fmt::format("KBEEmailVerificationTableMongodb::activateAccount: account has been activated, flags={}.\n", info.flags));
 			return false;
 		}
 
@@ -1058,8 +1058,8 @@ namespace KBEngine {
 
 		if (logtime > 0 && time(NULL) - logtime > g_kbeSrvConfig.emailBindInfo_.deadline)
 		{
-			ERROR_MSG(fmt::format("KBEEmailVerificationTableMongodb::bindEMail({}): is expired! {} > {}.\n",
-				code, (time(NULL) - logtime), g_kbeSrvConfig.emailBindInfo_.deadline));
+			ERROR_MSG(fmt::format("KBEEmailVerificationTableMongodb::bindEMail: verification expired! {} > {}.\n",
+				(time(NULL) - logtime), g_kbeSrvConfig.emailBindInfo_.deadline));
 			return false;
 		}
 
@@ -1068,8 +1068,8 @@ namespace KBEngine {
 
 		if (qemail != name)
 		{
-			WARNING_MSG(fmt::format("KBEEmailVerificationTableMongodb::bindEMail: code({}) username({}:{}, {}) not match.\n",
-				code, name, qname, qemail));
+			WARNING_MSG(fmt::format("KBEEmailVerificationTableMongodb::bindEMail: username({}:{}, {}) not match.\n",
+				name, qname, qemail));
 			return false;
 		}
 
@@ -1115,8 +1115,8 @@ namespace KBEngine {
 
 		if (logtime > 0 && time(NULL) - logtime > g_kbeSrvConfig.emailResetPasswordInfo_.deadline)
 		{
-			ERROR_MSG(fmt::format("KBEEmailVerificationTableMongodb::resetpassword({}): is expired! {} > {}.\n",
-				code, (time(NULL) - logtime), g_kbeSrvConfig.emailResetPasswordInfo_.deadline));
+			ERROR_MSG(fmt::format("KBEEmailVerificationTableMongodb::resetpassword: verification expired! {} > {}.\n",
+				(time(NULL) - logtime), g_kbeSrvConfig.emailResetPasswordInfo_.deadline));
 			return false;
 		}
 
@@ -1125,8 +1125,8 @@ namespace KBEngine {
 
 		if (qname != name)
 		{
-			WARNING_MSG(fmt::format("KBEEmailVerificationTableMongodb::resetpassword: code({}) username({} != {}) not match.\n",
-				code, name, qname));
+			WARNING_MSG(fmt::format("KBEEmailVerificationTableMongodb::resetpassword: username({} != {}) not match.\n",
+				name, qname));
 			return false;
 		}
 

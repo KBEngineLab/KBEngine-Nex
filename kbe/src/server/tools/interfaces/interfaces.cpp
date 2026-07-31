@@ -573,12 +573,9 @@ void Interfaces::createAccountResponse(std::string commitName, std::string realA
 	if (iter == reqCreateAccount_requests_.end())
 	{
 		// 理论上不可能找不到，但如果真找不到，这是个很恐怖的事情，必须写日志记录下来
-		ERROR_MSG(fmt::format("Interfaces::createAccountResponse: accountName '{}' not found!" \
-			"realAccountName = '{}', extra datas = '{}', error code = '{}'\n", 
-			commitName, 
-			realAccountName, 
-			extraDatas, 
-			errorCode));
+		ERROR_MSG(fmt::format("Interfaces::createAccountResponse: request not found, "
+			"commitNameSize={}, realAccountNameSize={}, extraDatasSize={}, errorCode={}\n",
+			commitName.size(), realAccountName.size(), extraDatas.size(), errorCode));
 
 		return;
 	}
@@ -688,12 +685,9 @@ void Interfaces::accountLoginResponse(std::string commitName, std::string realAc
 	if (iter == reqAccountLogin_requests_.end())
 	{
 		// 理论上不可能找不到，但如果真找不到，这是个很恐怖的事情，必须写日志记录下来
-		ERROR_MSG(fmt::format("Interfaces::accountLoginResponse: commitName '{}' not found! " \
-			"realAccountName = '{}', extra datas = '{}', error code = '{}'\n", 
-			commitName, 
-			realAccountName, 
-			extraDatas, 
-			errorCode));
+		ERROR_MSG(fmt::format("Interfaces::accountLoginResponse: request not found, "
+			"commitNameSize={}, realAccountNameSize={}, extraDatasSize={}, errorCode={}\n",
+			commitName.size(), realAccountName.size(), extraDatas.size(), errorCode));
 
 		return;
 	}
@@ -762,8 +756,11 @@ void Interfaces::charge(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 	s.readBlob(pOrdersCharge->postDatas);
 	s >> pOrdersCharge->cbid;
 
-	INFO_MSG(fmt::format("Interfaces::charge: componentID={4}, chargeID={0}, dbid={1}, cbid={2}, datas={3}!\n",
-		pOrdersCharge->ordersID, pOrdersCharge->dbid, pOrdersCharge->cbid, pOrdersCharge->postDatas, pOrdersCharge->baseappID));
+	// Provider payloads are opaque and may contain signed receipts or credentials.
+	// 平台载荷是不透明数据，可能包含签名收据或凭据，日志仅记录长度。
+	INFO_MSG(fmt::format("Interfaces::charge: componentID={}, chargeID={}, dbid={}, cbid={}, datasSize={}!\n",
+		pOrdersCharge->baseappID, pOrdersCharge->ordersID, pOrdersCharge->dbid,
+		pOrdersCharge->cbid, pOrdersCharge->postDatas.size()));
 
 	ORDERS::iterator iter = orders_.find(pOrdersCharge->ordersID);
 	if(iter != orders_.end())
@@ -804,10 +801,8 @@ void Interfaces::chargeResponse(std::string orderID, std::string extraDatas, KBE
 	ORDERS::iterator iter = orders_.find(orderID);
 	if (iter == orders_.end())
 	{
-		ERROR_MSG(fmt::format("Interfaces::chargeResponse: order id '{}' not found! extra datas = '{}', error code = '{}'\n", 
-			orderID, 
-			extraDatas, 
-			errorCode));
+		ERROR_MSG(fmt::format("Interfaces::chargeResponse: order id '{}' not found, "
+			"extraDatasSize={}, errorCode={}\n", orderID, extraDatas.size(), errorCode));
 		
 		// 这种情况也需要baseapp处理onLoseChargeCB
 		// 例如某些时候客户端出问题未向服务器注册这个订单号，但是计费平台有返回的情况
@@ -838,8 +833,8 @@ void Interfaces::chargeResponse(std::string orderID, std::string extraDatas, KBE
 		}
 		else
 		{
-			ERROR_MSG(fmt::format("Interfaces::chargeResponse: not found channels. orders={}, datas={}\n", 
-				orderID, extraDatas));
+			ERROR_MSG(fmt::format("Interfaces::chargeResponse: not found channels, orders={}, datasSize={}\n",
+				orderID, extraDatas.size()));
 		}
 
 		return;
@@ -864,8 +859,8 @@ void Interfaces::chargeResponse(std::string orderID, std::string extraDatas, KBE
 	}
 	else
 	{
-		ERROR_MSG(fmt::format("Interfaces::chargeResponse: not found channels. orders={}, datas={}\n", 
-			orderID, extraDatas));
+		ERROR_MSG(fmt::format("Interfaces::chargeResponse: not found channels, orders={}, datasSize={}\n",
+			orderID, extraDatas.size()));
 
 		Network::Bundle::reclaimPoolObject(pBundle);
 	}

@@ -156,6 +156,12 @@ kbe_set_target_folder("Build/Aggregates"
 if(BUILD_TESTING)
     # 统一测试构建入口包含 CTest 所需运行时和编译型 fixture，避免先运行 CTest 才发现测试程序尚未生成。
     # The unified test build entry includes the runtime and compiled fixtures required by CTest, avoiding late missing-executable failures.
-    add_custom_target(kbe_tests DEPENDS kbe_runtime kbe_sdk_tests kbe_network_tests kbe_common_tests)
+    add_custom_target(kbe_tests DEPENDS
+        kbe_runtime
+        kbe_sdk_tests
+        kbe_network_tests
+        kbe_common_tests
+        kbe_security_tests
+    )
     kbe_set_target_folder("Build/Aggregates" kbe_tests)
 endif()

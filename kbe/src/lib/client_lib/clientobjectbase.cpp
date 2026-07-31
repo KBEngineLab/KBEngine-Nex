@@ -776,7 +776,7 @@ void ClientObjectBase::onReloginBaseappFailed(Network::Channel * pChannel, SERVE
 void ClientObjectBase::onReloginBaseappSuccessfully(Network::Channel * pChannel, MemoryStream& s)
 {
 	s >> rndUUID_;
-	INFO_MSG(fmt::format("ClientObjectBase::onReloginBaseappSuccessfully! name={}, rndUUID={}.\n", name_, rndUUID_));
+	INFO_MSG(fmt::format("ClientObjectBase::onReloginBaseappSuccessfully! name={}.\n", name_));
 }
 
 //-------------------------------------------------------------------------------------	
@@ -801,8 +801,8 @@ void ClientObjectBase::onCreatedProxies(Network::Channel * pChannel, uint64 rndU
 
 	if(entity == NULL)
 	{
-		INFO_MSG(fmt::format("ClientObject::onCreatedProxies({}): rndUUID={} eid={} entityType={}!\n",
-			name_, rndUUID, eid, entityType));
+		INFO_MSG(fmt::format("ClientObject::onCreatedProxies({}): eid={} entityType={}!\n",
+			name_, eid, entityType));
 
 		// 设置entity的baseEntityCall
 		EntityCall* entitycall = new EntityCall(EntityDef::findScriptModule(entityType.c_str()), 

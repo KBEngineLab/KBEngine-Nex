@@ -216,8 +216,7 @@ int HTTPCBHandler::handleInputNotification(KBESOCKET fd)
 
 		if(code.size() > 0)
 		{
-			INFO_MSG(fmt::format("HTTPCBHandler:handleInputNotification: code = {}\n",
-				code.c_str()));
+			INFO_MSG("HTTPCBHandler:handleInputNotification: verification callback received.\n");
 
 			client.code = code;
 

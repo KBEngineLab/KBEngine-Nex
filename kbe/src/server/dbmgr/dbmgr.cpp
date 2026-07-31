@@ -1223,21 +1223,21 @@ void Dbmgr::eraseClientReq(Network::Channel* pChannel, std::string& logkey)
 //-------------------------------------------------------------------------------------
 void Dbmgr::accountActivate(Network::Channel* pChannel, std::string& scode)
 {
-	INFO_MSG(fmt::format("Dbmgr::accountActivate: code={}.\n", scode));
+	INFO_MSG("Dbmgr::accountActivate: request received.\n");
 	findBestInterfacesHandler()->accountActivate(pChannel, scode);
 }
 
 //-------------------------------------------------------------------------------------
 void Dbmgr::accountReqResetPassword(Network::Channel* pChannel, std::string& accountName)
 {
-	INFO_MSG(fmt::format("Dbmgr::accountReqResetPassword: accountName={}.\n", accountName));
+	INFO_MSG(fmt::format("Dbmgr::accountReqResetPassword: accountNameSize={}.\n", accountName.size()));
 	findBestInterfacesHandler()->accountReqResetPassword(pChannel, accountName);
 }
 
 //-------------------------------------------------------------------------------------
 void Dbmgr::accountResetPassword(Network::Channel* pChannel, std::string& accountName, std::string& newpassword, std::string& code)
 {
-	INFO_MSG(fmt::format("Dbmgr::accountResetPassword: accountName={}.\n", accountName));
+	INFO_MSG(fmt::format("Dbmgr::accountResetPassword: accountNameSize={}.\n", accountName.size()));
 	findBestInterfacesHandler()->accountResetPassword(pChannel, accountName, newpassword, code);
 }
 
@@ -1245,14 +1245,17 @@ void Dbmgr::accountResetPassword(Network::Channel* pChannel, std::string& accoun
 void Dbmgr::accountReqBindMail(Network::Channel* pChannel, ENTITY_ID entityID, std::string& accountName, 
 							   std::string& password, std::string& email)
 {
-	INFO_MSG(fmt::format("Dbmgr::accountReqBindMail: accountName={}, email={}.\n", accountName, email));
+	// This path handles both account identifiers and destination email addresses;
+	// never persist either value in logs. 此路径同时处理账户标识和目标邮箱，日志不得保留其内容。
+	INFO_MSG(fmt::format("Dbmgr::accountReqBindMail: accountNameSize={}, emailSize={}.\n",
+		accountName.size(), email.size()));
 	findBestInterfacesHandler()->accountReqBindMail(pChannel, entityID, accountName, password, email);
 }
 
 //-------------------------------------------------------------------------------------
 void Dbmgr::accountBindMail(Network::Channel* pChannel, std::string& username, std::string& scode)
 {
-	INFO_MSG(fmt::format("Dbmgr::accountBindMail: username={}, scode={}.\n", username, scode));
+	INFO_MSG(fmt::format("Dbmgr::accountBindMail: username={}.\n", username));
 	findBestInterfacesHandler()->accountBindMail(pChannel, username, scode);
 }
 
@@ -1260,7 +1263,7 @@ void Dbmgr::accountBindMail(Network::Channel* pChannel, std::string& username, s
 void Dbmgr::accountNewPassword(Network::Channel* pChannel, ENTITY_ID entityID, std::string& accountName, 
 							   std::string& password, std::string& newpassword)
 {
-	INFO_MSG(fmt::format("Dbmgr::accountNewPassword: accountName={}.\n", accountName));
+	INFO_MSG(fmt::format("Dbmgr::accountNewPassword: accountNameSize={}.\n", accountName.size()));
 	findBestInterfacesHandler()->accountNewPassword(pChannel, entityID, accountName, password, newpassword);
 }
 

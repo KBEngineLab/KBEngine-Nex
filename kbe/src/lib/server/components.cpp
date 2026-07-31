@@ -20,6 +20,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include "components.h"
+#include "component_routing_guard.h"
 #include "helper/debug_helper.h"
 #include "helper/sys_info.h"
 #include "network/channel.h"	
@@ -668,7 +669,20 @@ Components::ComponentInfos* Components::findComponent(COMPONENT_ID componentID)
 	return NULL;
 }
 
-//-------------------------------------------------------------------------------------		
+//-------------------------------------------------------------------------------------
+Network::Channel* Components::findComponentChannel(COMPONENT_TYPE componentType, COMPONENT_ID componentID)
+{
+	ComponentInfos* cinfos = componentID == 0 ? NULL : findComponent(componentType, componentID);
+	return Security::concreteComponentChannel(componentID, cinfos);
+}
+
+//-------------------------------------------------------------------------------------
+bool Components::isExpectedComponentChannel(COMPONENT_TYPE componentType, Network::Channel* pChannel)
+{
+	return Security::isExpectedComponentSource(componentType, findComponent(pChannel), pChannel);
+}
+
+//-------------------------------------------------------------------------------------
 Components::ComponentInfos* Components::findComponent(Network::Channel * pChannel)
 {
 	int ifind = 0;

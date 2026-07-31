@@ -1053,8 +1053,8 @@ bool DBTaskActivateAccount::db_thread_process()
 	success_ = pTable1->activateAccount(pdbi_, code_, info);
 	if(!success_)
 	{
-		ERROR_MSG(fmt::format("DBTaskActivateAccount::db_thread_process(): activateAccount({1}) error: {0}\n", 
-				pdbi_->getstrerror(), code_));
+		ERROR_MSG(fmt::format("DBTaskActivateAccount::db_thread_process(): activateAccount error: {}\n",
+				pdbi_->getstrerror()));
 		return false;
 	}
 
@@ -1138,8 +1138,8 @@ bool DBTaskReqAccountResetPassword::db_thread_process()
 //-------------------------------------------------------------------------------------
 thread::TPTask::TPTaskState DBTaskReqAccountResetPassword::presentMainThreadCommitted()
 {
-	DEBUG_MSG(fmt::format("Dbmgr::DBTaskReqAccountResetPassword: accountName={}, code_={}, success={}.\n",
-		accountName_, code_, success_));
+	DEBUG_MSG(fmt::format("Dbmgr::DBTaskReqAccountResetPassword: accountName={}, success={}.\n",
+		accountName_, success_));
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(LoginappInterface::onReqAccountResetPasswordCB);
@@ -1202,8 +1202,7 @@ bool DBTaskAccountResetPassword::db_thread_process()
 //-------------------------------------------------------------------------------------
 thread::TPTask::TPTaskState DBTaskAccountResetPassword::presentMainThreadCommitted()
 {
-	DEBUG_MSG(fmt::format("Dbmgr::DBTaskAccountResetPassword: code({}), success={}.\n",
-		code_, success_));
+	DEBUG_MSG(fmt::format("Dbmgr::DBTaskAccountResetPassword: success={}.\n", success_));
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(LoginappInterface::onAccountResetPassword);
@@ -1271,8 +1270,7 @@ bool DBTaskReqAccountBindEmail::db_thread_process()
 //-------------------------------------------------------------------------------------
 thread::TPTask::TPTaskState DBTaskReqAccountBindEmail::presentMainThreadCommitted()
 {
-	DEBUG_MSG(fmt::format("Dbmgr::DBTaskReqAccountBindEmail: code({}), success={}.\n", 
-		code_, success_));
+	DEBUG_MSG(fmt::format("Dbmgr::DBTaskReqAccountBindEmail: success={}.\n", success_));
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(BaseappInterface::onReqAccountBindEmailCBFromDBMgr);
@@ -1335,8 +1333,7 @@ bool DBTaskAccountBindEmail::db_thread_process()
 //-------------------------------------------------------------------------------------
 thread::TPTask::TPTaskState DBTaskAccountBindEmail::presentMainThreadCommitted()
 {
-	DEBUG_MSG(fmt::format("Dbmgr::DBTaskAccountBindEmail: code({}), success={}.\n", 
-		code_, success_));
+	DEBUG_MSG(fmt::format("Dbmgr::DBTaskAccountBindEmail: success={}.\n", success_));
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(LoginappInterface::onAccountBindedEmail);

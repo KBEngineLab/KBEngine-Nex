@@ -77,6 +77,21 @@ def require_owned_run_root(run_root, binary_root):
         raise RuntimeError(f"run root must stay below the CMake binary tree: {run_root}")
 
 
+def remove_run_root(run_root, timeout_seconds=5):
+    """Remove a prior owned run after Windows releases recently closed log handles.
+    等待 Windows 释放刚关闭的日志句柄后，删除上一次自有运行目录。
+    """
+    deadline = time.monotonic() + timeout_seconds
+    while run_root.exists():
+        try:
+            shutil.rmtree(run_root)
+            return
+        except OSError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.1)
+
+
 def parse_components(encoded):
     components = []
     for item in filter(None, encoded.split("|")):
@@ -143,7 +158,12 @@ def create_database_overlay(args, run_root):
 def read_text(path):
     if not path.is_file():
         return ""
-    return path.read_text(encoding="utf-8", errors="replace")
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        # Windows may deny a concurrent log read while the logger rotates or flushes.
+        # Windows 下 logger 轮转或刷新期间可能暂时拒绝并发读取。
+        return ""
 
 
 def component_output(entry, run_root):
@@ -266,8 +286,7 @@ def run_cluster(args):
     require_owned_run_root(args.run_root, args.binary_root)
     components = parse_components(args.components)
 
-    if args.run_root.exists():
-        shutil.rmtree(args.run_root)
+    remove_run_root(args.run_root)
     args.run_root.mkdir(parents=True)
 
     resource_roots = []

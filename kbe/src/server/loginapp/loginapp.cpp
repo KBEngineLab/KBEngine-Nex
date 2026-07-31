@@ -522,8 +522,10 @@ bool Loginapp::_createAccount(Network::Channel* pChannel, std::string& accountNa
         user_name = regex_replace(accountName, _g_mail_pattern, std::string("$1") );
         domain_name = regex_replace(accountName, _g_mail_pattern, std::string("$2") );
 		*/
-		WARNING_MSG(fmt::format("Loginapp::_createAccount: invalid email={}\n", 
-			accountName));
+		// Account names can be email addresses. Log only structural metadata so
+		// production diagnostics do not retain PII. 账户名可能是邮箱，仅记录结构信息以避免持久化个人信息。
+		WARNING_MSG(fmt::format("Loginapp::_createAccount: invalid email, size={}\n",
+			accountName.size()));
 
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(ClientInterface::onCreateAccountResult);
@@ -724,7 +726,7 @@ void Loginapp::onReqCreateMailAccountResult(Network::Channel* pChannel, MemorySt
 //-------------------------------------------------------------------------------------
 void Loginapp::onAccountActivated(Network::Channel* pChannel, std::string& code, bool success)
 {
-	DEBUG_MSG(fmt::format("Loginapp::onAccountActivated: code={}, success={}\n", code, success));
+	DEBUG_MSG(fmt::format("Loginapp::onAccountActivated: success={}\n", success));
 	if(!pHttpCBHandler)
 	{
 		WARNING_MSG("Loginapp::onAccountActivated: pHttpCBHandler is NULL!\n");
@@ -737,7 +739,7 @@ void Loginapp::onAccountActivated(Network::Channel* pChannel, std::string& code,
 //-------------------------------------------------------------------------------------
 void Loginapp::onAccountBindedEmail(Network::Channel* pChannel, std::string& code, bool success)
 {
-	DEBUG_MSG(fmt::format("Loginapp::onAccountBindedEmail: code={}, success={}\n", code, success));
+	DEBUG_MSG(fmt::format("Loginapp::onAccountBindedEmail: success={}\n", success));
 	if(!pHttpCBHandler)
 	{
 		WARNING_MSG("Loginapp::onAccountBindedEmail: pHttpCBHandler is NULL!\n");
@@ -750,7 +752,7 @@ void Loginapp::onAccountBindedEmail(Network::Channel* pChannel, std::string& cod
 //-------------------------------------------------------------------------------------
 void Loginapp::onAccountResetPassword(Network::Channel* pChannel, std::string& code, bool success)
 {
-	DEBUG_MSG(fmt::format("Loginapp::onAccountResetPassword: code={}, success={}\n", code, success));
+	DEBUG_MSG(fmt::format("Loginapp::onAccountResetPassword: success={}\n", success));
 	if(!pHttpCBHandler)
 	{
 		WARNING_MSG("Loginapp::onAccountResetPassword: pHttpCBHandler is NULL!\n");
@@ -821,8 +823,8 @@ void Loginapp::reqAccountResetPassword(Network::Channel* pChannel, std::string& 
 void Loginapp::onReqAccountResetPasswordCB(Network::Channel* pChannel, std::string& accountName, std::string& email,
 	SERVER_ERROR_CODE failedcode, std::string& code)
 {
-	INFO_MSG(fmt::format("Loginapp::onReqAccountResetPasswordCB: {}, email={}, failedcode={}!\n", 
-		accountName, email, failedcode));
+	INFO_MSG(fmt::format("Loginapp::onReqAccountResetPasswordCB: accountNameSize={}, emailSize={}, failedcode={}!\n",
+		accountName.size(), email.size(), failedcode));
 
 	if(failedcode == SERVER_SUCCESS)
 	{
@@ -864,8 +866,9 @@ void Loginapp::onReqAccountBindEmailAllocCallbackLoginapp(Network::Channel* pCha
 	if (pChannel->isExternal())
 		return;
 
-	INFO_MSG(fmt::format("Loginapp::onReqAccountBindEmailAllocCallbackLoginapp: {}, email={}, failedcode={}! reqBaseappID={}\n",
-		accountName, email, failedcode, reqBaseappID));
+	INFO_MSG(fmt::format("Loginapp::onReqAccountBindEmailAllocCallbackLoginapp: accountNameSize={}, "
+		"emailSize={}, failedcode={}! reqBaseappID={}\n",
+		accountName.size(), email.size(), failedcode, reqBaseappID));
 
 	Components::COMPONENTS& loginapps = Components::getSingleton().getComponents(LOGINAPP_TYPE);
 
@@ -1132,8 +1135,10 @@ void Loginapp::login(Network::Channel* pChannel, MemoryStream& s)
 	if(ctype < UNKNOWN_CLIENT_COMPONENT_TYPE || ctype >= CLIENT_TYPE_END)
 		ctype = UNKNOWN_CLIENT_COMPONENT_TYPE;
 
-	INFO_MSG(fmt::format("Loginapp::login: new client[{0}], loginName={1}, datas={2}.\n",
-		COMPONENT_CLIENT_NAME[ctype], loginName, datas));
+	// Login extension data may carry provider assertions or device tokens.
+	// 登录扩展数据可能包含平台凭据或设备令牌，因此只能记录长度。
+	INFO_MSG(fmt::format("Loginapp::login: new client[{}], loginNameSize={}, datasSize={}.\n",
+		COMPONENT_CLIENT_NAME[ctype], loginName.size(), datas.size()));
 
 	pChannel->extra(loginName);
 
@@ -1148,8 +1153,8 @@ void Loginapp::login(Network::Channel* pChannel, MemoryStream& s)
 //-------------------------------------------------------------------------------------
 void Loginapp::_loginFailed(Network::Channel* pChannel, std::string& loginName, SERVER_ERROR_CODE failedcode, std::string& datas, bool force)
 {
-	INFO_MSG(fmt::format("Loginapp::loginFailed: loginName={0} login failed. failedcode={1}, datas={2}.\n",
-		loginName, SERVER_ERR_STR[failedcode], datas));
+	INFO_MSG(fmt::format("Loginapp::loginFailed: loginNameSize={}, failedcode={}, datasSize={}.\n",
+		loginName.size(), SERVER_ERR_STR[failedcode], datas.size()));
 	
 	PendingLoginMgr::PLInfos* infos = NULL;
 

@@ -355,8 +355,8 @@ void InterfacesHandler_Interfaces::onCreateAccountCB(KBEngine::MemoryStream& s)
 		{
 			if (!email_isvalid(accountName.c_str()))
 			{
-				WARNING_MSG(fmt::format("InterfacesHandler_Interfaces::onCreateAccountCB: invalid email={}\n",
-					accountName));
+				WARNING_MSG(fmt::format("InterfacesHandler_Interfaces::onCreateAccountCB: invalid email, size={}\n",
+					accountName.size()));
 
 				accountName = "";
 			}
@@ -590,8 +590,10 @@ void InterfacesHandler_Interfaces::charge(Network::Channel* pChannel, KBEngine::
 	s.readBlob(datas);
 	s >> cbid;
 
-	INFO_MSG(fmt::format("InterfacesHandler_Interfaces::charge: chargeID={0}, dbid={3}, cbid={1}, datas={2}!\n",
-		chargeID, cbid, datas, dbid));
+	// Charge payloads may contain provider credentials or signed receipts.
+	// 计费载荷可能包含平台凭据或签名收据，仅记录长度而不记录内容。
+	INFO_MSG(fmt::format("InterfacesHandler_Interfaces::charge: chargeID={}, dbid={}, cbid={}, datasSize={}!\n",
+		chargeID, dbid, cbid, datas.size()));
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 
@@ -621,8 +623,8 @@ void InterfacesHandler_Interfaces::onChargeCB(KBEngine::MemoryStream& s)
 	s >> cbid;
 	s >> retcode;
 
-	INFO_MSG(fmt::format("InterfacesHandler_Interfaces::onChargeCB: chargeID={0}, dbid={3}, cbid={1}, cid={4}, datas={2}!\n",
-		chargeID, cbid, datas, dbid, cid));
+	INFO_MSG(fmt::format("InterfacesHandler_Interfaces::onChargeCB: chargeID={}, dbid={}, cbid={}, cid={}, datasSize={}!\n",
+		chargeID, dbid, cbid, cid, datas.size()));
 
 	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(BASEAPP_TYPE, cid);
 	if (cid == 0 || cinfos == NULL || cinfos->pChannel == NULL || cinfos->pChannel->isDestroyed())

@@ -31,11 +31,7 @@ keySize_(key.size()),
 isGood_(false),
 pBlowFishKey_(NULL)
 {
-	if (init())
-	{
-		//DEBUG_MSG(fmt::format("KBEBlowfish::KBEBlowfish(): Using Blowfish key: {}\n", 
-		//	this->strBlowFishKey()));
-	}
+	init();
 }
 
 //-------------------------------------------------------------------------------------
@@ -48,11 +44,7 @@ KBEBlowfish::KBEBlowfish(int keySize):
 	RAND_bytes((unsigned char*)const_cast<char *>(key_.c_str()), 
 		static_cast<int>(key_.size()));
 
-	if (this->init())
-	{
-		DEBUG_MSG(fmt::format("KBEBlowfish::KBEBlowfish(): Using Blowfish key: {}\n", 
-			this->strBlowFishKey()));
-	}
+	this->init();
 }
 
 //-------------------------------------------------------------------------------------

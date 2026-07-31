@@ -20,6 +20,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include "baseappmgr.h"
+#include "server/component_routing_guard.h"
 #include "baseappmgr_interface.h"
 #include "network/common.h"
 #include "network/tcp_packet.h"
@@ -214,20 +215,29 @@ void Baseappmgr::forwardMessage(Network::Channel* pChannel, MemoryStream& s)
 	COMPONENT_ID sender_componentID, forward_componentID;
 
 	s >> sender_componentID >> forward_componentID;
-	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(forward_componentID);
-
-	if(cinfos == NULL || cinfos->pChannel == NULL)
+	Components& components = Components::getSingleton();
+	Components::ComponentInfos* senderInfos = components.findComponent(BASEAPP_TYPE, sender_componentID);
+	if (pChannel == NULL || pChannel->isExternal() ||
+		!Security::isBoundComponentSource(sender_componentID, senderInfos, pChannel))
 	{
-		ERROR_MSG(fmt::format("Baseappmgr::forwardMessage: not found forwardComponent({}, at:{:p})!\n", 
-			forward_componentID, (void*)cinfos));
+		WARNING_MSG(fmt::format("Baseappmgr::forwardMessage: rejected unbound senderComponent({}), channel={}!\n",
+			sender_componentID, (pChannel != NULL ? pChannel->c_str() : "null")));
+		s.done();
+		return;
+	}
 
-		KBE_ASSERT(false && "Baseappmgr::forwardMessage: not found forwardComponent!\n");
+	Network::Channel* pTargetChannel = components.findComponentChannel(BASEAPP_TYPE, forward_componentID);
+	if (pTargetChannel == NULL)
+	{
+		WARNING_MSG(fmt::format("Baseappmgr::forwardMessage: rejected unavailable targetComponent({})!\n",
+			forward_componentID));
+		s.done();
 		return;
 	}
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).append((char*)s.data() + s.rpos(), (int)s.length());
-	cinfos->pChannel->send(pBundle);
+	pTargetChannel->send(pBundle);
 	s.done();
 }
 
@@ -279,16 +289,27 @@ uint32 Baseappmgr::numLoadBalancingApp()
 void Baseappmgr::updateBaseapp(Network::Channel* pChannel, COMPONENT_ID componentID,
 							ENTITY_ID numEntitys, ENTITY_ID numProxices, float load, uint32 flags)
 {
-	Baseapp& baseapp = baseapps_[componentID];
+	Components& components = Components::getSingleton();
+	Components::ComponentInfos* sourceInfos =
+		componentID == 0 ? NULL : components.findComponent(BASEAPP_TYPE, componentID);
+	std::map<COMPONENT_ID, Baseapp>::iterator baseappIter = baseapps_.find(componentID);
+	if (pChannel == NULL || pChannel->isExternal() ||
+		!Security::isBoundComponentSource(componentID, sourceInfos, pChannel) ||
+		baseappIter == baseapps_.end() || !Security::isValidComponentMetric(load))
+	{
+		WARNING_MSG(fmt::format("Baseappmgr::updateBaseapp: rejected componentID({}), load({})!\n",
+			componentID, load));
+		return;
+	}
+
+	Baseapp& baseapp = baseappIter->second;
 	
 	baseapp.load(load);
 	baseapp.numProxices(numProxices);
 	baseapp.numEntitys(numEntitys);
 	baseapp.flags(flags);
 
-	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(componentID);
-	if (cinfos)
-		cinfos->appFlags = flags;
+	sourceInfos->appFlags = flags;
 	
 	updateBestBaseapp();
 }
@@ -770,15 +791,26 @@ void Baseappmgr::sendAllocatedBaseappAddr(Network::Channel* pChannel,
 //-------------------------------------------------------------------------------------
 void Baseappmgr::onBaseappInitProgress(Network::Channel* pChannel, COMPONENT_ID cid, float progress)
 {
+	Components& components = Components::getSingleton();
+	Components::ComponentInfos* sourceInfos =
+		cid == 0 ? NULL : components.findComponent(BASEAPP_TYPE, cid);
+	std::map<COMPONENT_ID, Baseapp>::iterator baseappIter = baseapps_.find(cid);
+	if (pChannel == NULL || pChannel->isExternal() ||
+		!Security::isBoundComponentSource(cid, sourceInfos, pChannel) ||
+		baseappIter == baseapps_.end() || !Security::isValidComponentMetric(progress))
+	{
+		WARNING_MSG(fmt::format("Baseappmgr::onBaseappInitProgress: rejected cid({}), progress({})!\n",
+			cid, progress));
+		return;
+	}
+
 	if(progress > 1.f)
 	{
 		INFO_MSG(fmt::format("Baseappmgr::onBaseappInitProgress: cid={0}, progress={1}.\n",
 			cid , (progress > 1.f ? 1.f : progress)));
 	}
 
-	KBE_ASSERT(baseapps_.find(cid) != baseapps_.end());
-
-	baseapps_[cid].initProgress(progress);
+	baseappIter->second.initProgress(progress);
 
 	size_t completedCount = 0;
 
@@ -787,7 +819,7 @@ void Baseappmgr::onBaseappInitProgress(Network::Channel* pChannel, COMPONENT_ID 
 	{
 		if((*iter1).second.initProgress() > 1.f)
 		{
-			Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(cid);
+			Components::ComponentInfos* cinfos = components.findComponent(BASEAPP_TYPE, iter1->first);
 			if(cinfos)
 				cinfos->state = COMPONENT_STATE_RUN;
 

@@ -28,6 +28,25 @@ add_executable(kbe_test_network_udp_send_backpressure
     udp_send_backpressure.cpp
     ${CMAKE_SOURCE_DIR}/lib/network/udp_send_backpressure.cpp
 )
+
+# These focused fixtures compile selected network implementation files directly.
+# common.h publicly includes fmt headers, so inherit fmt usage requirements without
+# linking the full common library and its unrelated runtime initialization.
+# 这些轻量夹具直接编译指定网络实现；common.h 公开包含 fmt，因此只继承 fmt 的
+# 使用要求，避免为了头文件再引入整个 common 库及无关运行时初始化。
+set(_kbe_network_test_targets
+    kbe_test_network_completion_rearm
+    kbe_test_network_completion_send_queue
+    kbe_test_network_completion_context_pool
+    kbe_test_network_completion_udp_send_queue
+    kbe_test_network_kcp_update_queue
+    kbe_test_network_kcp_send_state
+    kbe_test_network_udp_send_backpressure
+)
+foreach(_kbe_network_test_target IN LISTS _kbe_network_test_targets)
+    target_link_libraries(${_kbe_network_test_target} PRIVATE fmt::fmt)
+endforeach()
+
 target_include_directories(kbe_test_network_completion_send_queue SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/lib)
 set_target_properties(kbe_test_network_completion_send_queue PROPERTIES FOLDER "Tests/Network")
 target_include_directories(kbe_test_network_completion_context_pool SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/lib)
