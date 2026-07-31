@@ -63,6 +63,7 @@ file(READ "${KBE_SOURCE_ROOT}/server/baseapp/baseapp.cpp" _kbe_baseapp)
 file(READ "${KBE_SOURCE_ROOT}/server/baseappmgr/baseappmgr.cpp" _kbe_baseappmgr)
 file(READ "${KBE_SOURCE_ROOT}/server/cellapp/cellapp.cpp" _kbe_cellapp)
 file(READ "${KBE_SOURCE_ROOT}/server/cellappmgr/cellappmgr.cpp" _kbe_cellappmgr)
+file(READ "${KBE_SOURCE_ROOT}/server/dbmgr/dbmgr.cpp" _kbe_dbmgr)
 
 # Network-derived component IDs must use the fail-closed guard instead of a
 # nullable dereference, assertion, or map insertion. 网络组件 ID 必须经过拒绝式守卫，
@@ -73,13 +74,36 @@ set(_kbe_forbidden_routing_literals
     "KBE_ASSERT(cinfos != NULL && cinfos->pChannel != NULL)"
     "baseapps_[componentID]"
     "cellapps_[componentID]"
+	"KBE_ASSERT(entityDBID > 0)"
+	"KBE_ASSERT(false && \"dataType error!"
+	"KBE_ASSERT(false && \"Cellapp::onCreateCellEntityFromBaseapp"
+	"DBUtil::pThreadPool(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex))->"
+	"bufferedDBTasksMaps_[g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex)]"
 )
 foreach(_kbe_forbidden IN LISTS _kbe_forbidden_routing_literals)
-    string(FIND "${_kbe_baseapp}\n${_kbe_baseappmgr}\n${_kbe_cellappmgr}"
+	string(FIND "${_kbe_baseapp}\n${_kbe_baseappmgr}\n${_kbe_cellapp}\n${_kbe_cellappmgr}\n${_kbe_dbmgr}"
         "${_kbe_forbidden}" _kbe_forbidden_position)
     if(NOT _kbe_forbidden_position EQUAL -1)
         message(FATAL_ERROR "Component routing contract regressed: ${_kbe_forbidden}")
     endif()
+endforeach()
+
+foreach(_kbe_required IN ITEMS
+	"Dbmgr::removeEntity: rejected componentID="
+	"Dbmgr::entityAutoLoad: rejected dbInterfaceIndex="
+	"Dbmgr::queryEntity: rejected componentID="
+	"Security::isValidPersistentEntityID"
+	"Security::isValidDatabaseQueryMode"
+	"validateBaseappEntityCreationSource"
+	"{}: rejected componentID="
+	"\"Cellapp::onCreateCellEntityFromBaseapp\""
+	"Cellapp::_onCreateCellEntityFromBaseapp: rejected unavailable space"
+)
+	string(FIND "${_kbe_cellapp}\n${_kbe_dbmgr}"
+		"${_kbe_required}" _kbe_required_position)
+	if(_kbe_required_position EQUAL -1)
+		message(FATAL_ERROR "Database or Cell creation ingress guard is missing: ${_kbe_required}")
+	endif()
 endforeach()
 
 foreach(_kbe_required IN ITEMS

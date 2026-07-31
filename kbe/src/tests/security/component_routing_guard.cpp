@@ -78,13 +78,29 @@ bool testMalformedMetricsFailClosed()
 			std::numeric_limits<float>::infinity()),
 			"infinite component metric was accepted");
 }
+
+bool testMalformedDatabaseRequestsFailClosed()
+{
+	return require(KBEngine::Security::isValidPersistentEntityID(1),
+		"valid persistent entity ID was rejected") &&
+		require(!KBEngine::Security::isValidPersistentEntityID(0),
+			"zero persistent entity ID was accepted") &&
+		require(KBEngine::Security::isValidDatabaseQueryMode(0) &&
+			KBEngine::Security::isValidDatabaseQueryMode(1) &&
+			KBEngine::Security::isValidDatabaseQueryMode(2),
+			"defined database query mode was rejected") &&
+		require(!KBEngine::Security::isValidDatabaseQueryMode(-1) &&
+			!KBEngine::Security::isValidDatabaseQueryMode(3),
+			"undefined database query mode was accepted");
+}
 }
 
 int main()
 {
 	if (!testMutatedTargetsFailClosed() ||
 		!testPayloadSenderMustMatchChannel() ||
-		!testMalformedMetricsFailClosed())
+		!testMalformedMetricsFailClosed() ||
+		!testMalformedDatabaseRequestsFailClosed())
 		return EXIT_FAILURE;
 
 	std::cout << "SECURITY_COMPONENT_ROUTING_GUARD_TEST_PASS" << std::endl;

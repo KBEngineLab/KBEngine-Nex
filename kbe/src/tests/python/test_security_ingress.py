@@ -12,6 +12,7 @@ import time
 
 
 COMPONENT_IDS = {
+    "dbmgr": 4000,
     "baseappmgr": 5000,
     "cellappmgr": 6000,
     "baseapp": 7001,
@@ -19,6 +20,22 @@ COMPONENT_IDS = {
 }
 
 PROBES = (
+    (
+        "dbmgr-invalid-global-data-type",
+        "dbmgr",
+        "internal",
+        "DBMGR_TYPE",
+        "Dbmgr::onBroadcastGlobalDataChanged",
+        r"Dbmgr::onBroadcastGlobalDataChanged: rejected componentType=6, dataType=255",
+    ),
+    (
+        "dbmgr-zero-entity-dbid",
+        "dbmgr",
+        "internal",
+        "DBMGR_TYPE",
+        "Dbmgr::removeEntity",
+        r"Dbmgr::removeEntity: rejected componentID=7001, entityDBID=0",
+    ),
     (
         "baseappmgr-zero-forward",
         "baseappmgr",
@@ -83,6 +100,15 @@ PROBES = (
         "Cellapp::onRemoteCallMethodFromClient",
         r"Cellapp::onRemoteCallMethodFromClient: rejected unregistered source Channel, "
         r"srcEntityID=1, targetID=2",
+    ),
+    (
+        "cellapp-spoofed-entity-create",
+        "cellapp",
+        "internal",
+        "CELLAPP_TYPE",
+        "Cellapp::onCreateCellEntityFromBaseapp",
+        r"Cellapp::onCreateCellEntityFromBaseapp: rejected componentID=7001, "
+        r"entityType=Account, hasClient=false",
     ),
 )
 
@@ -232,6 +258,10 @@ def query_message_contract(repository_root, component_type_name, endpoint, messa
 
 
 def probe_body(probe_case):
+    if probe_case == "dbmgr-invalid-global-data-type":
+        return struct.pack("=BBIi", 255, 1, 0, 6)
+    if probe_case == "dbmgr-zero-entity-dbid":
+        return struct.pack("=HQiQ", 0, 7001, 1, 0)
     if probe_case == "baseappmgr-zero-forward":
         return struct.pack("=QQ", 0, 7001)
     if probe_case == "baseappmgr-spoofed-update":
@@ -248,6 +278,8 @@ def probe_body(probe_case):
         return struct.pack("=i", 1) + b"invalid\0security@example.invalid\0"
     if probe_case == "cellapp-unregistered-cell-rpc":
         return struct.pack("=ii", 1, 2)
+    if probe_case == "cellapp-spoofed-entity-create":
+        return struct.pack("=i", 1) + b"Account\0" + struct.pack("=iQBB", 2, 7001, 0, 0)
     raise RuntimeError(f"unsupported probe case: {probe_case}")
 
 

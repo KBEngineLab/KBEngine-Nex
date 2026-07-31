@@ -32,6 +32,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/udp_packet.h"
 #include "network/message_handler.h"
 #include "thread/threadpool.h"
+#include "server/component_routing_guard.h"
 #include "server/components.h"
 #include "server/asyncio_helper.h"
 #include "server/plugin_runtime.h"
@@ -47,6 +48,21 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "loginapp/loginapp_interface.h"
 
 namespace KBEngine{
+
+namespace
+{
+Components::ComponentInfos* findBoundBaseappSource(Network::Channel* pChannel,
+	COMPONENT_ID componentID)
+{
+	if (pChannel == NULL || pChannel->isExternal() || pChannel->isDestroyed())
+		return NULL;
+
+	Components::ComponentInfos* sourceInfos = componentID == 0 ? NULL :
+		Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
+	return Security::isBoundComponentSource(componentID, sourceInfos, pChannel) ?
+		sourceInfos : NULL;
+}
+}
 
 ServerConfig g_serverConfig;
 KBE_SINGLETON_INIT(Dbmgr);
@@ -648,6 +664,14 @@ void Dbmgr::onRegisterNewApp(Network::Channel* pChannel, int32 uid, std::string&
 //-------------------------------------------------------------------------------------
 void Dbmgr::onGlobalDataClientLogon(Network::Channel* pChannel, COMPONENT_TYPE componentType)
 {
+	if ((componentType != BASEAPP_TYPE && componentType != CELLAPP_TYPE) ||
+		!Components::getSingleton().isExpectedComponentChannel(componentType, pChannel))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::onGlobalDataClientLogon: rejected componentType={}, addr={}.\n",
+			componentType, pChannel->c_str()));
+		return;
+	}
+
 	if(BASEAPP_TYPE == componentType)
 	{
 		pBaseAppData_->onGlobalDataClientLogon(pChannel, componentType);
@@ -685,6 +709,14 @@ void Dbmgr::onBroadcastGlobalDataChanged(Network::Channel* pChannel, KBEngine::M
 
 	s >> componentType;
 
+	if ((componentType != BASEAPP_TYPE && componentType != CELLAPP_TYPE) ||
+		!Components::getSingleton().isExpectedComponentChannel(componentType, pChannel))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::onBroadcastGlobalDataChanged: rejected componentType={}, dataType={}, addr={}.\n",
+			componentType, dataType, pChannel->c_str()));
+		return;
+	}
+
 	switch(dataType)
 	{
 	case GlobalDataServer::GLOBAL_DATA:
@@ -706,7 +738,8 @@ void Dbmgr::onBroadcastGlobalDataChanged(Network::Channel* pChannel, KBEngine::M
 			pCellAppData_->write(pChannel, componentType, key, value);
 		break;
 	default:
-		KBE_ASSERT(false && "dataType error!\n");
+		WARNING_MSG(fmt::format("Dbmgr::onBroadcastGlobalDataChanged: rejected dataType={}, addr={}.\n",
+			dataType, pChannel->c_str()));
 		break;
 	};
 }
@@ -1083,6 +1116,14 @@ void Dbmgr::writeEntity(Network::Channel* pChannel,
 
 	s >> componentID >> eid >> entityDBID >> dbInterfaceIndex;
 
+	if (findBoundBaseappSource(pChannel, componentID) == NULL)
+	{
+		WARNING_MSG(fmt::format("Dbmgr::writeEntity: rejected unbound componentID={}, addr={}.\n",
+			componentID, pChannel->c_str()));
+		s.done();
+		return;
+	}
+
 	Buffered_DBTasks* pBuffered_DBTasks = findBufferedDBTask(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex));
 	if (!pBuffered_DBTasks)
 	{
@@ -1106,7 +1147,14 @@ void Dbmgr::removeEntity(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 	uint16 dbInterfaceIndex;
 
 	s >> dbInterfaceIndex >> componentID >> eid >> entityDBID;
-	KBE_ASSERT(entityDBID > 0);
+	if (findBoundBaseappSource(pChannel, componentID) == NULL ||
+		!Security::isValidPersistentEntityID(entityDBID))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::removeEntity: rejected componentID={}, entityDBID={}, addr={}.\n",
+			componentID, entityDBID, pChannel->c_str()));
+		s.done();
+		return;
+	}
 
 	Buffered_DBTasks* pBuffered_DBTasks = findBufferedDBTask(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex));
 	if (!pBuffered_DBTasks)
@@ -1134,9 +1182,26 @@ void Dbmgr::entityAutoLoad(Network::Channel* pChannel, KBEngine::MemoryStream& s
 	uint16 dbInterfaceIndex = 0;
 
 	s >> dbInterfaceIndex >> componentID >> entityType >> start >> end;
+	if (findBoundBaseappSource(pChannel, componentID) == NULL)
+	{
+		WARNING_MSG(fmt::format("Dbmgr::entityAutoLoad: rejected unbound componentID={}, addr={}.\n",
+			componentID, pChannel->c_str()));
+		s.done();
+		return;
+	}
 
-	DBUtil::pThreadPool(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex))->
-		addTask(new DBTaskEntityAutoLoad(pChannel->addr(), componentID, entityType, start, end));
+	thread::ThreadPool* pThreadPool =
+		DBUtil::pThreadPool(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex));
+	if (pThreadPool == NULL)
+	{
+		WARNING_MSG(fmt::format("Dbmgr::entityAutoLoad: rejected dbInterfaceIndex={}.\n",
+			dbInterfaceIndex));
+		s.done();
+		return;
+	}
+
+	pThreadPool->addTask(new DBTaskEntityAutoLoad(pChannel->addr(), componentID, entityType, start, end));
+	s.done();
 }
 
 //-------------------------------------------------------------------------------------
@@ -1149,10 +1214,28 @@ void Dbmgr::deleteEntityByDBID(Network::Channel* pChannel, KBEngine::MemoryStrea
 	uint16 dbInterfaceIndex = 0;
 
 	s >> dbInterfaceIndex >> componentID >> entityDBID >> callbackID >> sid;
-	KBE_ASSERT(entityDBID > 0);
+	if (findBoundBaseappSource(pChannel, componentID) == NULL ||
+		!Security::isValidPersistentEntityID(entityDBID))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::deleteEntityByDBID: rejected componentID={}, entityDBID={}, addr={}.\n",
+			componentID, entityDBID, pChannel->c_str()));
+		s.done();
+		return;
+	}
 
-	DBUtil::pThreadPool(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex))->
-		addTask(new DBTaskDeleteEntityByDBID(pChannel->addr(), componentID, entityDBID, callbackID, sid));
+	thread::ThreadPool* pThreadPool =
+		DBUtil::pThreadPool(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex));
+	if (pThreadPool == NULL)
+	{
+		WARNING_MSG(fmt::format("Dbmgr::deleteEntityByDBID: rejected dbInterfaceIndex={}.\n",
+			dbInterfaceIndex));
+		s.done();
+		return;
+	}
+
+	pThreadPool->addTask(new DBTaskDeleteEntityByDBID(
+		pChannel->addr(), componentID, entityDBID, callbackID, sid));
+	s.done();
 }
 
 //-------------------------------------------------------------------------------------
@@ -1165,18 +1248,56 @@ void Dbmgr::lookUpEntityByDBID(Network::Channel* pChannel, KBEngine::MemoryStrea
 	uint16 dbInterfaceIndex = 0;
 
 	s >> dbInterfaceIndex >> componentID >> entityDBID >> callbackID >> sid;
-	KBE_ASSERT(entityDBID > 0);
+	if (findBoundBaseappSource(pChannel, componentID) == NULL ||
+		!Security::isValidPersistentEntityID(entityDBID))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::lookUpEntityByDBID: rejected componentID={}, entityDBID={}, addr={}.\n",
+			componentID, entityDBID, pChannel->c_str()));
+		s.done();
+		return;
+	}
 
-	DBUtil::pThreadPool(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex))->
-		addTask(new DBTaskLookUpEntityByDBID(pChannel->addr(), componentID, entityDBID, callbackID, sid));
+	thread::ThreadPool* pThreadPool =
+		DBUtil::pThreadPool(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex));
+	if (pThreadPool == NULL)
+	{
+		WARNING_MSG(fmt::format("Dbmgr::lookUpEntityByDBID: rejected dbInterfaceIndex={}.\n",
+			dbInterfaceIndex));
+		s.done();
+		return;
+	}
+
+	pThreadPool->addTask(new DBTaskLookUpEntityByDBID(
+		pChannel->addr(), componentID, entityDBID, callbackID, sid));
+	s.done();
 }
 
 //-------------------------------------------------------------------------------------
 void Dbmgr::queryEntity(Network::Channel* pChannel, uint16 dbInterfaceIndex, COMPONENT_ID componentID, int8 queryMode, DBID dbid,
 	std::string& entityType, CALLBACK_ID callbackID, ENTITY_ID entityID)
 {
-	bufferedDBTasksMaps_[g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex)].
-		addTask(new DBTaskQueryEntity(pChannel->addr(), queryMode, entityType, dbid, componentID, callbackID, entityID));
+	Network::Channel* targetChannel =
+		Components::getSingleton().findComponentChannel(BASEAPP_TYPE, componentID);
+	if (!Components::getSingleton().isExpectedComponentChannel(BASEAPP_TYPE, pChannel) ||
+		targetChannel == NULL || !Security::isValidPersistentEntityID(dbid) ||
+		!Security::isValidDatabaseQueryMode(queryMode) || entityID <= 0)
+	{
+		WARNING_MSG(fmt::format("Dbmgr::queryEntity: rejected componentID={}, queryMode={}, dbid={}, entityID={}, addr={}.\n",
+			componentID, queryMode, dbid, entityID, pChannel->c_str()));
+		return;
+	}
+
+	Buffered_DBTasks* pBufferedDBTasks =
+		findBufferedDBTask(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex));
+	if (pBufferedDBTasks == NULL)
+	{
+		WARNING_MSG(fmt::format("Dbmgr::queryEntity: rejected dbInterfaceIndex={}.\n",
+			dbInterfaceIndex));
+		return;
+	}
+
+	pBufferedDBTasks->addTask(new DBTaskQueryEntity(
+		pChannel->addr(), queryMode, entityType, dbid, componentID, callbackID, entityID));
 
 	numQueryEntity_++;
 }

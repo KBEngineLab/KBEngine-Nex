@@ -58,8 +58,34 @@ KBE_SINGLETON_INIT(Cellapp);
 
 Navigation g_navigation;
 
+namespace
+{
+Components::ComponentInfos* validateBaseappEntityCreationSource(
+	Network::Channel* pChannel, COMPONENT_ID componentID,
+	const std::string& entityType, bool hasClient, const char* operation)
+{
+	Components::ComponentInfos* sourceInfos = componentID == 0 ? NULL :
+		Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
+	ScriptDefModule* scriptModule = EntityDef::findScriptModule(entityType.c_str());
+	const bool validScriptModule = scriptModule != NULL && scriptModule->hasCell() &&
+		(!hasClient || scriptModule->hasClient());
+	const bool validChannel = pChannel != NULL && !pChannel->isExternal() &&
+		!pChannel->isDestroyed() &&
+		Security::isBoundComponentSource(componentID, sourceInfos, pChannel);
+	if (!validChannel || !validScriptModule)
+	{
+		WARNING_MSG(fmt::format("{}: rejected componentID={}, entityType={}, hasClient={}, addr={}.\n",
+			operation, componentID, entityType, hasClient,
+			pChannel != NULL ? pChannel->c_str() : "none"));
+		return NULL;
+	}
+
+	return sourceInfos;
+}
+}
+
 //-------------------------------------------------------------------------------------
-Cellapp::Cellapp(Network::EventDispatcher& dispatcher, 
+Cellapp::Cellapp(Network::EventDispatcher& dispatcher,
 			 Network::NetworkInterface& ninterface, 
 			 COMPONENT_TYPE componentType,
 			 COMPONENT_ID componentID):
@@ -941,6 +967,15 @@ void Cellapp::onCreateCellEntityInNewSpaceFromBaseapp(Network::Channel* pChannel
 	s >> componentID;
 	s >> hasClient;
 
+	Components::ComponentInfos* cinfos = validateBaseappEntityCreationSource(
+		pChannel, componentID, entityType, hasClient,
+		"Cellapp::onCreateCellEntityInNewSpaceFromBaseapp");
+	if (cinfos == NULL)
+	{
+		s.done();
+		return;
+	}
+
 	// DEBUG_MSG("Cellapp::onCreateCellEntityInNewSpaceFromBaseapp: spaceID=%u, entityType=%s, entityID=%d, componentID=%"PRAppID".\n", 
 	//	spaceID, entityType.c_str(), entitycallEntityID, componentID);
 
@@ -990,8 +1025,7 @@ void Cellapp::onCreateCellEntityInNewSpaceFromBaseapp(Network::Channel* pChannel
 		}
 
 		// 此处baseapp可能还有没初始化过来， 所以有一定概率是为None的
-		Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
-		if(cinfos == NULL || cinfos->pChannel == NULL)
+		if(cinfos->pChannel == NULL || cinfos->pChannel->isDestroyed())
 		{
 			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 			ForwardItem* pFI = new ForwardItem();
@@ -1058,6 +1092,15 @@ void Cellapp::onRestoreSpaceInCellFromBaseapp(Network::Channel* pChannel, KBEngi
 	s >> componentID;
 	s >> hasClient;
 
+	Components::ComponentInfos* cinfos = validateBaseappEntityCreationSource(
+		pChannel, componentID, entityType, hasClient,
+		"Cellapp::onRestoreSpaceInCellFromBaseapp");
+	if (cinfos == NULL)
+	{
+		s.done();
+		return;
+	}
+
 	// DEBUG_MSG("Cellapp::onRestoreSpaceInCellFromBaseapp: spaceID=%u, entityType=%s, entityID=%d, componentID=%"PRAppID".\n", 
 	//	spaceID, entityType.c_str(), entitycallEntityID, componentID);
 
@@ -1098,8 +1141,7 @@ void Cellapp::onRestoreSpaceInCellFromBaseapp(Network::Channel* pChannel, KBEngi
 		}
 
 		// 此处baseapp可能还有没初始化过来， 所以有一定概率是为None的
-		Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
-		if(cinfos == NULL || cinfos->pChannel == NULL)
+		if(cinfos->pChannel == NULL || cinfos->pChannel->isDestroyed())
 		{
 			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 			ForwardItem* pFI = new ForwardItem();
@@ -1177,9 +1219,17 @@ void Cellapp::onCreateCellEntityFromBaseapp(Network::Channel* pChannel, KBEngine
 	s >> hasClient;
 	s >> inRescore;
 
+	Components::ComponentInfos* cinfos = validateBaseappEntityCreationSource(
+		pChannel, componentID, entityType, hasClient,
+		"Cellapp::onCreateCellEntityFromBaseapp");
+	if (cinfos == NULL)
+	{
+		s.done();
+		return;
+	}
+
 	// 此处baseapp可能还有没初始化过来， 所以有一定概率是为None的
-	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
-	if(cinfos == NULL || cinfos->pChannel == NULL)
+	if(cinfos->pChannel == NULL || cinfos->pChannel->isDestroyed())
 	{
 		MemoryStream* pCellData = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 		pCellData->append(s);
@@ -1212,7 +1262,12 @@ void Cellapp::_onCreateCellEntityFromBaseapp(std::string& entityType, ENTITY_ID 
 {
 	// 注意：此处理论不会找不到组件， 因为onCreateCellEntityFromBaseapp中已经进行过一次消息缓存判断
 	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
-	KBE_ASSERT(cinfos != NULL && cinfos->pChannel != NULL);
+	if (cinfos == NULL || cinfos->pChannel == NULL || cinfos->pChannel->isDestroyed())
+	{
+		WARNING_MSG(fmt::format("Cellapp::_onCreateCellEntityFromBaseapp: source BaseApp unavailable, componentID={}.\n",
+			componentID));
+		return;
+	}
 
 	Entity* pCreateToEntity = pEntities_->find(createToEntityID);
 
@@ -1318,7 +1373,12 @@ void Cellapp::_onCreateCellEntityFromBaseapp(std::string& entityType, ENTITY_ID 
 		return;
 	}
 
-	KBE_ASSERT(false && "Cellapp::onCreateCellEntityFromBaseapp: error!\n");
+	WARNING_MSG(fmt::format("Cellapp::_onCreateCellEntityFromBaseapp: rejected unavailable space, entityID={}, spaceID={}.\n",
+		entityID, spaceID));
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	pBundle->newMessage(BaseappInterface::onCreateCellFailure);
+	BaseappInterface::onCreateCellFailureArgs1::staticAddToBundle(*pBundle, entityID);
+	cinfos->pChannel->send(pBundle);
 }
 
 //-------------------------------------------------------------------------------------

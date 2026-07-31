@@ -69,6 +69,22 @@ bool isValidComponentMetric(FloatT value) noexcept
 	return std::isfinite(value) && value >= static_cast<FloatT>(0);
 }
 
+/** Database entity operations require a concrete persistent identifier.
+ *  数据库实体操作必须携带确定且非零的持久化标识。
+ */
+inline bool isValidPersistentEntityID(DBID entityDBID) noexcept
+{
+	return entityDBID > 0;
+}
+
+/** Keep packet-carried query modes inside the protocol's defined range.
+ *  将封包携带的查询模式限制在协议已定义的范围内。
+ */
+inline bool isValidDatabaseQueryMode(int8 queryMode) noexcept
+{
+	return queryMode >= 0 && queryMode <= 2;
+}
+
 }
 }
 
