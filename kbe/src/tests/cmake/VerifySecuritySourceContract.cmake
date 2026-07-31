@@ -229,6 +229,8 @@ foreach(_kbe_required IN ITEMS
 	"validateEntityScriptType(\"Dbmgr::lookUpEntityByDBID\""
 	"validateEntityScriptType(\"Dbmgr::queryEntity\""
 	"validateEntityAutoLoadRange(\"Dbmgr::entityAutoLoad\""
+	"Dbmgr::writeEntity: rejected shouldAutoLoad="
+	"resolveDbInterfaceName(\"Dbmgr::writeEntity\""
 )
 	string(FIND "${_kbe_cellapp}\n${_kbe_cellappmgr}\n${_kbe_dbmgr}\n${_kbe_interfaces_handler}"
 		"${_kbe_required}" _kbe_required_position)

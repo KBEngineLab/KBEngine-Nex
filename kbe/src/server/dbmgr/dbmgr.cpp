@@ -153,6 +153,20 @@ bool validateEntityAutoLoadRange(const char* operation, ENTITY_ID start, ENTITY_
 		operation, start, end));
 	return false;
 }
+
+bool resolveDbInterfaceName(const char* operation, uint16 dbInterfaceIndex, std::string& dbInterfaceName)
+{
+	const char* configuredName = g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex);
+	if (configuredName == NULL || configuredName[0] == '\0')
+	{
+		WARNING_MSG(fmt::format("{}: rejected dbInterfaceIndex={}.\n",
+			operation, dbInterfaceIndex));
+		return false;
+	}
+
+	dbInterfaceName.assign(configuredName);
+	return true;
+}
 }
 
 ServerConfig g_serverConfig;
@@ -1017,7 +1031,11 @@ void Dbmgr::onEntityOffline(Network::Channel* pChannel, DBID dbid, ENTITY_SCRIPT
 	if (!validateEntityScriptType("Dbmgr::onEntityOffline", sid))
 		return;
 
-	Buffered_DBTasks* pBuffered_DBTasks = findBufferedDBTask(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex));
+	std::string dbInterfaceName;
+	if (!resolveDbInterfaceName("Dbmgr::onEntityOffline", dbInterfaceIndex, dbInterfaceName))
+		return;
+
+	Buffered_DBTasks* pBuffered_DBTasks = findBufferedDBTask(dbInterfaceName);
 	if (!pBuffered_DBTasks)
 	{
 		ERROR_MSG(fmt::format("Dbmgr::onEntityOffline: not found dbInterfaceIndex({})!\n", dbInterfaceIndex));
@@ -1052,10 +1070,9 @@ void Dbmgr::executeRawDatabaseCommand(Network::Channel* pChannel,
 		return;
 	}
 
-	std::string dbInterfaceName = g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex);
-	if (dbInterfaceName.size() == 0)
+	std::string dbInterfaceName;
+	if (!resolveDbInterfaceName("Dbmgr::executeRawDatabaseCommand", dbInterfaceIndex, dbInterfaceName))
 	{
-		ERROR_MSG(fmt::format("Dbmgr::executeRawDatabaseCommand: not found dbInterface({})!\n", dbInterfaceName));
 		s.done();
 		return;
 	}
@@ -1322,14 +1339,16 @@ void Dbmgr::writeEntity(Network::Channel* pChannel,
 
 	const size_t entityPayloadPosition = s.rpos();
 	ENTITY_SCRIPT_UID sid = 0;
-	if (s.length() < sizeof(sid))
+	CALLBACK_ID callbackID = 0;
+	int8 shouldAutoLoad = -1;
+	if (s.length() < sizeof(sid) + sizeof(callbackID) + sizeof(shouldAutoLoad))
 	{
-		WARNING_MSG("Dbmgr::writeEntity: rejected missing entity script type.\n");
+		WARNING_MSG("Dbmgr::writeEntity: rejected incomplete entity write header.\n");
 		s.done();
 		return;
 	}
 
-	s >> sid;
+	s >> sid >> callbackID >> shouldAutoLoad;
 	s.rpos(entityPayloadPosition);
 	if (!validateEntityScriptType("Dbmgr::writeEntity", sid))
 	{
@@ -1337,7 +1356,22 @@ void Dbmgr::writeEntity(Network::Channel* pChannel,
 		return;
 	}
 
-	Buffered_DBTasks* pBuffered_DBTasks = findBufferedDBTask(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex));
+	if (shouldAutoLoad != -1 && shouldAutoLoad != 0 && shouldAutoLoad != 1)
+	{
+		WARNING_MSG(fmt::format("Dbmgr::writeEntity: rejected shouldAutoLoad={}.\n",
+			shouldAutoLoad));
+		s.done();
+		return;
+	}
+
+	std::string dbInterfaceName;
+	if (!resolveDbInterfaceName("Dbmgr::writeEntity", dbInterfaceIndex, dbInterfaceName))
+	{
+		s.done();
+		return;
+	}
+
+	Buffered_DBTasks* pBuffered_DBTasks = findBufferedDBTask(dbInterfaceName);
 	if (!pBuffered_DBTasks)
 	{
 		ERROR_MSG(fmt::format("Dbmgr::writeEntity: not found dbInterfaceIndex({})!\n", dbInterfaceIndex));
@@ -1386,7 +1420,14 @@ void Dbmgr::removeEntity(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 		return;
 	}
 
-	Buffered_DBTasks* pBuffered_DBTasks = findBufferedDBTask(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex));
+	std::string dbInterfaceName;
+	if (!resolveDbInterfaceName("Dbmgr::removeEntity", dbInterfaceIndex, dbInterfaceName))
+	{
+		s.done();
+		return;
+	}
+
+	Buffered_DBTasks* pBuffered_DBTasks = findBufferedDBTask(dbInterfaceName);
 	if (!pBuffered_DBTasks)
 	{
 		ERROR_MSG(fmt::format("Dbmgr::removeEntity: not found dbInterfaceIndex({})!\n", dbInterfaceIndex));
@@ -1432,8 +1473,14 @@ void Dbmgr::entityAutoLoad(Network::Channel* pChannel, KBEngine::MemoryStream& s
 		return;
 	}
 
-	thread::ThreadPool* pThreadPool =
-		DBUtil::pThreadPool(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex));
+	std::string dbInterfaceName;
+	if (!resolveDbInterfaceName("Dbmgr::entityAutoLoad", dbInterfaceIndex, dbInterfaceName))
+	{
+		s.done();
+		return;
+	}
+
+	thread::ThreadPool* pThreadPool = DBUtil::pThreadPool(dbInterfaceName);
 	if (pThreadPool == NULL)
 	{
 		WARNING_MSG(fmt::format("Dbmgr::entityAutoLoad: rejected dbInterfaceIndex={}.\n",
@@ -1466,8 +1513,14 @@ void Dbmgr::deleteEntityByDBID(Network::Channel* pChannel, KBEngine::MemoryStrea
 		return;
 	}
 
-	thread::ThreadPool* pThreadPool =
-		DBUtil::pThreadPool(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex));
+	std::string dbInterfaceName;
+	if (!resolveDbInterfaceName("Dbmgr::deleteEntityByDBID", dbInterfaceIndex, dbInterfaceName))
+	{
+		s.done();
+		return;
+	}
+
+	thread::ThreadPool* pThreadPool = DBUtil::pThreadPool(dbInterfaceName);
 	if (pThreadPool == NULL)
 	{
 		WARNING_MSG(fmt::format("Dbmgr::deleteEntityByDBID: rejected dbInterfaceIndex={}.\n",
@@ -1501,8 +1554,14 @@ void Dbmgr::lookUpEntityByDBID(Network::Channel* pChannel, KBEngine::MemoryStrea
 		return;
 	}
 
-	thread::ThreadPool* pThreadPool =
-		DBUtil::pThreadPool(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex));
+	std::string dbInterfaceName;
+	if (!resolveDbInterfaceName("Dbmgr::lookUpEntityByDBID", dbInterfaceIndex, dbInterfaceName))
+	{
+		s.done();
+		return;
+	}
+
+	thread::ThreadPool* pThreadPool = DBUtil::pThreadPool(dbInterfaceName);
 	if (pThreadPool == NULL)
 	{
 		WARNING_MSG(fmt::format("Dbmgr::lookUpEntityByDBID: rejected dbInterfaceIndex={}.\n",
@@ -1534,8 +1593,11 @@ void Dbmgr::queryEntity(Network::Channel* pChannel, uint16 dbInterfaceIndex, COM
 		return;
 	}
 
-	Buffered_DBTasks* pBufferedDBTasks =
-		findBufferedDBTask(g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex));
+	std::string dbInterfaceName;
+	if (!resolveDbInterfaceName("Dbmgr::queryEntity", dbInterfaceIndex, dbInterfaceName))
+		return;
+
+	Buffered_DBTasks* pBufferedDBTasks = findBufferedDBTask(dbInterfaceName);
 	if (pBufferedDBTasks == NULL)
 	{
 		WARNING_MSG(fmt::format("Dbmgr::queryEntity: rejected dbInterfaceIndex={}.\n",
