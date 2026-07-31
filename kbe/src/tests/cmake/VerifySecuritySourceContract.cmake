@@ -50,6 +50,7 @@ set(_kbe_forbidden_sensitive_literals
 	"datas={3}"
 	"extra datas = '{}'"
 	", datas={}"
+	"sdatas_.c_str()"
 )
 
 foreach(_kbe_forbidden IN LISTS _kbe_forbidden_sensitive_literals)
@@ -93,6 +94,7 @@ set(_kbe_forbidden_routing_literals
 	"KBE_ASSERT(pInterfacesChannel)"
 	"KBE_ASSERT(addr_ != Network::Address::NONE)"
 	"Dbmgr::accountBindMail: username={}"
+	"KBE_ASSERT((*fiter).pChannel != NULL)"
 )
 foreach(_kbe_forbidden IN LISTS _kbe_forbidden_routing_literals)
 	string(FIND "${_kbe_baseapp}\n${_kbe_baseappmgr}\n${_kbe_cellapp}\n${_kbe_cellappmgr}\n${_kbe_dbmgr}\n${_kbe_interfaces_handler}"
@@ -110,6 +112,17 @@ foreach(_kbe_required IN ITEMS
 		"${_kbe_required}" _kbe_required_position)
 	if(_kbe_required_position EQUAL -1)
 		message(FATAL_ERROR "GlobalData unavailable-channel guard is missing: ${_kbe_required}")
+	endif()
+endforeach()
+
+foreach(_kbe_required IN ITEMS
+	"Dbmgr::onRegisterNewApp: skipped unavailable broadcast target"
+	"callbackID={}, commandSize={}"
+)
+	string(FIND "${_kbe_dbmgr}\n${_kbe_sensitive_text}"
+		"${_kbe_required}" _kbe_required_position)
+	if(_kbe_required_position EQUAL -1)
+		message(FATAL_ERROR "DBMgr availability or raw-command log guard is missing: ${_kbe_required}")
 	endif()
 endforeach()
 

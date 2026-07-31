@@ -699,6 +699,16 @@ void Dbmgr::onRegisterNewApp(Network::Channel* pChannel, int32 uid, std::string&
 				if((*fiter).cid == componentID)
 					continue;
 
+				// 组件记录可能处于连接建立或断连清理窗口，注册广播不能因此终止 DBMgr。
+				// Component records can outlive a usable channel during connect or cleanup; registration broadcast must remain available.
+				if ((*fiter).pChannel == NULL || (*fiter).pChannel->isDestroyed())
+				{
+					WARNING_MSG(fmt::format(
+						"Dbmgr::onRegisterNewApp: skipped unavailable broadcast target, componentType={}, componentID={}.\n",
+						broadcastCpTypes[idx], (*fiter).cid));
+					continue;
+				}
+
 				Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 				ENTITTAPP_COMMON_NETWORK_MESSAGE(broadcastCpTypes[idx], (*pBundle), onGetEntityAppFromDbmgr);
 				
@@ -715,7 +725,6 @@ void Dbmgr::onRegisterNewApp(Network::Channel* pChannel, int32 uid, std::string&
 							intaddr, intport, extaddr, extport, g_kbeSrvConfig.getConfig().externalAddress);
 				}
 				
-				KBE_ASSERT((*fiter).pChannel != NULL);
 				(*fiter).pChannel->send(pBundle);
 			}
 		}

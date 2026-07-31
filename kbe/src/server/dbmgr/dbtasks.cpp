@@ -223,7 +223,11 @@ bool DBTaskExecuteRawDatabaseCommandByEntity::db_thread_process()
 //-------------------------------------------------------------------------------------
 thread::TPTask::TPTaskState DBTaskExecuteRawDatabaseCommandByEntity::presentMainThreadCommitted()
 {
-	DEBUG_MSG(fmt::format("Dbmgr::ExecuteRawDatabaseCommandByEntity::presentMainThread: {}.\n", sdatas_.c_str()));
+	// 原始命令可能包含密码、令牌或业务数据，日志仅保留诊断所需的元数据。
+	// Raw commands may contain credentials, tokens, or business data; log only diagnostic metadata.
+	DEBUG_MSG(fmt::format(
+		"Dbmgr::ExecuteRawDatabaseCommandByEntity::presentMainThread: callbackID={}, commandSize={}.\n",
+		callbackID_, sdatas_.size()));
 
 	// 如果不需要回调则结束
 	if(callbackID_ <= 0)
@@ -295,7 +299,11 @@ thread::TPTask::TPTaskState DBTaskExecuteRawDatabaseCommandByEntity::presentMain
 //-------------------------------------------------------------------------------------
 thread::TPTask::TPTaskState DBTaskExecuteRawDatabaseCommand::presentMainThreadCommitted()
 {
-	DEBUG_MSG(fmt::format("Dbmgr::DBTaskExecuteRawDatabaseCommand::presentMainThread: {}.\n", sdatas_.c_str()));
+	// 与实体命令使用相同的日志边界，避免 Debug 构建泄露完整查询内容。
+	// Keep the same logging boundary as entity commands so Debug builds never expose full query contents.
+	DEBUG_MSG(fmt::format(
+		"Dbmgr::DBTaskExecuteRawDatabaseCommand::presentMainThread: callbackID={}, commandSize={}.\n",
+		callbackID_, sdatas_.size()));
 
 	// 如果不需要回调则结束
 	if(callbackID_ <= 0)
