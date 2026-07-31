@@ -25,6 +25,7 @@ REGISTERED_PROBE_COMPONENT_IDS = {
     "dbmgr-registered-wrong-component-type": 9001,
     "dbmgr-registered-sender-channel-mismatch": 9002,
     "dbmgr-registered-invalid-entity-type": 9003,
+    "dbmgr-registered-invalid-entity-range": 9004,
 }
 
 PROBES = (
@@ -311,8 +312,8 @@ PROBES = (
         "Loginapp::onDbmgrInitCompleted",
         r"Loginapp::onDbmgrInitCompleted: rejected non-DBMgr source",
     ),
-    # BaseApp registration broadcasts discovery state, so keep this stateful probe last.
-    # BaseApp 注册会广播发现状态，因此这个有状态探针必须放在最后。
+    # BaseApp registration broadcasts discovery state, so keep these stateful probes last.
+    # BaseApp 注册会广播发现状态，因此这两个有状态探针必须放在最后。
     (
         "dbmgr-registered-invalid-entity-type",
         "dbmgr",
@@ -320,6 +321,14 @@ PROBES = (
         "DBMGR_TYPE",
         "Dbmgr::entityAutoLoad",
         r"Dbmgr::entityAutoLoad: rejected entity script type ID=65535",
+    ),
+    (
+        "dbmgr-registered-invalid-entity-range",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::entityAutoLoad",
+        r"Dbmgr::entityAutoLoad: rejected entity auto-load range, start=-1, end=0",
     ),
 )
 
@@ -510,6 +519,8 @@ def probe_body(probe_case, component_uid):
         return b"a\0b\0" + struct.pack("=BQiQIH", 0, 7001, 4242, 0, 0, 0)
     if probe_case == "dbmgr-registered-invalid-entity-type":
         return struct.pack("=HQHii", 0, 9003, 65535, 0, 0)
+    if probe_case == "dbmgr-registered-invalid-entity-range":
+        return struct.pack("=HQHii", 0, 9004, 1, -1, 0)
     if probe_case == "dbmgr-spoofed-active-tick":
         return struct.pack("=iQ", 6, 7001)
     if probe_case == "dbmgr-spoofed-kill-request":
@@ -589,7 +600,10 @@ def component_registration_body(component_uid, component_type, component_id):
 
 
 def registered_probe_component_type(probe_case):
-    if probe_case == "dbmgr-registered-invalid-entity-type":
+    if probe_case in {
+        "dbmgr-registered-invalid-entity-type",
+        "dbmgr-registered-invalid-entity-range",
+    }:
         return 6
     return 13
 

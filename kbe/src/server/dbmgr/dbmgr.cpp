@@ -140,6 +140,19 @@ bool validateEntityScriptType(const char* operation, const std::string& scriptTy
 		operation, scriptType.size()));
 	return false;
 }
+
+bool validateEntityAutoLoadRange(const char* operation, ENTITY_ID start, ENTITY_ID end)
+{
+	// BaseApp 按固定 32 条分页；限制范围可避免负数转换、错误 LIMIT 和超大数据库扫描。
+	// BaseApp pages in fixed batches of 32; bound the range to prevent signed conversion, invalid LIMIT, and huge scans.
+	const ENTITY_ID maxBatchSize = 32;
+	if (start >= 0 && end > start && end - start <= maxBatchSize)
+		return true;
+
+	WARNING_MSG(fmt::format("{}: rejected entity auto-load range, start={}, end={}.\n",
+		operation, start, end));
+	return false;
+}
 }
 
 ServerConfig g_serverConfig;
@@ -1408,6 +1421,12 @@ void Dbmgr::entityAutoLoad(Network::Channel* pChannel, KBEngine::MemoryStream& s
 	}
 
 	if (!validateEntityScriptType("Dbmgr::entityAutoLoad", entityType))
+	{
+		s.done();
+		return;
+	}
+
+	if (!validateEntityAutoLoadRange("Dbmgr::entityAutoLoad", start, end))
 	{
 		s.done();
 		return;
