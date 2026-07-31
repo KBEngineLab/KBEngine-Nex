@@ -224,6 +224,8 @@ foreach(_kbe_required IN ITEMS
     "Security::isBoundClientEntity"
     "sourceEntity->baseEntityCall()->componentID() == sourceComponent->cid"
     "Security::isAuthorizedClientCellTarget"
+	"forwardEntityMessageToCellappFromClient: rejected unregistered"
+	"forwardEntityMessageToCellappFromClient: rejected unbound"
 )
     string(FIND "${_kbe_baseapp}\n${_kbe_cellapp}"
         "${_kbe_required}" _kbe_required_position)

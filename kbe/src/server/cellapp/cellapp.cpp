@@ -1852,13 +1852,40 @@ void Cellapp::forwardEntityMessageToCellappFromClient(Network::Channel* pChannel
 
 	s >> srcEntityID;
 
-	KBEngine::Entity* e = KBEngine::Cellapp::getSingleton().findEntity(srcEntityID);		
+	Components::ComponentInfos* sourceComponent = Components::getSingleton().findComponent(pChannel);
+	const bool fromBaseapp = Security::isExpectedComponentSource(BASEAPP_TYPE, sourceComponent, pChannel);
+	const bool fromCellapp = Security::isExpectedComponentSource(CELLAPP_TYPE, sourceComponent, pChannel);
+	if (!fromBaseapp && !fromCellapp)
+	{
+		WARNING_MSG(fmt::format("Cellapp::forwardEntityMessageToCellappFromClient: rejected unregistered "
+			"source Channel, srcEntityID={}, addr={}.\n", srcEntityID,
+			pChannel != NULL ? pChannel->c_str() : "none"));
+		s.done();
+		return;
+	}
+
+	KBEngine::Entity* e = KBEngine::Cellapp::getSingleton().findEntity(srcEntityID);
 
 	if(e == NULL)
 	{	
 		WARNING_MSG(fmt::format("Cellapp::forwardEntityMessageToCellappFromClient: not found entityID:{}.\n",
 			srcEntityID));
 		
+		s.done();
+		return;
+	}
+
+	// BaseApp is the authenticated client boundary. The entity may already be a
+	// Ghost during migration, so bind its Base EntityCall before forwarding it.
+	// BaseApp 是客户端认证边界。迁移期间实体可能已经成为 Ghost，因此必须先把
+	// 实际 BaseApp Channel 绑定到实体的 Base EntityCall，再允许继续转发。
+	if (fromBaseapp && (e->baseEntityCall() == NULL ||
+		e->baseEntityCall()->componentID() != sourceComponent->cid))
+	{
+		WARNING_MSG(fmt::format("Cellapp::forwardEntityMessageToCellappFromClient: rejected unbound "
+			"BaseApp source, srcEntityID={}, baseappID={}, entityBaseappID={}.\n",
+			srcEntityID, sourceComponent->cid,
+			e->baseEntityCall() != NULL ? e->baseEntityCall()->componentID() : 0));
 		s.done();
 		return;
 	}

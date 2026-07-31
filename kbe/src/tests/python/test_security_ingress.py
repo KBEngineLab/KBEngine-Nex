@@ -277,6 +277,15 @@ PROBES = (
         r"srcEntityID=1, targetID=2",
     ),
     (
+        "cellapp-unregistered-entity-forward",
+        "cellapp",
+        "internal",
+        "CELLAPP_TYPE",
+        "Cellapp::forwardEntityMessageToCellappFromClient",
+        r"Cellapp::forwardEntityMessageToCellappFromClient: rejected unregistered "
+        r"source Channel, srcEntityID=1",
+    ),
+    (
         "cellapp-spoofed-entity-create",
         "cellapp",
         "internal",
@@ -532,6 +541,8 @@ def probe_body(probe_case, component_uid):
         return struct.pack("=i", 1) + b"invalid\0security@example.invalid\0"
     if probe_case == "cellapp-unregistered-cell-rpc":
         return struct.pack("=ii", 1, 2)
+    if probe_case == "cellapp-unregistered-entity-forward":
+        return struct.pack("=i", 1)
     if probe_case == "cellapp-spoofed-entity-create":
         return struct.pack("=i", 1) + b"Account\0" + struct.pack("=iQBB", 2, 7001, 0, 0)
     if probe_case == "loginapp-spoofed-dbmgr-init":
