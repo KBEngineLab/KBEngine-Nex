@@ -48,12 +48,27 @@ bool testCellTargetRelationshipFailsClosed()
 			0, 43, 7, 7, true, true),
 			"zero source entity ID was accepted");
 }
+
+bool testCellRelayRequiresLiveGhostOwnership()
+{
+	return require(KBEngine::Security::isAuthorizedCellRelay(true, 7, 7),
+		"CellApp relay from the live Ghost holder was rejected") &&
+		require(!KBEngine::Security::isAuthorizedCellRelay(true, 7, 8),
+		"CellApp relay from an unrelated component was accepted") &&
+		require(!KBEngine::Security::isAuthorizedCellRelay(false, 7, 7),
+		"CellApp relay to a non-real target was accepted") &&
+		require(!KBEngine::Security::isAuthorizedCellRelay(true, 0, 7),
+		"CellApp relay with an unbound source was accepted") &&
+		require(!KBEngine::Security::isAuthorizedCellRelay(true, 7, 0),
+		"CellApp relay without a live Ghost route was accepted");
+}
 }
 
 int main()
 {
 	if (!testAccountEntityMustMatchPrincipal() ||
-		!testCellTargetRelationshipFailsClosed())
+		!testCellTargetRelationshipFailsClosed() ||
+		!testCellRelayRequiresLiveGhostOwnership())
 		return EXIT_FAILURE;
 
 	std::cout << "SECURITY_CLIENT_REQUEST_GUARD_TEST_PASS" << std::endl;

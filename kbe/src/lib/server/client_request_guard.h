@@ -51,6 +51,23 @@ inline bool isAuthorizedClientCellTarget(ENTITY_ID sourceEntityID,
 		(controlledBySource || inSourceView);
 }
 
+/**
+ * Bind a CellApp relay to the CellApp that currently owns the target Ghost.
+ * 将 CellApp 中继绑定到当前持有目标 Ghost 的 CellApp。
+ *
+ * The final real CellApp can verify this relationship from its migration state;
+ * a registered component ID alone is not sufficient because it does not prove
+ * that the sender has a live Ghost route for this entity.
+ * 目标 real CellApp 可以从迁移状态验证该关系；仅凭已注册组件 ID 不能证明
+ * 发送方确实持有该实体的有效 Ghost 路由。
+ */
+inline bool isAuthorizedCellRelay(bool targetIsReal,
+	COMPONENT_ID sourceCellID, COMPONENT_ID targetGhostCellID) noexcept
+{
+	return targetIsReal && sourceCellID > 0 && targetGhostCellID > 0 &&
+		sourceCellID == targetGhostCellID;
+}
+
 }
 }
 

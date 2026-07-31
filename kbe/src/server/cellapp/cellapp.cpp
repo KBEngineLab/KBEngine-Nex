@@ -1636,6 +1636,15 @@ void Cellapp::onRemoteCallMethodFromClient(Network::Channel* pChannel, KBEngine:
 			return;
 		}
 	}
+	else if (fromCellapp && !Security::isAuthorizedCellRelay(e->isReal(),
+		sourceComponent->cid, e->ghostCell()))
+	{
+		WARNING_MSG(fmt::format("Cellapp::onRemoteCallMethodFromClient: rejected stale CellApp relay, "
+			"srcEntityID={}, targetID={}, sourceCellappID={}, targetGhostCellID={}, targetIsReal={}.\n",
+			srcEntityID, targetID, sourceComponent->cid, e->ghostCell(), e->isReal()));
+		s.done();
+		return;
+	}
 
 	// 这个方法呼叫如果不是这个proxy自己的方法则必须呼叫的entity和proxy的cellEntity在一个space中。
 	try
