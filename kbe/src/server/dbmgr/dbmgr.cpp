@@ -1461,7 +1461,23 @@ void Dbmgr::syncEntityStreamTemplate(Network::Channel* pChannel, KBEngine::Memor
 		KBEAccountTable* pTable =
 			static_cast<KBEAccountTable*>(iter->second.findKBETable(KBE_TABLE_PERFIX "_accountinfos"));
 
-		KBE_ASSERT(pTable);
+		if (pTable == NULL)
+		{
+			ERROR_MSG(fmt::format("Dbmgr::syncEntityStreamTemplate: rejected missing account table, dbInterface={}.\n",
+				iter->first));
+			s.done();
+			return;
+		}
+	}
+
+	// Validate every interface first so one malformed backend cannot leave only a
+	// subset of account templates updated.
+	// 先验证全部数据库接口，避免某个后端缺表时只更新了部分账户模板。
+	for (iter = EntityTables::sEntityTables.begin();
+		iter != EntityTables::sEntityTables.end(); ++iter)
+	{
+		KBEAccountTable* pTable =
+			static_cast<KBEAccountTable*>(iter->second.findKBETable(KBE_TABLE_PERFIX "_accountinfos"));
 
 		s.rpos(rpos);
 		pTable->accountDefMemoryStream(s);

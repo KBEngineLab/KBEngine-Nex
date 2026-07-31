@@ -191,6 +191,7 @@ foreach(_kbe_required IN ITEMS
 	"Dbmgr::queryAccount: rejected componentID="
 	"Dbmgr::executeRawDatabaseCommand: rejected componentType="
 	"Dbmgr::syncEntityStreamTemplate"
+	"Dbmgr::syncEntityStreamTemplate: rejected missing account table"
 	"isAllowedRawDatabaseSource"
 )
 	string(FIND "${_kbe_cellapp}\n${_kbe_cellappmgr}\n${_kbe_dbmgr}\n${_kbe_interfaces_handler}"
