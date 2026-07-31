@@ -1411,10 +1411,12 @@ void Dbmgr::lookUpEntityByDBID(Network::Channel* pChannel, KBEngine::MemoryStrea
 void Dbmgr::queryEntity(Network::Channel* pChannel, uint16 dbInterfaceIndex, COMPONENT_ID componentID, int8 queryMode, DBID dbid,
 	std::string& entityType, CALLBACK_ID callbackID, ENTITY_ID entityID)
 {
-	Network::Channel* targetChannel =
-		Components::getSingleton().findComponentChannel(BASEAPP_TYPE, componentID);
-	if (!Components::getSingleton().isExpectedComponentChannel(BASEAPP_TYPE, pChannel) ||
-		targetChannel == NULL || !Security::isValidPersistentEntityID(dbid) ||
+	// The callback target is carried in the payload, so bind it to the concrete
+	// requesting BaseApp Channel before scheduling any database work.
+	// 回调目标来自网络载荷，因此必须先绑定到实际发起请求的 BaseApp Channel，
+	// 防止一个已注册 BaseApp 把查询结果路由到另一个 BaseApp。
+	if (findBoundBaseappSource(pChannel, componentID) == NULL ||
+		!Security::isValidPersistentEntityID(dbid) ||
 		!Security::isValidDatabaseQueryMode(queryMode) || entityID <= 0)
 	{
 		WARNING_MSG(fmt::format("Dbmgr::queryEntity: rejected componentID={}, queryMode={}, dbid={}, entityID={}, addr={}.\n",
