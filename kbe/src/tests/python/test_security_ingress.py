@@ -26,6 +26,8 @@ REGISTERED_PROBE_COMPONENT_IDS = {
     "dbmgr-registered-sender-channel-mismatch": 9002,
     "dbmgr-registered-invalid-entity-type": 9003,
     "dbmgr-registered-invalid-entity-range": 9004,
+    "dbmgr-registered-invalid-db-interface": 9005,
+    "dbmgr-registered-invalid-autoload-flag": 9006,
 }
 
 PROBES = (
@@ -330,6 +332,22 @@ PROBES = (
         "Dbmgr::entityAutoLoad",
         r"Dbmgr::entityAutoLoad: rejected entity auto-load range, start=-1, end=0",
     ),
+    (
+        "dbmgr-registered-invalid-db-interface",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::entityAutoLoad",
+        r"Dbmgr::entityAutoLoad: rejected dbInterfaceIndex=65535",
+    ),
+    (
+        "dbmgr-registered-invalid-autoload-flag",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::writeEntity",
+        r"Dbmgr::writeEntity: rejected shouldAutoLoad=2",
+    ),
 )
 
 
@@ -521,6 +539,10 @@ def probe_body(probe_case, component_uid):
         return struct.pack("=HQHii", 0, 9003, 65535, 0, 0)
     if probe_case == "dbmgr-registered-invalid-entity-range":
         return struct.pack("=HQHii", 0, 9004, 1, -1, 0)
+    if probe_case == "dbmgr-registered-invalid-db-interface":
+        return struct.pack("=HQHii", 65535, 9005, 1, 0, 32)
+    if probe_case == "dbmgr-registered-invalid-autoload-flag":
+        return struct.pack("=QiQHHIb", 9006, 1, 0, 0, 1, 0, 2)
     if probe_case == "dbmgr-spoofed-active-tick":
         return struct.pack("=iQ", 6, 7001)
     if probe_case == "dbmgr-spoofed-kill-request":
@@ -603,6 +625,8 @@ def registered_probe_component_type(probe_case):
     if probe_case in {
         "dbmgr-registered-invalid-entity-type",
         "dbmgr-registered-invalid-entity-range",
+        "dbmgr-registered-invalid-db-interface",
+        "dbmgr-registered-invalid-autoload-flag",
     }:
         return 6
     return 13
