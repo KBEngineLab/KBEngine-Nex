@@ -128,6 +128,9 @@ public:
 	uint32 numTcpClients() const;
 	uint32 numKcpHandshakes() const;
 	uint32 numDestroyedClients() const;
+	uint64 numClientEntities() const;
+	uint64 kcpFixedAllocatedBytes() const;
+	uint64 kcpDynamicAllocatedBytes() const;
 	uint32 numClients() const { return static_cast<uint32>(clients_.size()); }
 	uint64 totalKcpHandshakeSuccesses() const { return totalKcpHandshakeSuccesses_; }
 	uint64 totalTcpConnections() const { return totalTcpConnections_; }

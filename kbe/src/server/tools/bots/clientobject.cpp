@@ -639,8 +639,12 @@ void ClientObject::gameTick()
 			destroy();
 			return;
 		}
-		
-		pServerChannel()->updateTick(NULL);
+
+		// NetworkInterface::processChannels() advances the shared tick epoch once
+		// before Bots visits its clients. Channel counters reset lazily on actual IO,
+		// so touching every idle Channel here only creates O(N) cache-line writes.
+		// NetworkInterface::processChannels() 会在 Bots 遍历客户端前统一推进 Tick epoch。
+		// Channel 计数器已在真实收发时懒清零，因此这里逐个写空闲 Channel 只会制造 O(N) 缓存写入。
 	}
 	else
 	{

@@ -481,14 +481,6 @@ bool ServerApp::registerNewApp(Network::Channel* pChannel, int32 uid, std::strin
 	}
 	else
 	{
-		if (cinfos->pChannel != NULL && cinfos->pChannel != pChannel &&
-			!cinfos->pChannel->isDestroyed())
-		{
-			WARNING_MSG(fmt::format("ServerApp::registerNewApp: rejected live binding replacement, componentType={}, componentID={}, addr={}.\n",
-				componentType, componentID, pChannel->c_str()));
-			return false;
-		}
-
 		if (!(cinfos->pIntAddr->ip == intaddr && cinfos->pIntAddr->port == intport))
 		{
 			ERROR_MSG(fmt::format("ServerApp::onRegisterNewApp: error component(uid:{}, username:{}, componentType:{}, componentID:{}, from {})!\n",
@@ -497,6 +489,31 @@ bool ServerApp::registerNewApp(Network::Channel* pChannel, int32 uid, std::strin
 				COMPONENT_NAME_EX((COMPONENT_TYPE)componentType), componentID, pChannel->c_str()));
 
 			return false;
+		}
+
+		if (cinfos->pChannel != NULL && cinfos->pChannel != pChannel &&
+			!cinfos->pChannel->isDestroyed())
+		{
+			// KBE 的组件连接是历史双向连接：本进程可能先通过主动连接建立出站 Channel，
+			// 随后再收到对端的入站注册。只有尚未绑定的内部 Channel 才能完成这次合法
+			// 反向绑定，并提升为主路由；已经绑定过组件的 Channel 仍然拒绝抢占。
+			// KBE keeps a historical bidirectional connection: an outbound Channel may
+			// exist before the peer's inbound registration arrives. Only an unbound
+			// internal Channel may complete that reverse binding and become authoritative;
+			// a Channel already bound to a component cannot replace the live route.
+			if (pChannel->componentID() != UNKNOWN_COMPONENT_TYPE)
+			{
+				WARNING_MSG(fmt::format("ServerApp::registerNewApp: rejected live binding replacement, componentType={}, componentID={}, addr={}.\n",
+					componentType, componentID, pChannel->c_str()));
+				return false;
+			}
+
+			// 反向 Channel 接管主路由后，旧主动 Channel 已不再有任何组件用途；
+			// 若继续留在 NetworkInterface，它不会再收到心跳并会被误报为超时退出。
+			// Once the reverse Channel owns the route, the old outbound Channel has no
+			// remaining component role. Keeping it would stop heartbeats and report a
+			// false timeout later, so retire it through the normal maintenance path.
+			cinfos->pChannel->destroy();
 		}
 
 		cinfos->pChannel = pChannel;
@@ -580,7 +597,8 @@ void ServerApp::onAppActiveTick(Network::Channel* pChannel, COMPONENT_TYPE compo
 	// 心跳封包只能刷新其实际 Channel 所绑定的组件，不能替其他组件续命。
 	Components::ComponentInfos* sourceInfos = Components::getSingleton().findComponent(
 		componentType, KBEngine::getUserUID(), componentID);
-	if (!Security::isBoundComponentSource(componentID, sourceInfos, pChannel))
+	if (!Security::isBoundBidirectionalComponentSource(componentID, sourceInfos, pChannel,
+		pChannel->componentID()))
 	{
 		WARNING_MSG(fmt::format("ServerApp::onAppActiveTick: rejected componentType={}, componentID={}, addr={}.\n",
 			componentType, componentID, pChannel->c_str()));

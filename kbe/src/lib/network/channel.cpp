@@ -52,6 +52,25 @@ namespace KBEngine {
 namespace Network
 {
 
+namespace
+{
+// 空闲 KCP 没有需要刷新、确认或重传的状态；将维护粒度放宽到 100ms，
+// 可显著减少大量静默连接的定时器与堆操作。任何收发事件都会通过
+// scheduleKcpUpdate() 提交更早截止时间，因此活跃链路仍使用配置的低延迟周期。
+// An idle KCP control block has nothing to flush, acknowledge, or retransmit.
+// A 100 ms maintenance cadence removes timer and heap churn for large silent fleets.
+// Any send or receive event schedules an earlier deadline, preserving the configured
+// low-latency cadence for active channels.
+const IUINT32 KCP_IDLE_UPDATE_INTERVAL_MS = 100;
+
+bool isKcpIdle(const ikcpcb& kcp)
+{
+	return kcp.nsnd_que == 0 && kcp.nsnd_buf == 0 &&
+		kcp.nrcv_que == 0 && kcp.nrcv_buf == 0 &&
+		kcp.ackcount == 0 && kcp.probe == 0;
+}
+}
+
 // 优雅关闭必须有硬上限，防止失联客户端永久占用 Channel、socket 和 completion 状态。
 // Graceful close needs a hard bound so an absent peer cannot retain Channel, socket, and completion state forever.
 static const uint64 GRACEFUL_CLOSE_TIMEOUT_STAMPS = 5 * stampsPerSecond();
@@ -464,7 +483,10 @@ void Channel::updateKcp()
 	// KCP uses wrapping 32-bit milliseconds; signed subtraction preserves ordering across the roughly 49-day wrap boundary.
 	// KCP 使用会回绕的 32 位毫秒时钟；有符号差值可在约 49 天回绕边界保持正确顺序。
 	const IINT32 checkedDelay = static_cast<IINT32>(next - current);
-	const IUINT32 delay = checkedDelay > 0 ? static_cast<IUINT32>(checkedDelay) : 1;
+	IUINT32 delay = checkedDelay > 0 ? static_cast<IUINT32>(checkedDelay) : 1;
+	if (isKcpIdle(*pKCP_) && delay < KCP_IDLE_UPDATE_INTERVAL_MS)
+		delay = KCP_IDLE_UPDATE_INTERVAL_MS;
+
 	scheduleKcpUpdate(static_cast<int64>(delay) * 1000);
 }
 

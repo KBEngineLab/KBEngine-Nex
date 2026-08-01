@@ -112,7 +112,15 @@ def evaluate_quality(
     if request_result.get("total", 0) and request_result.get("success_rate_percent", 0.0) < minimum_success:
         blockers.append(f"request success rate below {minimum_success:.3f}%")
     phase_counters = summary.get("phase_counters", {})
-    quality_counters = phase_counters.get("measurement", summary.get("counters", {}))
+    # 只有日志计数按测量窗口裁剪；进程退出、请求失败和协议计数没有阶段标签，
+    # 必须保留全局值，否则测量阶段存在日志记录时会把真正的失败静默掉。
+    # Only log counters are scoped to the measurement window. Process exits,
+    # request failures, and protocol counters are unphased and must stay global.
+    quality_counters = Counter(summary.get("counters", {}))
+    measurement_counters = phase_counters.get("measurement", {})
+    for metric, value in measurement_counters.items():
+        if metric.startswith("log."):
+            quality_counters[metric] = int(value)
     process_exits = int(quality_counters.get("process.exit.count", 0))
     if process_exits > 0:
         blockers.append(f"workload process exits={process_exits}")

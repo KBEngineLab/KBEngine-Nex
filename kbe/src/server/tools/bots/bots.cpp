@@ -139,6 +139,18 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/udpSendBacklogBytes", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBacklogBytes);
 	WATCH_OBJECT("bots/performance/udpSendBacklogPeakBytes", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBacklogPeakBytes);
 	WATCH_OBJECT("bots/performance/udpSendBackpressure", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBackpressureCount);
+	// KCP 调度与队列指标用于区分空闲定时维护开销和真实业务流量，避免仅凭进程 CPU 猜测热点。
+	// KCP scheduler and queue metrics distinguish idle maintenance cost from real traffic instead of inferring hotspots from process CPU alone.
+	WATCH_OBJECT("bots/performance/kcpScheduledChannels", &networkInterface(), &Network::NetworkInterface::kcpScheduledChannelCount);
+	WATCH_OBJECT("bots/performance/kcpUpdateCalls", &networkInterface(), &Network::NetworkInterface::kcpUpdateCallCount);
+	WATCH_OBJECT("bots/performance/kcpTimerWakeups", &networkInterface(), &Network::NetworkInterface::kcpTimerWakeupCount);
+	WATCH_OBJECT("bots/performance/kcpTimerRearms", &networkInterface(), &Network::NetworkInterface::kcpTimerRearmCount);
+	WATCH_OBJECT("bots/performance/kcpPendingSegments", &networkInterface(), &Network::NetworkInterface::kcpPendingSegmentCount);
+	WATCH_OBJECT("bots/performance/kcpQueuedSegments", &networkInterface(), &Network::NetworkInterface::kcpQueuedSegmentCount);
+	WATCH_OBJECT("bots/performance/kcpUnackedSegments", &networkInterface(), &Network::NetworkInterface::kcpUnackedSegmentCount);
+	WATCH_OBJECT("bots/performance/kcpFixedAllocatedBytes", this, &Bots::kcpFixedAllocatedBytes);
+	WATCH_OBJECT("bots/performance/kcpDynamicAllocatedBytes", this, &Bots::kcpDynamicAllocatedBytes);
+	WATCH_OBJECT("bots/performance/clientEntities", this, &Bots::numClientEntities);
 	return WatchPool::initWatchPools();
 }
 
@@ -452,6 +464,69 @@ uint32 Bots::numDestroyedClients() const
 	for (CLIENTS::const_iterator iter = clients_.begin(); iter != clients_.end(); ++iter)
 		count += iter->second->isDestroyed() ? 1 : 0;
 	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Bots::numClientEntities() const
+{
+	uint64 count = 0;
+	for (CLIENTS::const_iterator iter = clients_.begin(); iter != clients_.end(); ++iter)
+	{
+		const ClientObject* pClient = iter->second;
+		if (pClient != NULL && pClient->pEntities() != NULL)
+			count += static_cast<uint64>(pClient->pEntities()->size());
+	}
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Bots::kcpFixedAllocatedBytes() const
+{
+	uint64 allocatedBytes = 0;
+	for (CLIENTS::const_iterator iter = clients_.begin(); iter != clients_.end(); ++iter)
+	{
+		const Network::Channel* pChannel = iter->second != NULL ? iter->second->pServerChannel() : NULL;
+		const ikcpcb* pKcp = pChannel != NULL ? pChannel->pKCP() : NULL;
+		if (pKcp == NULL)
+			continue;
+
+		// ikcp_create()/ikcp_setmtu() allocate the control block and a three-datagram
+		// flush buffer. ACK storage grows by ackblock pairs and remains allocated.
+		// ikcp_create()/ikcp_setmtu() 固定分配控制块和三份数据报 flush buffer；
+		// ACK 存储按 ackblock 对扩容，并在连接生命周期内保留容量。
+		allocatedBytes += sizeof(ikcpcb);
+		const IUINT32 protocolOverhead = pKcp->mtu - pKcp->mss;
+		allocatedBytes += static_cast<uint64>(pKcp->mtu + protocolOverhead) * 3;
+		allocatedBytes += static_cast<uint64>(pKcp->ackblock) * 2 * sizeof(IUINT32);
+	}
+	return allocatedBytes;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Bots::kcpDynamicAllocatedBytes() const
+{
+	uint64 allocatedBytes = 0;
+	for (CLIENTS::const_iterator iter = clients_.begin(); iter != clients_.end(); ++iter)
+	{
+		const Network::Channel* pChannel = iter->second != NULL ? iter->second->pServerChannel() : NULL;
+		const ikcpcb* pKcp = pChannel != NULL ? pChannel->pKCP() : NULL;
+		if (pKcp == NULL)
+			continue;
+
+		const IQUEUEHEAD* queues[] = {
+			&pKcp->snd_queue, &pKcp->rcv_queue, &pKcp->snd_buf, &pKcp->rcv_buf
+		};
+		for (size_t queueIndex = 0; queueIndex < sizeof(queues) / sizeof(queues[0]); ++queueIndex)
+		{
+			const IQUEUEHEAD* head = queues[queueIndex];
+			for (const IQUEUEHEAD* node = head->next; node != head; node = node->next)
+			{
+				const IKCPSEG* segment = iqueue_entry(node, IKCPSEG, node);
+				allocatedBytes += sizeof(IKCPSEG) + static_cast<uint64>(segment->len);
+			}
+		}
+	}
+	return allocatedBytes;
 }
 
 //-------------------------------------------------------------------------------------

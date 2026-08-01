@@ -103,10 +103,14 @@ def main() -> int:
         with JsonlRecorder(phase_path, "test-run", "contract") as recorder:
             recorder.record("logs", "all", "log.error.count", 3, "count", {"kind": "counter", "phase": "shutdown"})
             recorder.record("logs", "all", "log.error.count", 1, "count", {"kind": "counter", "phase": "measurement"})
+            recorder.record("runner", "workload", "process.exit.count", 1, "count", {"kind": "counter"})
         phase_summary = build_summary(load_events(phase_path), {"max_log_errors": 0})
         assert phase_summary["counters"]["log.error.count"] == 4
         assert phase_summary["phase_counters"]["shutdown"]["log.error.count"] == 3
         assert phase_summary["quality"]["status"] == "BLOCKER"
+        assert "workload process exits=1" in phase_summary["quality"]["blockers"]
+        log_only_summary = build_summary(load_events(phase_path), {"max_log_errors": 1})
+        assert not any(item.startswith("log errors=") for item in log_only_summary["quality"]["blockers"])
         assert summary["requests"]["success"] == 4
         assert summary["requests"]["failures"] == 1
         assert summary["counters"]["request.slow.count"] == 1
