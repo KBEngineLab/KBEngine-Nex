@@ -230,6 +230,14 @@ foreach(_kbe_required IN ITEMS
 	"Cellapp::onCreateCellEntityFromBaseapp: rejected malformed or oversized payload"
 	"Cellapp::onDestroyCellEntityFromBaseapp: rejected invalid entity ID"
 	"Cellapp::onDestroyCellEntityFromBaseapp: rejected unbound source"
+	"Baseappmgr::forwardMessage: rejected incomplete header"
+	"Baseappmgr::reqCreateEntityAnywhere: rejected malformed or oversized payload"
+	"Baseappmgr::reqCreateEntityRemotely: rejected malformed or oversized payload"
+	"Baseappmgr::reqCreateEntityAnywhereFromDBIDQueryBestBaseappID: rejected unbound BaseApp source"
+	"Baseappmgr::reqCreateEntityAnywhereFromDBID: rejected malformed or oversized payload"
+	"Baseappmgr::reqCreateEntityRemotelyFromDBID: rejected malformed or oversized payload"
+	"Baseappmgr::registerPendingAccountToBaseapp: rejected unbound LoginApp source"
+	"Baseappmgr::registerPendingAccountToBaseappAddr: rejected malformed or oversized payload"
 	"findOrReconnectChannel"
 	"Interfaces Channel unavailable after reconnect"
 	"reconnect: rejected missing Interfaces address"
@@ -269,7 +277,7 @@ foreach(_kbe_required IN ITEMS
 	"if (!task->enable)"
 	"cbid = 0"
 )
-	string(FIND "${_kbe_baseapp}\n${_kbe_cellapp}\n${_kbe_cellappmgr}\n${_kbe_dbmgr}\n${_kbe_interfaces_handler}\n${_kbe_sensitive_text}"
+	string(FIND "${_kbe_baseapp}\n${_kbe_baseappmgr}\n${_kbe_cellapp}\n${_kbe_cellappmgr}\n${_kbe_dbmgr}\n${_kbe_interfaces_handler}\n${_kbe_sensitive_text}"
 		"${_kbe_required}" _kbe_required_position)
 	if(_kbe_required_position EQUAL -1)
 		message(FATAL_ERROR "Database or Cell creation ingress guard is missing: ${_kbe_required}")
@@ -279,7 +287,7 @@ endforeach()
 foreach(_kbe_required IN ITEMS
     "Security::isBoundComponentSource"
     "isExpectedComponentChannel"
-    "findComponentChannel(BASEAPP_TYPE"
+	"isAvailableBaseappTarget"
 	"isAvailableCellappTarget"
     "Security::isValidComponentMetric"
 	"Baseappmgr::onRegisterNewApp: added registered BaseApp"

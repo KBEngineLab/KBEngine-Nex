@@ -20,6 +20,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include "baseappmgr.h"
+#include "server/bounded_stream_reader.h"
 #include "server/component_routing_guard.h"
 #include "baseappmgr_interface.h"
 #include "network/common.h"
@@ -40,6 +41,142 @@ namespace KBEngine{
 	
 ServerConfig g_serverConfig;
 KBE_SINGLETON_INIT(Baseappmgr);
+
+namespace
+{
+const size_t ENTITY_TYPE_MAX_LENGTH = 128;
+const size_t ACCOUNT_FIELD_MAX_LENGTH = 128;
+const size_t PASSWORD_MAX_LENGTH = 255;
+
+Components::ComponentInfos* findBoundComponentSource(Network::Channel* pChannel,
+	COMPONENT_TYPE expectedType, COMPONENT_ID expectedID = 0)
+{
+	if (pChannel == NULL || pChannel->isExternal() || pChannel->isDestroyed() ||
+		pChannel->condemn() != 0)
+	{
+		return NULL;
+	}
+
+	Components& components = Components::getSingleton();
+	Components::ComponentInfos* infos = expectedID == 0 ?
+		components.findComponent(pChannel) : components.findComponent(expectedType, expectedID);
+	if (infos == NULL && expectedID == 0 && pChannel->componentID() != 0)
+		infos = components.findComponent(expectedType, pChannel->componentID());
+
+	if (infos == NULL || infos->componentType != expectedType || infos->cid == 0 ||
+		(expectedID != 0 && infos->cid != expectedID) ||
+		!Security::isBoundBidirectionalComponentSource(infos->cid, infos, pChannel,
+			pChannel->componentID()))
+	{
+		return NULL;
+	}
+
+	return infos;
+}
+
+bool isAvailableBaseappTarget(Components::ComponentInfos* infos, bool requireRunning)
+{
+	return infos != NULL && infos->componentType == BASEAPP_TYPE && infos->cid != 0 &&
+		infos->pChannel != NULL && !infos->pChannel->isExternal() &&
+		!infos->pChannel->isDestroyed() && infos->pChannel->condemn() == 0 &&
+		infos->pChannel->componentID() == infos->cid &&
+		(!requireRunning || infos->state == COMPONENT_STATE_RUN);
+}
+
+bool validateForwardHeader(const MemoryStream& stream)
+{
+	BoundedStreamReader reader(stream);
+	COMPONENT_ID senderID = 0;
+	COMPONENT_ID targetID = 0;
+	return reader.read(senderID) && reader.read(targetID);
+}
+
+bool validateEntityCreationRequest(const MemoryStream& stream, bool hasExplicitTarget,
+	COMPONENT_ID& sourceID)
+{
+	BoundedStreamReader reader(stream);
+	COMPONENT_ID targetID = 0;
+	CALLBACK_ID callbackID = 0;
+	return (!hasExplicitTarget || (reader.read(targetID) && targetID > 0)) &&
+		reader.skipString(ENTITY_TYPE_MAX_LENGTH, false) &&
+		reader.skipBlob(NETWORK_MESSAGE_MAX_SIZE) &&
+		reader.read(sourceID) && sourceID > 0 &&
+		reader.read(callbackID) && reader.empty();
+}
+
+bool validateDBIDQueryRequest(const MemoryStream& stream)
+{
+	BoundedStreamReader reader(stream);
+	DBID entityDBID = 0;
+	CALLBACK_ID callbackID = 0;
+	uint16 dbInterfaceIndex = 0;
+	return reader.skipString(ENTITY_TYPE_MAX_LENGTH, false) &&
+		reader.read(entityDBID) && entityDBID > 0 &&
+		reader.read(callbackID) && reader.read(dbInterfaceIndex) && reader.empty();
+}
+
+bool validateDBIDCreationForward(const MemoryStream& stream, COMPONENT_ID& sourceID)
+{
+	BoundedStreamReader reader(stream);
+	COMPONENT_ID targetID = 0;
+	COMPONENT_ID echoedTargetID = 0;
+	uint16 dbInterfaceIndex = 0;
+	DBID entityDBID = 0;
+	CALLBACK_ID callbackID = 0;
+	bool success = false;
+	ENTITY_ID entityID = 0;
+	bool wasActive = false;
+	if (!reader.read(targetID) || targetID == 0 ||
+		!reader.read(sourceID) || sourceID == 0 ||
+		!reader.read(echoedTargetID) || echoedTargetID != targetID ||
+		!reader.read(dbInterfaceIndex) ||
+		!reader.skipString(ENTITY_TYPE_MAX_LENGTH, false) ||
+		!reader.read(entityDBID) || entityDBID == 0 ||
+		!reader.read(callbackID) || !reader.read(success) ||
+		!reader.read(entityID) || !reader.read(wasActive))
+	{
+		return false;
+	}
+
+	if (success && entityID <= 0)
+		return false;
+
+	if (wasActive)
+	{
+		COMPONENT_ID activeComponentID = 0;
+		ENTITY_ID activeEntityID = 0;
+		if (!reader.read(activeComponentID) || activeComponentID == 0 ||
+			!reader.read(activeEntityID) || activeEntityID <= 0)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+bool validatePendingLoginRequest(const MemoryStream& stream, bool hasExplicitTarget)
+{
+	BoundedStreamReader reader(stream);
+	COMPONENT_ID targetID = 0;
+	bool needCheckPassword = false;
+	ENTITY_ID entityID = 0;
+	DBID entityDBID = 0;
+	uint32 flags = 0;
+	uint64 deadline = 0;
+	int clientType = 0;
+	bool forceInternalLogin = false;
+	return (!hasExplicitTarget || (reader.read(targetID) && targetID > 0)) &&
+		reader.skipString(ACCOUNT_FIELD_MAX_LENGTH, false) &&
+		reader.skipString(ACCOUNT_FIELD_MAX_LENGTH, false) &&
+		reader.skipString(PASSWORD_MAX_LENGTH, true) &&
+		reader.read(needCheckPassword) &&
+		(!hasExplicitTarget || reader.read(entityID)) &&
+		reader.read(entityDBID) && reader.read(flags) && reader.read(deadline) &&
+		reader.read(clientType) && reader.read(forceInternalLogin) &&
+		reader.skipBlob(NETWORK_MESSAGE_MAX_SIZE) && reader.empty();
+}
+}
 
 
 class AppForwardItem : public ForwardItem
@@ -238,13 +375,20 @@ void Baseappmgr::finalise()
 //-------------------------------------------------------------------------------------
 void Baseappmgr::forwardMessage(Network::Channel* pChannel, MemoryStream& s)
 {
+	if (!validateForwardHeader(s))
+	{
+		WARNING_MSG("Baseappmgr::forwardMessage: rejected incomplete header.\n");
+		s.done();
+		return;
+	}
+
 	COMPONENT_ID sender_componentID, forward_componentID;
 
 	s >> sender_componentID >> forward_componentID;
 	Components& components = Components::getSingleton();
-	Components::ComponentInfos* senderInfos = components.findComponent(BASEAPP_TYPE, sender_componentID);
-	if (pChannel == NULL || pChannel->isExternal() ||
-		!Security::isBoundComponentSource(sender_componentID, senderInfos, pChannel))
+	Components::ComponentInfos* senderInfos =
+		findBoundComponentSource(pChannel, BASEAPP_TYPE, sender_componentID);
+	if (senderInfos == NULL)
 	{
 		WARNING_MSG(fmt::format("Baseappmgr::forwardMessage: rejected unbound senderComponent({}), channel={}!\n",
 			sender_componentID, (pChannel != NULL ? pChannel->c_str() : "null")));
@@ -252,8 +396,9 @@ void Baseappmgr::forwardMessage(Network::Channel* pChannel, MemoryStream& s)
 		return;
 	}
 
-	Network::Channel* pTargetChannel = components.findComponentChannel(BASEAPP_TYPE, forward_componentID);
-	if (pTargetChannel == NULL)
+	Components::ComponentInfos* targetInfos =
+		components.findComponent(BASEAPP_TYPE, forward_componentID);
+	if (!isAvailableBaseappTarget(targetInfos, false))
 	{
 		WARNING_MSG(fmt::format("Baseappmgr::forwardMessage: rejected unavailable targetComponent({})!\n",
 			forward_componentID));
@@ -263,7 +408,7 @@ void Baseappmgr::forwardMessage(Network::Channel* pChannel, MemoryStream& s)
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).append((char*)s.data() + s.rpos(), (int)s.length());
-	pTargetChannel->send(pBundle);
+	targetInfos->pChannel->send(pBundle);
 	s.done();
 }
 
@@ -274,10 +419,7 @@ bool Baseappmgr::componentsReady()
 	Components::COMPONENTS::iterator ctiter = cts.begin();
 	for(; ctiter != cts.end(); ++ctiter)
 	{
-		if((*ctiter).pChannel == NULL)
-			return false;
-
-		if((*ctiter).state != COMPONENT_STATE_RUN)
+		if (!isAvailableBaseappTarget(&(*ctiter), true))
 			return false;
 	}
 
@@ -288,10 +430,7 @@ bool Baseappmgr::componentsReady()
 bool Baseappmgr::componentReady(COMPONENT_ID cid)
 {
 	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(BASEAPP_TYPE, cid);
-	if(cinfos == NULL || cinfos->pChannel == NULL || cinfos->state != COMPONENT_STATE_RUN)
-		return false;
-
-	return true;
+	return isAvailableBaseappTarget(cinfos, true);
 }
 
 //-------------------------------------------------------------------------------------
@@ -385,8 +524,23 @@ void Baseappmgr::updateBestBaseapp()
 //-------------------------------------------------------------------------------------
 void Baseappmgr::reqCreateEntityAnywhere(Network::Channel* pChannel, MemoryStream& s) 
 {
-	Components::ComponentInfos* cinfos = 
-		Components::getSingleton().findComponent(pChannel);
+	COMPONENT_ID sourceID = 0;
+	if (!validateEntityCreationRequest(s, false, sourceID))
+	{
+		WARNING_MSG("Baseappmgr::reqCreateEntityAnywhere: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
+
+	Components::ComponentInfos* cinfos =
+		findBoundComponentSource(pChannel, BASEAPP_TYPE, sourceID);
+	if (cinfos == NULL)
+	{
+		WARNING_MSG(fmt::format("Baseappmgr::reqCreateEntityAnywhere: rejected unbound BaseApp componentID={}.\n",
+			sourceID));
+		s.done();
+		return;
+	}
 
 	// 此时肯定是在运行状态中，但有可能在等待创建space
 	// 所以初始化进度没有完成, 在只有一个baseapp的情况下如果这
@@ -403,7 +557,7 @@ void Baseappmgr::reqCreateEntityAnywhere(Network::Channel* pChannel, MemoryStrea
 	}
 
 	cinfos = Components::getSingleton().findComponent(BASEAPP_TYPE, bestBaseappID_);
-	if (cinfos == NULL || cinfos->pChannel == NULL || cinfos->state != COMPONENT_STATE_RUN)
+	if (!isAvailableBaseappTarget(cinfos, true))
 	{
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		ForwardItem* pFI = new AppForwardItem();
@@ -445,8 +599,23 @@ void Baseappmgr::reqCreateEntityAnywhere(Network::Channel* pChannel, MemoryStrea
 //-------------------------------------------------------------------------------------
 void Baseappmgr::reqCreateEntityRemotely(Network::Channel* pChannel, MemoryStream& s)
 {
+	COMPONENT_ID sourceID = 0;
+	if (!validateEntityCreationRequest(s, true, sourceID))
+	{
+		WARNING_MSG("Baseappmgr::reqCreateEntityRemotely: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
+
 	Components::ComponentInfos* cinfos =
-		Components::getSingleton().findComponent(pChannel);
+		findBoundComponentSource(pChannel, BASEAPP_TYPE, sourceID);
+	if (cinfos == NULL)
+	{
+		WARNING_MSG(fmt::format("Baseappmgr::reqCreateEntityRemotely: rejected unbound BaseApp componentID={}.\n",
+			sourceID));
+		s.done();
+		return;
+	}
 
 	// 此时肯定是在运行状态中，但有可能在等待创建space
 	// 所以初始化进度没有完成, 在只有一个baseapp的情况下如果这
@@ -458,7 +627,7 @@ void Baseappmgr::reqCreateEntityRemotely(Network::Channel* pChannel, MemoryStrea
 	s >> createToComponentID;
 
 	cinfos = Components::getSingleton().findComponent(BASEAPP_TYPE, createToComponentID);
-	if (cinfos == NULL || cinfos->pChannel == NULL || cinfos->state != COMPONENT_STATE_RUN)
+	if (!isAvailableBaseappTarget(cinfos, true))
 	{
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		ForwardItem* pFI = new AppForwardItem();
@@ -500,8 +669,21 @@ void Baseappmgr::reqCreateEntityRemotely(Network::Channel* pChannel, MemoryStrea
 //-------------------------------------------------------------------------------------
 void Baseappmgr::reqCreateEntityAnywhereFromDBIDQueryBestBaseappID(Network::Channel* pChannel, MemoryStream& s)
 {
+	if (!validateDBIDQueryRequest(s))
+	{
+		WARNING_MSG("Baseappmgr::reqCreateEntityAnywhereFromDBIDQueryBestBaseappID: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
+
 	Components::ComponentInfos* cinfos =
-		Components::getSingleton().findComponent(pChannel);
+		findBoundComponentSource(pChannel, BASEAPP_TYPE);
+	if (cinfos == NULL)
+	{
+		WARNING_MSG("Baseappmgr::reqCreateEntityAnywhereFromDBIDQueryBestBaseappID: rejected unbound BaseApp source.\n");
+		s.done();
+		return;
+	}
 
 	// 此时肯定是在运行状态中，但有可能在等待创建space
 	// 所以初始化进度没有完成, 在只有一个baseapp的情况下如果这
@@ -517,15 +699,12 @@ void Baseappmgr::reqCreateEntityAnywhereFromDBIDQueryBestBaseappID(Network::Chan
 			baseapps_.size()));
 	}
 
-	if (cinfos)
-	{
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-		(*pBundle).newMessage(BaseappInterface::onGetCreateEntityAnywhereFromDBIDBestBaseappID);
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	(*pBundle).newMessage(BaseappInterface::onGetCreateEntityAnywhereFromDBIDBestBaseappID);
 
-		(*pBundle) << bestBaseappID_;
-		(*pBundle).append((char*)s.data() + s.rpos(), (int)s.length());
-		cinfos->pChannel->send(pBundle);
-	}
+	(*pBundle) << bestBaseappID_;
+	(*pBundle).append((char*)s.data() + s.rpos(), (int)s.length());
+	pChannel->send(pBundle);
 
 	s.done();
 }
@@ -533,8 +712,23 @@ void Baseappmgr::reqCreateEntityAnywhereFromDBIDQueryBestBaseappID(Network::Chan
 //-------------------------------------------------------------------------------------
 void Baseappmgr::reqCreateEntityAnywhereFromDBID(Network::Channel* pChannel, MemoryStream& s) 
 {
-	Components::ComponentInfos* cinfos = 
-		Components::getSingleton().findComponent(pChannel);
+	COMPONENT_ID sourceID = 0;
+	if (!validateDBIDCreationForward(s, sourceID))
+	{
+		WARNING_MSG("Baseappmgr::reqCreateEntityAnywhereFromDBID: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
+
+	Components::ComponentInfos* cinfos =
+		findBoundComponentSource(pChannel, BASEAPP_TYPE, sourceID);
+	if (cinfos == NULL)
+	{
+		WARNING_MSG(fmt::format("Baseappmgr::reqCreateEntityAnywhereFromDBID: rejected unbound BaseApp componentID={}.\n",
+			sourceID));
+		s.done();
+		return;
+	}
 
 	// 此时肯定是在运行状态中，但有可能在等待创建space
 	// 所以初始化进度没有完成, 在只有一个baseapp的情况下如果这
@@ -546,7 +740,7 @@ void Baseappmgr::reqCreateEntityAnywhereFromDBID(Network::Channel* pChannel, Mem
 	s >> targetComponentID;
 
 	cinfos = Components::getSingleton().findComponent(BASEAPP_TYPE, targetComponentID);
-	if(cinfos == NULL || cinfos->pChannel == NULL || cinfos->state != COMPONENT_STATE_RUN)
+	if (!isAvailableBaseappTarget(cinfos, true))
 	{
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		ForwardItem* pFI = new AppForwardItem();
@@ -588,8 +782,23 @@ void Baseappmgr::reqCreateEntityAnywhereFromDBID(Network::Channel* pChannel, Mem
 //-------------------------------------------------------------------------------------
 void Baseappmgr::reqCreateEntityRemotelyFromDBID(Network::Channel* pChannel, MemoryStream& s)
 {
+	COMPONENT_ID sourceID = 0;
+	if (!validateDBIDCreationForward(s, sourceID))
+	{
+		WARNING_MSG("Baseappmgr::reqCreateEntityRemotelyFromDBID: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
+
 	Components::ComponentInfos* cinfos =
-		Components::getSingleton().findComponent(pChannel);
+		findBoundComponentSource(pChannel, BASEAPP_TYPE, sourceID);
+	if (cinfos == NULL)
+	{
+		WARNING_MSG(fmt::format("Baseappmgr::reqCreateEntityRemotelyFromDBID: rejected unbound BaseApp componentID={}.\n",
+			sourceID));
+		s.done();
+		return;
+	}
 
 	// 此时肯定是在运行状态中，但有可能在等待创建space
 	// 所以初始化进度没有完成, 在只有一个baseapp的情况下如果这
@@ -601,7 +810,7 @@ void Baseappmgr::reqCreateEntityRemotelyFromDBID(Network::Channel* pChannel, Mem
 	s >> targetComponentID;
 
 	cinfos = Components::getSingleton().findComponent(BASEAPP_TYPE, targetComponentID);
-	if (cinfos == NULL || cinfos->pChannel == NULL || cinfos->state != COMPONENT_STATE_RUN)
+	if (!isAvailableBaseappTarget(cinfos, true))
 	{
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		ForwardItem* pFI = new AppForwardItem();
@@ -643,6 +852,22 @@ void Baseappmgr::reqCreateEntityRemotelyFromDBID(Network::Channel* pChannel, Mem
 //-------------------------------------------------------------------------------------
 void Baseappmgr::registerPendingAccountToBaseapp(Network::Channel* pChannel, MemoryStream& s)
 {
+	if (!validatePendingLoginRequest(s, false))
+	{
+		WARNING_MSG("Baseappmgr::registerPendingAccountToBaseapp: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
+
+	Components::ComponentInfos* sourceInfos =
+		findBoundComponentSource(pChannel, LOGINAPP_TYPE);
+	if (sourceInfos == NULL)
+	{
+		WARNING_MSG("Baseappmgr::registerPendingAccountToBaseapp: rejected unbound LoginApp source.\n");
+		s.done();
+		return;
+	}
+
 	std::string loginName;
 	std::string accountName;
 	std::string password;
@@ -657,13 +882,6 @@ void Baseappmgr::registerPendingAccountToBaseapp(Network::Channel* pChannel, Mem
 	s >> loginName >> accountName >> password >> needCheckPassword >> entityDBID >> flags >> deadline >> clientType >> forceInternalLogin;
 	s.readBlob(datas);
 
-	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(pChannel);
-	if(cinfos == NULL || cinfos->pChannel == NULL)
-	{
-		ERROR_MSG("Baseappmgr::registerPendingAccountToBaseapp: not found loginapp!\n");
-		return;
-	}
-
 	if (pending_logins_.find(loginName) != pending_logins_.end())
 	{
 		ERROR_MSG(fmt::format("Baseappmgr::registerPendingAccountToBaseapp: Already registered! accountName={}.\n",
@@ -672,7 +890,7 @@ void Baseappmgr::registerPendingAccountToBaseapp(Network::Channel* pChannel, Mem
 		return;
 	}
 
-	pending_logins_[loginName] = cinfos->cid;
+	pending_logins_[loginName] = sourceInfos->cid;
 
 	updateBestBaseapp();
 
@@ -683,9 +901,10 @@ void Baseappmgr::registerPendingAccountToBaseapp(Network::Channel* pChannel, Mem
 	}
 
 	ENTITY_ID eid = 0;
-	cinfos = Components::getSingleton().findComponent(BASEAPP_TYPE, bestBaseappID_);
+	Components::ComponentInfos* cinfos =
+		Components::getSingleton().findComponent(BASEAPP_TYPE, bestBaseappID_);
 
-	if (cinfos == NULL || cinfos->pChannel == NULL || cinfos->state != COMPONENT_STATE_RUN)
+	if (!isAvailableBaseappTarget(cinfos, true))
 	{
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		ForwardItem* pFI = new AppForwardItem();
@@ -728,6 +947,22 @@ void Baseappmgr::registerPendingAccountToBaseapp(Network::Channel* pChannel, Mem
 //-------------------------------------------------------------------------------------
 void Baseappmgr::registerPendingAccountToBaseappAddr(Network::Channel* pChannel, MemoryStream& s)
 {
+	if (!validatePendingLoginRequest(s, true))
+	{
+		WARNING_MSG("Baseappmgr::registerPendingAccountToBaseappAddr: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
+
+	Components::ComponentInfos* sourceInfos =
+		findBoundComponentSource(pChannel, LOGINAPP_TYPE);
+	if (sourceInfos == NULL)
+	{
+		WARNING_MSG("Baseappmgr::registerPendingAccountToBaseappAddr: rejected unbound LoginApp source.\n");
+		s.done();
+		return;
+	}
+
 	COMPONENT_ID componentID;
 	std::string loginName;
 	std::string accountName;
@@ -747,13 +982,6 @@ void Baseappmgr::registerPendingAccountToBaseappAddr(Network::Channel* pChannel,
 	DEBUG_MSG(fmt::format("Baseappmgr::registerPendingAccountToBaseappAddr:{0}, componentID={1}, entityID={2}.\n",
 		accountName, componentID, entityID));
 
-	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(pChannel);
-	if(cinfos == NULL || cinfos->pChannel == NULL)
-	{
-		ERROR_MSG("Baseappmgr::registerPendingAccountToBaseapp: not found loginapp!\n");
-		return;
-	}
-
 	if (pending_logins_.find(loginName) != pending_logins_.end())
 	{
 		ERROR_MSG(fmt::format("Baseappmgr::registerPendingAccountToBaseappAddr: Already registered! accountName={}.\n",
@@ -762,10 +990,11 @@ void Baseappmgr::registerPendingAccountToBaseappAddr(Network::Channel* pChannel,
 		return;
 	}
 
-	pending_logins_[loginName] = cinfos->cid;
+	pending_logins_[loginName] = sourceInfos->cid;
 
-	cinfos = Components::getSingleton().findComponent(componentID);
-	if(cinfos == NULL || cinfos->pChannel == NULL)
+	Components::ComponentInfos* cinfos =
+		Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
+	if (!isAvailableBaseappTarget(cinfos, true))
 	{
 		ERROR_MSG(fmt::format("Baseappmgr::registerPendingAccountToBaseappAddr: not found baseapp({}).\n", componentID));
 		sendAllocatedBaseappAddr(pChannel, loginName, accountName, "", 0, 0);

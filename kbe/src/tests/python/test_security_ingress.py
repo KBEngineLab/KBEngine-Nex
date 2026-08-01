@@ -345,6 +345,94 @@ PROBES = (
         r"Baseappmgr::forwardMessage: rejected unbound senderComponent\(0\)",
     ),
     (
+        "baseappmgr-truncated-forward",
+        "baseappmgr",
+        "internal",
+        "BASEAPPMGR_TYPE",
+        "Baseappmgr::forwardMessage",
+        r"Baseappmgr::forwardMessage: rejected incomplete header",
+    ),
+    (
+        "baseappmgr-truncated-create-anywhere",
+        "baseappmgr",
+        "internal",
+        "BASEAPPMGR_TYPE",
+        "Baseappmgr::reqCreateEntityAnywhere",
+        r"Baseappmgr::reqCreateEntityAnywhere: rejected malformed or oversized payload",
+    ),
+    (
+        "baseappmgr-spoofed-create-anywhere",
+        "baseappmgr",
+        "internal",
+        "BASEAPPMGR_TYPE",
+        "Baseappmgr::reqCreateEntityAnywhere",
+        r"Baseappmgr::reqCreateEntityAnywhere: rejected unbound BaseApp componentID=7001",
+    ),
+    (
+        "baseappmgr-truncated-create-remotely",
+        "baseappmgr",
+        "internal",
+        "BASEAPPMGR_TYPE",
+        "Baseappmgr::reqCreateEntityRemotely",
+        r"Baseappmgr::reqCreateEntityRemotely: rejected malformed or oversized payload",
+    ),
+    (
+        "baseappmgr-truncated-dbid-query",
+        "baseappmgr",
+        "internal",
+        "BASEAPPMGR_TYPE",
+        "Baseappmgr::reqCreateEntityAnywhereFromDBIDQueryBestBaseappID",
+        r"Baseappmgr::reqCreateEntityAnywhereFromDBIDQueryBestBaseappID: rejected malformed or oversized payload",
+    ),
+    (
+        "baseappmgr-spoofed-dbid-query",
+        "baseappmgr",
+        "internal",
+        "BASEAPPMGR_TYPE",
+        "Baseappmgr::reqCreateEntityAnywhereFromDBIDQueryBestBaseappID",
+        r"Baseappmgr::reqCreateEntityAnywhereFromDBIDQueryBestBaseappID: rejected unbound BaseApp source",
+    ),
+    (
+        "baseappmgr-truncated-dbid-anywhere",
+        "baseappmgr",
+        "internal",
+        "BASEAPPMGR_TYPE",
+        "Baseappmgr::reqCreateEntityAnywhereFromDBID",
+        r"Baseappmgr::reqCreateEntityAnywhereFromDBID: rejected malformed or oversized payload",
+    ),
+    (
+        "baseappmgr-truncated-dbid-remotely",
+        "baseappmgr",
+        "internal",
+        "BASEAPPMGR_TYPE",
+        "Baseappmgr::reqCreateEntityRemotelyFromDBID",
+        r"Baseappmgr::reqCreateEntityRemotelyFromDBID: rejected malformed or oversized payload",
+    ),
+    (
+        "baseappmgr-truncated-pending-login",
+        "baseappmgr",
+        "internal",
+        "BASEAPPMGR_TYPE",
+        "Baseappmgr::registerPendingAccountToBaseapp",
+        r"Baseappmgr::registerPendingAccountToBaseapp: rejected malformed or oversized payload",
+    ),
+    (
+        "baseappmgr-spoofed-pending-login",
+        "baseappmgr",
+        "internal",
+        "BASEAPPMGR_TYPE",
+        "Baseappmgr::registerPendingAccountToBaseapp",
+        r"Baseappmgr::registerPendingAccountToBaseapp: rejected unbound LoginApp source",
+    ),
+    (
+        "baseappmgr-truncated-pending-login-addr",
+        "baseappmgr",
+        "internal",
+        "BASEAPPMGR_TYPE",
+        "Baseappmgr::registerPendingAccountToBaseappAddr",
+        r"Baseappmgr::registerPendingAccountToBaseappAddr: rejected malformed or oversized payload",
+    ),
+    (
         "baseappmgr-spoofed-update",
         "baseappmgr",
         "internal",
@@ -915,6 +1003,23 @@ def probe_body(probe_case, component_uid):
         return struct.pack("=Qi", 7001, 6) + b"security-probe\0" + struct.pack("=i", 0) + b"probe\0"
     if probe_case == "baseappmgr-zero-forward":
         return struct.pack("=QQ", 0, 7001)
+    if probe_case in {
+        "baseappmgr-truncated-forward",
+        "baseappmgr-truncated-create-anywhere",
+        "baseappmgr-truncated-create-remotely",
+        "baseappmgr-truncated-dbid-query",
+        "baseappmgr-truncated-dbid-anywhere",
+        "baseappmgr-truncated-dbid-remotely",
+        "baseappmgr-truncated-pending-login",
+        "baseappmgr-truncated-pending-login-addr",
+    }:
+        return b""
+    if probe_case == "baseappmgr-spoofed-create-anywhere":
+        return b"Account\0" + struct.pack("=IQI", 0, 7001, 0)
+    if probe_case == "baseappmgr-spoofed-dbid-query":
+        return b"Account\0" + struct.pack("=QIH", 1, 0, 0)
+    if probe_case == "baseappmgr-spoofed-pending-login":
+        return b"login\0account\0\0" + struct.pack("=BQIQiBI", 0, 0, 0, 0, 0, 0, 0)
     if probe_case == "baseappmgr-spoofed-update":
         return struct.pack("=QiifI", 7001, 0, 0, float("nan"), 0)
     if probe_case == "cellappmgr-zero-forward":
