@@ -60,6 +60,35 @@ Navigation g_navigation;
 
 namespace
 {
+Components::ComponentInfos* findBoundCellappSource(Network::Channel* pChannel)
+{
+	if (pChannel == NULL || pChannel->isDestroyed() || pChannel->condemn() != 0)
+		return NULL;
+
+	Components& components = Components::getSingleton();
+	Components::ComponentInfos* infos = components.findComponent(pChannel);
+	if (infos == NULL && pChannel->componentID() != 0)
+		infos = components.findComponent(CELLAPP_TYPE, pChannel->componentID());
+
+	if (infos == NULL || infos->componentType != CELLAPP_TYPE || infos->cid == 0 ||
+		!Security::isBoundBidirectionalComponentSource(infos->cid, infos, pChannel,
+			pChannel->componentID()))
+	{
+		return NULL;
+	}
+
+	return infos;
+}
+
+bool isCurrentGhostPeer(Entity* entity, COMPONENT_ID sourceCellID)
+{
+	if (entity == NULL || sourceCellID == 0)
+		return false;
+
+	const COMPONENT_ID peerCellID = entity->isReal() ? entity->ghostCell() : entity->realCell();
+	return peerCellID != 0 && peerCellID == sourceCellID;
+}
+
 Components::ComponentInfos* validateBaseappEntityCreationSource(
 	Network::Channel* pChannel, COMPONENT_ID componentID,
 	const std::string& entityType, bool hasClient, bool allowCellappmgrRelay,
@@ -1815,6 +1844,20 @@ void Cellapp::onUpdateDataFromClientForControlledEntity(Network::Channel* pChann
 //-------------------------------------------------------------------------------------
 void Cellapp::onUpdateGhostPropertys(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (s.length() < sizeof(ENTITY_ID))
+	{
+		WARNING_MSG("Cellapp::onUpdateGhostPropertys: rejected incomplete fixed header.\n");
+		s.done();
+		return;
+	}
+	Components::ComponentInfos* sourceInfos = findBoundCellappSource(pChannel);
+	if (sourceInfos == NULL)
+	{
+		WARNING_MSG("Cellapp::onUpdateGhostPropertys: rejected unbound CellApp source.\n");
+		s.done();
+		return;
+	}
+
 	ENTITY_ID entityID;
 	
 	s >> entityID;
@@ -1845,6 +1888,13 @@ void Cellapp::onUpdateGhostPropertys(Network::Channel* pChannel, KBEngine::Memor
 		s.done();
 		return;
 	}
+	if (!isCurrentGhostPeer(entity, sourceInfos->cid))
+	{
+		WARNING_MSG(fmt::format("Cellapp::onUpdateGhostPropertys: rejected stale CellApp source, entityID={}, sourceCellID={}.\n",
+			entityID, sourceInfos->cid));
+		s.done();
+		return;
+	}
 
 	entity->onUpdateGhostPropertys(s);
 }
@@ -1852,6 +1902,20 @@ void Cellapp::onUpdateGhostPropertys(Network::Channel* pChannel, KBEngine::Memor
 //-------------------------------------------------------------------------------------
 void Cellapp::onRemoteRealMethodCall(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (s.length() < sizeof(ENTITY_ID))
+	{
+		WARNING_MSG("Cellapp::onRemoteRealMethodCall: rejected incomplete fixed header.\n");
+		s.done();
+		return;
+	}
+	Components::ComponentInfos* sourceInfos = findBoundCellappSource(pChannel);
+	if (sourceInfos == NULL)
+	{
+		WARNING_MSG("Cellapp::onRemoteRealMethodCall: rejected unbound CellApp source.\n");
+		s.done();
+		return;
+	}
+
 	ENTITY_ID entityID;
 	
 	s >> entityID;
@@ -1882,6 +1946,13 @@ void Cellapp::onRemoteRealMethodCall(Network::Channel* pChannel, KBEngine::Memor
 		s.done();
 		return;
 	}
+	if (!isCurrentGhostPeer(entity, sourceInfos->cid))
+	{
+		WARNING_MSG(fmt::format("Cellapp::onRemoteRealMethodCall: rejected stale CellApp source, entityID={}, sourceCellID={}.\n",
+			entityID, sourceInfos->cid));
+		s.done();
+		return;
+	}
 
 	entity->onRemoteRealMethodCall(s);
 }
@@ -1889,6 +1960,20 @@ void Cellapp::onRemoteRealMethodCall(Network::Channel* pChannel, KBEngine::Memor
 //-------------------------------------------------------------------------------------
 void Cellapp::onUpdateGhostVolatileData(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (s.length() < sizeof(ENTITY_ID))
+	{
+		WARNING_MSG("Cellapp::onUpdateGhostVolatileData: rejected incomplete fixed header.\n");
+		s.done();
+		return;
+	}
+	Components::ComponentInfos* sourceInfos = findBoundCellappSource(pChannel);
+	if (sourceInfos == NULL)
+	{
+		WARNING_MSG("Cellapp::onUpdateGhostVolatileData: rejected unbound CellApp source.\n");
+		s.done();
+		return;
+	}
+
 	ENTITY_ID entityID;
 	
 	s >> entityID;
@@ -1916,6 +2001,13 @@ void Cellapp::onUpdateGhostVolatileData(Network::Channel* pChannel, KBEngine::Me
 		ERROR_MSG(fmt::format("Cellapp::onUpdateGhostVolatileData: not found entity({})\n", 
 			entityID));
 
+		s.done();
+		return;
+	}
+	if (!isCurrentGhostPeer(entity, sourceInfos->cid))
+	{
+		WARNING_MSG(fmt::format("Cellapp::onUpdateGhostVolatileData: rejected stale CellApp source, entityID={}, sourceCellID={}.\n",
+			entityID, sourceInfos->cid));
 		s.done();
 		return;
 	}
@@ -2179,6 +2271,23 @@ PyObject* Cellapp::__py_address(PyObject* self, PyObject* args)
 //-------------------------------------------------------------------------------------
 void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 {
+	const size_t teleportHeaderSize = sizeof(ENTITY_ID) * 2 + sizeof(SPACE_ID) +
+		sizeof(ENTITY_SCRIPT_UID) + sizeof(Position3D) + sizeof(Direction3D) +
+		sizeof(COMPONENT_ID);
+	if (s.length() < teleportHeaderSize)
+	{
+		WARNING_MSG("Cellapp::reqTeleportToCellApp: rejected incomplete fixed header.\n");
+		s.done();
+		return;
+	}
+	Components::ComponentInfos* sourceInfos = findBoundCellappSource(pChannel);
+	if (sourceInfos == NULL)
+	{
+		WARNING_MSG("Cellapp::reqTeleportToCellApp: rejected unbound CellApp source.\n");
+		s.done();
+		return;
+	}
+
 	size_t rpos = s.rpos();
 
 	ENTITY_ID nearbyMBRefID = 0, teleportEntityID = 0;
@@ -2195,6 +2304,13 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 
 	COMPONENT_ID ghostCell;
 	s >> ghostCell;
+	if (ghostCell == 0 || ghostCell != sourceInfos->cid)
+	{
+		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellApp: rejected sourceCellID={}, payloadSourceCellID={}.\n",
+			sourceInfos->cid, ghostCell));
+		s.done();
+		return;
+	}
 
 	bool success = false;
 
@@ -2319,6 +2435,20 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 //-------------------------------------------------------------------------------------
 void Cellapp::reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s)
 {
+	const size_t callbackHeaderSize = sizeof(COMPONENT_ID) * 3 + sizeof(ENTITY_ID) + sizeof(bool);
+	if (s.length() < callbackHeaderSize)
+	{
+		WARNING_MSG("Cellapp::reqTeleportToCellAppCB: rejected incomplete fixed header.\n");
+		s.done();
+		return;
+	}
+	if (pChannel == NULL || pChannel->isDestroyed() || pChannel->condemn() != 0)
+	{
+		WARNING_MSG("Cellapp::reqTeleportToCellAppCB: rejected unavailable source Channel.\n");
+		s.done();
+		return;
+	}
+
 	bool success;
 	COMPONENT_ID sourceCellappID, targetCellappID, entityBaseappID;
 	ENTITY_ID teleportEntityID = 0;
@@ -2407,6 +2537,19 @@ void Cellapp::reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s
 //-------------------------------------------------------------------------------------
 void Cellapp::reqTeleportToCellAppOver(Network::Channel* pChannel, MemoryStream& s)
 {
+	if (s.length() < sizeof(ENTITY_ID))
+	{
+		WARNING_MSG("Cellapp::reqTeleportToCellAppOver: rejected incomplete fixed header.\n");
+		s.done();
+		return;
+	}
+	if (!Components::getSingleton().isExpectedComponentChannel(BASEAPP_TYPE, pChannel))
+	{
+		WARNING_MSG("Cellapp::reqTeleportToCellAppOver: rejected non-BaseApp source.\n");
+		s.done();
+		return;
+	}
+
 	ENTITY_ID teleportEntityID = 0;
 
 	s >> teleportEntityID;
@@ -2418,6 +2561,14 @@ void Cellapp::reqTeleportToCellAppOver(Network::Channel* pChannel, MemoryStream&
 		ERROR_MSG(fmt::format("Cellapp::reqTeleportToCellAppOver: not found reqTeleportEntity({}), lose entity!\n", 
 			teleportEntityID));
 
+		s.done();
+		return;
+	}
+	if (entity->baseEntityCall() == NULL ||
+		entity->baseEntityCall()->componentID() != pChannel->componentID())
+	{
+		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellAppOver: rejected unbound BaseApp entity={}, sourceBaseAppID={}.\n",
+			teleportEntityID, pChannel->componentID()));
 		s.done();
 		return;
 	}

@@ -324,6 +324,12 @@ foreach(_kbe_required IN ITEMS
 	"forwardEntityMessageToCellappFromClient: rejected incomplete fixed header"
 	"onUpdateDataFromClient: rejected incomplete fixed header"
 	"onUpdateDataFromClientForControlledEntity: rejected incomplete fixed header"
+	"onUpdateGhostPropertys: rejected incomplete fixed header"
+	"onRemoteRealMethodCall: rejected incomplete fixed header"
+	"onUpdateGhostVolatileData: rejected incomplete fixed header"
+	"reqTeleportToCellApp: rejected incomplete fixed header"
+	"reqTeleportToCellAppCB: rejected incomplete fixed header"
+	"reqTeleportToCellAppOver: rejected incomplete fixed header"
 )
     string(FIND "${_kbe_baseapp}\n${_kbe_cellapp}"
         "${_kbe_required}" _kbe_required_position)

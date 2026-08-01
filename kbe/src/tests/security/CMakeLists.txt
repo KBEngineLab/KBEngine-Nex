@@ -74,7 +74,7 @@ if(KBE_TEST_SERVER_CLUSTER)
 	)
 	set_tests_properties(security.multiprocess_ingress PROPERTIES
 		LABELS "security;integration;network;runtime;server"
-		PASS_REGULAR_EXPRESSION "SECURITY_MULTIPROCESS_INGRESS_PASS probes=64"
+		PASS_REGULAR_EXPRESSION "SECURITY_MULTIPROCESS_INGRESS_PASS probes=70"
 		RUN_SERIAL TRUE
 		TIMEOUT 240
 	)
