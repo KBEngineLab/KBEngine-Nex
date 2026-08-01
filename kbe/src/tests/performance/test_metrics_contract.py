@@ -1,5 +1,6 @@
 """Contract tests for the Performance Lab. / 性能实验室契约测试。"""
 
+import ast
 import tempfile
 import sys
 from pathlib import Path
@@ -16,7 +17,24 @@ from performance.report import build_summary, load_events, validate_event
 from performance.watcher_metrics import parse_target, resolve_target
 
 
+def assert_fixture_callbacks() -> None:
+    fixture_root = resolve_fixture_root("network-baseline")
+    required = {
+        "base/kbemain.py": ("onInit", "onBaseAppReady", "onReadyForLogin"),
+        "cell/kbemain.py": ("onInit",),
+        "db/kbemain.py": ("onDBMgrReady", "onSelectAccountDBInterface"),
+        "interface/kbemain.py": ("onInterfaceAppReady",),
+        "logger/kbemain.py": ("onLoggerAppReady",),
+        "login/kbemain.py": ("onLoginAppReady", "onLoginCallbackFromDB", "onCreateAccountCallbackFromDB"),
+    }
+    for relative, callbacks in required.items():
+        module = ast.parse((fixture_root / relative).read_text(encoding="utf-8"))
+        functions = {node.name for node in module.body if isinstance(node, ast.FunctionDef)}
+        assert set(callbacks).issubset(functions), f"missing fixture callback in {relative}"
+
+
 def main() -> int:
+    assert_fixture_callbacks()
     process_row = {
         "CPU": 12.5,
         "WorkingSet64": 101,

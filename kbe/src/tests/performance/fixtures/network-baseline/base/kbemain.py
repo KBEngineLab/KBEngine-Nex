@@ -5,6 +5,13 @@
 import KBEngine
 
 
+def onInit(isReload):
+    """Keep the baseline free of asset-level initialization work.
+    显式提供引擎入口，避免基线因缺少回调产生 Python 异常。
+    """
+    pass
+
+
 def onBaseAppReady(isBootstrap):
     if isBootstrap:
         KBEngine.createEntityLocally("Space", {})

@@ -5,6 +5,21 @@
 import KBEngine
 
 
+def onLoginAppReady():
+    """Keep local login validation side-effect free.
+    本地登录校验保持无副作用，不混入外部平台逻辑。
+    """
+    pass
+
+
+def onLoginCallbackFromDB(loginName, accountName, errorno, datas):
+    pass
+
+
+def onCreateAccountCallbackFromDB(accountName, errorno, datas):
+    pass
+
+
 def onRequestLogin(loginName, password, clientType, datas):
     if len(loginName) > 64:
         return (KBEngine.SERVER_ERR_NAME, loginName, password, clientType, datas)

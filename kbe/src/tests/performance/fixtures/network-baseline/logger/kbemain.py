@@ -3,6 +3,13 @@
 """
 
 
+def onLoggerAppReady():
+    """Keep logger startup deterministic without adding script work.
+    保持 Logger 启动确定性，不增加脚本层工作。
+    """
+    pass
+
+
 def onReadyForShutDown():
     return True
 

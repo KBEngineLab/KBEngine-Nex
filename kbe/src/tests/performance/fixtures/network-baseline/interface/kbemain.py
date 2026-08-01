@@ -5,6 +5,17 @@
 import KBEngine
 
 
+def onInterfaceAppReady():
+    """Keep Interfaces available without opening a fixture socket.
+    保持 Interfaces 可用，但基线不创建额外监听套接字。
+    """
+    pass
+
+
+def onInterfaceAppShutDown():
+    pass
+
+
 def onRequestCreateAccount(registerName, password, datas):
     KBEngine.createAccountResponse(registerName, registerName, datas, KBEngine.SERVER_SUCCESS)
 

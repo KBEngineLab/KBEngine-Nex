@@ -3,5 +3,20 @@
 """
 
 
+def onDBMgrReady():
+    """The local network baseline needs no database bootstrap work.
+    本地网络基线不执行额外数据库启动逻辑。
+    """
+    pass
+
+
+def onDBMgrShutDown():
+    pass
+
+
+def onReadyForShutDown():
+    return True
+
+
 def onSelectAccountDBInterface(accountName):
     return "default"
