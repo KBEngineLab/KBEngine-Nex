@@ -98,6 +98,15 @@ def main() -> int:
         assert summary["latency"]["heartbeat"]["count"] == 5
         assert summary["latency"]["heartbeat"]["p99_ms"] >= 40
         assert summary["counters"]["log.error.count"] == 2
+        assert summary["phase_counters"] == {}
+        phase_path = Path(directory) / "phase.jsonl"
+        with JsonlRecorder(phase_path, "test-run", "contract") as recorder:
+            recorder.record("logs", "all", "log.error.count", 3, "count", {"kind": "counter", "phase": "shutdown"})
+            recorder.record("logs", "all", "log.error.count", 1, "count", {"kind": "counter", "phase": "measurement"})
+        phase_summary = build_summary(load_events(phase_path), {"max_log_errors": 0})
+        assert phase_summary["counters"]["log.error.count"] == 4
+        assert phase_summary["phase_counters"]["shutdown"]["log.error.count"] == 3
+        assert phase_summary["quality"]["status"] == "BLOCKER"
         assert summary["requests"]["success"] == 4
         assert summary["requests"]["failures"] == 1
         assert summary["counters"]["request.slow.count"] == 1

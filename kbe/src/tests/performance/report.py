@@ -42,6 +42,7 @@ def build_summary(
     samples: dict[str, LatencyHistogram] = defaultdict(LatencyHistogram)
     sample_units: dict[str, str] = {}
     counters: Counter[str] = Counter()
+    phase_counters: dict[str, Counter[str]] = defaultdict(Counter)
     gauges: dict[str, float] = {}
     metadata: dict[str, str] = {}
     for event in events:
@@ -56,6 +57,9 @@ def build_summary(
             sample_units.setdefault(sample_key, str(event.get("unit", "")))
         elif metric.startswith("log.") or tags.get("kind") == "counter":
             counters[metric] += int(float(event["value"]))
+            phase = tags.get("phase")
+            if phase:
+                phase_counters[str(phase)][metric] += int(float(event["value"]))
         elif isinstance(event["value"], (int, float)):
             gauges[f"{event['component']}.{metric}"] = float(event["value"])
         metadata.setdefault("run_id", str(event["run_id"]))
@@ -71,6 +75,10 @@ def build_summary(
             for name, histogram in sorted(samples.items())
         },
         "counters": dict(sorted(counters.items())),
+        "phase_counters": {
+            phase: dict(sorted(values.items()))
+            for phase, values in sorted(phase_counters.items())
+        },
         "gauges": dict(sorted(gauges.items())),
         "requests": {
             "total": total_requests,
@@ -103,7 +111,9 @@ def evaluate_quality(
     minimum_success = float(thresholds.get("success_rate_min_percent", 99.0))
     if request_result.get("total", 0) and request_result.get("success_rate_percent", 0.0) < minimum_success:
         blockers.append(f"request success rate below {minimum_success:.3f}%")
-    process_exits = int(summary.get("counters", {}).get("process.exit.count", 0))
+    phase_counters = summary.get("phase_counters", {})
+    quality_counters = phase_counters.get("measurement", summary.get("counters", {}))
+    process_exits = int(quality_counters.get("process.exit.count", 0))
     if process_exits > 0:
         blockers.append(f"workload process exits={process_exits}")
     readiness_failures = int(summary.get("counters", {}).get("readiness.failure.count", 0))
@@ -112,7 +122,7 @@ def evaluate_quality(
     max_protocol_errors = int(thresholds.get("max_protocol_errors", 0))
     protocol_errors = sum(
         value
-        for metric, value in summary.get("counters", {}).items()
+        for metric, value in quality_counters.items()
         if "protocol" in metric.lower() or "not_found_msgid" in metric.lower()
     )
     if protocol_errors > max_protocol_errors:
@@ -134,11 +144,11 @@ def evaluate_quality(
     if network_errors > 0:
         blockers.append(f"Bots network errors={network_errors}")
     max_log_errors = int(thresholds.get("max_log_errors", 0))
-    log_errors = int(summary.get("counters", {}).get("log.error.count", 0))
+    log_errors = int(quality_counters.get("log.error.count", 0))
     if log_errors > max_log_errors:
         blockers.append(f"log errors={log_errors} > {max_log_errors}")
     for metric in ("log.resource_unavailable.count", "log.abnormal_exit.count"):
-        value = int(summary.get("counters", {}).get(metric, 0))
+        value = int(quality_counters.get(metric, 0))
         if value > 0:
             blockers.append(f"{metric}={value}")
     for metric, expected in readiness.items():
@@ -213,6 +223,11 @@ def write_report(summary: dict[str, Any], json_path: Path, markdown_path: Path) 
     lines.extend(["", "## Counters", "", "| Metric | Value |", "| --- | ---: |"])
     for metric, value in summary.get("counters", {}).items():
         lines.append(f"| `{metric}` | {value} |")
+    if summary.get("phase_counters"):
+        lines.extend(["", "## Phase Counters", "", "| Phase | Metric | Value |", "| --- | --- | ---: |"])
+        for phase, counters in summary["phase_counters"].items():
+            for metric, value in counters.items():
+                lines.append(f"| `{phase}` | `{metric}` | {value} |")
     lines.extend(["", "## Gauges", "", "| Metric | Value |", "| --- | ---: |"])
     for metric, value in summary.get("gauges", {}).items():
         lines.append(f"| `{metric}` | {value:.2f} |")

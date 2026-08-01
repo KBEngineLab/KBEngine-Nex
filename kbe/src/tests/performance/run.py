@@ -150,6 +150,10 @@ def main() -> int:
                 configured_bots,
             )
             wait_for_warmup(process, max(float(scenario.get("warmup_seconds", 0.0)), 0.0))
+            # 丢弃启动阶段日志，避免初始化告警污染稳态质量门；测量和关闭阶段仍分别保留。
+            # Drain startup logs so initialization noise cannot fail the steady-state gate; measurement and shutdown remain visible.
+            for log_collector in log_collectors:
+                record_log_samples(recorder, log_collector, "startup")
             started = time.monotonic()
             next_sample = started
             while time.monotonic() - started < duration:
@@ -158,6 +162,8 @@ def main() -> int:
                     break
                 if process_collector:
                     record_process_samples(recorder, process_collector)
+                for log_collector in log_collectors:
+                    record_log_samples(recorder, log_collector, "measurement")
                 if watcher_collector:
                     for target in watcher_targets:
                         request_started_ms = monotonic_milliseconds()
@@ -227,8 +233,7 @@ def main() -> int:
                 cluster.stop()
                 cluster = None
             for log_collector in log_collectors:
-                for metric, value in log_collector.sample().items():
-                    recorder.record("logs", str(log_collector.root), f"log.{metric}.count", value, "count")
+                record_log_samples(recorder, log_collector, "shutdown")
             recorder.flush()
     summary = build_summary(
         load_events(events_path),
@@ -317,6 +322,21 @@ def record_process_samples(recorder: JsonlRecorder, collector: ProcessGroupColle
         recorder.record_sample("process", process_name, "threads.active", sample.thread_count, "count")
         if sample.handle_count is not None:
             recorder.record_sample("process", process_name, "handles.active", sample.handle_count, "count")
+
+
+def record_log_samples(recorder: JsonlRecorder, collector: IncrementalLogCollector, phase: str) -> None:
+    """Record incremental logs with lifecycle phase metadata.
+    按生命周期阶段记录增量日志，避免把主动关闭期间的断链提示算入稳态错误。
+    """
+    for metric, value in collector.sample().items():
+        recorder.record(
+            "logs",
+            str(collector.root),
+            f"log.{metric}.count",
+            value,
+            "count",
+            {"kind": "counter", "phase": phase},
+        )
 
 
 def wait_for_workload_ready(
