@@ -62,7 +62,7 @@ public:
 	virtual void onLoginAccountCB(Network::Channel* pChannel, KBEngine::MemoryStream& s) = 0;
 
 	virtual void charge(Network::Channel* pChannel, KBEngine::MemoryStream& s) = 0;
-	virtual void onChargeCB(KBEngine::MemoryStream& s) = 0;
+	virtual void onChargeCB(Network::Channel* pChannel, KBEngine::MemoryStream& s) = 0;
 
 	virtual void accountActivate(Network::Channel* pChannel, std::string& scode) = 0;
 	virtual void accountReqResetPassword(Network::Channel* pChannel, std::string& accountName) = 0;
@@ -96,7 +96,7 @@ public:
 
 	virtual void charge(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	virtual void onChargeCB(KBEngine::MemoryStream& s);
+	virtual void onChargeCB(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
 	virtual void accountActivate(Network::Channel* pChannel, std::string& scode);
 	virtual void accountReqResetPassword(Network::Channel* pChannel, std::string& accountName);
@@ -135,7 +135,7 @@ public:
 
 	virtual void charge(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	virtual void onChargeCB(KBEngine::MemoryStream& s);
+	virtual void onChargeCB(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
 	virtual void accountActivate(Network::Channel* pChannel, std::string& scode);
 	virtual void accountReqResetPassword(Network::Channel* pChannel, std::string& accountName);

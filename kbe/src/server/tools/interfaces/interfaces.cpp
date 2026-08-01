@@ -31,6 +31,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "server/components.h"
 #include "server/plugin_runtime.h"
 #include "server/asyncio_helper.h"
+#include "server/interfaces_payload_guard.h"
 #include "server/telnet_server.h"
 
 #include "baseapp/baseapp_interface.h"
@@ -41,7 +42,17 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "dbmgr/dbmgr_interface.h"	
 
 namespace KBEngine{
-	
+
+namespace
+{
+bool isAvailableDbmgrChannel(Network::Channel* pChannel, COMPONENT_ID expectedComponentID = 0)
+{
+	return pChannel != NULL && !pChannel->isDestroyed() && pChannel->condemn() == 0 &&
+		(expectedComponentID == 0 || pChannel->componentID() == expectedComponentID) &&
+		Components::getSingleton().isExpectedComponentChannel(DBMGR_TYPE, pChannel);
+}
+}
+
 ServerConfig g_serverConfig;
 KBE_SINGLETON_INIT(Interfaces);
 
@@ -53,6 +64,8 @@ Interfaces::Interfaces(Network::EventDispatcher& dispatcher,
 			 COMPONENT_ID componentID):
 	PythonApp(dispatcher, ninterface, componentType, componentID),
 	mainProcessTimer_(),
+	orders_(),
+	nextOrdersTimeout_(0),
 	reqCreateAccount_requests_(),
 	reqAccountLogin_requests_(),
 	pTelnetServer_(NULL),
@@ -72,9 +85,11 @@ Interfaces::~Interfaces()
 		REQCREATE_MAP::iterator iter = reqCreateAccount_requests_.begin();
 		for(; iter != reqCreateAccount_requests_.end(); ++iter)
 		{
-			WARNING_MSG(fmt::format("Interfaces::~Interfaces(): Discarding {0}/{1} reqCreateAccount[{2:p}] tasks.\n", 
+			WARNING_MSG(fmt::format("Interfaces::~Interfaces(): Discarding {0}/{1} reqCreateAccount[{2:p}] tasks.\n",
 				++i, reqCreateAccount_requests_.size(), (void*)iter->second));
+			delete iter->second;
 		}
+		reqCreateAccount_requests_.clear();
 	}
 
 	if(reqAccountLogin_requests_.size() > 0)
@@ -83,9 +98,11 @@ Interfaces::~Interfaces()
 		REQLOGIN_MAP::iterator iter = reqAccountLogin_requests_.begin();
 		for(; iter != reqAccountLogin_requests_.end(); ++iter)
 		{
-			WARNING_MSG(fmt::format("Interfaces::~Interfaces(): Discarding {0}/{1} reqAccountLogin[{2:p}] tasks.\n", 
+			WARNING_MSG(fmt::format("Interfaces::~Interfaces(): Discarding {0}/{1} reqAccountLogin[{2:p}] tasks.\n",
 				++i, reqAccountLogin_requests_.size(), (void*)iter->second));
+			delete iter->second;
 		}
+		reqAccountLogin_requests_.clear();
 	}
 }
 
@@ -135,6 +152,34 @@ void Interfaces::handleMainTick()
 	
 	threadPool_.onMainThreadTick();
 	networkInterface().processChannels(&InterfacesInterface::messageHandlers);
+	cleanupExpiredOrders();
+}
+
+//-------------------------------------------------------------------------------------
+void Interfaces::cleanupExpiredOrders()
+{
+	const uint64 now = timestamp();
+	if (nextOrdersTimeout_ == 0 || now < nextOrdersTimeout_)
+		return;
+
+	size_t expiredCount = 0;
+	nextOrdersTimeout_ = 0;
+	for (ORDERS::iterator iter = orders_.begin(); iter != orders_.end();)
+	{
+		if (iter->second->timeout <= now)
+		{
+			iter = orders_.erase(iter);
+			++expiredCount;
+			continue;
+		}
+
+		if (nextOrdersTimeout_ == 0 || iter->second->timeout < nextOrdersTimeout_)
+			nextOrdersTimeout_ = iter->second->timeout;
+		++iter;
+	}
+
+	if (expiredCount > 0)
+		WARNING_MSG(fmt::format("Interfaces::cleanupExpiredOrders: expiredCount={}.\n", expiredCount));
 }
 
 //-------------------------------------------------------------------------------------
@@ -492,12 +537,16 @@ void Interfaces::onExecuteRawDatabaseCommandCB(Network::Channel* pChannel, KBEng
 void Interfaces::eraseOrders(std::string ordersid)
 {
 	ORDERS::iterator iter = orders_.find(ordersid);
-	if(iter != orders_.end())
+	if(iter == orders_.end())
 	{
-		ERROR_MSG(fmt::format("Interfaces::eraseOrders: chargeID={} not found!\n", ordersid));
+		ERROR_MSG(fmt::format("Interfaces::eraseOrders: chargeIDSize={} not found.\n", ordersid.size()));
+		return;
 	}
 
+	const bool erasedNextOrder = iter->second->timeout == nextOrdersTimeout_;
 	orders_.erase(iter);
+	if (erasedNextOrder)
+		nextOrdersTimeout_ = timestamp();
 }
 
 //-------------------------------------------------------------------------------------
@@ -581,6 +630,12 @@ void Interfaces::createAccountResponse(std::string commitName, std::string realA
 	}
 
 	CreateAccountTask *task = iter->second;
+	if (!task->enable)
+	{
+		reqCreateAccount_requests_.erase(iter);
+		delete task;
+		return;
+	}
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 
@@ -693,6 +748,12 @@ void Interfaces::accountLoginResponse(std::string commitName, std::string realAc
 	}
 
 	LoginAccountTask *task = iter->second;
+	if (!task->enable)
+	{
+		reqAccountLogin_requests_.erase(iter);
+		delete task;
+		return;
+	}
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	
@@ -743,6 +804,19 @@ PyObject* Interfaces::__py_accountLoginResponse(PyObject* self, PyObject* args)
 //-------------------------------------------------------------------------------------
 void Interfaces::charge(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (!isAvailableDbmgrChannel(pChannel))
+	{
+		WARNING_MSG("Interfaces::charge: rejected non-DBMgr source.\n");
+		s.done();
+		return;
+	}
+	if (!InterfacesPayloadGuard::validateInterfacesChargeStream(s))
+	{
+		WARNING_MSG("Interfaces::charge: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
+
 	OrdersCharge* pOrdersCharge = new OrdersCharge();
 
 	pOrdersCharge->timeout = timestamp() + uint64(g_kbeSrvConfig.interfaces_orders_timeout_ * stampsPerSecond());
@@ -758,22 +832,21 @@ void Interfaces::charge(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 
 	// Provider payloads are opaque and may contain signed receipts or credentials.
 	// 平台载荷是不透明数据，可能包含签名收据或凭据，日志仅记录长度。
-	INFO_MSG(fmt::format("Interfaces::charge: componentID={}, chargeID={}, dbid={}, cbid={}, datasSize={}!\n",
-		pOrdersCharge->baseappID, pOrdersCharge->ordersID, pOrdersCharge->dbid,
+	INFO_MSG(fmt::format("Interfaces::charge: componentID={}, chargeIDSize={}, dbid={}, cbid={}, datasSize={}!\n",
+		pOrdersCharge->baseappID, pOrdersCharge->ordersID.size(), pOrdersCharge->dbid,
 		pOrdersCharge->cbid, pOrdersCharge->postDatas.size()));
 
 	ORDERS::iterator iter = orders_.find(pOrdersCharge->ordersID);
 	if(iter != orders_.end())
 	{
-		ERROR_MSG(fmt::format("Interfaces::charge: chargeID={} is exist!\n", pOrdersCharge->ordersID));
+		ERROR_MSG(fmt::format("Interfaces::charge: duplicate chargeIDSize={}.\n", pOrdersCharge->ordersID.size()));
 		delete pOrdersCharge;
 		return;
 	}
 
-	ChargeTask* pinfo = new ChargeTask();
-	pinfo->orders = *pOrdersCharge;
-	pinfo->pOrders = pOrdersCharge;
 	orders_[pOrdersCharge->ordersID].reset(pOrdersCharge);
+	if (nextOrdersTimeout_ == 0 || pOrdersCharge->timeout < nextOrdersTimeout_)
+		nextOrdersTimeout_ = pOrdersCharge->timeout;
 	
 	// 把请求交由脚本处理
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
@@ -798,43 +871,45 @@ void Interfaces::charge(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 //-------------------------------------------------------------------------------------
 void Interfaces::chargeResponse(std::string orderID, std::string extraDatas, KBEngine::SERVER_ERROR_CODE errorCode)
 {
+	if (!InterfacesPayloadGuard::isValidChargeID(orderID) ||
+		!InterfacesPayloadGuard::isValidChargeData(extraDatas) ||
+		!InterfacesPayloadGuard::isValidErrorCode(errorCode))
+	{
+		WARNING_MSG(fmt::format("Interfaces::chargeResponse: rejected fields, orderIDSize={}, extraDatasSize={}, errorCode={}.\n",
+			orderID.size(), extraDatas.size(), errorCode));
+		return;
+	}
+
 	ORDERS::iterator iter = orders_.find(orderID);
 	if (iter == orders_.end())
 	{
-		ERROR_MSG(fmt::format("Interfaces::chargeResponse: order id '{}' not found, "
-			"extraDatasSize={}, errorCode={}\n", orderID, extraDatas.size(), errorCode));
-		
+		ERROR_MSG(fmt::format("Interfaces::chargeResponse: order not found, "
+			"orderIDSize={}, extraDatasSize={}, errorCode={}\n", orderID.size(), extraDatas.size(), errorCode));
+
 		// 这种情况也需要baseapp处理onLoseChargeCB
 		// 例如某些时候客户端出问题未向服务器注册这个订单号，但是计费平台有返回的情况
 		// 将订单发送给注册的所有的dbmgr
-		const Network::NetworkInterface::ChannelMap& channels = Interfaces::getSingleton().networkInterface().channels();
-		if(channels.size() > 0)
+		Components::COMPONENTS& dbmgrs = Components::getSingleton().getComponents(DBMGR_TYPE);
+		bool sent = false;
+		for (Components::COMPONENTS::iterator componentIter = dbmgrs.begin();
+			componentIter != dbmgrs.end(); ++componentIter)
 		{
-			Network::NetworkInterface::ChannelMap::const_iterator channeliter = channels.begin();
-			for(; channeliter != channels.end(); ++channeliter)
-			{
-				Network::Channel* pChannel = channeliter->second;
-				if(pChannel)
-				{
-					COMPONENT_ID baseappID = 0;
-					DBID dbid = 0;
-					CALLBACK_ID cbid = 0;
+			Network::Channel* pDbmgrChannel = componentIter->pChannel;
+			if (!isAvailableDbmgrChannel(pDbmgrChannel, componentIter->cid))
+				continue;
 
-					Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-
-					(*pBundle).newMessage(DbmgrInterface::onChargeCB);
-					(*pBundle) << baseappID << orderID << dbid;
-					(*pBundle).appendBlob(extraDatas);
-					(*pBundle) << cbid;
-					(*pBundle) << errorCode;
-					pChannel->send(pBundle);
-				}
-			}
+			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+			(*pBundle).newMessage(DbmgrInterface::onChargeCB);
+			(*pBundle) << COMPONENT_ID(0) << orderID << DBID(0);
+			(*pBundle).appendBlob(extraDatas);
+			(*pBundle) << CALLBACK_ID(0) << errorCode;
+			pDbmgrChannel->send(pBundle);
+			sent = true;
 		}
-		else
+		if (!sent)
 		{
-			ERROR_MSG(fmt::format("Interfaces::chargeResponse: not found channels, orders={}, datasSize={}\n",
-				orderID, extraDatas.size()));
+			ERROR_MSG(fmt::format("Interfaces::chargeResponse: not found DBMgr channels, orderIDSize={}, datasSize={}\n",
+				orderID.size(), extraDatas.size()));
 		}
 
 		return;
@@ -853,19 +928,22 @@ void Interfaces::chargeResponse(std::string orderID, std::string extraDatas, KBE
 
 	Network::Channel* pChannel = networkInterface().findChannel(orders->address);
 
-	if(pChannel)
+	if(isAvailableDbmgrChannel(pChannel, orders->dbmgrID))
 	{
 		pChannel->send(pBundle);
 	}
 	else
 	{
-		ERROR_MSG(fmt::format("Interfaces::chargeResponse: not found channels, orders={}, datasSize={}\n",
-			orderID, extraDatas.size()));
+		ERROR_MSG(fmt::format("Interfaces::chargeResponse: stale DBMgr session, orderIDSize={}, datasSize={}\n",
+			orderID.size(), extraDatas.size()));
 
 		Network::Bundle::reclaimPoolObject(pBundle);
 	}
 
+	const bool erasedNextOrder = orders->timeout == nextOrdersTimeout_;
 	orders_.erase(iter);
+	if (erasedNextOrder)
+		nextOrdersTimeout_ = timestamp();
 }
 
 //-------------------------------------------------------------------------------------
@@ -897,18 +975,29 @@ PyObject* Interfaces::__py_chargeResponse(PyObject* self, PyObject* args)
 //-------------------------------------------------------------------------------------
 void Interfaces::eraseClientReq(Network::Channel* pChannel, std::string& logkey)
 {
+	if (!isAvailableDbmgrChannel(pChannel))
+	{
+		WARNING_MSG("Interfaces::eraseClientReq: rejected non-DBMgr source.\n");
+		return;
+	}
+	if (!InterfacesPayloadGuard::isValidClientRequestKey(logkey))
+	{
+		WARNING_MSG(fmt::format("Interfaces::eraseClientReq: rejected keySize={}.\n", logkey.size()));
+		return;
+	}
+
 	REQCREATE_MAP::iterator citer = reqCreateAccount_requests_.find(logkey);
 	if(citer != reqCreateAccount_requests_.end())
 	{
 		citer->second->enable = false;
-		DEBUG_MSG(fmt::format("Interfaces::eraseClientReq: reqCreateAccount_logkey={} set disabled!\n", logkey));
+		DEBUG_MSG(fmt::format("Interfaces::eraseClientReq: create request keySize={} disabled.\n", logkey.size()));
 	}
 
 	REQLOGIN_MAP::iterator liter = reqAccountLogin_requests_.find(logkey);
 	if(liter != reqAccountLogin_requests_.end())
 	{
 		liter->second->enable = false;
-		DEBUG_MSG(fmt::format("Interfaces::eraseClientReq: reqAccountLogin_logkey={} set disabled!\n", logkey));
+		DEBUG_MSG(fmt::format("Interfaces::eraseClientReq: login request keySize={} disabled.\n", logkey.size()));
 	}
 }
 

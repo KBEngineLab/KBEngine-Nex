@@ -5,6 +5,9 @@ endif()
 set(_kbe_sensitive_sources
     "lib/common/blowfish.cpp"
     "lib/server/serverapp.cpp"
+	"lib/server/bounded_stream_reader.h"
+	"lib/server/interfaces_payload_guard.cpp"
+	"lib/server/interfaces_payload_guard.h"
     "lib/client_lib/clientobjectbase.cpp"
     "server/baseapp/baseapp.cpp"
 	"server/dbmgr/dbmgr.cpp"
@@ -249,8 +252,16 @@ foreach(_kbe_required IN ITEMS
 	"Dbmgr::accountReqBindMail: rejected fields"
 	"isAvailableCallbackTarget"
 	"pChannel->condemn() != 0"
+	"validateChargeRequestStream"
+	"validateChargeCallbackStream"
+	"validateBaseappChargeCallbackStream"
+	"Interfaces::charge: rejected non-DBMgr source"
+	"Interfaces::eraseClientReq: rejected non-DBMgr source"
+	"Interfaces::cleanupExpiredOrders: expiredCount="
+	"if (!task->enable)"
+	"cbid = 0"
 )
-	string(FIND "${_kbe_cellapp}\n${_kbe_cellappmgr}\n${_kbe_dbmgr}\n${_kbe_interfaces_handler}"
+	string(FIND "${_kbe_baseapp}\n${_kbe_cellapp}\n${_kbe_cellappmgr}\n${_kbe_dbmgr}\n${_kbe_interfaces_handler}\n${_kbe_sensitive_text}"
 		"${_kbe_required}" _kbe_required_position)
 	if(_kbe_required_position EQUAL -1)
 		message(FATAL_ERROR "Database or Cell creation ingress guard is missing: ${_kbe_required}")

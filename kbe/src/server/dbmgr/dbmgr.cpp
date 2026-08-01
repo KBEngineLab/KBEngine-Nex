@@ -23,6 +23,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "dbmgr_interface.h"
 #include "dbtasks.h"
 #include "account_request_guard.h"
+#include "server/interfaces_payload_guard.h"
 #include "profile.h"
 #include "interfaces_handler.h"
 #include "sync_app_datas_handler.h"
@@ -1767,6 +1768,12 @@ void Dbmgr::charge(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 		s.done();
 		return;
 	}
+	if (!InterfacesPayloadGuard::validateChargeRequestStream(s))
+	{
+		WARNING_MSG("Dbmgr::charge: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
 
 	InterfacesHandler* pHandler = findInterfacesHandlerOrWarn("Dbmgr::charge");
 	if (pHandler != NULL)
@@ -1783,10 +1790,16 @@ void Dbmgr::onChargeCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 		s.done();
 		return;
 	}
+	if (!InterfacesPayloadGuard::validateChargeCallbackStream(s))
+	{
+		WARNING_MSG("Dbmgr::onChargeCB: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
 
 	InterfacesHandler* pHandler = findInterfacesHandlerOrWarn("Dbmgr::onChargeCB");
 	if (pHandler != NULL)
-		pHandler->onChargeCB(s);
+		pHandler->onChargeCB(pChannel, s);
 	else
 		s.done();
 }
@@ -1796,6 +1809,11 @@ void Dbmgr::eraseClientReq(Network::Channel* pChannel, std::string& logkey)
 {
 	if (!isExpectedIngressSource(LOGINAPP_TYPE, pChannel, "Dbmgr::eraseClientReq"))
 		return;
+	if (!InterfacesPayloadGuard::isValidClientRequestKey(logkey))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::eraseClientReq: rejected keySize={}.\n", logkey.size()));
+		return;
+	}
 
 	std::vector<InterfacesHandler*>::iterator iter = pInterfacesHandlers_.begin();
 	for (; iter != pInterfacesHandlers_.end(); ++iter)

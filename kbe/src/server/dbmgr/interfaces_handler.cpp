@@ -20,6 +20,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "dbmgr.h"
 #include "interfaces_handler.h"
 #include "account_request_guard.h"
+#include "server/interfaces_payload_guard.h"
 #include "buffered_dbtasks.h"
 #include "db_interface/db_threadpool.h"
 #include "db_interface/db_interface.h"
@@ -150,13 +151,17 @@ void InterfacesHandler_Dbmgr::onLoginAccountCB(Network::Channel* pChannel, KBEng
 //-------------------------------------------------------------------------------------
 void InterfacesHandler_Dbmgr::charge(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	(void)pChannel;
 	INFO_MSG("InterfacesHandler_Dbmgr::charge: no implement!\n");
+	s.done();
 }
 
 //-------------------------------------------------------------------------------------
-void InterfacesHandler_Dbmgr::onChargeCB(KBEngine::MemoryStream& s)
+void InterfacesHandler_Dbmgr::onChargeCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	(void)pChannel;
 	INFO_MSG("InterfacesHandler_Dbmgr::onChargeCB: no implement!\n");
+	s.done();
 }
 
 //-------------------------------------------------------------------------------------
@@ -659,8 +664,8 @@ void InterfacesHandler_Interfaces::charge(Network::Channel* pChannel, KBEngine::
 
 	// Charge payloads may contain provider credentials or signed receipts.
 	// 计费载荷可能包含平台凭据或签名收据，仅记录长度而不记录内容。
-	INFO_MSG(fmt::format("InterfacesHandler_Interfaces::charge: chargeID={}, dbid={}, cbid={}, datasSize={}!\n",
-		chargeID, dbid, cbid, datas.size()));
+	INFO_MSG(fmt::format("InterfacesHandler_Interfaces::charge: chargeIDSize={}, dbid={}, cbid={}, datasSize={}!\n",
+		chargeID.size(), dbid, cbid, datas.size()));
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 
@@ -674,8 +679,18 @@ void InterfacesHandler_Interfaces::charge(Network::Channel* pChannel, KBEngine::
 }
 
 //-------------------------------------------------------------------------------------
-void InterfacesHandler_Interfaces::onChargeCB(KBEngine::MemoryStream& s)
+void InterfacesHandler_Interfaces::onChargeCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	Network::Channel* pInterfacesChannel =
+		findOrReconnectChannel("InterfacesHandler_Interfaces::onChargeCB");
+	if (pInterfacesChannel == NULL || pInterfacesChannel != pChannel ||
+		!Components::getSingleton().isExpectedComponentChannel(INTERFACES_TYPE, pChannel))
+	{
+		WARNING_MSG("InterfacesHandler_Interfaces::onChargeCB: rejected stale Interfaces session.\n");
+		s.done();
+		return;
+	}
+
 	std::string chargeID;
 	std::string datas;
 	CALLBACK_ID cbid;
@@ -690,14 +705,14 @@ void InterfacesHandler_Interfaces::onChargeCB(KBEngine::MemoryStream& s)
 	s >> cbid;
 	s >> retcode;
 
-	INFO_MSG(fmt::format("InterfacesHandler_Interfaces::onChargeCB: chargeID={}, dbid={}, cbid={}, cid={}, datasSize={}!\n",
-		chargeID, dbid, cbid, cid, datas.size()));
+	INFO_MSG(fmt::format("InterfacesHandler_Interfaces::onChargeCB: chargeIDSize={}, dbid={}, cbid={}, cid={}, datasSize={}!\n",
+		chargeID.size(), dbid, cbid, cid, datas.size()));
 
 	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(BASEAPP_TYPE, cid);
-	if (cid == 0 || cinfos == NULL || cinfos->pChannel == NULL || cinfos->pChannel->isDestroyed())
+	if (!isAvailableCallbackTarget(cinfos, cid))
 	{
-		ERROR_MSG(fmt::format("InterfacesHandler_Interfaces::onChargeCB: baseapp not found!, chargeID={}, cid={}.\n", 
-			chargeID, cid));
+		ERROR_MSG(fmt::format("InterfacesHandler_Interfaces::onChargeCB: baseapp not found, chargeIDSize={}, cid={}.\n",
+			chargeID.size(), cid));
 
 		// 此时应该随机找一个baseapp调用onLoseChargeCB
 		bool found = false;
@@ -706,14 +721,18 @@ void InterfacesHandler_Interfaces::onChargeCB(KBEngine::MemoryStream& s)
 		for (Components::COMPONENTS::iterator iter = components.begin(); iter != components.end(); ++iter)
 		{
 			cinfos = &(*iter);
-			if (cinfos == NULL || cinfos->pChannel == NULL || cinfos->pChannel->isDestroyed())
+			if (!isAvailableCallbackTarget(cinfos, cinfos->cid))
 			{
 				continue;
 			}
 
-			WARNING_MSG(fmt::format("InterfacesHandler_Interfaces::onChargeCB: , chargeID={}, not found cid={}, forward to component({}) processing!\n",
-				chargeID, cid, cinfos->cid));
+			WARNING_MSG(fmt::format("InterfacesHandler_Interfaces::onChargeCB: chargeIDSize={}, not found cid={}, forward to component({}) processing!\n",
+				chargeID.size(), cid, cinfos->cid));
 
+			// The callback belongs to the missing BaseApp. Clearing it makes the
+			// fallback invoke onLoseChargeCB instead of consuming an unrelated callback.
+			// 回调属于已丢失的 BaseApp；清零后让备用节点进入 onLoseChargeCB，避免误取其他回调。
+			cbid = 0;
 			found = true;
 			break;
 		}

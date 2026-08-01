@@ -9,6 +9,7 @@ add_library(server STATIC
     globaldata_server.cpp
     idallocate.cpp
     id_component_querier.cpp
+	interfaces_payload_guard.cpp
     machine_infos.cpp
     pendingLoginmgr.cpp
     plugin_runtime.cpp

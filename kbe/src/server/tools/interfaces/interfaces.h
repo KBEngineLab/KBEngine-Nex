@@ -59,6 +59,7 @@ public:
 	
 	void handleTimeout(TimerHandle handle, void * arg);
 	void handleMainTick();
+	void cleanupExpiredOrders();
 
 	/* 初始化相关接口 */
 	bool initializeBegin();
@@ -148,6 +149,7 @@ protected:
 
 	// 订单
 	ORDERS																	orders_;
+	uint64																	nextOrdersTimeout_;
 
 	// 所有的请求记录， 避免某类重复性请求。
 	REQCREATE_MAP															reqCreateAccount_requests_;

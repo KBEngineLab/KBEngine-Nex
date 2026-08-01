@@ -22,6 +22,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "baseapp.h"
 #include "server/client_request_guard.h"
 #include "server/component_routing_guard.h"
+#include "server/interfaces_payload_guard.h"
 #include "proxy.h"
 #include "entity.h"
 #include "space.h"
@@ -3558,9 +3559,16 @@ PyObject* Baseapp::__py_charge(PyObject* self, PyObject* args)
 		return NULL;
 	}
 
-	if(strlen(pChargeID) <= 0)
+	const size_t chargeIDLength = strlen(pChargeID);
+	if(chargeIDLength <= 0)
 	{
 		PyErr_Format(PyExc_TypeError, "KBEngine::charge: ordersID is NULL!");
+		PyErr_PrintEx(0);
+		return NULL;
+	}
+	if(chargeIDLength > InterfacesPayloadGuard::CHARGE_ID_MAX_LENGTH)
+	{
+		PyErr_Format(PyExc_ValueError, "KBEngine::charge: ordersID is too long!");
 		PyErr_PrintEx(0);
 		return NULL;
 	}
@@ -3596,6 +3604,12 @@ PyObject* Baseapp::__py_charge(PyObject* self, PyObject* args)
 		SCRIPT_ERROR_CHECK();
 		return NULL;
 	}
+	if (length < 0 || static_cast<size_t>(length) > NETWORK_MESSAGE_MAX_SIZE)
+	{
+		PyErr_Format(PyExc_ValueError, "KBEngine::charge: byteDatas is too large!");
+		PyErr_PrintEx(0);
+		return NULL;
+	}
 
 	datas.assign(buffer, length);
 
@@ -3615,11 +3629,18 @@ PyObject* Baseapp::__py_charge(PyObject* self, PyObject* args)
 //-------------------------------------------------------------------------------------
 void Baseapp::charge(std::string chargeID, DBID dbid, const std::string& datas, PyObject* pycallback)
 {
-	CALLBACK_ID callbackID = callbackMgr().save(pycallback, uint64(g_kbeSrvConfig.interfaces_orders_timeout_ + 
+	Network::Channel* pChannel = Components::getSingleton().getDbmgrChannel();
+	if(pChannel == NULL || pChannel->isDestroyed() || pChannel->condemn() != 0)
+	{
+		ERROR_MSG("Baseapp::charge: not found available dbmgr.\n");
+		return;
+	}
+
+	CALLBACK_ID callbackID = callbackMgr().save(pycallback, uint64(g_kbeSrvConfig.interfaces_orders_timeout_ +
 		g_kbeSrvConfig.callback_timeout_));
 
-	INFO_MSG(fmt::format("Baseapp::charge: chargeID={0}, dbid={2}, pycallback={1}.\n",
-		chargeID,
+	INFO_MSG(fmt::format("Baseapp::charge: chargeIDSize={0}, dbid={2}, pycallback={1}.\n",
+		chargeID.size(),
 		callbackID,
 		dbid));
 
@@ -3631,15 +3652,6 @@ void Baseapp::charge(std::string chargeID, DBID dbid, const std::string& datas, 
 	(*pBundle).appendBlob(datas);
 	(*pBundle) << callbackID;
 
-	Network::Channel* pChannel = Components::getSingleton().getDbmgrChannel();
-
-	if(pChannel == NULL)
-	{
-		ERROR_MSG("Baseapp::charge: not found dbmgr!\n");
-		Network::Bundle::reclaimPoolObject(pBundle);
-		return;
-	}
-
 	pChannel->send(pBundle);
 }
 
@@ -3650,6 +3662,12 @@ void Baseapp::onChargeCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 	{
 		WARNING_MSG(fmt::format("Baseapp::onChargeCB: rejected non-DBMgr source, addr={}.\n",
 			pChannel->c_str()));
+		s.done();
+		return;
+	}
+	if (!InterfacesPayloadGuard::validateBaseappChargeCallbackStream(s))
+	{
+		WARNING_MSG("Baseapp::onChargeCB: rejected malformed or oversized payload.\n");
 		s.done();
 		return;
 	}
@@ -3666,8 +3684,8 @@ void Baseapp::onChargeCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 	s >> callbackID;
 	s >> retcode;
 
-	INFO_MSG(fmt::format("Baseapp::onChargeCB: chargeID={0}, dbid={2}, pycallback={1}.\n",
-		chargeID,
+	INFO_MSG(fmt::format("Baseapp::onChargeCB: chargeIDSize={0}, dbid={2}, pycallback={1}.\n",
+		chargeID.size(),
 		callbackID,
 		dbid));
 

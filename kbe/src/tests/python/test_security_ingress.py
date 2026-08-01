@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+from contextlib import ExitStack
 import os
 from pathlib import Path
 import re
@@ -36,6 +37,14 @@ REGISTERED_PROBE_COMPONENT_IDS = {
     "dbmgr-registered-truncated-interfaces-callback": 9012,
     "dbmgr-registered-invalid-bind-entity": 9013,
     "dbmgr-registered-invalid-callback-error": 9014,
+    "dbmgr-registered-truncated-charge": 9015,
+    "dbmgr-registered-zero-charge-dbid": 9016,
+    "dbmgr-registered-empty-charge-id": 9017,
+    "dbmgr-registered-oversized-charge-id": 9018,
+    "dbmgr-registered-truncated-charge-callback": 9019,
+    "dbmgr-registered-invalid-charge-error": 9020,
+    "dbmgr-registered-empty-erase-key": 9021,
+    "dbmgr-registered-oversized-erase-key": 9022,
 }
 
 PROBES = (
@@ -246,6 +255,70 @@ PROBES = (
         "DBMGR_TYPE",
         "Dbmgr::accountReqBindMail",
         r"Dbmgr::accountReqBindMail: rejected fields, entityID=0",
+    ),
+    (
+        "dbmgr-registered-truncated-charge",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::charge",
+        r"Dbmgr::charge: rejected malformed or oversized payload",
+    ),
+    (
+        "dbmgr-registered-zero-charge-dbid",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::charge",
+        r"Dbmgr::charge: rejected malformed or oversized payload",
+    ),
+    (
+        "dbmgr-registered-empty-charge-id",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::charge",
+        r"Dbmgr::charge: rejected malformed or oversized payload",
+    ),
+    (
+        "dbmgr-registered-oversized-charge-id",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::charge",
+        r"Dbmgr::charge: rejected malformed or oversized payload",
+    ),
+    (
+        "dbmgr-registered-truncated-charge-callback",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::onChargeCB",
+        r"Dbmgr::onChargeCB: rejected malformed or oversized payload",
+    ),
+    (
+        "dbmgr-registered-invalid-charge-error",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::onChargeCB",
+        r"Dbmgr::onChargeCB: rejected malformed or oversized payload",
+    ),
+    (
+        "dbmgr-registered-empty-erase-key",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::eraseClientReq",
+        r"Dbmgr::eraseClientReq: rejected keySize=0",
+    ),
+    (
+        "dbmgr-registered-oversized-erase-key",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::eraseClientReq",
+        r"Dbmgr::eraseClientReq: rejected keySize=129",
     ),
     (
         "dbmgr-spoofed-active-tick",
@@ -684,6 +757,22 @@ def probe_body(probe_case, component_uid):
         )
     if probe_case == "dbmgr-registered-invalid-bind-entity":
         return struct.pack("=i", 0) + b"account\0password\0mail@example.invalid\0"
+    if probe_case == "dbmgr-registered-truncated-charge":
+        return b"order\0"
+    if probe_case == "dbmgr-registered-zero-charge-dbid":
+        return b"order\0" + struct.pack("=QII", 0, 0, 1)
+    if probe_case == "dbmgr-registered-empty-charge-id":
+        return b"\0" + struct.pack("=QII", 1, 0, 1)
+    if probe_case == "dbmgr-registered-oversized-charge-id":
+        return b"a" * 129 + b"\0" + struct.pack("=QII", 1, 0, 1)
+    if probe_case == "dbmgr-registered-truncated-charge-callback":
+        return b"\0"
+    if probe_case == "dbmgr-registered-invalid-charge-error":
+        return struct.pack("=Q", 7001) + b"order\0" + struct.pack("=QIIH", 1, 0, 1, 65535)
+    if probe_case == "dbmgr-registered-empty-erase-key":
+        return b"\0"
+    if probe_case == "dbmgr-registered-oversized-erase-key":
+        return b"a" * 129 + b"\0"
     if probe_case == "dbmgr-spoofed-active-tick":
         return struct.pack("=iQ", 6, 7001)
     if probe_case == "dbmgr-spoofed-kill-request":
@@ -774,6 +863,10 @@ def registered_probe_component_type(probe_case):
         "dbmgr-registered-invalid-db-interface",
         "dbmgr-registered-invalid-autoload-flag",
         "dbmgr-registered-invalid-bind-entity",
+        "dbmgr-registered-truncated-charge",
+        "dbmgr-registered-zero-charge-dbid",
+        "dbmgr-registered-empty-charge-id",
+        "dbmgr-registered-oversized-charge-id",
     }:
         return 6
     if probe_case in {
@@ -782,6 +875,8 @@ def registered_probe_component_type(probe_case):
         "dbmgr-registered-oversized-create-account",
         "dbmgr-registered-truncated-account-login",
         "dbmgr-registered-oversized-account-login",
+        "dbmgr-registered-empty-erase-key",
+        "dbmgr-registered-oversized-erase-key",
     }:
         return 2
     return 13
@@ -938,14 +1033,10 @@ def run_test(args):
             for component_name in {probe[1] for probe in PROBES if probe[2] == "external"}
         }
         component_uid = find_component_uid(ready_logs, "baseapp")
-        # Fake component discovery must not advertise the DBMgr endpoint itself:
-        # real components would connect back to DBMgr and collide with its existing Channel.
-        # 伪组件不能发布 DBMgr 自身端点，否则真实组件回连时会与既有 Channel 冲突。
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as registration_listener:
-            registration_listener.bind((internal_endpoints["dbmgr"][0], 0))
-            registration_listener.listen(64)
-            registration_endpoint = registration_listener.getsockname()
-
+        # Every discovered fake component needs a distinct live endpoint. Real components
+        # connect to advertised addresses, and reusing one endpoint creates Channel conflicts.
+        # 每个被发现的伪组件都需要独立且存活的端点；真实组件会主动回连，复用地址会造成 Channel 冲突。
+        with ExitStack() as registration_listeners:
             for (
                 probe_case,
                 component_name,
@@ -955,6 +1046,11 @@ def run_test(args):
                 rejection_pattern,
             ) in PROBES:
                 if endpoint_kind == "registered-internal":
+                    registration_listener = registration_listeners.enter_context(
+                        socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    )
+                    registration_listener.bind((internal_endpoints["dbmgr"][0], 0))
+                    registration_listener.listen(64)
                     run_registered_probe(
                         args,
                         process,
@@ -966,7 +1062,7 @@ def run_test(args):
                         message_name,
                         internal_endpoints[component_name],
                         internal_endpoints[component_name],
-                        registration_endpoint,
+                        registration_listener.getsockname(),
                         rejection_pattern,
                         component_uid,
                     )
