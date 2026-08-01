@@ -9,6 +9,7 @@ set(_kbe_sensitive_sources
     "server/baseapp/baseapp.cpp"
     "server/dbmgr/dbmgr.cpp"
     "server/dbmgr/dbtasks.cpp"
+	"server/dbmgr/dbtasks.h"
     "server/loginapp/loginapp.cpp"
     "server/loginapp/http_cb_handler.cpp"
 	"server/tools/interfaces/interfaces.cpp"
@@ -314,6 +315,31 @@ foreach(_kbe_required IN ITEMS
 		"${_kbe_required}" _kbe_required_position)
 	if(_kbe_required_position EQUAL -1)
 		message(FATAL_ERROR "Callback expiry driver is missing: ${_kbe_required}")
+	endif()
+endforeach()
+
+foreach(_kbe_required IN ITEMS
+	"COMPONENT_ID routeComponentID_"
+	"pChannel->condemn() == 0"
+	"pChannel->componentID() == routeComponentID_"
+	"bindRouteComponent(componentID_)"
+)
+	string(FIND "${_kbe_sensitive_text}" "${_kbe_required}" _kbe_required_position)
+	if(_kbe_required_position EQUAL -1)
+		message(FATAL_ERROR "DBTask callback route guard is missing: ${_kbe_required}")
+	endif()
+endforeach()
+
+foreach(_kbe_required IN ITEMS
+	"if (!transactionCommitted())"
+	"DBTaskWriteEntity::presentMainThreadFailed"
+	"DBTaskDeleteEntityByDBID::presentMainThreadFailed"
+	"DBTaskLookUpEntityByDBID::presentMainThreadFailed"
+	"DBTaskQueryEntity::presentMainThreadFailed"
+)
+	string(FIND "${_kbe_sensitive_text}" "${_kbe_required}" _kbe_required_position)
+	if(_kbe_required_position EQUAL -1)
+		message(FATAL_ERROR "DBTask transaction failure guard is missing: ${_kbe_required}")
 	endif()
 endforeach()
 

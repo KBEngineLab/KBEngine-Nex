@@ -49,14 +49,16 @@ public:
 	DBTask(const Network::Address& addr):
 	DBTaskBase(),
 	pDatas_(0),
-	addr_(addr)
+	addr_(addr),
+	routeComponentID_(0)
 	{
 	}
 
 	DBTask():
 	DBTaskBase(),
 	pDatas_(0),
-	addr_()
+	addr_(),
+	routeComponentID_(0)
 	{
 	}
 	
@@ -76,9 +78,11 @@ public:
 
 protected:
 	std::string transactionFailureError() const;
+	void bindRouteComponent(COMPONENT_ID componentID) { routeComponentID_ = componentID; }
 
 	MemoryStream* pDatas_;
 	Network::Address addr_;
+	COMPONENT_ID routeComponentID_;
 };
 
 /*

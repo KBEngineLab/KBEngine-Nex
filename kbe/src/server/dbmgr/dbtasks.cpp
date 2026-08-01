@@ -44,7 +44,8 @@ namespace KBEngine{
 DBTask::DBTask(const Network::Address& addr, MemoryStream& datas):
 DBTaskBase(),
 pDatas_(0),
-addr_(addr)
+addr_(addr),
+routeComponentID_(0)
 {
 	pDatas_ = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 	*pDatas_ = datas;
@@ -62,7 +63,8 @@ bool DBTask::send(Network::Bundle* pBundle)
 {
 	Network::Channel* pChannel = Dbmgr::getSingleton().networkInterface().findChannel(addr_);
 	
-	if(pChannel){
+	if(pChannel && !pChannel->isDestroyed() && pChannel->condemn() == 0 &&
+		(routeComponentID_ == 0 || pChannel->componentID() == routeComponentID_)){
 		pChannel->send(pBundle);
 	}
 	else{
@@ -134,6 +136,7 @@ pExecret_(NULL)
 	(*pDatas_) >> componentID_ >> componentType_;
 	(*pDatas_) >> callbackID_;
 	(*pDatas_).readBlob(sdatas_);
+	bindRouteComponent(componentID_);
 }
 
 //-------------------------------------------------------------------------------------
@@ -184,6 +187,7 @@ pExecret_(NULL)
 	(*pDatas_) >> componentID_ >> componentType_;
 	(*pDatas_) >> callbackID_;
 	(*pDatas_).readBlob(sdatas_);
+	bindRouteComponent(componentID_);
 }
 
 //-------------------------------------------------------------------------------------
@@ -254,16 +258,10 @@ thread::TPTask::TPTaskState DBTaskExecuteRawDatabaseCommandByEntity::presentMain
 		if (error_.size() <= 0)
 			(*pBundle).append(pExecret_);
 
-		Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(componentType_, componentID_);
-
-		if (cinfos && cinfos->pChannel)
+		if (!this->send(pBundle))
 		{
-			cinfos->pChannel->send(pBundle);
-		}
-		else
-		{
-			ERROR_MSG(fmt::format("DBTask::ExecuteRawDatabaseCommandByEntity::presentMainThread: {} not found!\n",
-				COMPONENT_NAME_EX(componentType_)));
+			ERROR_MSG(fmt::format("DBTask::ExecuteRawDatabaseCommandByEntity::presentMainThread: route unavailable, componentType={}, componentID={}, addr={}.\n",
+				componentType_, componentID_, addr_.c_str()));
 
 			Network::Bundle::reclaimPoolObject(pBundle);
 		}
@@ -330,16 +328,10 @@ thread::TPTask::TPTaskState DBTaskExecuteRawDatabaseCommand::presentMainThreadCo
 		if (error_.size() <= 0)
 			(*pBundle).append(pExecret_);
 
-		Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(componentType_, componentID_);
-
-		if (cinfos && cinfos->pChannel)
+		if (!this->send(pBundle))
 		{
-			cinfos->pChannel->send(pBundle);
-		}
-		else
-		{
-			ERROR_MSG(fmt::format("DBTask::DBTaskExecuteRawDatabaseCommand::presentMainThread: {} not found!\n",
-				COMPONENT_NAME_EX(componentType_)));
+			ERROR_MSG(fmt::format("DBTask::DBTaskExecuteRawDatabaseCommand::presentMainThread: route unavailable, componentType={}, componentID={}, addr={}.\n",
+				componentType_, componentID_, addr_.c_str()));
 
 			Network::Bundle::reclaimPoolObject(pBundle);
 		}
@@ -385,6 +377,7 @@ callbackID_(0),
 shouldAutoLoad_(-1),
 success_(false)
 {
+	bindRouteComponent(componentID_);
 	// 回调路由字段必须在事务开始前解析，BEGIN 失败时才能释放 BaseApp 中等待的回调。
 	// Callback routing fields are parsed before BEGIN so a begin failure can release the waiting BaseApp callback.
 	(*pDatas_) >> sid_ >> callbackID_ >> shouldAutoLoad_;
@@ -485,6 +478,7 @@ eid_(eid),
 entityDBID_(entityDBID),
 sid_(0)
 {
+	bindRouteComponent(componentID_);
 }
 
 //-------------------------------------------------------------------------------------
@@ -527,6 +521,7 @@ success_(false),
 entityID_(0),
 entityInAppID_(0)
 {
+	bindRouteComponent(componentID_);
 }
 
 //-------------------------------------------------------------------------------------
@@ -606,6 +601,7 @@ start_(start),
 end_(end),
 outs_()
 {
+	bindRouteComponent(componentID_);
 }
 
 //-------------------------------------------------------------------------------------
@@ -666,6 +662,7 @@ entityID_(0),
 entityInAppID_(0),
 serverGroupID_(0)
 {
+	bindRouteComponent(componentID_);
 }
 
 //-------------------------------------------------------------------------------------
@@ -1459,6 +1456,7 @@ deadline_(0),
 bindatas_(),
 needCheckPassword_(needCheckPassword)
 {
+	bindRouteComponent(componentID_);
 	s_ = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 }
 
@@ -1943,6 +1941,7 @@ wasActiveCID_(0),
 wasActiveEntityID_(0),
 serverGroupID_(0)
 {
+	bindRouteComponent(componentID_);
 	s_ = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 }
 
