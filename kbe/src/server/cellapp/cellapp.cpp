@@ -35,6 +35,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/udp_packet.h"
 #include "network/network_stats.h"
 #include "server/client_request_guard.h"
+#include "server/bounded_stream_reader.h"
 #include "server/component_routing_guard.h"
 #include "server/components.h"
 #include "server/telnet_server.h"
@@ -60,6 +61,34 @@ Navigation g_navigation;
 
 namespace
 {
+const size_t ENTITY_TYPE_MAX_LENGTH = 128;
+
+bool validateSpaceCreationForward(const MemoryStream& stream)
+{
+	BoundedStreamReader reader(stream);
+	ENTITY_ID entityID = 0;
+	SPACE_ID spaceID = 0;
+	COMPONENT_ID componentID = 0;
+	return reader.skipString(ENTITY_TYPE_MAX_LENGTH, false) &&
+		reader.read(entityID) && entityID > 0 &&
+		reader.read(spaceID) && spaceID > 0 &&
+		reader.read(componentID) && componentID > 0 &&
+		reader.skip(sizeof(uint8));
+}
+
+bool validateEntityCreationForward(const MemoryStream& stream)
+{
+	BoundedStreamReader reader(stream);
+	ENTITY_ID createToEntityID = 0;
+	ENTITY_ID entityID = 0;
+	COMPONENT_ID componentID = 0;
+	return reader.read(createToEntityID) && createToEntityID > 0 &&
+		reader.skipString(ENTITY_TYPE_MAX_LENGTH, false) &&
+		reader.read(entityID) && entityID > 0 &&
+		reader.read(componentID) && componentID > 0 &&
+		reader.skip(sizeof(uint8) * 2);
+}
+
 Components::ComponentInfos* findBoundCellappSource(Network::Channel* pChannel)
 {
 	if (pChannel == NULL || pChannel->isDestroyed() || pChannel->condemn() != 0)
@@ -111,7 +140,8 @@ Components::ComponentInfos* validateBaseappEntityCreationSource(
 		Security::isBoundBidirectionalComponentSource(channelInfos->cid, channelInfos,
 			pChannel, pChannel != NULL ? pChannel->componentID() : 0);
 	const bool validChannel = pChannel != NULL && !pChannel->isExternal() &&
-		!pChannel->isDestroyed() && (validDirectSource || validRelay);
+		!pChannel->isDestroyed() && pChannel->condemn() == 0 &&
+		(validDirectSource || validRelay);
 	if (!validChannel || !validScriptModule)
 	{
 		WARNING_MSG(fmt::format("{}: rejected componentID={}, entityType={}, hasClient={}, addr={}.\n",
@@ -1047,6 +1077,13 @@ void Cellapp::onBroadcastCellAppDataChanged(Network::Channel* pChannel, KBEngine
 //-------------------------------------------------------------------------------------
 void Cellapp::onCreateCellEntityInNewSpaceFromBaseapp(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (!validateSpaceCreationForward(s))
+	{
+		WARNING_MSG("Cellapp::onCreateCellEntityInNewSpaceFromBaseapp: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
+
 	std::string entityType;
 	ENTITY_ID entitycallEntityID;
 	COMPONENT_ID componentID;
@@ -1171,6 +1208,13 @@ void Cellapp::onCreateCellEntityInNewSpaceFromBaseapp(Network::Channel* pChannel
 //-------------------------------------------------------------------------------------
 void Cellapp::onRestoreSpaceInCellFromBaseapp(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (!validateSpaceCreationForward(s))
+	{
+		WARNING_MSG("Cellapp::onRestoreSpaceInCellFromBaseapp: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
+
 	std::string entityType;
 	ENTITY_ID entitycallEntityID;
 	COMPONENT_ID componentID;
@@ -1294,6 +1338,13 @@ void Cellapp::requestRestore(Network::Channel* pChannel, KBEngine::MemoryStream&
 //-------------------------------------------------------------------------------------
 void Cellapp::onCreateCellEntityFromBaseapp(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (!validateEntityCreationForward(s))
+	{
+		WARNING_MSG("Cellapp::onCreateCellEntityFromBaseapp: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
+
 	std::string entityType;
 	ENTITY_ID createToEntityID, entityID;
 	
@@ -1481,6 +1532,27 @@ void Cellapp::_onCreateCellEntityFromBaseapp(std::string& entityType, ENTITY_ID 
 void Cellapp::onDestroyCellEntityFromBaseapp(Network::Channel* pChannel, ENTITY_ID eid)
 {
 	// DEBUG_MSG("Cellapp::onDestroyCellEntityFromBaseapp:entityID=%d.\n", eid);
+	if (eid <= 0)
+	{
+		WARNING_MSG("Cellapp::onDestroyCellEntityFromBaseapp: rejected invalid entity ID.\n");
+		return;
+	}
+
+	Components& components = Components::getSingleton();
+	Components::ComponentInfos* sourceInfos = components.findComponent(pChannel);
+	if (sourceInfos == NULL && pChannel != NULL && pChannel->componentID() != 0)
+		sourceInfos = components.findComponent(pChannel->componentID());
+	const bool sourceAvailable = pChannel != NULL && !pChannel->isExternal() &&
+		!pChannel->isDestroyed() && pChannel->condemn() == 0 && sourceInfos != NULL &&
+		Security::isBoundBidirectionalComponentSource(sourceInfos->cid, sourceInfos,
+			pChannel, pChannel->componentID());
+	if (!sourceAvailable || (sourceInfos->componentType != BASEAPP_TYPE &&
+		sourceInfos->componentType != CELLAPP_TYPE))
+	{
+		WARNING_MSG(fmt::format("Cellapp::onDestroyCellEntityFromBaseapp: rejected unbound source, entityID={}, sourceComponentID={}.\n",
+			eid, sourceInfos != NULL ? sourceInfos->cid : 0));
+		return;
+	}
 
 	KBEngine::Entity* e = KBEngine::Cellapp::getSingleton().findEntity(eid);
 
@@ -1489,6 +1561,17 @@ void Cellapp::onDestroyCellEntityFromBaseapp(Network::Channel* pChannel, ENTITY_
 		WARNING_MSG(fmt::format("Cellapp::onDestroyCellEntityFromBaseapp: not found entityID:{}.\n",
 			eid));
 
+		return;
+	}
+
+	const bool fromBoundBaseapp = sourceInfos->componentType == BASEAPP_TYPE &&
+		e->baseEntityCall() != NULL && e->baseEntityCall()->componentID() == sourceInfos->cid;
+	const bool fromCurrentGhost = sourceInfos->componentType == CELLAPP_TYPE &&
+		e->isReal() && e->ghostCell() == sourceInfos->cid;
+	if (!fromBoundBaseapp && !fromCurrentGhost)
+	{
+		WARNING_MSG(fmt::format("Cellapp::onDestroyCellEntityFromBaseapp: rejected source not bound to entity, entityID={}, sourceComponentID={}.\n",
+			eid, sourceInfos->cid));
 		return;
 	}
 

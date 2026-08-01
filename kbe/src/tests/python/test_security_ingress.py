@@ -361,6 +361,30 @@ PROBES = (
         r"Cellappmgr::forwardMessage: rejected unbound senderComponent\(0\)",
     ),
     (
+        "cellappmgr-truncated-forward",
+        "cellappmgr",
+        "internal",
+        "CELLAPPMGR_TYPE",
+        "Cellappmgr::forwardMessage",
+        r"Cellappmgr::forwardMessage: rejected incomplete header",
+    ),
+    (
+        "cellappmgr-truncated-create-space",
+        "cellappmgr",
+        "internal",
+        "CELLAPPMGR_TYPE",
+        "Cellappmgr::reqCreateCellEntityInNewSpace",
+        r"Cellappmgr::reqCreateCellEntityInNewSpace: rejected malformed or oversized payload",
+    ),
+    (
+        "cellappmgr-truncated-restore-space",
+        "cellappmgr",
+        "internal",
+        "CELLAPPMGR_TYPE",
+        "Cellappmgr::reqRestoreSpaceInCell",
+        r"Cellappmgr::reqRestoreSpaceInCell: rejected malformed or oversized payload",
+    ),
+    (
         "cellappmgr-spoofed-update",
         "cellappmgr",
         "internal",
@@ -472,6 +496,38 @@ PROBES = (
         "CELLAPP_TYPE",
         "Cellapp::onRemoteCallMethodFromClient",
         r"Cellapp::onRemoteCallMethodFromClient: rejected incomplete fixed header",
+    ),
+    (
+        "cellapp-truncated-create-space",
+        "cellapp",
+        "internal",
+        "CELLAPP_TYPE",
+        "Cellapp::onCreateCellEntityInNewSpaceFromBaseapp",
+        r"Cellapp::onCreateCellEntityInNewSpaceFromBaseapp: rejected malformed or oversized payload",
+    ),
+    (
+        "cellapp-truncated-restore-space",
+        "cellapp",
+        "internal",
+        "CELLAPP_TYPE",
+        "Cellapp::onRestoreSpaceInCellFromBaseapp",
+        r"Cellapp::onRestoreSpaceInCellFromBaseapp: rejected malformed or oversized payload",
+    ),
+    (
+        "cellapp-truncated-entity-create",
+        "cellapp",
+        "internal",
+        "CELLAPP_TYPE",
+        "Cellapp::onCreateCellEntityFromBaseapp",
+        r"Cellapp::onCreateCellEntityFromBaseapp: rejected malformed or oversized payload",
+    ),
+    (
+        "cellapp-zero-entity-destroy",
+        "cellapp",
+        "internal",
+        "CELLAPP_TYPE",
+        "Cellapp::onDestroyCellEntityFromBaseapp",
+        r"Cellapp::onDestroyCellEntityFromBaseapp: rejected invalid entity ID",
     ),
     (
         "cellapp-truncated-entity-forward",
@@ -863,6 +919,12 @@ def probe_body(probe_case, component_uid):
         return struct.pack("=QiifI", 7001, 0, 0, float("nan"), 0)
     if probe_case == "cellappmgr-zero-forward":
         return struct.pack("=QQ", 0, 8001)
+    if probe_case in {
+        "cellappmgr-truncated-forward",
+        "cellappmgr-truncated-create-space",
+        "cellappmgr-truncated-restore-space",
+    }:
+        return b""
     if probe_case == "cellappmgr-spoofed-update":
         return struct.pack("=QifI", 8001, 0, float("nan"), 0)
     if probe_case == "baseapp-spoofed-callback":
@@ -899,6 +961,9 @@ def probe_body(probe_case, component_uid):
         return struct.pack("=ii", 1, 2)
     if probe_case in {
         "cellapp-truncated-cell-rpc",
+        "cellapp-truncated-create-space",
+        "cellapp-truncated-restore-space",
+        "cellapp-truncated-entity-create",
         "cellapp-truncated-entity-forward",
         "cellapp-truncated-client-update",
         "cellapp-truncated-controlled-update",
@@ -910,6 +975,8 @@ def probe_body(probe_case, component_uid):
         "cellapp-truncated-teleport-over",
     }:
         return b""
+    if probe_case == "cellapp-zero-entity-destroy":
+        return struct.pack("=i", 0)
     if probe_case == "cellapp-unregistered-entity-forward":
         return struct.pack("=i", 1)
     if probe_case == "cellapp-spoofed-entity-create":

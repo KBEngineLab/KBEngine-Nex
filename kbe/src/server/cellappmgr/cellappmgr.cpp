@@ -21,6 +21,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "cellappmgr.h"
 #include "server/component_routing_guard.h"
+#include "server/bounded_stream_reader.h"
 #include "cellappmgr_interface.h"
 #include "network/common.h"
 #include "network/tcp_packet.h"
@@ -38,6 +39,54 @@ namespace KBEngine{
 	
 ServerConfig g_serverConfig;
 KBE_SINGLETON_INIT(Cellappmgr);
+
+namespace
+{
+const size_t ENTITY_TYPE_MAX_LENGTH = 128;
+
+bool validateCreateSpaceRequest(const MemoryStream& stream)
+{
+	BoundedStreamReader reader(stream);
+	ENTITY_ID entityID = 0;
+	uint32 cellappIndex = 0;
+	COMPONENT_ID componentID = 0;
+	return reader.skipString(ENTITY_TYPE_MAX_LENGTH, false) &&
+		reader.read(entityID) && entityID > 0 &&
+		reader.read(cellappIndex) &&
+		reader.read(componentID) && componentID > 0 &&
+		reader.skip(sizeof(uint8));
+}
+
+bool validateRestoreSpaceRequest(const MemoryStream& stream)
+{
+	BoundedStreamReader reader(stream);
+	ENTITY_ID entityID = 0;
+	COMPONENT_ID componentID = 0;
+	SPACE_ID spaceID = 0;
+	return reader.skipString(ENTITY_TYPE_MAX_LENGTH, false) &&
+		reader.read(entityID) && entityID > 0 &&
+		reader.read(componentID) && componentID > 0 &&
+		reader.read(spaceID) && spaceID > 0 &&
+		reader.skip(sizeof(uint8));
+}
+
+bool validateForwardHeader(const MemoryStream& stream)
+{
+	BoundedStreamReader reader(stream);
+	COMPONENT_ID senderID = 0;
+	COMPONENT_ID targetID = 0;
+	return reader.read(senderID) && reader.read(targetID);
+}
+
+bool isAvailableCellappTarget(Components::ComponentInfos* infos, bool requireRunning)
+{
+	return infos != NULL && infos->cid != 0 && infos->pChannel != NULL &&
+		!infos->pChannel->isExternal() && !infos->pChannel->isDestroyed() &&
+		infos->pChannel->condemn() == 0 &&
+		infos->pChannel->componentID() == infos->cid &&
+		(!requireRunning || infos->state == COMPONENT_STATE_RUN);
+}
+}
 
 class AppForwardItem : public ForwardItem
 {
@@ -257,6 +306,13 @@ void Cellappmgr::finalise()
 //-------------------------------------------------------------------------------------
 void Cellappmgr::forwardMessage(Network::Channel* pChannel, MemoryStream& s)
 {
+	if (!validateForwardHeader(s))
+	{
+		WARNING_MSG("Cellappmgr::forwardMessage: rejected incomplete header.\n");
+		s.done();
+		return;
+	}
+
 	COMPONENT_ID sender_componentID, forward_componentID;
 
 	s >> sender_componentID >> forward_componentID;
@@ -271,8 +327,9 @@ void Cellappmgr::forwardMessage(Network::Channel* pChannel, MemoryStream& s)
 		return;
 	}
 
-	Network::Channel* pTargetChannel = components.findComponentChannel(CELLAPP_TYPE, forward_componentID);
-	if (pTargetChannel == NULL)
+	Components::ComponentInfos* targetInfos =
+		components.findComponent(CELLAPP_TYPE, forward_componentID);
+	if (!isAvailableCellappTarget(targetInfos, false))
 	{
 		WARNING_MSG(fmt::format("Cellappmgr::forwardMessage: rejected unavailable targetComponent({})!\n",
 			forward_componentID));
@@ -282,7 +339,7 @@ void Cellappmgr::forwardMessage(Network::Channel* pChannel, MemoryStream& s)
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).append((char*)s.data() + s.rpos(), (int)s.length());
-	pTargetChannel->send(pBundle);
+	targetInfos->pChannel->send(pBundle);
 	s.done();
 }
 
@@ -343,10 +400,7 @@ bool Cellappmgr::componentsReady()
 bool Cellappmgr::componentReady(COMPONENT_ID cid)
 {
 	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(CELLAPP_TYPE, cid);
-	if(cinfos == NULL || cinfos->pChannel == NULL || cinfos->state != COMPONENT_STATE_RUN)
-		return false;
-
-	return true;
+	return isAvailableCellappTarget(cinfos, true);
 }
 
 //-------------------------------------------------------------------------------------
@@ -369,6 +423,13 @@ uint32 Cellappmgr::numLoadBalancingApp()
 //-------------------------------------------------------------------------------------
 void Cellappmgr::reqCreateCellEntityInNewSpace(Network::Channel* pChannel, MemoryStream& s) 
 {
+	if (!validateCreateSpaceRequest(s))
+	{
+		WARNING_MSG("Cellappmgr::reqCreateCellEntityInNewSpace: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
+
 	std::string entityType;
 	ENTITY_ID id;
 	COMPONENT_ID componentID;
@@ -388,6 +449,7 @@ void Cellappmgr::reqCreateCellEntityInNewSpace(Network::Channel* pChannel, Memor
 	Components::ComponentInfos* sourceInfos = componentID == 0 ? NULL :
 		Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
 	if (pChannel == NULL || pChannel->isExternal() || pChannel->isDestroyed() ||
+		pChannel->condemn() != 0 ||
 		!Security::isBoundBidirectionalComponentSource(componentID, sourceInfos,
 			pChannel, pChannel != NULL ? pChannel->componentID() : 0))
 	{
@@ -434,7 +496,7 @@ void Cellappmgr::reqCreateCellEntityInNewSpace(Network::Channel* pChannel, Memor
 	if (bestCellappID_ > 0)
 		cinfos = Components::getSingleton().findComponent(CELLAPP_TYPE, bestCellappID_);
 
-	if (cinfos == NULL || cinfos->pChannel == NULL || cinfos->state != COMPONENT_STATE_RUN)
+	if (!isAvailableCellappTarget(cinfos, true))
 	{
 		WARNING_MSG("Cellappmgr::reqCreateCellEntityInNewSpace: not found cellapp, message is buffered.\n");
 
@@ -474,6 +536,13 @@ void Cellappmgr::reqCreateCellEntityInNewSpace(Network::Channel* pChannel, Memor
 //-------------------------------------------------------------------------------------
 void Cellappmgr::reqRestoreSpaceInCell(Network::Channel* pChannel, MemoryStream& s) 
 {
+	if (!validateRestoreSpaceRequest(s))
+	{
+		WARNING_MSG("Cellappmgr::reqRestoreSpaceInCell: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
+
 	std::string entityType;
 	ENTITY_ID id;
 	COMPONENT_ID componentID;
@@ -489,6 +558,7 @@ void Cellappmgr::reqRestoreSpaceInCell(Network::Channel* pChannel, MemoryStream&
 	Components::ComponentInfos* sourceInfos = componentID == 0 ? NULL :
 		Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
 	if (pChannel == NULL || pChannel->isExternal() || pChannel->isDestroyed() ||
+		pChannel->condemn() != 0 ||
 		!Security::isBoundBidirectionalComponentSource(componentID, sourceInfos,
 			pChannel, pChannel != NULL ? pChannel->componentID() : 0))
 	{
@@ -513,7 +583,7 @@ void Cellappmgr::reqRestoreSpaceInCell(Network::Channel* pChannel, MemoryStream&
 		entityType, id, componentID, spaceID));
 
 	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(CELLAPP_TYPE, bestCellappID_);
-	if(cinfos == NULL || cinfos->pChannel == NULL || cinfos->state != COMPONENT_STATE_RUN)
+	if (!isAvailableCellappTarget(cinfos, true))
 	{
 		WARNING_MSG("Cellappmgr::reqRestoreSpaceInCell: not found cellapp, message is buffered.\n");
 		ForwardItem* pFI = new AppForwardItem();
