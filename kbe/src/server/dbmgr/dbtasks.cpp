@@ -748,7 +748,8 @@ thread::TPTask::TPTaskState DBTaskLookUpEntityByDBID::presentMainThreadFailed()
 }
 
 //-------------------------------------------------------------------------------------
-DBTaskCreateAccount::DBTaskCreateAccount(const Network::Address& addr, 
+DBTaskCreateAccount::DBTaskCreateAccount(const Network::Address& addr,
+										 COMPONENT_ID routeComponentID,
 										 std::string& registerName,
 										 std::string& accountName, 
 										 std::string& password, 
@@ -762,6 +763,7 @@ postdatas_(postdatas),
 getdatas_(getdatas),
 success_(false)
 {
+	bindRouteComponent(routeComponentID);
 }
 
 //-------------------------------------------------------------------------------------
@@ -919,7 +921,8 @@ std::string genmail_code(const std::string& str)
 }
 
 //-------------------------------------------------------------------------------------
-DBTaskCreateMailAccount::DBTaskCreateMailAccount(const Network::Address& addr, 
+DBTaskCreateMailAccount::DBTaskCreateMailAccount(const Network::Address& addr,
+										 COMPONENT_ID routeComponentID,
 										 std::string& registerName,
 										 std::string& accountName, 
 										 std::string& password, 
@@ -933,6 +936,7 @@ postdatas_(postdatas),
 getdatas_(getdatas),
 success_(false)
 {
+	bindRouteComponent(routeComponentID);
 }
 
 //-------------------------------------------------------------------------------------
@@ -1032,12 +1036,14 @@ thread::TPTask::TPTaskState DBTaskCreateMailAccount::presentMainThreadFailed()
 }
 
 //-------------------------------------------------------------------------------------
-DBTaskActivateAccount::DBTaskActivateAccount(const Network::Address& addr, 
+DBTaskActivateAccount::DBTaskActivateAccount(const Network::Address& addr,
+										 COMPONENT_ID routeComponentID,
 										 std::string& code):
 DBTask(addr),
 code_(code),
 success_(false)
 {
+	bindRouteComponent(routeComponentID);
 }
 
 //-------------------------------------------------------------------------------------
@@ -1092,13 +1098,15 @@ thread::TPTask::TPTaskState DBTaskActivateAccount::presentMainThreadFailed()
 
 
 //-------------------------------------------------------------------------------------
-DBTaskReqAccountResetPassword::DBTaskReqAccountResetPassword(const Network::Address& addr, std::string& accountName):
+DBTaskReqAccountResetPassword::DBTaskReqAccountResetPassword(const Network::Address& addr,
+	COMPONENT_ID routeComponentID, std::string& accountName):
 DBTask(addr),
 code_(),
 email_(),
 accountName_(accountName),
 success_(false)
 {
+	bindRouteComponent(routeComponentID);
 }
 
 //-------------------------------------------------------------------------------------
@@ -1177,7 +1185,8 @@ thread::TPTask::TPTaskState DBTaskReqAccountResetPassword::presentMainThreadFail
 }
 
 //-------------------------------------------------------------------------------------
-DBTaskAccountResetPassword::DBTaskAccountResetPassword(const Network::Address& addr, std::string& accountName, 
+DBTaskAccountResetPassword::DBTaskAccountResetPassword(const Network::Address& addr,
+		COMPONENT_ID routeComponentID, std::string& accountName,
 		std::string& newpassword, std::string& code):
 DBTask(addr),
 code_(code),
@@ -1185,6 +1194,7 @@ accountName_(accountName),
 newpassword_(newpassword),
 success_(false)
 {
+	bindRouteComponent(routeComponentID);
 }
 
 //-------------------------------------------------------------------------------------
@@ -1232,7 +1242,8 @@ thread::TPTask::TPTaskState DBTaskAccountResetPassword::presentMainThreadFailed(
 }
 
 //-------------------------------------------------------------------------------------
-DBTaskReqAccountBindEmail::DBTaskReqAccountBindEmail(const Network::Address& addr, ENTITY_ID entityID, std::string& accountName, 
+DBTaskReqAccountBindEmail::DBTaskReqAccountBindEmail(const Network::Address& addr,
+		COMPONENT_ID routeComponentID, ENTITY_ID entityID, std::string& accountName,
 		std::string password,std::string& email):
 DBTask(addr),
 code_(),
@@ -1242,6 +1253,7 @@ email_(email),
 success_(false),
 entityID_(entityID)
 {
+	bindRouteComponent(routeComponentID);
 }
 
 //-------------------------------------------------------------------------------------
@@ -1309,13 +1321,15 @@ thread::TPTask::TPTaskState DBTaskReqAccountBindEmail::presentMainThreadFailed()
 }
 
 //-------------------------------------------------------------------------------------
-DBTaskAccountBindEmail::DBTaskAccountBindEmail(const Network::Address& addr, std::string& accountName, 
+DBTaskAccountBindEmail::DBTaskAccountBindEmail(const Network::Address& addr,
+		COMPONENT_ID routeComponentID, std::string& accountName,
 		std::string& code):
 DBTask(addr),
 code_(code),
 accountName_(accountName),
 success_(false)
 {
+	bindRouteComponent(routeComponentID);
 }
 
 //-------------------------------------------------------------------------------------
@@ -1363,7 +1377,8 @@ thread::TPTask::TPTaskState DBTaskAccountBindEmail::presentMainThreadFailed()
 }
 
 //-------------------------------------------------------------------------------------
-DBTaskAccountNewPassword::DBTaskAccountNewPassword(const Network::Address& addr, ENTITY_ID entityID, std::string& accountName, 
+DBTaskAccountNewPassword::DBTaskAccountNewPassword(const Network::Address& addr,
+		COMPONENT_ID routeComponentID, ENTITY_ID entityID, std::string& accountName,
 		std::string& oldpassword_, std::string& newpassword):
 DBTask(addr),
 accountName_(accountName),
@@ -1371,6 +1386,7 @@ oldpassword_(oldpassword_), newpassword_(newpassword),
 success_(false),
 entityID_(entityID)
 {
+	bindRouteComponent(routeComponentID);
 }
 
 //-------------------------------------------------------------------------------------
@@ -1687,7 +1703,8 @@ thread::TPTask::TPTaskState DBTaskEntityOffline::presentMainThreadCommitted()
 }
 
 //-------------------------------------------------------------------------------------
-DBTaskAccountLogin::DBTaskAccountLogin(const Network::Address& addr, 
+DBTaskAccountLogin::DBTaskAccountLogin(const Network::Address& addr,
+									   COMPONENT_ID routeComponentID,
 									   std::string& loginName, 
 									   std::string& accountName, 
 									   std::string& password, 
@@ -1711,6 +1728,7 @@ deadline_(0),
 needCheckPassword_(needCheckPassword),
 serverGroupID_(0)
 {
+	bindRouteComponent(routeComponentID);
 }
 
 //-------------------------------------------------------------------------------------

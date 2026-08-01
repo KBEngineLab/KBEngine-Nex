@@ -318,7 +318,8 @@ protected:
 class DBTaskCreateAccount : public DBTask
 {
 public:
-	DBTaskCreateAccount(const Network::Address& addr, std::string& registerName, std::string& accountName, 
+	DBTaskCreateAccount(const Network::Address& addr, COMPONENT_ID routeComponentID,
+		std::string& registerName, std::string& accountName,
 		std::string& password, std::string& postdatas, std::string& getdatas);
 	virtual ~DBTaskCreateAccount();
 	virtual bool db_thread_process();
@@ -347,7 +348,8 @@ protected:
 class DBTaskCreateMailAccount : public DBTask
 {
 public:
-	DBTaskCreateMailAccount(const Network::Address& addr, std::string& registerName, std::string& accountName, 
+	DBTaskCreateMailAccount(const Network::Address& addr, COMPONENT_ID routeComponentID,
+		std::string& registerName, std::string& accountName,
 		std::string& password, std::string& postdatas, std::string& getdatas);
 	virtual ~DBTaskCreateMailAccount();
 	virtual bool db_thread_process();
@@ -373,7 +375,8 @@ protected:
 class DBTaskActivateAccount : public DBTask
 {
 public:
-	DBTaskActivateAccount(const Network::Address& addr, std::string& code);
+	DBTaskActivateAccount(const Network::Address& addr, COMPONENT_ID routeComponentID,
+		std::string& code);
 	virtual ~DBTaskActivateAccount();
 	virtual bool db_thread_process();
 	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
@@ -395,7 +398,8 @@ protected:
 class DBTaskReqAccountResetPassword : public DBTask
 {
 public:
-	DBTaskReqAccountResetPassword(const Network::Address& addr, std::string& accountName);
+	DBTaskReqAccountResetPassword(const Network::Address& addr, COMPONENT_ID routeComponentID,
+		std::string& accountName);
 	virtual ~DBTaskReqAccountResetPassword();
 	virtual bool db_thread_process();
 	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
@@ -419,7 +423,8 @@ protected:
 class DBTaskAccountResetPassword : public DBTask
 {
 public:
-	DBTaskAccountResetPassword(const Network::Address& addr, std::string& accountName, 
+	DBTaskAccountResetPassword(const Network::Address& addr, COMPONENT_ID routeComponentID,
+		std::string& accountName,
 		std::string& newpassword, std::string& code);
 	virtual ~DBTaskAccountResetPassword();
 	virtual bool db_thread_process();
@@ -444,7 +449,8 @@ protected:
 class DBTaskReqAccountBindEmail : public DBTask
 {
 public:
-	DBTaskReqAccountBindEmail(const Network::Address& addr, ENTITY_ID entityID, std::string& accountName, 
+	DBTaskReqAccountBindEmail(const Network::Address& addr, COMPONENT_ID routeComponentID,
+		ENTITY_ID entityID, std::string& accountName,
 		std::string password,std::string& email);
 	virtual ~DBTaskReqAccountBindEmail();
 	virtual bool db_thread_process();
@@ -471,7 +477,8 @@ protected:
 class DBTaskAccountBindEmail : public DBTask
 {
 public:
-	DBTaskAccountBindEmail(const Network::Address& addr, std::string& accountName, 
+	DBTaskAccountBindEmail(const Network::Address& addr, COMPONENT_ID routeComponentID,
+		std::string& accountName,
 		std::string& code);
 	virtual ~DBTaskAccountBindEmail();
 	virtual bool db_thread_process();
@@ -494,7 +501,8 @@ protected:
 class DBTaskAccountNewPassword : public DBTask
 {
 public:
-	DBTaskAccountNewPassword(const Network::Address& addr, ENTITY_ID entityID, std::string& accountName, 
+	DBTaskAccountNewPassword(const Network::Address& addr, COMPONENT_ID routeComponentID,
+		ENTITY_ID entityID, std::string& accountName,
 		std::string& oldpassword_, std::string& newpassword);
 	virtual ~DBTaskAccountNewPassword();
 	virtual bool db_thread_process();
@@ -596,7 +604,8 @@ protected:
 class DBTaskAccountLogin : public DBTask
 {
 public:
-	DBTaskAccountLogin(const Network::Address& addr, std::string& loginName, 
+	DBTaskAccountLogin(const Network::Address& addr, COMPONENT_ID routeComponentID,
+		std::string& loginName,
 		std::string& accountName, std::string& password, SERVER_ERROR_CODE retcode, std::string& postdatas, 
 		std::string& getdatas, bool needCheckPassword);
 

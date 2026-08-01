@@ -19,6 +19,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "dbmgr.h"
 #include "interfaces_handler.h"
+#include "account_request_guard.h"
 #include "buffered_dbtasks.h"
 #include "db_interface/db_threadpool.h"
 #include "db_interface/db_interface.h"
@@ -33,6 +34,17 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "tools/interfaces/interfaces_interface.h"
 
 namespace KBEngine{
+
+namespace
+{
+bool isAvailableCallbackTarget(Components::ComponentInfos* infos, COMPONENT_ID componentID)
+{
+	return componentID != 0 && infos != NULL && infos->cid == componentID &&
+		infos->pChannel != NULL && !infos->pChannel->isDestroyed() &&
+		infos->pChannel->condemn() == 0 &&
+		infos->pChannel->componentID() == componentID;
+}
+}
 
 //-------------------------------------------------------------------------------------
 InterfacesHandler* InterfacesHandlerFactory::create(std::string type)
@@ -88,21 +100,23 @@ bool InterfacesHandler_Dbmgr::createAccount(Network::Channel* pChannel, std::str
 	// 如果是email，先查询账号是否存在然后将其登记入库
 	if(uatype == ACCOUNT_TYPE_MAIL)
 	{
-		pThreadPool->addTask(new DBTaskCreateMailAccount(pChannel->addr(),
+		pThreadPool->addTask(new DBTaskCreateMailAccount(pChannel->addr(), pChannel->componentID(),
 			registerName, registerName, password, datas, datas));
 
 		return true;
 	}
 
-	pThreadPool->addTask(new DBTaskCreateAccount(pChannel->addr(),
+	pThreadPool->addTask(new DBTaskCreateAccount(pChannel->addr(), pChannel->componentID(),
 		registerName, registerName, password, datas, datas));
 
 	return true;
 }
 
 //-------------------------------------------------------------------------------------
-void InterfacesHandler_Dbmgr::onCreateAccountCB(KBEngine::MemoryStream& s)
+void InterfacesHandler_Dbmgr::onCreateAccountCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	(void)pChannel;
+	s.done();
 }
 
 //-------------------------------------------------------------------------------------
@@ -120,15 +134,17 @@ bool InterfacesHandler_Dbmgr::loginAccount(Network::Channel* pChannel, std::stri
 		return false;
 	}
 
-	pThreadPool->addTask(new DBTaskAccountLogin(pChannel->addr(),
+	pThreadPool->addTask(new DBTaskAccountLogin(pChannel->addr(), pChannel->componentID(),
 		loginName, loginName, password, SERVER_SUCCESS, datas, datas, true));
 
 	return true;
 }
 
 //-------------------------------------------------------------------------------------
-void InterfacesHandler_Dbmgr::onLoginAccountCB(KBEngine::MemoryStream& s)
+void InterfacesHandler_Dbmgr::onLoginAccountCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	(void)pChannel;
+	s.done();
 }
 
 //-------------------------------------------------------------------------------------
@@ -166,7 +182,7 @@ void InterfacesHandler_Dbmgr::accountActivate(Network::Channel* pChannel, std::s
 			return;
 		}
 
-		pThreadPool->addTask(new DBTaskActivateAccount(pChannel->addr(), scode));
+		pThreadPool->addTask(new DBTaskActivateAccount(pChannel->addr(), pChannel->componentID(), scode));
 	}
 }
 
@@ -184,7 +200,7 @@ void InterfacesHandler_Dbmgr::accountReqResetPassword(Network::Channel* pChannel
 		return;
 	}
 
-	pThreadPool->addTask(new DBTaskReqAccountResetPassword(pChannel->addr(), accountName));
+	pThreadPool->addTask(new DBTaskReqAccountResetPassword(pChannel->addr(), pChannel->componentID(), accountName));
 }
 
 //-------------------------------------------------------------------------------------
@@ -201,7 +217,7 @@ void InterfacesHandler_Dbmgr::accountResetPassword(Network::Channel* pChannel, s
 		return;
 	}
 
-	pThreadPool->addTask(new DBTaskAccountResetPassword(pChannel->addr(), accountName, newpassword, scode));
+	pThreadPool->addTask(new DBTaskAccountResetPassword(pChannel->addr(), pChannel->componentID(), accountName, newpassword, scode));
 }
 
 //-------------------------------------------------------------------------------------
@@ -219,7 +235,7 @@ void InterfacesHandler_Dbmgr::accountReqBindMail(Network::Channel* pChannel, ENT
 		return;
 	}
 
-	pThreadPool->addTask(new DBTaskReqAccountBindEmail(pChannel->addr(), entityID, accountName, password, email));
+	pThreadPool->addTask(new DBTaskReqAccountBindEmail(pChannel->addr(), pChannel->componentID(), entityID, accountName, password, email));
 }
 
 //-------------------------------------------------------------------------------------
@@ -236,7 +252,7 @@ void InterfacesHandler_Dbmgr::accountBindMail(Network::Channel* pChannel, std::s
 		return;
 	}
 
-	pThreadPool->addTask(new DBTaskAccountBindEmail(pChannel->addr(), username, scode));
+	pThreadPool->addTask(new DBTaskAccountBindEmail(pChannel->addr(), pChannel->componentID(), username, scode));
 }
 
 //-------------------------------------------------------------------------------------
@@ -254,7 +270,7 @@ void InterfacesHandler_Dbmgr::accountNewPassword(Network::Channel* pChannel, ENT
 		return;
 	}
 
-	pThreadPool->addTask(new DBTaskAccountNewPassword(pChannel->addr(), entityID, accountName, password, newpassword));
+	pThreadPool->addTask(new DBTaskAccountNewPassword(pChannel->addr(), pChannel->componentID(), entityID, accountName, password, newpassword));
 }
 
 //-------------------------------------------------------------------------------------
@@ -281,14 +297,16 @@ Network::Channel* InterfacesHandler_Interfaces::findOrReconnectChannel(const cha
 {
 	Network::Channel* pInterfacesChannel =
 		Dbmgr::getSingleton().networkInterface().findChannel(addr_);
-	if (pInterfacesChannel != NULL && !pInterfacesChannel->isDestroyed())
+	if (pInterfacesChannel != NULL && !pInterfacesChannel->isDestroyed() &&
+		pInterfacesChannel->condemn() == 0)
 		return pInterfacesChannel;
 
 	if (!reconnect())
 		return NULL;
 
 	pInterfacesChannel = Dbmgr::getSingleton().networkInterface().findChannel(addr_);
-	if (pInterfacesChannel == NULL || pInterfacesChannel->isDestroyed())
+	if (pInterfacesChannel == NULL || pInterfacesChannel->isDestroyed() ||
+		pInterfacesChannel->condemn() != 0)
 	{
 		WARNING_MSG(fmt::format("{}: Interfaces Channel unavailable after reconnect, addr={}.\n",
 			operation, addr_.c_str()));
@@ -320,21 +338,42 @@ bool InterfacesHandler_Interfaces::createAccount(Network::Channel* pChannel, std
 }
 
 //-------------------------------------------------------------------------------------
-void InterfacesHandler_Interfaces::onCreateAccountCB(KBEngine::MemoryStream& s)
+void InterfacesHandler_Interfaces::onCreateAccountCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	Network::Channel* expectedChannel =
+		Dbmgr::getSingleton().networkInterface().findChannel(addr_);
+	if (pChannel == NULL || pChannel != expectedChannel || pChannel->isDestroyed() ||
+		pChannel->condemn() != 0 ||
+		!AccountRequestGuard::validateInterfacesCallbackStream(s))
+	{
+		WARNING_MSG(fmt::format("InterfacesHandler_Interfaces::onCreateAccountCB: rejected callback stream, remaining={}.\n",
+			s.length()));
+		s.done();
+		return;
+	}
+
 	std::string registerName, accountName, password, postdatas, getdatas;
-	COMPONENT_ID cid;
+	COMPONENT_ID cid = 0;
 	SERVER_ERROR_CODE success = SERVER_ERR_OP_FAILED;
 
 	s >> cid >> registerName >> accountName >> password >> success;
 	s.readBlob(postdatas);
 	s.readBlob(getdatas);
+	if (!AccountRequestGuard::isValidAccountName(registerName) ||
+		!AccountRequestGuard::isValidAccountName(accountName, true) ||
+		!AccountRequestGuard::isValidPassword(password) ||
+		!AccountRequestGuard::isValidInterfacesData(postdatas) ||
+		!AccountRequestGuard::isValidInterfacesData(getdatas))
+	{
+		WARNING_MSG("InterfacesHandler_Interfaces::onCreateAccountCB: rejected callback fields.\n");
+		return;
+	}
 
 	if (success != SERVER_SUCCESS && success != SERVER_ERR_LOCAL_PROCESSING)
 		accountName = "";
 
 	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(LOGINAPP_TYPE, cid);
-	if(cinfos == NULL || cinfos->pChannel == NULL)
+	if (!isAvailableCallbackTarget(cinfos, cid))
 	{
 		ERROR_MSG("InterfacesHandler_Interfaces::onCreateAccountCB: loginapp not found!\n");
 		return;
@@ -358,7 +397,7 @@ void InterfacesHandler_Interfaces::onCreateAccountCB(KBEngine::MemoryStream& s)
 		{
 			if (email_isvalid(accountName.c_str()))
 			{
-				pThreadPool->addTask(new DBTaskCreateMailAccount(cinfos->pChannel->addr(),
+				pThreadPool->addTask(new DBTaskCreateMailAccount(cinfos->pChannel->addr(), cid,
 					registerName, accountName, password, postdatas, getdatas));
 
 				return;
@@ -376,7 +415,7 @@ void InterfacesHandler_Interfaces::onCreateAccountCB(KBEngine::MemoryStream& s)
 			}
 			else
 			{
-				pThreadPool->addTask(new DBTaskCreateMailAccount(cinfos->pChannel->addr(),
+				pThreadPool->addTask(new DBTaskCreateMailAccount(cinfos->pChannel->addr(), cid,
 					registerName, accountName, password, postdatas, getdatas));
 
 				return;
@@ -384,7 +423,7 @@ void InterfacesHandler_Interfaces::onCreateAccountCB(KBEngine::MemoryStream& s)
 		}
 	}
 
-	pThreadPool->addTask(new DBTaskCreateAccount(cinfos->pChannel->addr(),
+	pThreadPool->addTask(new DBTaskCreateAccount(cinfos->pChannel->addr(), cid,
 		registerName, accountName, password, postdatas, getdatas));
 }
 
@@ -408,15 +447,36 @@ bool InterfacesHandler_Interfaces::loginAccount(Network::Channel* pChannel, std:
 }
 
 //-------------------------------------------------------------------------------------
-void InterfacesHandler_Interfaces::onLoginAccountCB(KBEngine::MemoryStream& s)
+void InterfacesHandler_Interfaces::onLoginAccountCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	Network::Channel* expectedChannel =
+		Dbmgr::getSingleton().networkInterface().findChannel(addr_);
+	if (pChannel == NULL || pChannel != expectedChannel || pChannel->isDestroyed() ||
+		pChannel->condemn() != 0 ||
+		!AccountRequestGuard::validateInterfacesCallbackStream(s))
+	{
+		WARNING_MSG(fmt::format("InterfacesHandler_Interfaces::onLoginAccountCB: rejected callback stream, remaining={}.\n",
+			s.length()));
+		s.done();
+		return;
+	}
+
 	std::string loginName, accountName, password, postdatas, getdatas;
-	COMPONENT_ID cid;
+	COMPONENT_ID cid = 0;
 	SERVER_ERROR_CODE success = SERVER_ERR_OP_FAILED;
 
 	s >> cid >> loginName >> accountName >> password >> success;
 	s.readBlob(postdatas);
 	s.readBlob(getdatas);
+	if (!AccountRequestGuard::isValidAccountName(loginName) ||
+		!AccountRequestGuard::isValidAccountName(accountName, true) ||
+		!AccountRequestGuard::isValidPassword(password) ||
+		!AccountRequestGuard::isValidInterfacesData(postdatas) ||
+		!AccountRequestGuard::isValidInterfacesData(getdatas))
+	{
+		WARNING_MSG("InterfacesHandler_Interfaces::onLoginAccountCB: rejected callback fields.\n");
+		return;
+	}
 
 	bool needCheckPassword = (success == SERVER_ERR_LOCAL_PROCESSING);
 
@@ -426,7 +486,7 @@ void InterfacesHandler_Interfaces::onLoginAccountCB(KBEngine::MemoryStream& s)
 		success = SERVER_SUCCESS;
 
 	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(LOGINAPP_TYPE, cid);
-	if(cinfos == NULL || cinfos->pChannel == NULL)
+	if (!isAvailableCallbackTarget(cinfos, cid))
 	{
 		ERROR_MSG("InterfacesHandler_Interfaces::onLoginAccountCB: loginapp not found!\n");
 		return;
@@ -443,7 +503,7 @@ void InterfacesHandler_Interfaces::onLoginAccountCB(KBEngine::MemoryStream& s)
 		return;
 	}
 
-	pThreadPool->addTask(new DBTaskAccountLogin(cinfos->pChannel->addr(),
+	pThreadPool->addTask(new DBTaskAccountLogin(cinfos->pChannel->addr(), cid,
 		loginName, accountName, password, success, postdatas, getdatas, needCheckPassword));
 }
 
@@ -451,7 +511,8 @@ void InterfacesHandler_Interfaces::onLoginAccountCB(KBEngine::MemoryStream& s)
 bool InterfacesHandler_Interfaces::initialize()
 {
 	Network::Channel* pInterfacesChannel = Dbmgr::getSingleton().networkInterface().findChannel(addr_);
-	if(pInterfacesChannel && !pInterfacesChannel->isDestroyed())
+	if(pInterfacesChannel && !pInterfacesChannel->isDestroyed() &&
+		pInterfacesChannel->condemn() == 0)
 		return true;
 
 	return reconnect();

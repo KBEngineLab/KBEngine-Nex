@@ -22,6 +22,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "dbmgr.h"
 #include "dbmgr_interface.h"
 #include "dbtasks.h"
+#include "account_request_guard.h"
 #include "profile.h"
 #include "interfaces_handler.h"
 #include "sync_app_datas_handler.h"
@@ -908,15 +909,27 @@ void Dbmgr::reqCreateAccount(Network::Channel* pChannel, KBEngine::MemoryStream&
 		return;
 	}
 
+	if (!AccountRequestGuard::validateCreateAccountStream(s))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::reqCreateAccount: rejected malformed or oversized payload, remaining={}.\n",
+			s.length()));
+		s.done();
+		return;
+	}
+
 	std::string registerName, password, datas;
 	uint8 uatype = 0;
 
 	s >> registerName >> password >> uatype;
 	s.readBlob(datas);
 
-	if(registerName.size() == 0)
+	if (!AccountRequestGuard::isValidAccountName(registerName) ||
+		!AccountRequestGuard::isValidPassword(password) ||
+		!AccountRequestGuard::isValidAccountData(datas) ||
+		!AccountRequestGuard::isValidAccountType(uatype))
 	{
-		ERROR_MSG("Dbmgr::reqCreateAccount: registerName is empty.\n");
+		WARNING_MSG(fmt::format("Dbmgr::reqCreateAccount: rejected fields, registerNameSize={}, passwordSize={}, datasSize={}, accountType={}.\n",
+			registerName.size(), password.size(), datas.size(), uatype));
 		return;
 	}
 
@@ -937,11 +950,18 @@ void Dbmgr::onCreateAccountCBFromInterfaces(Network::Channel* pChannel, KBEngine
 		s.done();
 		return;
 	}
+	if (!AccountRequestGuard::validateInterfacesCallbackStream(s))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::onCreateAccountCBFromInterfaces: rejected malformed or oversized payload, remaining={}.\n",
+			s.length()));
+		s.done();
+		return;
+	}
 
 	InterfacesHandler* pHandler =
 		findInterfacesHandlerOrWarn("Dbmgr::onCreateAccountCBFromInterfaces");
 	if (pHandler != NULL)
-		pHandler->onCreateAccountCB(s);
+		pHandler->onCreateAccountCB(pChannel, s);
 	else
 		s.done();
 }
@@ -955,13 +975,24 @@ void Dbmgr::onAccountLogin(Network::Channel* pChannel, KBEngine::MemoryStream& s
 		return;
 	}
 
+	if (!AccountRequestGuard::validateLoginStream(s))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::onAccountLogin: rejected malformed or oversized payload, remaining={}.\n",
+			s.length()));
+		s.done();
+		return;
+	}
+
 	std::string loginName, password, datas;
 	s >> loginName >> password;
 	s.readBlob(datas);
 
-	if(loginName.size() == 0)
+	if (!AccountRequestGuard::isValidAccountName(loginName) ||
+		!AccountRequestGuard::isValidPassword(password) ||
+		!AccountRequestGuard::isValidAccountData(datas))
 	{
-		ERROR_MSG("Dbmgr::onAccountLogin: loginName is empty.\n");
+		WARNING_MSG(fmt::format("Dbmgr::onAccountLogin: rejected fields, loginNameSize={}, passwordSize={}, datasSize={}.\n",
+			loginName.size(), password.size(), datas.size()));
 		return;
 	}
 
@@ -979,11 +1010,18 @@ void Dbmgr::onLoginAccountCBBFromInterfaces(Network::Channel* pChannel, KBEngine
 		s.done();
 		return;
 	}
+	if (!AccountRequestGuard::validateInterfacesCallbackStream(s))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::onLoginAccountCBBFromInterfaces: rejected malformed or oversized payload, remaining={}.\n",
+			s.length()));
+		s.done();
+		return;
+	}
 
 	InterfacesHandler* pHandler =
 		findInterfacesHandlerOrWarn("Dbmgr::onLoginAccountCBBFromInterfaces");
 	if (pHandler != NULL)
-		pHandler->onLoginAccountCB(s);
+		pHandler->onLoginAccountCB(pChannel, s);
 	else
 		s.done();
 }
@@ -1006,9 +1044,11 @@ void Dbmgr::queryAccount(Network::Channel* pChannel,
 		return;
 	}
 
-	if(accountName.size() == 0)
+	if (!AccountRequestGuard::isValidAccountName(accountName) ||
+		!AccountRequestGuard::isValidPassword(password))
 	{
-		ERROR_MSG("Dbmgr::queryAccount: accountName is empty.\n");
+		WARNING_MSG(fmt::format("Dbmgr::queryAccount: rejected account fields, accountNameSize={}, passwordSize={}.\n",
+			accountName.size(), password.size()));
 		return;
 	}
 
@@ -1767,6 +1807,11 @@ void Dbmgr::accountActivate(Network::Channel* pChannel, std::string& scode)
 {
 	if (!isExpectedIngressSource(LOGINAPP_TYPE, pChannel, "Dbmgr::accountActivate"))
 		return;
+	if (!AccountRequestGuard::isValidVerificationCode(scode))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::accountActivate: rejected codeSize={}.\n", scode.size()));
+		return;
+	}
 
 	INFO_MSG("Dbmgr::accountActivate: request received.\n");
 	InterfacesHandler* pHandler = findInterfacesHandlerOrWarn("Dbmgr::accountActivate");
@@ -1782,6 +1827,12 @@ void Dbmgr::accountReqResetPassword(Network::Channel* pChannel, std::string& acc
 	{
 		return;
 	}
+	if (!AccountRequestGuard::isValidAccountName(accountName))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::accountReqResetPassword: rejected accountNameSize={}.\n",
+			accountName.size()));
+		return;
+	}
 
 	INFO_MSG(fmt::format("Dbmgr::accountReqResetPassword: accountNameSize={}.\n", accountName.size()));
 	InterfacesHandler* pHandler = findInterfacesHandlerOrWarn("Dbmgr::accountReqResetPassword");
@@ -1794,6 +1845,14 @@ void Dbmgr::accountResetPassword(Network::Channel* pChannel, std::string& accoun
 {
 	if (!isExpectedIngressSource(LOGINAPP_TYPE, pChannel, "Dbmgr::accountResetPassword"))
 		return;
+	if (!AccountRequestGuard::isValidAccountName(accountName) ||
+		!AccountRequestGuard::isValidPassword(newpassword) ||
+		!AccountRequestGuard::isValidVerificationCode(code))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::accountResetPassword: rejected fields, accountNameSize={}, newPasswordSize={}, codeSize={}.\n",
+			accountName.size(), newpassword.size(), code.size()));
+		return;
+	}
 
 	INFO_MSG(fmt::format("Dbmgr::accountResetPassword: accountNameSize={}.\n", accountName.size()));
 	InterfacesHandler* pHandler = findInterfacesHandlerOrWarn("Dbmgr::accountResetPassword");
@@ -1807,6 +1866,14 @@ void Dbmgr::accountReqBindMail(Network::Channel* pChannel, ENTITY_ID entityID, s
 {
 	if (!isExpectedIngressSource(BASEAPP_TYPE, pChannel, "Dbmgr::accountReqBindMail"))
 		return;
+	if (entityID <= 0 || !AccountRequestGuard::isValidAccountName(accountName) ||
+		!AccountRequestGuard::isValidPassword(password) ||
+		!AccountRequestGuard::isValidAccountName(email))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::accountReqBindMail: rejected fields, entityID={}, accountNameSize={}, passwordSize={}, emailSize={}.\n",
+			entityID, accountName.size(), password.size(), email.size()));
+		return;
+	}
 
 	// This path handles both account identifiers and destination email addresses;
 	// never persist either value in logs. 此路径同时处理账户标识和目标邮箱，日志不得保留其内容。
@@ -1822,6 +1889,13 @@ void Dbmgr::accountBindMail(Network::Channel* pChannel, std::string& username, s
 {
 	if (!isExpectedIngressSource(LOGINAPP_TYPE, pChannel, "Dbmgr::accountBindMail"))
 		return;
+	if (!AccountRequestGuard::isValidAccountName(username) ||
+		!AccountRequestGuard::isValidVerificationCode(scode))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::accountBindMail: rejected fields, usernameSize={}, codeSize={}.\n",
+			username.size(), scode.size()));
+		return;
+	}
 
 	INFO_MSG(fmt::format("Dbmgr::accountBindMail: usernameSize={}.\n", username.size()));
 	InterfacesHandler* pHandler = findInterfacesHandlerOrWarn("Dbmgr::accountBindMail");
@@ -1835,6 +1909,14 @@ void Dbmgr::accountNewPassword(Network::Channel* pChannel, ENTITY_ID entityID, s
 {
 	if (!isExpectedIngressSource(BASEAPP_TYPE, pChannel, "Dbmgr::accountNewPassword"))
 		return;
+	if (entityID <= 0 || !AccountRequestGuard::isValidAccountName(accountName) ||
+		!AccountRequestGuard::isValidPassword(password) ||
+		!AccountRequestGuard::isValidPassword(newpassword))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::accountNewPassword: rejected fields, entityID={}, accountNameSize={}, oldPasswordSize={}, newPasswordSize={}.\n",
+			entityID, accountName.size(), password.size(), newpassword.size()));
+		return;
+	}
 
 	INFO_MSG(fmt::format("Dbmgr::accountNewPassword: accountNameSize={}.\n", accountName.size()));
 	InterfacesHandler* pHandler = findInterfacesHandlerOrWarn("Dbmgr::accountNewPassword");

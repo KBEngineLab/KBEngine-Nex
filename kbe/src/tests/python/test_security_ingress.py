@@ -28,6 +28,14 @@ REGISTERED_PROBE_COMPONENT_IDS = {
     "dbmgr-registered-invalid-entity-range": 9004,
     "dbmgr-registered-invalid-db-interface": 9005,
     "dbmgr-registered-invalid-autoload-flag": 9006,
+    "dbmgr-registered-truncated-create-account": 9007,
+    "dbmgr-registered-invalid-account-type": 9008,
+    "dbmgr-registered-oversized-create-account": 9009,
+    "dbmgr-registered-truncated-account-login": 9010,
+    "dbmgr-registered-oversized-account-login": 9011,
+    "dbmgr-registered-truncated-interfaces-callback": 9012,
+    "dbmgr-registered-invalid-bind-entity": 9013,
+    "dbmgr-registered-invalid-callback-error": 9014,
 }
 
 PROBES = (
@@ -174,6 +182,70 @@ PROBES = (
         "DBMGR_TYPE",
         "Dbmgr::queryAccount",
         r"Dbmgr::queryAccount: rejected componentID=7001, entityID=4242",
+    ),
+    (
+        "dbmgr-registered-truncated-create-account",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::reqCreateAccount",
+        r"Dbmgr::reqCreateAccount: rejected malformed or oversized payload",
+    ),
+    (
+        "dbmgr-registered-invalid-account-type",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::reqCreateAccount",
+        r"Dbmgr::reqCreateAccount: rejected fields, .*accountType=255",
+    ),
+    (
+        "dbmgr-registered-oversized-create-account",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::reqCreateAccount",
+        r"Dbmgr::reqCreateAccount: rejected malformed or oversized payload",
+    ),
+    (
+        "dbmgr-registered-truncated-account-login",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::onAccountLogin",
+        r"Dbmgr::onAccountLogin: rejected malformed or oversized payload",
+    ),
+    (
+        "dbmgr-registered-oversized-account-login",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::onAccountLogin",
+        r"Dbmgr::onAccountLogin: rejected malformed or oversized payload",
+    ),
+    (
+        "dbmgr-registered-truncated-interfaces-callback",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::onCreateAccountCBFromInterfaces",
+        r"Dbmgr::onCreateAccountCBFromInterfaces: rejected malformed or oversized payload",
+    ),
+    (
+        "dbmgr-registered-invalid-callback-error",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::onCreateAccountCBFromInterfaces",
+        r"Dbmgr::onCreateAccountCBFromInterfaces: rejected malformed or oversized payload",
+    ),
+    (
+        "dbmgr-registered-invalid-bind-entity",
+        "dbmgr",
+        "registered-internal",
+        "DBMGR_TYPE",
+        "Dbmgr::accountReqBindMail",
+        r"Dbmgr::accountReqBindMail: rejected fields, entityID=0",
     ),
     (
         "dbmgr-spoofed-active-tick",
@@ -592,6 +664,26 @@ def probe_body(probe_case, component_uid):
         return struct.pack("=HQHii", 65535, 9005, 1, 0, 32)
     if probe_case == "dbmgr-registered-invalid-autoload-flag":
         return struct.pack("=QiQHHIb", 9006, 1, 0, 0, 1, 0, 2)
+    if probe_case == "dbmgr-registered-truncated-create-account":
+        return b"account\0password\0"
+    if probe_case == "dbmgr-registered-invalid-account-type":
+        return b"account\0password\0" + struct.pack("=BI", 255, 0)
+    if probe_case == "dbmgr-registered-oversized-create-account":
+        return b"a" * 129 + b"\0password\0" + struct.pack("=BI", 1, 0)
+    if probe_case == "dbmgr-registered-truncated-account-login":
+        return b"account\0"
+    if probe_case == "dbmgr-registered-oversized-account-login":
+        return b"a" * 129 + b"\0password\0" + struct.pack("=I", 0)
+    if probe_case == "dbmgr-registered-truncated-interfaces-callback":
+        return b"\0"
+    if probe_case == "dbmgr-registered-invalid-callback-error":
+        return (
+            struct.pack("=Q", 9000)
+            + b"account\0account\0password\0"
+            + struct.pack("=HII", 65535, 0, 0)
+        )
+    if probe_case == "dbmgr-registered-invalid-bind-entity":
+        return struct.pack("=i", 0) + b"account\0password\0mail@example.invalid\0"
     if probe_case == "dbmgr-spoofed-active-tick":
         return struct.pack("=iQ", 6, 7001)
     if probe_case == "dbmgr-spoofed-kill-request":
@@ -681,9 +773,22 @@ def registered_probe_component_type(probe_case):
         "dbmgr-registered-invalid-entity-range",
         "dbmgr-registered-invalid-db-interface",
         "dbmgr-registered-invalid-autoload-flag",
+        "dbmgr-registered-invalid-bind-entity",
     }:
         return 6
+    if probe_case in {
+        "dbmgr-registered-truncated-create-account",
+        "dbmgr-registered-invalid-account-type",
+        "dbmgr-registered-oversized-create-account",
+        "dbmgr-registered-truncated-account-login",
+        "dbmgr-registered-oversized-account-login",
+    }:
+        return 2
     return 13
+
+
+def component_type_label(component_type):
+    return {2: "loginapp", 6: "baseapp", 13: "interfaces"}[component_type]
 
 
 def run_probe(
@@ -719,6 +824,7 @@ def run_registered_probe(
     message_name,
     contract_endpoint,
     ingress_endpoint,
+    registration_endpoint,
     rejection_pattern,
     component_uid,
 ):
@@ -734,7 +840,7 @@ def run_registered_probe(
         registration_id,
         registration_length,
         component_registration_body(
-            component_uid, component_type, component_id, ingress_endpoint
+            component_uid, component_type, component_id, registration_endpoint
         ),
         "Dbmgr::onRegisterNewApp",
     )
@@ -749,7 +855,7 @@ def run_registered_probe(
             run_root,
             controller_stdout,
             controller_stderr,
-            rf"ServerApp::onRegisterNewApp:.*componentType:{'baseapp' if component_type == 6 else 'interfaces'}.*componentID:{component_id}",
+            rf"ServerApp::onRegisterNewApp:.*componentType:{component_type_label(component_type)}.*componentID:{component_id}",
             10,
             f"registration marker for {probe_case}",
         )
@@ -832,67 +938,76 @@ def run_test(args):
             for component_name in {probe[1] for probe in PROBES if probe[2] == "external"}
         }
         component_uid = find_component_uid(ready_logs, "baseapp")
-        for (
-            probe_case,
-            component_name,
-            endpoint_kind,
-            component_type,
-            message_name,
-            rejection_pattern,
-        ) in PROBES:
-            if endpoint_kind == "registered-internal":
-                run_registered_probe(
+        # Fake component discovery must not advertise the DBMgr endpoint itself:
+        # real components would connect back to DBMgr and collide with its existing Channel.
+        # 伪组件不能发布 DBMgr 自身端点，否则真实组件回连时会与既有 Channel 冲突。
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as registration_listener:
+            registration_listener.bind((internal_endpoints["dbmgr"][0], 0))
+            registration_listener.listen(64)
+            registration_endpoint = registration_listener.getsockname()
+
+            for (
+                probe_case,
+                component_name,
+                endpoint_kind,
+                component_type,
+                message_name,
+                rejection_pattern,
+            ) in PROBES:
+                if endpoint_kind == "registered-internal":
+                    run_registered_probe(
+                        args,
+                        process,
+                        args.run_root,
+                        controller_stdout,
+                        controller_stderr,
+                        probe_case,
+                        component_type,
+                        message_name,
+                        internal_endpoints[component_name],
+                        internal_endpoints[component_name],
+                        registration_endpoint,
+                        rejection_pattern,
+                        component_uid,
+                    )
+                    continue
+
+                run_probe(
                     args,
-                    process,
-                    args.run_root,
-                    controller_stdout,
-                    controller_stderr,
                     probe_case,
                     component_type,
                     message_name,
                     internal_endpoints[component_name],
-                    internal_endpoints[component_name],
-                    rejection_pattern,
+                    (
+                        external_endpoints[component_name]
+                        if endpoint_kind == "external"
+                        else internal_endpoints[component_name]
+                    ),
                     component_uid,
                 )
-                continue
+                wait_for_text(
+                    process,
+                    args.run_root,
+                    controller_stdout,
+                    controller_stderr,
+                    rejection_pattern,
+                    10,
+                    f"rejection marker for {probe_case}",
+                )
 
-            run_probe(
-                args,
-                probe_case,
-                component_type,
-                message_name,
-                internal_endpoints[component_name],
-                (
-                    external_endpoints[component_name]
-                    if endpoint_kind == "external"
-                    else internal_endpoints[component_name]
-                ),
-                component_uid,
-            )
-            wait_for_text(
-                process,
-                args.run_root,
-                controller_stdout,
-                controller_stderr,
-                rejection_pattern,
-                10,
-                f"rejection marker for {probe_case}",
-            )
+            # The cluster controller checks every owned component while held. Keeping
+            # it alive across a scheduling interval proves the malformed frames did
+            # not terminate a target process. 集群控制器在 hold 状态持续检查全部子进程；
+            # 跨过一个调度周期仍存活，证明畸形帧没有终止目标组件。
+            time.sleep(0.5)
+            if process.poll() is not None:
+                raise RuntimeError(f"cluster exited after probes with code {process.returncode}")
 
-        # The cluster controller checks every owned component while held. Keeping
-        # it alive across a scheduling interval proves the malformed frames did
-        # not terminate a target process. 集群控制器在 hold 状态持续检查全部子进程；
-        # 跨过一个调度周期仍存活，证明畸形帧没有终止目标组件。
-        time.sleep(0.5)
-        if process.poll() is not None:
-            raise RuntimeError(f"cluster exited after probes with code {process.returncode}")
-
-        stop_file.touch()
-        result = process.wait(timeout=30)
-        if result != 0:
-            raise RuntimeError(f"cluster cleanup failed with code {result}")
-        print(f"SECURITY_MULTIPROCESS_INGRESS_PASS probes={len(PROBES)}", flush=True)
+            stop_file.touch()
+            result = process.wait(timeout=30)
+            if result != 0:
+                raise RuntimeError(f"cluster cleanup failed with code {result}")
+            print(f"SECURITY_MULTIPROCESS_INGRESS_PASS probes={len(PROBES)}", flush=True)
     finally:
         if process is not None and process.poll() is None:
             try:

@@ -57,9 +57,9 @@ public:
 	virtual bool loginAccount(Network::Channel* pChannel, std::string& loginName, 
 		std::string& password, std::string& datas) = 0;
 
-	virtual void onCreateAccountCB(KBEngine::MemoryStream& s) = 0;
+	virtual void onCreateAccountCB(Network::Channel* pChannel, KBEngine::MemoryStream& s) = 0;
 
-	virtual void onLoginAccountCB(KBEngine::MemoryStream& s) = 0;
+	virtual void onLoginAccountCB(Network::Channel* pChannel, KBEngine::MemoryStream& s) = 0;
 
 	virtual void charge(Network::Channel* pChannel, KBEngine::MemoryStream& s) = 0;
 	virtual void onChargeCB(KBEngine::MemoryStream& s) = 0;
@@ -90,9 +90,9 @@ public:
 	virtual bool loginAccount(Network::Channel* pChannel, std::string& loginName, 
 		std::string& password, std::string& datas);
 
-	virtual void onCreateAccountCB(KBEngine::MemoryStream& s);
+	virtual void onCreateAccountCB(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	virtual void onLoginAccountCB(KBEngine::MemoryStream& s);
+	virtual void onLoginAccountCB(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
 	virtual void charge(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
@@ -129,9 +129,9 @@ public:
 	virtual bool loginAccount(Network::Channel* pChannel, std::string& loginName, 
 		std::string& password, std::string& datas);
 
-	virtual void onCreateAccountCB(KBEngine::MemoryStream& s);
+	virtual void onCreateAccountCB(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
-	virtual void onLoginAccountCB(KBEngine::MemoryStream& s);
+	virtual void onLoginAccountCB(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
 	virtual void charge(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 

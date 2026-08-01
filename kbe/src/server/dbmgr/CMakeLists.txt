@@ -1,5 +1,6 @@
 kbe_add_server_executable(dbmgr KBE_DBMGR
     SOURCES
+		account_request_guard.cpp
         buffered_dbtasks.cpp
         dbmgr.cpp
         dbmgr_interface.cpp
