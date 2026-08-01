@@ -96,6 +96,26 @@ InterfacesHandler* findInterfacesHandlerOrWarn(const char* operation)
 	return pHandler;
 }
 
+bool validateRawDatabaseCommandStream(MemoryStream& s)
+{
+	const size_t payloadPosition = s.rpos();
+	const size_t fixedHeaderSize = sizeof(ENTITY_ID) + sizeof(uint16) +
+		sizeof(COMPONENT_ID) + sizeof(COMPONENT_TYPE) + sizeof(CALLBACK_ID) + sizeof(ArraySize);
+	if (s.length() < fixedHeaderSize)
+		return false;
+
+	ENTITY_ID entityID = 0;
+	uint16 dbInterfaceIndex = 0;
+	COMPONENT_ID componentID = 0;
+	COMPONENT_TYPE componentType = UNKNOWN_COMPONENT_TYPE;
+	CALLBACK_ID callbackID = 0;
+	ArraySize commandSize = 0;
+	s >> entityID >> dbInterfaceIndex >> componentID >> componentType >> callbackID >> commandSize;
+	const bool valid = static_cast<size_t>(commandSize) <= s.length();
+	s.rpos(payloadPosition);
+	return valid;
+}
+
 bool isAllowedRawDatabaseSource(Network::Channel* pChannel,
 	COMPONENT_TYPE componentType, COMPONENT_ID componentID)
 {
@@ -1046,9 +1066,17 @@ void Dbmgr::onEntityOffline(Network::Channel* pChannel, DBID dbid, ENTITY_SCRIPT
 }
 
 //-------------------------------------------------------------------------------------
-void Dbmgr::executeRawDatabaseCommand(Network::Channel* pChannel, 
+void Dbmgr::executeRawDatabaseCommand(Network::Channel* pChannel,
 									  KBEngine::MemoryStream& s)
 {
+	if (!validateRawDatabaseCommandStream(s))
+	{
+		WARNING_MSG(fmt::format("Dbmgr::executeRawDatabaseCommand: rejected truncated payload, remaining={}.\n",
+			s.length()));
+		s.done();
+		return;
+	}
+
 	ENTITY_ID entityID = -1;
 	s >> entityID;
 

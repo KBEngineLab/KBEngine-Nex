@@ -96,6 +96,14 @@ PROBES = (
         r"Dbmgr::executeRawDatabaseCommand: rejected componentType=6, componentID=7001",
     ),
     (
+        "dbmgr-truncated-raw-database-command",
+        "dbmgr",
+        "internal",
+        "DBMGR_TYPE",
+        "Dbmgr::executeRawDatabaseCommand",
+        r"Dbmgr::executeRawDatabaseCommand: rejected truncated payload",
+    ),
+    (
         "dbmgr-unregistered-stream-template",
         "dbmgr",
         "internal",
@@ -525,6 +533,8 @@ def probe_body(probe_case, component_uid):
         return b"a\0b\0" + struct.pack("=BQiQIH", 0, 7001, 1, 0, 0, 0)
     if probe_case == "dbmgr-spoofed-raw-database-command":
         return struct.pack("=iHQiII", -1, 0, 7001, 6, 0, 0)
+    if probe_case == "dbmgr-truncated-raw-database-command":
+        return struct.pack("=iH", -1, 0)
     if probe_case == "dbmgr-unregistered-stream-template":
         return b""
     if probe_case == "dbmgr-registration-zero-id":

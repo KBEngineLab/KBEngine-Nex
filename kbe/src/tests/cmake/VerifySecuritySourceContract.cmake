@@ -118,6 +118,7 @@ endforeach()
 foreach(_kbe_required IN ITEMS
 	"Dbmgr::onRegisterNewApp: skipped unavailable broadcast target"
 	"callbackID={}, commandSize={}"
+	"Dbmgr::executeRawDatabaseCommand: rejected truncated payload"
 )
 	string(FIND "${_kbe_dbmgr}\n${_kbe_sensitive_text}"
 		"${_kbe_required}" _kbe_required_position)
