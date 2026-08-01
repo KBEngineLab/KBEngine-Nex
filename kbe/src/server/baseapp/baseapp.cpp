@@ -20,6 +20,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include "baseapp.h"
+#include "server/bounded_stream_reader.h"
 #include "server/client_request_guard.h"
 #include "server/component_routing_guard.h"
 #include "server/interfaces_payload_guard.h"
@@ -63,6 +64,61 @@ namespace KBEngine{
 	
 ServerConfig g_serverConfig;
 KBE_SINGLETON_INIT(Baseapp);
+
+namespace
+{
+const size_t ENTITY_TYPE_MAX_LENGTH = 128;
+
+bool validateDBIDCallbackHeader(const MemoryStream& stream, bool hasSourceComponent)
+{
+	BoundedStreamReader reader(stream);
+	COMPONENT_ID sourceComponentID = 0;
+	COMPONENT_ID targetComponentID = 0;
+	uint16 dbInterfaceIndex = 0;
+	DBID entityDBID = 0;
+	CALLBACK_ID callbackID = 0;
+	bool success = false;
+	ENTITY_ID entityID = 0;
+	bool wasActive = false;
+	if (hasSourceComponent && (!reader.read(sourceComponentID) || sourceComponentID == 0))
+		return false;
+	return reader.read(targetComponentID) && targetComponentID > 0 &&
+		reader.read(dbInterfaceIndex) &&
+		reader.skipString(ENTITY_TYPE_MAX_LENGTH, false) &&
+		reader.read(entityDBID) && entityDBID > 0 &&
+		reader.read(callbackID) && reader.read(success) &&
+		reader.read(entityID) && reader.read(wasActive) &&
+		(!wasActive || (reader.read(sourceComponentID) && sourceComponentID > 0 &&
+			reader.read(entityID) && entityID > 0));
+}
+
+bool validateRestoreSpaceCallbackHeader(const MemoryStream& stream)
+{
+	BoundedStreamReader reader(stream);
+	COMPONENT_ID baseappID = 0;
+	COMPONENT_ID cellappID = 0;
+	SPACE_ID spaceID = 0;
+	ENTITY_ID spaceEntityID = 0;
+	ENTITY_SCRIPT_UID scriptType = 0;
+	bool destroyed = false;
+	return reader.read(baseappID) && baseappID > 0 &&
+		reader.read(cellappID) && cellappID > 0 &&
+		reader.read(spaceID) && spaceID > 0 &&
+		reader.read(spaceEntityID) && spaceEntityID > 0 &&
+		reader.read(scriptType) && reader.read(destroyed);
+}
+
+bool validateEntityCallbackHeader(const MemoryStream& stream)
+{
+	BoundedStreamReader reader(stream);
+	CALLBACK_ID callbackID = 0;
+	ENTITY_ID entityID = 0;
+	COMPONENT_ID componentID = 0;
+	return reader.read(callbackID) && reader.skipString(ENTITY_TYPE_MAX_LENGTH, false) &&
+		reader.read(entityID) && entityID > 0 && reader.read(componentID) && componentID > 0 &&
+		reader.empty();
+}
+}
 
 // 创建一个用于生成实体的字典，包含了实体所有的持久化属性和数据
 PyObject* createDictDataFromPersistentStream(MemoryStream& s, const char* entityType)
@@ -768,13 +824,28 @@ void Baseapp::onCellAppDeath(Network::Channel * pChannel)
 //-------------------------------------------------------------------------------------
 void Baseapp::onRequestRestoreCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	if(pChannel->isExternal())
+	if(pChannel == NULL || pChannel->isExternal())
 		return;
+	if (s.length() < sizeof(COMPONENT_ID) * 2 + sizeof(bool))
+	{
+		WARNING_MSG("Baseapp::onRequestRestoreCB: rejected incomplete fixed header.\n");
+		s.done();
+		return;
+	}
 	
 	COMPONENT_ID cid, source_cid;
 	bool canRestore = true;
 
 	s >> cid >> source_cid >> canRestore;
+	Components::ComponentInfos* sourceInfos = Components::getSingleton().findComponent(pChannel);
+	if (sourceInfos == NULL || sourceInfos->componentType != CELLAPP_TYPE ||
+		sourceInfos->cid != source_cid || cid == 0)
+	{
+		WARNING_MSG(fmt::format("Baseapp::onRequestRestoreCB: rejected unbound CellApp source, cid={}, source_cid={}.\n",
+			cid, source_cid));
+		s.done();
+		return;
+	}
 
 	DEBUG_MSG(fmt::format("Baseapp::onRequestRestoreCB: cid={}, source_cid={}, canRestore={}, channel={}.\n", 
 		cid, source_cid, canRestore, pChannel->c_str()));
@@ -809,6 +880,12 @@ void Baseapp::onRestoreSpaceCellFromOtherBaseapp(Network::Channel* pChannel, KBE
 {
 	if(pChannel->isExternal())
 		return;
+	if (!validateRestoreSpaceCallbackHeader(s))
+	{
+		WARNING_MSG("Baseapp::onRestoreSpaceCellFromOtherBaseapp: rejected malformed fixed header.\n");
+		s.done();
+		return;
+	}
 	
 	COMPONENT_ID baseappID = 0, cellappID = 0;
 	SPACE_ID spaceID = 0;
@@ -817,6 +894,15 @@ void Baseapp::onRestoreSpaceCellFromOtherBaseapp(Network::Channel* pChannel, KBE
 	ENTITY_SCRIPT_UID utype = 0;
 
 	s >> baseappID >> cellappID >> spaceID >> spaceEntityID >> utype >> destroyed;
+	Components::ComponentInfos* sourceInfos = Components::getSingleton().findComponent(pChannel);
+	if (sourceInfos == NULL || sourceInfos->componentType != BASEAPP_TYPE ||
+		sourceInfos->cid != baseappID)
+	{
+		WARNING_MSG(fmt::format("Baseapp::onRestoreSpaceCellFromOtherBaseapp: rejected unbound BaseApp source, baseappID={}.\n",
+			baseappID));
+		s.done();
+		return;
+	}
 
 	INFO_MSG(fmt::format("Baseapp::onRestoreSpaceCellFromOtherBaseapp: baseappID={0}, cellappID={5}, spaceID={1}, spaceEntityID={2}, destroyed={3}, "
 		"restoreEntityHandlers({4})\n",
@@ -1279,7 +1365,9 @@ void Baseapp::createEntityFromDBID(const char* entityType, DBID dbid, PyObject* 
 	CALLBACK_ID callbackID = 0;
 	if(pyCallback != NULL)
 	{
-		callbackID = callbackMgr().save(pyCallback);
+		callbackID = callbackMgr().save(pyCallback,
+			CallbackSourceContext::component(DBMGR_TYPE, dbmgrinfos->cid,
+				dbmgrinfos->pChannel->sessionEpoch()));
 	}
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
@@ -1304,6 +1392,17 @@ void Baseapp::onCreateEntityFromDBIDCallback(Network::Channel* pChannel, KBEngin
 		s.done();
 		return;
 	}
+	if (!validateDBIDCallbackHeader(s, false))
+	{
+		WARNING_MSG("Baseapp::onCreateEntityFromDBIDCallback: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
+	Components::ComponentInfos* callbackSourceInfos =
+		Components::getSingleton().findComponent(pChannel);
+	const CallbackSourceContext callbackSource = CallbackSourceContext::component(
+		DBMGR_TYPE, callbackSourceInfos != NULL ? callbackSourceInfos->cid : 0,
+		pChannel != NULL ? pChannel->sessionEpoch() : 0);
 	
 	std::string entityType;
 	DBID dbid;
@@ -1386,7 +1485,7 @@ void Baseapp::onCreateEntityFromDBIDCallback(Network::Channel* pChannel, KBEngin
 			}
 
 			// baseEntityRef, dbid, wasActive
-			PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID);
+			PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID, callbackSource);
 			if(pyfunc != NULL)
 			{
 				SCOPED_PROFILE(SCRIPTCALL_PROFILE);
@@ -1443,7 +1542,7 @@ void Baseapp::onCreateEntityFromDBIDCallback(Network::Channel* pChannel, KBEngin
 
 		if(callbackID > 0)
 		{
-			PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID);
+			PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID, callbackSource);
 			if(pyfunc)
 			{
 				// 不需要通知脚本
@@ -1459,7 +1558,7 @@ void Baseapp::onCreateEntityFromDBIDCallback(Network::Channel* pChannel, KBEngin
 		//	Py_INCREF(e);
 
 		// baseEntityRef, dbid, wasActive
-		PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID);
+		PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID, callbackSource);
 		if(pyfunc != NULL)
 		{
 			SCOPED_PROFILE(SCRIPTCALL_PROFILE);
@@ -1632,7 +1731,9 @@ void Baseapp::createEntityAnywhereFromDBID(const char* entityType, DBID dbid, Py
 	CALLBACK_ID callbackID = 0;
 	if(pyCallback != NULL)
 	{
-		callbackID = callbackMgr().save(pyCallback);
+		callbackID = callbackMgr().save(pyCallback,
+			CallbackSourceContext((uint32(1) << DBMGR_TYPE) | (uint32(1) << BASEAPP_TYPE) |
+				(uint32(1) << BASEAPPMGR_TYPE)));
 	}
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
@@ -1651,6 +1752,10 @@ void Baseapp::onGetCreateEntityAnywhereFromDBIDBestBaseappID(Network::Channel* p
 		s.done();
 		return;
 	}
+	Components::ComponentInfos* callbackSourceInfos = Components::getSingleton().findComponent(pChannel);
+	const CallbackSourceContext callbackSource = CallbackSourceContext::component(
+		BASEAPPMGR_TYPE, callbackSourceInfos != NULL ? callbackSourceInfos->cid : 0,
+		pChannel != NULL ? pChannel->sessionEpoch() : 0);
 	
 	COMPONENT_ID targetComponentID;
 	s >> targetComponentID;
@@ -1676,7 +1781,7 @@ void Baseapp::onGetCreateEntityAnywhereFromDBIDBestBaseappID(Network::Channel* p
 
 		if (callbackID > 0)
 		{
-			PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID);
+			PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID, callbackSource);
 			if (pyfunc != NULL)
 			{
 			}
@@ -1707,6 +1812,16 @@ void Baseapp::onCreateEntityAnywhereFromDBIDCallback(Network::Channel* pChannel,
 		s.done();
 		return;
 	}
+	if (!validateDBIDCallbackHeader(s, false))
+	{
+		WARNING_MSG("Baseapp::onCreateEntityAnywhereFromDBIDCallback: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
+	Components::ComponentInfos* callbackSourceInfos = Components::getSingleton().findComponent(pChannel);
+	const CallbackSourceContext callbackSource = CallbackSourceContext::component(
+		DBMGR_TYPE, callbackSourceInfos != NULL ? callbackSourceInfos->cid : 0,
+		pChannel != NULL ? pChannel->sessionEpoch() : 0);
 	
 	size_t currpos = s.rpos();
 
@@ -1781,7 +1896,7 @@ void Baseapp::onCreateEntityAnywhereFromDBIDCallback(Network::Channel* pChannel,
 			}
 
 			// baseEntityRef, dbid, wasActive
-			PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID);
+			PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID, callbackSource);
 			if(pyfunc != NULL)
 			{
 				SCOPED_PROFILE(SCRIPTCALL_PROFILE);
@@ -1815,7 +1930,7 @@ void Baseapp::onCreateEntityAnywhereFromDBIDCallback(Network::Channel* pChannel,
 
 		if (callbackID > 0)
 		{
-			PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID);
+			PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID, callbackSource);
 			if (pyfunc != NULL)
 			{
 			}
@@ -1846,6 +1961,12 @@ void Baseapp::createEntityAnywhereFromDBIDOtherBaseapp(Network::Channel* pChanne
 	{
 		WARNING_MSG(fmt::format("Baseapp::createEntityAnywhereFromDBIDOtherBaseapp: rejected non-BaseAppMgr source, addr={}.\n",
 			pChannel->c_str()));
+		s.done();
+		return;
+	}
+	if (!validateDBIDCallbackHeader(s, true))
+	{
+		WARNING_MSG("Baseapp::createEntityAnywhereFromDBIDOtherBaseapp: rejected malformed or oversized payload.\n");
 		s.done();
 		return;
 	}
@@ -1951,7 +2072,7 @@ void Baseapp::createEntityAnywhereFromDBIDOtherBaseapp(Network::Channel* pChanne
 
 //-------------------------------------------------------------------------------------
 void Baseapp::onCreateEntityAnywhereFromDBIDOtherBaseappCallback(Network::Channel* pChannel, COMPONENT_ID createByBaseappID,
-														   std::string entityType, ENTITY_ID createdEntityID, CALLBACK_ID callbackID, DBID dbid)
+															   std::string entityType, ENTITY_ID createdEntityID, CALLBACK_ID callbackID, DBID dbid)
 {
 	if (pChannel != NULL)
 	{
@@ -1964,6 +2085,9 @@ void Baseapp::onCreateEntityAnywhereFromDBIDOtherBaseappCallback(Network::Channe
 			return;
 		}
 	}
+	const CallbackSourceContext callbackSource = CallbackSourceContext::component(
+		BASEAPP_TYPE, createByBaseappID,
+		pChannel != NULL ? pChannel->sessionEpoch() : 0);
 	
 	if(callbackID > 0)
 	{
@@ -1975,7 +2099,7 @@ void Baseapp::onCreateEntityAnywhereFromDBIDOtherBaseappCallback(Network::Channe
 
 			if (callbackID > 0)
 			{
-				PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID);
+				PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID, callbackSource);
 				if (pyfunc != NULL)
 				{
 				}
@@ -1985,7 +2109,7 @@ void Baseapp::onCreateEntityAnywhereFromDBIDOtherBaseappCallback(Network::Channe
 		}
 
 		// baseEntityRef, dbid, wasActive
-		PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID);
+		PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID, callbackSource);
 		if(pyfunc != NULL)
 		{
 			Entity* pEntity = this->findEntity(createdEntityID);
@@ -2189,7 +2313,9 @@ void Baseapp::createEntityRemotelyFromDBID(const char* entityType, DBID dbid, CO
 	CALLBACK_ID callbackID = 0;
 	if(pyCallback != NULL)
 	{
-		callbackID = callbackMgr().save(pyCallback);
+		callbackID = callbackMgr().save(pyCallback,
+			CallbackSourceContext((uint32(1) << DBMGR_TYPE) | (uint32(1) << BASEAPP_TYPE) |
+				(uint32(1) << BASEAPPMGR_TYPE)));
 	}
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
@@ -2214,6 +2340,16 @@ void Baseapp::onCreateEntityRemotelyFromDBIDCallback(Network::Channel* pChannel,
 		s.done();
 		return;
 	}
+	if (!validateDBIDCallbackHeader(s, false))
+	{
+		WARNING_MSG("Baseapp::onCreateEntityRemotelyFromDBIDCallback: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
+	Components::ComponentInfos* callbackSourceInfos = Components::getSingleton().findComponent(pChannel);
+	const CallbackSourceContext callbackSource = CallbackSourceContext::component(
+		DBMGR_TYPE, callbackSourceInfos != NULL ? callbackSourceInfos->cid : 0,
+		pChannel != NULL ? pChannel->sessionEpoch() : 0);
 	
 	size_t currpos = s.rpos();
 
@@ -2356,6 +2492,12 @@ void Baseapp::createEntityRemotelyFromDBIDOtherBaseapp(Network::Channel* pChanne
 		s.done();
 		return;
 	}
+	if (!validateDBIDCallbackHeader(s, true))
+	{
+		WARNING_MSG("Baseapp::createEntityRemotelyFromDBIDOtherBaseapp: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
 	
 	std::string entityType;
 	DBID dbid;
@@ -2471,6 +2613,9 @@ void Baseapp::onCreateEntityRemotelyFromDBIDOtherBaseappCallback(Network::Channe
 			return;
 		}
 	}
+	const CallbackSourceContext callbackSource = CallbackSourceContext::component(
+		BASEAPP_TYPE, createByBaseappID,
+		pChannel != NULL ? pChannel->sessionEpoch() : 0);
 	
 	if(callbackID > 0)
 	{
@@ -2482,7 +2627,7 @@ void Baseapp::onCreateEntityRemotelyFromDBIDOtherBaseappCallback(Network::Channe
 
 			if (callbackID > 0)
 			{
-				PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID);
+				PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID, callbackSource);
 				if (pyfunc != NULL)
 				{
 				}
@@ -2492,7 +2637,7 @@ void Baseapp::onCreateEntityRemotelyFromDBIDOtherBaseappCallback(Network::Channe
 		}
 
 		// baseEntityRef, dbid, wasActive
-		PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID);
+		PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID, callbackSource);
 		if(pyfunc != NULL)
 		{
 			Entity* pEntity = this->findEntity(createdEntityID);
@@ -2686,7 +2831,8 @@ void Baseapp::createEntityAnywhere(const char* entityType, PyObject* params, PyO
 	CALLBACK_ID callbackID = 0;
 	if(pyCallback != NULL)
 	{
-		callbackID = callbackMgr().save(pyCallback);
+		callbackID = callbackMgr().save(pyCallback,
+			CallbackSourceContext::component(BASEAPP_TYPE));
 	}
 
 	(*pBundle) << callbackID;
@@ -2787,6 +2933,12 @@ void Baseapp::onCreateEntityAnywhereCallback(Network::Channel* pChannel, KBEngin
 {
 	if(pChannel->isExternal())
 		return;
+	if (!validateEntityCallbackHeader(s))
+	{
+		WARNING_MSG("Baseapp::onCreateEntityAnywhereCallback: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
 
 	CALLBACK_ID callbackID = 0;
 	std::string entityType;
@@ -2827,7 +2979,10 @@ void Baseapp::_onCreateEntityAnywhereCallback(Network::Channel* pChannel, CALLBA
 
 	// Validate the callback source before take(); an invalid packet must not consume
 	// the legitimate pending callback. 在 take() 前校验来源，非法封包不得消费合法回调。
-	PyObjectPtr pyCallback = callbackMgr().take(callbackID);
+	const CallbackSourceContext callbackSource = CallbackSourceContext::component(
+		BASEAPP_TYPE, pChannel != NULL ? componentID : g_componentID,
+		pChannel != NULL ? pChannel->sessionEpoch() : 0);
+	PyObjectPtr pyCallback = callbackMgr().take(callbackID, callbackSource);
 	PyObject* pyargs = PyTuple_New(1);
 
 	if(pChannel != NULL)
@@ -2932,7 +3087,8 @@ void Baseapp::createEntityRemotely(const char* entityType, COMPONENT_ID componen
 	CALLBACK_ID callbackID = 0;
 	if (pyCallback != NULL)
 	{
-		callbackID = callbackMgr().save(pyCallback);
+		callbackID = callbackMgr().save(pyCallback,
+			CallbackSourceContext::component(BASEAPP_TYPE));
 	}
 
 	(*pBundle) << callbackID;
@@ -3033,6 +3189,12 @@ void Baseapp::onCreateEntityRemotelyCallback(Network::Channel* pChannel, KBEngin
 {
 	if (pChannel->isExternal())
 		return;
+	if (!validateEntityCallbackHeader(s))
+	{
+		WARNING_MSG("Baseapp::onCreateEntityRemotelyCallback: rejected malformed or oversized payload.\n");
+		s.done();
+		return;
+	}
 
 	CALLBACK_ID callbackID = 0;
 	std::string entityType;
@@ -3389,7 +3551,9 @@ void Baseapp::executeRawDatabaseCommand(const char* datas, uint32 size, PyObject
 	CALLBACK_ID callbackID = 0;
 
 	if(pycallback && PyCallable_Check(pycallback))
-		callbackID = callbackMgr().save(pycallback);
+		callbackID = callbackMgr().save(pycallback,
+			CallbackSourceContext::component(DBMGR_TYPE, dbmgrinfos->cid,
+				dbmgrinfos->pChannel->sessionEpoch()));
 
 	(*pBundle) << callbackID;
 	(*pBundle) << size;
@@ -3407,6 +3571,11 @@ void Baseapp::onExecuteRawDatabaseCommandCB(Network::Channel* pChannel, KBEngine
 		s.done();
 		return;
 	}
+	Components::ComponentInfos* callbackSourceInfos =
+		Components::getSingleton().findComponent(pChannel);
+	const CallbackSourceContext callbackSource = CallbackSourceContext::component(
+		DBMGR_TYPE, callbackSourceInfos != NULL ? callbackSourceInfos->cid : 0,
+		pChannel != NULL ? pChannel->sessionEpoch() : 0);
 	
 	std::string err;
 	CALLBACK_ID callbackID = 0;
@@ -3506,7 +3675,7 @@ void Baseapp::onExecuteRawDatabaseCommandCB(Network::Channel* pChannel, KBEngine
 	{
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-		PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID);
+		PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID, callbackSource);
 		if(pyfunc != NULL)
 		{
 			PyObject* pyResult = PyObject_CallFunction(pyfunc.get(), 
@@ -3636,8 +3805,10 @@ void Baseapp::charge(std::string chargeID, DBID dbid, const std::string& datas, 
 		return;
 	}
 
-	CALLBACK_ID callbackID = callbackMgr().save(pycallback, uint64(g_kbeSrvConfig.interfaces_orders_timeout_ +
-		g_kbeSrvConfig.callback_timeout_));
+	CALLBACK_ID callbackID = callbackMgr().save(pycallback,
+		CallbackSourceContext::component(DBMGR_TYPE, pChannel->componentID(),
+			pChannel->sessionEpoch()),
+		uint64(g_kbeSrvConfig.interfaces_orders_timeout_ + g_kbeSrvConfig.callback_timeout_));
 
 	INFO_MSG(fmt::format("Baseapp::charge: chargeIDSize={0}, dbid={2}, pycallback={1}.\n",
 		chargeID.size(),
@@ -3665,6 +3836,11 @@ void Baseapp::onChargeCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 		s.done();
 		return;
 	}
+	Components::ComponentInfos* callbackSourceInfos =
+		Components::getSingleton().findComponent(pChannel);
+	const CallbackSourceContext callbackSource = CallbackSourceContext::component(
+		DBMGR_TYPE, callbackSourceInfos != NULL ? callbackSourceInfos->cid : 0,
+		pChannel != NULL ? pChannel->sessionEpoch() : 0);
 	if (!InterfacesPayloadGuard::validateBaseappChargeCallbackStream(s))
 	{
 		WARNING_MSG("Baseapp::onChargeCB: rejected malformed or oversized payload.\n");
@@ -3696,7 +3872,7 @@ void Baseapp::onChargeCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 
 	if(callbackID > 0)
 	{
-		PyObjectPtr pycallback = callbackMgr().take(callbackID);
+		PyObjectPtr pycallback = callbackMgr().take(callbackID, callbackSource);
 
 		if(pycallback != NULL)
 		{
@@ -5426,7 +5602,9 @@ PyObject* Baseapp::__py_deleteEntityByDBID(PyObject* self, PyObject* args)
 		return NULL;
 	}
 
-	CALLBACK_ID callbackID = Baseapp::getSingleton().callbackMgr().save(pycallback);
+	CALLBACK_ID callbackID = Baseapp::getSingleton().callbackMgr().save(pycallback,
+		CallbackSourceContext::component(DBMGR_TYPE, dbmgrinfos->cid,
+			dbmgrinfos->pChannel->sessionEpoch()));
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(DbmgrInterface::deleteEntityByDBID);
@@ -5450,6 +5628,11 @@ void Baseapp::deleteEntityByDBIDCB(Network::Channel* pChannel, KBEngine::MemoryS
 		s.done();
 		return;
 	}
+	Components::ComponentInfos* callbackSourceInfos =
+		Components::getSingleton().findComponent(pChannel);
+	const CallbackSourceContext callbackSource = CallbackSourceContext::component(
+		DBMGR_TYPE, callbackSourceInfos != NULL ? callbackSourceInfos->cid : 0,
+		pChannel != NULL ? pChannel->sessionEpoch() : 0);
 	
 	ENTITY_ID entityID = 0;
 	COMPONENT_ID entityInAppID = 0;
@@ -5470,7 +5653,7 @@ void Baseapp::deleteEntityByDBIDCB(Network::Channel* pChannel, KBEngine::MemoryS
 	if(callbackID > 0)
 	{
 		// true or false or entitycall
-		PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID);
+		PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID, callbackSource);
 		if(pyfunc != NULL)
 		{
 			PyObject* pyval = NULL;
@@ -5608,7 +5791,9 @@ PyObject* Baseapp::__py_lookUpEntityByDBID(PyObject* self, PyObject* args)
 		return NULL;
 	}
 
-	CALLBACK_ID callbackID = Baseapp::getSingleton().callbackMgr().save(pycallback);
+	CALLBACK_ID callbackID = Baseapp::getSingleton().callbackMgr().save(pycallback,
+		CallbackSourceContext::component(DBMGR_TYPE, dbmgrinfos->cid,
+			dbmgrinfos->pChannel->sessionEpoch()));
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(DbmgrInterface::lookUpEntityByDBID);
@@ -5632,6 +5817,11 @@ void Baseapp::lookUpEntityByDBIDCB(Network::Channel* pChannel, KBEngine::MemoryS
 		s.done();
 		return;
 	}
+	Components::ComponentInfos* callbackSourceInfos =
+		Components::getSingleton().findComponent(pChannel);
+	const CallbackSourceContext callbackSource = CallbackSourceContext::component(
+		DBMGR_TYPE, callbackSourceInfos != NULL ? callbackSourceInfos->cid : 0,
+		pChannel != NULL ? pChannel->sessionEpoch() : 0);
 	
 	ENTITY_ID entityID = 0;
 	COMPONENT_ID entityInAppID = 0;
@@ -5652,7 +5842,7 @@ void Baseapp::lookUpEntityByDBIDCB(Network::Channel* pChannel, KBEngine::MemoryS
 	if(callbackID > 0)
 	{
 		// true or false or entitycall
-		PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID);
+		PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID, callbackSource);
 		if(pyfunc != NULL)
 		{
 			PyObject* pyval = NULL;

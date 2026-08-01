@@ -134,13 +134,13 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappInterface)
 	BASEAPP_MESSAGE_DECLARE_STREAM(onCreateEntityAnywhere,							NETWORK_VARIABLE_MESSAGE)
 
 	// createEntityAnywhere成功之后回调消息到发起层createEntityAnywhere的baseapp的entity。
-	BASEAPP_MESSAGE_DECLARE_STREAM(onCreateEntityAnywhereCallback,					NETWORK_FIXED_MESSAGE)
+	BASEAPP_MESSAGE_DECLARE_STREAM(onCreateEntityAnywhereCallback,					NETWORK_VARIABLE_MESSAGE)
 
 	// createEntityRemotely成功之后回调消息到发起层createEntityRemotely的baseapp的entity。
-	BASEAPP_MESSAGE_DECLARE_STREAM(onCreateEntityRemotely,							NETWORK_FIXED_MESSAGE)
+	BASEAPP_MESSAGE_DECLARE_STREAM(onCreateEntityRemotely,							NETWORK_VARIABLE_MESSAGE)
 
 	// createEntityRemotely成功之后回调消息到发起层createEntityRemotely的baseapp的entity。
-	BASEAPP_MESSAGE_DECLARE_STREAM(onCreateEntityRemotelyCallback,					 NETWORK_FIXED_MESSAGE)
+	BASEAPP_MESSAGE_DECLARE_STREAM(onCreateEntityRemotelyCallback,					 NETWORK_VARIABLE_MESSAGE)
 
 	// createCellEntity的cell实体创建成功回调。
 	BASEAPP_MESSAGE_DECLARE_ARGS3(onEntityGetCell,									NETWORK_FIXED_MESSAGE,
@@ -221,16 +221,16 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappInterface)
 									bool,											success)
 
 	// createEntityFromDBID的回调
-	BASEAPP_MESSAGE_DECLARE_STREAM(onCreateEntityFromDBIDCallback,					NETWORK_FIXED_MESSAGE)
+	BASEAPP_MESSAGE_DECLARE_STREAM(onCreateEntityFromDBIDCallback,					NETWORK_VARIABLE_MESSAGE)
 
 	// createEntityAnywhereFromDBID的回调
-	BASEAPP_MESSAGE_DECLARE_STREAM(onGetCreateEntityAnywhereFromDBIDBestBaseappID,	NETWORK_FIXED_MESSAGE)
+	BASEAPP_MESSAGE_DECLARE_STREAM(onGetCreateEntityAnywhereFromDBIDBestBaseappID,	NETWORK_VARIABLE_MESSAGE)
 
 	// createEntityAnywhereFromDBID的回调
-	BASEAPP_MESSAGE_DECLARE_STREAM(onCreateEntityAnywhereFromDBIDCallback,			NETWORK_FIXED_MESSAGE)
+	BASEAPP_MESSAGE_DECLARE_STREAM(onCreateEntityAnywhereFromDBIDCallback,			NETWORK_VARIABLE_MESSAGE)
 
 	// createEntityAnywhereFromDBID的回调
-	BASEAPP_MESSAGE_DECLARE_STREAM(createEntityAnywhereFromDBIDOtherBaseapp,		NETWORK_FIXED_MESSAGE)
+	BASEAPP_MESSAGE_DECLARE_STREAM(createEntityAnywhereFromDBIDOtherBaseapp,		NETWORK_VARIABLE_MESSAGE)
 
 	// createEntityAnywhereFromDBID的回调
 	BASEAPP_MESSAGE_DECLARE_ARGS5(onCreateEntityAnywhereFromDBIDOtherBaseappCallback,NETWORK_VARIABLE_MESSAGE,
@@ -241,10 +241,10 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappInterface)
 									DBID,											dbid)
 
 	// createEntityRemotelyFromDBID的回调
-	BASEAPP_MESSAGE_DECLARE_STREAM(onCreateEntityRemotelyFromDBIDCallback,			NETWORK_FIXED_MESSAGE)
+	BASEAPP_MESSAGE_DECLARE_STREAM(onCreateEntityRemotelyFromDBIDCallback,			NETWORK_VARIABLE_MESSAGE)
 
 	// createEntityRemotelyFromDBID的回调
-	BASEAPP_MESSAGE_DECLARE_STREAM(createEntityRemotelyFromDBIDOtherBaseapp,		NETWORK_FIXED_MESSAGE)
+	BASEAPP_MESSAGE_DECLARE_STREAM(createEntityRemotelyFromDBIDOtherBaseapp,		NETWORK_VARIABLE_MESSAGE)
 
 	// createEntityRemotelyFromDBID的回调
 	BASEAPP_MESSAGE_DECLARE_ARGS5(onCreateEntityRemotelyFromDBIDOtherBaseappCallback,NETWORK_VARIABLE_MESSAGE,

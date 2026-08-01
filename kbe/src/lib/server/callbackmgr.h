@@ -46,14 +46,42 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 	
 namespace KBEngine{
 
+// 回调来源上下文绑定组件身份和具体 Channel 生命周期，避免重连后的新会话消费旧请求。
+// Callback source context binds component identity and Channel lifetime so a reconnect cannot consume an old request.
+struct CallbackSourceContext
+{
+	uint32 componentTypeMask;
+	COMPONENT_ID componentID;
+	uint64 sessionEpoch;
+
+	CallbackSourceContext(uint32 mask = 0, COMPONENT_ID cid = 0, uint64 epoch = 0):
+		componentTypeMask(mask), componentID(cid), sessionEpoch(epoch) {}
+
+	static CallbackSourceContext component(COMPONENT_TYPE type, COMPONENT_ID cid = 0,
+		uint64 epoch = 0)
+	{
+		return CallbackSourceContext(type < 32 ? (uint32(1) << type) : 0, cid, epoch);
+	}
+
+	bool matches(const CallbackSourceContext& actual) const
+	{
+		return (componentTypeMask == 0 ||
+			(actual.componentTypeMask != 0 && (componentTypeMask & actual.componentTypeMask) != 0)) &&
+			(componentID == 0 || componentID == actual.componentID) &&
+			(sessionEpoch == 0 || sessionEpoch == actual.sessionEpoch);
+	}
+};
+
 template<typename T>
 class CallbackMgr
 {
 public:
 	typedef std::map< CALLBACK_ID, std::pair< T, uint64 > > CALLBACKS;
+	typedef std::map<CALLBACK_ID, CallbackSourceContext> SOURCES;
 
 	CallbackMgr():
-	cbMap_(),
+		cbMap_(),
+		cbSources_(),
 	idAlloc_(),
 	nextTimeout_(0)
 	{
@@ -67,6 +95,7 @@ public:
 	void finalise()
 	{
 		cbMap_.clear();
+		cbSources_.clear();
 		nextTimeout_ = 0;
 	}
 
@@ -80,6 +109,11 @@ public:
 	*/
 	CALLBACK_ID save(T callback, uint64 timeout = 0/*secs*/)
 	{
+		return save(callback, CallbackSourceContext(), timeout);
+	}
+
+	CALLBACK_ID save(T callback, const CallbackSourceContext& source, uint64 timeout = 0/*secs*/)
+	{
 		if(timeout == 0)
 			timeout = uint64(ServerConfig::getSingleton().callback_timeout_);
 
@@ -87,6 +121,7 @@ public:
 		const uint64 expiry = timestamp() + (timeout * stampsPerSecond());
 		cbMap_.insert(typename CALLBACKS::value_type(cbID,
 			std::pair< T, uint64 >(callback, expiry)));
+		cbSources_[cbID] = source;
 		if(nextTimeout_ == 0 || expiry < nextTimeout_)
 			nextTimeout_ = expiry;
 
@@ -99,13 +134,25 @@ public:
 	*/
 	T take(CALLBACK_ID cbID)
 	{
+		return take(cbID, CallbackSourceContext());
+	}
+
+	T take(CALLBACK_ID cbID, const CallbackSourceContext& actual)
+	{
 		typename CALLBACKS::iterator itr = cbMap_.find(cbID);
 		if(itr != cbMap_.end()){
+			typename SOURCES::const_iterator sourceItr = cbSources_.find(cbID);
+			if (sourceItr != cbSources_.end() && !sourceItr->second.matches(actual))
+			{
+				tick();
+				return NULL;
+			}
 			T t = itr->second.first;
 			const bool removedNextTimeout = itr->second.second <= nextTimeout_;
 			if(removedNextTimeout)
 				nextTimeout_ = 0;
 			idAlloc_.reclaim(itr->first);
+			cbSources_.erase(itr->first);
 			cbMap_.erase(itr);
 			if(removedNextTimeout)
 				tick();
@@ -140,6 +187,7 @@ public:
 				if(processTimeout(iter->first, iter->second.first))
 				{
 					idAlloc_.reclaim(iter->first);
+					cbSources_.erase(iter->first);
 					cbMap_.erase(iter++);
 					continue;
 				}
@@ -163,6 +211,7 @@ public:
 
 protected:
 	CALLBACKS cbMap_;									// 所有的回调都存储在这个map中
+	SOURCES cbSources_;
 	IDAllocate<CALLBACK_ID> idAlloc_;					// 回调的id分配器
 	uint64 nextTimeout_;
 };
@@ -180,12 +229,19 @@ inline void CallbackMgr<PyObjectPtr>::addToStream(KBEngine::MemoryStream& s)
 		s << iter->first;
 		s.appendBlob(script::Pickler::pickle(iter->second.first.get()));
 		s << iter->second.second;
+		// 实体迁移必须携带来源 fence，否则恢复后的回调会退化为仅按 callback ID 匹配。
+		// Entity migration must retain the source fence or restored callbacks would match by callback ID alone.
+		SOURCES::const_iterator sourceItr = cbSources_.find(iter->first);
+		const CallbackSourceContext source = sourceItr != cbSources_.end() ?
+			sourceItr->second : CallbackSourceContext();
+		s << source.componentTypeMask << source.componentID << source.sessionEpoch;
 	}
 }
 
 template<>
 inline void CallbackMgr<PyObjectPtr>::createFromStream(KBEngine::MemoryStream& s)
 {
+	cbSources_.clear();
 	CALLBACK_ID v;
 	s >> v;
 
@@ -210,6 +266,9 @@ inline void CallbackMgr<PyObjectPtr>::createFromStream(KBEngine::MemoryStream& s
 		uint64 timeout;
 		s >> timeout;
 
+		CallbackSourceContext source;
+		s >> source.componentTypeMask >> source.componentID >> source.sessionEpoch;
+
 		if(pyCallback == NULL || cbID == 0)
 		{
 			ERROR_MSG(fmt::format("CallbackMgr::createFromStream: pyCallback({}) error!\n", cbID));
@@ -218,6 +277,7 @@ inline void CallbackMgr<PyObjectPtr>::createFromStream(KBEngine::MemoryStream& s
 
 		cbMap_.insert(CallbackMgr<PyObjectPtr>::CALLBACKS::value_type(cbID, 
 			std::pair< PyObjectPtr, uint64 >(pyCallback, timeout)));
+		cbSources_[cbID] = source;
 		if(nextTimeout_ == 0 || timeout < nextTimeout_)
 			nextTimeout_ = timeout;
 

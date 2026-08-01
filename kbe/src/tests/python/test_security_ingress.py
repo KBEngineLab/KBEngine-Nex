@@ -489,6 +489,46 @@ PROBES = (
         r"onCreateEntityAnywhereCallback: rejected unbound sourceComponent\(7001\)",
     ),
     (
+        "baseapp-unregistered-dbid-callback",
+        "baseapp",
+        "internal",
+        "BASEAPP_TYPE",
+        "Baseapp::onCreateEntityFromDBIDCallback",
+        r"Baseapp::onCreateEntityFromDBIDCallback: rejected non-DBMgr source",
+    ),
+    (
+        "baseapp-unregistered-anywhere-callback",
+        "baseapp",
+        "internal",
+        "BASEAPP_TYPE",
+        "Baseapp::onCreateEntityAnywhereCallback",
+        r"Baseapp::onCreateEntityAnywhereCallback: rejected unbound sourceComponent",
+    ),
+    (
+        "baseapp-truncated-remotely-callback",
+        "baseapp",
+        "internal",
+        "BASEAPP_TYPE",
+        "Baseapp::onCreateEntityRemotelyCallback",
+        r"Baseapp::onCreateEntityRemotelyCallback: rejected malformed or oversized payload",
+    ),
+    (
+        "baseapp-truncated-restore-request",
+        "baseapp",
+        "internal",
+        "BASEAPP_TYPE",
+        "Baseapp::onRequestRestoreCB",
+        r"Baseapp::onRequestRestoreCB: rejected incomplete fixed header",
+    ),
+    (
+        "baseapp-truncated-restore-space",
+        "baseapp",
+        "internal",
+        "BASEAPP_TYPE",
+        "Baseapp::onRestoreSpaceCellFromOtherBaseapp",
+        r"Baseapp::onRestoreSpaceCellFromOtherBaseapp: rejected malformed fixed header",
+    ),
+    (
         "baseapp-spoofed-dbmgr-init",
         "baseapp",
         "internal",
@@ -1034,6 +1074,14 @@ def probe_body(probe_case, component_uid):
         return struct.pack("=QifI", 8001, 0, float("nan"), 0)
     if probe_case == "baseapp-spoofed-callback":
         return struct.pack("=I", 1) + b"Account\0" + struct.pack("=iQ", 1, 7001)
+    if probe_case in {
+        "baseapp-unregistered-dbid-callback",
+        "baseapp-unregistered-anywhere-callback",
+        "baseapp-truncated-remotely-callback",
+        "baseapp-truncated-restore-request",
+        "baseapp-truncated-restore-space",
+    }:
+        return b""
     if probe_case in {
         "baseapp-spoofed-dbmgr-init",
         "cellapp-spoofed-dbmgr-init",

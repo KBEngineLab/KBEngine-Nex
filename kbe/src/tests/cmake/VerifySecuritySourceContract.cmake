@@ -67,6 +67,7 @@ foreach(_kbe_forbidden IN LISTS _kbe_forbidden_sensitive_literals)
 endforeach()
 
 file(READ "${KBE_SOURCE_ROOT}/server/baseapp/baseapp.cpp" _kbe_baseapp)
+file(READ "${KBE_SOURCE_ROOT}/server/baseapp/baseapp_interface.h" _kbe_baseapp_interface)
 file(READ "${KBE_SOURCE_ROOT}/server/baseappmgr/baseappmgr.cpp" _kbe_baseappmgr)
 file(READ "${KBE_SOURCE_ROOT}/server/cellapp/cellapp.cpp" _kbe_cellapp)
 file(READ "${KBE_SOURCE_ROOT}/server/cellappmgr/cellappmgr.cpp" _kbe_cellappmgr)
@@ -78,6 +79,16 @@ file(READ "${KBE_SOURCE_ROOT}/lib/server/callbackmgr.h" _kbe_callbackmgr)
 file(READ "${KBE_SOURCE_ROOT}/lib/server/serverapp.cpp" _kbe_serverapp)
 file(READ "${KBE_SOURCE_ROOT}/lib/server/serverapp.h" _kbe_serverapp_header)
 file(READ "${KBE_SOURCE_ROOT}/lib/server/globaldata_server.cpp" _kbe_globaldata_server)
+
+# Stream handlers carry runtime-sized MemoryStream bodies. Declaring one as a
+# fixed zero-length message makes the payload parse as unrelated message IDs.
+# Stream 处理器携带运行时长度正文；声明为固定零长度会把正文误解析为其他消息 ID。
+string(REGEX MATCH
+	"BASEAPP_MESSAGE_DECLARE_STREAM\\([^\n\r]*NETWORK_FIXED_MESSAGE"
+	_kbe_fixed_stream_contract "${_kbe_baseapp_interface}")
+if(_kbe_fixed_stream_contract)
+	message(FATAL_ERROR "BaseApp stream message regressed to a fixed-length contract")
+endif()
 file(READ "${KBE_SOURCE_ROOT}/lib/server/globaldata_client.cpp" _kbe_globaldata_client)
 file(READ "${KBE_SOURCE_ROOT}/lib/db_interface/db_interface.cpp" _kbe_db_interface)
 
@@ -238,6 +249,15 @@ foreach(_kbe_required IN ITEMS
 	"Baseappmgr::reqCreateEntityRemotelyFromDBID: rejected malformed or oversized payload"
 	"Baseappmgr::registerPendingAccountToBaseapp: rejected unbound LoginApp source"
 	"Baseappmgr::registerPendingAccountToBaseappAddr: rejected malformed or oversized payload"
+	"Baseapp::onCreateEntityFromDBIDCallback: rejected malformed or oversized payload"
+	"Baseapp::onCreateEntityAnywhereCallback: rejected malformed or oversized payload"
+	"Baseapp::onCreateEntityRemotelyCallback: rejected malformed or oversized payload"
+	"Baseapp::onRequestRestoreCB: rejected incomplete fixed header"
+	"Baseapp::onRestoreSpaceCellFromOtherBaseapp: rejected malformed fixed header"
+	"CallbackSourceContext::component"
+	"sessionEpoch()"
+	"routingEpoch()"
+	"rejected stale relay epoch"
 	"findOrReconnectChannel"
 	"Interfaces Channel unavailable after reconnect"
 	"reconnect: rejected missing Interfaces address"

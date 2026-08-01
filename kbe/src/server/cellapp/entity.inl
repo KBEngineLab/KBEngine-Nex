@@ -181,6 +181,11 @@ INLINE void Entity::ghostCell(COMPONENT_ID cellID)
 	ghostCell_ = cellID; 
 }
 
+INLINE uint64 Entity::routingEpoch(void) const
+{
+	return routingEpoch_;
+}
+
 //-------------------------------------------------------------------------------------
 INLINE SPACE_ENTITIES::size_type Entity::spaceEntityIdx() const
 {

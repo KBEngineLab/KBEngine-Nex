@@ -121,6 +121,7 @@ clientEntityCall_(NULL),
 baseEntityCall_(NULL),
 realCell_(0),
 ghostCell_(0),
+routingEpoch_(1),
 lastpos_(),
 position_(),
 pPyPosition_(NULL),
@@ -4216,6 +4217,8 @@ void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s)
 
 	realCell_ = realCell;
 	ghostCell_ = 0;
+	if (++routingEpoch_ == 0)
+		routingEpoch_ = 1;
 	
 	GhostManager* gm = Cellapp::getSingleton().pGhostManager();
 	if(gm)
@@ -4280,7 +4283,7 @@ void Entity::addToStream(KBEngine::MemoryStream& s)
 	bool hasCustomVolatileinfo = (pCustomVolatileinfo_ != NULL);
 	ENTITY_ID controlledByID = (controlledBy_ != NULL ? controlledBy_->id() : 0);
 		
-	s << pScriptModule_->getUType() << spaceID_ << isDestroyed_ << 
+	s << pScriptModule_->getUType() << routingEpoch_ << spaceID_ << isDestroyed_ <<
 		isOnGround_ << topSpeed_ << topSpeedY_ << 
 		layer_ << baseEntityCallComponentID << hasCustomVolatileinfo << controlledByID;
 
@@ -4307,7 +4310,7 @@ void Entity::createFromStream(KBEngine::MemoryStream& s)
 	bool hasCustomVolatileinfo;
 	ENTITY_ID controlledByID;
 
-	s >> scriptUType >> spaceID_ >> isDestroyed_ >> isOnGround_ >> topSpeed_ >> 
+	s >> scriptUType >> routingEpoch_ >> spaceID_ >> isDestroyed_ >> isOnGround_ >> topSpeed_ >>
 		topSpeedY_ >> layer_ >> baseEntityCallComponentID >> hasCustomVolatileinfo >> controlledByID;
 
 	s >> persistentDigest_[0] >> persistentDigest_[1] >> persistentDigest_[2] >> persistentDigest_[3] >> persistentDigest_[4];

@@ -234,6 +234,9 @@ public:
 
 	COMPONENT_ID componentID() const{ return componentID_; }
 	void componentID(COMPONENT_ID cid){ componentID_ = cid; }
+	// 每次 Channel 生命周期分配唯一会话号，供异步回调和跨组件授权拒绝旧连接重放。
+	// Each Channel lifetime receives a unique epoch so async callbacks and relay authorization can fence stale connections.
+	uint64 sessionEpoch() const { return sessionEpoch_; }
 
 	bool handshake(Packet* pPacket);
 	// 将 TLS 内存 BIO 的输出密文交给 completion poller，保持 socket IO 的单一所有权。
@@ -335,6 +338,7 @@ private:
 	ChannelTypes				channelType_;
 
 	COMPONENT_ID				componentID_;
+	uint64					sessionEpoch_;
 
 	// 支持指定某个通道使用某个消息handlers
 	KBEngine::Network::MessageHandlers* pMsgHandlers_;

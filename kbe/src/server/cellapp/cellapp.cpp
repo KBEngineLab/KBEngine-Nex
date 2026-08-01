@@ -1755,6 +1755,25 @@ void Cellapp::onRemoteCallMethodFromClient(Network::Channel* pChannel, KBEngine:
 		return;
 	}
 
+	uint64 relayEpoch = 0;
+	if (fromCellapp)
+	{
+		if (s.length() < sizeof(relayEpoch))
+		{
+			WARNING_MSG("Cellapp::onRemoteCallMethodFromClient: rejected missing relay epoch.\n");
+			s.done();
+			return;
+		}
+		s >> relayEpoch;
+		if (relayEpoch == 0 || relayEpoch != e->routingEpoch())
+		{
+			WARNING_MSG(fmt::format("Cellapp::onRemoteCallMethodFromClient: rejected stale relay epoch, "
+				"entityID={}, received={}, current={}.\n", targetID, relayEpoch, e->routingEpoch()));
+			s.done();
+			return;
+		}
+	}
+
 	// BaseApp is the authenticated client boundary. Bind that concrete Channel to
 	// the source Entity and enforce the engine-level relationship before any
 	// Ghost forwarding. Registered CellApp sources are continuations of a request
@@ -1809,6 +1828,7 @@ void Cellapp::onRemoteCallMethodFromClient(Network::Channel* pChannel, KBEngine:
 				pBundle->newMessage(CellappInterface::onRemoteCallMethodFromClient);
 				(*pBundle) << srcEntityID;
 				(*pBundle) << targetID;
+				(*pBundle) << e->routingEpoch();
 				pBundle->append(s);
 				gm->pushMessage(e->realCell(), pBundle);
 			}
@@ -2156,6 +2176,25 @@ void Cellapp::forwardEntityMessageToCellappFromClient(Network::Channel* pChannel
 		return;
 	}
 
+	uint64 relayEpoch = 0;
+	if (fromCellapp)
+	{
+		if (s.length() < sizeof(relayEpoch))
+		{
+			WARNING_MSG("Cellapp::forwardEntityMessageToCellappFromClient: rejected missing relay epoch.\n");
+			s.done();
+			return;
+		}
+		s >> relayEpoch;
+		if (relayEpoch == 0 || relayEpoch != e->routingEpoch())
+		{
+			WARNING_MSG(fmt::format("Cellapp::forwardEntityMessageToCellappFromClient: rejected stale relay epoch, "
+				"entityID={}, received={}, current={}.\n", srcEntityID, relayEpoch, e->routingEpoch()));
+			s.done();
+			return;
+		}
+	}
+
 	if(e->isDestroyed())
 	{
 		ERROR_MSG(fmt::format("{}::forwardEntityMessageToCellappFromClient: {} is destroyed!\n",	
@@ -2174,6 +2213,7 @@ void Cellapp::forwardEntityMessageToCellappFromClient(Network::Channel* pChannel
 			Network::Bundle* pBundle = gm->createSendBundle(e->realCell());
 			pBundle->newMessage(CellappInterface::forwardEntityMessageToCellappFromClient);
 			(*pBundle) << srcEntityID;
+			(*pBundle) << e->routingEpoch();
 			pBundle->append(s);
 			gm->pushMessage(e->realCell(), pBundle);
 		}

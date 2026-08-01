@@ -45,6 +45,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "helper/profile.h"
 #include "common/ssl.h"
 #include "common/kbeversion.h"
+#include <atomic>
 #include <cstring>
 
 namespace KBEngine { 
@@ -54,6 +55,7 @@ namespace Network
 // 优雅关闭必须有硬上限，防止失联客户端永久占用 Channel、socket 和 completion 状态。
 // Graceful close needs a hard bound so an absent peer cannot retain Channel, socket, and completion state forever.
 static const uint64 GRACEFUL_CLOSE_TIMEOUT_STAMPS = 5 * stampsPerSecond();
+static std::atomic<uint64> g_nextChannelSessionEpoch(1);
 
 //-------------------------------------------------------------------------------------
 static ObjectPool<Channel> _g_objPool("Channel");
@@ -92,7 +94,7 @@ size_t Channel::getPoolObjectBytes()
 		+ sizeof(flags_) + sizeof(numPacketsSent_) + sizeof(numPacketsReceived_) + sizeof(numBytesSent_) + sizeof(numBytesReceived_)
 		+ sizeof(lastTickBytesReceived_) + sizeof(lastTickBytesSent_) + sizeof(lastTickEpoch_) + sizeof(pFilter_) + sizeof(pEndPoint_) + sizeof(pPacketReceiver_) + sizeof(pPacketSender_)
 		+ sizeof(proxyID_) + strextra_.size() + sizeof(channelType_)
-		+ sizeof(componentID_) + sizeof(pMsgHandlers_) + sizeof(pKCP_) + condemnReason_.size();
+		+ sizeof(componentID_) + sizeof(sessionEpoch_) + sizeof(pMsgHandlers_) + sizeof(pKCP_) + condemnReason_.size();
 
 	return bytes;
 }
@@ -112,7 +114,9 @@ void Channel::onReclaimObject()
 //-------------------------------------------------------------------------------------
 void Channel::onEabledPoolObject()
 {
-
+	sessionEpoch_ = g_nextChannelSessionEpoch.fetch_add(1, std::memory_order_relaxed);
+	if (sessionEpoch_ == 0)
+		sessionEpoch_ = g_nextChannelSessionEpoch.fetch_add(1, std::memory_order_relaxed);
 }
 
 //-------------------------------------------------------------------------------------
@@ -145,6 +149,7 @@ Channel::Channel(NetworkInterface & networkInterface,
 	strextra_(),
 	channelType_(CHANNEL_NORMAL),
 	componentID_(UNKNOWN_COMPONENT_TYPE),
+	sessionEpoch_(0),
 	pMsgHandlers_(NULL),
 	flags_(0),
 	pKCP_(NULL),
@@ -189,6 +194,7 @@ Channel::Channel():
 	strextra_(),
 	channelType_(CHANNEL_NORMAL),
 	componentID_(UNKNOWN_COMPONENT_TYPE),
+	sessionEpoch_(0),
 	pMsgHandlers_(NULL),
 	flags_(0),
 	pKCP_(NULL),

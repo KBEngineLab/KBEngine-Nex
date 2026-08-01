@@ -115,6 +115,7 @@ public:
 	*/
 	INLINE COMPONENT_ID ghostCell(void) const;
 	INLINE void ghostCell(COMPONENT_ID cellID);
+	INLINE uint64 routingEpoch(void) const;
 
 	/**
 		定义属性数据被改变，组件属性通过 pEntityComponent 标识所属父属性。
@@ -657,6 +658,8 @@ protected:
 
 	// 如果一个entity为real，那么entity可能会存在一个ghost的指向
 	COMPONENT_ID											ghostCell_;	
+
+	uint64 routingEpoch_;
 
 	// entity的当前位置
 	Position3D												lastpos_;
