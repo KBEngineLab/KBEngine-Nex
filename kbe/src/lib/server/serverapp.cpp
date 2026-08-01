@@ -439,6 +439,15 @@ bool ServerApp::registerNewApp(Network::Channel* pChannel, int32 uid, std::strin
 		return false;
 	}
 
+	// 注册广播中的内部地址会被其他组件直接用于建立 Channel，必须在进入组件表前拒绝空端点。
+	// The advertised internal endpoint is used directly to create Channels, so reject empty endpoints before publishing the component.
+	if (intaddr == 0 || intport == 0)
+	{
+		WARNING_MSG(fmt::format("ServerApp::registerNewApp: rejected invalid internal endpoint, componentType={}, componentID={}, intaddr={}, intport={}, addr={} .\n",
+			componentType, componentID, intaddr, ntohs(intport), pChannel->c_str()));
+		return false;
+	}
+
 	INFO_MSG(fmt::format("ServerApp::onRegisterNewApp: uid:{0}, username:{1}, componentType:{2}, "
 			"componentID:{3}, globalorderID={9}, grouporderID={10}, intaddr:{4}, intport:{5}, extaddr:{6}, extport:{7},  from {8}.\n",
 			uid,

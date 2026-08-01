@@ -610,12 +610,17 @@ def message_frame(message_id, message_length, body, message_name):
     return frame + body
 
 
-def component_registration_body(component_uid, component_type, component_id):
+def component_registration_body(component_uid, component_type, component_id, endpoint=None):
+    intaddr = 0
+    intport = 0
+    if endpoint is not None:
+        intaddr = struct.unpack("=I", socket.inet_aton(endpoint[0]))[0]
+        intport = socket.htons(endpoint[1])
     return (
         struct.pack("=i", component_uid)
         + b"security-probe\0"
         + struct.pack(
-            "=iQiiIHIH", component_type, component_id, 0, 0, 0, 0, 0, 0
+            "=iQiiIHIH", component_type, component_id, 0, 0, intaddr, intport, 0, 0
         )
         + b"\0"
     )
@@ -679,7 +684,9 @@ def run_registered_probe(
     registration_frame = message_frame(
         registration_id,
         registration_length,
-        component_registration_body(component_uid, component_type, component_id),
+        component_registration_body(
+            component_uid, component_type, component_id, ingress_endpoint
+        ),
         "Dbmgr::onRegisterNewApp",
     )
     probe_frame = message_frame(

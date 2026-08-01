@@ -143,6 +143,7 @@ endforeach()
 foreach(_kbe_required IN ITEMS
 	"bool registerNewApp(Network::Channel* pChannel"
 	"ServerApp::registerNewApp: rejected uid="
+	"ServerApp::registerNewApp: rejected invalid internal endpoint"
 	"ServerApp::registerNewApp: rejected componentID conflict"
 	"ServerApp::registerNewApp: rejected live binding replacement"
 	"rejected unbound registration"

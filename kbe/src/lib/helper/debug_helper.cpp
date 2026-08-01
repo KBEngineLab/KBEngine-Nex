@@ -36,6 +36,10 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include <fstream>
 #include <sys/stat.h>
 
+#if KBE_PLATFORM == PLATFORM_WIN32
+#include <cstdlib>
+#endif
+
 #if KBE_PLATFORM == PLATFORM_UNIX
 #include <unistd.h>
 #include <syslog.h>
@@ -274,7 +278,11 @@ void myassert(const char * exp, const char * func, const char * file, unsigned i
 {
 	DebugHelper::getSingleton().backtrace_msg();
 	std::string s = (fmt::format("assertion failed: {}, file {}, line {}, at: {}\n", exp, file, line, func));
-	printf("%s%02d: %s", COMPONENT_NAME_EX_2(g_componentType), g_componentGroupOrder, (std::string("[ASSERT]: ") + s).c_str());
+	std::string message = std::string("[ASSERT]: ") + s;
+	printf("%s%02d: %s", COMPONENT_NAME_EX_2(g_componentType), g_componentGroupOrder, message.c_str());
+	fprintf(stderr, "%s%02d: %s", COMPONENT_NAME_EX_2(g_componentType), g_componentGroupOrder, message.c_str());
+	fflush(stdout);
+	fflush(stderr);
 
 	dbghelper.print_msg(s);
     abort();
@@ -511,6 +519,14 @@ void DebugHelper::unlockthread()
 //-------------------------------------------------------------------------------------
 void DebugHelper::initialize(COMPONENT_TYPE componentType)
 {
+#if KBE_PLATFORM == PLATFORM_WIN32
+	// 集成测试必须把 abort 转换为可捕获的进程退出，避免 Debug CRT 对话框阻塞控制器。
+	// Integration tests must turn abort into an observable process exit instead of a blocking Debug CRT dialog.
+	if (std::getenv("KBE_TEST_MODE") != NULL)
+	{
+		_set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+	}
+#endif
 #ifndef NO_USE_LOG4CXX
 	
 	char helpConfig[MAX_PATH];

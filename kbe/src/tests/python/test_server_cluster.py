@@ -311,6 +311,9 @@ def run_cluster(args):
             "KBE_ROOT": str(args.repository_root),
             "KBE_RES_PATH": os.pathsep.join(str(path) for path in resource_roots),
             "KBE_BIN_PATH": str(components[0]["executable"].parent),
+            # 禁止 Debug CRT 弹窗；abort 仍然保留并由控制器检查退出码。
+            # Disable Debug CRT dialogs; abort remains enabled and is checked by the controller.
+            "KBE_TEST_MODE": "1",
         }
     )
 
