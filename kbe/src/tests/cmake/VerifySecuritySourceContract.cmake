@@ -119,6 +119,10 @@ foreach(_kbe_required IN ITEMS
 	"Dbmgr::onRegisterNewApp: skipped unavailable broadcast target"
 	"callbackID={}, commandSize={}"
 	"Dbmgr::executeRawDatabaseCommand: rejected truncated payload"
+	"Dbmgr::writeEntity: rejected incomplete fixed header"
+	"Dbmgr::removeEntity: rejected incomplete fixed header"
+	"Dbmgr::deleteEntityByDBID: rejected incomplete fixed header"
+	"Dbmgr::lookUpEntityByDBID: rejected incomplete fixed header"
 )
 	string(FIND "${_kbe_dbmgr}\n${_kbe_sensitive_text}"
 		"${_kbe_required}" _kbe_required_position)

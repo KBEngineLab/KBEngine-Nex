@@ -116,6 +116,11 @@ bool validateRawDatabaseCommandStream(MemoryStream& s)
 	return valid;
 }
 
+bool hasRemainingBytes(MemoryStream& s, size_t required)
+{
+	return s.length() >= required;
+}
+
 bool isAllowedRawDatabaseSource(Network::Channel* pChannel,
 	COMPONENT_TYPE componentType, COMPONENT_ID componentID)
 {
@@ -1346,9 +1351,16 @@ void Dbmgr::onExecuteRawDatabaseCommandCB(KBEngine::MemoryStream& s)
 }
 
 //-------------------------------------------------------------------------------------
-void Dbmgr::writeEntity(Network::Channel* pChannel, 
+void Dbmgr::writeEntity(Network::Channel* pChannel,
 						KBEngine::MemoryStream& s)
 {
+	if (!hasRemainingBytes(s, sizeof(COMPONENT_ID) + sizeof(ENTITY_ID) + sizeof(DBID) + sizeof(uint16)))
+	{
+		WARNING_MSG("Dbmgr::writeEntity: rejected incomplete fixed header.\n");
+		s.done();
+		return;
+	}
+
 	ENTITY_ID eid;
 	DBID entityDBID;
 	COMPONENT_ID componentID;
@@ -1416,6 +1428,13 @@ void Dbmgr::writeEntity(Network::Channel* pChannel,
 //-------------------------------------------------------------------------------------
 void Dbmgr::removeEntity(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (!hasRemainingBytes(s, sizeof(uint16) + sizeof(COMPONENT_ID) + sizeof(ENTITY_ID) + sizeof(DBID)))
+	{
+		WARNING_MSG("Dbmgr::removeEntity: rejected incomplete fixed header.\n");
+		s.done();
+		return;
+	}
+
 	ENTITY_ID eid;
 	DBID entityDBID;
 	COMPONENT_ID componentID;
@@ -1524,6 +1543,14 @@ void Dbmgr::entityAutoLoad(Network::Channel* pChannel, KBEngine::MemoryStream& s
 //-------------------------------------------------------------------------------------
 void Dbmgr::deleteEntityByDBID(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (!hasRemainingBytes(s, sizeof(uint16) + sizeof(COMPONENT_ID) + sizeof(DBID) +
+		sizeof(CALLBACK_ID) + sizeof(ENTITY_SCRIPT_UID)))
+	{
+		WARNING_MSG("Dbmgr::deleteEntityByDBID: rejected incomplete fixed header.\n");
+		s.done();
+		return;
+	}
+
 	COMPONENT_ID componentID;
 	ENTITY_SCRIPT_UID sid;
 	CALLBACK_ID callbackID = 0;
@@ -1565,6 +1592,14 @@ void Dbmgr::deleteEntityByDBID(Network::Channel* pChannel, KBEngine::MemoryStrea
 //-------------------------------------------------------------------------------------
 void Dbmgr::lookUpEntityByDBID(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (!hasRemainingBytes(s, sizeof(uint16) + sizeof(COMPONENT_ID) + sizeof(DBID) +
+		sizeof(CALLBACK_ID) + sizeof(ENTITY_SCRIPT_UID)))
+	{
+		WARNING_MSG("Dbmgr::lookUpEntityByDBID: rejected incomplete fixed header.\n");
+		s.done();
+		return;
+	}
+
 	COMPONENT_ID componentID;
 	ENTITY_SCRIPT_UID sid;
 	CALLBACK_ID callbackID = 0;

@@ -104,6 +104,38 @@ PROBES = (
         r"Dbmgr::executeRawDatabaseCommand: rejected truncated payload",
     ),
     (
+        "dbmgr-truncated-write-entity",
+        "dbmgr",
+        "internal",
+        "DBMGR_TYPE",
+        "Dbmgr::writeEntity",
+        r"Dbmgr::writeEntity: rejected incomplete fixed header",
+    ),
+    (
+        "dbmgr-truncated-remove-entity",
+        "dbmgr",
+        "internal",
+        "DBMGR_TYPE",
+        "Dbmgr::removeEntity",
+        r"Dbmgr::removeEntity: rejected incomplete fixed header",
+    ),
+    (
+        "dbmgr-truncated-delete-entity",
+        "dbmgr",
+        "internal",
+        "DBMGR_TYPE",
+        "Dbmgr::deleteEntityByDBID",
+        r"Dbmgr::deleteEntityByDBID: rejected incomplete fixed header",
+    ),
+    (
+        "dbmgr-truncated-lookup-entity",
+        "dbmgr",
+        "internal",
+        "DBMGR_TYPE",
+        "Dbmgr::lookUpEntityByDBID",
+        r"Dbmgr::lookUpEntityByDBID: rejected incomplete fixed header",
+    ),
+    (
         "dbmgr-unregistered-stream-template",
         "dbmgr",
         "internal",
@@ -535,6 +567,13 @@ def probe_body(probe_case, component_uid):
         return struct.pack("=iHQiII", -1, 0, 7001, 6, 0, 0)
     if probe_case == "dbmgr-truncated-raw-database-command":
         return struct.pack("=iH", -1, 0)
+    if probe_case in {
+        "dbmgr-truncated-write-entity",
+        "dbmgr-truncated-remove-entity",
+        "dbmgr-truncated-delete-entity",
+        "dbmgr-truncated-lookup-entity",
+    }:
+        return b"\0\0"
     if probe_case == "dbmgr-unregistered-stream-template":
         return b""
     if probe_case == "dbmgr-registration-zero-id":
