@@ -382,6 +382,9 @@ void Dbmgr::handleMainTick()
 	// DEBUG_MSG(fmt::format("Dbmgr::handleGameTick[{}]:{}\n", t, ++kbeTime));
 	
 	threadPool_.onMainThreadTick();
+	// DBMgr 本地 Python 数据库回调在组件空闲时也必须按时释放。
+	// Local Python database callbacks must expire even while no new callback traffic arrives.
+	pyCallbackMgr_.tick();
 	DBUtil::handleMainTick();
 	networkInterface().processChannels(&DbmgrInterface::messageHandlers);
 }

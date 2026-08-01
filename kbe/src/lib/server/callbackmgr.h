@@ -55,7 +55,7 @@ public:
 	CallbackMgr():
 	cbMap_(),
 	idAlloc_(),
-	lastTimestamp_(0)
+	nextTimeout_(0)
 	{
 	}
 
@@ -67,6 +67,7 @@ public:
 	void finalise()
 	{
 		cbMap_.clear();
+		nextTimeout_ = 0;
 	}
 
 
@@ -83,8 +84,11 @@ public:
 			timeout = uint64(ServerConfig::getSingleton().callback_timeout_);
 
 		CALLBACK_ID cbID = idAlloc_.alloc();
-		cbMap_.insert(typename CALLBACKS::value_type(cbID, 
-			std::pair< T, uint64 >(callback, timestamp() + (timeout * stampsPerSecond()))));
+		const uint64 expiry = timestamp() + (timeout * stampsPerSecond());
+		cbMap_.insert(typename CALLBACKS::value_type(cbID,
+			std::pair< T, uint64 >(callback, expiry)));
+		if(nextTimeout_ == 0 || expiry < nextTimeout_)
+			nextTimeout_ = expiry;
 
 		tick();
 		return cbID;
@@ -98,8 +102,13 @@ public:
 		typename CALLBACKS::iterator itr = cbMap_.find(cbID);
 		if(itr != cbMap_.end()){
 			T t = itr->second.first;
+			const bool removedNextTimeout = itr->second.second <= nextTimeout_;
+			if(removedNextTimeout)
+				nextTimeout_ = 0;
 			idAlloc_.reclaim(itr->first);
 			cbMap_.erase(itr);
+			if(removedNextTimeout)
+				tick();
 			return t;
 		}
 		
@@ -112,14 +121,21 @@ public:
 	*/
 	void tick()
 	{
-		if(timestamp() - lastTimestamp_ < (ServerConfig::getSingleton().callback_timeout_ * stampsPerSecond()))
+		if(cbMap_.empty())
+		{
+			nextTimeout_ = 0;
+			return;
+		}
+
+		const uint64 now = timestamp();
+		if(nextTimeout_ != 0 && now <= nextTimeout_)
 			return;
 
-		lastTimestamp_ = timestamp(); 
+		nextTimeout_ = 0;
 		typename CALLBACKS::iterator iter = cbMap_.begin();
 		for(; iter!= cbMap_.end(); )
 		{
-			if(lastTimestamp_ > iter->second.second)
+			if(now > iter->second.second)
 			{
 				if(processTimeout(iter->first, iter->second.first))
 				{
@@ -128,6 +144,9 @@ public:
 					continue;
 				}
 			}
+
+			if(nextTimeout_ == 0 || iter->second.second < nextTimeout_)
+				nextTimeout_ = iter->second.second;
 
 			++iter;
 		}
@@ -145,7 +164,7 @@ public:
 protected:
 	CALLBACKS cbMap_;									// 所有的回调都存储在这个map中
 	IDAllocate<CALLBACK_ID> idAlloc_;					// 回调的id分配器
-	uint64 lastTimestamp_;
+	uint64 nextTimeout_;
 };
 
 template<>
@@ -199,6 +218,8 @@ inline void CallbackMgr<PyObjectPtr>::createFromStream(KBEngine::MemoryStream& s
 
 		cbMap_.insert(CallbackMgr<PyObjectPtr>::CALLBACKS::value_type(cbID, 
 			std::pair< PyObjectPtr, uint64 >(pyCallback, timeout)));
+		if(nextTimeout_ == 0 || timeout < nextTimeout_)
+			nextTimeout_ = timeout;
 
 		Py_DECREF(pyCallback);
 	}

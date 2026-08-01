@@ -68,6 +68,7 @@ file(READ "${KBE_SOURCE_ROOT}/server/dbmgr/dbmgr.cpp" _kbe_dbmgr)
 file(READ "${KBE_SOURCE_ROOT}/server/dbmgr/interfaces_handler.cpp" _kbe_interfaces_handler)
 file(READ "${KBE_SOURCE_ROOT}/server/loginapp/loginapp.cpp" _kbe_loginapp)
 file(READ "${KBE_SOURCE_ROOT}/lib/server/entity_app.h" _kbe_entity_app)
+file(READ "${KBE_SOURCE_ROOT}/lib/server/callbackmgr.h" _kbe_callbackmgr)
 file(READ "${KBE_SOURCE_ROOT}/lib/server/serverapp.cpp" _kbe_serverapp)
 file(READ "${KBE_SOURCE_ROOT}/lib/server/serverapp.h" _kbe_serverapp_header)
 file(READ "${KBE_SOURCE_ROOT}/lib/server/globaldata_server.cpp" _kbe_globaldata_server)
@@ -303,6 +304,17 @@ foreach(_kbe_required IN ITEMS
     if(_kbe_required_position EQUAL -1)
         message(FATAL_ERROR "Client request authorization guard is missing: ${_kbe_required}")
     endif()
+endforeach()
+
+foreach(_kbe_required IN ITEMS
+	"uint64 nextTimeout_"
+	"pyCallbackMgr_.tick()"
+)
+	string(FIND "${_kbe_callbackmgr}\n${_kbe_entity_app}\n${_kbe_dbmgr}"
+		"${_kbe_required}" _kbe_required_position)
+	if(_kbe_required_position EQUAL -1)
+		message(FATAL_ERROR "Callback expiry driver is missing: ${_kbe_required}")
+	endif()
 endforeach()
 
 message(STATUS "Verified component routing and sensitive-log source contracts")

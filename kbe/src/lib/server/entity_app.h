@@ -741,6 +741,9 @@ void EntityApp<E>::handleGameTick()
 
 	++g_kbetime;
 	threadPool_.onMainThreadTick();
+	// 回调超时必须由稳定主循环驱动，不能依赖后续 save/take 偶然触发。
+	// Callback expiry is driven by the stable main loop instead of depending on later save/take calls.
+	pyCallbackMgr_.tick();
 	handleTimers();
 	
 	{
