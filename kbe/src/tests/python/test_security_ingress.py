@@ -466,6 +466,38 @@ PROBES = (
         r"srcEntityID=1, targetID=2",
     ),
     (
+        "cellapp-truncated-cell-rpc",
+        "cellapp",
+        "internal",
+        "CELLAPP_TYPE",
+        "Cellapp::onRemoteCallMethodFromClient",
+        r"Cellapp::onRemoteCallMethodFromClient: rejected incomplete fixed header",
+    ),
+    (
+        "cellapp-truncated-entity-forward",
+        "cellapp",
+        "internal",
+        "CELLAPP_TYPE",
+        "Cellapp::forwardEntityMessageToCellappFromClient",
+        r"Cellapp::forwardEntityMessageToCellappFromClient: rejected incomplete fixed header",
+    ),
+    (
+        "cellapp-truncated-client-update",
+        "cellapp",
+        "internal",
+        "CELLAPP_TYPE",
+        "Cellapp::onUpdateDataFromClient",
+        r"Cellapp::onUpdateDataFromClient: rejected incomplete fixed header",
+    ),
+    (
+        "cellapp-truncated-controlled-update",
+        "cellapp",
+        "internal",
+        "CELLAPP_TYPE",
+        "Cellapp::onUpdateDataFromClientForControlledEntity",
+        r"Cellapp::onUpdateDataFromClientForControlledEntity: rejected incomplete fixed header",
+    ),
+    (
         "cellapp-unregistered-entity-forward",
         "cellapp",
         "internal",
@@ -817,6 +849,13 @@ def probe_body(probe_case, component_uid):
         return struct.pack("=i", 1) + b"invalid\0security@example.invalid\0"
     if probe_case == "cellapp-unregistered-cell-rpc":
         return struct.pack("=ii", 1, 2)
+    if probe_case in {
+        "cellapp-truncated-cell-rpc",
+        "cellapp-truncated-entity-forward",
+        "cellapp-truncated-client-update",
+        "cellapp-truncated-controlled-update",
+    }:
+        return b""
     if probe_case == "cellapp-unregistered-entity-forward":
         return struct.pack("=i", 1)
     if probe_case == "cellapp-spoofed-entity-create":

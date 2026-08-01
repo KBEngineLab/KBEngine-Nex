@@ -1604,6 +1604,13 @@ void Cellapp::onEntityCall(Network::Channel* pChannel, KBEngine::MemoryStream& s
 //-------------------------------------------------------------------------------------
 void Cellapp::onRemoteCallMethodFromClient(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (s.length() < sizeof(ENTITY_ID) * 2)
+	{
+		WARNING_MSG("Cellapp::onRemoteCallMethodFromClient: rejected incomplete fixed header.\n");
+		s.done();
+		return;
+	}
+
 	ENTITY_ID srcEntityID, targetID;
 
 	s >> srcEntityID >> targetID;
@@ -1711,6 +1718,13 @@ void Cellapp::onRemoteCallMethodFromClient(Network::Channel* pChannel, KBEngine:
 //-------------------------------------------------------------------------------------
 void Cellapp::onUpdateDataFromClient(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (s.length() < sizeof(ENTITY_ID))
+	{
+		WARNING_MSG("Cellapp::onUpdateDataFromClient: rejected incomplete fixed header.\n");
+		s.done();
+		return;
+	}
+
 	ENTITY_ID srcEntityID = 0;
 
 	s >> srcEntityID;
@@ -1749,6 +1763,13 @@ void Cellapp::onUpdateDataFromClient(Network::Channel* pChannel, KBEngine::Memor
 //-------------------------------------------------------------------------------------
 void Cellapp::onUpdateDataFromClientForControlledEntity(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (s.length() < sizeof(ENTITY_ID) * 2)
+	{
+		WARNING_MSG("Cellapp::onUpdateDataFromClientForControlledEntity: rejected incomplete fixed header.\n");
+		s.done();
+		return;
+	}
+
 	ENTITY_ID proxiesEntityID = 0;
 	s >> proxiesEntityID;
 	if(proxiesEntityID <= 0)
@@ -1905,6 +1926,13 @@ void Cellapp::onUpdateGhostVolatileData(Network::Channel* pChannel, KBEngine::Me
 //-------------------------------------------------------------------------------------
 void Cellapp::forwardEntityMessageToCellappFromClient(Network::Channel* pChannel, MemoryStream& s)
 {
+	if (s.length() < sizeof(ENTITY_ID))
+	{
+		WARNING_MSG("Cellapp::forwardEntityMessageToCellappFromClient: rejected incomplete fixed header.\n");
+		s.done();
+		return;
+	}
+
 	ENTITY_ID srcEntityID;
 
 	s >> srcEntityID;

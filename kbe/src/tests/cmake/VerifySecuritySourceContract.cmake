@@ -320,6 +320,10 @@ foreach(_kbe_required IN ITEMS
 	"Security::isBoundBidirectionalComponentSource"
 	"forwardEntityMessageToCellappFromClient: rejected unregistered"
 	"forwardEntityMessageToCellappFromClient: rejected unbound"
+	"onRemoteCallMethodFromClient: rejected incomplete fixed header"
+	"forwardEntityMessageToCellappFromClient: rejected incomplete fixed header"
+	"onUpdateDataFromClient: rejected incomplete fixed header"
+	"onUpdateDataFromClientForControlledEntity: rejected incomplete fixed header"
 )
     string(FIND "${_kbe_baseapp}\n${_kbe_cellapp}"
         "${_kbe_required}" _kbe_required_position)
