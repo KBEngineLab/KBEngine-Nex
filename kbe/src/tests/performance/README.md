@@ -12,6 +12,12 @@ python -B -m performance.run --scenario performance/scenarios/smoke.json --durat
 The runner writes `raw.jsonl`, `summary.json`, and `report.md` below `kbe/src/out/performance-runs/`.
 运行器会在 `kbe/src/out/performance-runs/` 下生成 `raw.jsonl`、`summary.json` 和 `report.md`。
 
+Process samples include CPU normalized to the machine's logical processor count, working set,
+thread count, and, on Windows, private committed memory, peak working set, and handle count.
+进程采样包含按整机逻辑处理器数归一化的 CPU、工作集和线程数；Windows 还会记录私有提交量、
+进程启动以来的峰值工作集和句柄数。工作集包含共享驻留页，判断真实进程内存成本时应优先比较
+`memory.private`，并结合 `memory.working_set` 判断当前物理内存压力。
+
 Watcher sampling is opt-in and runs from the controller process:
 Watcher 采样默认关闭，并且由控制器进程执行：
 

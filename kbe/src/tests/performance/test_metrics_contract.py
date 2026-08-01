@@ -11,11 +11,27 @@ if __package__ in (None, ""):
 from performance.assets import create_config_overlay, resolve_bots_schedule, resolve_fixture_root
 from performance.log_metrics import IncrementalLogCollector
 from performance.metrics import JsonlRecorder
+from performance.process_metrics import ProcessCollector, _parse_windows_process_row
 from performance.report import build_summary, load_events, validate_event
 from performance.watcher_metrics import parse_target, resolve_target
 
 
 def main() -> int:
+    process_row = {
+        "CPU": 12.5,
+        "WorkingSet64": 101,
+        "PrivateMemorySize64": 102,
+        "PeakWorkingSet64": 103,
+        "ThreadCount": 7,
+        "Handles": 19,
+    }
+    assert _parse_windows_process_row(process_row) == (12.5, 101, 102, 103, 7, 19)
+    process_collector = ProcessCollector(1)
+    process_sample = process_collector._finish(*_parse_windows_process_row(process_row))
+    assert process_sample.working_set_bytes == 101
+    assert process_sample.private_bytes == 102
+    assert process_sample.peak_working_set_bytes == 103
+    assert process_sample.thread_count == 7 and process_sample.handle_count == 19
     target = parse_target("BOTS_TYPE=127.0.0.1:11000:root/bots/network/poller")
     assert target.component_type == "BOTS_TYPE"
     assert target.port == 11000

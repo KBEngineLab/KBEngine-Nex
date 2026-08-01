@@ -304,7 +304,19 @@ def record_process_samples(recorder: JsonlRecorder, collector: ProcessGroupColle
     for process_name, sample in collector.sample().items():
         recorder.record_sample("process", process_name, "cpu.percent", sample.cpu_percent, "%")
         recorder.record_sample("process", process_name, "memory.working_set", sample.working_set_bytes, "bytes")
+        if sample.private_bytes is not None:
+            recorder.record_sample("process", process_name, "memory.private", sample.private_bytes, "bytes")
+        if sample.peak_working_set_bytes is not None:
+            recorder.record_sample(
+                "process",
+                process_name,
+                "memory.working_set_peak",
+                sample.peak_working_set_bytes,
+                "bytes",
+            )
         recorder.record_sample("process", process_name, "threads.active", sample.thread_count, "count")
+        if sample.handle_count is not None:
+            recorder.record_sample("process", process_name, "handles.active", sample.handle_count, "count")
 
 
 def wait_for_workload_ready(
