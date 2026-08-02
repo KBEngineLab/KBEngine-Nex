@@ -314,6 +314,7 @@ def assert_gameplay_stress_scenario() -> None:
     assert scenario["reliable_udp_tick_interval_ms"] == 10
     assert scenario["reliable_udp_min_rto_ms"] == 50
     assert scenario["runtime_log_level"] == "warn"
+    assert scenario["server_runtime_log_level"] == "info"
     assert scenario["workload_processes"] == 4
     assert scenario["workload_cid_start"] == 10000
     assert "fixture" not in scenario
@@ -517,6 +518,7 @@ def main() -> int:
             reliable_udp_tick_interval_ms=20,
             reliable_udp_min_rto_ms=50,
             runtime_log_level="warn",
+            server_runtime_log_level="info",
         )
         xml_root = ET.parse(overlay).getroot()
         assert xml_root.findtext("./bots/defaultAddBots/totalCount") == "500"
@@ -530,7 +532,7 @@ def main() -> int:
         ).read_text(encoding="utf-8")
         assert "log4j.rootLogger=warn, R" in bots_log_config
         assert "logs/bots.${KBE_COMPONENTID}.log" in bots_log_config
-        assert "log4j.rootLogger=warn, R" in baseapp_log_config
+        assert "log4j.rootLogger=info, R" in baseapp_log_config
         log_path = root / "streamed.log"
         log_path.write_text("ordinary line\nWARNING split across chunks\nERROR final\n", encoding="utf-8")
         log_collector = IncrementalLogCollector(root)

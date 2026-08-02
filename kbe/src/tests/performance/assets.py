@@ -31,6 +31,7 @@ def create_config_overlay(
     reliable_udp_tick_interval_ms: int | None = None,
     reliable_udp_min_rto_ms: int | None = None,
     runtime_log_level: str | None = None,
+    server_runtime_log_level: str | None = None,
 ) -> Path:
     """Write only the per-run XML override; source assets remain read-only.
     只写入本次运行的 XML 覆盖文件，源资产保持只读。
@@ -101,11 +102,15 @@ def create_config_overlay(
     destination.parent.mkdir(parents=True, exist_ok=True)
     tree.write(destination, encoding="utf-8", xml_declaration=True)
     if runtime_log_level is not None:
-        create_log_config_overlay(output_root, runtime_log_level)
+        create_log_config_overlay(
+            output_root,
+            runtime_log_level,
+            server_runtime_log_level or runtime_log_level,
+        )
     return destination
 
 
-def create_log_config_overlay(output_root: Path, level: str) -> None:
+def create_log_config_overlay(output_root: Path, bots_level: str, server_level: str) -> None:
     """Create per-run log4cxx files without changing repository or game assets.
     创建本轮专用 log4cxx 配置，不修改仓库默认值或业务资产。
 
@@ -113,13 +118,17 @@ def create_log_config_overlay(output_root: Path, level: str) -> None:
     connection/entity INFO and DEBUG messages that would otherwise become load.
     性能运行保留警告和错误，同时过滤会反过来形成负载的连接/实体 INFO、DEBUG 日志。
     """
-    normalized_level = level.strip().lower()
-    if normalized_level not in {"debug", "info", "warn", "error"}:
-        raise ValueError(f"unsupported runtime log level: {level}")
+    normalized_bots_level = bots_level.strip().lower()
+    normalized_server_level = server_level.strip().lower()
+    allowed_levels = {"debug", "info", "warn", "error"}
+    if normalized_bots_level not in allowed_levels or normalized_server_level not in allowed_levels:
+        raise ValueError(
+            f"unsupported runtime log level: bots={bots_level}, server={server_level}"
+        )
 
     resource_root = output_root / "config-overlay/res"
     (resource_root / "log4j.properties").write_text(
-        _log4cxx_properties(normalized_level, "bots"),
+        _log4cxx_properties(normalized_bots_level, "bots"),
         encoding="utf-8",
     )
     properties_root = resource_root / "server/log4cxx_properties"
@@ -136,7 +145,7 @@ def create_log_config_overlay(output_root: Path, level: str) -> None:
         "loginapp",
     ):
         (properties_root / f"{component}.properties").write_text(
-            _log4cxx_properties(normalized_level, component),
+            _log4cxx_properties(normalized_server_level, component),
             encoding="utf-8",
         )
 

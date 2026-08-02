@@ -152,6 +152,7 @@ def main() -> int:
             int(scenario["reliable_udp_tick_interval_ms"]) if "reliable_udp_tick_interval_ms" in scenario else None,
             int(scenario["reliable_udp_min_rto_ms"]) if "reliable_udp_min_rto_ms" in scenario else None,
             str(scenario["runtime_log_level"]) if "runtime_log_level" in scenario else None,
+            str(scenario["server_runtime_log_level"]) if "server_runtime_log_level" in scenario else None,
         )
         environment = build_environment(_repository_root(), args.assets_root, output, fixture_root)
         environment.update(scenario_environment(scenario))
