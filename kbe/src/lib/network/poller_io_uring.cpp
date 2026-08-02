@@ -104,6 +104,11 @@ void IoUringPoller::IoUringContext::reset(KBESOCKET fdArg, KBESOCKET socketArg, 
 	msg.msg_namelen = addrLen;
 }
 
+size_t IoUringPoller::IoUringContext::retainedBytes() const
+{
+	return data.capacity() + tcpSendData.capacity();
+}
+
 //-------------------------------------------------------------------------------------
 IoUringPoller::Ring::Ring() :
 	sqHead(NULL),
@@ -178,6 +183,19 @@ uint64 IoUringPoller::contextReuseCount() const { return contextPool_.reuseCount
 uint64 IoUringPoller::contextOutstandingCount() const { return contextPool_.outstandingCount(); }
 uint64 IoUringPoller::contextCachedCount() const { return contextPool_.cachedCount(); }
 uint64 IoUringPoller::contextPeakOutstandingCount() const { return contextPool_.peakOutstandingCount(); }
+uint64 IoUringPoller::contextOutstandingBytes() const
+{
+	size_t bytes = 0;
+	for (const IoUringContext* context : outstandingContexts_)
+	{
+		if (context != NULL)
+		{
+			bytes += context->retainedBytes();
+		}
+	}
+	return static_cast<uint64>(bytes);
+}
+uint64 IoUringPoller::contextCachedBytes() const { return static_cast<uint64>(contextPool_.cachedBytes()); }
 
 //-------------------------------------------------------------------------------------
 int IoUringPoller::toTimeoutMilliseconds(double maxWait)

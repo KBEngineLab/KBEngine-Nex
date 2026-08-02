@@ -30,6 +30,11 @@ struct TestContext
 		}
 	}
 
+	size_t retainedBytes() const
+	{
+		return data.capacity();
+	}
+
 	int fd;
 	unsigned long long generation;
 	int operation;
@@ -71,7 +76,8 @@ bool testReuseAndReset()
 		require(pool.outstandingCount() == 1, "outstanding count is incorrect") &&
 		require(pool.peakOutstandingCount() == 1, "peak outstanding count is incorrect");
 	pool.release(reused);
-	return valid && require(pool.cachedCount() == 1, "cached count is incorrect");
+	return valid && require(pool.cachedCount() == 1, "cached count is incorrect") &&
+		require(pool.cachedBytes() == reused->data.capacity(), "cached bytes are incorrect");
 }
 
 bool testOutstandingAndCacheLimit()

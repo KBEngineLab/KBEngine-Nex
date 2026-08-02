@@ -134,6 +134,8 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/network/poller/contextsOutstanding", &networkInterface(), &Network::NetworkInterface::pollerContextsOutstanding);
 	WATCH_OBJECT("bots/network/poller/contextsCached", &networkInterface(), &Network::NetworkInterface::pollerContextsCached);
 	WATCH_OBJECT("bots/network/poller/contextsPeakOutstanding", &networkInterface(), &Network::NetworkInterface::pollerContextsPeakOutstanding);
+	WATCH_OBJECT("bots/network/poller/contextsOutstandingBytes", &networkInterface(), &Network::NetworkInterface::pollerContextsOutstandingBytes);
+	WATCH_OBJECT("bots/network/poller/contextsCachedBytes", &networkInterface(), &Network::NetworkInterface::pollerContextsCachedBytes);
 	// 聚合目录只复用现有 getter，使性能控制器一次请求取得关键快照，避免高负载时串行查询多个目录放大主线程等待。
 	// The aggregate directory reuses existing getters so one controller request obtains the critical snapshot without serial main-thread waits.
 	WATCH_OBJECT("bots/performance/clientsTotal", this, &Bots::numClients);

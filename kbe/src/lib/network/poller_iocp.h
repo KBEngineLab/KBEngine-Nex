@@ -36,6 +36,8 @@ public:
 	uint64 contextOutstandingCount() const override;
 	uint64 contextCachedCount() const override;
 	uint64 contextPeakOutstandingCount() const override;
+	uint64 contextOutstandingBytes() const override;
+	uint64 contextCachedBytes() const override;
 
 protected:
 	// 将 fd 绑定到 IOCP 并投递读侧 completion。
@@ -67,6 +69,7 @@ private:
 	{
 		IocpContext();
 		void reset(KBESOCKET fdArg, KBESOCKET socketArg, SocketKind kindArg, Operation operationArg, uint64 generationArg);
+		size_t retainedBytes() const;
 
 		// 每一次异步调用都拥有独立的 OVERLAPPED 和数据缓冲。
 		// 完成回调回来前，buffer 必须一直有效，所以不能使用栈内存。

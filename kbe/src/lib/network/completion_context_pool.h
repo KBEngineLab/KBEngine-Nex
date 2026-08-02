@@ -108,6 +108,18 @@ public:
 	uint64_t outstandingCount() const { return outstandingCount_; }
 	uint64_t peakOutstandingCount() const { return peakOutstandingCount_; }
 	size_t cachedCount() const { return cached_.size(); }
+	size_t cachedBytes() const
+	{
+		size_t bytes = 0;
+		for (const Context* context : cached_)
+		{
+			if (context != NULL)
+			{
+				bytes += context->retainedBytes();
+			}
+		}
+		return bytes;
+	}
 
 private:
 	size_t cacheLimit_;

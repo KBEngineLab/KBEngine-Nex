@@ -131,6 +131,8 @@ public:
 	uint64 pollerContextsOutstanding() const;
 	uint64 pollerContextsCached() const;
 	uint64 pollerContextsPeakOutstanding() const;
+	uint64 pollerContextsOutstandingBytes() const;
+	uint64 pollerContextsCachedBytes() const;
 	uint64 pollerTcpSendOwnershipTransfers() const;
 	uint64 pollerTcpSendBatchCopies() const;
 	uint64 pollerTcpSendBatchCopiedBytes() const;

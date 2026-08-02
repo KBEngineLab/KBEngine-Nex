@@ -119,6 +119,8 @@ public:
 	virtual uint64 contextOutstandingCount() const;
 	virtual uint64 contextCachedCount() const;
 	virtual uint64 contextPeakOutstandingCount() const;
+	virtual uint64 contextOutstandingBytes() const;
+	virtual uint64 contextCachedBytes() const;
 	virtual uint64 tcpSendOwnershipTransferCount() const;
 	virtual uint64 tcpSendBatchCopyCount() const;
 	virtual uint64 tcpSendBatchCopiedBytes() const;

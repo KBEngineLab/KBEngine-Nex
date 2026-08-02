@@ -30,6 +30,11 @@ size_t CompletionTcpSendBuffer::size() const
 	return offset_ <= storage_.size() ? storage_.size() - offset_ : 0;
 }
 
+size_t CompletionTcpSendBuffer::capacity() const
+{
+	return storage_.capacity();
+}
+
 bool CompletionTcpSendBuffer::empty() const
 {
 	return size() == 0;

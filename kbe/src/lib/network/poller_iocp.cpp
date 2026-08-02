@@ -96,6 +96,11 @@ void IocpPoller::IocpContext::reset(KBESOCKET fdArg, KBESOCKET socketArg, Socket
 	udpAddrLen = sizeof(udpAddr);
 }
 
+size_t IocpPoller::IocpContext::retainedBytes() const
+{
+	return data.capacity() + tcpSendData.capacity();
+}
+
 //-------------------------------------------------------------------------------------
 IocpPoller::IocpPoller() :
 	CompletionPoller(),
@@ -117,6 +122,19 @@ uint64 IocpPoller::contextReuseCount() const { return contextPool_.reuseCount();
 uint64 IocpPoller::contextOutstandingCount() const { return contextPool_.outstandingCount(); }
 uint64 IocpPoller::contextCachedCount() const { return contextPool_.cachedCount(); }
 uint64 IocpPoller::contextPeakOutstandingCount() const { return contextPool_.peakOutstandingCount(); }
+uint64 IocpPoller::contextOutstandingBytes() const
+{
+	size_t bytes = 0;
+	for (const OutstandingContexts::value_type& item : outstandingContexts_)
+	{
+		if (item.second != NULL)
+		{
+			bytes += item.second->retainedBytes();
+		}
+	}
+	return static_cast<uint64>(bytes);
+}
+uint64 IocpPoller::contextCachedBytes() const { return static_cast<uint64>(contextPool_.cachedBytes()); }
 
 //-------------------------------------------------------------------------------------
 IocpPoller::~IocpPoller()

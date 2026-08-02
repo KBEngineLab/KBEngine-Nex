@@ -256,6 +256,8 @@ uint64 EventPoller::contextReuseCount() const { return 0; }
 uint64 EventPoller::contextOutstandingCount() const { return 0; }
 uint64 EventPoller::contextCachedCount() const { return 0; }
 uint64 EventPoller::contextPeakOutstandingCount() const { return 0; }
+uint64 EventPoller::contextOutstandingBytes() const { return 0; }
+uint64 EventPoller::contextCachedBytes() const { return 0; }
 uint64 EventPoller::tcpSendOwnershipTransferCount() const { return 0; }
 uint64 EventPoller::tcpSendBatchCopyCount() const { return 0; }
 uint64 EventPoller::tcpSendBatchCopiedBytes() const { return 0; }

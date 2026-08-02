@@ -19,6 +19,7 @@ public:
 	char* data();
 	const char* data() const;
 	size_t size() const;
+	size_t capacity() const;
 	bool empty() const;
 	void reset(size_t maxRetainedCapacity);
 

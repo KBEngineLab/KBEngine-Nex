@@ -39,6 +39,8 @@ public:
 	uint64 contextOutstandingCount() const override;
 	uint64 contextCachedCount() const override;
 	uint64 contextPeakOutstandingCount() const override;
+	uint64 contextOutstandingBytes() const override;
+	uint64 contextCachedBytes() const override;
 
 protected:
 	// 注册读侧时投递 accept/recv/recvmsg completion。
@@ -68,6 +70,7 @@ private:
 		// 每个 SQE 绑定一个 context，CQE 回来前所有缓冲和 msghdr 必须保持有效。
 		IoUringContext();
 		void reset(KBESOCKET fdArg, KBESOCKET socketArg, SocketKind kindArg, Operation operationArg, uint64 generationArg);
+		size_t retainedBytes() const;
 
 		KBESOCKET fd;
 		KBESOCKET socket;
