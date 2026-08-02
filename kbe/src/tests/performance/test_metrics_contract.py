@@ -37,6 +37,9 @@ def assert_fixture_callbacks() -> None:
     client_methods = avatar_def.findall("./ClientMethods")
     assert len(client_methods) == 1, "Avatar.def must contain one ClientMethods section"
     assert client_methods[0].find("./pythonPerformanceProbeResponse") is not None
+    avatar_source = (fixture_root / "bots/Avatar.py").read_text(encoding="utf-8")
+    assert "KBE_PERF_PYTHON_RTT_INTERVAL" in avatar_source
+    assert "max(0.1, min(60.0, interval))" in avatar_source
 
 
 def main() -> int:
