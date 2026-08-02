@@ -1,6 +1,7 @@
 """Contract tests for the Performance Lab. / 性能实验室契约测试。"""
 
 import ast
+import importlib.util
 import types
 import tempfile
 import sys
@@ -30,6 +31,29 @@ from performance.run import (
     wait_for_workload_ready,
 )
 from performance.watcher_metrics import WatcherCollector, WatcherSchedule, parse_target, resolve_target
+
+
+def load_cluster_controller_module():
+    path = Path(__file__).resolve().parent.parent / "python/test_server_cluster.py"
+    spec = importlib.util.spec_from_file_location("kbe_test_server_cluster", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def assert_centralized_discovery_matching() -> None:
+    controller = load_cluster_controller_module()
+    central_log = (
+        "OFF baseappmgr [thread] baseappmgr-1 10103 5000 "
+        "Components::process(): Found all the components!\n"
+        "OFF cellappmgr [thread] cellappmgr-1 10103 6000 "
+        "Components::process(): Found all the components!\n"
+    )
+    assert controller.centralized_discovery_marker(central_log, "baseappmgr", 5000)
+    assert controller.centralized_discovery_marker(central_log, "cellappmgr", 6000)
+    assert not controller.centralized_discovery_marker(central_log, "baseappmgr", 6000)
+    assert not controller.centralized_discovery_marker(central_log, "interfaces", 3000)
 
 
 def assert_watcher_connection_reuse() -> None:
@@ -425,6 +449,7 @@ def assert_readiness_target_ownership() -> None:
 
 
 def main() -> int:
+    assert_centralized_discovery_matching()
     assert_watcher_connection_reuse()
     assert_watcher_schedule()
     assert_cprofile_window_metrics()

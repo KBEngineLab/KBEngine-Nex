@@ -179,6 +179,39 @@ def component_output(entry, run_root):
     return "\n".join(output)
 
 
+def centralized_discovery_marker(log_text, component_name, component_id):
+    """Match one component's discovery marker in the central Logger stream.
+    在中央 Logger 流中精确匹配一个组件的发现完成标记。
+
+    Performance runs use a rolling logger file whose name does not follow the
+    legacy ``logger_<component>.log`` convention.  Requiring both component
+    name and CID prevents another component's marker from satisfying this one.
+    性能压测使用不遵循旧 ``logger_<component>.log`` 命名的滚动日志；同时要求
+    组件名和 CID，可以避免用其他组件的完成行误判当前组件已经完成发现。
+    """
+    marker = re.compile(
+        rf"\b{re.escape(component_name)}\b[^\r\n]*"
+        rf"\b{int(component_id)}\b[^\r\n]*Found all the components!",
+        re.IGNORECASE,
+    )
+    return marker.search(log_text) is not None
+
+
+def component_discovery_complete(entry, run_root):
+    if "Found all the components!" in component_output(entry, run_root):
+        return True
+
+    log_root = run_root / "logs"
+    if not log_root.is_dir():
+        return False
+    component_name = entry["spec"]["name"]
+    component_id = entry["spec"]["component_id"]
+    return any(
+        centralized_discovery_marker(read_text(path), component_name, component_id)
+        for path in sorted(log_root.glob("logger*.log"))
+    )
+
+
 def all_run_logs(entries, run_root):
     output = []
     for entry in entries:
@@ -216,7 +249,7 @@ def wait_for_discovery(entries, run_root):
     deadline = time.monotonic() + 30
     managers = [entry for entry in entries if entry["spec"]["name"] in ("baseappmgr", "cellappmgr")]
     while time.monotonic() < deadline:
-        if all("Found all the components!" in component_output(entry, run_root) for entry in managers):
+        if all(component_discovery_complete(entry, run_root) for entry in managers):
             return
         time.sleep(0.25)
     raise RuntimeError("BaseAppMgr and CellAppMgr did not complete component discovery before timeout")
