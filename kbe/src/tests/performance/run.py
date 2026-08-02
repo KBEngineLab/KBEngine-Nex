@@ -40,7 +40,12 @@ class WorkloadReadinessError(RuntimeError):
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run an isolated KBE performance scenario")
     parser.add_argument("--scenario", required=True, type=Path)
-    parser.add_argument("--output-root", type=Path, default=Path("kbe/src/out/performance-runs"))
+    # Resolve the default from the repository instead of the caller's cwd.  The
+    # runner changes child-process directories, and a relative default used from
+    # kbe/src/tests previously created a nested tests/kbe/src/out tree.
+    # 默认输出必须相对仓库根目录解析；运行器会切换子进程 cwd，旧的相对默认值
+    # 从 kbe/src/tests 启动时会错误生成 tests/kbe/src/out 嵌套目录。
+    parser.add_argument("--output-root", type=Path)
     parser.add_argument("--log-root", type=Path)
     parser.add_argument("--duration", type=float)
     parser.add_argument("--sample-interval", type=float, default=1.0)
@@ -64,7 +69,7 @@ def main() -> int:
     # 子进程切换到隔离目录前冻结所有用户路径，避免相对 KBE_RES_PATH 随 cwd 失效。
     # Freeze every user path before child processes change cwd so relative KBE_RES_PATH entries remain valid.
     args.scenario = args.scenario.resolve()
-    args.output_root = args.output_root.resolve()
+    args.output_root = (args.output_root or (_repository_root() / "kbe/src/out/performance-runs")).resolve()
     if args.assets_root:
         args.assets_root = args.assets_root.resolve()
     if args.tools_root:

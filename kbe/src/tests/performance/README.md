@@ -9,8 +9,11 @@ Run a short local sample:
 python -B -m performance.run --scenario performance/scenarios/smoke.json --duration 30 --command "<workload command>"
 ```
 
-The runner writes `raw.jsonl`, `summary.json`, and `report.md` below `kbe/src/out/performance-runs/`.
-运行器会在 `kbe/src/out/performance-runs/` 下生成 `raw.jsonl`、`summary.json` 和 `report.md`。
+The runner writes `raw.jsonl`, `summary.json`, and `report.md` below the repository-root
+`kbe/src/out/performance-runs/`, regardless of the caller's current directory. Pass
+`--output-root` to override it explicitly.
+运行器默认把 `raw.jsonl`、`summary.json` 和 `report.md` 写入仓库根目录下的
+`kbe/src/out/performance-runs/`，与启动时的当前目录无关；需要时可用 `--output-root` 覆盖。
 
 Process samples include CPU normalized to the machine's logical processor count, working set,
 thread count, and, on Windows, private committed memory, peak working set, and handle count.

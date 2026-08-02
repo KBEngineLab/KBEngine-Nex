@@ -124,6 +124,16 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/network/poller/udpSendBacklogBytes", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBacklogBytes);
 	WATCH_OBJECT("bots/network/poller/udpSendBacklogPeakBytes", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBacklogPeakBytes);
 	WATCH_OBJECT("bots/network/poller/udpSendBackpressure", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBackpressureCount);
+	// Bots 不继承 ServerApp 的完整 Watcher 注册，显式暴露 completion context，
+	// 以区分 IOCP 缓存与每个 ClientObject/Entity 的长期内存。
+	// Bots does not inherit ServerApp's complete watcher registration. Expose
+	// completion-context counters explicitly so IOCP cache memory can be separated
+	// from the long-lived ClientObject/Entity cost.
+	WATCH_OBJECT("bots/network/poller/contextAllocations", &networkInterface(), &Network::NetworkInterface::pollerContextAllocations);
+	WATCH_OBJECT("bots/network/poller/contextReuses", &networkInterface(), &Network::NetworkInterface::pollerContextReuses);
+	WATCH_OBJECT("bots/network/poller/contextsOutstanding", &networkInterface(), &Network::NetworkInterface::pollerContextsOutstanding);
+	WATCH_OBJECT("bots/network/poller/contextsCached", &networkInterface(), &Network::NetworkInterface::pollerContextsCached);
+	WATCH_OBJECT("bots/network/poller/contextsPeakOutstanding", &networkInterface(), &Network::NetworkInterface::pollerContextsPeakOutstanding);
 	// 聚合目录只复用现有 getter，使性能控制器一次请求取得关键快照，避免高负载时串行查询多个目录放大主线程等待。
 	// The aggregate directory reuses existing getters so one controller request obtains the critical snapshot without serial main-thread waits.
 	WATCH_OBJECT("bots/performance/clientsTotal", this, &Bots::numClients);

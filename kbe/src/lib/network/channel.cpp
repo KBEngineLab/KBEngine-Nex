@@ -54,20 +54,17 @@ namespace Network
 
 namespace
 {
-// 空闲 KCP 没有需要刷新、确认或重传的状态；将维护粒度放宽到 100ms，
-// 可显著减少大量静默连接的定时器与堆操作。任何收发事件都会通过
-// scheduleKcpUpdate() 提交更早截止时间，因此活跃链路仍使用配置的低延迟周期。
-// An idle KCP control block has nothing to flush, acknowledge, or retransmit.
-// A 100 ms maintenance cadence removes timer and heap churn for large silent fleets.
-// Any send or receive event schedules an earlier deadline, preserving the configured
-// low-latency cadence for active channels.
-const IUINT32 KCP_IDLE_UPDATE_INTERVAL_MS = 100;
-
+// 空闲 KCP 没有需要刷新、确认或重传的状态；它不需要继续占用全局调度堆。
+// 收到数据或提交发送队列时，接收器/发送器会重新调用 scheduleKcpUpdate() 唤醒它。
+// A fully idle KCP has nothing to flush, acknowledge, or retransmit, so it does not
+// need to occupy the global scheduler heap. Receives and sends call scheduleKcpUpdate()
+// again before touching KCP state and wake the connection on demand.
 bool isKcpIdle(const ikcpcb& kcp)
 {
 	return kcp.nsnd_que == 0 && kcp.nsnd_buf == 0 &&
 		kcp.nrcv_que == 0 && kcp.nrcv_buf == 0 &&
-		kcp.ackcount == 0 && kcp.probe == 0;
+		kcp.ackcount == 0 && kcp.probe == 0 &&
+		kcp.probe_wait == 0 && kcp.rmt_wnd != 0;
 }
 }
 
@@ -479,14 +476,21 @@ void Channel::updateKcp()
 
 	const IUINT32 current = static_cast<IUINT32>(kbe_clock());
 	ikcp_update(pKCP_, current);
+	if (isKcpIdle(*pKCP_))
+	{
+		// 完全空闲时取消当前队列项；真实 UDP 收包和 KCP 发送会在进入 KCP 前重新入队。
+		// Cancel the queue entry for a fully idle connection; real UDP receives and KCP sends
+		// re-enqueue it before entering KCP state.
+		if (pNetworkInterface_ != NULL)
+			pNetworkInterface_->kcpUpdateScheduler_.cancel(*this);
+		return;
+	}
+
 	const IUINT32 next = ikcp_check(pKCP_, current);
 	// KCP uses wrapping 32-bit milliseconds; signed subtraction preserves ordering across the roughly 49-day wrap boundary.
 	// KCP 使用会回绕的 32 位毫秒时钟；有符号差值可在约 49 天回绕边界保持正确顺序。
 	const IINT32 checkedDelay = static_cast<IINT32>(next - current);
-	IUINT32 delay = checkedDelay > 0 ? static_cast<IUINT32>(checkedDelay) : 1;
-	if (isKcpIdle(*pKCP_) && delay < KCP_IDLE_UPDATE_INTERVAL_MS)
-		delay = KCP_IDLE_UPDATE_INTERVAL_MS;
-
+	const IUINT32 delay = checkedDelay > 0 ? static_cast<IUINT32>(checkedDelay) : 1;
 	scheduleKcpUpdate(static_cast<int64>(delay) * 1000);
 }
 

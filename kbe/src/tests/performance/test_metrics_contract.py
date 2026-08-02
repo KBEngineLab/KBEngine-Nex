@@ -14,6 +14,7 @@ from performance.log_metrics import IncrementalLogCollector
 from performance.metrics import JsonlRecorder
 from performance.process_metrics import ProcessCollector, _parse_windows_process_row
 from performance.report import build_summary, load_events, validate_event
+from performance.run import _repository_root
 from performance.watcher_metrics import parse_target, resolve_target
 
 
@@ -35,6 +36,9 @@ def assert_fixture_callbacks() -> None:
 
 def main() -> int:
     assert_fixture_callbacks()
+    repository_root = _repository_root()
+    assert repository_root.is_dir()
+    assert (repository_root / "kbe/src/tests/performance/run.py").is_file()
     process_row = {
         "CPU": 12.5,
         "WorkingSet64": 101,
