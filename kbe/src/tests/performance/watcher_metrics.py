@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import math
+import re
 import sys
 import time
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -63,6 +64,85 @@ def resolve_target(target: WatcherTarget, log_roots: list[Path]) -> WatcherTarge
                     target.component_name,
                 )
     raise LookupError(f"component endpoint is not available yet: {target.component_name}")
+
+
+def watcher_target_key(target: WatcherTarget) -> str:
+    """Return the stable scenario key for a target, independent of its endpoint.
+    返回与临时端点无关的稳定场景键，供采样周期配置使用。
+    """
+    return f"{target.component_type}:{target.path}"
+
+
+class WatcherSchedule:
+    """Schedule independent steady-state sampling periods for Watcher targets.
+    为不同 Watcher 目标维护独立的稳态采样周期。
+    """
+
+    def __init__(
+        self,
+        targets: list[WatcherTarget],
+        default_interval_seconds: float,
+        interval_overrides: dict[str, Any] | None = None,
+    ):
+        default_interval = _validate_interval(default_interval_seconds, "default")
+        overrides = dict(interval_overrides or {})
+        known_keys = {watcher_target_key(target) for target in targets}
+        unknown_keys = sorted(set(overrides) - known_keys)
+        if unknown_keys:
+            raise ValueError(f"watcher interval has unknown target(s): {', '.join(unknown_keys)}")
+        self._intervals = {
+            _watcher_target_identity(target): _validate_interval(
+                overrides.get(watcher_target_key(target), default_interval),
+                watcher_target_key(target),
+            )
+            for target in targets
+        }
+        self._next_due: dict[tuple[str, str, int, str], float] = {}
+
+    def due(self, target: WatcherTarget, now: float | None = None) -> bool:
+        """Return whether target may be sampled at the supplied monotonic time.
+        判断目标在给定单调时钟时刻是否到达采样时间。
+        """
+        key = _watcher_target_identity(target)
+        current = time.monotonic() if now is None else now
+        tolerance = min(self._intervals[key] * 0.1, 0.1)
+        return current + tolerance >= self._next_due.get(key, float("-inf"))
+
+    def mark_sampled(self, target: WatcherTarget, now: float | None = None) -> None:
+        """Set the next deadline after a completed query, including failures.
+        查询完成后设置下一次截止时间，失败查询也不能立即重试形成控制面风暴。
+        """
+        key = _watcher_target_identity(target)
+        current = time.monotonic() if now is None else now
+        interval = self._intervals[key]
+        deadline = self._next_due.get(key)
+        if deadline is None:
+            self._next_due[key] = current + interval
+            return
+        next_deadline = deadline + interval
+        if next_deadline <= current:
+            skipped = math.floor((current - next_deadline) / interval) + 1
+            next_deadline += skipped * interval
+        self._next_due[key] = next_deadline
+
+    def interval(self, target: WatcherTarget) -> float:
+        """Return the effective interval for one target. / 返回目标的实际采样周期。"""
+        return self._intervals[_watcher_target_identity(target)]
+
+
+def _watcher_target_identity(target: WatcherTarget) -> tuple[str, str, int, str]:
+    endpoint = target.component_name or target.host
+    return target.component_type, endpoint, target.port, target.path
+
+
+def _validate_interval(value: Any, name: str) -> float:
+    try:
+        interval = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"watcher interval must be a finite number: {name}") from exc
+    if not math.isfinite(interval) or interval < 0.1:
+        raise ValueError(f"watcher interval must be >= 0.1 seconds: {name}")
+    return interval
 
 
 class WatcherCollector:

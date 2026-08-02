@@ -16,7 +16,7 @@ from performance.metrics import JsonlRecorder
 from performance.process_metrics import ProcessCollector, _parse_windows_process_row
 from performance.report import build_summary, load_events, validate_event
 from performance.run import _repository_root
-from performance.watcher_metrics import WatcherCollector, parse_target, resolve_target
+from performance.watcher_metrics import WatcherCollector, WatcherSchedule, parse_target, resolve_target
 
 
 def assert_watcher_connection_reuse() -> None:
@@ -87,6 +87,49 @@ def assert_watcher_connection_reuse() -> None:
             sys.modules["pycommon"] = previous
 
 
+def assert_watcher_schedule() -> None:
+    bots = parse_target("BOTS_TYPE=127.0.0.1:11000:root/bots/performance")
+    cell = parse_target("CELLAPP_TYPE=127.0.0.1:12000:root/witness")
+    schedule = WatcherSchedule(
+        [bots, cell],
+        1.0,
+        {"BOTS_TYPE:root/bots/performance": 5.0},
+    )
+    assert schedule.interval(bots) == 5.0
+    assert schedule.interval(cell) == 1.0
+    assert schedule.due(bots, 100.0)
+    schedule.mark_sampled(bots, 100.0)
+    assert not schedule.due(bots, 104.89)
+    assert schedule.due(bots, 104.9)
+    schedule.mark_sampled(bots, 104.9)
+    assert not schedule.due(bots, 109.89)
+    assert schedule.due(bots, 109.9)
+    assert schedule.due(cell, 104.9)
+    schedule.mark_sampled(cell, 100.0)
+    assert not schedule.due(cell, 100.89)
+    assert schedule.due(cell, 100.9)
+    schedule.mark_sampled(cell, 102.2)
+    assert not schedule.due(cell, 102.89)
+    assert schedule.due(cell, 102.9)
+    second_cell = parse_target("CELLAPP_TYPE=127.0.0.1:12001:root/witness")
+    multi_instance = WatcherSchedule([cell, second_cell], 1.0)
+    multi_instance.mark_sampled(cell, 100.0)
+    assert not multi_instance.due(cell, 100.5)
+    assert multi_instance.due(second_cell, 100.5)
+    try:
+        WatcherSchedule([bots], 1.0, {"BOTS_TYPE:root/unknown": 5.0})
+    except ValueError as exc:
+        assert "unknown target" in str(exc)
+    else:
+        raise AssertionError("unknown Watcher interval target must fail")
+    try:
+        WatcherSchedule([bots], 1.0, {"BOTS_TYPE:root/bots/performance": 0.0})
+    except ValueError as exc:
+        assert ">= 0.1" in str(exc)
+    else:
+        raise AssertionError("invalid Watcher interval must fail")
+
+
 def assert_fixture_callbacks() -> None:
     fixture_root = resolve_fixture_root("network-baseline")
     required = {
@@ -115,6 +158,7 @@ def assert_fixture_callbacks() -> None:
 
 def main() -> int:
     assert_watcher_connection_reuse()
+    assert_watcher_schedule()
     assert_fixture_callbacks()
     repository_root = _repository_root()
     assert repository_root.is_dir()

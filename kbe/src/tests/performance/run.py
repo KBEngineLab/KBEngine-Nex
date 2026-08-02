@@ -24,7 +24,7 @@ from .log_metrics import IncrementalLogCollector
 from .metrics import JsonlRecorder, monotonic_milliseconds
 from .process_metrics import ProcessGroupCollector
 from .report import build_summary, load_events, write_report
-from .watcher_metrics import WatcherCollector, WatcherTarget, parse_target, resolve_target
+from .watcher_metrics import WatcherCollector, WatcherSchedule, WatcherTarget, parse_target, resolve_target
 
 
 class WorkloadReadinessError(RuntimeError):
@@ -86,6 +86,16 @@ def main() -> int:
     duration = float(args.duration if args.duration is not None else scenario.get("duration_seconds", 30))
     configured_bots = int(args.bots if args.bots is not None else scenario.get("bots", 0))
     interval = max(float(args.sample_interval), 0.1)
+    watcher_targets = [parse_target(value) for value in args.watcher_target]
+    watcher_schedule = (
+        WatcherSchedule(
+            watcher_targets,
+            interval,
+            dict(scenario.get("watcher_intervals", {})),
+        )
+        if watcher_targets
+        else None
+    )
     run_id = f"{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
     output = args.output_root / f"{name}-{run_id}"
     output.mkdir(parents=True, exist_ok=True)
@@ -140,7 +150,6 @@ def main() -> int:
         log_roots.add((cluster.run_root / "server/logs").resolve())
     log_collectors = [IncrementalLogCollector(path) for path in sorted(log_roots)]
     watcher_collector = WatcherCollector(args.tools_root, args.watcher_timeout) if args.tools_root and args.watcher_target else None
-    watcher_targets = [parse_target(value) for value in args.watcher_target]
     events_path = output / "raw.jsonl"
     readiness_failure: WorkloadReadinessError | None = None
     with JsonlRecorder(events_path, run_id, name) as recorder:
@@ -172,7 +181,10 @@ def main() -> int:
                 for log_collector in log_collectors:
                     record_log_samples(recorder, log_collector, "measurement")
                 if watcher_collector:
+                    sample_now = time.monotonic()
                     for target in watcher_targets:
+                        if watcher_schedule is not None and not watcher_schedule.due(target, sample_now):
+                            continue
                         request_started_ms = monotonic_milliseconds()
                         operation = f"watcher:{target.component_type}:{target.path}"
                         try:
@@ -189,26 +201,32 @@ def main() -> int:
                                 float(scenario.get("slow_request_threshold_ms", 0.0)) or None,
                             )
                             recorder.record("watcher", target.component_type, "query.error.count", 1, "count", {"kind": "counter", "error": type(exc).__name__})
-                            continue
-                        recorder.record_request_latency(
-                            "watcher",
-                            target.component_type,
-                            operation,
-                            request_started_ms,
-                            monotonic_milliseconds(),
-                            True,
-                            slow_threshold_ms=float(scenario.get("slow_request_threshold_ms", 0.0)) or None,
-                        )
-                        for metric, value in values.items():
-                            if isinstance(value, (int, float)):
-                                metric_name = f"{target.path}/{metric}".replace("//", "/")
-                                recorder.record_sample(
-                                    "watcher",
-                                    target.component_type,
-                                    metric_name,
-                                    value,
-                                    watcher_unit(metric_name),
-                                )
+                        else:
+                            recorder.record_request_latency(
+                                "watcher",
+                                target.component_type,
+                                operation,
+                                request_started_ms,
+                                monotonic_milliseconds(),
+                                True,
+                                slow_threshold_ms=float(scenario.get("slow_request_threshold_ms", 0.0)) or None,
+                            )
+                            for metric, value in values.items():
+                                if isinstance(value, (int, float)):
+                                    metric_name = f"{target.path}/{metric}".replace("//", "/")
+                                    recorder.record_sample(
+                                        "watcher",
+                                        target.component_type,
+                                        metric_name,
+                                        value,
+                                        watcher_unit(metric_name),
+                                    )
+                        finally:
+                            if watcher_schedule is not None:
+                                # Anchor deadlines to the sampling cycle so query RTT cannot
+                                # accidentally halve a one-second target's effective cadence.
+                                # 截止时间锚定采样周期，避免查询 RTT 把一秒目标意外降成隔轮采样。
+                                watcher_schedule.mark_sampled(target, sample_now)
                 recorder.flush()
                 next_sample += interval
                 delay = next_sample - time.monotonic()

@@ -35,6 +35,23 @@ python -B -m performance.run --scenario performance/scenarios/baseline.json `
 `HOST:PORT` remains available when the endpoint is managed externally.
 `@bots` 会从本轮自有日志中发现临时内部端点；由外部环境固定端点时仍可使用 `HOST:PORT`。
 
+Scenarios may lower the steady-state frequency of an expensive target without changing readiness:
+场景可单独降低大目录的稳态采样频率，而不改变 readiness 查询：
+
+```json
+{
+  "watcher_intervals": {
+    "BOTS_TYPE:root/bots/performance": 5.0
+  }
+}
+```
+
+Keys use `COMPONENT_TYPE:PATH`; values are seconds and must be at least `0.1`. Unknown keys fail
+before the cluster starts. Each target keeps an independent monotonic deadline, failed queries wait
+for their next period, and missed periods are not replayed as a burst.
+键格式为 `COMPONENT_TYPE:PATH`，值为秒且不得小于 `0.1`。未知目标会在集群启动前失败。
+每个目标使用独立单调时钟截止点；失败查询等待下一周期，错过的周期不会集中补发。
+
 `--start-cluster` starts the existing nine-component integration controller, waits for its
 readiness marker, samples only the published child PIDs, and requests graceful cleanup through
 an owned stop file. It requires `--cluster-components` and `--cluster-binary-root`.
