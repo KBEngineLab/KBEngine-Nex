@@ -59,6 +59,16 @@ def assert_centralized_discovery_matching() -> None:
     assert not controller.centralized_discovery_marker(central_log, "baseappmgr", 6000)
     assert not controller.centralized_discovery_marker(central_log, "interfaces", 3000)
 
+    class AliveProcess:
+        @staticmethod
+        def poll():
+            return None
+
+    controller.wait_for_process_stability(
+        [{"process": AliveProcess(), "spec": {"name": "baseappmgr"}}],
+        0.01,
+    )
+
 
 def assert_partial_workload_start_cleanup() -> None:
     class FakeProcess:
@@ -681,6 +691,19 @@ def main() -> int:
         selected_bot = parse_target("BOTS_TYPE=@bots#10001:root/bots")
         resolved_selected_bot = resolve_target(selected_bot, [log_root])
         assert resolved_selected_bot.port == 13502
+        manifest_root = root / "cluster/server"
+        manifest_logs = manifest_root / "logs"
+        manifest_logs.mkdir(parents=True)
+        (manifest_root / "components.json").write_text(
+            '[{"name":"baseappmgr","component_id":5000,'
+            '"intaddr":"127.0.0.1","intport":15000}]\n',
+            encoding="utf-8",
+        )
+        resolved_manifest = resolve_target(
+            parse_target("BASEAPPMGR_TYPE=@baseappmgr:root/readiness"),
+            [manifest_logs],
+        )
+        assert resolved_manifest.host == "127.0.0.1" and resolved_manifest.port == 15000
         assets = root / "assets/res/server"
         assets.mkdir(parents=True)
         (assets / "kbengine.xml").write_text("<root><bots /></root>\n", encoding="utf-8")

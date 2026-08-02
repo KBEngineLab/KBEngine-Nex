@@ -83,6 +83,7 @@ class PerformanceCluster:
             str(self.startup_timeout_seconds),
             "--hold-until-file",
             str(self.stop_file),
+            "--external-readiness",
         ]
         if self.fixture_root is not None:
             command.extend(("--resource-overlay", str(self.fixture_root)))
@@ -134,6 +135,13 @@ class PerformanceCluster:
                     self.process.kill()
                     self.process.wait()
         self._close_logs()
+
+    def assert_running(self, phase: str) -> None:
+        """Fail immediately when the owned cluster controller or a child exits.
+        自有集群控制器或子进程退出时立即失败，避免等待 Watcher 超时。
+        """
+        if self.process is not None and self.process.poll() is not None:
+            raise RuntimeError(self._failure_message(f"cluster exited during {phase}"))
 
     def wait_for_log_readiness(
         self,

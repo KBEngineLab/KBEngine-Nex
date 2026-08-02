@@ -45,6 +45,11 @@ def parse_arguments():
     parser.add_argument("--database-password", default="")
     parser.add_argument("--startup-timeout-seconds", type=int, default=90)
     parser.add_argument(
+        "--external-readiness",
+        action="store_true",
+        help="Publish live child processes and delegate semantic readiness to an external controller",
+    )
+    parser.add_argument(
         "--hold-until-file",
         type=Path,
         help="Keep the ready cluster alive until this file exists; used by external test controllers",
@@ -245,6 +250,21 @@ def wait_for_running(entries, run_root, timeout):
     raise RuntimeError(f"components did not reach running state before timeout: {', '.join(pending)}")
 
 
+def wait_for_process_stability(entries, seconds=2.0):
+    """Verify that every spawned child survives a short ownership handoff window.
+    确认全部子进程在控制权交接窗口内保持存活，不把日志文本冒充语义就绪。
+    """
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        for entry in entries:
+            result = entry["process"].poll()
+            if result is not None:
+                raise RuntimeError(
+                    f"{entry['spec']['name']} exited during startup with code {result}"
+                )
+        time.sleep(min(0.1, max(deadline - time.monotonic(), 0.0)))
+
+
 def wait_for_discovery(entries, run_root):
     deadline = time.monotonic() + 30
     managers = [entry for entry in entries if entry["spec"]["name"] in ("baseappmgr", "cellappmgr")]
@@ -413,8 +433,15 @@ def run_cluster(args):
             # Machine establishes discovery first; the remaining components still register through the real network discovery flow.
             time.sleep(1.0 if spec["name"] == "machine" else 0.15)
 
-        wait_for_running(entries, args.run_root, args.startup_timeout_seconds)
-        wait_for_discovery(entries, args.run_root)
+        if args.external_readiness:
+            # PerformanceCluster performs Manager onReadyForLogin checks through
+            # Watcher. This stage only proves ownership and early process health.
+            # 性能控制器会通过 Watcher 校验 Manager onReadyForLogin；本阶段
+            # 只确认进程归属和早期存活，避免依赖可被日志级别过滤的 INFO。
+            wait_for_process_stability(entries)
+        else:
+            wait_for_running(entries, args.run_root, args.startup_timeout_seconds)
+            wait_for_discovery(entries, args.run_root)
         for entry in entries:
             result = entry["process"].poll()
             if result is not None:

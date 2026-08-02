@@ -38,7 +38,11 @@ def parse_target(value: str) -> WatcherTarget:
         raise ValueError("watcher target must be TYPE=HOST:PORT:PATH or TYPE=@COMPONENT:PATH") from exc
 
 
-def resolve_target(target: WatcherTarget, log_roots: list[Path]) -> WatcherTarget:
+def resolve_target(
+    target: WatcherTarget,
+    log_roots: list[Path],
+    machine_resolver: MachineEndpointResolver | None = None,
+) -> WatcherTarget:
     """Resolve a component's ephemeral internal endpoint from owned logs.
     从本轮自有日志解析组件的临时内部端点。
     """
@@ -50,6 +54,30 @@ def resolve_target(target: WatcherTarget, log_roots: list[Path]) -> WatcherTarge
     component_id_pattern = (
         rf"componentID:{re.escape(component_id)}(?:,|\s)" if separator else ""
     )
+
+    # The cluster manifest is structured and remains available when INFO logs
+    # are disabled. It owns server endpoints but not separately started Bots.
+    # 集群清单不受 INFO 日志级别影响，优先用于服务端组件；独立 Bots 再走
+    # 日志或 Machine 发现。
+    for root in log_roots:
+        manifest_path = root.parent / "components.json"
+        if not manifest_path.is_file():
+            continue
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        for item in manifest:
+            if str(item.get("name", "")).lower() != component_name.lower():
+                continue
+            if separator and int(item.get("component_id", 0)) != int(component_id):
+                continue
+            host = str(item.get("intaddr", ""))
+            port = int(item.get("intport", 0))
+            if host and port > 0:
+                return WatcherTarget(
+                    target.component_type, host, port, target.path, target.component_name,
+                )
     pattern = re.compile(
         rf"componentType:{re.escape(component_name)}(?:,|\s).*?"
         rf"{component_id_pattern}.*?intaddr:([^,]+), intport:(\d+)",
@@ -71,7 +99,77 @@ def resolve_target(target: WatcherTarget, log_roots: list[Path]) -> WatcherTarge
                     target.path,
                     target.component_name,
                 )
+    if machine_resolver is not None:
+        return machine_resolver.resolve(target)
     raise LookupError(f"component endpoint is not available yet: {target.component_name}")
+
+
+class MachineEndpointResolver:
+    """Cache KBMachine discovery on one stable UDP reply port.
+    在固定 UDP 回复端口上缓存 KBMachine 组件发现结果。
+
+    Machine refreshes component health synchronously for a new request key. Reusing
+    one socket lets its duplicate-request cache serve retries without repeatedly
+    scanning every process and turning readiness polling into server load.
+    Machine 会为新的请求键同步刷新组件健康状态。复用同一 socket 可命中其重复
+    请求缓存，避免 readiness 轮询反复扫描全部进程并制造额外服务端负载。
+    """
+
+    def __init__(self, tools_root: Path):
+        self.tools_root = tools_root
+        self._machines: Any | None = None
+        self._define: Any | None = None
+        self._cache: dict[tuple[str, int | None], tuple[str, int]] = {}
+
+    def _initialize(self) -> None:
+        if self._machines is not None:
+            return
+        sys.path.insert(0, str(self.tools_root))
+        try:
+            from pycommon import Define, Machines
+
+            self._define = Define
+            self._machines = Machines.Machines()
+        finally:
+            sys.path.pop(0)
+
+    def _refresh(self) -> None:
+        self._initialize()
+        assert self._machines is not None and self._define is not None
+        self._machines.queryAllInterfaces("<broadcast>", trycount=0, timeout=0.5)
+        cache: dict[tuple[str, int | None], tuple[str, int]] = {}
+        for component_type, infos in self._machines.interfaces.items():
+            name = str(self._define.COMPONENT_NAME[int(component_type)]).lower()
+            for info in infos:
+                endpoint = (str(info.intaddr), int(info.intport))
+                cache[(name, int(info.componentID))] = endpoint
+                cache.setdefault((name, None), endpoint)
+        self._cache = cache
+
+    def resolve(self, target: WatcherTarget) -> WatcherTarget:
+        component_name, separator, component_id = target.component_name.partition("#")
+        key = (component_name.lower(), int(component_id) if separator else None)
+        endpoint = self._cache.get(key)
+        if endpoint is None:
+            self._refresh()
+            endpoint = self._cache.get(key)
+        if endpoint is None:
+            raise LookupError(
+                f"component endpoint is not registered with Machine: {target.component_name}"
+            )
+        return WatcherTarget(
+            target.component_type,
+            endpoint[0],
+            endpoint[1],
+            target.path,
+            target.component_name,
+        )
+
+    def close(self) -> None:
+        if self._machines is not None:
+            self._machines.stopListen()
+            self._machines = None
+        self._cache = {}
 
 
 def watcher_target_key(target: WatcherTarget) -> str:
@@ -174,6 +272,13 @@ class WatcherCollector:
         self.timeout_seconds = timeout_seconds
         self._watchers: dict[tuple[str, str, int, str], Any] = {}
         self._last_stats: dict[tuple[str, str, int, str], WatcherQueryStats] = {}
+        self._machine_resolver = MachineEndpointResolver(tools_root)
+
+    def resolve_target(self, target: WatcherTarget, log_roots: list[Path]) -> WatcherTarget:
+        """Resolve through manifest/logs, then one cached Machine session.
+        依次通过清单、日志和单个缓存 Machine 会话解析端点。
+        """
+        return resolve_target(target, log_roots, self._machine_resolver)
 
     def _get_watcher(self, target: WatcherTarget) -> tuple[Any, bool]:
         """Return a connected Watcher for one endpoint, creating it lazily.
@@ -241,6 +346,7 @@ class WatcherCollector:
                 watcher.close()
             except (AttributeError, OSError):
                 pass
+        self._machine_resolver.close()
 
 
 def estimate_response_bytes(value: Any) -> int:

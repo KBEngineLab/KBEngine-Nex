@@ -244,6 +244,7 @@ def main() -> int:
                 cellapp_count,
                 args.server_ready_timeout,
                 args.watcher_timeout,
+                cluster,
             )
             server_readiness = scenario.get("server_readiness")
             if server_readiness is not None:
@@ -298,8 +299,13 @@ def main() -> int:
                 max(float(args.workload_ready_timeout), 1.0),
                 dict(scenario.get("readiness", {})),
                 configured_bots,
+                cluster,
             )
-            wait_for_warmup(processes, max(float(scenario.get("warmup_seconds", 0.0)), 0.0))
+            wait_for_warmup(
+                processes,
+                max(float(scenario.get("warmup_seconds", 0.0)), 0.0),
+                cluster,
+            )
             if watcher_collector:
                 drain_watcher_windows(watcher_collector, watcher_targets)
             # 丢弃启动阶段日志，避免初始化告警污染稳态质量门；测量和关闭阶段仍分别保留。
@@ -325,6 +331,8 @@ def main() -> int:
                 if workload_exit is not None:
                     recorder.record("runner", "workload", "process.exit.count", 1, "count", {"kind": "counter"})
                     break
+                if cluster is not None:
+                    cluster.assert_running("measurement")
                 if process_collector:
                     record_process_samples(recorder, process_collector)
                 for log_collector in log_collectors:
@@ -579,6 +587,7 @@ def wait_for_cluster_ready_for_login(
     cellapp_count: int,
     timeout_seconds: float,
     watcher_timeout_seconds: float,
+    cluster: PerformanceCluster | None = None,
 ) -> dict[str, dict[str, object]]:
     """Wait for standard BaseApp/CellApp onReadyForLogin aggregation.
     等待标准 BaseApp/CellApp onReadyForLogin 聚合状态。
@@ -594,10 +603,12 @@ def wait_for_cluster_ready_for_login(
     deadline = time.monotonic() + timeout_seconds
     try:
         while time.monotonic() < deadline:
+            if cluster is not None:
+                cluster.assert_running("server readiness")
             all_ready = True
             for unresolved, expected_apps in declarations:
                 try:
-                    target = resolve_target(unresolved, log_roots)
+                    target = collector.resolve_target(unresolved, log_roots)
                     values = collector.query(target)
                     observed[unresolved.component_name] = values
                     if not manager_readiness_satisfied(values, expected_apps):
@@ -909,6 +920,7 @@ def wait_for_workload_ready(
     timeout_seconds: float,
     readiness: dict[str, object],
     configured_bots: int,
+    cluster: PerformanceCluster | None = None,
 ) -> list[WatcherTarget]:
     """Exclude process and Watcher startup from the measured request window.
     将进程和 Watcher 启动期排除在请求成功率与延迟窗口之外。
@@ -919,6 +931,8 @@ def wait_for_workload_ready(
     last_error: Exception | None = None
     last_observed: dict[str, object] = {}
     while time.monotonic() < deadline:
+        if cluster is not None:
+            cluster.assert_running("workload readiness")
         workload_exit = first_workload_exit(processes)
         if workload_exit is not None:
             raise WorkloadReadinessError(
@@ -926,7 +940,14 @@ def wait_for_workload_ready(
                 last_observed,
             )
         try:
-            resolved_targets = [resolve_target(target, log_roots) for target in watcher_targets]
+            resolved_targets = [
+                (
+                    watcher_collector.resolve_target(target, log_roots)
+                    if hasattr(watcher_collector, "resolve_target")
+                    else resolve_target(target, log_roots)
+                )
+                for target in watcher_targets
+            ]
             observed: dict[str, object] = {}
             readiness_targets = select_readiness_targets(resolved_targets, readiness)
             aggregate_readiness = len(readiness_targets) > 1
@@ -1031,9 +1052,15 @@ def first_workload_exit(processes: list[subprocess.Popen[bytes]]) -> int | None:
     return None
 
 
-def wait_for_warmup(processes: list[subprocess.Popen[bytes]], seconds: float) -> None:
+def wait_for_warmup(
+    processes: list[subprocess.Popen[bytes]],
+    seconds: float,
+    cluster: PerformanceCluster | None = None,
+) -> None:
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
+        if cluster is not None:
+            cluster.assert_running("warmup")
         workload_exit = first_workload_exit(processes)
         if workload_exit is not None:
             raise RuntimeError(f"workload exited during warmup with code {workload_exit}")
