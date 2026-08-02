@@ -2,6 +2,8 @@
 不经过持久化和业务系统、直接进入空 Space 的 Proxy。
 """
 
+import time
+
 import KBEngine
 
 
@@ -37,6 +39,20 @@ class Avatar(KBEngine.Proxy):
         if not self.isDestroyed:
             self.destroy()
 
-    def pythonPerformanceProbe(self, started_ns):
+    def pythonPerformanceProbe(self, request_id, client_started_ns):
+        base_received_ns = time.perf_counter_ns()
+        if self.cell is not None:
+            self.cell.pythonPerformanceCellProbe(request_id, client_started_ns, base_received_ns)
+
+    def pythonPerformanceCellResponse(
+        self, request_id, client_started_ns, base_received_ns, cell_received_ns
+    ):
+        base_returned_ns = time.perf_counter_ns()
         if self.client is not None:
-            self.client.pythonPerformanceProbeResponse(started_ns)
+            self.client.pythonPerformanceProbeResponse(
+                request_id,
+                client_started_ns,
+                base_received_ns,
+                cell_received_ns,
+                base_returned_ns,
+            )

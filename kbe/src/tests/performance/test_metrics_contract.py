@@ -15,7 +15,14 @@ from performance.log_metrics import IncrementalLogCollector
 from performance.metrics import JsonlRecorder
 from performance.process_metrics import ProcessCollector, _parse_windows_process_row
 from performance.report import build_summary, load_events, validate_event
-from performance.run import _repository_root, merge_watcher_target_specs, record_watcher_samples
+from performance.run import (
+    _repository_root,
+    load_scenario,
+    merge_watcher_target_specs,
+    record_watcher_samples,
+    readiness_value_matches,
+    scenario_environment,
+)
 from performance.watcher_metrics import WatcherCollector, WatcherSchedule, parse_target, resolve_target
 
 
@@ -239,7 +246,34 @@ def assert_fixture_callbacks() -> None:
     assert "KBE_PERF_PYTHON_RTT_INTERVAL" in avatar_source
     assert "max(0.1, min(60.0, interval))" in avatar_source
     assert "KBE_PERF_PYTHON_RTT_SAMPLE_EVERY" in avatar_source
+    assert "recordPerformanceTransaction" in avatar_source
+    assert "_python_probe_pending" in avatar_source
+    assert "_python_probe_entity_sequence" in avatar_source
+    assert "(_python_probe_entity_sequence - 1)" in avatar_source
+    assert "recordPerformanceProbeTimeout" in avatar_source
     assert "max(1, min(10000, every))" in avatar_source
+
+
+def assert_python_latency_scenario() -> None:
+    scenario_path = Path(__file__).resolve().parent / "scenarios/python_latency.json"
+    scenario = load_scenario(scenario_path)
+    assert scenario["name"] == "python-latency"
+    assert len(scenario["watcher_targets"]) == 31
+    assert scenario["watcher_intervals"]["BOTS_TYPE:root/bots/performance"] == 5.0
+    assert scenario["workload_environment"]["KBE_PERF_PYTHON_RTT_SAMPLE_EVERY"] == "50"
+    assert scenario["readiness"]["root/bots/pythonLatency/control/successes"] == {"min": 1}
+    assert readiness_value_matches(1, {"min": 1}, 2000)
+    assert not readiness_value_matches(0, {"min": 1}, 2000)
+    assert readiness_value_matches(2000, "$bots", 2000)
+    assert scenario["watcher_intervals"]["BOTS_TYPE:root/bots/pythonLatency/roundTrip"] == 2.0
+    environment = scenario_environment(scenario)
+    assert environment["KBE_PERF_PYTHON_CHAIN"] == "1"
+    try:
+        scenario_environment({"workload_environment": {"PATH": "invalid"}})
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("unrestricted workload environment key must fail")
 
 
 def main() -> int:
@@ -247,6 +281,7 @@ def main() -> int:
     assert_watcher_schedule()
     assert_cprofile_window_metrics()
     assert_fixture_callbacks()
+    assert_python_latency_scenario()
     repository_root = _repository_root()
     assert repository_root.is_dir()
     assert (repository_root / "kbe/src/tests/performance/run.py").is_file()

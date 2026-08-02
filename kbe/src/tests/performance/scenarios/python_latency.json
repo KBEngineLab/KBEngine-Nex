@@ -1,0 +1,35 @@
+{
+  "extends": "stress.json",
+  "name": "python-latency",
+  "duration_seconds": 60,
+  "workload_environment": {
+    "KBE_PERF_PYTHON_CHAIN": "1",
+    "KBE_PERF_PYTHON_RTT_INTERVAL": "2.0",
+    "KBE_PERF_PYTHON_RTT_SAMPLE_EVERY": "50",
+    "KBE_PERF_PYTHON_RTT_TIMEOUT": "5.0"
+  },
+  "watcher_targets_add": [
+    "BOTS_TYPE=@bots:root/bots/pythonLatency/control",
+    "BOTS_TYPE=@bots:root/bots/pythonLatency/roundTrip",
+    "BOTS_TYPE=@bots:root/bots/pythonLatency/clientToBase",
+    "BOTS_TYPE=@bots:root/bots/pythonLatency/baseToCell",
+    "BOTS_TYPE=@bots:root/bots/pythonLatency/cellToBase",
+    "BOTS_TYPE=@bots:root/bots/pythonLatency/baseToClient"
+  ],
+  "watcher_intervals": {
+    "BOTS_TYPE:root/bots/pythonLatency/control": 2.0,
+    "BOTS_TYPE:root/bots/pythonLatency/roundTrip": 2.0,
+    "BOTS_TYPE:root/bots/pythonLatency/clientToBase": 2.0,
+    "BOTS_TYPE:root/bots/pythonLatency/baseToCell": 2.0,
+    "BOTS_TYPE:root/bots/pythonLatency/cellToBase": 2.0,
+    "BOTS_TYPE:root/bots/pythonLatency/baseToClient": 2.0
+  },
+  "readiness": {
+    "root/bots/performance/clientsTotal": "$bots",
+    "root/bots/performance/clientsKcp": "$bots",
+    "root/witness/active": "$bots",
+    "root/bots/pythonLatency/control/successes": {
+      "min": 1
+    }
+  }
+}

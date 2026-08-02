@@ -208,6 +208,9 @@ bool ClientApp::installEntityDef()
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	publish,			__py_getAppPublish,								METH_VARARGS,	0)
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	fireEvent,			__py_fireEvent,									METH_VARARGS,	0)
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	recordPerformanceLatency,	__py_recordPerformanceLatency,				METH_VARARGS,	0)
+	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	recordPerformanceTransaction,	__py_recordPerformanceTransaction,		METH_VARARGS,	0)
+	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	recordPerformanceProbeTimeout,	__py_recordPerformanceProbeTimeout,		METH_VARARGS,	0)
+	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	recordPerformanceProbeInvalidResponse,	__py_recordPerformanceProbeInvalidResponse,	METH_VARARGS,	0)
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	player,				__py_getPlayer,									METH_VARARGS,	0)
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	getSpaceData,		__py_GetSpaceData,								METH_VARARGS,	0)
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	callback,			__py_callback,									METH_VARARGS,	0)
@@ -242,6 +245,32 @@ void ClientApp::recordPythonPerformanceLatency(uint64 startNs, uint64 endNs)
 	(void)endNs;
 }
 
+void ClientApp::recordPythonPerformanceTransaction(
+	uint64 requestID,
+	uint64 clientStartedNs,
+	uint64 baseReceivedNs,
+	uint64 cellReceivedNs,
+	uint64 baseReturnedNs,
+	uint64 clientCompletedNs)
+{
+	(void)requestID;
+	(void)clientStartedNs;
+	(void)baseReceivedNs;
+	(void)cellReceivedNs;
+	(void)baseReturnedNs;
+	(void)clientCompletedNs;
+}
+
+void ClientApp::recordPythonPerformanceProbeTimeout(uint64 requestID)
+{
+	(void)requestID;
+}
+
+void ClientApp::recordPythonPerformanceProbeInvalidResponse(uint64 requestID)
+{
+	(void)requestID;
+}
+
 PyObject* ClientApp::__py_recordPerformanceLatency(PyObject* self, PyObject* args)
 {
 	unsigned long long startNs = 0;
@@ -252,6 +281,47 @@ PyObject* ClientApp::__py_recordPerformanceLatency(PyObject* self, PyObject* arg
 		return NULL;
 	}
 	ClientApp::getSingleton().recordPythonPerformanceLatency(static_cast<uint64>(startNs), static_cast<uint64>(endNs));
+	S_Return;
+}
+
+PyObject* ClientApp::__py_recordPerformanceTransaction(PyObject* self, PyObject* args)
+{
+	unsigned long long requestID = 0;
+	unsigned long long clientStartedNs = 0;
+	unsigned long long baseReceivedNs = 0;
+	unsigned long long cellReceivedNs = 0;
+	unsigned long long baseReturnedNs = 0;
+	unsigned long long clientCompletedNs = 0;
+	if (!PyArg_ParseTuple(args, "KKKKKK", &requestID, &clientStartedNs, &baseReceivedNs,
+		&cellReceivedNs, &baseReturnedNs, &clientCompletedNs))
+	{
+		return NULL;
+	}
+	ClientApp::getSingleton().recordPythonPerformanceTransaction(
+		static_cast<uint64>(requestID),
+		static_cast<uint64>(clientStartedNs),
+		static_cast<uint64>(baseReceivedNs),
+		static_cast<uint64>(cellReceivedNs),
+		static_cast<uint64>(baseReturnedNs),
+		static_cast<uint64>(clientCompletedNs));
+	S_Return;
+}
+
+PyObject* ClientApp::__py_recordPerformanceProbeTimeout(PyObject* self, PyObject* args)
+{
+	unsigned long long requestID = 0;
+	if (!PyArg_ParseTuple(args, "K", &requestID))
+		return NULL;
+	ClientApp::getSingleton().recordPythonPerformanceProbeTimeout(static_cast<uint64>(requestID));
+	S_Return;
+}
+
+PyObject* ClientApp::__py_recordPerformanceProbeInvalidResponse(PyObject* self, PyObject* args)
+{
+	unsigned long long requestID = 0;
+	if (!PyArg_ParseTuple(args, "K", &requestID))
+		return NULL;
+	ClientApp::getSingleton().recordPythonPerformanceProbeInvalidResponse(static_cast<uint64>(requestID));
 	S_Return;
 }
 

@@ -175,6 +175,15 @@ def evaluate_quality(
         ]
         if not matches:
             blockers.append(f"readiness metric was not sampled: {metric}")
+        elif isinstance(expected_value, dict) and set(expected_value) == {"min"}:
+            minimum_expected = expected_value["min"]
+            if not isinstance(minimum_expected, (int, float)):
+                blockers.append(f"invalid readiness minimum: {metric} expected={minimum_expected!r}")
+            elif any(values["min"] < minimum_expected for values in matches):
+                minimum = min(values["min"] for values in matches)
+                blockers.append(
+                    f"readiness metric dropped: {metric} min={minimum}, expected>={minimum_expected}"
+                )
         elif any(values["min"] != expected_value for values in matches):
             minimum = min(values["min"] for values in matches)
             blockers.append(f"readiness metric dropped: {metric} min={minimum}, expected={expected_value}")

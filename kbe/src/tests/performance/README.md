@@ -122,6 +122,24 @@ Scenario readiness rules can compare a Watcher metric with `$bots`; the measurem
 only after all rules match and `warmup_seconds` has elapsed.
 场景就绪规则可将 Watcher 指标与 `$bots` 比较；全部满足并完成 `warmup_seconds` 预热后才开始计时。
 
+A readiness rule may also require a numeric lower bound with `{"min": 1}`. The
+`python_latency.json` scenario uses this form for `pythonLatency/control/successes`, so an enabled
+probe with no completed transaction cannot produce an empty PASS.
+就绪规则也可使用 `{"min": 1}` 声明数值下限。`python_latency.json` 用它约束
+`pythonLatency/control/successes`，因此探针虽启用但没有完成事务时不能空载通过。
+
+`python_latency.json` is an opt-in end-to-end Python probe. It samples one in every 50 Bots every
+two seconds (about 20 transactions/second at 2,000 Bots), permits one in-flight request per sampled
+Bot, and publishes round-trip plus Client-to-Base, Base-to-Cell, Cell-to-Base, and Base-to-Client
+P50/P95/P99 distributions. The five native windows allocate about 240 KiB only when
+`KBE_PERF_PYTHON_CHAIN=1`; with the flag absent, no probe callback, RPC, or window allocation occurs.
+P99.9 remains explicitly unavailable unless the retained window has enough samples.
+`python_latency.json` 是按需启用的 Python 全链路探针。它每两秒抽取 1/50 Bots（2,000 Bots 时约
+20 transaction/s），每个被抽样 Bot 最多保留一个在途请求，并发布 RoundTrip、Client-to-Base、
+Base-to-Cell、Cell-to-Base、Base-to-Client 的 P50/P95/P99。五个原生窗口仅在
+`KBE_PERF_PYTHON_CHAIN=1` 时分配约 240 KiB；未设置开关时不创建探针定时器、不发送 RPC、也不分配窗口。
+保留窗口样本不足时，P99.9 通过 `p999Available=0` 明确标记为不可用。
+
 The built-in scenarios use the versioned `network-baseline` fixture. It creates one empty Space and
 places each Avatar outside every other Avatar's AOI, so startup cost, NPCs, database character writes,
 and gameplay timers do not contaminate the engine connection baseline. Asset-specific load belongs in

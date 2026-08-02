@@ -13,11 +13,28 @@
 		<pythonPerformanceProbe>
 			<Exposed/>
 			<Arg>UINT64</Arg>
+			<Arg>UINT64</Arg>
 		</pythonPerformanceProbe>
+		<pythonPerformanceCellResponse>
+			<Arg>UINT64</Arg>
+			<Arg>UINT64</Arg>
+			<Arg>UINT64</Arg>
+			<Arg>UINT64</Arg>
+		</pythonPerformanceCellResponse>
     </BaseMethods>
-    <CellMethods />
+    <CellMethods>
+		<pythonPerformanceCellProbe>
+			<Arg>UINT64</Arg>
+			<Arg>UINT64</Arg>
+			<Arg>UINT64</Arg>
+		</pythonPerformanceCellProbe>
+	</CellMethods>
     <ClientMethods>
 		<pythonPerformanceProbeResponse>
+			<Arg>UINT64</Arg>
+			<Arg>UINT64</Arg>
+			<Arg>UINT64</Arg>
+			<Arg>UINT64</Arg>
 			<Arg>UINT64</Arg>
 		</pythonPerformanceProbeResponse>
 	</ClientMethods>

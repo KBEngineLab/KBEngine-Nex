@@ -46,6 +46,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "helper/profile_handler.h"
 #include "pyscript/pyprofile_handler.h"
 #include <algorithm>
+#include <cstdlib>
+#include <cstring>
 
 #include "../../../server/baseapp/baseapp_interface.h"
 #include "../../../server/loginapp/loginapp_interface.h"
@@ -74,8 +76,22 @@ totalNetworkErrors_(0),
 totalRemovedClients_(0),
 lastBotsTickMicros_(0),
 maxBotsTickMicros_(0),
-pythonPerformanceLatencyWindowPrimed_(false)
+pythonLatencyEnabled_(false),
+pythonLatencySuccesses_(0),
+pythonLatencyTimeouts_(0),
+pythonLatencyInvalidTimestamps_(0),
+pythonLatencyInvalidResponses_(0)
 {
+	const char* pythonChain = std::getenv("KBE_PERF_PYTHON_CHAIN");
+	const char* pythonRtt = std::getenv("KBE_PERF_PYTHON_RTT");
+	pythonLatencyEnabled_ = (pythonChain != NULL && std::strcmp(pythonChain, "1") == 0) ||
+		(pythonRtt != NULL && std::strcmp(pythonRtt, "1") == 0);
+	for (size_t index = 0; index < PYTHON_LATENCY_OPERATION_COUNT; ++index)
+	{
+		pythonLatencyWindows_[index] = pythonLatencyEnabled_ ? new ProfileLatencyWindow(
+			PYTHON_LATENCY_WINDOW_CAPACITY, 10ULL * 1000ULL * 1000ULL * 1000ULL) : NULL;
+	}
+
 	// Bots 同时承载多个客户端，组件 owner 查找必须先通过 componentID 路由到对应的 ClientObject。
 	// Bots hosts multiple clients, so component owner lookup must route through componentID to the matching ClientObject first.
 	EntityCall::setGetEntityFunc(std::bind(&Bots::tryGetEntity, this,
@@ -93,6 +109,9 @@ pythonPerformanceLatencyWindowPrimed_(false)
 //-------------------------------------------------------------------------------------
 Bots::~Bots()
 {
+	for (size_t index = 0; index < PYTHON_LATENCY_OPERATION_COUNT; ++index)
+		SAFE_RELEASE(pythonLatencyWindows_[index]);
+
 	SAFE_RELEASE(pActiveReportHandler_);
 	Components::getSingleton().finalise();
 	SAFE_RELEASE(pEventPoller_);
@@ -171,6 +190,30 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/pythonLatencyP99Micros", this, &Bots::pythonPerformanceLatencyP99Micros);
 	WATCH_OBJECT("bots/performance/pythonLatencyWindowCount", this, &Bots::pythonPerformanceLatencyWindowCount);
 	WATCH_OBJECT("bots/performance/pythonLatencyWindowP99Micros", this, &Bots::pythonPerformanceLatencyWindowP99Micros);
+	WATCH_OBJECT("bots/pythonLatency/control/enabled", this, &Bots::pythonLatencyEnabled);
+	WATCH_OBJECT("bots/pythonLatency/control/successes", this, &Bots::pythonLatencySuccesses);
+	WATCH_OBJECT("bots/pythonLatency/control/timeouts", this, &Bots::pythonLatencyTimeouts);
+	WATCH_OBJECT("bots/pythonLatency/control/invalidTimestamps", this, &Bots::pythonLatencyInvalidTimestamps);
+	WATCH_OBJECT("bots/pythonLatency/control/invalidResponses", this, &Bots::pythonLatencyInvalidResponses);
+	WATCH_OBJECT("bots/pythonLatency/control/successRatePercent", this, &Bots::pythonLatencySuccessRatePercent);
+	WATCH_OBJECT("bots/pythonLatency/control/allocatedBytes", this, &Bots::pythonLatencyAllocatedBytes);
+
+#define KBE_WATCH_PYTHON_LATENCY(PATH, SUFFIX) \
+	WATCH_OBJECT("bots/pythonLatency/" PATH "/count", this, &Bots::pythonLatency##SUFFIX##Count); \
+	WATCH_OBJECT("bots/pythonLatency/" PATH "/meanMicros", this, &Bots::pythonLatency##SUFFIX##MeanMicros); \
+	WATCH_OBJECT("bots/pythonLatency/" PATH "/p50Micros", this, &Bots::pythonLatency##SUFFIX##P50Micros); \
+	WATCH_OBJECT("bots/pythonLatency/" PATH "/p95Micros", this, &Bots::pythonLatency##SUFFIX##P95Micros); \
+	WATCH_OBJECT("bots/pythonLatency/" PATH "/p99Micros", this, &Bots::pythonLatency##SUFFIX##P99Micros); \
+	WATCH_OBJECT("bots/pythonLatency/" PATH "/p999Micros", this, &Bots::pythonLatency##SUFFIX##P999Micros); \
+	WATCH_OBJECT("bots/pythonLatency/" PATH "/maxMicros", this, &Bots::pythonLatency##SUFFIX##MaxMicros); \
+	WATCH_OBJECT("bots/pythonLatency/" PATH "/p999Available", this, &Bots::pythonLatency##SUFFIX##P999Available);
+
+	KBE_WATCH_PYTHON_LATENCY("roundTrip", RoundTrip)
+	KBE_WATCH_PYTHON_LATENCY("clientToBase", ClientToBase)
+	KBE_WATCH_PYTHON_LATENCY("baseToCell", BaseToCell)
+	KBE_WATCH_PYTHON_LATENCY("cellToBase", CellToBase)
+	KBE_WATCH_PYTHON_LATENCY("baseToClient", BaseToClient)
+#undef KBE_WATCH_PYTHON_LATENCY
 	return WatchPool::initWatchPools();
 }
 
@@ -501,58 +544,136 @@ uint64 Bots::numClientEntities() const
 
 void Bots::recordPythonPerformanceLatency(uint64 startNs, uint64 endNs)
 {
-	if (endNs < startNs)
+	if (!pythonLatencyEnabled_ || endNs < startNs)
 		return;
-	if (pythonPerformanceLatenciesMicros_.size() >= 100000)
-		pythonPerformanceLatenciesMicros_.erase(pythonPerformanceLatenciesMicros_.begin());
-	const uint64 latencyMicros = (endNs - startNs) / 1000;
-	pythonPerformanceLatenciesMicros_.push_back(latencyMicros);
-	if (pythonPerformanceLatencyWindowMicros_.size() < 100000)
-		pythonPerformanceLatencyWindowMicros_.push_back(latencyMicros);
+	pythonLatencyWindows_[PYTHON_LATENCY_ROUND_TRIP]->record(
+		endNs - startNs, monotonicNanoseconds());
+	++pythonLatencySuccesses_;
+}
+
+void Bots::recordPythonPerformanceTransaction(
+	uint64 requestID,
+	uint64 clientStartedNs,
+	uint64 baseReceivedNs,
+	uint64 cellReceivedNs,
+	uint64 baseReturnedNs,
+	uint64 clientCompletedNs)
+{
+	if (!pythonLatencyEnabled_)
+		return;
+	if (requestID == 0 || clientStartedNs > baseReceivedNs || baseReceivedNs > cellReceivedNs ||
+		cellReceivedNs > baseReturnedNs || baseReturnedNs > clientCompletedNs)
+	{
+		++pythonLatencyInvalidTimestamps_;
+		return;
+	}
+
+	// Python perf_counter_ns() supplies comparable segment durations, while the window age must use
+	// the engine clock so expiry never depends on platform-specific clock origins.
+	// Python perf_counter_ns() 用于计算可比的分段时长；窗口年龄统一使用引擎时钟，避免依赖平台时钟原点。
+	const uint64 completedAtNs = monotonicNanoseconds();
+	pythonLatencyWindows_[PYTHON_LATENCY_ROUND_TRIP]->record(
+		clientCompletedNs - clientStartedNs, completedAtNs);
+	pythonLatencyWindows_[PYTHON_LATENCY_CLIENT_TO_BASE]->record(
+		baseReceivedNs - clientStartedNs, completedAtNs);
+	pythonLatencyWindows_[PYTHON_LATENCY_BASE_TO_CELL]->record(
+		cellReceivedNs - baseReceivedNs, completedAtNs);
+	pythonLatencyWindows_[PYTHON_LATENCY_CELL_TO_BASE]->record(
+		baseReturnedNs - cellReceivedNs, completedAtNs);
+	pythonLatencyWindows_[PYTHON_LATENCY_BASE_TO_CLIENT]->record(
+		clientCompletedNs - baseReturnedNs, completedAtNs);
+	++pythonLatencySuccesses_;
+}
+
+void Bots::recordPythonPerformanceProbeTimeout(uint64 requestID)
+{
+	(void)requestID;
+	if (pythonLatencyEnabled_)
+		++pythonLatencyTimeouts_;
+}
+
+void Bots::recordPythonPerformanceProbeInvalidResponse(uint64 requestID)
+{
+	(void)requestID;
+	if (pythonLatencyEnabled_)
+		++pythonLatencyInvalidResponses_;
 }
 
 uint64 Bots::pythonPerformanceLatencyCount() const
 {
-	return static_cast<uint64>(pythonPerformanceLatenciesMicros_.size());
+	return pythonLatencySuccesses_;
 }
 
 uint64 Bots::pythonPerformanceLatencyP99Micros() const
 {
-	if (pythonPerformanceLatenciesMicros_.empty())
-		return 0;
-	std::vector<uint64> ordered(pythonPerformanceLatenciesMicros_);
-	std::sort(ordered.begin(), ordered.end());
-	return ordered[(ordered.size() - 1) * 99 / 100];
+	return static_cast<uint64>(pythonLatencyRoundTripP99Micros());
 }
 
 uint64 Bots::pythonPerformanceLatencyWindowCount() const
 {
-	if (!pythonPerformanceLatencyWindowPrimed_)
-	{
-		pythonPerformanceLatencyWindowMicros_.clear();
-		pythonPerformanceLatencyWindowPrimed_ = true;
-		return 0;
-	}
-	return static_cast<uint64>(pythonPerformanceLatencyWindowMicros_.size());
+	return pythonLatencyRoundTripCount();
 }
 
 uint64 Bots::pythonPerformanceLatencyWindowP99Micros() const
 {
-	if (!pythonPerformanceLatencyWindowPrimed_)
-	{
-		pythonPerformanceLatencyWindowMicros_.clear();
-		pythonPerformanceLatencyWindowPrimed_ = true;
-		return 0;
-	}
-	if (pythonPerformanceLatencyWindowMicros_.empty())
-		return 0;
-	std::vector<uint64> ordered(pythonPerformanceLatencyWindowMicros_);
-	std::sort(ordered.begin(), ordered.end());
-	const uint64 p99 = ordered[(ordered.size() - 1) * 99 / 100];
-	// Watcher queries register count before percentile; clearing here starts the next sampling window.
-	pythonPerformanceLatencyWindowMicros_.clear();
-	return p99;
+	return static_cast<uint64>(pythonLatencyRoundTripP99Micros());
 }
+
+uint64 Bots::monotonicNanoseconds()
+{
+	return static_cast<uint64>(static_cast<long double>(timestamp()) * 1000000000.0L /
+		static_cast<long double>(stampsPerSecond()));
+}
+
+const ProfileLatencyWindow::Snapshot& Bots::pythonLatencySnapshot(PythonLatencyOperation operation) const
+{
+	static const ProfileLatencyWindow::Snapshot empty;
+	ProfileLatencyWindow* window = pythonLatencyWindows_[operation];
+	return window != NULL ? window->snapshot(monotonicNanoseconds()) : empty;
+}
+
+uint64 Bots::pythonLatencyAllocatedBytes() const
+{
+	uint64 bytes = 0;
+	for (size_t index = 0; index < PYTHON_LATENCY_OPERATION_COUNT; ++index)
+	{
+		if (pythonLatencyWindows_[index] != NULL)
+			bytes += pythonLatencyWindows_[index]->allocatedBytes();
+	}
+	return bytes;
+}
+
+double Bots::pythonLatencySuccessRatePercent() const
+{
+	const uint64 completed = pythonLatencySuccesses_ + pythonLatencyTimeouts_;
+	return completed > 0 ? static_cast<double>(pythonLatencySuccesses_) * 100.0 /
+		static_cast<double>(completed) : 0.0;
+}
+
+#define KBE_DEFINE_PYTHON_LATENCY_GETTERS(SUFFIX, OPERATION) \
+	uint64 Bots::pythonLatency##SUFFIX##Count() const \
+	{ return pythonLatencySnapshot(OPERATION).count; } \
+	double Bots::pythonLatency##SUFFIX##MeanMicros() const \
+	{ return pythonLatencySnapshot(OPERATION).meanStamps / 1000.0; } \
+	double Bots::pythonLatency##SUFFIX##P50Micros() const \
+	{ return static_cast<double>(pythonLatencySnapshot(OPERATION).p50Stamps) / 1000.0; } \
+	double Bots::pythonLatency##SUFFIX##P95Micros() const \
+	{ return static_cast<double>(pythonLatencySnapshot(OPERATION).p95Stamps) / 1000.0; } \
+	double Bots::pythonLatency##SUFFIX##P99Micros() const \
+	{ return static_cast<double>(pythonLatencySnapshot(OPERATION).p99Stamps) / 1000.0; } \
+	double Bots::pythonLatency##SUFFIX##P999Micros() const \
+	{ return static_cast<double>(pythonLatencySnapshot(OPERATION).p999Stamps) / 1000.0; } \
+	double Bots::pythonLatency##SUFFIX##MaxMicros() const \
+	{ return static_cast<double>(pythonLatencySnapshot(OPERATION).maxStamps) / 1000.0; } \
+	bool Bots::pythonLatency##SUFFIX##P999Available() const \
+	{ return pythonLatencySnapshot(OPERATION).p999Available; }
+
+KBE_DEFINE_PYTHON_LATENCY_GETTERS(RoundTrip, PYTHON_LATENCY_ROUND_TRIP)
+KBE_DEFINE_PYTHON_LATENCY_GETTERS(ClientToBase, PYTHON_LATENCY_CLIENT_TO_BASE)
+KBE_DEFINE_PYTHON_LATENCY_GETTERS(BaseToCell, PYTHON_LATENCY_BASE_TO_CELL)
+KBE_DEFINE_PYTHON_LATENCY_GETTERS(CellToBase, PYTHON_LATENCY_CELL_TO_BASE)
+KBE_DEFINE_PYTHON_LATENCY_GETTERS(BaseToClient, PYTHON_LATENCY_BASE_TO_CLIENT)
+#undef KBE_DEFINE_PYTHON_LATENCY_GETTERS
 
 //-------------------------------------------------------------------------------------
 uint64 Bots::kcpFixedAllocatedBytes() const

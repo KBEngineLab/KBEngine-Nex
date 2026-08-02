@@ -29,6 +29,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "pyscript/script.h"
 #include "network/endpoint.h"
 #include "helper/debug_helper.h"
+#include "helper/profile_latency.h"
 #include "helper/script_loglevel.h"
 #include "xml/xml.h"	
 #include "common/singleton.h"
@@ -132,10 +133,43 @@ public:
 	uint64 kcpFixedAllocatedBytes() const;
 	uint64 kcpDynamicAllocatedBytes() const;
 	void recordPythonPerformanceLatency(uint64 startNs, uint64 endNs) override;
+	void recordPythonPerformanceTransaction(
+		uint64 requestID,
+		uint64 clientStartedNs,
+		uint64 baseReceivedNs,
+		uint64 cellReceivedNs,
+		uint64 baseReturnedNs,
+		uint64 clientCompletedNs) override;
+	void recordPythonPerformanceProbeTimeout(uint64 requestID) override;
+	void recordPythonPerformanceProbeInvalidResponse(uint64 requestID) override;
 	uint64 pythonPerformanceLatencyCount() const;
 	uint64 pythonPerformanceLatencyP99Micros() const;
 	uint64 pythonPerformanceLatencyWindowCount() const;
 	uint64 pythonPerformanceLatencyWindowP99Micros() const;
+	bool pythonLatencyEnabled() const { return pythonLatencyEnabled_; }
+	uint64 pythonLatencySuccesses() const { return pythonLatencySuccesses_; }
+	uint64 pythonLatencyTimeouts() const { return pythonLatencyTimeouts_; }
+	uint64 pythonLatencyInvalidTimestamps() const { return pythonLatencyInvalidTimestamps_; }
+	uint64 pythonLatencyInvalidResponses() const { return pythonLatencyInvalidResponses_; }
+	uint64 pythonLatencyAllocatedBytes() const;
+	double pythonLatencySuccessRatePercent() const;
+
+#define KBE_DECLARE_PYTHON_LATENCY_GETTERS(SUFFIX) \
+	uint64 pythonLatency##SUFFIX##Count() const; \
+	double pythonLatency##SUFFIX##MeanMicros() const; \
+	double pythonLatency##SUFFIX##P50Micros() const; \
+	double pythonLatency##SUFFIX##P95Micros() const; \
+	double pythonLatency##SUFFIX##P99Micros() const; \
+	double pythonLatency##SUFFIX##P999Micros() const; \
+	double pythonLatency##SUFFIX##MaxMicros() const; \
+	bool pythonLatency##SUFFIX##P999Available() const;
+
+	KBE_DECLARE_PYTHON_LATENCY_GETTERS(RoundTrip)
+	KBE_DECLARE_PYTHON_LATENCY_GETTERS(ClientToBase)
+	KBE_DECLARE_PYTHON_LATENCY_GETTERS(BaseToCell)
+	KBE_DECLARE_PYTHON_LATENCY_GETTERS(CellToBase)
+	KBE_DECLARE_PYTHON_LATENCY_GETTERS(BaseToClient)
+#undef KBE_DECLARE_PYTHON_LATENCY_GETTERS
 	uint32 numClients() const { return static_cast<uint32>(clients_.size()); }
 	uint64 totalKcpHandshakeSuccesses() const { return totalKcpHandshakeSuccesses_; }
 	uint64 totalTcpConnections() const { return totalTcpConnections_; }
@@ -436,9 +470,29 @@ protected:
 	uint64											totalRemovedClients_;
 	uint64											lastBotsTickMicros_;
 	uint64											maxBotsTickMicros_;
-	std::vector<uint64> pythonPerformanceLatenciesMicros_;
-	mutable std::vector<uint64> pythonPerformanceLatencyWindowMicros_;
-	mutable bool pythonPerformanceLatencyWindowPrimed_;
+
+	enum PythonLatencyOperation
+	{
+		PYTHON_LATENCY_ROUND_TRIP = 0,
+		PYTHON_LATENCY_CLIENT_TO_BASE,
+		PYTHON_LATENCY_BASE_TO_CELL,
+		PYTHON_LATENCY_CELL_TO_BASE,
+		PYTHON_LATENCY_BASE_TO_CLIENT,
+		PYTHON_LATENCY_OPERATION_COUNT
+	};
+	// 探针默认仅产生约 20 TPS；2,048 槽可覆盖十倍突发，同时避免为稀疏采样保留通用 10,000 槽窗口。
+	// The probe defaults to about 20 TPS; 2,048 slots cover a 10x burst without retaining generic 10,000-slot windows.
+	static const size_t PYTHON_LATENCY_WINDOW_CAPACITY = 2048;
+
+	const ProfileLatencyWindow::Snapshot& pythonLatencySnapshot(PythonLatencyOperation operation) const;
+	static uint64 monotonicNanoseconds();
+
+	bool pythonLatencyEnabled_;
+	ProfileLatencyWindow* pythonLatencyWindows_[PYTHON_LATENCY_OPERATION_COUNT];
+	uint64 pythonLatencySuccesses_;
+	uint64 pythonLatencyTimeouts_;
+	uint64 pythonLatencyInvalidTimestamps_;
+	uint64 pythonLatencyInvalidResponses_;
 };
 
 }

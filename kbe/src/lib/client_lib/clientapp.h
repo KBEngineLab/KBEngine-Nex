@@ -91,6 +91,15 @@ public:
 	virtual bool installPyModules();
 	virtual void onInstallPyModules(){};
 	virtual void recordPythonPerformanceLatency(uint64 startNs, uint64 endNs);
+	virtual void recordPythonPerformanceTransaction(
+		uint64 requestID,
+		uint64 clientStartedNs,
+		uint64 baseReceivedNs,
+		uint64 cellReceivedNs,
+		uint64 baseReturnedNs,
+		uint64 clientCompletedNs);
+	virtual void recordPythonPerformanceProbeTimeout(uint64 requestID);
+	virtual void recordPythonPerformanceProbeInvalidResponse(uint64 requestID);
 	virtual bool uninstallPyModules();
 	virtual bool uninstallPyScript();
 	virtual bool installEntityDef();
@@ -133,6 +142,9 @@ public:
 	static PyObject* __py_getPlayer(PyObject* self, PyObject* args);
 	static PyObject* __py_fireEvent(PyObject* self, PyObject* args);
 	static PyObject* __py_recordPerformanceLatency(PyObject* self, PyObject* args);
+	static PyObject* __py_recordPerformanceTransaction(PyObject* self, PyObject* args);
+	static PyObject* __py_recordPerformanceProbeTimeout(PyObject* self, PyObject* args);
+	static PyObject* __py_recordPerformanceProbeInvalidResponse(PyObject* self, PyObject* args);
 
 	virtual void onServerClosed();
 

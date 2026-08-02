@@ -80,7 +80,7 @@ def main() -> int:
         args.thresholds = args.thresholds.resolve()
     if args.cluster_binary_root:
         args.cluster_binary_root = args.cluster_binary_root.resolve()
-    scenario = json.loads(args.scenario.read_text(encoding="utf-8"))
+    scenario = load_scenario(args.scenario)
     fixture_root = resolve_fixture_root(str(scenario["fixture"])) if scenario.get("fixture") else None
     name = str(scenario["name"])
     duration = float(args.duration if args.duration is not None else scenario.get("duration_seconds", 30))
@@ -116,6 +116,7 @@ def main() -> int:
             int(scenario["external_receive_bytes"]) if "external_receive_bytes" in scenario else None,
         )
         environment = build_environment(_repository_root(), args.assets_root, output, fixture_root)
+        environment.update(scenario_environment(scenario))
         scenario_metadata = dict(scenario)
         scenario_metadata["effective_bots_tick_time"] = bots_tick_time
         scenario_metadata["effective_bots_tick_count"] = bots_tick_count
@@ -384,6 +385,58 @@ def merge_watcher_target_specs(scenario_specs: list[object], cli_specs: list[str
     return merged
 
 
+def load_scenario(path: Path, loading: set[Path] | None = None) -> dict[str, object]:
+    """Load one versioned scenario with optional same-directory inheritance.
+    加载版本化场景，并支持同目录内的可选继承。
+    """
+    resolved = path.resolve()
+    active = set() if loading is None else set(loading)
+    if resolved in active:
+        raise ValueError(f"cyclic performance scenario inheritance: {resolved}")
+    active.add(resolved)
+    scenario = json.loads(resolved.read_text(encoding="utf-8"))
+    parent_name = scenario.pop("extends", None)
+    additive_targets = list(scenario.pop("watcher_targets_add", []))
+    if parent_name is None:
+        if additive_targets:
+            raise ValueError("watcher_targets_add requires an extended scenario")
+        return scenario
+    if Path(str(parent_name)).name != str(parent_name):
+        raise ValueError(f"scenario extends must name a sibling file: {parent_name}")
+    parent_path = (resolved.parent / str(parent_name)).resolve()
+    if parent_path.parent != resolved.parent:
+        raise ValueError(f"scenario extends escaped its directory: {parent_name}")
+    merged = load_scenario(parent_path, active)
+    for key, value in scenario.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = {**dict(merged[key]), **value}
+        else:
+            merged[key] = value
+    merged["watcher_targets"] = merge_watcher_target_specs(
+        list(merged.get("watcher_targets", [])),
+        [str(value) for value in additive_targets],
+    )
+    return merged
+
+
+def scenario_environment(scenario: dict[str, object]) -> dict[str, str]:
+    """Validate the narrow environment surface allowed to a workload fixture.
+    校验性能 fixture 可使用的受限环境变量表面。
+    """
+    configured = scenario.get("workload_environment", {})
+    if not isinstance(configured, dict):
+        raise ValueError("workload_environment must be an object")
+    environment: dict[str, str] = {}
+    for key, value in configured.items():
+        name = str(key)
+        if not name.startswith("KBE_PERF_"):
+            raise ValueError(f"unsupported workload environment key: {name}")
+        if not isinstance(value, (str, int, float)):
+            raise ValueError(f"workload environment value must be scalar: {name}")
+        environment[name] = str(value)
+    return environment
+
+
 def _repository_root() -> Path:
     return Path(__file__).resolve().parents[4]
 
@@ -438,7 +491,10 @@ def record_watcher_samples(
         "p999Micros",
         "maxMicros",
     }
-    latency_count = values.get("count") if target.path.endswith("/latency") else None
+    has_latency_distribution = "count" in values and any(
+        metric in values for metric in latency_stat_metrics
+    )
+    latency_count = values.get("count") if has_latency_distribution else None
     for metric, value in values.items():
         if not isinstance(value, (int, float)):
             continue
@@ -579,10 +635,9 @@ def wait_for_workload_ready(
                 )
             last_observed = observed
             for metric, expected in readiness.items():
-                expected_value = configured_bots if expected == "$bots" else expected
-                if observed.get(metric) != expected_value:
+                if not readiness_value_matches(observed.get(metric), expected, configured_bots):
                     raise RuntimeError(
-                        f"readiness {metric}={observed.get(metric)!r}, expected={expected_value!r}"
+                        f"readiness {metric}={observed.get(metric)!r}, expected={expected!r}"
                     )
             return resolved_targets
         except (LookupError, OSError, RuntimeError, TimeoutError, ValueError) as exc:
@@ -592,6 +647,23 @@ def wait_for_workload_ready(
         f"workload readiness timed out after {timeout_seconds:.1f}s: {last_error}",
         last_observed,
     )
+
+
+def readiness_value_matches(observed: object, expected: object, configured_bots: int) -> bool:
+    """Match exact readiness values or an explicit numeric minimum.
+    匹配精确就绪值，或显式声明的数值下限。
+    """
+    expected_value = configured_bots if expected == "$bots" else expected
+    if isinstance(expected_value, dict):
+        if set(expected_value) != {"min"}:
+            raise ValueError(f"unsupported readiness predicate: {expected_value!r}")
+        minimum = expected_value["min"]
+        return (
+            isinstance(observed, (int, float))
+            and isinstance(minimum, (int, float))
+            and observed >= minimum
+        )
+    return observed == expected_value
 
 
 def wait_for_warmup(process: subprocess.Popen[bytes] | None, seconds: float) -> None:
