@@ -9,6 +9,45 @@ Run a short local sample:
 python -B -m performance.run --scenario performance/scenarios/smoke.json --duration 30 --command "<workload command>"
 ```
 
+Run the formal gameplay workload with a generated local topology:
+使用自动生成的本地拓扑运行正式业务压测：
+
+```powershell
+python -B -m performance.run `
+  --scenario performance/scenarios/gameplay_10000.json `
+  --assets-root D:\KBELAB\KBEProject\kbengine_stresstest\mmorpg\server_assets `
+  --server-binary-dir D:\KBELAB\kbengine\kbengine1x\kbe\src\out\cmake\windows-ninja\bin\Release `
+  --build-root D:\KBELAB\kbengine\kbengine1x\kbe\src\out\build\windows-ninja-multi `
+  --tools-root D:\KBELAB\kbengine\kbengine1x\kbe\tools\server `
+  --start-cluster `
+  --baseapp-count 3 `
+  --cellapp-count 6 `
+  --bots 10000 `
+  --bots-processes 4 `
+  --bots-batch-size 8 `
+  --bots-batch-interval 0.08 `
+  --server-ready-timeout 300 `
+  --workload-ready-timeout 300
+```
+
+`--server-binary-dir` generates the singleton components plus the requested BaseApp/CellApp
+processes and supplies the Bots executable automatically. `--bots-batch-size` is the aggregate
+batch across all Bots processes and must divide evenly; the example creates about 100 Bots/second.
+Server startup waits for BaseAppMgr and CellAppMgr `root/readiness` values derived from
+`onReadyForLogin`, including exact expected process counts. It does not depend on game Space logs.
+`--server-binary-dir` 会自动生成单例组件和指定数量的 BaseApp/CellApp，并自动选择 Bots 可执行文件。
+`--bots-batch-size` 表示全部 Bots 进程合计的单批数量且必须可整除；示例约为每秒 100 Bots。
+服务端启动通过 BaseAppMgr/CellAppMgr 的 `root/readiness` 等待底层 `onReadyForLogin` 聚合结果，
+同时校验精确进程数，不再依赖业务 Space 日志。
+
+Bots write their own rotating log by default and do not connect to Logger. Add `--bots-dev` to the
+runner, or `--dev` when launching `bots.exe` directly, only when centralized IDE/PyCharm log display
+is required. Development mode intentionally adds serialization, network, Logger CPU, and centralized
+disk IO, so it must remain disabled for publishable performance runs.
+Bots 默认只写自身滚动日志且不连接 Logger。只有需要 IDE/PyCharm 集中日志显示时，才向运行器添加
+`--bots-dev`，或直接启动 `bots.exe` 时添加 `--dev`。开发模式会额外产生序列化、网络、Logger CPU
+和集中磁盘 IO，因此发布正式性能数据时必须关闭。
+
 The runner writes `raw.jsonl`, `summary.json`, and `report.md` below the repository-root
 `kbe/src/out/performance-runs/`, regardless of the caller's current directory. Pass
 `--output-root` to override it explicitly.

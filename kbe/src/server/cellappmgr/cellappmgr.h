@@ -68,6 +68,7 @@ public:
 	bool initializeBegin();
 	bool inInitialize();
 	bool initializeEnd();
+	bool initializeWatcher();
 	void finalise();
 
 	/** 找出一个最空闲的cellapp */
@@ -108,6 +109,10 @@ public:
 	void removeCellapp(COMPONENT_ID cid);
 	Cellapp& getCellapp(COMPONENT_ID cid);
 	std::map< COMPONENT_ID, Cellapp >& cellapps();
+	uint32 readyForLoginApps();
+	uint32 totalReadyForLoginApps();
+	float minReadyForLoginProgress();
+	bool readyForLogin();
 
 	uint32 numLoadBalancingApp();
 

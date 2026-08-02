@@ -1106,10 +1106,10 @@ void Components::onChannelDeregister(Network::Channel * pChannel, bool isShuting
 }
 
 //-------------------------------------------------------------------------------------
-bool Components::findLogger()
+bool Components::findLogger(bool allowBots)
 {
 	if (g_componentType == LOGGER_TYPE || g_componentType == MACHINE_TYPE || g_componentType == TOOL_TYPE ||
-		g_componentType == CONSOLE_TYPE || g_componentType == CLIENT_TYPE || g_componentType == BOTS_TYPE || 
+		g_componentType == CONSOLE_TYPE || g_componentType == CLIENT_TYPE || (g_componentType == BOTS_TYPE && !allowBots) ||
 		g_componentType == WATCHER_TYPE || componentType_ == INTERFACES_TYPE)
 	{
 		DebugHelper::getSingleton().onNoLogger();
@@ -1218,6 +1218,20 @@ RESTART_RECV:
 					}
 					else
 					{
+						// Bots 只在显式开发模式下连接 Logger。普通压测保持本地日志，
+						// 避免集中日志的网络、序列化和磁盘 IO 进入负载模型。
+						// Bots connect to Logger only in explicit development mode. Normal
+						// load tests keep logs local so forwarding is not part of the workload.
+						if (g_componentType == BOTS_TYPE && allowBots)
+						{
+							Components::ComponentInfos* pLogger = findComponent(LOGGER_TYPE, getUserUID(), 0);
+							if (pLogger != NULL)
+							{
+								DebugHelper::getSingleton().registerLogger(
+									LoggerInterface::writeLog.msgID, pLogger->pIntAddr.get());
+							}
+						}
+
 						//findComponentTypes_[0] = -1;
 						for(size_t ic=1; ic<sizeof(findComponentTypes_) - 1; ++ic)
 						{

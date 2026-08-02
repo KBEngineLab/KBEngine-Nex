@@ -52,6 +52,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 	
 namespace KBEngine{
 
+extern bool g_botsDevMode;
+
 class ClientObject;
 class PyBots;
 class TelnetServer;

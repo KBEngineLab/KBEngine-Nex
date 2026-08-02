@@ -233,7 +233,7 @@ public:
 	void extraData3(uint64 v){ extraData3_ = v; }
 	void extraData4(uint64 v){ extraData4_ = v; }
 
-	bool findLogger();
+	bool findLogger(bool allowBots = false);
 	
 	void broadcastSelf();
 

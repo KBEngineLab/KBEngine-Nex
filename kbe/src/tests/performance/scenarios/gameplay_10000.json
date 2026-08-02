@@ -13,16 +13,10 @@
   "reliable_udp_tick_interval_ms": 10,
   "reliable_udp_min_rto_ms": 50,
   "runtime_log_level": "warn",
-  "server_runtime_log_level": "info",
+  "server_runtime_log_level": "warn",
   "warmup_seconds": 30,
   "external_receive_messages": 4096,
   "external_receive_bytes": 4194304,
-  "server_readiness": {
-    "pattern": "EntityApp::createEntity: new Space(?:Center)? ",
-    "min_count": 52,
-    "log_glob": "logger*.log",
-    "timeout_seconds": 240
-  },
   "watcher_targets": [
     "BOTS_TYPE=@bots:root/bots/performance",
     "BASEAPP_TYPE=@baseapp:root",

@@ -31,6 +31,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "server/components.h"
 #include "helper/console_helper.h"
 
+#include <algorithm>
+
 #include "../../server/baseapp/baseapp_interface.h"
 #include "../../server/cellapp/cellapp_interface.h"
 #include "../../server/dbmgr/dbmgr_interface.h"
@@ -178,6 +180,62 @@ void Cellappmgr::onRegisterNewApp(Network::Channel* pChannel,
 std::map< COMPONENT_ID, Cellapp >& Cellappmgr::cellapps()
 {
 	return cellapps_;
+}
+
+//-------------------------------------------------------------------------------------
+uint32 Cellappmgr::readyForLoginApps()
+{
+	uint32 count = 0;
+	for (std::map< COMPONENT_ID, Cellapp >::const_iterator iter = cellapps_.begin(); iter != cellapps_.end(); ++iter)
+	{
+		if (!iter->second.isDestroyed() && iter->second.initProgress() >= 1.f)
+			++count;
+	}
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint32 Cellappmgr::totalReadyForLoginApps()
+{
+	uint32 count = 0;
+	for (std::map< COMPONENT_ID, Cellapp >::const_iterator iter = cellapps_.begin(); iter != cellapps_.end(); ++iter)
+	{
+		if (!iter->second.isDestroyed())
+			++count;
+	}
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+float Cellappmgr::minReadyForLoginProgress()
+{
+	float progress = 1.f;
+	bool found = false;
+	for (std::map< COMPONENT_ID, Cellapp >::const_iterator iter = cellapps_.begin(); iter != cellapps_.end(); ++iter)
+	{
+		if (iter->second.isDestroyed())
+			continue;
+		found = true;
+		progress = std::min(progress, iter->second.initProgress());
+	}
+	return found ? progress : 0.f;
+}
+
+//-------------------------------------------------------------------------------------
+bool Cellappmgr::readyForLogin()
+{
+	const uint32 total = totalReadyForLoginApps();
+	return total > 0 && readyForLoginApps() == total;
+}
+
+//-------------------------------------------------------------------------------------
+bool Cellappmgr::initializeWatcher()
+{
+	WATCH_OBJECT("readiness/readyForLogin", this, &Cellappmgr::readyForLogin);
+	WATCH_OBJECT("readiness/readyApps", this, &Cellappmgr::readyForLoginApps);
+	WATCH_OBJECT("readiness/totalApps", this, &Cellappmgr::totalReadyForLoginApps);
+	WATCH_OBJECT("readiness/minProgress", this, &Cellappmgr::minReadyForLoginProgress);
+	return ServerApp::initializeWatcher();
 }
 
 //-------------------------------------------------------------------------------------

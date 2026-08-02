@@ -54,6 +54,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{
 
+bool g_botsDevMode = false;
+
 //-------------------------------------------------------------------------------------
 Bots::Bots(Network::EventDispatcher& dispatcher, 
 			 Network::NetworkInterface& ninterface, 
@@ -120,6 +122,23 @@ Bots::~Bots()
 //-------------------------------------------------------------------------------------
 bool Bots::initialize()
 {
+	// --dev 是 IDE 集中日志的显式开关。默认不连接 Logger，确保正式
+	// Bots 与压测只承担本地日志 IO。
+	// --dev explicitly enables centralized IDE logging. Normal Bots and load
+	// tests do not connect to Logger and incur local logging cost only.
+	if (g_botsDevMode)
+	{
+		// ClientApp's generic bootstrap does not install a DebugHelper network
+		// interface because normal clients never forward logs. Development Bots do.
+		// ClientApp 通用启动流程不会设置 DebugHelper 网络接口，因为普通客户端
+		// 不转发日志；开发模式 Bots 必须在注册 Logger 前补齐该依赖。
+		DebugHelper::getSingleton().pNetworkInterface(&networkInterface());
+		if (!Components::getSingleton().findLogger(true))
+		{
+			WARNING_MSG("Bots::initialize: --dev requested but Logger is unavailable; continuing with local logs.\n");
+		}
+	}
+
 	// 广播自己的地址给网上上的所有kbemachine
 	this->dispatcher().addTask(&Components::getSingleton());
 	return ClientApp::initialize() && initializeWatcher();
@@ -128,6 +147,7 @@ bool Bots::initialize()
 //-------------------------------------------------------------------------------------
 bool Bots::initializeWatcher()
 {
+	WATCH_OBJECT("bots/devMode", g_botsDevMode);
 	WATCH_OBJECT("bots/clients/total", this, &Bots::numClients);
 	WATCH_OBJECT("bots/clients/kcp", this, &Bots::numKcpClients);
 	WATCH_OBJECT("bots/clients/tcp", this, &Bots::numTcpClients);

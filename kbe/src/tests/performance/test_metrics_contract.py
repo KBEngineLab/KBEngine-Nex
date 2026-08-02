@@ -22,15 +22,18 @@ from performance.run import (
     expand_bots_watcher_targets,
     expand_component_watcher_targets,
     load_scenario,
+    manager_readiness_satisfied,
     merge_watcher_target_specs,
     partition_workload_bots,
     record_watcher_samples,
     readiness_value_matches,
     select_readiness_targets,
     scenario_environment,
+    start_command,
     wait_for_workload_ready,
     start_workload_commands,
 )
+from performance.topology import build_local_cluster_components, partition_batch_size
 from performance.watcher_metrics import WatcherCollector, WatcherSchedule, parse_target, resolve_target
 
 
@@ -104,6 +107,31 @@ def assert_partial_workload_start_cleanup() -> None:
             assert str(exc) == "first workload missing"
     finally:
         globals_["start_command"] = original
+
+
+def assert_windows_command_line_preserves_quoted_executable() -> None:
+    globals_ = start_command.__globals__
+    original_name = globals_["os"].name
+    original_popen = globals_["subprocess"].Popen
+    observed: dict[str, object] = {}
+
+    class FakeProcess:
+        pass
+
+    def capture_popen(args, **kwargs):
+        observed["args"] = args
+        observed["kwargs"] = kwargs
+        return FakeProcess()
+
+    try:
+        globals_["os"].name = "nt"
+        globals_["subprocess"].Popen = capture_popen
+        process = start_command('"C:\\Program Files\\KBE\\bots.exe" --cid=10000')
+        assert isinstance(process, FakeProcess)
+        assert observed["args"] == '"C:\\Program Files\\KBE\\bots.exe" --cid=10000'
+    finally:
+        globals_["subprocess"].Popen = original_popen
+        globals_["os"].name = original_name
 
 
 def assert_watcher_connection_reuse() -> None:
@@ -388,12 +416,11 @@ def assert_gameplay_stress_scenario() -> None:
     assert scenario["reliable_udp_tick_interval_ms"] == 10
     assert scenario["reliable_udp_min_rto_ms"] == 50
     assert scenario["runtime_log_level"] == "warn"
-    assert scenario["server_runtime_log_level"] == "info"
+    assert scenario["server_runtime_log_level"] == "warn"
     assert scenario["workload_processes"] == 4
     assert scenario["workload_cid_start"] == 10000
     assert "fixture" not in scenario
-    assert scenario["server_readiness"]["min_count"] == 52
-    assert scenario["server_readiness"]["log_glob"] == "logger*.log"
+    assert "server_readiness" not in scenario
     targets = expand_component_watcher_targets(
         [parse_target(value) for value in scenario["watcher_targets"]],
         scenario["watcher_component_ids"],
@@ -413,6 +440,74 @@ def assert_gameplay_stress_scenario() -> None:
     assert comparison["name"] == "gameplay-10000-kcp20"
     assert comparison["reliable_udp_tick_interval_ms"] == 20
     assert comparison["reliable_udp_min_rto_ms"] == 50
+
+
+def assert_parameterized_topology_and_manager_readiness() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        binary_dir = Path(directory)
+        for name in ("machine", "logger", "interfaces", "dbmgr", "baseappmgr",
+                     "cellappmgr", "baseapp", "cellapp", "loginapp"):
+            (binary_dir / f"{name}.exe").touch()
+
+        components, watcher_ids = build_local_cluster_components(binary_dir, 3, 6)
+        declarations = components.split("|")
+        assert len(declarations) == 16
+        assert [int(item.split("::")[2]) for item in declarations] == [
+            1000, 2000, 3000, 4000, 5000, 6000,
+            7001, 7002, 7003,
+            8001, 8002, 8003, 8004, 8005, 8006,
+            9000,
+        ]
+        assert [int(item.split("::")[3]) for item in declarations] == list(range(1, 17))
+        assert watcher_ids == {
+            "baseapp": [7001, 7002, 7003],
+            "cellapp": [8001, 8002, 8003, 8004, 8005, 8006],
+        }
+
+        (binary_dir / "cellapp.exe").unlink()
+        try:
+            build_local_cluster_components(binary_dir, 3, 6)
+        except FileNotFoundError as exc:
+            assert "cellapp.exe" in str(exc)
+        else:
+            raise AssertionError("a missing server executable must fail before startup")
+
+    assert partition_batch_size(100, 4) == 25
+    try:
+        partition_batch_size(10, 4)
+    except ValueError as exc:
+        assert "divisible" in str(exc)
+    else:
+        raise AssertionError("uneven aggregate batches must be rejected")
+
+    ready = {"readyForLogin": True, "readyApps": 3, "totalApps": 3, "minProgress": 1.0}
+    assert manager_readiness_satisfied(ready, 3)
+    assert manager_readiness_satisfied({**ready, "readyForLogin": "true"}, 3)
+    assert not manager_readiness_satisfied({**ready, "readyApps": 2}, 3)
+    assert not manager_readiness_satisfied({**ready, "totalApps": 2}, 3)
+    assert not manager_readiness_satisfied({**ready, "minProgress": 0.99}, 3)
+
+
+def assert_bots_dev_and_manager_watcher_source_contract() -> None:
+    source_root = _repository_root() / "kbe/src"
+    bots_main = (source_root / "server/tools/bots/main.cpp").read_text(encoding="utf-8")
+    bots_source = (source_root / "server/tools/bots/bots.cpp").read_text(encoding="utf-8")
+    components_source = (source_root / "lib/server/components.cpp").read_text(encoding="utf-8")
+    assert 'std::string(argv[index]) == "--dev"' in bots_main
+    assert 'WATCH_OBJECT("bots/devMode", g_botsDevMode)' in bots_source
+    network_index = bots_source.index("DebugHelper::getSingleton().pNetworkInterface(&networkInterface())")
+    logger_index = bots_source.index("Components::getSingleton().findLogger(true)")
+    assert network_index < logger_index
+    assert "g_componentType == BOTS_TYPE && !allowBots" in components_source
+
+    for relative_path, manager_name in (
+        ("server/baseappmgr/baseappmgr.cpp", "Baseappmgr"),
+        ("server/cellappmgr/cellappmgr.cpp", "Cellappmgr"),
+    ):
+        manager_source = (source_root / relative_path).read_text(encoding="utf-8")
+        for watcher_path in ("readyForLogin", "readyApps", "totalApps", "minProgress"):
+            assert f'WATCH_OBJECT("readiness/{watcher_path}"' in manager_source
+        assert f"bool {manager_name}::initializeWatcher()" in manager_source
 
 
 def assert_readiness_target_ownership() -> None:
@@ -502,6 +597,7 @@ def assert_readiness_target_ownership() -> None:
 def main() -> int:
     assert_centralized_discovery_matching()
     assert_partial_workload_start_cleanup()
+    assert_windows_command_line_preserves_quoted_executable()
     assert_watcher_connection_reuse()
     assert_watcher_schedule()
     assert_cprofile_window_metrics()
@@ -509,6 +605,8 @@ def main() -> int:
     assert_python_latency_scenario()
     assert_multi_component_cluster_manifest()
     assert_gameplay_stress_scenario()
+    assert_parameterized_topology_and_manager_readiness()
+    assert_bots_dev_and_manager_watcher_source_contract()
     assert_readiness_target_ownership()
     repository_root = _repository_root()
     assert repository_root.is_dir()

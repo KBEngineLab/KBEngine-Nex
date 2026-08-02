@@ -31,6 +31,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "server/components.h"
 #include "helper/console_helper.h"
 
+#include <algorithm>
+
 #include "../../server/cellappmgr/cellappmgr_interface.h"
 #include "../../server/baseapp/baseapp_interface.h"
 #include "../../server/cellapp/cellapp_interface.h"
@@ -240,6 +242,66 @@ Baseappmgr::~Baseappmgr()
 std::map< COMPONENT_ID, Baseapp >& Baseappmgr::baseapps()
 {
 	return baseapps_;
+}
+
+//-------------------------------------------------------------------------------------
+uint32 Baseappmgr::readyForLoginApps()
+{
+	uint32 count = 0;
+	for (std::map< COMPONENT_ID, Baseapp >::const_iterator iter = baseapps_.begin(); iter != baseapps_.end(); ++iter)
+	{
+		if (!iter->second.isDestroyed() && iter->second.initProgress() >= 1.f)
+			++count;
+	}
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint32 Baseappmgr::totalReadyForLoginApps()
+{
+	uint32 count = 0;
+	for (std::map< COMPONENT_ID, Baseapp >::const_iterator iter = baseapps_.begin(); iter != baseapps_.end(); ++iter)
+	{
+		if (!iter->second.isDestroyed())
+			++count;
+	}
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+float Baseappmgr::minReadyForLoginProgress()
+{
+	float progress = 1.f;
+	bool found = false;
+	for (std::map< COMPONENT_ID, Baseapp >::const_iterator iter = baseapps_.begin(); iter != baseapps_.end(); ++iter)
+	{
+		if (iter->second.isDestroyed())
+			continue;
+		found = true;
+		progress = std::min(progress, iter->second.initProgress());
+	}
+	return found ? progress : 0.f;
+}
+
+//-------------------------------------------------------------------------------------
+bool Baseappmgr::readyForLogin()
+{
+	const uint32 total = totalReadyForLoginApps();
+	return total > 0 && readyForLoginApps() == total;
+}
+
+//-------------------------------------------------------------------------------------
+bool Baseappmgr::initializeWatcher()
+{
+	// Manager 已经聚合每个 BaseApp 的 onReadyForLogin 进度；Watcher 只扫描
+	// 少量组件状态，不进入 Entity 或网络包热路径。
+	// The manager already aggregates every BaseApp onReadyForLogin result. These
+	// watchers scan only the small component map, never entities or packet queues.
+	WATCH_OBJECT("readiness/readyForLogin", this, &Baseappmgr::readyForLogin);
+	WATCH_OBJECT("readiness/readyApps", this, &Baseappmgr::readyForLoginApps);
+	WATCH_OBJECT("readiness/totalApps", this, &Baseappmgr::totalReadyForLoginApps);
+	WATCH_OBJECT("readiness/minProgress", this, &Baseappmgr::minReadyForLoginProgress);
+	return ServerApp::initializeWatcher();
 }
 
 //-------------------------------------------------------------------------------------

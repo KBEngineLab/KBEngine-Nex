@@ -67,6 +67,7 @@ public:
 	bool initializeBegin();
 	bool inInitialize();
 	bool initializeEnd();
+	bool initializeWatcher();
 	void finalise();
 
 	COMPONENT_ID findFreeBaseapp();
@@ -153,6 +154,10 @@ public:
 	bool componentReady(COMPONENT_ID cid);
 
 	std::map< COMPONENT_ID, Baseapp >& baseapps();
+	uint32 readyForLoginApps();
+	uint32 totalReadyForLoginApps();
+	float minReadyForLoginProgress();
+	bool readyForLogin();
 
 	uint32 numLoadBalancingApp();
 

@@ -21,6 +21,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "client_lib/kbemain.h"
 #include "bots.h"
 
+#include <string>
+
 #undef DEFINE_IN_INTERFACE
 #include "client_lib/client_interface.h"
 #define DEFINE_IN_INTERFACE
@@ -77,6 +79,15 @@ using namespace KBEngine;
 int KBENGINE_MAIN(int argc, char* argv[])
 {
 	g_componentType = BOTS_TYPE;
+	for (int index = 1; index < argc; ++index)
+	{
+		if (std::string(argv[index]) == "--dev")
+		{
+			g_botsDevMode = true;
+			break;
+		}
+	}
+
 	return kbeMainT<Bots>(argc, argv, g_componentType, -1, -1, 0, 0, 0, "");
 }
 

@@ -24,6 +24,7 @@ from .log_metrics import IncrementalLogCollector
 from .metrics import JsonlRecorder, monotonic_milliseconds
 from .process_metrics import ProcessGroupCollector
 from .report import build_summary, load_events, write_report
+from .topology import build_local_cluster_components, partition_batch_size
 from .watcher_metrics import WatcherCollector, WatcherSchedule, WatcherTarget, parse_target, resolve_target
 
 
@@ -50,20 +51,34 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--duration", type=float)
     parser.add_argument("--sample-interval", type=float, default=1.0)
     parser.add_argument("--command", help="Command line to run the workload")
-    parser.add_argument("--workload-processes", type=int, help="Number of workload processes")
+    parser.add_argument("--workload-processes", "--bots-processes", dest="workload_processes", type=int,
+                        help="Number of Bots workload processes")
     parser.add_argument("--workload-cid-start", type=int, help="First workload component ID")
     parser.add_argument("--workload-gus-start", type=int, help="First workload group order ID")
     parser.add_argument("--assets-root", type=Path, help="Read-only game assets used for the isolated config overlay")
     parser.add_argument("--bots", type=int, help="Override the scenario Bots count")
+    parser.add_argument("--bots-batch-size", type=int,
+                        help="Aggregate Bots added per batch across all Bots processes")
+    parser.add_argument("--bots-batch-interval", type=float,
+                        help="Seconds between Bots connection batches")
+    parser.add_argument("--bots-dev", action="store_true",
+                        help="Enable Bots Logger forwarding for IDE development")
     parser.add_argument("--tools-root", type=Path, help="kbe/tools/server root for Watcher queries")
     parser.add_argument("--watcher-target", action="append", default=[], metavar="TYPE=HOST:PORT:PATH|TYPE=@COMPONENT:PATH")
     parser.add_argument("--watcher-timeout", type=float, default=2.0)
     parser.add_argument("--workload-ready-timeout", type=float, default=60.0)
     parser.add_argument("--thresholds", type=Path, help="Quality thresholds JSON; defaults to the scenario reference")
-    parser.add_argument("--start-cluster", action="store_true", help="Start and own an isolated nine-component server cluster")
+    parser.add_argument("--start-cluster", action="store_true", help="Start and own an isolated server cluster")
+    parser.add_argument("--server-binary-dir", type=Path,
+                        help="Release binary directory used to generate the local cluster and Bots command")
+    parser.add_argument("--baseapp-count", type=int, help="Number of local BaseApp processes")
+    parser.add_argument("--cellapp-count", type=int, help="Number of local CellApp processes")
     parser.add_argument("--cluster-components", help="Pipe-separated NAME::EXE::CID::GUS component specification")
-    parser.add_argument("--cluster-binary-root", type=Path, help="CMake build root used for isolated cluster runtime files")
+    parser.add_argument("--cluster-binary-root", "--build-root", dest="cluster_binary_root", type=Path,
+                        help="CMake build root used for isolated cluster runtime files")
     parser.add_argument("--cluster-startup-timeout", type=int, default=90)
+    parser.add_argument("--server-ready-timeout", type=float, default=240.0,
+                        help="Seconds to wait for BaseAppMgr and CellAppMgr onReadyForLogin readiness")
     return parser.parse_args()
 
 
@@ -83,6 +98,8 @@ def main() -> int:
         args.thresholds = args.thresholds.resolve()
     if args.cluster_binary_root:
         args.cluster_binary_root = args.cluster_binary_root.resolve()
+    if args.server_binary_dir:
+        args.server_binary_dir = args.server_binary_dir.resolve()
     scenario = load_scenario(args.scenario)
     fixture_root = resolve_fixture_root(str(scenario["fixture"])) if scenario.get("fixture") else None
     name = str(scenario["name"])
@@ -103,6 +120,32 @@ def main() -> int:
         if args.workload_gus_start is not None
         else scenario.get("workload_gus_start", 40)
     )
+    declared_component_ids = dict(scenario.get("watcher_component_ids", {}))
+    baseapp_count = int(args.baseapp_count if args.baseapp_count is not None else
+                        len(declared_component_ids.get("baseapp", [7001])))
+    cellapp_count = int(args.cellapp_count if args.cellapp_count is not None else
+                        len(declared_component_ids.get("cellapp", [8001])))
+    if baseapp_count < 1 or cellapp_count < 1:
+        raise ValueError("--baseapp-count and --cellapp-count must be positive")
+    if args.server_binary_dir:
+        generated_components, generated_component_ids = build_local_cluster_components(
+            args.server_binary_dir, baseapp_count, cellapp_count,
+        )
+        if not args.cluster_components:
+            args.cluster_components = generated_components
+        if not args.command:
+            dev_argument = " --dev" if args.bots_dev else ""
+            args.command = (
+                f'"{args.server_binary_dir / "bots.exe"}" '
+                f"--cid={{cid}} --gus={{gus}} --hide=1{dev_argument}"
+            )
+        scenario = dict(scenario)
+        scenario["watcher_component_ids"] = generated_component_ids
+    elif args.bots_dev:
+        if not args.command:
+            raise ValueError("--bots-dev requires --server-binary-dir or --command")
+        args.command = f"{args.command} --dev"
+
     bots_per_process = partition_workload_bots(configured_bots, workload_process_count)
     interval = max(float(args.sample_interval), 0.1)
     watcher_target_specs = merge_watcher_target_specs(
@@ -133,6 +176,14 @@ def main() -> int:
     environment = None
     if args.assets_root:
         per_process_scenario = dict(scenario)
+        if args.bots_batch_size is not None:
+            per_process_scenario["bots_tick_count"] = partition_batch_size(
+                args.bots_batch_size, workload_process_count,
+            )
+        if args.bots_batch_interval is not None:
+            if args.bots_batch_interval <= 0:
+                raise ValueError("--bots-batch-interval must be positive")
+            per_process_scenario["bots_tick_time"] = args.bots_batch_interval
         if "connect_rate_per_second" in per_process_scenario:
             per_process_scenario["connect_rate_per_second"] = (
                 float(per_process_scenario["connect_rate_per_second"]) / workload_process_count
@@ -184,6 +235,16 @@ def main() -> int:
         )
         try:
             owned_processes.update({f"cluster:{item.name}": item.pid for item in cluster.start()})
+            if not args.tools_root:
+                raise ValueError("--tools-root is required to verify server onReadyForLogin readiness")
+            wait_for_cluster_ready_for_login(
+                args.tools_root,
+                [cluster.run_root / "server/logs"],
+                baseapp_count,
+                cellapp_count,
+                args.server_ready_timeout,
+                args.watcher_timeout,
+            )
             server_readiness = scenario.get("server_readiness")
             if server_readiness is not None:
                 if not isinstance(server_readiness, dict):
@@ -494,6 +555,65 @@ def expand_component_watcher_targets(
     return expanded
 
 
+def manager_readiness_satisfied(values: dict[str, object], expected_apps: int) -> bool:
+    """Validate one Manager's aggregated onReadyForLogin snapshot.
+    校验一个 Manager 聚合的 onReadyForLogin 快照。
+    """
+    try:
+        ready_flag = values["readyForLogin"]
+        ready = ready_flag is True or str(ready_flag).strip().lower() in {"1", "true", "yes"}
+        return (
+            ready
+            and int(values["readyApps"]) == expected_apps
+            and int(values["totalApps"]) == expected_apps
+            and float(values["minProgress"]) >= 1.0
+        )
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def wait_for_cluster_ready_for_login(
+    tools_root: Path,
+    log_roots: list[Path],
+    baseapp_count: int,
+    cellapp_count: int,
+    timeout_seconds: float,
+    watcher_timeout_seconds: float,
+) -> dict[str, dict[str, object]]:
+    """Wait for standard BaseApp/CellApp onReadyForLogin aggregation.
+    等待标准 BaseApp/CellApp onReadyForLogin 聚合状态。
+    """
+    if timeout_seconds <= 0:
+        raise ValueError("server readiness timeout must be positive")
+    declarations = (
+        (parse_target("BASEAPPMGR_TYPE=@baseappmgr:root/readiness"), baseapp_count),
+        (parse_target("CELLAPPMGR_TYPE=@cellappmgr:root/readiness"), cellapp_count),
+    )
+    collector = WatcherCollector(tools_root, max(watcher_timeout_seconds, 0.1))
+    observed: dict[str, dict[str, object]] = {}
+    deadline = time.monotonic() + timeout_seconds
+    try:
+        while time.monotonic() < deadline:
+            all_ready = True
+            for unresolved, expected_apps in declarations:
+                try:
+                    target = resolve_target(unresolved, log_roots)
+                    values = collector.query(target)
+                    observed[unresolved.component_name] = values
+                    if not manager_readiness_satisfied(values, expected_apps):
+                        all_ready = False
+                except (LookupError, OSError, RuntimeError, TimeoutError, ValueError):
+                    all_ready = False
+            if all_ready:
+                return observed
+            time.sleep(0.25)
+    finally:
+        collector.close()
+    raise TimeoutError(
+        f"server onReadyForLogin readiness timed out after {timeout_seconds:.1f}s: {observed}"
+    )
+
+
 def start_workload_commands(
     command: str | None,
     process_count: int,
@@ -534,7 +654,11 @@ def start_command(
 ) -> subprocess.Popen[bytes] | None:
     if not command:
         return None
-    args = shlex.split(command, posix=os.name != "nt")
+    # CreateProcess owns Windows command-line quoting. shlex(posix=False) keeps
+    # wrapping quotes inside argv[0], which breaks executable paths containing spaces.
+    # Windows 路径引号交给 CreateProcess 解析；shlex(posix=False) 会把 argv[0]
+    # 两侧引号保留下来，导致含空格的可执行文件路径无法启动。
+    args: str | list[str] = command if os.name == "nt" else shlex.split(command)
     if not args:
         return None
     stdout_handle = None
