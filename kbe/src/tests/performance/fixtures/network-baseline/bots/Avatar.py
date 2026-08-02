@@ -26,7 +26,15 @@ class Avatar(KBEngine.Entity):
         if self.base is not None:
             self.base.pythonPerformanceProbe(time.perf_counter_ns())
         if os.environ.get("KBE_PERF_PYTHON_RTT") == "1":
-            KBEngine.callback(1.0, self._python_performance_probe)
+            KBEngine.callback(self._python_probe_interval(), self._python_performance_probe)
+
+    @staticmethod
+    def _python_probe_interval():
+        try:
+            interval = float(os.environ.get("KBE_PERF_PYTHON_RTT_INTERVAL", "1.0"))
+        except (TypeError, ValueError):
+            interval = 1.0
+        return max(0.1, min(60.0, interval))
 
     def pythonPerformanceProbeResponse(self, started_ns):
         KBEngine.recordPerformanceLatency(started_ns, time.perf_counter_ns())
