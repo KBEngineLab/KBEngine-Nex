@@ -60,7 +60,14 @@ def assert_watcher_connection_reuse() -> None:
         collector = WatcherCollector(Path("."), timeout_seconds=0.1)
         target = parse_target("BOTS_TYPE=127.0.0.1:11000:root/bots")
         assert collector.query(target)["clients"] == 1
+        first_stats = collector.last_query_stats(target)
+        assert first_stats is not None
+        assert first_stats.value_count == 1
+        assert first_stats.response_bytes_estimated > 0
+        assert not first_stats.connection_reused
         assert collector.query(target)["clients"] == 2
+        second_stats = collector.last_query_stats(target)
+        assert second_stats is not None and second_stats.connection_reused
         assert len(FakeWatcher.instances) == 1
         watcher = FakeWatcher.instances[0]
         assert watcher.connect_count == 1 and watcher.clear_count == 2
@@ -116,6 +123,17 @@ def assert_watcher_schedule() -> None:
     multi_instance.mark_sampled(cell, 100.0)
     assert not multi_instance.due(cell, 100.5)
     assert multi_instance.due(second_cell, 100.5)
+    discovered = parse_target("BOTS_TYPE=@bots:root/bots/performance")
+    discovered_schedule = WatcherSchedule([discovered], 1.0)
+    resolved_discovered = type(discovered)(
+        discovered.component_type,
+        "127.0.0.1",
+        13501,
+        discovered.path,
+        discovered.component_name,
+    )
+    assert discovered_schedule.interval(resolved_discovered) == 1.0
+    assert discovered_schedule.due(resolved_discovered, 100.0)
     try:
         WatcherSchedule([bots], 1.0, {"BOTS_TYPE:root/unknown": 5.0})
     except ValueError as exc:
@@ -225,6 +243,10 @@ def main() -> int:
         summary = build_summary(events)
         assert summary["latency"]["heartbeat"]["count"] == 5
         assert summary["latency"]["heartbeat"]["p99_ms"] >= 40
+        assert summary["latency"]["heartbeat"]["mean_ms"] == 40
+        assert summary["latency"]["heartbeat"]["total_ms"] == 200
+        assert summary["operation_counters"]["heartbeat"]["request.success.count"] == 4
+        assert summary["operation_counters"]["heartbeat"]["request.error.count"] == 1
         assert summary["counters"]["log.error.count"] == 2
         assert summary["phase_counters"] == {}
         phase_path = Path(directory) / "phase.jsonl"
@@ -250,6 +272,8 @@ def main() -> int:
             recorder.record_sample("watcher", "BOTS_TYPE", "bots/performance/tickMaxMicros", 100000, "micros")
         sampled = build_summary(load_events(recorder_path), {"tick_p99_max_ms": 2.0})
         assert sampled["samples"]["watcher.BOTS_TYPE.bots/tick/lastMicros"]["count"] == 2
+        assert sampled["samples"]["watcher.BOTS_TYPE.bots/tick/lastMicros"]["mean"] == 2000
+        assert sampled["samples"]["watcher.BOTS_TYPE.bots/tick/lastMicros"]["total"] == 4000
         assert sampled["samples"]["watcher.BOTS_TYPE.bots/tick/lastMicros"]["p99"] > 2000
         assert sampled["quality"]["status"] == "SLOW"
         assert all("tickMaxMicros" not in item for item in sampled["quality"]["slow"])

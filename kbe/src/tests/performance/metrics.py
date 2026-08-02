@@ -128,11 +128,13 @@ class LatencyHistogram:
         self.max_samples = max_samples
         self._samples: list[float] = []
         self.count = 0
+        self.total = 0.0
 
     def observe(self, milliseconds: float) -> None:
         if milliseconds < 0:
             raise ValueError("latency cannot be negative")
         self.count += 1
+        self.total += milliseconds
         if len(self._samples) < self.max_samples:
             self._samples.append(milliseconds)
             return
@@ -160,6 +162,8 @@ class LatencyHistogram:
             "p99_ms": self.percentile(99),
             "p999_ms": self.percentile(99.9),
             "max_ms": max(self._samples, default=0.0),
+            "mean_ms": self.total / self.count if self.count else 0.0,
+            "total_ms": self.total,
         }
 
     def distribution(self) -> dict[str, float | int]:
@@ -175,6 +179,8 @@ class LatencyHistogram:
             "p999": self.percentile(99.9),
             "min": min(self._samples, default=0.0),
             "max": max(self._samples, default=0.0),
+            "mean": self.total / self.count if self.count else 0.0,
+            "total": self.total,
         }
 
 

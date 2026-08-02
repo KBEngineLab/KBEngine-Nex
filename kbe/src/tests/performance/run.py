@@ -119,7 +119,7 @@ def main() -> int:
     elif args.command and configured_bots > 0:
         raise ValueError("--assets-root is required when starting a scenario with Bots")
     cluster = None
-    owned_processes: dict[str, int] = {}
+    owned_processes: dict[str, int] = {"controller": os.getpid()}
     if args.start_cluster:
         if not args.assets_root or not args.cluster_components or not args.cluster_binary_root:
             raise ValueError("--start-cluster requires --assets-root, --cluster-components and --cluster-binary-root")
@@ -170,6 +170,16 @@ def main() -> int:
             # Drain startup logs so initialization noise cannot fail the steady-state gate; measurement and shutdown remain visible.
             for log_collector in log_collectors:
                 record_log_samples(recorder, log_collector, "startup")
+            watcher_sample_times: dict[tuple[str, str, int, str], float] = {}
+            if watcher_collector:
+                for target in watcher_targets:
+                    recorder.record_sample(
+                        "watcher",
+                        target.component_type,
+                        f"{target.path}/sampling/configuredIntervalMs",
+                        watcher_schedule.interval(target) * 1000.0 if watcher_schedule else interval * 1000.0,
+                        "ms",
+                    )
             started = time.monotonic()
             next_sample = started
             while time.monotonic() - started < duration:
@@ -183,10 +193,37 @@ def main() -> int:
                 if watcher_collector:
                     sample_now = time.monotonic()
                     for target in watcher_targets:
-                        if watcher_schedule is not None and not watcher_schedule.due(target, sample_now):
-                            continue
-                        request_started_ms = monotonic_milliseconds()
+                        target_id = (target.component_type, target.host, target.port, target.path)
                         operation = f"watcher:{target.component_type}:{target.path}"
+                        if watcher_schedule is not None and not watcher_schedule.due(target, sample_now):
+                            recorder.record(
+                                "watcher",
+                                target.component_type,
+                                "schedule.skipped.count",
+                                1,
+                                "count",
+                                {"kind": "counter", "operation": operation},
+                            )
+                            continue
+                        recorder.record(
+                            "watcher",
+                            target.component_type,
+                            "schedule.due.count",
+                            1,
+                            "count",
+                            {"kind": "counter", "operation": operation},
+                        )
+                        previous_sample = watcher_sample_times.get(target_id)
+                        if previous_sample is not None:
+                            recorder.record_sample(
+                                "watcher",
+                                target.component_type,
+                                f"{target.path}/sampling/actualIntervalMs",
+                                (sample_now - previous_sample) * 1000.0,
+                                "ms",
+                            )
+                        watcher_sample_times[target_id] = sample_now
+                        request_started_ms = monotonic_milliseconds()
                         try:
                             values = watcher_collector.query(target)
                         except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
@@ -221,6 +258,29 @@ def main() -> int:
                                         value,
                                         watcher_unit(metric_name),
                                     )
+                            query_stats = watcher_collector.last_query_stats(target)
+                            if query_stats is not None:
+                                recorder.record_sample(
+                                    "watcher",
+                                    target.component_type,
+                                    f"{target.path}/sampling/responseValues",
+                                    query_stats.value_count,
+                                    "count",
+                                )
+                                recorder.record_sample(
+                                    "watcher",
+                                    target.component_type,
+                                    f"{target.path}/sampling/responseBytesEstimated",
+                                    query_stats.response_bytes_estimated,
+                                    "bytes_estimated",
+                                )
+                                recorder.record_sample(
+                                    "watcher",
+                                    target.component_type,
+                                    f"{target.path}/sampling/connectionReused",
+                                    int(query_stats.connection_reused),
+                                    "count",
+                                )
                         finally:
                             if watcher_schedule is not None:
                                 # Anchor deadlines to the sampling cycle so query RTT cannot

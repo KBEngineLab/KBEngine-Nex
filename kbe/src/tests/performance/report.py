@@ -42,6 +42,7 @@ def build_summary(
     samples: dict[str, LatencyHistogram] = defaultdict(LatencyHistogram)
     sample_units: dict[str, str] = {}
     counters: Counter[str] = Counter()
+    operation_counters: dict[str, Counter[str]] = defaultdict(Counter)
     phase_counters: dict[str, Counter[str]] = defaultdict(Counter)
     gauges: dict[str, float] = {}
     metadata: dict[str, str] = {}
@@ -57,6 +58,8 @@ def build_summary(
             sample_units.setdefault(sample_key, str(event.get("unit", "")))
         elif metric.startswith("log.") or tags.get("kind") == "counter":
             counters[metric] += int(float(event["value"]))
+            if operation != "default":
+                operation_counters[operation][metric] += int(float(event["value"]))
             phase = tags.get("phase")
             if phase:
                 phase_counters[str(phase)][metric] += int(float(event["value"]))
@@ -75,6 +78,10 @@ def build_summary(
             for name, histogram in sorted(samples.items())
         },
         "counters": dict(sorted(counters.items())),
+        "operation_counters": {
+            operation: dict(sorted(values.items()))
+            for operation, values in sorted(operation_counters.items())
+        },
         "phase_counters": {
             phase: dict(sorted(values.items()))
             for phase, values in sorted(phase_counters.items())
@@ -210,12 +217,12 @@ def write_report(summary: dict[str, Any], json_path: Path, markdown_path: Path) 
         "",
         "## Latency",
         "",
-        "| Operation | Count | P50 (ms) | P95 (ms) | P99 (ms) | P99.9 (ms) | Max (ms) |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Operation | Count | Mean (ms) | P50 (ms) | P95 (ms) | P99 (ms) | P99.9 (ms) | Max (ms) | Total (ms) |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for operation, values in summary.get("latency", {}).items():
         lines.append(
-            "| {0} | {count} | {p50_ms:.2f} | {p95_ms:.2f} | {p99_ms:.2f} | {p999_ms:.2f} | {max_ms:.2f} |".format(operation, **values)
+            "| {0} | {count} | {mean_ms:.2f} | {p50_ms:.2f} | {p95_ms:.2f} | {p99_ms:.2f} | {p999_ms:.2f} | {max_ms:.2f} | {total_ms:.2f} |".format(operation, **values)
         )
     lines.extend(["", "## Quality", "", f"- Status: `{summary.get('quality', {}).get('status', 'UNKNOWN')}`"])
     if summary.get("failure"):
@@ -225,12 +232,17 @@ def write_report(summary: dict[str, Any], json_path: Path, markdown_path: Path) 
         lines.append(f"- BLOCKER: {item}")
     for item in summary.get("quality", {}).get("slow", []):
         lines.append(f"- SLOW: {item}")
-    lines.extend(["", "## Samples", "", "| Metric | Count | Min | P99 | Max | Unit |", "| --- | ---: | ---: | ---: | ---: | --- |"])
+    lines.extend(["", "## Samples", "", "| Metric | Count | Min | Mean | P99 | Max | Total | Unit |", "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"])
     for metric, values in summary.get("samples", {}).items():
-        lines.append(f"| `{metric}` | {values['count']} | {values['min']:.2f} | {values['p99']:.2f} | {values['max']:.2f} | {values['unit']} |")
+        lines.append(f"| `{metric}` | {values['count']} | {values['min']:.2f} | {values['mean']:.2f} | {values['p99']:.2f} | {values['max']:.2f} | {values['total']:.2f} | {values['unit']} |")
     lines.extend(["", "## Counters", "", "| Metric | Value |", "| --- | ---: |"])
     for metric, value in summary.get("counters", {}).items():
         lines.append(f"| `{metric}` | {value} |")
+    if summary.get("operation_counters"):
+        lines.extend(["", "## Operation Counters", "", "| Operation | Metric | Value |", "| --- | --- | ---: |"])
+        for operation, counters in summary["operation_counters"].items():
+            for metric, value in counters.items():
+                lines.append(f"| `{operation}` | `{metric}` | {value} |")
     if summary.get("phase_counters"):
         lines.extend(["", "## Phase Counters", "", "| Phase | Metric | Value |", "| --- | --- | ---: |"])
         for phase, counters in summary["phase_counters"].items():

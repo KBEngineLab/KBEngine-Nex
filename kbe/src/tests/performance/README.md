@@ -52,6 +52,24 @@ for their next period, and missed periods are not replayed as a burst.
 键格式为 `COMPONENT_TYPE:PATH`，值为秒且不得小于 `0.1`。未知目标会在集群启动前失败。
 每个目标使用独立单调时钟截止点；失败查询等待下一周期，错过的周期不会集中补发。
 
+The standard publication set includes:
+标准发布数据集包括：
+
+- `process.cluster:*`: server CPU, private/working-set memory, peak memory, threads, and handles;
+- `process.workload:*`: Bots process resources when an external workload is owned;
+- `process.controller:*`: the sampler/controller's own CPU, memory, threads, and handles;
+- `watcher.*.<path>/*`: engine metrics returned by each target;
+- `watcher.*.<path>/sampling/*`: configured and actual interval, response value count,
+  protocol-neutral estimated response bytes, and connection reuse;
+- request latency `mean`, `p50`, `p95`, `p99`, `p99.9`, `max`, and `total`, plus operation-level
+  success/error/due/skipped counters.
+
+`responseBytesEstimated` is a JSON-equivalent estimate, not an on-wire protocol byte count. The
+controller process runs outside engine threads, so its resource samples measure observability cost
+separately from server workload cost.
+`responseBytesEstimated` 是 JSON 等价估算值，不是线协议字节数。控制器运行在引擎线程之外，
+其资源样本用于与服务端工作负载成本分开发布。
+
 `--start-cluster` starts the existing nine-component integration controller, waits for its
 readiness marker, samples only the published child PIDs, and requests graceful cleanup through
 an owned stop file. It requires `--cluster-components` and `--cluster-binary-root`.

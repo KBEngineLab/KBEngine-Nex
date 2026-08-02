@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import json
 import re
 import sys
 import time
@@ -131,8 +132,12 @@ class WatcherSchedule:
 
 
 def _watcher_target_identity(target: WatcherTarget) -> tuple[str, str, int, str]:
-    endpoint = target.component_name or target.host
-    return target.component_type, endpoint, target.port, target.path
+    if target.component_name:
+        # Discovered ports are ephemeral; the component name is the stable identity
+        # across pre-start configuration and post-readiness resolution.
+        # 动态端口每轮都会变化；组件名才是启动前配置与就绪后解析之间的稳定身份。
+        return target.component_type, target.component_name, 0, target.path
+    return target.component_type, target.host, target.port, target.path
 
 
 def _validate_interval(value: Any, name: str) -> float:
@@ -145,13 +150,25 @@ def _validate_interval(value: Any, name: str) -> float:
     return interval
 
 
+@dataclass(frozen=True, slots=True)
+class WatcherQueryStats:
+    """Metadata about the last response, separate from Watcher values.
+    保存最近一次响应的元数据，与业务 Watcher 值分离，避免污染指标树。
+    """
+
+    value_count: int
+    response_bytes_estimated: int
+    connection_reused: bool
+
+
 class WatcherCollector:
     def __init__(self, tools_root: Path, timeout_seconds: float = 5.0):
         self.tools_root = tools_root
         self.timeout_seconds = timeout_seconds
         self._watchers: dict[tuple[str, str, int], Any] = {}
+        self._last_stats: dict[tuple[str, str, int], WatcherQueryStats] = {}
 
-    def _get_watcher(self, target: WatcherTarget) -> Any:
+    def _get_watcher(self, target: WatcherTarget) -> tuple[Any, bool]:
         """Return a connected Watcher for one endpoint, creating it lazily.
         按端点复用控制连接，减少每次采样的 TCP 建连和调度抖动。
         """
@@ -166,14 +183,15 @@ class WatcherCollector:
                 watcher = Watcher.Watcher(component_type)
                 watcher.connect(target.host, target.port)
                 self._watchers[key] = watcher
-            return watcher
+                return watcher, False
+            return watcher, True
         finally:
             sys.path.pop(0)
 
     def query(self, target: WatcherTarget) -> dict[str, Any]:
         """Query one snapshot outside the server process. / 在服务进程外查询一次快照。"""
         key = (target.component_type, target.host, target.port)
-        watcher = self._get_watcher(target)
+        watcher, connection_reused = self._get_watcher(target)
         try:
             if hasattr(watcher, "clearWatchData"):
                 watcher.clearWatchData()
@@ -183,7 +201,13 @@ class WatcherCollector:
                 watcher.processOne(min(0.25, max(deadline - time.monotonic(), 0.01)))
             if not watcher.watchData:
                 raise TimeoutError(f"watcher query timed out: {target.path}")
-            return flatten_values(watcher.watchData[0].get("values", {}))
+            values = flatten_values(watcher.watchData[0].get("values", {}))
+            self._last_stats[key] = WatcherQueryStats(
+                len(values),
+                estimate_response_bytes(watcher.watchData[0]),
+                connection_reused,
+            )
+            return values
         except Exception:
             # A broken socket must not poison later samples; the next query reconnects.
             # 失效连接立即淘汰，下一次查询自动重连，避免错误状态持续污染采样。
@@ -193,6 +217,12 @@ class WatcherCollector:
             except (AttributeError, OSError):
                 pass
             raise
+
+    def last_query_stats(self, target: WatcherTarget) -> WatcherQueryStats | None:
+        """Return metadata for the last successful target query.
+        返回目标最近一次成功查询的响应元数据。
+        """
+        return self._last_stats.get((target.component_type, target.host, target.port))
 
     def close(self) -> None:
         """Close all cached control connections owned by this collector.
@@ -204,6 +234,16 @@ class WatcherCollector:
                 watcher.close()
             except (AttributeError, OSError):
                 pass
+
+
+def estimate_response_bytes(value: Any) -> int:
+    """Estimate JSON-equivalent response size for a protocol-neutral metric.
+    估算 JSON 等价响应大小，仅用于趋势比较，不宣称为线协议字节数。
+    """
+    try:
+        return len(json.dumps(value, ensure_ascii=True, separators=(",", ":")).encode("utf-8"))
+    except (TypeError, ValueError):
+        return len(repr(value).encode("utf-8", errors="replace"))
 
 
 def flatten_values(values: dict[str, Any], prefix: str = "") -> dict[str, Any]:
