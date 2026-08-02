@@ -20,6 +20,8 @@ class Avatar(KBEngine.Entity):
             if self._python_probe_started:
                 return
             self._python_probe_started = True
+            if self.id % self._python_probe_sample_every() != 0:
+                return
             self._python_performance_probe()
 
     def _python_performance_probe(self):
@@ -35,6 +37,14 @@ class Avatar(KBEngine.Entity):
         except (TypeError, ValueError):
             interval = 1.0
         return max(0.1, min(60.0, interval))
+
+    @staticmethod
+    def _python_probe_sample_every():
+        try:
+            every = int(os.environ.get("KBE_PERF_PYTHON_RTT_SAMPLE_EVERY", "1"))
+        except (TypeError, ValueError):
+            every = 1
+        return max(1, min(10000, every))
 
     def pythonPerformanceProbeResponse(self, started_ns):
         KBEngine.recordPerformanceLatency(started_ns, time.perf_counter_ns())

@@ -155,6 +155,8 @@ def main() -> int:
                 configured_bots,
             )
             wait_for_warmup(process, max(float(scenario.get("warmup_seconds", 0.0)), 0.0))
+            if watcher_collector:
+                drain_watcher_windows(watcher_collector, watcher_targets)
             # 丢弃启动阶段日志，避免初始化告警污染稳态质量门；测量和关闭阶段仍分别保留。
             # Drain startup logs so initialization noise cannot fail the steady-state gate; measurement and shutdown remain visible.
             for log_collector in log_collectors:
@@ -402,6 +404,14 @@ def wait_for_warmup(process: subprocess.Popen[bytes] | None, seconds: float) -> 
         if process is not None and process.poll() is not None:
             raise RuntimeError(f"workload exited during warmup with code {process.returncode}")
         time.sleep(min(0.25, max(deadline - time.monotonic(), 0.0)))
+
+
+def drain_watcher_windows(watcher_collector: WatcherCollector, watcher_targets: list[WatcherTarget]) -> None:
+    """Discard readiness/warmup watcher windows before steady-state sampling.
+    丢弃 readiness/warmup 阶段累积的窗口指标，避免启动排队污染稳态 P99。
+    """
+    for target in watcher_targets:
+        watcher_collector.query(target)
 
 
 def stop_process(process: subprocess.Popen[bytes] | None) -> None:

@@ -40,6 +40,8 @@ def assert_fixture_callbacks() -> None:
     avatar_source = (fixture_root / "bots/Avatar.py").read_text(encoding="utf-8")
     assert "KBE_PERF_PYTHON_RTT_INTERVAL" in avatar_source
     assert "max(0.1, min(60.0, interval))" in avatar_source
+    assert "KBE_PERF_PYTHON_RTT_SAMPLE_EVERY" in avatar_source
+    assert "max(1, min(10000, every))" in avatar_source
 
 
 def main() -> int:

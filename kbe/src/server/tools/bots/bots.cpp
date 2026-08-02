@@ -73,7 +73,8 @@ totalTcpFallbacks_(0),
 totalNetworkErrors_(0),
 totalRemovedClients_(0),
 lastBotsTickMicros_(0),
-maxBotsTickMicros_(0)
+maxBotsTickMicros_(0),
+pythonPerformanceLatencyWindowPrimed_(false)
 {
 	// Bots 同时承载多个客户端，组件 owner 查找必须先通过 componentID 路由到对应的 ClientObject。
 	// Bots hosts multiple clients, so component owner lookup must route through componentID to the matching ClientObject first.
@@ -168,6 +169,8 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/clientEntities", this, &Bots::numClientEntities);
 	WATCH_OBJECT("bots/performance/pythonLatencyCount", this, &Bots::pythonPerformanceLatencyCount);
 	WATCH_OBJECT("bots/performance/pythonLatencyP99Micros", this, &Bots::pythonPerformanceLatencyP99Micros);
+	WATCH_OBJECT("bots/performance/pythonLatencyWindowCount", this, &Bots::pythonPerformanceLatencyWindowCount);
+	WATCH_OBJECT("bots/performance/pythonLatencyWindowP99Micros", this, &Bots::pythonPerformanceLatencyWindowP99Micros);
 	return WatchPool::initWatchPools();
 }
 
@@ -502,7 +505,10 @@ void Bots::recordPythonPerformanceLatency(uint64 startNs, uint64 endNs)
 		return;
 	if (pythonPerformanceLatenciesMicros_.size() >= 100000)
 		pythonPerformanceLatenciesMicros_.erase(pythonPerformanceLatenciesMicros_.begin());
-	pythonPerformanceLatenciesMicros_.push_back((endNs - startNs) / 1000);
+	const uint64 latencyMicros = (endNs - startNs) / 1000;
+	pythonPerformanceLatenciesMicros_.push_back(latencyMicros);
+	if (pythonPerformanceLatencyWindowMicros_.size() < 100000)
+		pythonPerformanceLatencyWindowMicros_.push_back(latencyMicros);
 }
 
 uint64 Bots::pythonPerformanceLatencyCount() const
@@ -517,6 +523,35 @@ uint64 Bots::pythonPerformanceLatencyP99Micros() const
 	std::vector<uint64> ordered(pythonPerformanceLatenciesMicros_);
 	std::sort(ordered.begin(), ordered.end());
 	return ordered[(ordered.size() - 1) * 99 / 100];
+}
+
+uint64 Bots::pythonPerformanceLatencyWindowCount() const
+{
+	if (!pythonPerformanceLatencyWindowPrimed_)
+	{
+		pythonPerformanceLatencyWindowMicros_.clear();
+		pythonPerformanceLatencyWindowPrimed_ = true;
+		return 0;
+	}
+	return static_cast<uint64>(pythonPerformanceLatencyWindowMicros_.size());
+}
+
+uint64 Bots::pythonPerformanceLatencyWindowP99Micros() const
+{
+	if (!pythonPerformanceLatencyWindowPrimed_)
+	{
+		pythonPerformanceLatencyWindowMicros_.clear();
+		pythonPerformanceLatencyWindowPrimed_ = true;
+		return 0;
+	}
+	if (pythonPerformanceLatencyWindowMicros_.empty())
+		return 0;
+	std::vector<uint64> ordered(pythonPerformanceLatencyWindowMicros_);
+	std::sort(ordered.begin(), ordered.end());
+	const uint64 p99 = ordered[(ordered.size() - 1) * 99 / 100];
+	// Watcher queries register count before percentile; clearing here starts the next sampling window.
+	pythonPerformanceLatencyWindowMicros_.clear();
+	return p99;
 }
 
 //-------------------------------------------------------------------------------------

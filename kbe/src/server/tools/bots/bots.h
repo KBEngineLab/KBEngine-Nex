@@ -134,6 +134,8 @@ public:
 	void recordPythonPerformanceLatency(uint64 startNs, uint64 endNs) override;
 	uint64 pythonPerformanceLatencyCount() const;
 	uint64 pythonPerformanceLatencyP99Micros() const;
+	uint64 pythonPerformanceLatencyWindowCount() const;
+	uint64 pythonPerformanceLatencyWindowP99Micros() const;
 	uint32 numClients() const { return static_cast<uint32>(clients_.size()); }
 	uint64 totalKcpHandshakeSuccesses() const { return totalKcpHandshakeSuccesses_; }
 	uint64 totalTcpConnections() const { return totalTcpConnections_; }
@@ -435,6 +437,8 @@ protected:
 	uint64											lastBotsTickMicros_;
 	uint64											maxBotsTickMicros_;
 	std::vector<uint64> pythonPerformanceLatenciesMicros_;
+	mutable std::vector<uint64> pythonPerformanceLatencyWindowMicros_;
+	mutable bool pythonPerformanceLatencyWindowPrimed_;
 };
 
 }
