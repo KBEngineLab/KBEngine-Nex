@@ -50,6 +50,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--duration", type=float)
     parser.add_argument("--sample-interval", type=float, default=1.0)
     parser.add_argument("--command", help="Command line to run the workload")
+    parser.add_argument("--workload-processes", type=int, help="Number of workload processes")
+    parser.add_argument("--workload-cid-start", type=int, help="First workload component ID")
+    parser.add_argument("--workload-gus-start", type=int, help="First workload group order ID")
     parser.add_argument("--assets-root", type=Path, help="Read-only game assets used for the isolated config overlay")
     parser.add_argument("--bots", type=int, help="Override the scenario Bots count")
     parser.add_argument("--tools-root", type=Path, help="kbe/tools/server root for Watcher queries")
@@ -85,12 +88,32 @@ def main() -> int:
     name = str(scenario["name"])
     duration = float(args.duration if args.duration is not None else scenario.get("duration_seconds", 30))
     configured_bots = int(args.bots if args.bots is not None else scenario.get("bots", 0))
+    workload_process_count = int(
+        args.workload_processes
+        if args.workload_processes is not None
+        else scenario.get("workload_processes", 1)
+    )
+    workload_cid_start = int(
+        args.workload_cid_start
+        if args.workload_cid_start is not None
+        else scenario.get("workload_cid_start", 10000)
+    )
+    workload_gus_start = int(
+        args.workload_gus_start
+        if args.workload_gus_start is not None
+        else scenario.get("workload_gus_start", 40)
+    )
+    bots_per_process = partition_workload_bots(configured_bots, workload_process_count)
     interval = max(float(args.sample_interval), 0.1)
     watcher_target_specs = merge_watcher_target_specs(
         list(scenario.get("watcher_targets", [])),
         args.watcher_target,
     )
-    watcher_targets = [parse_target(value) for value in watcher_target_specs]
+    watcher_targets = expand_bots_watcher_targets(
+        [parse_target(value) for value in watcher_target_specs],
+        workload_process_count,
+        workload_cid_start,
+    )
     watcher_schedule = (
         WatcherSchedule(
             watcher_targets,
@@ -105,11 +128,19 @@ def main() -> int:
     output.mkdir(parents=True, exist_ok=True)
     environment = None
     if args.assets_root:
-        bots_tick_time, bots_tick_count = resolve_bots_schedule(scenario, configured_bots)
+        per_process_scenario = dict(scenario)
+        if "connect_rate_per_second" in per_process_scenario:
+            per_process_scenario["connect_rate_per_second"] = (
+                float(per_process_scenario["connect_rate_per_second"]) / workload_process_count
+            )
+        bots_tick_time, bots_tick_count = resolve_bots_schedule(
+            per_process_scenario,
+            bots_per_process,
+        )
         create_config_overlay(
             args.assets_root,
             output,
-            configured_bots,
+            bots_per_process,
             bots_tick_time,
             bots_tick_count,
             int(scenario["external_receive_messages"]) if "external_receive_messages" in scenario else None,
@@ -120,6 +151,11 @@ def main() -> int:
         scenario_metadata = dict(scenario)
         scenario_metadata["effective_bots_tick_time"] = bots_tick_time
         scenario_metadata["effective_bots_tick_count"] = bots_tick_count
+        scenario_metadata["effective_workload_processes"] = workload_process_count
+        scenario_metadata["effective_bots_per_process"] = bots_per_process
+        scenario_metadata["effective_workload_cids"] = list(
+            range(workload_cid_start, workload_cid_start + workload_process_count)
+        )
         write_scenario_metadata(output, scenario_metadata, configured_bots)
     elif args.command and configured_bots > 0:
         raise ValueError("--assets-root is required when starting a scenario with Bots")
@@ -154,13 +190,25 @@ def main() -> int:
             cluster.stop()
             raise
     try:
-        process = start_command(args.command, environment, output)
+        processes = start_workload_commands(
+            args.command,
+            workload_process_count,
+            workload_cid_start,
+            workload_gus_start,
+            environment,
+            output,
+        )
     except Exception:
         if cluster is not None:
             cluster.stop()
         raise
-    if process:
-        owned_processes["workload"] = process.pid
+    for index, process in enumerate(processes):
+        process_name = (
+            "workload"
+            if workload_process_count == 1
+            else f"workload:{workload_cid_start + index}"
+        )
+        owned_processes[process_name] = process.pid
     process_collector = ProcessGroupCollector(owned_processes) if owned_processes else None
     log_roots = {output.resolve()}
     if args.log_root:
@@ -174,7 +222,7 @@ def main() -> int:
     with JsonlRecorder(events_path, run_id, name) as recorder:
         try:
             watcher_targets = wait_for_workload_ready(
-                process,
+                processes,
                 watcher_collector,
                 watcher_targets,
                 list(log_roots),
@@ -182,7 +230,7 @@ def main() -> int:
                 dict(scenario.get("readiness", {})),
                 configured_bots,
             )
-            wait_for_warmup(process, max(float(scenario.get("warmup_seconds", 0.0)), 0.0))
+            wait_for_warmup(processes, max(float(scenario.get("warmup_seconds", 0.0)), 0.0))
             if watcher_collector:
                 drain_watcher_windows(watcher_collector, watcher_targets)
             # 丢弃启动阶段日志，避免初始化告警污染稳态质量门；测量和关闭阶段仍分别保留。
@@ -204,7 +252,8 @@ def main() -> int:
             started = time.monotonic()
             next_sample = started
             while time.monotonic() - started < duration:
-                if process and process.poll() is not None:
+                workload_exit = first_workload_exit(processes)
+                if workload_exit is not None:
                     recorder.record("runner", "workload", "process.exit.count", 1, "count", {"kind": "counter"})
                     break
                 if process_collector:
@@ -331,8 +380,8 @@ def main() -> int:
         finally:
             # 先停止本轮进程再读取日志，保证文件内容闭合且扫描开销不污染测量窗口。
             # Stop owned processes before reading logs so files are complete and scan cost cannot perturb the measured window.
-            stop_process(process)
-            process = None
+            stop_processes(processes)
+            processes = []
             if cluster is not None:
                 cluster.stop()
                 cluster = None
@@ -354,10 +403,85 @@ def main() -> int:
     return 1 if readiness_failure is not None else 0
 
 
+def partition_workload_bots(configured_bots: int, process_count: int) -> int:
+    """Return an equal per-process Bot count for an aggregate workload.
+    将全局 Bots 数量等分到各压测进程，避免 XML 的单进程语义造成重复创建。
+    """
+    if process_count < 1:
+        raise ValueError("workload process count must be positive")
+    if configured_bots < 1:
+        raise ValueError("configured Bots must be positive")
+    if configured_bots % process_count != 0:
+        raise ValueError(
+            f"configured Bots ({configured_bots}) must be divisible by workload processes "
+            f"({process_count})"
+        )
+    return configured_bots // process_count
+
+
+def expand_bots_watcher_targets(
+    targets: list[WatcherTarget],
+    process_count: int,
+    cid_start: int,
+) -> list[WatcherTarget]:
+    """Expand an unqualified Bots target to every owned Bots component.
+    将未指定组件 ID 的 Bots 目标扩展到本轮拥有的每个 Bots 进程。
+    """
+    expanded: list[WatcherTarget] = []
+    for target in targets:
+        if target.component_name.lower() != "bots" or process_count == 1:
+            expanded.append(target)
+            continue
+        expanded.extend(
+            WatcherTarget(
+                target.component_type,
+                target.host,
+                target.port,
+                target.path,
+                f"bots#{cid_start + index}",
+            )
+            for index in range(process_count)
+        )
+    return expanded
+
+
+def start_workload_commands(
+    command: str | None,
+    process_count: int,
+    cid_start: int,
+    gus_start: int,
+    environment: dict[str, str] | None = None,
+    working_directory: Path | None = None,
+) -> list[subprocess.Popen[bytes]]:
+    """Start an owned workload group and clean up partial startup failures.
+    启动本轮拥有的压测进程组；若中途失败，立即清理已经启动的成员。
+    """
+    if not command:
+        return []
+    processes: list[subprocess.Popen[bytes]] = []
+    try:
+        for index in range(process_count):
+            rendered = (
+                command.replace("{index}", str(index))
+                .replace("{cid}", str(cid_start + index))
+                .replace("{gus}", str(gus_start + index))
+            )
+            output_stem = "workload" if process_count == 1 else f"workload.{cid_start + index}"
+            process = start_command(rendered, environment, working_directory, output_stem)
+            if process is None:
+                raise ValueError("workload command cannot be empty")
+            processes.append(process)
+        return processes
+    except Exception:
+        stop_processes(processes)
+        raise
+
+
 def start_command(
     command: str | None,
     environment: dict[str, str] | None = None,
     working_directory: Path | None = None,
+    output_stem: str = "workload",
 ) -> subprocess.Popen[bytes] | None:
     if not command:
         return None
@@ -367,8 +491,8 @@ def start_command(
     stdout_handle = None
     stderr_handle = None
     if working_directory is not None:
-        stdout_handle = (working_directory / "workload.stdout.log").open("wb")
-        stderr_handle = (working_directory / "workload.stderr.log").open("wb")
+        stdout_handle = (working_directory / f"{output_stem}.stdout.log").open("wb")
+        stderr_handle = (working_directory / f"{output_stem}.stderr.log").open("wb")
     try:
         return subprocess.Popen(
             args,
@@ -605,7 +729,7 @@ def record_log_samples(recorder: JsonlRecorder, collector: IncrementalLogCollect
 
 
 def wait_for_workload_ready(
-    process: subprocess.Popen[bytes] | None,
+    processes: list[subprocess.Popen[bytes]],
     watcher_collector: WatcherCollector | None,
     watcher_targets: list[WatcherTarget],
     log_roots: list[Path],
@@ -616,30 +740,40 @@ def wait_for_workload_ready(
     """Exclude process and Watcher startup from the measured request window.
     将进程和 Watcher 启动期排除在请求成功率与延迟窗口之外。
     """
-    if process is None or watcher_collector is None or not watcher_targets:
+    if not processes or watcher_collector is None or not watcher_targets:
         return watcher_targets
     deadline = time.monotonic() + timeout_seconds
     last_error: Exception | None = None
     last_observed: dict[str, object] = {}
     while time.monotonic() < deadline:
-        result = process.poll()
-        if result is not None:
+        workload_exit = first_workload_exit(processes)
+        if workload_exit is not None:
             raise WorkloadReadinessError(
-                f"workload exited before readiness with code {result}",
+                f"workload exited before readiness with code {workload_exit}",
                 last_observed,
             )
         try:
             resolved_targets = [resolve_target(target, log_roots) for target in watcher_targets]
             observed: dict[str, object] = {}
             readiness_targets = select_readiness_targets(resolved_targets, readiness)
+            aggregate_readiness = len(readiness_targets) > 1
             for target in readiness_targets:
                 values = watcher_collector.query(target)
-                observed.update(
-                    {
-                        f"{target.path}/{metric}".replace("//", "/"): value
-                        for metric, value in values.items()
-                    }
-                )
+                for metric, value in values.items():
+                    full_metric = f"{target.path}/{metric}".replace("//", "/")
+                    if aggregate_readiness and full_metric in readiness:
+                        previous = observed.get(full_metric, 0)
+                        if not isinstance(previous, (int, float)) or not isinstance(
+                            value, (int, float)
+                        ):
+                            raise ValueError(
+                                f"multi-process readiness metric must be numeric: {full_metric}"
+                            )
+                        observed[full_metric] = previous + value
+                    elif aggregate_readiness:
+                        observed[f"{target.component_name}/{full_metric}"] = value
+                    else:
+                        observed[full_metric] = value
             last_observed = observed
             for metric, expected in readiness.items():
                 if not readiness_value_matches(observed.get(metric), expected, configured_bots):
@@ -685,13 +819,14 @@ def select_readiness_targets(
             for index, target in candidates
             if len(target.path) == longest_path
         ]
-        if len(owners) != 1:
+        owner_shapes = {(target.component_type, target.path) for _, target in owners}
+        if len(owner_shapes) != 1:
             descriptions = ", ".join(
                 f"{target.component_type}={target.host}:{target.port}:{target.path}"
                 for _, target in owners
             )
             raise ValueError(f"ambiguous readiness target for {metric}: {descriptions}")
-        selected.add(owners[0][0])
+        selected.update(index for index, _ in owners)
     return [target for index, target in enumerate(watcher_targets) if index in selected]
 
 
@@ -712,11 +847,23 @@ def readiness_value_matches(observed: object, expected: object, configured_bots:
     return observed == expected_value
 
 
-def wait_for_warmup(process: subprocess.Popen[bytes] | None, seconds: float) -> None:
+def first_workload_exit(processes: list[subprocess.Popen[bytes]]) -> int | None:
+    """Return the first observed workload exit code, if all members should be alive.
+    当压测组成员本应存活时，返回首个已经退出的进程代码。
+    """
+    for process in processes:
+        result = process.poll()
+        if result is not None:
+            return result
+    return None
+
+
+def wait_for_warmup(processes: list[subprocess.Popen[bytes]], seconds: float) -> None:
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
-        if process is not None and process.poll() is not None:
-            raise RuntimeError(f"workload exited during warmup with code {process.returncode}")
+        workload_exit = first_workload_exit(processes)
+        if workload_exit is not None:
+            raise RuntimeError(f"workload exited during warmup with code {workload_exit}")
         time.sleep(min(0.25, max(deadline - time.monotonic(), 0.0)))
 
 
@@ -735,6 +882,12 @@ def stop_process(process: subprocess.Popen[bytes] | None) -> None:
         process.terminate()
     else:
         process.send_signal(signal.SIGTERM)
+
+
+def stop_processes(processes: list[subprocess.Popen[bytes]]) -> None:
+    """Stop every owned workload process. / 停止本轮拥有的全部压测进程。"""
+    for process in processes:
+        stop_process(process)
     try:
         process.wait(timeout=5)
     except subprocess.TimeoutExpired:

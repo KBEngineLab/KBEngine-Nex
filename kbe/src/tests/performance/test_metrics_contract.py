@@ -18,12 +18,15 @@ from performance.process_metrics import ProcessCollector, _parse_windows_process
 from performance.report import build_summary, load_events, validate_event
 from performance.run import (
     _repository_root,
+    expand_bots_watcher_targets,
     load_scenario,
     merge_watcher_target_specs,
+    partition_workload_bots,
     record_watcher_samples,
     readiness_value_matches,
     select_readiness_targets,
     scenario_environment,
+    wait_for_workload_ready,
 )
 from performance.watcher_metrics import WatcherCollector, WatcherSchedule, parse_target, resolve_target
 
@@ -307,6 +310,8 @@ def assert_gameplay_stress_scenario() -> None:
     assert scenario["bots"] == 10000
     assert scenario["duration_seconds"] == 300
     assert scenario["connect_rate_per_second"] == 100
+    assert scenario["workload_processes"] == 4
+    assert scenario["workload_cid_start"] == 10000
     assert "fixture" not in scenario
     assert scenario["server_readiness"]["min_count"] == 52
 
@@ -326,9 +331,18 @@ def assert_readiness_target_ownership() -> None:
     )
     assert selected == [targets[0]]
 
-    ambiguous = [
+    aggregate = [
         parse_target("BOTS_TYPE=127.0.0.1:11000:root/bots/performance"),
         parse_target("BOTS_TYPE=127.0.0.1:11001:root/bots/performance"),
+    ]
+    assert select_readiness_targets(
+        aggregate,
+        {"root/bots/performance/clientsTotal": 1},
+    ) == aggregate
+
+    ambiguous = [
+        parse_target("BOTS_TYPE=127.0.0.1:11000:root/bots/performance"),
+        parse_target("CELLAPP_TYPE=127.0.0.1:11001:root/bots/performance"),
     ]
     try:
         select_readiness_targets(ambiguous, {"root/bots/performance/clientsTotal": 1})
@@ -336,6 +350,54 @@ def assert_readiness_target_ownership() -> None:
         assert "ambiguous readiness target" in str(exc)
     else:
         raise AssertionError("ambiguous readiness ownership must be rejected")
+
+    assert partition_workload_bots(10000, 4) == 2500
+    try:
+        partition_workload_bots(10000, 3)
+    except ValueError as exc:
+        assert "must be divisible" in str(exc)
+    else:
+        raise AssertionError("uneven workload partitions must be rejected")
+
+    expanded = expand_bots_watcher_targets([targets[0], targets[1]], 4, 10000)
+    assert [target.component_name for target in expanded] == [
+        "bots#10000",
+        "bots#10001",
+        "bots#10002",
+        "bots#10003",
+        "baseapp",
+    ]
+
+    class AliveProcess:
+        @staticmethod
+        def poll():
+            return None
+
+    class AggregateCollector:
+        @staticmethod
+        def query(target):
+            assert target.component_type == "BOTS_TYPE"
+            return {"clientsTotal": 2500, "clientsKcp": 2500}
+
+    aggregate_targets = [
+        parse_target(
+            f"BOTS_TYPE=127.0.0.1:{11000 + index}:root/bots/performance"
+        )
+        for index in range(4)
+    ]
+    ready_targets = wait_for_workload_ready(
+        [AliveProcess()],
+        AggregateCollector(),
+        aggregate_targets,
+        [],
+        0.1,
+        {
+            "root/bots/performance/clientsTotal": 10000,
+            "root/bots/performance/clientsKcp": 10000,
+        },
+        10000,
+    )
+    assert ready_targets == aggregate_targets
 
 
 def main() -> int:
@@ -385,11 +447,15 @@ def main() -> int:
         log_root = root / "logs"
         log_root.mkdir()
         (log_root / "machine.log").write_text(
-            "componentType:bots, intaddr:127.0.0.1, intport:13501\n",
+            "componentType:bots, componentID:10000, intaddr:127.0.0.1, intport:13501\n"
+            "componentType:bots, componentID:10001, intaddr:127.0.0.1, intport:13502\n",
             encoding="utf-8",
         )
         resolved = resolve_target(discovered, [log_root])
         assert resolved.host == "127.0.0.1" and resolved.port == 13501
+        selected_bot = parse_target("BOTS_TYPE=@bots#10001:root/bots")
+        resolved_selected_bot = resolve_target(selected_bot, [log_root])
+        assert resolved_selected_bot.port == 13502
         assets = root / "assets/res/server"
         assets.mkdir(parents=True)
         (assets / "kbengine.xml").write_text("<root><bots /></root>\n", encoding="utf-8")

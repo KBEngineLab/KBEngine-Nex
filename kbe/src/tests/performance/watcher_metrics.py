@@ -44,8 +44,15 @@ def resolve_target(target: WatcherTarget, log_roots: list[Path]) -> WatcherTarge
     """
     if not target.component_name:
         return target
+    component_name, separator, component_id = target.component_name.partition("#")
+    if separator and (not component_id or not component_id.isdigit()):
+        raise ValueError(f"invalid component selector: {target.component_name}")
+    component_id_pattern = (
+        rf"componentID:{re.escape(component_id)}(?:,|\s)" if separator else ""
+    )
     pattern = re.compile(
-        rf"componentType:{re.escape(target.component_name)}(?:,|\s).*?intaddr:([^,]+), intport:(\d+)",
+        rf"componentType:{re.escape(component_name)}(?:,|\s).*?"
+        rf"{component_id_pattern}.*?intaddr:([^,]+), intport:(\d+)",
         re.IGNORECASE,
     )
     for root in log_roots:
