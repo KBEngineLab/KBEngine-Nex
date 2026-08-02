@@ -207,6 +207,7 @@ bool ClientApp::installEntityDef()
 	// 注册一些接口到kbengine
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	publish,			__py_getAppPublish,								METH_VARARGS,	0)
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	fireEvent,			__py_fireEvent,									METH_VARARGS,	0)
+	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	recordPerformanceLatency,	__py_recordPerformanceLatency,				METH_VARARGS,	0)
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	player,				__py_getPlayer,									METH_VARARGS,	0)
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	getSpaceData,		__py_GetSpaceData,								METH_VARARGS,	0)
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	callback,			__py_callback,									METH_VARARGS,	0)
@@ -231,6 +232,27 @@ bool ClientApp::installEntityDef()
 	// 匹配相对路径获得全路径
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	matchPath,			__py_matchPath,									METH_VARARGS,	0)
 	return true;
+}
+
+// Python supplies perf_counter_ns timestamps at the probe boundary; derived clients may aggregate them.
+// Python 在探针边界提供 perf_counter_ns 时间戳；派生客户端负责聚合，默认客户端保持无开销空实现。
+void ClientApp::recordPythonPerformanceLatency(uint64 startNs, uint64 endNs)
+{
+	(void)startNs;
+	(void)endNs;
+}
+
+PyObject* ClientApp::__py_recordPerformanceLatency(PyObject* self, PyObject* args)
+{
+	unsigned long long startNs = 0;
+	unsigned long long endNs = 0;
+	if (!PyArg_ParseTuple(args, "KK", &startNs, &endNs) || endNs < startNs)
+	{
+		PyErr_SetString(PyExc_ValueError, "recordPerformanceLatency expects end_ns >= start_ns");
+		return NULL;
+	}
+	ClientApp::getSingleton().recordPythonPerformanceLatency(static_cast<uint64>(startNs), static_cast<uint64>(endNs));
+	S_Return;
 }
 
 //-------------------------------------------------------------------------------------

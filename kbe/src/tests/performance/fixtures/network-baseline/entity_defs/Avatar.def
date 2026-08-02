@@ -11,6 +11,15 @@
         <createCell>
             <Arg>ENTITYCALL</Arg>
         </createCell>
+		<pythonPerformanceProbe>
+			<Exposed/>
+			<Arg>UINT64</Arg>
+		</pythonPerformanceProbe>
     </BaseMethods>
     <CellMethods />
+    <ClientMethods>
+		<pythonPerformanceProbeResponse>
+			<Arg>UINT64</Arg>
+		</pythonPerformanceProbeResponse>
+	</ClientMethods>
 </root>

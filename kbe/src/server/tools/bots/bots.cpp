@@ -45,6 +45,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "helper/profiler.h"
 #include "helper/profile_handler.h"
 #include "pyscript/pyprofile_handler.h"
+#include <algorithm>
 
 #include "../../../server/baseapp/baseapp_interface.h"
 #include "../../../server/loginapp/loginapp_interface.h"
@@ -165,6 +166,8 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/kcpFixedAllocatedBytes", this, &Bots::kcpFixedAllocatedBytes);
 	WATCH_OBJECT("bots/performance/kcpDynamicAllocatedBytes", this, &Bots::kcpDynamicAllocatedBytes);
 	WATCH_OBJECT("bots/performance/clientEntities", this, &Bots::numClientEntities);
+	WATCH_OBJECT("bots/performance/pythonLatencyCount", this, &Bots::pythonPerformanceLatencyCount);
+	WATCH_OBJECT("bots/performance/pythonLatencyP99Micros", this, &Bots::pythonPerformanceLatencyP99Micros);
 	return WatchPool::initWatchPools();
 }
 
@@ -491,6 +494,29 @@ uint64 Bots::numClientEntities() const
 			count += static_cast<uint64>(pClient->pEntities()->size());
 	}
 	return count;
+}
+
+void Bots::recordPythonPerformanceLatency(uint64 startNs, uint64 endNs)
+{
+	if (endNs < startNs)
+		return;
+	if (pythonPerformanceLatenciesMicros_.size() >= 100000)
+		pythonPerformanceLatenciesMicros_.erase(pythonPerformanceLatenciesMicros_.begin());
+	pythonPerformanceLatenciesMicros_.push_back((endNs - startNs) / 1000);
+}
+
+uint64 Bots::pythonPerformanceLatencyCount() const
+{
+	return static_cast<uint64>(pythonPerformanceLatenciesMicros_.size());
+}
+
+uint64 Bots::pythonPerformanceLatencyP99Micros() const
+{
+	if (pythonPerformanceLatenciesMicros_.empty())
+		return 0;
+	std::vector<uint64> ordered(pythonPerformanceLatenciesMicros_);
+	std::sort(ordered.begin(), ordered.end());
+	return ordered[(ordered.size() - 1) * 99 / 100];
 }
 
 //-------------------------------------------------------------------------------------

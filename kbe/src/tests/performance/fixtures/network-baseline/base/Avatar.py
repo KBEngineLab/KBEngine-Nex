@@ -36,3 +36,7 @@ class Avatar(KBEngine.Proxy):
             account.destroy()
         if not self.isDestroyed:
             self.destroy()
+
+    def pythonPerformanceProbe(self, started_ns):
+        if self.client is not None:
+            self.client.pythonPerformanceProbeResponse(started_ns)

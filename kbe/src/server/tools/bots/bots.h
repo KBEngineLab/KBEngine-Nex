@@ -131,6 +131,9 @@ public:
 	uint64 numClientEntities() const;
 	uint64 kcpFixedAllocatedBytes() const;
 	uint64 kcpDynamicAllocatedBytes() const;
+	void recordPythonPerformanceLatency(uint64 startNs, uint64 endNs) override;
+	uint64 pythonPerformanceLatencyCount() const;
+	uint64 pythonPerformanceLatencyP99Micros() const;
 	uint32 numClients() const { return static_cast<uint32>(clients_.size()); }
 	uint64 totalKcpHandshakeSuccesses() const { return totalKcpHandshakeSuccesses_; }
 	uint64 totalTcpConnections() const { return totalTcpConnections_; }
@@ -431,6 +434,7 @@ protected:
 	uint64											totalRemovedClients_;
 	uint64											lastBotsTickMicros_;
 	uint64											maxBotsTickMicros_;
+	std::vector<uint64> pythonPerformanceLatenciesMicros_;
 };
 
 }

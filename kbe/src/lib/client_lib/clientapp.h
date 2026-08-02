@@ -90,6 +90,7 @@ public:
 
 	virtual bool installPyModules();
 	virtual void onInstallPyModules(){};
+	virtual void recordPythonPerformanceLatency(uint64 startNs, uint64 endNs);
 	virtual bool uninstallPyModules();
 	virtual bool uninstallPyScript();
 	virtual bool installEntityDef();
@@ -131,6 +132,7 @@ public:
 	static PyObject* __py_getAppPublish(PyObject* self, PyObject* args);
 	static PyObject* __py_getPlayer(PyObject* self, PyObject* args);
 	static PyObject* __py_fireEvent(PyObject* self, PyObject* args);
+	static PyObject* __py_recordPerformanceLatency(PyObject* self, PyObject* args);
 
 	virtual void onServerClosed();
 
