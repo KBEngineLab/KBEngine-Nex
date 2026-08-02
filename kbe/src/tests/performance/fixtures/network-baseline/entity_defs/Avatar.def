@@ -6,7 +6,6 @@
         <roll />
     </Volatile>
     <Properties />
-    <ClientMethods />
     <BaseMethods>
         <createCell>
             <Arg>ENTITYCALL</Arg>

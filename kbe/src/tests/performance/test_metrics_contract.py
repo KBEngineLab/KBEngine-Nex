@@ -33,6 +33,11 @@ def assert_fixture_callbacks() -> None:
         functions = {node.name for node in module.body if isinstance(node, ast.FunctionDef)}
         assert set(callbacks).issubset(functions), f"missing fixture callback in {relative}"
 
+    avatar_def = ET.parse(fixture_root / "entity_defs/Avatar.def").getroot()
+    client_methods = avatar_def.findall("./ClientMethods")
+    assert len(client_methods) == 1, "Avatar.def must contain one ClientMethods section"
+    assert client_methods[0].find("./pythonPerformanceProbeResponse") is not None
+
 
 def main() -> int:
     assert_fixture_callbacks()
