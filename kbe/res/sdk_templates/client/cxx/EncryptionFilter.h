@@ -63,7 +63,7 @@ namespace KBEngine {
         static const int MIN_KEY_SIZE = 4;
         static const int MAX_KEY_SIZE = 56;
         static const int BLOCK_SIZE = 8;          // Blowfish块大小
-        static const int MIN_PACKET_SIZE = 3;     // 最小包大小：uint16 + uint8
+        static const int MIN_PACKET_SIZE = 3 + BLOCK_SIZE; // 帧头 + 至少一个 Blowfish 块 / Header plus one block
 
         bool isGood_;
         MemoryStream* pPacket_;
@@ -87,6 +87,8 @@ namespace KBEngine {
         // 执行Blowfish加密（确保与OpenSSL一致）
         void blowfishEncrypt(uint8_t* dst, const uint8_t* src) const;
         void blowfishDecrypt(uint8_t* dst, const uint8_t* src) const;
+        bool validFrame(uint16 encodedLength, uint8 padSize, uint16& payloadLength) const;
+        void resetReceiveFrame();
     };
 
 } // namespace KBEngine

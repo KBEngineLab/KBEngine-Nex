@@ -79,6 +79,34 @@ file(READ "${KBE_SOURCE_ROOT}/lib/server/callbackmgr.h" _kbe_callbackmgr)
 file(READ "${KBE_SOURCE_ROOT}/lib/server/serverapp.cpp" _kbe_serverapp)
 file(READ "${KBE_SOURCE_ROOT}/lib/server/serverapp.h" _kbe_serverapp_header)
 file(READ "${KBE_SOURCE_ROOT}/lib/server/globaldata_server.cpp" _kbe_globaldata_server)
+file(READ "${KBE_SOURCE_ROOT}/../res/sdk_templates/client/csharp/EncryptionFilter.cs" _kbe_sdk_csharp_encryption)
+file(READ "${KBE_SOURCE_ROOT}/../res/sdk_templates/client/cxx/EncryptionFilter.cpp" _kbe_sdk_cxx_encryption)
+file(READ "${KBE_SOURCE_ROOT}/../res/sdk_templates/client/gdscript/BlowfishFilter.gd" _kbe_sdk_gdscript_encryption)
+
+# Generated SDKs must reject malformed Blowfish frames before decrypting or
+# passing bytes to a message reader. 生成 SDK 必须在解密和消息解析前拒绝非法帧。
+foreach(_kbe_required IN ITEMS
+	"invalid encrypted frame"
+	"payloadLength % (int)BLOCK_SIZE"
+	"padSize < (int)BLOCK_SIZE"
+)
+	string(FIND "${_kbe_sdk_csharp_encryption}" "${_kbe_required}" _kbe_required_position)
+	if(_kbe_required_position EQUAL -1)
+		message(FATAL_ERROR "C# SDK Blowfish frame guard is missing: ${_kbe_required}")
+	endif()
+endforeach()
+
+foreach(_kbe_sdk_encryption_source IN ITEMS
+	"${_kbe_sdk_cxx_encryption}"
+	"${_kbe_sdk_gdscript_encryption}"
+)
+	foreach(_kbe_required IN ITEMS "invalid encrypted frame" "% BLOCK_SIZE" "< BLOCK_SIZE")
+		string(FIND "${_kbe_sdk_encryption_source}" "${_kbe_required}" _kbe_required_position)
+		if(_kbe_required_position EQUAL -1)
+			message(FATAL_ERROR "C++ or GDScript SDK Blowfish frame guard is missing: ${_kbe_required}")
+		endif()
+	endforeach()
+endforeach()
 
 # Stream handlers carry runtime-sized MemoryStream bodies. Declaring one as a
 # fixed zero-length message makes the payload parse as unrelated message IDs.

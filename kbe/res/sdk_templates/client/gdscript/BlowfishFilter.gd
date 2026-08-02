@@ -9,6 +9,16 @@ var m_enctyptStrem:MemoryStream
 var m_padSize:int
 var m_packLen:int
 
+func validFrame(_encodedLength:int, _padSize:int)-> bool:
+	var encryptedPayloadLen:int = _encodedLength - 1 if _encodedLength > 0 else 0
+	return encryptedPayloadLen > 0 and encryptedPayloadLen % BLOCK_SIZE == 0 \
+		and _padSize >= 0 and _padSize < BLOCK_SIZE and _padSize <= encryptedPayloadLen
+
+func resetReceiveFrame()-> void:
+	self.m_packet.clear()
+	self.m_packLen = 0
+	self.m_padSize = 0
+
 func _init()-> void:
 	self.m_blowfish = Blowfish.new()
 	self.m_packet = ObjectPool.createObject(MemoryStream)
@@ -58,17 +68,19 @@ func recv(_reader:MessageReaderBase, _buffer:PackedByteArray, _rpos:int, _len:in
 		Dbg.ERROR_MSG("BlowfishFilter::recv: Dropping packet, due to invalid filter")
 		return false
 
-	if self.m_packet.length() == 0 and _len >= MIN_PACKET_SIZE \
-			and _buffer.decode_u16(_rpos) - 1 == _len - 3:
-	
-		var packLen:int = _buffer.decode_u16(_rpos) - 1
+	if self.m_packet.length() == 0 and _len >= MIN_PACKET_SIZE:
+		var encodedLength:int = _buffer.decode_u16(_rpos)
 		var padSize:int = _buffer[_rpos + 2]
-		decryptData(_buffer, _rpos + 3, _len - 3)
-
-		var length:int = packLen - padSize
-		if _reader:
-			_reader.process(_buffer, _rpos + 3, length)
-		return true
+		if not validFrame(encodedLength, padSize):
+			Dbg.ERROR_MSG("BlowfishFilter::recv: invalid encrypted frame")
+			resetReceiveFrame()
+			return false
+		var packLen:int = encodedLength - 1
+		if packLen == _len - 3:
+			decryptData(_buffer, _rpos + 3, packLen)
+			if _reader:
+				_reader.process(_buffer, _rpos + 3, packLen - padSize)
+			return true
 
 	self.m_packet.append(_buffer, _rpos, _len)
 	while self.m_packet.length() > 0:
@@ -77,9 +89,13 @@ func recv(_reader:MessageReaderBase, _buffer:PackedByteArray, _rpos:int, _len:in
 		if self.m_packLen <= 0:
 			# 如果满足一个最小包则尝试解包, 否则缓存这个包待与下一个包合并然后解包
 			if self.m_packet.length() >= MIN_PACKET_SIZE:
-				self.m_packLen = self.m_packet.readUint16()
+				var encodedLength:int = self.m_packet.readUint16()
 				self.m_padSize = self.m_packet.readUint8()
-				self.m_packLen -= 1
+				if not validFrame(encodedLength, self.m_padSize):
+					Dbg.ERROR_MSG("BlowfishFilter::recv: invalid encrypted frame")
+					resetReceiveFrame()
+					return false
+				self.m_packLen = encodedLength - 1
 				if self.m_packet.length() > self.m_packLen:
 					currLen = self.m_packet.rpos + self.m_packLen
 					oldwpos = self.m_packet.wpos

@@ -29,6 +29,20 @@
         const UInt32 BLOCK_SIZE = 8;
         const UInt32 MIN_PACKET_SIZE = sizeof(UInt16) + 1 + BLOCK_SIZE;
 
+        private static bool validFrame(int encodedLength, int padSize, out int payloadLength)
+        {
+            payloadLength = encodedLength > 0 ? encodedLength - 1 : 0;
+            return payloadLength > 0 && payloadLength % (int)BLOCK_SIZE == 0 &&
+                padSize >= 0 && padSize < (int)BLOCK_SIZE && padSize <= payloadLength;
+        }
+
+        private void resetReceiveFrame()
+        {
+            _packet.clear();
+            _packLen = 0;
+            _padSize = 0;
+        }
+
         public BlowfishFilter()
         {
         }
@@ -111,20 +125,27 @@
                 return false;
             }
 
-            if (_packet.length() == 0 && len >= MIN_PACKET_SIZE && BitConverter.ToUInt16(buffer, (int)rpos) - 1 == len - 3)
+            if (_packet.length() == 0 && len >= MIN_PACKET_SIZE)
             {
-                int packLen = BitConverter.ToUInt16(buffer, (int)rpos) - 1;
+                int encodedLength = BitConverter.ToUInt16(buffer, (int)rpos);
                 int padSize = buffer[rpos + 2];
-
-                decrypt(buffer, (int)(rpos + 3), (int)(len - 3));
-
-                int length = packLen - padSize;
-                if (reader != null)
+                int packLen;
+                if (!validFrame(encodedLength, padSize, out packLen))
                 {
-                    reader.process(buffer, rpos + 3, (UInt32)length);
+                    KBELog.ERROR_MSG("BlowfishFilter::recv: invalid encrypted frame");
+                    resetReceiveFrame();
+                    return false;
                 }
 
-                return true;
+                if ((UInt32)packLen == len - 3)
+                {
+                    decrypt(buffer, (int)(rpos + 3), packLen);
+
+                    if (reader != null)
+                        reader.process(buffer, rpos + 3, (UInt32)(packLen - padSize));
+
+                    return true;
+                }
             }
 
             _packet.append(buffer, rpos, len);
@@ -138,10 +159,16 @@
                     // 如果满足一个最小包则尝试解包, 否则缓存这个包待与下一个包合并然后解包
                     if (_packet.length() >= MIN_PACKET_SIZE)
                     {
-                        _packLen = _packet.readUint16();
+                        int encodedLength = _packet.readUint16();
                         _padSize = _packet.readUint8();
-
-                        _packLen -= 1;
+                        int payloadLength;
+                        if (!validFrame(encodedLength, _padSize, out payloadLength))
+                        {
+                            KBELog.ERROR_MSG("BlowfishFilter::recv: invalid encrypted frame");
+                            resetReceiveFrame();
+                            return false;
+                        }
+                        _packLen = (UInt16)payloadLength;
 
                         if (_packet.length() > _packLen)
                         {

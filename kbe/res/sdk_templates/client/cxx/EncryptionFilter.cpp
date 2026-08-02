@@ -275,21 +275,40 @@ bool BlowfishFilter::send(NetworkInterfaceBase* pPacketSender, MemoryStream* pPa
     return pPacketSender->sendTo(pPacket);
 }
 
+bool BlowfishFilter::validFrame(uint16 encodedLength, uint8 padSize, uint16& payloadLength) const {
+    payloadLength = encodedLength > 0 ? static_cast<uint16>(encodedLength - 1) : 0;
+    return payloadLength > 0 && payloadLength % BLOCK_SIZE == 0 &&
+        padSize < BLOCK_SIZE && padSize <= payloadLength;
+}
+
+void BlowfishFilter::resetReceiveFrame() {
+    pPacket_->clear(false);
+    packetLen_ = 0;
+    padSize_ = 0;
+}
+
 bool BlowfishFilter::recv(MessageReader* pMessageReader, MemoryStream* pPacket) {
     if (!isGood_) {
         ERROR_MSG("BlowfishFilter::recv: Dropping packet due to invalid filter");
         return false;
     }
 
-    uint32 oldrpos = pPacket->rpos();
     uint32 len = pPacket->length();
-    uint16 packeLen = pPacket->readUint16();
+    uint32 oldrpos = pPacket->rpos();
 
     // 检查是否为一个完整的包
-    if (len > MIN_PACKET_SIZE) {
+    if (pPacket_->length() == 0 && len >= MIN_PACKET_SIZE) {
+        uint16 encodedLength = pPacket->readUint16();
+        uint8 padSize = pPacket->readUint8();
+        uint16 payloadLength = 0;
+        if (!validFrame(encodedLength, padSize, payloadLength)) {
+            ERROR_MSG("BlowfishFilter::recv: invalid encrypted frame");
+            pPacket->clear(false);
+            resetReceiveFrame();
+            return false;
+        }
 
-        if (0 == pPacket_->length() && static_cast<uint32>(packeLen - 1) == len - 3) {
-            uint8 padSize = pPacket->readUint8();
+        if (static_cast<uint32>(payloadLength) == len - 3) {
             decrypt(pPacket);
 
             // 移除填充字节
@@ -301,7 +320,7 @@ bool BlowfishFilter::recv(MessageReader* pMessageReader, MemoryStream* pPacket) 
             // 处理消息
             if (pMessageReader) {
                 // 这里需要实现MessageReader::process接口
-                pMessageReader->process(pPacket->data() + pPacket->rpos(), 0, pPacket->length() - padSize);
+                pMessageReader->process(pPacket->data() + pPacket->rpos(), 0, payloadLength - padSize);
             }
 
             pPacket->clear(false);
@@ -321,10 +340,16 @@ bool BlowfishFilter::recv(MessageReader* pMessageReader, MemoryStream* pPacket) 
 
         if (packetLen_ <= 0) {
             if (pPacket_->length() >= MIN_PACKET_SIZE) {
-                (*pPacket_) >> packetLen_;
+                uint16 encodedLength = 0;
+                (*pPacket_) >> encodedLength;
                 (*pPacket_) >> padSize_;
-
-                packetLen_ -= 1;
+                uint16 payloadLength = 0;
+                if (!validFrame(encodedLength, padSize_, payloadLength)) {
+                    ERROR_MSG("BlowfishFilter::recv: invalid encrypted frame");
+                    resetReceiveFrame();
+                    return false;
+                }
+                packetLen_ = payloadLength;
 
                 if (pPacket_->length() > packetLen_) {
                     currLen = pPacket_->rpos() + packetLen_;
