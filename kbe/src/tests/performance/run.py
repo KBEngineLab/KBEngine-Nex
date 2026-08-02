@@ -937,11 +937,15 @@ def stop_processes(processes: list[subprocess.Popen[bytes]]) -> None:
     """Stop every owned workload process. / 停止本轮拥有的全部压测进程。"""
     for process in processes:
         stop_process(process)
-    try:
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait()
+    # 先通知全部成员，再逐个等待，避免串行等待期间其他成员继续产生负载。
+    # Notify every member first, then wait individually so peers cannot keep
+    # producing load while an earlier process consumes its shutdown timeout.
+    for process in processes:
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
 
 
 if __name__ == "__main__":

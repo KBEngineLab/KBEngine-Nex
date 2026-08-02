@@ -29,6 +29,7 @@ from performance.run import (
     select_readiness_targets,
     scenario_environment,
     wait_for_workload_ready,
+    start_workload_commands,
 )
 from performance.watcher_metrics import WatcherCollector, WatcherSchedule, parse_target, resolve_target
 
@@ -54,6 +55,55 @@ def assert_centralized_discovery_matching() -> None:
     assert controller.centralized_discovery_marker(central_log, "cellappmgr", 6000)
     assert not controller.centralized_discovery_marker(central_log, "baseappmgr", 6000)
     assert not controller.centralized_discovery_marker(central_log, "interfaces", 3000)
+
+
+def assert_partial_workload_start_cleanup() -> None:
+    class FakeProcess:
+        def __init__(self):
+            self.terminated = False
+            self.waited = False
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            self.terminated = True
+
+        def wait(self, timeout=None):
+            self.waited = True
+            return 0
+
+    globals_ = start_workload_commands.__globals__
+    original = globals_["start_command"]
+    first = FakeProcess()
+    calls = 0
+
+    def fail_second(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return first
+        raise FileNotFoundError("missing workload")
+
+    try:
+        globals_["start_command"] = fail_second
+        try:
+            start_workload_commands("bots --cid={cid}", 2, 10000, 40)
+            raise AssertionError("partial workload startup should fail")
+        except FileNotFoundError as exc:
+            assert str(exc) == "missing workload"
+        assert first.terminated and first.waited
+
+        globals_["start_command"] = lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            FileNotFoundError("first workload missing")
+        )
+        try:
+            start_workload_commands("bots", 1, 10000, 40)
+            raise AssertionError("first workload startup should fail")
+        except FileNotFoundError as exc:
+            assert str(exc) == "first workload missing"
+    finally:
+        globals_["start_command"] = original
 
 
 def assert_watcher_connection_reuse() -> None:
@@ -451,6 +501,7 @@ def assert_readiness_target_ownership() -> None:
 
 def main() -> int:
     assert_centralized_discovery_matching()
+    assert_partial_workload_start_cleanup()
     assert_watcher_connection_reuse()
     assert_watcher_schedule()
     assert_cprofile_window_metrics()
