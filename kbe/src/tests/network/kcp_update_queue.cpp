@@ -105,6 +105,22 @@ bool testRescheduleAfterTake()
 	return require(queue.takeDue(2, key) && key == 5, "callback-style reschedule did not fire") &&
 		require(queue.scheduleRequestCount() == 2, "schedule request metric is incorrect");
 }
+
+bool testDueAndOverdueMetrics()
+{
+	KBEngine::Network::KcpUpdateQueue queue;
+	queue.schedule(1, 10);
+	queue.schedule(2, 20);
+	queue.schedule(3, 30);
+
+	KBEngine::Network::KcpUpdateQueue::Key key = 0;
+	KBEngine::Network::KcpUpdateQueue::Time dueTime = 0;
+	return require(queue.dueCount(20) == 2, "due count is incorrect") &&
+		require(queue.overdueCount(20) == 1, "overdue count is incorrect") &&
+		require(queue.takeDue(20, key, &dueTime) && key == 1 && dueTime == 10,
+			"taken deadline was not reported") &&
+		require(queue.dueCount(20) == 1, "taken entry remained in due count");
+}
 }
 
 int main()
@@ -113,7 +129,8 @@ int main()
 		!testEarlierReplacementAndStaleEntry() ||
 		!testCancellationAndKeyReuse() ||
 		!testBoundedStaleCompaction() ||
-		!testRescheduleAfterTake())
+		!testRescheduleAfterTake() ||
+		!testDueAndOverdueMetrics())
 	{
 		return EXIT_FAILURE;
 	}

@@ -134,6 +134,13 @@ public:
 	virtual uint64 udpSendBacklogBytes() const;
 	virtual uint64 udpSendBacklogPeakBytes() const;
 	virtual uint64 udpSendBackpressureCount() const;
+	virtual uint64 completionProcessRounds() const;
+	virtual uint64 completionProcessedCount() const;
+	virtual uint64 completionLastBatchCount() const;
+	virtual uint64 completionMaxBatchCount() const;
+	virtual uint64 completionBudgetExhaustionCount() const;
+	virtual uint64 completionConsecutiveBudgetExhaustions() const;
+	virtual uint64 completionMaxConsecutiveBudgetExhaustions() const;
 
 	void clearSpareTime()		{spareTime_ = 0;}
 	uint64 spareTime() const	{return spareTime_;}

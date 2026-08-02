@@ -28,6 +28,8 @@ def create_config_overlay(
     tick_count: int | None = None,
     external_receive_messages: int | None = None,
     external_receive_bytes: int | None = None,
+    reliable_udp_tick_interval_ms: int | None = None,
+    reliable_udp_min_rto_ms: int | None = None,
 ) -> Path:
     """Write only the per-run XML override; source assets remain read-only.
     只写入本次运行的 XML 覆盖文件，源资产保持只读。
@@ -77,6 +79,22 @@ def create_config_overlay(
             if receive_bytes is None:
                 receive_bytes = ET.SubElement(receive, "bytes")
             set_xml_value(receive_bytes, "external", external_receive_bytes)
+
+    if reliable_udp_tick_interval_ms is not None or reliable_udp_min_rto_ms is not None:
+        network_interface = root.find("./networkInterface")
+        if network_interface is None:
+            network_interface = ET.SubElement(root, "networkInterface")
+        reliable_udp = network_interface.find("./reliableUDP")
+        if reliable_udp is None:
+            reliable_udp = ET.SubElement(network_interface, "reliableUDP")
+        if reliable_udp_tick_interval_ms is not None:
+            if not 1 <= reliable_udp_tick_interval_ms <= 1000:
+                raise ValueError("reliable UDP tick interval must be between 1 and 1000 milliseconds")
+            set_xml_value(reliable_udp, "tickInterval", reliable_udp_tick_interval_ms)
+        if reliable_udp_min_rto_ms is not None:
+            if not 1 <= reliable_udp_min_rto_ms <= 60000:
+                raise ValueError("reliable UDP minimum RTO must be between 1 and 60000 milliseconds")
+            set_xml_value(reliable_udp, "minRTO", reliable_udp_min_rto_ms)
 
     destination = output_root / "config-overlay/res/server/kbengine.xml"
     destination.parent.mkdir(parents=True, exist_ok=True)

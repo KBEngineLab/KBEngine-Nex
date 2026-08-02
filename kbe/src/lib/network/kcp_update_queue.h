@@ -28,8 +28,10 @@ public:
 
 	// Due entries transfer out one at a time so callbacks may safely reschedule the same key.
 	// 到期项逐个移出，使回调能够安全地重新调度同一个 key。
-	bool takeDue(Time now, Key& key);
+	bool takeDue(Time now, Key& key, Time* pDueTime = NULL);
 	bool nextDue(Time& dueTime);
+	size_t dueCount(Time now) const;
+	size_t overdueCount(Time now) const;
 
 	size_t scheduledCount() const { return scheduledCount_; }
 	size_t heapEntryCount() const { return heap_.size(); }

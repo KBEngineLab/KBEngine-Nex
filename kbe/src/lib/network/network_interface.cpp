@@ -56,6 +56,10 @@ NetworkInterface::NetworkInterface(Network::EventDispatcher * pDispatcher,
 	channelMap_(),
 	channelMaintenance_(),
 	channelTickEpoch_(0),
+	finalizedKcpAckSentCount_(0),
+	finalizedKcpAckReceivedCount_(0),
+	finalizedKcpTimeoutRetransmissionCount_(0),
+	finalizedKcpFastRetransmissionCount_(0),
 	pDispatcher_(pDispatcher),
 	kcpUpdateScheduler_(*pDispatcher),
 	pExtListenerReceiver_(NULL),
@@ -666,6 +670,13 @@ KBE_POLLER_METRIC(pollerReceiveTransferredBytes, receiveOwnershipTransferredByte
 KBE_POLLER_METRIC(pollerUdpSendBacklogBytes, udpSendBacklogBytes)
 KBE_POLLER_METRIC(pollerUdpSendBacklogPeakBytes, udpSendBacklogPeakBytes)
 KBE_POLLER_METRIC(pollerUdpSendBackpressureCount, udpSendBackpressureCount)
+KBE_POLLER_METRIC(pollerCompletionProcessRounds, completionProcessRounds)
+KBE_POLLER_METRIC(pollerCompletionProcessedCount, completionProcessedCount)
+KBE_POLLER_METRIC(pollerCompletionLastBatchCount, completionLastBatchCount)
+KBE_POLLER_METRIC(pollerCompletionMaxBatchCount, completionMaxBatchCount)
+KBE_POLLER_METRIC(pollerCompletionBudgetExhaustionCount, completionBudgetExhaustionCount)
+KBE_POLLER_METRIC(pollerCompletionConsecutiveBudgetExhaustions, completionConsecutiveBudgetExhaustions)
+KBE_POLLER_METRIC(pollerCompletionMaxConsecutiveBudgetExhaustions, completionMaxConsecutiveBudgetExhaustions)
 
 #undef KBE_POLLER_METRIC
 
@@ -679,6 +690,13 @@ uint64 NetworkInterface::kcpSchedulerCompactionCount() const { return kcpUpdateS
 uint64 NetworkInterface::kcpUpdateCallCount() const { return kcpUpdateScheduler_.updateCallCount(); }
 uint64 NetworkInterface::kcpTimerWakeupCount() const { return kcpUpdateScheduler_.timerWakeupCount(); }
 uint64 NetworkInterface::kcpTimerRearmCount() const { return kcpUpdateScheduler_.timerRearmCount(); }
+uint64 NetworkInterface::kcpDueChannelCount() const { return kcpUpdateScheduler_.dueChannelCount(); }
+uint64 NetworkInterface::kcpOverdueChannelCount() const { return kcpUpdateScheduler_.overdueChannelCount(); }
+uint64 NetworkInterface::kcpDeadlineMissCount() const { return kcpUpdateScheduler_.deadlineMissCount(); }
+uint64 NetworkInterface::kcpMaxScheduleDelayMicros() const { return kcpUpdateScheduler_.maxScheduleDelayMicros(); }
+uint64 NetworkInterface::kcpBudgetExhaustionCount() const { return kcpUpdateScheduler_.budgetExhaustionCount(); }
+uint64 NetworkInterface::kcpConsecutiveBudgetExhaustions() const { return kcpUpdateScheduler_.consecutiveBudgetExhaustions(); }
+uint64 NetworkInterface::kcpMaxConsecutiveBudgetExhaustions() const { return kcpUpdateScheduler_.maxConsecutiveBudgetExhaustions(); }
 
 //-------------------------------------------------------------------------------------
 uint64 NetworkInterface::kcpPendingSegmentCount() const
@@ -735,14 +753,40 @@ uint64 NetworkInterface::kcpAcknowledgedSegmentCount() const
 //-------------------------------------------------------------------------------------
 uint64 NetworkInterface::kcpRetransmissionCount() const
 {
-	uint64 retransmissions = 0;
-	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
-	{
-		const Channel* pChannel = iter->second;
-		if (pChannel != NULL && pChannel->pKCP() != NULL)
-			retransmissions += static_cast<uint64>(pChannel->pKCP()->xmit);
+	return kcpTimeoutRetransmissionCount() + kcpFastRetransmissionCount();
+}
+
+//-------------------------------------------------------------------------------------
+#define KBE_KCP_CUMULATIVE_METRIC(methodName, fieldName, finalizedFieldName) \
+	uint64 NetworkInterface::methodName() const \
+	{ \
+		uint64 total = finalizedFieldName; \
+		for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter) \
+		{ \
+			const Channel* pChannel = iter->second; \
+			if (pChannel != NULL && pChannel->pKCP() != NULL) \
+				total += static_cast<uint64>(pChannel->pKCP()->fieldName); \
+		} \
+		return total; \
 	}
-	return retransmissions;
+
+KBE_KCP_CUMULATIVE_METRIC(kcpTimeoutRetransmissionCount, timeout_retransmissions, finalizedKcpTimeoutRetransmissionCount_)
+KBE_KCP_CUMULATIVE_METRIC(kcpFastRetransmissionCount, fast_retransmissions, finalizedKcpFastRetransmissionCount_)
+KBE_KCP_CUMULATIVE_METRIC(kcpAckSentCount, ack_sent, finalizedKcpAckSentCount_)
+KBE_KCP_CUMULATIVE_METRIC(kcpAckReceivedCount, ack_received, finalizedKcpAckReceivedCount_)
+
+#undef KBE_KCP_CUMULATIVE_METRIC
+
+//-------------------------------------------------------------------------------------
+void NetworkInterface::accumulateFinalizedKcpDiagnostics(uint64 ackSent, uint64 ackReceived,
+	uint64 timeoutRetransmissions, uint64 fastRetransmissions)
+{
+	// Channel 和 NetworkInterface 都属于同一 dispatcher 线程；归档销毁连接的计数不需要锁或原子操作。
+	// Channel and NetworkInterface share one dispatcher thread, so archiving a closing connection needs no lock or atomic operation.
+	finalizedKcpAckSentCount_ += ackSent;
+	finalizedKcpAckReceivedCount_ += ackReceived;
+	finalizedKcpTimeoutRetransmissionCount_ += timeoutRetransmissions;
+	finalizedKcpFastRetransmissionCount_ += fastRetransmissions;
 }
 
 //-------------------------------------------------------------------------------------

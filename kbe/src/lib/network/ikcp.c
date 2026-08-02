@@ -294,6 +294,10 @@ ikcpcb* ikcp_create(IUINT32 conv, void *user)
 	kcp->acklist = NULL;
 	kcp->ackblock = 0;
 	kcp->ackcount = 0;
+	kcp->ack_sent = 0;
+	kcp->ack_received = 0;
+	kcp->timeout_retransmissions = 0;
+	kcp->fast_retransmissions = 0;
 	kcp->rx_srtt = 0;
 	kcp->rx_rttval = 0;
 	kcp->rx_rto = IKCP_RTO_DEF;
@@ -807,6 +811,7 @@ int ikcp_input(ikcpcb *kcp, const char *data, long size)
 		ikcp_shrink_buf(kcp);
 
 		if (cmd == IKCP_CMD_ACK) {
+			kcp->ack_received++;
 			if (_itimediff(kcp->current, ts) >= 0) {
 				ikcp_update_ack(kcp, _itimediff(kcp->current, ts));
 			}
@@ -959,6 +964,7 @@ void ikcp_flush(ikcpcb *kcp)
 
 	// flush acknowledges
 	count = kcp->ackcount;
+	kcp->ack_sent += (IUINT64)count;
 	for (i = 0; i < count; i++) {
 		size = (int)(ptr - buffer);
 		if (size + (int)IKCP_OVERHEAD > (int)kcp->mtu) {
@@ -1063,6 +1069,7 @@ void ikcp_flush(ikcpcb *kcp)
 			needsend = 1;
 			segment->xmit++;
 			kcp->xmit++;
+			kcp->timeout_retransmissions++;
 			if (kcp->nodelay == 0) {
 				segment->rto += kcp->rx_rto;
 			}	else {
@@ -1077,6 +1084,7 @@ void ikcp_flush(ikcpcb *kcp)
 			segment->fastack = 0;
 			segment->resendts = current + segment->rto;
 			change++;
+			kcp->fast_retransmissions++;
 		}
 
 		if (needsend) {

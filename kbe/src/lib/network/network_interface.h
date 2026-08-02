@@ -146,6 +146,13 @@ public:
 	uint64 pollerUdpSendBacklogBytes() const;
 	uint64 pollerUdpSendBacklogPeakBytes() const;
 	uint64 pollerUdpSendBackpressureCount() const;
+	uint64 pollerCompletionProcessRounds() const;
+	uint64 pollerCompletionProcessedCount() const;
+	uint64 pollerCompletionLastBatchCount() const;
+	uint64 pollerCompletionMaxBatchCount() const;
+	uint64 pollerCompletionBudgetExhaustionCount() const;
+	uint64 pollerCompletionConsecutiveBudgetExhaustions() const;
+	uint64 pollerCompletionMaxConsecutiveBudgetExhaustions() const;
 	uint64 kcpScheduledChannelCount() const;
 	uint64 kcpSchedulerHeapEntryCount() const;
 	uint64 kcpScheduleRequestCount() const;
@@ -155,11 +162,22 @@ public:
 	uint64 kcpUpdateCallCount() const;
 	uint64 kcpTimerWakeupCount() const;
 	uint64 kcpTimerRearmCount() const;
+	uint64 kcpDueChannelCount() const;
+	uint64 kcpOverdueChannelCount() const;
+	uint64 kcpDeadlineMissCount() const;
+	uint64 kcpMaxScheduleDelayMicros() const;
+	uint64 kcpBudgetExhaustionCount() const;
+	uint64 kcpConsecutiveBudgetExhaustions() const;
+	uint64 kcpMaxConsecutiveBudgetExhaustions() const;
 	uint64 kcpPendingSegmentCount() const;
 	uint64 kcpQueuedSegmentCount() const;
 	uint64 kcpUnackedSegmentCount() const;
 	uint64 kcpAcknowledgedSegmentCount() const;
 	uint64 kcpRetransmissionCount() const;
+	uint64 kcpTimeoutRetransmissionCount() const;
+	uint64 kcpFastRetransmissionCount() const;
+	uint64 kcpAckSentCount() const;
+	uint64 kcpAckReceivedCount() const;
 	uint64 kcpMaxPendingSegmentsPerChannel() const;
 	uint64 kcpSendWindowBlockedChannelCount() const;
 	uint64 kcpAdmissionLimitedChannelCount() const;
@@ -175,6 +193,8 @@ private:
 	bool registerChannel(Channel* pChannel, bool replaceExistingAcceptedChannel);
 	void requestChannelMaintenance(Channel* pChannel);
 	void cancelChannelMaintenance(const Address& address);
+	void accumulateFinalizedKcpDiagnostics(uint64 ackSent, uint64 ackReceived,
+		uint64 timeoutRetransmissions, uint64 fastRetransmissions);
 	uint64 channelTickEpoch() const { return channelTickEpoch_; }
 
 private:
@@ -187,6 +207,10 @@ private:
 	// Tick epoch 让 Channel 在首次收发时懒清零窗口计数，避免为全部连接执行无效写入。
 	// The tick epoch lets a Channel lazily reset window counters on first activity, avoiding writes to every connection.
 	uint64									channelTickEpoch_;
+	uint64									finalizedKcpAckSentCount_;
+	uint64									finalizedKcpAckReceivedCount_;
+	uint64									finalizedKcpTimeoutRetransmissionCount_;
+	uint64									finalizedKcpFastRetransmissionCount_;
 
 	EventDispatcher *						pDispatcher_;
 	KcpUpdateScheduler					kcpUpdateScheduler_;

@@ -126,7 +126,7 @@ void KcpUpdateQueue::pruneStaleTop()
 }
 
 //-------------------------------------------------------------------------------------
-bool KcpUpdateQueue::takeDue(Time now, Key& key)
+bool KcpUpdateQueue::takeDue(Time now, Key& key, Time* pDueTime)
 {
 	pruneStaleTop();
 	if (heap_.empty() || heap_.front().dueTime > now)
@@ -141,7 +141,33 @@ bool KcpUpdateQueue::takeDue(Time now, Key& key)
 	active->second.token = 0;
 	--scheduledCount_;
 	key = entry.key;
+	if (pDueTime != NULL)
+		*pDueTime = entry.dueTime;
 	return true;
+}
+
+//-------------------------------------------------------------------------------------
+size_t KcpUpdateQueue::dueCount(Time now) const
+{
+	size_t count = 0;
+	for (ActiveEntries::const_iterator iter = active_.begin(); iter != active_.end(); ++iter)
+	{
+		if (iter->second.token != 0 && iter->second.dueTime <= now)
+			++count;
+	}
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+size_t KcpUpdateQueue::overdueCount(Time now) const
+{
+	size_t count = 0;
+	for (ActiveEntries::const_iterator iter = active_.begin(); iter != active_.end(); ++iter)
+	{
+		if (iter->second.token != 0 && iter->second.dueTime < now)
+			++count;
+	}
+	return count;
 }
 
 //-------------------------------------------------------------------------------------

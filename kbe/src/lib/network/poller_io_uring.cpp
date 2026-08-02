@@ -1096,6 +1096,9 @@ int IoUringPoller::processPendingEvents(double maxWait)
 		}
 	}
 
+	recordCompletionBatch(static_cast<uint32>(readyCount),
+		readyCount >= static_cast<int>(COMPLETION_MAX_COMPLETIONS_PER_TICK));
+
 	return readyCount;
 }
 

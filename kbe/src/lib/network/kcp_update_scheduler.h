@@ -32,6 +32,13 @@ public:
 	uint64 updateCallCount() const { return updateCallCount_; }
 	uint64 timerWakeupCount() const { return timerWakeupCount_; }
 	uint64 timerRearmCount() const { return timerRearmCount_; }
+	uint64 dueChannelCount() const;
+	uint64 overdueChannelCount() const;
+	uint64 deadlineMissCount() const { return deadlineMissCount_; }
+	uint64 maxScheduleDelayMicros() const { return maxScheduleDelayMicros_; }
+	uint64 budgetExhaustionCount() const { return budgetExhaustionCount_; }
+	uint64 consecutiveBudgetExhaustions() const { return consecutiveBudgetExhaustions_; }
+	uint64 maxConsecutiveBudgetExhaustions() const { return maxConsecutiveBudgetExhaustions_; }
 
 private:
 	void handleTimeout(TimerHandle handle, void* pUser) override;
@@ -48,6 +55,11 @@ private:
 	uint64 updateCallCount_;
 	uint64 timerWakeupCount_;
 	uint64 timerRearmCount_;
+	uint64 deadlineMissCount_;
+	uint64 maxScheduleDelayMicros_;
+	uint64 budgetExhaustionCount_;
+	uint64 consecutiveBudgetExhaustions_;
+	uint64 maxConsecutiveBudgetExhaustions_;
 };
 
 }

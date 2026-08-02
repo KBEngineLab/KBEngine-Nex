@@ -318,6 +318,12 @@ struct IKCPCB
 	IUINT32 *acklist;
 	IUINT32 ackcount;
 	IUINT32 ackblock;
+	/* Low-overhead cumulative diagnostics, updated only where KCP already classifies a segment.
+	 * 低开销累计诊断指标，只在 KCP 已经完成报文分类的位置更新。 */
+	IUINT64 ack_sent;
+	IUINT64 ack_received;
+	IUINT64 timeout_retransmissions;
+	IUINT64 fast_retransmissions;
 	void *user;
 	char *buffer;
 	int fastresend;

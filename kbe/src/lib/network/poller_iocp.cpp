@@ -1162,6 +1162,9 @@ int IocpPoller::processPendingEvents(double maxWait)
 			kbe_strerror(errorCode)));
 	}
 
+	recordCompletionBatch(static_cast<uint32>(readyCount),
+		readyCount >= static_cast<int>(COMPLETION_MAX_COMPLETIONS_PER_TICK));
+
 	return readyCount;
 }
 

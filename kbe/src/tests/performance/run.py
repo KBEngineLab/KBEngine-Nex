@@ -114,6 +114,10 @@ def main() -> int:
         workload_process_count,
         workload_cid_start,
     )
+    watcher_targets = expand_component_watcher_targets(
+        watcher_targets,
+        dict(scenario.get("watcher_component_ids", {})),
+    )
     watcher_schedule = (
         WatcherSchedule(
             watcher_targets,
@@ -145,6 +149,8 @@ def main() -> int:
             bots_tick_count,
             int(scenario["external_receive_messages"]) if "external_receive_messages" in scenario else None,
             int(scenario["external_receive_bytes"]) if "external_receive_bytes" in scenario else None,
+            int(scenario["reliable_udp_tick_interval_ms"]) if "reliable_udp_tick_interval_ms" in scenario else None,
+            int(scenario["reliable_udp_min_rto_ms"]) if "reliable_udp_min_rto_ms" in scenario else None,
         )
         environment = build_environment(_repository_root(), args.assets_root, output, fixture_root)
         environment.update(scenario_environment(scenario))
@@ -441,6 +447,47 @@ def expand_bots_watcher_targets(
                 f"bots#{cid_start + index}",
             )
             for index in range(process_count)
+        )
+    return expanded
+
+
+def expand_component_watcher_targets(
+    targets: list[WatcherTarget],
+    configured_ids: dict[object, object],
+) -> list[WatcherTarget]:
+    """Expand selected server Watchers to every declared component instance.
+    将指定服务端 Watcher 扩展到场景声明的全部组件实例。
+
+    Explicit IDs keep runs reproducible and avoid guessing ownership from unrelated
+    machine logs. Already-qualified selectors such as baseapp#7001 remain unchanged.
+    显式 CID 保证运行可复现，也避免从无关 Machine 日志猜测归属；已经带 CID 的目标保持不变。
+    """
+    component_ids: dict[str, tuple[int, ...]] = {}
+    for component_name, raw_ids in configured_ids.items():
+        name = str(component_name).lower()
+        if not name or not isinstance(raw_ids, list):
+            raise ValueError("watcher_component_ids values must be arrays")
+        ids = tuple(int(value) for value in raw_ids)
+        if not ids or any(value <= 0 for value in ids) or len(set(ids)) != len(ids):
+            raise ValueError(f"watcher_component_ids contains invalid IDs: {component_name}")
+        component_ids[name] = ids
+
+    expanded: list[WatcherTarget] = []
+    for target in targets:
+        name = target.component_name.lower()
+        ids = component_ids.get(name)
+        if not ids or "#" in target.component_name:
+            expanded.append(target)
+            continue
+        expanded.extend(
+            WatcherTarget(
+                target.component_type,
+                target.host,
+                target.port,
+                target.path,
+                f"{target.component_name}#{component_id}",
+            )
+            for component_id in ids
         )
     return expanded
 

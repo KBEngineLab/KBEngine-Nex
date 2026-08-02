@@ -226,6 +226,15 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/poller/udpSendBacklogBytes", &networkInterface_, &Network::NetworkInterface::pollerUdpSendBacklogBytes);
 	WATCH_OBJECT("network/poller/udpSendBacklogPeakBytes", &networkInterface_, &Network::NetworkInterface::pollerUdpSendBacklogPeakBytes);
 	WATCH_OBJECT("network/poller/udpSendBackpressure", &networkInterface_, &Network::NetworkInterface::pollerUdpSendBackpressureCount);
+	// 批次计数只在 poll 返回路径做常量时间累加，用于证明 256 completion 公平性预算是否持续饱和。
+	// Batch counters add constant-time work only on poll return and reveal whether the 256-completion fairness budget remains saturated.
+	WATCH_OBJECT("network/poller/completionProcessRounds", &networkInterface_, &Network::NetworkInterface::pollerCompletionProcessRounds);
+	WATCH_OBJECT("network/poller/completionProcessed", &networkInterface_, &Network::NetworkInterface::pollerCompletionProcessedCount);
+	WATCH_OBJECT("network/poller/completionLastBatch", &networkInterface_, &Network::NetworkInterface::pollerCompletionLastBatchCount);
+	WATCH_OBJECT("network/poller/completionMaxBatch", &networkInterface_, &Network::NetworkInterface::pollerCompletionMaxBatchCount);
+	WATCH_OBJECT("network/poller/completionBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::pollerCompletionBudgetExhaustionCount);
+	WATCH_OBJECT("network/poller/completionConsecutiveBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::pollerCompletionConsecutiveBudgetExhaustions);
+	WATCH_OBJECT("network/poller/completionMaxConsecutiveBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::pollerCompletionMaxConsecutiveBudgetExhaustions);
 	// Compare active channels, heap entries, wakeups, and updates together to quantify scheduler aggregation without assuming aligned deadlines.
 	// 联合观察活动 Channel、堆项、唤醒和更新次数，用于量化调度聚合效果，不假设各 Channel 截止时间天然对齐。
 	WATCH_OBJECT("network/kcp/scheduledChannels", &networkInterface_, &Network::NetworkInterface::kcpScheduledChannelCount);
@@ -237,6 +246,13 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/kcp/updateCalls", &networkInterface_, &Network::NetworkInterface::kcpUpdateCallCount);
 	WATCH_OBJECT("network/kcp/timerWakeups", &networkInterface_, &Network::NetworkInterface::kcpTimerWakeupCount);
 	WATCH_OBJECT("network/kcp/timerRearms", &networkInterface_, &Network::NetworkInterface::kcpTimerRearmCount);
+	WATCH_OBJECT("network/kcp/dueChannels", &networkInterface_, &Network::NetworkInterface::kcpDueChannelCount);
+	WATCH_OBJECT("network/kcp/overdueChannels", &networkInterface_, &Network::NetworkInterface::kcpOverdueChannelCount);
+	WATCH_OBJECT("network/kcp/deadlineMisses", &networkInterface_, &Network::NetworkInterface::kcpDeadlineMissCount);
+	WATCH_OBJECT("network/kcp/maxScheduleDelayMicros", &networkInterface_, &Network::NetworkInterface::kcpMaxScheduleDelayMicros);
+	WATCH_OBJECT("network/kcp/budgetExhaustions", &networkInterface_, &Network::NetworkInterface::kcpBudgetExhaustionCount);
+	WATCH_OBJECT("network/kcp/consecutiveBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::kcpConsecutiveBudgetExhaustions);
+	WATCH_OBJECT("network/kcp/maxConsecutiveBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::kcpMaxConsecutiveBudgetExhaustions);
 	// waitsnd 指标区分 KCP 自身积压和 completion UDP 队列积压，避免只根据 4 MiB socket backlog 推断根因。
 	// The waitsnd metrics separate KCP-owned backlog from the completion UDP queue instead of inferring the cause from a 4 MiB socket backlog alone.
 	WATCH_OBJECT("network/kcp/pendingSegments", &networkInterface_, &Network::NetworkInterface::kcpPendingSegmentCount);
@@ -244,6 +260,10 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/kcp/unackedSegments", &networkInterface_, &Network::NetworkInterface::kcpUnackedSegmentCount);
 	WATCH_OBJECT("network/kcp/acknowledgedSegments", &networkInterface_, &Network::NetworkInterface::kcpAcknowledgedSegmentCount);
 	WATCH_OBJECT("network/kcp/retransmissions", &networkInterface_, &Network::NetworkInterface::kcpRetransmissionCount);
+	WATCH_OBJECT("network/kcp/timeoutRetransmissions", &networkInterface_, &Network::NetworkInterface::kcpTimeoutRetransmissionCount);
+	WATCH_OBJECT("network/kcp/fastRetransmissions", &networkInterface_, &Network::NetworkInterface::kcpFastRetransmissionCount);
+	WATCH_OBJECT("network/kcp/acksSent", &networkInterface_, &Network::NetworkInterface::kcpAckSentCount);
+	WATCH_OBJECT("network/kcp/acksReceived", &networkInterface_, &Network::NetworkInterface::kcpAckReceivedCount);
 	WATCH_OBJECT("network/kcp/maxPendingSegmentsPerChannel", &networkInterface_, &Network::NetworkInterface::kcpMaxPendingSegmentsPerChannel);
 	WATCH_OBJECT("network/kcp/sendWindowBlockedChannels", &networkInterface_, &Network::NetworkInterface::kcpSendWindowBlockedChannelCount);
 	WATCH_OBJECT("network/kcp/admissionLimitedChannels", &networkInterface_, &Network::NetworkInterface::kcpAdmissionLimitedChannelCount);

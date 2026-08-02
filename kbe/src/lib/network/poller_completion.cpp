@@ -74,7 +74,14 @@ CompletionPoller::CompletionPoller() :
 	receiveOwnershipTransferCount_(0),
 	receiveOwnershipTransferredBytes_(0),
 	udpSendBacklogPeakBytes_(0),
-	udpSendBackpressureCount_(0)
+	udpSendBackpressureCount_(0),
+	completionProcessRounds_(0),
+	completionProcessedCount_(0),
+	completionLastBatchCount_(0),
+	completionMaxBatchCount_(0),
+	completionBudgetExhaustionCount_(0),
+	completionConsecutiveBudgetExhaustions_(0),
+	completionMaxConsecutiveBudgetExhaustions_(0)
 {
 }
 
@@ -358,6 +365,33 @@ uint64 CompletionPoller::udpSendBacklogBytes() const
 }
 uint64 CompletionPoller::udpSendBacklogPeakBytes() const { return udpSendBacklogPeakBytes_; }
 uint64 CompletionPoller::udpSendBackpressureCount() const { return udpSendBackpressureCount_; }
+uint64 CompletionPoller::completionProcessRounds() const { return completionProcessRounds_; }
+uint64 CompletionPoller::completionProcessedCount() const { return completionProcessedCount_; }
+uint64 CompletionPoller::completionLastBatchCount() const { return completionLastBatchCount_; }
+uint64 CompletionPoller::completionMaxBatchCount() const { return completionMaxBatchCount_; }
+uint64 CompletionPoller::completionBudgetExhaustionCount() const { return completionBudgetExhaustionCount_; }
+uint64 CompletionPoller::completionConsecutiveBudgetExhaustions() const { return completionConsecutiveBudgetExhaustions_; }
+uint64 CompletionPoller::completionMaxConsecutiveBudgetExhaustions() const { return completionMaxConsecutiveBudgetExhaustions_; }
+
+//-------------------------------------------------------------------------------------
+void CompletionPoller::recordCompletionBatch(uint32 processedCount, bool budgetExhausted)
+{
+	++completionProcessRounds_;
+	completionProcessedCount_ += processedCount;
+	completionLastBatchCount_ = processedCount;
+	completionMaxBatchCount_ = std::max<uint64>(completionMaxBatchCount_, processedCount);
+	if (budgetExhausted)
+	{
+		++completionBudgetExhaustionCount_;
+		++completionConsecutiveBudgetExhaustions_;
+		completionMaxConsecutiveBudgetExhaustions_ = std::max(completionMaxConsecutiveBudgetExhaustions_,
+			completionConsecutiveBudgetExhaustions_);
+	}
+	else
+	{
+		completionConsecutiveBudgetExhaustions_ = 0;
+	}
+}
 
 //-------------------------------------------------------------------------------------
 void CompletionPoller::requestRearm(KBESOCKET fd, uint8 flags)

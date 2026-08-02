@@ -271,6 +271,13 @@ uint64 EventPoller::receiveOwnershipTransferredBytes() const { return 0; }
 uint64 EventPoller::udpSendBacklogBytes() const { return 0; }
 uint64 EventPoller::udpSendBacklogPeakBytes() const { return 0; }
 uint64 EventPoller::udpSendBackpressureCount() const { return 0; }
+uint64 EventPoller::completionProcessRounds() const { return 0; }
+uint64 EventPoller::completionProcessedCount() const { return 0; }
+uint64 EventPoller::completionLastBatchCount() const { return 0; }
+uint64 EventPoller::completionMaxBatchCount() const { return 0; }
+uint64 EventPoller::completionBudgetExhaustionCount() const { return 0; }
+uint64 EventPoller::completionConsecutiveBudgetExhaustions() const { return 0; }
+uint64 EventPoller::completionMaxConsecutiveBudgetExhaustions() const { return 0; }
 
 //-------------------------------------------------------------------------------------
 const char* EventPoller::defaultIOModelName()

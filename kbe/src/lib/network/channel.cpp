@@ -438,6 +438,14 @@ void Channel::finaliseKcp()
 
 	if (pKCP_)
 	{
+		if (pNetworkInterface_)
+		{
+			pNetworkInterface_->accumulateFinalizedKcpDiagnostics(
+				static_cast<uint64>(pKCP_->ack_sent),
+				static_cast<uint64>(pKCP_->ack_received),
+				static_cast<uint64>(pKCP_->timeout_retransmissions),
+				static_cast<uint64>(pKCP_->fast_retransmissions));
+		}
 		ikcp_release(pKCP_);
 		pKCP_ = NULL;
 	}

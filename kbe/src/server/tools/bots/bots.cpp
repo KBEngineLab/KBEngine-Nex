@@ -172,6 +172,12 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/udpSendBacklogBytes", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBacklogBytes);
 	WATCH_OBJECT("bots/performance/udpSendBacklogPeakBytes", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBacklogPeakBytes);
 	WATCH_OBJECT("bots/performance/udpSendBackpressure", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBackpressureCount);
+	WATCH_OBJECT("bots/performance/completionProcessed", &networkInterface(), &Network::NetworkInterface::pollerCompletionProcessedCount);
+	WATCH_OBJECT("bots/performance/completionLastBatch", &networkInterface(), &Network::NetworkInterface::pollerCompletionLastBatchCount);
+	WATCH_OBJECT("bots/performance/completionMaxBatch", &networkInterface(), &Network::NetworkInterface::pollerCompletionMaxBatchCount);
+	WATCH_OBJECT("bots/performance/completionBudgetExhaustions", &networkInterface(), &Network::NetworkInterface::pollerCompletionBudgetExhaustionCount);
+	WATCH_OBJECT("bots/performance/completionConsecutiveBudgetExhaustions", &networkInterface(), &Network::NetworkInterface::pollerCompletionConsecutiveBudgetExhaustions);
+	WATCH_OBJECT("bots/performance/completionMaxConsecutiveBudgetExhaustions", &networkInterface(), &Network::NetworkInterface::pollerCompletionMaxConsecutiveBudgetExhaustions);
 	WATCH_OBJECT("bots/performance/contextsOutstandingBytes", &networkInterface(), &Network::NetworkInterface::pollerContextsOutstandingBytes);
 	WATCH_OBJECT("bots/performance/contextsCachedBytes", &networkInterface(), &Network::NetworkInterface::pollerContextsCachedBytes);
 	// KCP 调度与队列指标用于区分空闲定时维护开销和真实业务流量，避免仅凭进程 CPU 猜测热点。
@@ -180,9 +186,24 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/kcpUpdateCalls", &networkInterface(), &Network::NetworkInterface::kcpUpdateCallCount);
 	WATCH_OBJECT("bots/performance/kcpTimerWakeups", &networkInterface(), &Network::NetworkInterface::kcpTimerWakeupCount);
 	WATCH_OBJECT("bots/performance/kcpTimerRearms", &networkInterface(), &Network::NetworkInterface::kcpTimerRearmCount);
+	WATCH_OBJECT("bots/performance/kcpDueChannels", &networkInterface(), &Network::NetworkInterface::kcpDueChannelCount);
+	WATCH_OBJECT("bots/performance/kcpOverdueChannels", &networkInterface(), &Network::NetworkInterface::kcpOverdueChannelCount);
+	WATCH_OBJECT("bots/performance/kcpDeadlineMisses", &networkInterface(), &Network::NetworkInterface::kcpDeadlineMissCount);
+	WATCH_OBJECT("bots/performance/kcpMaxScheduleDelayMicros", &networkInterface(), &Network::NetworkInterface::kcpMaxScheduleDelayMicros);
+	WATCH_OBJECT("bots/performance/kcpBudgetExhaustions", &networkInterface(), &Network::NetworkInterface::kcpBudgetExhaustionCount);
+	WATCH_OBJECT("bots/performance/kcpConsecutiveBudgetExhaustions", &networkInterface(), &Network::NetworkInterface::kcpConsecutiveBudgetExhaustions);
+	WATCH_OBJECT("bots/performance/kcpMaxConsecutiveBudgetExhaustions", &networkInterface(), &Network::NetworkInterface::kcpMaxConsecutiveBudgetExhaustions);
 	WATCH_OBJECT("bots/performance/kcpPendingSegments", &networkInterface(), &Network::NetworkInterface::kcpPendingSegmentCount);
 	WATCH_OBJECT("bots/performance/kcpQueuedSegments", &networkInterface(), &Network::NetworkInterface::kcpQueuedSegmentCount);
 	WATCH_OBJECT("bots/performance/kcpUnackedSegments", &networkInterface(), &Network::NetworkInterface::kcpUnackedSegmentCount);
+	WATCH_OBJECT("bots/performance/kcpRetransmissions", &networkInterface(), &Network::NetworkInterface::kcpRetransmissionCount);
+	WATCH_OBJECT("bots/performance/kcpTimeoutRetransmissions", &networkInterface(), &Network::NetworkInterface::kcpTimeoutRetransmissionCount);
+	WATCH_OBJECT("bots/performance/kcpFastRetransmissions", &networkInterface(), &Network::NetworkInterface::kcpFastRetransmissionCount);
+	WATCH_OBJECT("bots/performance/kcpAcksSent", &networkInterface(), &Network::NetworkInterface::kcpAckSentCount);
+	WATCH_OBJECT("bots/performance/kcpAcksReceived", &networkInterface(), &Network::NetworkInterface::kcpAckReceivedCount);
+	WATCH_OBJECT("bots/performance/kcpSendWindowBlockedChannels", &networkInterface(), &Network::NetworkInterface::kcpSendWindowBlockedChannelCount);
+	WATCH_OBJECT("bots/performance/kcpAdmissionLimitedChannels", &networkInterface(), &Network::NetworkInterface::kcpAdmissionLimitedChannelCount);
+	WATCH_OBJECT("bots/performance/kcpRemoteWindowZeroChannels", &networkInterface(), &Network::NetworkInterface::kcpRemoteWindowZeroChannelCount);
 	WATCH_OBJECT("bots/performance/kcpFixedAllocatedBytes", this, &Bots::kcpFixedAllocatedBytes);
 	WATCH_OBJECT("bots/performance/kcpDynamicAllocatedBytes", this, &Bots::kcpDynamicAllocatedBytes);
 	WATCH_OBJECT("bots/performance/clientEntities", this, &Bots::numClientEntities);

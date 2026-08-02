@@ -68,6 +68,13 @@ public:
 	uint64 udpSendBacklogBytes() const override;
 	uint64 udpSendBacklogPeakBytes() const override;
 	uint64 udpSendBackpressureCount() const override;
+	uint64 completionProcessRounds() const override;
+	uint64 completionProcessedCount() const override;
+	uint64 completionLastBatchCount() const override;
+	uint64 completionMaxBatchCount() const override;
+	uint64 completionBudgetExhaustionCount() const override;
+	uint64 completionConsecutiveBudgetExhaustions() const override;
+	uint64 completionMaxConsecutiveBudgetExhaustions() const override;
 
 protected:
 	enum SocketKind
@@ -234,6 +241,9 @@ protected:
 	bool takeRearmRequest(KBESOCKET& fd, uint8& flags);
 	size_t rearmBatchSize() const;
 	void recordRearmAttempt(bool retryRequired);
+	// Record one poll round without scanning socket state; a zero-sized round resets a prior exhaustion streak.
+	// 记录一轮 poll，无需扫描 socket 状态；空轮次也会终止此前的连续预算耗尽。
+	void recordCompletionBatch(uint32 processedCount, bool budgetExhausted);
 
 	SocketStates socketStates_;
 	AcceptedSocketMap acceptedSockets_;
@@ -253,6 +263,13 @@ protected:
 	uint64 receiveOwnershipTransferredBytes_;
 	uint64 udpSendBacklogPeakBytes_;
 	uint64 udpSendBackpressureCount_;
+	uint64 completionProcessRounds_;
+	uint64 completionProcessedCount_;
+	uint64 completionLastBatchCount_;
+	uint64 completionMaxBatchCount_;
+	uint64 completionBudgetExhaustionCount_;
+	uint64 completionConsecutiveBudgetExhaustions_;
+	uint64 completionMaxConsecutiveBudgetExhaustions_;
 };
 
 }

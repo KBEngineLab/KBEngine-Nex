@@ -27,7 +27,12 @@ KcpUpdateScheduler::KcpUpdateScheduler(EventDispatcher& dispatcher) :
 	processing_(false),
 	updateCallCount_(0),
 	timerWakeupCount_(0),
-	timerRearmCount_(0)
+	timerRearmCount_(0),
+	deadlineMissCount_(0),
+	maxScheduleDelayMicros_(0),
+	budgetExhaustionCount_(0),
+	consecutiveBudgetExhaustions_(0),
+	maxConsecutiveBudgetExhaustions_(0)
 {
 }
 
@@ -38,6 +43,18 @@ KcpUpdateScheduler::~KcpUpdateScheduler()
 	{
 		timerHandle_.cancel();
 	}
+}
+
+//-------------------------------------------------------------------------------------
+uint64 KcpUpdateScheduler::dueChannelCount() const
+{
+	return static_cast<uint64>(queue_.dueCount(timestamp()));
+}
+
+//-------------------------------------------------------------------------------------
+uint64 KcpUpdateScheduler::overdueChannelCount() const
+{
+	return static_cast<uint64>(queue_.overdueCount(timestamp()));
 }
 
 //-------------------------------------------------------------------------------------
@@ -142,8 +159,16 @@ void KcpUpdateScheduler::handleTimeout(TimerHandle handle, void*)
 	processing_ = true;
 	const uint64 now = timestamp();
 	KcpUpdateQueue::Key key = 0;
-	for (size_t processed = 0; processed < KCP_UPDATES_PER_WAKEUP && queue_.takeDue(now, key); ++processed)
+	KcpUpdateQueue::Time dueTime = 0;
+	size_t processed = 0;
+	for (; processed < KCP_UPDATES_PER_WAKEUP && queue_.takeDue(now, key, &dueTime); ++processed)
 	{
+		if (now > dueTime)
+		{
+			++deadlineMissCount_;
+			maxScheduleDelayMicros_ = std::max<uint64>(maxScheduleDelayMicros_,
+				static_cast<uint64>(stampsToDelay(now - dueTime)));
+		}
 		Channel* channel = reinterpret_cast<Channel*>(key);
 		++updateCallCount_;
 		channel->updateKcp();
@@ -153,6 +178,21 @@ void KcpUpdateScheduler::handleTimeout(TimerHandle handle, void*)
 			// 正常回调会原地续约；inactive 项表示 Channel 已结束，此时可删除为复用保留的 map 节点。
 			queue_.cancel(key);
 		}
+	}
+
+	KcpUpdateQueue::Time nextDueTime = 0;
+	const bool budgetExhausted = processed == KCP_UPDATES_PER_WAKEUP &&
+		queue_.nextDue(nextDueTime) && nextDueTime <= now;
+	if (budgetExhausted)
+	{
+		++budgetExhaustionCount_;
+		++consecutiveBudgetExhaustions_;
+		maxConsecutiveBudgetExhaustions_ = std::max(maxConsecutiveBudgetExhaustions_,
+			consecutiveBudgetExhaustions_);
+	}
+	else
+	{
+		consecutiveBudgetExhaustions_ = 0;
 	}
 	processing_ = false;
 	armNextTimer();

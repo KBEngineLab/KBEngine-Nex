@@ -19,6 +19,7 @@ from performance.report import build_summary, load_events, validate_event
 from performance.run import (
     _repository_root,
     expand_bots_watcher_targets,
+    expand_component_watcher_targets,
     load_scenario,
     merge_watcher_target_specs,
     partition_workload_bots,
@@ -310,10 +311,31 @@ def assert_gameplay_stress_scenario() -> None:
     assert scenario["bots"] == 10000
     assert scenario["duration_seconds"] == 300
     assert scenario["connect_rate_per_second"] == 100
+    assert scenario["reliable_udp_tick_interval_ms"] == 10
+    assert scenario["reliable_udp_min_rto_ms"] == 50
     assert scenario["workload_processes"] == 4
     assert scenario["workload_cid_start"] == 10000
     assert "fixture" not in scenario
     assert scenario["server_readiness"]["min_count"] == 52
+    targets = expand_component_watcher_targets(
+        [parse_target(value) for value in scenario["watcher_targets"]],
+        scenario["watcher_component_ids"],
+    )
+    assert {target.component_name for target in targets if target.path == "root/network/kcp"} == {
+        "baseapp#7001",
+        "baseapp#7002",
+        "baseapp#7003",
+        "cellapp#8001",
+        "cellapp#8002",
+        "cellapp#8003",
+        "cellapp#8004",
+        "cellapp#8005",
+        "cellapp#8006",
+    }
+    comparison = load_scenario(scenario_path.with_name("gameplay_10000_kcp20.json"))
+    assert comparison["name"] == "gameplay-10000-kcp20"
+    assert comparison["reliable_udp_tick_interval_ms"] == 20
+    assert comparison["reliable_udp_min_rto_ms"] == 50
 
 
 def assert_readiness_target_ownership() -> None:
@@ -470,11 +492,21 @@ def main() -> int:
         assets = root / "assets/res/server"
         assets.mkdir(parents=True)
         (assets / "kbengine.xml").write_text("<root><bots /></root>\n", encoding="utf-8")
-        overlay = create_config_overlay(root / "assets", root / "run", 500, external_receive_messages=1024, external_receive_bytes=1048576)
+        overlay = create_config_overlay(
+            root / "assets",
+            root / "run",
+            500,
+            external_receive_messages=1024,
+            external_receive_bytes=1048576,
+            reliable_udp_tick_interval_ms=20,
+            reliable_udp_min_rto_ms=50,
+        )
         xml_root = ET.parse(overlay).getroot()
         assert xml_root.findtext("./bots/defaultAddBots/totalCount") == "500"
         assert xml_root.findtext("./channelCommon/windowOverflow/receive/messages/external") == "1024"
         assert xml_root.findtext("./channelCommon/windowOverflow/receive/bytes/external") == "1048576"
+        assert xml_root.findtext("./networkInterface/reliableUDP/tickInterval") == "20"
+        assert xml_root.findtext("./networkInterface/reliableUDP/minRTO") == "50"
         log_path = root / "streamed.log"
         log_path.write_text("ordinary line\nWARNING split across chunks\nERROR final\n", encoding="utf-8")
         log_collector = IncrementalLogCollector(root)
