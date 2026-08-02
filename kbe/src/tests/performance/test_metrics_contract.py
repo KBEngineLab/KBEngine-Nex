@@ -343,6 +343,7 @@ def assert_gameplay_stress_scenario() -> None:
     assert scenario["workload_cid_start"] == 10000
     assert "fixture" not in scenario
     assert scenario["server_readiness"]["min_count"] == 52
+    assert scenario["server_readiness"]["log_glob"] == "logger*.log"
     targets = expand_component_watcher_targets(
         [parse_target(value) for value in scenario["watcher_targets"]],
         scenario["watcher_component_ids"],

@@ -20,7 +20,7 @@
   "server_readiness": {
     "pattern": "EntityApp::createEntity: new Space(?:Center)? ",
     "min_count": 52,
-    "log_glob": "logger_cellapp.log",
+    "log_glob": "logger*.log",
     "timeout_seconds": 240
   },
   "watcher_targets": [
