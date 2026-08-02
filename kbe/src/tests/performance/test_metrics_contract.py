@@ -1,6 +1,7 @@
 """Contract tests for the Performance Lab. / 性能实验室契约测试。"""
 
 import ast
+import types
 import tempfile
 import sys
 from pathlib import Path
@@ -15,7 +16,75 @@ from performance.metrics import JsonlRecorder
 from performance.process_metrics import ProcessCollector, _parse_windows_process_row
 from performance.report import build_summary, load_events, validate_event
 from performance.run import _repository_root
-from performance.watcher_metrics import parse_target, resolve_target
+from performance.watcher_metrics import WatcherCollector, parse_target, resolve_target
+
+
+def assert_watcher_connection_reuse() -> None:
+    class FakeWatcher:
+        instances = []
+        fail_next = False
+
+        def __init__(self, component_type):
+            self.watchData = []
+            self.connect_count = 0
+            self.clear_count = 0
+            self.query_count = 0
+            self.close_count = 0
+            FakeWatcher.instances.append(self)
+
+        def connect(self, host, port):
+            self.connect_count += 1
+
+        def clearWatchData(self):
+            self.clear_count += 1
+            self.watchData = []
+
+        def requireQueryWatcher(self, path):
+            self.query_count += 1
+
+        def processOne(self, timeout):
+            if FakeWatcher.fail_next:
+                FakeWatcher.fail_next = False
+                raise OSError("connection reset")
+            self.watchData.append({"values": {"clients": self.query_count}})
+
+        def close(self):
+            self.close_count += 1
+
+    fake_pycommon = types.ModuleType("pycommon")
+    fake_pycommon.Define = types.SimpleNamespace(BOTS_TYPE=9)
+    fake_pycommon.Watcher = types.SimpleNamespace(Watcher=FakeWatcher)
+    previous = sys.modules.get("pycommon")
+    sys.modules["pycommon"] = fake_pycommon
+    try:
+        collector = WatcherCollector(Path("."), timeout_seconds=0.1)
+        target = parse_target("BOTS_TYPE=127.0.0.1:11000:root/bots")
+        assert collector.query(target)["clients"] == 1
+        assert collector.query(target)["clients"] == 2
+        assert len(FakeWatcher.instances) == 1
+        watcher = FakeWatcher.instances[0]
+        assert watcher.connect_count == 1 and watcher.clear_count == 2
+        collector.close()
+        assert watcher.close_count == 1
+        FakeWatcher.fail_next = True
+        reconnecting = WatcherCollector(Path("."), timeout_seconds=0.1)
+        try:
+            try:
+                reconnecting.query(target)
+            except OSError:
+                pass
+            else:
+                raise AssertionError("failed Watcher query must propagate")
+            assert reconnecting.query(target)["clients"] == 1
+            assert len(FakeWatcher.instances) == 3
+            assert FakeWatcher.instances[1].close_count == 1
+        finally:
+            reconnecting.close()
+    finally:
+        if previous is None:
+            sys.modules.pop("pycommon", None)
+        else:
+            sys.modules["pycommon"] = previous
 
 
 def assert_fixture_callbacks() -> None:
@@ -45,6 +114,7 @@ def assert_fixture_callbacks() -> None:
 
 
 def main() -> int:
+    assert_watcher_connection_reuse()
     assert_fixture_callbacks()
     repository_root = _repository_root()
     assert repository_root.is_dir()

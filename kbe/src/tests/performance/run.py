@@ -239,6 +239,8 @@ def main() -> int:
             if cluster is not None:
                 cluster.stop()
                 cluster = None
+            if watcher_collector is not None:
+                watcher_collector.close()
             for log_collector in log_collectors:
                 record_log_samples(recorder, log_collector, "shutdown")
             recorder.flush()

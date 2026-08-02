@@ -69,17 +69,34 @@ class WatcherCollector:
     def __init__(self, tools_root: Path, timeout_seconds: float = 5.0):
         self.tools_root = tools_root
         self.timeout_seconds = timeout_seconds
+        self._watchers: dict[tuple[str, str, int], Any] = {}
 
-    def query(self, target: WatcherTarget) -> dict[str, Any]:
-        """Query one snapshot outside the server process. / 在服务进程外查询一次快照。"""
+    def _get_watcher(self, target: WatcherTarget) -> Any:
+        """Return a connected Watcher for one endpoint, creating it lazily.
+        按端点复用控制连接，减少每次采样的 TCP 建连和调度抖动。
+        """
         sys.path.insert(0, str(self.tools_root))
-        watcher = None
         try:
             from pycommon import Define, Watcher
 
-            component_type = getattr(Define, target.component_type)
-            watcher = Watcher.Watcher(component_type)
-            watcher.connect(target.host, target.port)
+            key = (target.component_type, target.host, target.port)
+            watcher = self._watchers.get(key)
+            if watcher is None:
+                component_type = getattr(Define, target.component_type)
+                watcher = Watcher.Watcher(component_type)
+                watcher.connect(target.host, target.port)
+                self._watchers[key] = watcher
+            return watcher
+        finally:
+            sys.path.pop(0)
+
+    def query(self, target: WatcherTarget) -> dict[str, Any]:
+        """Query one snapshot outside the server process. / 在服务进程外查询一次快照。"""
+        key = (target.component_type, target.host, target.port)
+        watcher = self._get_watcher(target)
+        try:
+            if hasattr(watcher, "clearWatchData"):
+                watcher.clearWatchData()
             watcher.requireQueryWatcher(target.path)
             deadline = time.monotonic() + self.timeout_seconds
             while time.monotonic() < deadline and not watcher.watchData:
@@ -87,10 +104,26 @@ class WatcherCollector:
             if not watcher.watchData:
                 raise TimeoutError(f"watcher query timed out: {target.path}")
             return flatten_values(watcher.watchData[0].get("values", {}))
-        finally:
-            if watcher is not None:
+        except Exception:
+            # A broken socket must not poison later samples; the next query reconnects.
+            # 失效连接立即淘汰，下一次查询自动重连，避免错误状态持续污染采样。
+            self._watchers.pop(key, None)
+            try:
                 watcher.close()
-            sys.path.pop(0)
+            except (AttributeError, OSError):
+                pass
+            raise
+
+    def close(self) -> None:
+        """Close all cached control connections owned by this collector.
+        统一释放本轮采集器持有的控制连接。
+        """
+        watchers, self._watchers = self._watchers, {}
+        for watcher in watchers.values():
+            try:
+                watcher.close()
+            except (AttributeError, OSError):
+                pass
 
 
 def flatten_values(values: dict[str, Any], prefix: str = "") -> dict[str, Any]:
