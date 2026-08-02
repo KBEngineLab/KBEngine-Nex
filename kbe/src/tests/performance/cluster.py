@@ -9,6 +9,8 @@ import os
 import subprocess
 import sys
 import time
+from collections import Counter
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -65,6 +67,8 @@ class PerformanceCluster:
             str(script),
             "--components",
             self.components,
+            "--expected-component-count",
+            str(len(tuple(filter(None, self.components.split("|"))))),
             "--repository-root",
             str(self.repository_root),
             "--assets-root",
@@ -101,7 +105,18 @@ class PerformanceCluster:
     def component_processes(self) -> list[ClusterProcess]:
         manifest_path = self.run_root / "server/components.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        return [ClusterProcess(str(item["name"]), int(item["pid"])) for item in manifest]
+        counts = Counter(str(item["name"]) for item in manifest)
+        return [
+            ClusterProcess(
+                (
+                    f'{item["name"]}:{item["component_id"]}'
+                    if counts[str(item["name"])] > 1
+                    else str(item["name"])
+                ),
+                int(item["pid"]),
+            )
+            for item in manifest
+        ]
 
     def stop(self) -> None:
         if self.process is None:
@@ -119,6 +134,38 @@ class PerformanceCluster:
                     self.process.kill()
                     self.process.wait()
         self._close_logs()
+
+    def wait_for_log_readiness(
+        self,
+        pattern: str,
+        minimum_count: int,
+        log_glob: str,
+        timeout_seconds: float,
+    ) -> int:
+        """Wait for an asset-owned log milestone before starting workload clients.
+        在启动压测客户端前等待业务资产定义的日志里程碑。
+        """
+        if minimum_count < 1 or timeout_seconds <= 0:
+            raise ValueError("server log readiness count and timeout must be positive")
+        expression = re.compile(pattern)
+        deadline = time.monotonic() + timeout_seconds
+        log_root = self.run_root / "server/logs"
+        observed = 0
+        while time.monotonic() < deadline:
+            if self.process is not None and self.process.poll() is not None:
+                raise RuntimeError(self._failure_message("cluster exited before server log readiness"))
+            observed = sum(
+                len(expression.findall(self._read_text(path)))
+                for path in log_root.glob(log_glob)
+                if path.is_file()
+            )
+            if observed >= minimum_count:
+                return observed
+            time.sleep(0.25)
+        raise TimeoutError(
+            f"server log readiness timed out after {timeout_seconds:.1f}s: "
+            f"pattern={pattern!r}, observed={observed}, expected>={minimum_count}"
+        )
 
     def _wait_until_ready(self) -> None:
         deadline = time.monotonic() + self.startup_timeout_seconds + 15

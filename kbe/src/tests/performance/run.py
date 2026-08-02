@@ -138,7 +138,21 @@ def main() -> int:
             fixture_root,
             args.cluster_startup_timeout,
         )
-        owned_processes.update({f"cluster:{item.name}": item.pid for item in cluster.start()})
+        try:
+            owned_processes.update({f"cluster:{item.name}": item.pid for item in cluster.start()})
+            server_readiness = scenario.get("server_readiness")
+            if server_readiness is not None:
+                if not isinstance(server_readiness, dict):
+                    raise ValueError("server_readiness must be an object")
+                cluster.wait_for_log_readiness(
+                    str(server_readiness["pattern"]),
+                    int(server_readiness["min_count"]),
+                    str(server_readiness.get("log_glob", "*.log")),
+                    float(server_readiness.get("timeout_seconds", 180.0)),
+                )
+        except Exception:
+            cluster.stop()
+            raise
     try:
         process = start_command(args.command, environment, output)
     except Exception:
@@ -617,14 +631,7 @@ def wait_for_workload_ready(
         try:
             resolved_targets = [resolve_target(target, log_roots) for target in watcher_targets]
             observed: dict[str, object] = {}
-            readiness_targets = [
-                target
-                for target in resolved_targets
-                if any(
-                    metric == target.path or metric.startswith(f"{target.path}/")
-                    for metric in readiness
-                )
-            ]
+            readiness_targets = select_readiness_targets(resolved_targets, readiness)
             for target in readiness_targets:
                 values = watcher_collector.query(target)
                 observed.update(
@@ -647,6 +654,45 @@ def wait_for_workload_ready(
         f"workload readiness timed out after {timeout_seconds:.1f}s: {last_error}",
         last_observed,
     )
+
+
+def select_readiness_targets(
+    watcher_targets: list[WatcherTarget],
+    readiness: dict[str, object],
+) -> list[WatcherTarget]:
+    """Select the most specific Watcher owner for every readiness metric.
+    为每个就绪指标选择路径最具体的 Watcher 数据源。
+
+    A generic ``root`` target also prefixes every nested metric. Querying it during
+    readiness would repeatedly walk the full BaseApp/CellApp tree and could overwrite
+    a dedicated ``root/bots/performance`` result. Longest-prefix ownership keeps the
+    control-plane load bounded and prevents cross-component metric contamination.
+    通用 ``root`` 路径也会匹配所有子指标；最长前缀归属可避免反复遍历完整
+    BaseApp/CellApp 指标树，并防止其覆盖专用的 Bots 就绪数据。
+    """
+    selected: set[int] = set()
+    for metric in readiness:
+        candidates = [
+            (index, target)
+            for index, target in enumerate(watcher_targets)
+            if metric == target.path or metric.startswith(f"{target.path}/")
+        ]
+        if not candidates:
+            continue
+        longest_path = max(len(target.path) for _, target in candidates)
+        owners = [
+            (index, target)
+            for index, target in candidates
+            if len(target.path) == longest_path
+        ]
+        if len(owners) != 1:
+            descriptions = ", ".join(
+                f"{target.component_type}={target.host}:{target.port}:{target.path}"
+                for _, target in owners
+            )
+            raise ValueError(f"ambiguous readiness target for {metric}: {descriptions}")
+        selected.add(owners[0][0])
+    return [target for index, target in enumerate(watcher_targets) if index in selected]
 
 
 def readiness_value_matches(observed: object, expected: object, configured_bots: int) -> bool:

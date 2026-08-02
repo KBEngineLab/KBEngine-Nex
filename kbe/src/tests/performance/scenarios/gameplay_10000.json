@@ -1,0 +1,41 @@
+{
+  "name": "gameplay-10000",
+  "duration_seconds": 300,
+  "bots": 10000,
+  "connect_rate_per_second": 100,
+  "warmup_seconds": 30,
+  "external_receive_messages": 4096,
+  "external_receive_bytes": 4194304,
+  "server_readiness": {
+    "pattern": "EntityApp::createEntity: new Space(?:Center)? ",
+    "min_count": 52,
+    "log_glob": "logger_cellapp.log",
+    "timeout_seconds": 240
+  },
+  "watcher_targets": [
+    "BOTS_TYPE=@bots:root/bots/performance",
+    "BASEAPP_TYPE=@baseapp:root",
+    "BASEAPP_TYPE=@baseapp:root/stats",
+    "BASEAPP_TYPE=@baseapp:root/cprofiles/default/gameTick/latency",
+    "BASEAPP_TYPE=@baseapp:root/cprofiles/default/scriptCall/latency",
+    "CELLAPP_TYPE=@cellapp:root",
+    "CELLAPP_TYPE=@cellapp:root/stats",
+    "CELLAPP_TYPE=@cellapp:root/cprofiles/default/gameTick/latency",
+    "CELLAPP_TYPE=@cellapp:root/cprofiles/default/scriptCall/latency",
+    "CELLAPP_TYPE=@cellapp:root/cprofiles/default/clientUpdate/latency",
+    "CELLAPP_TYPE=@cellapp:root/witness"
+  ],
+  "watcher_intervals": {
+    "BOTS_TYPE:root/bots/performance": 5.0,
+    "BASEAPP_TYPE:root": 5.0,
+    "BASEAPP_TYPE:root/stats": 5.0,
+    "CELLAPP_TYPE:root": 5.0,
+    "CELLAPP_TYPE:root/stats": 5.0,
+    "CELLAPP_TYPE:root/witness": 5.0
+  },
+  "readiness": {
+    "root/bots/performance/clientsTotal": "$bots",
+    "root/bots/performance/clientsKcp": "$bots"
+  },
+  "thresholds": "../thresholds.json"
+}

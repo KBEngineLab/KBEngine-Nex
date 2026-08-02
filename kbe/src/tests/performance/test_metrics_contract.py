@@ -11,6 +11,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from performance.assets import create_config_overlay, resolve_bots_schedule, resolve_fixture_root
+from performance.cluster import PerformanceCluster
 from performance.log_metrics import IncrementalLogCollector
 from performance.metrics import JsonlRecorder
 from performance.process_metrics import ProcessCollector, _parse_windows_process_row
@@ -21,6 +22,7 @@ from performance.run import (
     merge_watcher_target_specs,
     record_watcher_samples,
     readiness_value_matches,
+    select_readiness_targets,
     scenario_environment,
 )
 from performance.watcher_metrics import WatcherCollector, WatcherSchedule, parse_target, resolve_target
@@ -276,12 +278,75 @@ def assert_python_latency_scenario() -> None:
         raise AssertionError("unrestricted workload environment key must fail")
 
 
+def assert_multi_component_cluster_manifest() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        run_root = root / "run"
+        manifest_root = run_root / "server"
+        manifest_root.mkdir(parents=True)
+        (manifest_root / "components.json").write_text(
+            """[
+  {"name": "machine", "component_id": 1000, "pid": 1},
+  {"name": "baseapp", "component_id": 7001, "pid": 2},
+  {"name": "baseapp", "component_id": 7002, "pid": 3}
+]\n""",
+            encoding="utf-8",
+        )
+        cluster = PerformanceCluster(root, root, root, run_root, "unused", root)
+        processes = cluster.component_processes()
+        assert [item.name for item in processes] == ["machine", "baseapp:7001", "baseapp:7002"]
+        log_root = manifest_root / "logs"
+        log_root.mkdir()
+        (log_root / "baseapp.7001.log").write_text("ready marker\nready marker\n", encoding="utf-8")
+        assert cluster.wait_for_log_readiness("ready marker", 2, "baseapp*.log", 0.1) == 2
+
+
+def assert_gameplay_stress_scenario() -> None:
+    scenario_path = Path(__file__).resolve().parent / "scenarios/gameplay_10000.json"
+    scenario = load_scenario(scenario_path)
+    assert scenario["bots"] == 10000
+    assert scenario["duration_seconds"] == 300
+    assert scenario["connect_rate_per_second"] == 100
+    assert "fixture" not in scenario
+    assert scenario["server_readiness"]["min_count"] == 52
+
+
+def assert_readiness_target_ownership() -> None:
+    targets = [
+        parse_target("BOTS_TYPE=@bots:root/bots/performance"),
+        parse_target("BASEAPP_TYPE=@baseapp:root"),
+        parse_target("CELLAPP_TYPE=@cellapp:root"),
+    ]
+    selected = select_readiness_targets(
+        targets,
+        {
+            "root/bots/performance/clientsTotal": 10000,
+            "root/bots/performance/clientsKcp": 10000,
+        },
+    )
+    assert selected == [targets[0]]
+
+    ambiguous = [
+        parse_target("BOTS_TYPE=127.0.0.1:11000:root/bots/performance"),
+        parse_target("BOTS_TYPE=127.0.0.1:11001:root/bots/performance"),
+    ]
+    try:
+        select_readiness_targets(ambiguous, {"root/bots/performance/clientsTotal": 1})
+    except ValueError as exc:
+        assert "ambiguous readiness target" in str(exc)
+    else:
+        raise AssertionError("ambiguous readiness ownership must be rejected")
+
+
 def main() -> int:
     assert_watcher_connection_reuse()
     assert_watcher_schedule()
     assert_cprofile_window_metrics()
     assert_fixture_callbacks()
     assert_python_latency_scenario()
+    assert_multi_component_cluster_manifest()
+    assert_gameplay_stress_scenario()
+    assert_readiness_target_ownership()
     repository_root = _repository_root()
     assert repository_root.is_dir()
     assert (repository_root / "kbe/src/tests/performance/run.py").is_file()

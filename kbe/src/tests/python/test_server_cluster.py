@@ -24,6 +24,7 @@ ERROR_PATTERN = re.compile(
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Run an isolated KBEngine server cluster smoke test.")
     parser.add_argument("--components", required=True)
+    parser.add_argument("--expected-component-count", type=int, default=COMPONENT_COUNT)
     parser.add_argument("--repository-root", type=Path, required=True)
     parser.add_argument("--assets-root", type=Path, required=True)
     parser.add_argument("--config-overlay", type=Path)
@@ -52,6 +53,8 @@ def parse_arguments():
 
     if not 10 <= args.startup_timeout_seconds <= 150:
         parser.error("--startup-timeout-seconds must be between 10 and 150")
+    if args.expected_component_count < COMPONENT_COUNT:
+        parser.error(f"--expected-component-count must be at least {COMPONENT_COUNT}")
     if args.database_type:
         if not args.database_port or not 1 <= args.database_port <= 65535:
             parser.error("--database-port must be between 1 and 65535")
@@ -92,7 +95,7 @@ def remove_run_root(run_root, timeout_seconds=5):
             time.sleep(0.1)
 
 
-def parse_components(encoded):
+def parse_components(encoded, expected_count=COMPONENT_COUNT):
     components = []
     for item in filter(None, encoded.split("|")):
         fields = item.split("::")
@@ -109,9 +112,9 @@ def parse_components(encoded):
                 "global_order": int(fields[3]),
             }
         )
-    if len(components) != COMPONENT_COUNT:
+    if len(components) != expected_count:
         raise RuntimeError(
-            f"server cluster smoke requires {COMPONENT_COUNT} components, received {len(components)}"
+            f"server cluster requires {expected_count} components, received {len(components)}"
         )
     return components
 
@@ -249,7 +252,11 @@ def write_component_manifest(entries, run_root):
     发布本轮子进程 PID，使外部控制器只采样自己启动的集群。
     """
     manifest = [
-        {"name": entry["spec"]["name"], "pid": entry["process"].pid}
+        {
+            "name": entry["spec"]["name"],
+            "component_id": entry["spec"]["component_id"],
+            "pid": entry["process"].pid,
+        }
         for entry in entries
     ]
     (run_root / "components.json").write_text(
@@ -284,7 +291,7 @@ def run_cluster(args):
     args.binary_root = normalized(args.binary_root)
     args.run_root = normalized(args.run_root)
     require_owned_run_root(args.run_root, args.binary_root)
-    components = parse_components(args.components)
+    components = parse_components(args.components, args.expected_component_count)
 
     remove_run_root(args.run_root)
     args.run_root.mkdir(parents=True)
