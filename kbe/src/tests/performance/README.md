@@ -71,3 +71,19 @@ with a non-zero status.
 
 Database scenarios are intentionally excluded from this phase.
 本阶段明确不包含数据库场景。
+
+For a long soak, use a 10-second sample interval and keep Python probes disabled when measuring
+the connection/memory baseline. Compare the first and last five minutes of
+`process.workload.memory.private`, `process.workload.memory.working_set`, `handles.active`,
+`kcpDynamicAllocatedBytes`, `contextsOutstandingBytes`, and `contextsCachedBytes` instead of
+using the full-window maximum as a leak claim.
+长时间 soak 建议使用 10 秒采样间隔；测量连接和内存基线时关闭 Python 探针。应比较
+`process.workload.memory.private`、`process.workload.memory.working_set`、`handles.active`、
+`kcpDynamicAllocatedBytes`、`contextsOutstandingBytes` 和 `contextsCachedBytes` 的前后五分钟均值及斜率，
+不能把全窗口最大值直接当作泄漏结论。
+
+`quality.status=SLOW` can be caused by an occasional Watcher control-plane spike while readiness,
+network errors, and process health remain valid. Treat it separately from gameplay RPC SLAs; the
+Watcher round trip is an external diagnostic measurement, not a business request latency.
+`quality.status=SLOW` 可能只是 Watcher 控制面偶发尖峰，而 readiness、网络错误和进程健康仍然有效。
+必须与业务 RPC SLA 分开解释；Watcher 往返是外部诊断指标，不是业务请求延迟。
