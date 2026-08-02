@@ -15,7 +15,7 @@ from performance.log_metrics import IncrementalLogCollector
 from performance.metrics import JsonlRecorder
 from performance.process_metrics import ProcessCollector, _parse_windows_process_row
 from performance.report import build_summary, load_events, validate_event
-from performance.run import _repository_root
+from performance.run import _repository_root, merge_watcher_target_specs, record_watcher_samples
 from performance.watcher_metrics import WatcherCollector, WatcherSchedule, parse_target, resolve_target
 
 
@@ -69,6 +69,9 @@ def assert_watcher_connection_reuse() -> None:
         second_stats = collector.last_query_stats(target)
         assert second_stats is not None and second_stats.connection_reused
         assert len(FakeWatcher.instances) == 1
+        second_path = parse_target("BOTS_TYPE=127.0.0.1:11000:root/network")
+        assert collector.query(second_path)["clients"] == 1
+        assert len(FakeWatcher.instances) == 2
         watcher = FakeWatcher.instances[0]
         assert watcher.connect_count == 1 and watcher.clear_count == 2
         collector.close()
@@ -83,8 +86,8 @@ def assert_watcher_connection_reuse() -> None:
             else:
                 raise AssertionError("failed Watcher query must propagate")
             assert reconnecting.query(target)["clients"] == 1
-            assert len(FakeWatcher.instances) == 3
-            assert FakeWatcher.instances[1].close_count == 1
+            assert len(FakeWatcher.instances) == 4
+            assert FakeWatcher.instances[2].close_count == 1
         finally:
             reconnecting.close()
     finally:
@@ -148,6 +151,40 @@ def assert_watcher_schedule() -> None:
         raise AssertionError("invalid Watcher interval must fail")
 
 
+def assert_cprofile_window_metrics() -> None:
+    stats = parse_target("BASEAPP_TYPE=127.0.0.1:12000:root/stats")
+    profile = parse_target("BASEAPP_TYPE=127.0.0.1:12000:root/cprofiles/default/scriptCall")
+    stamps = {}
+    previous = {}
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "cprofile.jsonl"
+        with JsonlRecorder(path, "test-run", "contract") as recorder:
+            record_watcher_samples(recorder, stats, {"stampsPerSecond": 1000}, 1.0, stamps, previous)
+            record_watcher_samples(
+                recorder,
+                profile,
+                {"count": 10, "sumTime": 100, "sumIntTime": 80, "lastTime": 5},
+                1.0,
+                stamps,
+                previous,
+            )
+            record_watcher_samples(
+                recorder,
+                profile,
+                {"count": 14, "sumTime": 140, "sumIntTime": 110, "lastTime": 6},
+                3.0,
+                stamps,
+                previous,
+            )
+        summary = build_summary(load_events(path))
+        prefix = "watcher.BASEAPP_TYPE.root/cprofiles/default/scriptCall"
+        assert summary["samples"][f"{prefix}/lastTimeMicros"]["max"] == 6000
+        assert summary["samples"][f"{prefix}/window/callCount"]["max"] == 4
+        assert summary["samples"][f"{prefix}/window/callsPerSecond"]["max"] == 2
+        assert summary["samples"][f"{prefix}/window/meanMicros"]["max"] == 10000
+        assert summary["samples"][f"{prefix}/window/meanSelfMicros"]["max"] == 7500
+
+
 def assert_fixture_callbacks() -> None:
     fixture_root = resolve_fixture_root("network-baseline")
     required = {
@@ -177,10 +214,15 @@ def assert_fixture_callbacks() -> None:
 def main() -> int:
     assert_watcher_connection_reuse()
     assert_watcher_schedule()
+    assert_cprofile_window_metrics()
     assert_fixture_callbacks()
     repository_root = _repository_root()
     assert repository_root.is_dir()
     assert (repository_root / "kbe/src/tests/performance/run.py").is_file()
+    assert "WATCH_OBJECT(\"spaceSize\", this, &Cellapp::spaceSize)" in (
+        repository_root / "kbe/src/server/cellapp/cellapp.cpp"
+    ).read_text(encoding="utf-8")
+    assert merge_watcher_target_specs(["A", "B"], ["B", "C"]) == ["A", "B", "C"]
     process_row = {
         "CPU": 12.5,
         "WorkingSet64": 101,

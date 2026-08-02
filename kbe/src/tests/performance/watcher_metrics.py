@@ -165,8 +165,8 @@ class WatcherCollector:
     def __init__(self, tools_root: Path, timeout_seconds: float = 5.0):
         self.tools_root = tools_root
         self.timeout_seconds = timeout_seconds
-        self._watchers: dict[tuple[str, str, int], Any] = {}
-        self._last_stats: dict[tuple[str, str, int], WatcherQueryStats] = {}
+        self._watchers: dict[tuple[str, str, int, str], Any] = {}
+        self._last_stats: dict[tuple[str, str, int, str], WatcherQueryStats] = {}
 
     def _get_watcher(self, target: WatcherTarget) -> tuple[Any, bool]:
         """Return a connected Watcher for one endpoint, creating it lazily.
@@ -176,7 +176,7 @@ class WatcherCollector:
         try:
             from pycommon import Define, Watcher
 
-            key = (target.component_type, target.host, target.port)
+            key = (target.component_type, target.host, target.port, target.path)
             watcher = self._watchers.get(key)
             if watcher is None:
                 component_type = getattr(Define, target.component_type)
@@ -190,7 +190,7 @@ class WatcherCollector:
 
     def query(self, target: WatcherTarget) -> dict[str, Any]:
         """Query one snapshot outside the server process. / 在服务进程外查询一次快照。"""
-        key = (target.component_type, target.host, target.port)
+        key = (target.component_type, target.host, target.port, target.path)
         watcher, connection_reused = self._get_watcher(target)
         try:
             if hasattr(watcher, "clearWatchData"):
@@ -222,7 +222,7 @@ class WatcherCollector:
         """Return metadata for the last successful target query.
         返回目标最近一次成功查询的响应元数据。
         """
-        return self._last_stats.get((target.component_type, target.host, target.port))
+        return self._last_stats.get((target.component_type, target.host, target.port, target.path))
 
     def close(self) -> None:
         """Close all cached control connections owned by this collector.

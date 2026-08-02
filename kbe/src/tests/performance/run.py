@@ -86,7 +86,11 @@ def main() -> int:
     duration = float(args.duration if args.duration is not None else scenario.get("duration_seconds", 30))
     configured_bots = int(args.bots if args.bots is not None else scenario.get("bots", 0))
     interval = max(float(args.sample_interval), 0.1)
-    watcher_targets = [parse_target(value) for value in args.watcher_target]
+    watcher_target_specs = merge_watcher_target_specs(
+        list(scenario.get("watcher_targets", [])),
+        args.watcher_target,
+    )
+    watcher_targets = [parse_target(value) for value in watcher_target_specs]
     watcher_schedule = (
         WatcherSchedule(
             watcher_targets,
@@ -149,7 +153,7 @@ def main() -> int:
     if cluster is not None:
         log_roots.add((cluster.run_root / "server/logs").resolve())
     log_collectors = [IncrementalLogCollector(path) for path in sorted(log_roots)]
-    watcher_collector = WatcherCollector(args.tools_root, args.watcher_timeout) if args.tools_root and args.watcher_target else None
+    watcher_collector = WatcherCollector(args.tools_root, args.watcher_timeout) if args.tools_root and watcher_targets else None
     events_path = output / "raw.jsonl"
     readiness_failure: WorkloadReadinessError | None = None
     with JsonlRecorder(events_path, run_id, name) as recorder:
@@ -171,6 +175,8 @@ def main() -> int:
             for log_collector in log_collectors:
                 record_log_samples(recorder, log_collector, "startup")
             watcher_sample_times: dict[tuple[str, str, int, str], float] = {}
+            watcher_stamps_per_second: dict[tuple[str, str, int], float] = {}
+            cprofile_previous: dict[tuple[str, str, int, str], tuple[int, float, float, float]] = {}
             if watcher_collector:
                 for target in watcher_targets:
                     recorder.record_sample(
@@ -248,16 +254,14 @@ def main() -> int:
                                 True,
                                 slow_threshold_ms=float(scenario.get("slow_request_threshold_ms", 0.0)) or None,
                             )
-                            for metric, value in values.items():
-                                if isinstance(value, (int, float)):
-                                    metric_name = f"{target.path}/{metric}".replace("//", "/")
-                                    recorder.record_sample(
-                                        "watcher",
-                                        target.component_type,
-                                        metric_name,
-                                        value,
-                                        watcher_unit(metric_name),
-                                    )
+                            record_watcher_samples(
+                                recorder,
+                                target,
+                                values,
+                                sample_now,
+                                watcher_stamps_per_second,
+                                cprofile_previous,
+                            )
                             query_stats = watcher_collector.last_query_stats(target)
                             if query_stats is not None:
                                 recorder.record_sample(
@@ -365,6 +369,21 @@ def start_command(
             stderr_handle.close()
 
 
+def merge_watcher_target_specs(scenario_specs: list[object], cli_specs: list[str]) -> list[str]:
+    """Merge versioned scenario targets with additive CLI targets in stable order.
+    按稳定顺序合并版本化场景目标和命令行追加目标，并消除完全相同的重复查询。
+    """
+    merged: list[str] = []
+    seen: set[str] = set()
+    for value in (*scenario_specs, *cli_specs):
+        target = str(value)
+        if target in seen:
+            continue
+        seen.add(target)
+        merged.append(target)
+    return merged
+
+
 def _repository_root() -> Path:
     return Path(__file__).resolve().parents[4]
 
@@ -380,6 +399,8 @@ def load_thresholds(scenario_path: Path, scenario: dict[str, object], explicit: 
 
 def watcher_unit(metric: str) -> str:
     lowered = metric.lower()
+    if "/cprofiles/" in lowered and lowered.endswith(("lasttime", "sumtime", "lastinttime", "suminttime")):
+        return "stamps"
     if lowered.endswith("micros"):
         return "micros"
     if "bytes" in lowered:
@@ -387,6 +408,78 @@ def watcher_unit(metric: str) -> str:
     if any(token in lowered for token in ("count", "total", "clients", "destroyed", "errors")):
         return "count"
     return ""
+
+
+def record_watcher_samples(
+    recorder: JsonlRecorder,
+    target: WatcherTarget,
+    values: dict[str, object],
+    sample_now: float,
+    stamps_per_second: dict[tuple[str, str, int], float],
+    cprofile_previous: dict[tuple[str, str, int, str], tuple[int, float, float, float]],
+) -> None:
+    """Record raw Watcher values and normalized cprofile window metrics.
+    记录原始 Watcher 值，并把 cprofile 累计 stamp 归一化为可发布的窗口指标。
+    """
+    endpoint = target.component_name or target.host
+    endpoint_port = 0 if target.component_name else target.port
+    component_key = (target.component_type, endpoint, endpoint_port)
+    if target.path.endswith("/stats"):
+        stamp_rate = values.get("stampsPerSecond")
+        if isinstance(stamp_rate, (int, float)) and stamp_rate > 0:
+            stamps_per_second[component_key] = float(stamp_rate)
+
+    stamp_rate = stamps_per_second.get(component_key)
+    for metric, value in values.items():
+        if not isinstance(value, (int, float)):
+            continue
+        metric_name = f"{target.path}/{metric}".replace("//", "/")
+        recorder.record_sample(
+            "watcher",
+            target.component_type,
+            metric_name,
+            value,
+            watcher_unit(metric_name),
+        )
+        if stamp_rate and "/cprofiles/" in target.path and metric in (
+            "lastTime",
+            "sumTime",
+            "lastIntTime",
+            "sumIntTime",
+        ):
+            recorder.record_sample(
+                "watcher",
+                target.component_type,
+                f"{target.path}/{metric}Micros",
+                float(value) / stamp_rate * 1_000_000.0,
+                "micros",
+            )
+
+    if not stamp_rate or "/cprofiles/" not in target.path:
+        return
+    count = values.get("count")
+    sum_time = values.get("sumTime")
+    sum_int_time = values.get("sumIntTime")
+    if not all(isinstance(value, (int, float)) for value in (count, sum_time, sum_int_time)):
+        return
+    profile_key = (*component_key, target.path)
+    current = (int(count), float(sum_time), float(sum_int_time), sample_now)
+    previous = cprofile_previous.get(profile_key)
+    cprofile_previous[profile_key] = current
+    if previous is None:
+        return
+    delta_count = max(current[0] - previous[0], 0)
+    delta_sum_micros = max(current[1] - previous[1], 0.0) / stamp_rate * 1_000_000.0
+    delta_self_micros = max(current[2] - previous[2], 0.0) / stamp_rate * 1_000_000.0
+    elapsed = max(sample_now - previous[3], 1e-6)
+    prefix = f"{target.path}/window"
+    recorder.record_sample("watcher", target.component_type, f"{prefix}/callCount", delta_count, "count")
+    recorder.record_sample("watcher", target.component_type, f"{prefix}/callsPerSecond", delta_count / elapsed, "count/s")
+    recorder.record_sample("watcher", target.component_type, f"{prefix}/totalMicros", delta_sum_micros, "micros")
+    recorder.record_sample("watcher", target.component_type, f"{prefix}/selfMicros", delta_self_micros, "micros")
+    if delta_count > 0:
+        recorder.record_sample("watcher", target.component_type, f"{prefix}/meanMicros", delta_sum_micros / delta_count, "micros")
+        recorder.record_sample("watcher", target.component_type, f"{prefix}/meanSelfMicros", delta_self_micros / delta_count, "micros")
 
 
 def record_process_samples(recorder: JsonlRecorder, collector: ProcessGroupCollector) -> None:
@@ -453,7 +546,15 @@ def wait_for_workload_ready(
         try:
             resolved_targets = [resolve_target(target, log_roots) for target in watcher_targets]
             observed: dict[str, object] = {}
-            for target in resolved_targets:
+            readiness_targets = [
+                target
+                for target in resolved_targets
+                if any(
+                    metric == target.path or metric.startswith(f"{target.path}/")
+                    for metric in readiness
+                )
+            ]
+            for target in readiness_targets:
                 values = watcher_collector.query(target)
                 observed.update(
                     {
