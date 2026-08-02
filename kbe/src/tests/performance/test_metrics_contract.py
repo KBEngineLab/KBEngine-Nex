@@ -412,6 +412,17 @@ def main() -> int:
     repository_root = _repository_root()
     assert repository_root.is_dir()
     assert (repository_root / "kbe/src/tests/performance/run.py").is_file()
+    bots_client_source = (
+        repository_root / "kbe/src/server/tools/bots/clientobject.cpp"
+    ).read_text(encoding="utf-8")
+    assert bots_client_source.count("state_ = C_STATE_LOGIN_BASEAPP_HELLO;") == 2
+    assert "case C_STATE_LOGIN_BASEAPP_HELLO:" in bots_client_source
+    assert "onHelloCB_ activates encryption" in bots_client_source
+    encryption_source = (
+        repository_root / "kbe/src/lib/network/encryption_filter.cpp"
+    ).read_text(encoding="utf-8")
+    assert "encryptedPayloadLen % BLOCK_SIZE" in encryption_source
+    assert "return REASON_CORRUPTED_PACKET;" in encryption_source
     assert "WATCH_OBJECT(\"spaceSize\", this, &Cellapp::spaceSize)" in (
         repository_root / "kbe/src/server/cellapp/cellapp.cpp"
     ).read_text(encoding="utf-8")

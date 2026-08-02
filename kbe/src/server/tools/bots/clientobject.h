@@ -59,9 +59,10 @@ public:
 		C_STATE_LOGIN = 2,
 		C_STATE_LOGIN_BASEAPP_CREATE = 3,
 		C_STATE_LOGIN_BASEAPP_KCP_HANDSHAKE = 4,
-		C_STATE_LOGIN_BASEAPP = 5,
-		C_STATE_PLAY = 6,
-		C_STATE_DESTROYED = 7,
+		C_STATE_LOGIN_BASEAPP_HELLO = 5,
+		C_STATE_LOGIN_BASEAPP = 6,
+		C_STATE_PLAY = 7,
+		C_STATE_DESTROYED = 8,
 	};
 
 	ClientObject(std::string name, Network::NetworkInterface& ninterface);

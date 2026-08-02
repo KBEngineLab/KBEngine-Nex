@@ -501,7 +501,12 @@ bool ClientObject::completeKcpHandshake(uint32 channelID)
 	pServerChannel_->startInactivityDetection(Network::g_channelExternalTimeout,
 		Network::g_channelExternalTimeout / 2.f);
 	connectedBaseapp_ = true;
-	state_ = C_STATE_PLAY;
+	// BaseApp installs its Blowfish filter immediately after consuming hello. Until
+	// onHelloCB_ installs the matching client filter, every follow-up packet would be
+	// plaintext and corrupt the encrypted stream under a delayed high-load response.
+	// BaseApp 在消费 hello 后立即安装 Blowfish；onHelloCB_ 安装客户端过滤器之前，
+	// 任何后续明文包都会在高负载回包延迟时破坏加密流。
+	state_ = C_STATE_LOGIN_BASEAPP_HELLO;
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(BaseappInterface::hello);
@@ -616,6 +621,9 @@ bool ClientObject::connectBaseappTcp()
 
 	pEndpoint->send(pBundle);
 	Network::Bundle::reclaimPoolObject(pBundle);
+	// TCP fallback has the same hello/filter ordering contract as KCP.
+	// TCP 回退与 KCP 使用相同的 hello/过滤器时序约束。
+	state_ = C_STATE_LOGIN_BASEAPP_HELLO;
 	Bots::getSingleton().onTcpConnected();
 	INFO_MSG(fmt::format("ClientObject::connectBaseappTcp: name={}, address={}:{}\n", name_, ip_, tcp_port_));
 	return true;
@@ -710,6 +718,10 @@ void ClientObject::gameTick()
 			break;
 		case C_STATE_LOGIN_BASEAPP_KCP_HANDSHAKE:
 			break;
+		case C_STATE_LOGIN_BASEAPP_HELLO:
+			// Do not send active ticks or script traffic until onHelloCB_ activates encryption.
+			// onHelloCB_ 激活加密之前，禁止发送心跳和脚本业务流量。
+			return;
 		case C_STATE_PLAY:
 			break;	
 		case C_STATE_DESTROYED:

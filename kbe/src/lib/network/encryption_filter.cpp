@@ -156,10 +156,28 @@ Reason BlowfishFilter::recv(Channel * pChannel, PacketReceiver & receiver, Packe
 			// 如果满足一个最小包则尝试解包, 否则缓存这个包待与下一个包合并然后解包
 			if(pPacket->length() >= (PACKET_LENGTH_SIZE + 1 + BLOCK_SIZE))
 			{
-				(*pPacket) >> packetLen_;
+				PacketLength encodedPacketLen = 0;
+				(*pPacket) >> encodedPacketLen;
 				(*pPacket) >> padSize_;
-				
-				packetLen_ -= 1;
+
+				const PacketLength encryptedPayloadLen = encodedPacketLen > 0
+					? static_cast<PacketLength>(encodedPacketLen - 1) : 0;
+				if (encryptedPayloadLen == 0 || encryptedPayloadLen % BLOCK_SIZE != 0 ||
+					padSize_ >= BLOCK_SIZE || padSize_ > encryptedPayloadLen)
+				{
+					ERROR_MSG(fmt::format(
+						"BlowfishFilter::recv: invalid encrypted frame, encodedLen={}, payloadLen={}, "
+						"padSize={}, channel={}\n",
+						encodedPacketLen, encryptedPayloadLen, static_cast<uint32>(padSize_),
+						pChannel->c_str()));
+					if (pPacket_ == pPacket)
+						pPacket_ = NULL;
+					packetLen_ = 0;
+					padSize_ = 0;
+					return REASON_CORRUPTED_PACKET;
+				}
+
+				packetLen_ = encryptedPayloadLen;
 
 				// 如果包是完整的下面流程会解密， 如果有多余的内容需要将其剪裁出来待与下一个包合并
 				if(pPacket->length() > packetLen_)
