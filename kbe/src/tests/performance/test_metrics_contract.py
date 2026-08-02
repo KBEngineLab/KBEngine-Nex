@@ -154,6 +154,9 @@ def assert_watcher_schedule() -> None:
 def assert_cprofile_window_metrics() -> None:
     stats = parse_target("BASEAPP_TYPE=127.0.0.1:12000:root/stats")
     profile = parse_target("BASEAPP_TYPE=127.0.0.1:12000:root/cprofiles/default/scriptCall")
+    latency_profile = parse_target(
+        "BASEAPP_TYPE=127.0.0.1:12000:root/cprofiles/default/scriptCall/latency"
+    )
     stamps = {}
     previous = {}
     with tempfile.TemporaryDirectory() as directory:
@@ -165,6 +168,31 @@ def assert_cprofile_window_metrics() -> None:
                 profile,
                 {"count": 10, "sumTime": 100, "sumIntTime": 80, "lastTime": 5},
                 1.0,
+                stamps,
+                previous,
+            )
+            record_watcher_samples(
+                recorder,
+                latency_profile,
+                {
+                    "count": 0,
+                    "meanMicros": 0,
+                    "p50Micros": 0,
+                    "p95Micros": 0,
+                    "p99Micros": 0,
+                    "p999Available": 0,
+                    "p999Micros": 0,
+                    "maxMicros": 0,
+                },
+                4.0,
+                stamps,
+                previous,
+            )
+            record_watcher_samples(
+                recorder,
+                latency_profile,
+                {"count": 10000, "meanMicros": 12, "p999Available": 1, "p999Micros": 123},
+                5.0,
                 stamps,
                 previous,
             )
@@ -183,6 +211,9 @@ def assert_cprofile_window_metrics() -> None:
         assert summary["samples"][f"{prefix}/window/callsPerSecond"]["max"] == 2
         assert summary["samples"][f"{prefix}/window/meanMicros"]["max"] == 10000
         assert summary["samples"][f"{prefix}/window/meanSelfMicros"]["max"] == 7500
+        assert summary["samples"][f"{prefix}/latency/meanMicros"]["count"] == 1
+        assert summary["samples"][f"{prefix}/latency/p999Micros"]["count"] == 1
+        assert summary["samples"][f"{prefix}/latency/p999Micros"]["max"] == 123
 
 
 def assert_fixture_callbacks() -> None:

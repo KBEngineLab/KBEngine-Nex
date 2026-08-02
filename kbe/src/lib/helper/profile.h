@@ -32,6 +32,7 @@ namespace KBEngine
 #if ENABLE_WATCHERS
 
 class ProfileVal;
+class ProfileLatencyWindow;
 
 class ProfileGroup
 {
@@ -71,7 +72,7 @@ private:
 class ProfileVal
 {
 public:
-	ProfileVal(std::string name, ProfileGroup * pGroup = NULL);
+	ProfileVal(std::string name, ProfileGroup * pGroup = NULL, bool collectLatency = false);
 	~ProfileVal();
 
 	bool initializeWatcher();
@@ -114,6 +115,8 @@ public:
 		if (--inProgress_ == 0){
 			lastTime_ = now - lastTime_;
 			sumTime_ += lastTime_;
+			if (pLatencyWindow_)
+				recordLatency(lastTime_, now);
 		}
 
 		lastQuantity_ = qty;
@@ -158,6 +161,19 @@ public:
 	INLINE uint32 count() const;
 
 	INLINE bool isTooLong() const;
+	void recordLatency(TimeStamp duration, TimeStamp completedAt);
+
+	uint64 latencyCount();
+	double latencyMeanMicros();
+	double latencyP50Micros();
+	double latencyP95Micros();
+	double latencyP99Micros();
+	double latencyP999Micros();
+	double latencyMaxMicros();
+	bool latencyP999Available();
+	uint64 latencyWindowCapacity();
+	double latencyWindowMaxAgeSeconds();
+	uint64 latencyWindowAllocatedBytes();
 
 	static void setWarningPeriod(TimeStamp warningPeriod) { warningPeriod_ = warningPeriod; }
 
@@ -187,6 +203,7 @@ public:
 	int				inProgress_;
 
 	bool			initWatcher_;
+	ProfileLatencyWindow*	pLatencyWindow_;
 
 private:
 	static TimeStamp warningPeriod_;
@@ -224,6 +241,10 @@ private:
 	static ProfileVal _localProfile( NAME );									\
 	ScopedProfile _autoScopedProfile( _localProfile, __FILE__, __LINE__ );
 
+#define AUTO_SCOPED_PROFILE_LATENCY( NAME )								\
+	static ProfileVal _localLatencyProfile( NAME, NULL, true );				\
+	ScopedProfile _autoScopedLatencyProfile( _localLatencyProfile, __FILE__, __LINE__ );
+
 #define SCOPED_PROFILE(PROFILE)													\
 	ScopedProfile PROFILE##_scopedProfile(PROFILE, __FILE__, __LINE__);
 
@@ -239,6 +260,7 @@ uint64 runningTime();
 #else
 
 #define AUTO_SCOPED_PROFILE( NAME )
+#define AUTO_SCOPED_PROFILE_LATENCY( NAME )
 #define STOP_PROFILE_WITH_DATA( PROFILE, DATA )
 #define STOP_PROFILE_WITH_CHECK( PROFILE )
 #define SCOPED_PROFILE(PROFILE)

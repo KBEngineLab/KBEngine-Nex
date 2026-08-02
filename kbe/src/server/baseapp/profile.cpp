@@ -21,8 +21,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "profile.h"	
 namespace KBEngine{	
 
-ProfileVal SCRIPTCALL_PROFILE("scriptCall");
-ProfileVal ONTIMER_PROFILE("onTimer");
+ProfileVal SCRIPTCALL_PROFILE("scriptCall", NULL, true);
+ProfileVal ONTIMER_PROFILE("onTimer", NULL, true);
 
 EventHistoryStats g_privateClientEventHistoryStats("PrivateClientEvents");
 EventHistoryStats g_publicClientEventHistoryStats("PublicClientEvents");

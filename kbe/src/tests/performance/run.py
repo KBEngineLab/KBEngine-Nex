@@ -430,8 +430,23 @@ def record_watcher_samples(
             stamps_per_second[component_key] = float(stamp_rate)
 
     stamp_rate = stamps_per_second.get(component_key)
+    latency_stat_metrics = {
+        "meanMicros",
+        "p50Micros",
+        "p95Micros",
+        "p99Micros",
+        "p999Micros",
+        "maxMicros",
+    }
+    latency_count = values.get("count") if target.path.endswith("/latency") else None
     for metric, value in values.items():
         if not isinstance(value, (int, float)):
+            continue
+        if latency_count == 0 and metric in latency_stat_metrics:
+            continue
+        if metric in ("p999Micros", "latency/p999Micros") and not values.get(
+            metric.replace("p999Micros", "p999Available"), False
+        ):
             continue
         metric_name = f"{target.path}/{metric}".replace("//", "/")
         recorder.record_sample(

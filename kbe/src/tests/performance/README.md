@@ -22,9 +22,9 @@ thread count, and, on Windows, private committed memory, peak working set, and h
 `memory.private`，并结合 `memory.working_set` 判断当前物理内存压力。
 
 Watcher sampling runs from the controller process. The built-in `baseline` and `stress` scenarios
-carry a versioned 18-target publication set; `--watcher-target` adds asset-specific targets without
+carry a versioned 25-target publication set; `--watcher-target` adds asset-specific targets without
 replacing or duplicating scenario targets:
-Watcher 采样由控制器进程执行。内置 `baseline` 和 `stress` 场景携带版本化的 18 目标发布集；
+Watcher 采样由控制器进程执行。内置 `baseline` 和 `stress` 场景携带版本化的 25 目标发布集；
 `--watcher-target` 用于追加资产专用目标，不会替换或重复场景目标：
 
 ```powershell
@@ -57,12 +57,13 @@ for their next period, and missed periods are not replayed as a burst.
 
 The standard targets cover Bots performance; BaseApp root, stats, channels, poller, KCP, gameTick,
 scriptCall, and onTimer; and CellApp root, stats, channels, poller, gameTick, scriptCall, onTimer,
-clientUpdate, and Witness. Readiness queries only the targets that contain a configured readiness
-metric. Other targets begin sampling in the steady-state window, avoiding unnecessary startup load.
+clientUpdate, and Witness. Seven additional `/latency` targets publish the exact recent distributions
+for the BaseApp/CellApp profiles. Readiness queries only the targets that contain a configured
+readiness metric. Other targets begin sampling in the steady-state window, avoiding unnecessary startup load.
 标准目标覆盖 Bots performance；BaseApp root、stats、channels、poller、KCP、gameTick、
 scriptCall、onTimer；以及 CellApp root、stats、channels、poller、gameTick、scriptCall、onTimer、
-clientUpdate 和 Witness。readiness 只查询能够覆盖已配置就绪指标的目标，其余目标在稳态窗口开始采样，
-避免给启动阶段增加无关控制面负载。
+clientUpdate 和 Witness；另有 7 个 `/latency` 子目标发布 BaseApp/CellApp Profile 的真实近期分布。
+readiness 只查询能够覆盖已配置就绪指标的目标，其余目标在稳态窗口开始采样，避免给启动阶段增加无关控制面负载。
 
 Watcher protocol responses do not carry a request ID. The collector therefore reuses one connection
 per `(component_type, host, port, path)`, not merely per endpoint. This prevents a delayed or chunked
@@ -102,14 +103,17 @@ request/response producer that emits the same JSONL request contract.
 玩法 SLA 仍需要资产专用的关联请求/响应生产器，并输出相同 JSONL 请求契约。
 
 For cprofile targets, the runner preserves raw stamp counters, converts time counters to microseconds
-using `root/stats/stampsPerSecond`, and derives window call count, calls/second, total/self time, and
-mean total/self time. `ProfileVal` does not retain an invocation distribution, so these values are not
-Python P50/P95/P99/P99.9. A real percentile requires a bounded low-overhead histogram in the profiled
-hot path; P99.9 should only be published when a window contains at least 10,000 samples.
+using `root/stats/stampsPerSecond`, and derives interval call count, calls/second, total/self time, and
+mean total/self time. The dedicated `/latency` targets are different: selected BaseApp/CellApp profiles
+retain exact outermost-call durations from the last 10 seconds, capped at the newest 10,000 samples,
+and publish count, mean, P50, P95, P99, and max. P99.9 is omitted unless all 10,000 slots are populated.
+At high throughput this is a newest-10,000-call window shorter than 10 seconds; nested scopes sharing
+one `ProfileVal` are represented by their outermost duration.
 对于 cprofile 目标，运行器保留原始 stamp 计数，使用 `root/stats/stampsPerSecond` 换算微秒，并派生
-窗口调用数、每秒调用数、总/自耗时及平均总/自耗时。`ProfileVal` 不保存单次调用分布，因此这些值不是
-Python P50/P95/P99/P99.9。真实分位数需要在被测热路径加入有界低开销直方图；窗口样本不足 10,000 时
-不发布 P99.9。
+间隔调用数、每秒调用数、总/自耗时及平均总/自耗时。专用 `/latency` 目标口径不同：指定的
+BaseApp/CellApp Profile 精确保留最近 10 秒、最多最新 10,000 个最外层调用时长，并发布 Count、Mean、
+P50、P95、P99 和 Max；只有 10,000 个槽位全部有样本时才发布 P99.9。高吞吐时它代表短于 10 秒的
+“最新 10,000 次”窗口；共享同一 `ProfileVal` 的嵌套作用域按最外层总时长记录。
 
 The scenario `bots` value sets `bots/defaultAddBots/totalCount` in the isolated overlay.
 场景中的 `bots` 值会写入隔离覆盖层的 `bots/defaultAddBots/totalCount`。

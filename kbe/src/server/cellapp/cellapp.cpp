@@ -282,6 +282,11 @@ void Cellapp::onShutdown(bool first)
 bool Cellapp::initializeWatcher()
 {
 	ProfileVal::setWarningPeriod(stampsPerSecond() / g_kbeSrvConfig.gameUpdateHertz());
+	// Publish zero-sample latency windows before the first script, timer, or client update.
+	// 在首次脚本、Timer 或客户端更新前发布零样本延迟窗口，避免空载场景缺少指标目录。
+	SCRIPTCALL_PROFILE.initializeWatcher();
+	ONTIMER_PROFILE.initializeWatcher();
+	CLIENT_UPDATE_PROFILE.initializeWatcher();
 
 	WATCH_OBJECT("load", this, &Cellapp::_getLoad);
 	WATCH_OBJECT("spaceSize", this, &Cellapp::spaceSize);
@@ -431,7 +436,7 @@ void Cellapp::handleTimeout(TimerHandle handle, void * arg)
 //-------------------------------------------------------------------------------------
 void Cellapp::handleGameTick()
 {
-	AUTO_SCOPED_PROFILE("gameTick");
+	AUTO_SCOPED_PROFILE_LATENCY("gameTick");
 
 	// 一定要在最前面
 	updateLoad();

@@ -19,6 +19,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "profile.h"
+#include "profile_latency.h"
 #include "helper/watcher.h"
 
 #ifndef CODE_INLINE
@@ -87,7 +88,7 @@ bool ProfileGroup::initializeWatcher()
 }
 
 //-------------------------------------------------------------------------------------
-ProfileVal::ProfileVal(std::string name, ProfileGroup * pGroup):
+ProfileVal::ProfileVal(std::string name, ProfileGroup * pGroup, bool collectLatency):
 	name_(name),
 	pProfileGroup_(pGroup),
 	lastTime_(0),
@@ -98,7 +99,10 @@ ProfileVal::ProfileVal(std::string name, ProfileGroup * pGroup):
 	sumQuantity_(0),
 	count_(0),
 	inProgress_(0),
-	initWatcher_(false)
+	initWatcher_(false),
+	pLatencyWindow_(collectLatency ? new ProfileLatencyWindow(
+		ProfileLatencyWindow::DEFAULT_CAPACITY,
+		stampsPerSecond() * 10) : NULL)
 {
 	if (pProfileGroup_ == NULL)
 	{
@@ -114,6 +118,8 @@ ProfileVal::ProfileVal(std::string name, ProfileGroup * pGroup):
 //-------------------------------------------------------------------------------------
 ProfileVal::~ProfileVal()
 {
+	SAFE_RELEASE(pLatencyWindow_);
+
 	if (pProfileGroup_)
 	{
 		// pProfileGroup_.erase(std::remove( pProfileGroup_->begin(), pProfileGroup_->end(), this ), pProfileGroup_->end());
@@ -153,7 +159,128 @@ bool ProfileVal::initializeWatcher()
 	kbe_snprintf(buf, MAX_BUF, "cprofiles/%s/%s/inProgress", pProfileGroup_->name(), name_.c_str());
 	WATCH_OBJECT(buf, inProgress_);
 
+	if (pLatencyWindow_)
+	{
+		kbe_snprintf(buf, MAX_BUF, "cprofiles/%s/%s/latency/count", pProfileGroup_->name(), name_.c_str());
+		WATCH_OBJECT(buf, this, &ProfileVal::latencyCount);
+
+		kbe_snprintf(buf, MAX_BUF, "cprofiles/%s/%s/latency/meanMicros", pProfileGroup_->name(), name_.c_str());
+		WATCH_OBJECT(buf, this, &ProfileVal::latencyMeanMicros);
+
+		kbe_snprintf(buf, MAX_BUF, "cprofiles/%s/%s/latency/p50Micros", pProfileGroup_->name(), name_.c_str());
+		WATCH_OBJECT(buf, this, &ProfileVal::latencyP50Micros);
+
+		kbe_snprintf(buf, MAX_BUF, "cprofiles/%s/%s/latency/p95Micros", pProfileGroup_->name(), name_.c_str());
+		WATCH_OBJECT(buf, this, &ProfileVal::latencyP95Micros);
+
+		kbe_snprintf(buf, MAX_BUF, "cprofiles/%s/%s/latency/p99Micros", pProfileGroup_->name(), name_.c_str());
+		WATCH_OBJECT(buf, this, &ProfileVal::latencyP99Micros);
+
+		kbe_snprintf(buf, MAX_BUF, "cprofiles/%s/%s/latency/p999Micros", pProfileGroup_->name(), name_.c_str());
+		WATCH_OBJECT(buf, this, &ProfileVal::latencyP999Micros);
+
+		kbe_snprintf(buf, MAX_BUF, "cprofiles/%s/%s/latency/maxMicros", pProfileGroup_->name(), name_.c_str());
+		WATCH_OBJECT(buf, this, &ProfileVal::latencyMaxMicros);
+
+		kbe_snprintf(buf, MAX_BUF, "cprofiles/%s/%s/latency/p999Available", pProfileGroup_->name(), name_.c_str());
+		WATCH_OBJECT(buf, this, &ProfileVal::latencyP999Available);
+
+		kbe_snprintf(buf, MAX_BUF, "cprofiles/%s/%s/latency/windowCapacity", pProfileGroup_->name(), name_.c_str());
+		WATCH_OBJECT(buf, this, &ProfileVal::latencyWindowCapacity);
+
+		kbe_snprintf(buf, MAX_BUF, "cprofiles/%s/%s/latency/windowMaxAgeSeconds", pProfileGroup_->name(), name_.c_str());
+		WATCH_OBJECT(buf, this, &ProfileVal::latencyWindowMaxAgeSeconds);
+
+		kbe_snprintf(buf, MAX_BUF, "cprofiles/%s/%s/latency/windowAllocatedBytes", pProfileGroup_->name(), name_.c_str());
+		WATCH_OBJECT(buf, this, &ProfileVal::latencyWindowAllocatedBytes);
+	}
+
 	return true;
+}
+
+//-------------------------------------------------------------------------------------
+void ProfileVal::recordLatency(TimeStamp duration, TimeStamp completedAt)
+{
+	pLatencyWindow_->record(duration, completedAt);
+}
+
+namespace
+{
+double latencyStampsToMicros(double stamps)
+{
+	return stamps / stampsPerSecondD() * 1000000.0;
+}
+}
+
+//-------------------------------------------------------------------------------------
+uint64 ProfileVal::latencyCount()
+{
+	return pLatencyWindow_ ? pLatencyWindow_->snapshot(timestamp()).count : 0;
+}
+
+//-------------------------------------------------------------------------------------
+double ProfileVal::latencyMeanMicros()
+{
+	return pLatencyWindow_ ? latencyStampsToMicros(pLatencyWindow_->snapshot(timestamp()).meanStamps) : 0.0;
+}
+
+//-------------------------------------------------------------------------------------
+double ProfileVal::latencyP50Micros()
+{
+	return pLatencyWindow_ ? latencyStampsToMicros(static_cast<double>(
+		pLatencyWindow_->snapshot(timestamp()).p50Stamps)) : 0.0;
+}
+
+//-------------------------------------------------------------------------------------
+double ProfileVal::latencyP95Micros()
+{
+	return pLatencyWindow_ ? latencyStampsToMicros(static_cast<double>(
+		pLatencyWindow_->snapshot(timestamp()).p95Stamps)) : 0.0;
+}
+
+//-------------------------------------------------------------------------------------
+double ProfileVal::latencyP99Micros()
+{
+	return pLatencyWindow_ ? latencyStampsToMicros(static_cast<double>(
+		pLatencyWindow_->snapshot(timestamp()).p99Stamps)) : 0.0;
+}
+
+//-------------------------------------------------------------------------------------
+double ProfileVal::latencyP999Micros()
+{
+	return pLatencyWindow_ ? latencyStampsToMicros(static_cast<double>(
+		pLatencyWindow_->snapshot(timestamp()).p999Stamps)) : 0.0;
+}
+
+//-------------------------------------------------------------------------------------
+double ProfileVal::latencyMaxMicros()
+{
+	return pLatencyWindow_ ? latencyStampsToMicros(static_cast<double>(
+		pLatencyWindow_->snapshot(timestamp()).maxStamps)) : 0.0;
+}
+
+//-------------------------------------------------------------------------------------
+bool ProfileVal::latencyP999Available()
+{
+	return pLatencyWindow_ && pLatencyWindow_->snapshot(timestamp()).p999Available;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 ProfileVal::latencyWindowCapacity()
+{
+	return pLatencyWindow_ ? pLatencyWindow_->capacity() : 0;
+}
+
+//-------------------------------------------------------------------------------------
+double ProfileVal::latencyWindowMaxAgeSeconds()
+{
+	return pLatencyWindow_ ? static_cast<double>(pLatencyWindow_->maxAgeStamps()) / stampsPerSecondD() : 0.0;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 ProfileVal::latencyWindowAllocatedBytes()
+{
+	return pLatencyWindow_ ? pLatencyWindow_->allocatedBytes() : 0;
 }
 
 //-------------------------------------------------------------------------------------

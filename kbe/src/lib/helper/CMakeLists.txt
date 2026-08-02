@@ -4,6 +4,7 @@ add_library(helper STATIC
     debug_option.cpp
     eventhistory_stats.cpp
     profile.cpp
+    profile_latency.cpp
     profile_handler.cpp
     profiler.cpp
     script_loglevel.cpp

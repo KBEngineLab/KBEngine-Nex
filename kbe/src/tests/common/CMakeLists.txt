@@ -19,6 +19,22 @@ set_tests_properties(common.pooling PROPERTIES
     PASS_REGULAR_EXPRESSION "COMMON_POOLING_TEST_PASS"
 )
 
+add_executable(kbe_test_profile_latency profile_latency.cpp)
+target_link_libraries(kbe_test_profile_latency PRIVATE helper)
+set_target_properties(kbe_test_profile_latency PROPERTIES FOLDER "Tests/Common")
+
+if(MSVC)
+	target_compile_options(kbe_test_profile_latency PRIVATE /W4 /WX /utf-8)
+else()
+	target_compile_options(kbe_test_profile_latency PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
+add_test(NAME performance.profile_latency COMMAND kbe_test_profile_latency)
+set_tests_properties(performance.profile_latency PROPERTIES
+	LABELS "common;cxx;unit;portable;performance"
+	PASS_REGULAR_EXPRESSION "PROFILE_LATENCY_TEST_PASS"
+)
+
 add_executable(kbe_test_witness_dirty_queue witness_dirty_queue.cpp)
 target_include_directories(kbe_test_witness_dirty_queue PRIVATE
 	"${CMAKE_SOURCE_DIR}"
@@ -78,6 +94,7 @@ set_tests_properties(cellapp.witness_volatile_budget PROPERTIES
 
 add_custom_target(kbe_common_tests DEPENDS
 	kbe_test_common_pooling
+	kbe_test_profile_latency
 	kbe_test_witness_dirty_queue
 	kbe_test_witness_load_metrics
 	kbe_test_witness_volatile_budget

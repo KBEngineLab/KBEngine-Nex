@@ -21,11 +21,11 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "profile.h"	
 namespace KBEngine{	
 
-ProfileVal SCRIPTCALL_PROFILE("scriptCall");
+ProfileVal SCRIPTCALL_PROFILE("scriptCall", NULL, true);
 ProfileVal ONMOVE_PROFILE("onMove");
 ProfileVal ON_NAVIGATE_PROFILE("onNavigate");
-ProfileVal CLIENT_UPDATE_PROFILE("clientUpdate");
-ProfileVal ONTIMER_PROFILE("onTimer");
+ProfileVal CLIENT_UPDATE_PROFILE("clientUpdate", NULL, true);
+ProfileVal ONTIMER_PROFILE("onTimer", NULL, true);
 
 EventHistoryStats g_privateClientEventHistoryStats("PrivateClientEvents");
 EventHistoryStats g_publicClientEventHistoryStats("PublicClientEvents");

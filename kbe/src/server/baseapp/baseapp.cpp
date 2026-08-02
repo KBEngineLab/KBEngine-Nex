@@ -473,6 +473,10 @@ void Baseapp::onShutdownEnd()
 bool Baseapp::initializeWatcher()
 {
 	ProfileVal::setWarningPeriod(stampsPerSecond() / g_kbeSrvConfig.gameUpdateHertz());
+	// Publish zero-sample latency windows before the first script or timer callback.
+	// 在首次脚本或 Timer 回调前发布零样本延迟窗口，避免空载场景缺少指标目录。
+	SCRIPTCALL_PROFILE.initializeWatcher();
+	ONTIMER_PROFILE.initializeWatcher();
 
 	WATCH_OBJECT("numProxices", this, &Baseapp::numProxices);
 	WATCH_OBJECT("numClients", this, &Baseapp::numClients);
@@ -646,7 +650,7 @@ void Baseapp::handleCheckStatusTick()
 //-------------------------------------------------------------------------------------
 void Baseapp::handleGameTick()
 {
-	AUTO_SCOPED_PROFILE("gameTick");
+	AUTO_SCOPED_PROFILE_LATENCY("gameTick");
 
 	// 一定要在最前面
 	updateLoad();
