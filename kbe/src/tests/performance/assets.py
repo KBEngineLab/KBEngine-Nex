@@ -134,6 +134,7 @@ def create_log_config_overlay(output_root: Path, bots_level: str, server_level: 
     properties_root = resource_root / "server/log4cxx_properties"
     properties_root.mkdir(parents=True, exist_ok=True)
     for component in (
+        "bots",
         "machine",
         "logger",
         "interfaces",
@@ -144,8 +145,9 @@ def create_log_config_overlay(output_root: Path, bots_level: str, server_level: 
         "cellapp",
         "loginapp",
     ):
+        component_level = normalized_bots_level if component == "bots" else normalized_server_level
         (properties_root / f"{component}.properties").write_text(
-            _log4cxx_properties(normalized_server_level, component),
+            _log4cxx_properties(component_level, component),
             encoding="utf-8",
         )
 

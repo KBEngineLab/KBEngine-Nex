@@ -603,12 +603,16 @@ def main() -> int:
         assert xml_root.findtext("./channelCommon/windowOverflow/receive/bytes/external") == "1048576"
         assert xml_root.findtext("./networkInterface/reliableUDP/tickInterval") == "20"
         assert xml_root.findtext("./networkInterface/reliableUDP/minRTO") == "50"
-        bots_log_config = (root / "run/config-overlay/res/log4j.properties").read_text(encoding="utf-8")
+        bots_log_config = (
+            root / "run/config-overlay/res/server/log4cxx_properties/bots.properties"
+        ).read_text(encoding="utf-8")
+        legacy_bots_log_config = (root / "run/config-overlay/res/log4j.properties").read_text(encoding="utf-8")
         baseapp_log_config = (
             root / "run/config-overlay/res/server/log4cxx_properties/baseapp.properties"
         ).read_text(encoding="utf-8")
         assert "log4j.rootLogger=warn, R" in bots_log_config
         assert "logs/bots.${KBE_COMPONENTID}.log" in bots_log_config
+        assert bots_log_config == legacy_bots_log_config
         assert "log4j.rootLogger=info, R" in baseapp_log_config
         log_path = root / "streamed.log"
         log_path.write_text("ordinary line\nWARNING split across chunks\nERROR final\n", encoding="utf-8")
