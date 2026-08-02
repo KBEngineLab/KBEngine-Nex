@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import json
 import re
+import socket
 import sys
 import time
 from dataclasses import dataclass
@@ -119,6 +120,8 @@ class MachineEndpointResolver:
         self.tools_root = tools_root
         self._machines: Any | None = None
         self._define: Any | None = None
+        self._machines_module: Any | None = None
+        self._message_stream: Any | None = None
         self._cache: dict[tuple[str, int | None], tuple[str, int]] = {}
 
     def _initialize(self) -> None:
@@ -126,32 +129,57 @@ class MachineEndpointResolver:
             return
         sys.path.insert(0, str(self.tools_root))
         try:
-            from pycommon import Define, Machines
+            from pycommon import Define, Machines, MessageStream
 
             self._define = Define
+            self._machines_module = Machines
+            self._message_stream = MessageStream
             self._machines = Machines.Machines()
         finally:
             sys.path.pop(0)
 
-    def _refresh(self) -> None:
-        self._initialize()
+    def _index_discovered_components(self) -> None:
         assert self._machines is not None and self._define is not None
-        self._machines.queryAllInterfaces("<broadcast>", trycount=0, timeout=0.5)
-        cache: dict[tuple[str, int | None], tuple[str, int]] = {}
         for component_type, infos in self._machines.interfaces.items():
             name = str(self._define.COMPONENT_NAME[int(component_type)]).lower()
             for info in infos:
                 endpoint = (str(info.intaddr), int(info.intport))
-                cache[(name, int(info.componentID))] = endpoint
-                cache.setdefault((name, None), endpoint)
-        self._cache = cache
+                self._cache[(name, int(info.componentID))] = endpoint
+                self._cache.setdefault((name, None), endpoint)
+
+    def _refresh(self, desired: tuple[str, int | None]) -> None:
+        self._initialize()
+        assert self._machines is not None
+        assert self._machines_module is not None and self._message_stream is not None
+
+        message = self._message_stream.MessageStreamWriter(
+            self._machines_module.MachineInterface_onQueryAllInterfaceInfos
+        )
+        message.writeInt32(self._machines.uid)
+        message.writeString(self._machines.username)
+        message.writeUint16(socket.htons(self._machines.replyPort))
+        started = time.monotonic()
+
+        def on_response(data: bytes, _address: tuple[str, int]) -> bool:
+            self._machines.parseQueryData(data)
+            self._index_discovered_components()
+            return desired in self._cache or time.monotonic() - started >= 10.0
+
+        # Stop as soon as the desired component arrives. Machines.queryAllInterfaces
+        # waits for UDP silence, which is unbounded while a large response stream is
+        # active and can defeat the runner's outer readiness timeout.
+        # 找到目标组件后立即停止；Machines.queryAllInterfaces 会等待 UDP 静默，
+        # 大响应流下时长无上限，会使运行器外层 readiness 超时失效。
+        self._machines.sendAndReceive(
+            message.build(), "<broadcast>", trycount=0, timeout=0.5, callback=on_response,
+        )
 
     def resolve(self, target: WatcherTarget) -> WatcherTarget:
         component_name, separator, component_id = target.component_name.partition("#")
         key = (component_name.lower(), int(component_id) if separator else None)
         endpoint = self._cache.get(key)
         if endpoint is None:
-            self._refresh()
+            self._refresh(key)
             endpoint = self._cache.get(key)
         if endpoint is None:
             raise LookupError(
