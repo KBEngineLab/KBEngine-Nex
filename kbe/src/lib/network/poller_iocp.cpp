@@ -1096,6 +1096,7 @@ int IocpPoller::processPendingEvents(double maxWait)
 #endif
 
 	int readyCount = 0;
+	bool completionTimeBudgetExhausted = false;
 
 	if (overlapped != NULL)
 	{
@@ -1113,7 +1114,9 @@ int IocpPoller::processPendingEvents(double maxWait)
 		handleCompletion(completionKey, overlapped, bytesTransferred, ok == TRUE, errorCode);
 
 		while (readyCount < static_cast<int>(COMPLETION_MAX_COMPLETIONS_PER_TICK) &&
-			(completionProcessingBudget == 0 || timestamp() - completionProcessingStart < completionProcessingBudget))
+			(readyCount < static_cast<int>(COMPLETION_MIN_COMPLETIONS_PER_TICK) ||
+				completionProcessingBudget == 0 ||
+				timestamp() - completionProcessingStart < completionProcessingBudget))
 		{
 			bytesTransferred = 0;
 			completionKey = 0;
@@ -1132,8 +1135,10 @@ int IocpPoller::processPendingEvents(double maxWait)
 
 		const uint64 completionProcessingElapsed = timestamp() - completionProcessingStart;
 		const bool countBudgetExhausted = readyCount >= static_cast<int>(COMPLETION_MAX_COMPLETIONS_PER_TICK);
-		const bool timeBudgetExceeded = completionProcessingBudget > 0 &&
+		const bool timeBudgetExceeded = readyCount >= static_cast<int>(COMPLETION_MIN_COMPLETIONS_PER_TICK) &&
+			completionProcessingBudget > 0 &&
 			completionProcessingElapsed >= completionProcessingBudget;
+		completionTimeBudgetExhausted = timeBudgetExceeded;
 		const bool timeBudgetWarningExceeded = completionProcessingBudget > 0 &&
 			completionProcessingElapsed >= completionProcessingBudget * COMPLETION_BUDGET_WARNING_MULTIPLIER;
 
@@ -1163,7 +1168,8 @@ int IocpPoller::processPendingEvents(double maxWait)
 	}
 
 	recordCompletionBatch(static_cast<uint32>(readyCount),
-		readyCount >= static_cast<int>(COMPLETION_MAX_COMPLETIONS_PER_TICK));
+		readyCount >= static_cast<int>(COMPLETION_MAX_COMPLETIONS_PER_TICK),
+		completionTimeBudgetExhausted);
 
 	return readyCount;
 }

@@ -235,6 +235,8 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/poller/completionBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::pollerCompletionBudgetExhaustionCount);
 	WATCH_OBJECT("network/poller/completionConsecutiveBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::pollerCompletionConsecutiveBudgetExhaustions);
 	WATCH_OBJECT("network/poller/completionMaxConsecutiveBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::pollerCompletionMaxConsecutiveBudgetExhaustions);
+	WATCH_OBJECT("network/poller/completionTimeBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::pollerCompletionTimeBudgetExhaustionCount);
+	WATCH_OBJECT("network/poller/discardedPacketsAfterClose", &networkInterface_, &Network::NetworkInterface::discardedPacketsAfterCloseCount);
 	// Compare active channels, heap entries, wakeups, and updates together to quantify scheduler aggregation without assuming aligned deadlines.
 	// 联合观察活动 Channel、堆项、唤醒和更新次数，用于量化调度聚合效果，不假设各 Channel 截止时间天然对齐。
 	WATCH_OBJECT("network/kcp/scheduledChannels", &networkInterface_, &Network::NetworkInterface::kcpScheduledChannelCount);
@@ -253,6 +255,9 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/kcp/budgetExhaustions", &networkInterface_, &Network::NetworkInterface::kcpBudgetExhaustionCount);
 	WATCH_OBJECT("network/kcp/consecutiveBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::kcpConsecutiveBudgetExhaustions);
 	WATCH_OBJECT("network/kcp/maxConsecutiveBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::kcpMaxConsecutiveBudgetExhaustions);
+	WATCH_OBJECT("network/kcp/timeBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::kcpTimeBudgetExhaustionCount);
+	WATCH_OBJECT("network/kcp/totalProcessingMicros", &networkInterface_, &Network::NetworkInterface::kcpTotalProcessingMicros);
+	WATCH_OBJECT("network/kcp/maxProcessingMicros", &networkInterface_, &Network::NetworkInterface::kcpMaxProcessingMicros);
 	// waitsnd 指标区分 KCP 自身积压和 completion UDP 队列积压，避免只根据 4 MiB socket backlog 推断根因。
 	// The waitsnd metrics separate KCP-owned backlog from the completion UDP queue instead of inferring the cause from a 4 MiB socket backlog alone.
 	WATCH_OBJECT("network/kcp/pendingSegments", &networkInterface_, &Network::NetworkInterface::kcpPendingSegmentCount);

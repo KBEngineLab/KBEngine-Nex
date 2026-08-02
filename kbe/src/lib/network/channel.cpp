@@ -1396,18 +1396,19 @@ void Channel::processPackets(KBEngine::Network::MessageHandlers* pMsgHandlers, P
 
 	if (this->isDestroyed())
 	{
-		ERROR_MSG(fmt::format("Channel::processPackets({}): channel[{:p}] is destroyed.\n", 
-			this->c_str(), (void*)this));
-
+		if (pNetworkInterface_ != NULL)
+			pNetworkInterface_->recordDiscardedPacketAfterClose();
+		RECLAIM_PACKET(pPacket->isTCPPacket(), pPacket);
 		return;
 	}
 
 	if(this->condemn() > 0 && !isGracefulClosing())
 	{
-		ERROR_MSG(fmt::format("Channel::processPackets({}): channel[{:p}] is condemn.\n", 
-			this->c_str(), (void*)this));
-
-		//this->destroy();
+		// Late completion packets are normal after an inactivity close. Reclaim them and expose one aggregate counter instead of synchronously logging every packet.
+		// inactivity 关闭后的迟到 completion 属于正常竞态；回收报文并记录聚合计数，避免逐包同步日志放大积压。
+		if (pNetworkInterface_ != NULL)
+			pNetworkInterface_->recordDiscardedPacketAfterClose();
+		RECLAIM_PACKET(pPacket->isTCPPacket(), pPacket);
 		return;
 	}
 	

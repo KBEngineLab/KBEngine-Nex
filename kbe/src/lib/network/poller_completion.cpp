@@ -81,7 +81,8 @@ CompletionPoller::CompletionPoller() :
 	completionMaxBatchCount_(0),
 	completionBudgetExhaustionCount_(0),
 	completionConsecutiveBudgetExhaustions_(0),
-	completionMaxConsecutiveBudgetExhaustions_(0)
+	completionMaxConsecutiveBudgetExhaustions_(0),
+	completionTimeBudgetExhaustionCount_(0)
 {
 }
 
@@ -372,15 +373,19 @@ uint64 CompletionPoller::completionMaxBatchCount() const { return completionMaxB
 uint64 CompletionPoller::completionBudgetExhaustionCount() const { return completionBudgetExhaustionCount_; }
 uint64 CompletionPoller::completionConsecutiveBudgetExhaustions() const { return completionConsecutiveBudgetExhaustions_; }
 uint64 CompletionPoller::completionMaxConsecutiveBudgetExhaustions() const { return completionMaxConsecutiveBudgetExhaustions_; }
+uint64 CompletionPoller::completionTimeBudgetExhaustionCount() const { return completionTimeBudgetExhaustionCount_; }
 
 //-------------------------------------------------------------------------------------
-void CompletionPoller::recordCompletionBatch(uint32 processedCount, bool budgetExhausted)
+void CompletionPoller::recordCompletionBatch(uint32 processedCount, bool countBudgetExhausted,
+	bool timeBudgetExhausted)
 {
 	++completionProcessRounds_;
 	completionProcessedCount_ += processedCount;
 	completionLastBatchCount_ = processedCount;
 	completionMaxBatchCount_ = std::max<uint64>(completionMaxBatchCount_, processedCount);
-	if (budgetExhausted)
+	if (timeBudgetExhausted)
+		++completionTimeBudgetExhaustionCount_;
+	if (countBudgetExhausted || timeBudgetExhausted)
 	{
 		++completionBudgetExhaustionCount_;
 		++completionConsecutiveBudgetExhaustions_;

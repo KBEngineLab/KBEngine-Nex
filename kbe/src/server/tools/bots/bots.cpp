@@ -178,6 +178,8 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/completionBudgetExhaustions", &networkInterface(), &Network::NetworkInterface::pollerCompletionBudgetExhaustionCount);
 	WATCH_OBJECT("bots/performance/completionConsecutiveBudgetExhaustions", &networkInterface(), &Network::NetworkInterface::pollerCompletionConsecutiveBudgetExhaustions);
 	WATCH_OBJECT("bots/performance/completionMaxConsecutiveBudgetExhaustions", &networkInterface(), &Network::NetworkInterface::pollerCompletionMaxConsecutiveBudgetExhaustions);
+	WATCH_OBJECT("bots/performance/completionTimeBudgetExhaustions", &networkInterface(), &Network::NetworkInterface::pollerCompletionTimeBudgetExhaustionCount);
+	WATCH_OBJECT("bots/performance/discardedPacketsAfterClose", &networkInterface(), &Network::NetworkInterface::discardedPacketsAfterCloseCount);
 	WATCH_OBJECT("bots/performance/contextsOutstandingBytes", &networkInterface(), &Network::NetworkInterface::pollerContextsOutstandingBytes);
 	WATCH_OBJECT("bots/performance/contextsCachedBytes", &networkInterface(), &Network::NetworkInterface::pollerContextsCachedBytes);
 	// KCP 调度与队列指标用于区分空闲定时维护开销和真实业务流量，避免仅凭进程 CPU 猜测热点。
@@ -193,6 +195,9 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/kcpBudgetExhaustions", &networkInterface(), &Network::NetworkInterface::kcpBudgetExhaustionCount);
 	WATCH_OBJECT("bots/performance/kcpConsecutiveBudgetExhaustions", &networkInterface(), &Network::NetworkInterface::kcpConsecutiveBudgetExhaustions);
 	WATCH_OBJECT("bots/performance/kcpMaxConsecutiveBudgetExhaustions", &networkInterface(), &Network::NetworkInterface::kcpMaxConsecutiveBudgetExhaustions);
+	WATCH_OBJECT("bots/performance/kcpTimeBudgetExhaustions", &networkInterface(), &Network::NetworkInterface::kcpTimeBudgetExhaustionCount);
+	WATCH_OBJECT("bots/performance/kcpTotalProcessingMicros", &networkInterface(), &Network::NetworkInterface::kcpTotalProcessingMicros);
+	WATCH_OBJECT("bots/performance/kcpMaxProcessingMicros", &networkInterface(), &Network::NetworkInterface::kcpMaxProcessingMicros);
 	WATCH_OBJECT("bots/performance/kcpPendingSegments", &networkInterface(), &Network::NetworkInterface::kcpPendingSegmentCount);
 	WATCH_OBJECT("bots/performance/kcpQueuedSegments", &networkInterface(), &Network::NetworkInterface::kcpQueuedSegmentCount);
 	WATCH_OBJECT("bots/performance/kcpUnackedSegments", &networkInterface(), &Network::NetworkInterface::kcpUnackedSegmentCount);

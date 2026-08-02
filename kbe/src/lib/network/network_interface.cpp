@@ -60,6 +60,7 @@ NetworkInterface::NetworkInterface(Network::EventDispatcher * pDispatcher,
 	finalizedKcpAckReceivedCount_(0),
 	finalizedKcpTimeoutRetransmissionCount_(0),
 	finalizedKcpFastRetransmissionCount_(0),
+	discardedPacketsAfterCloseCount_(0),
 	pDispatcher_(pDispatcher),
 	kcpUpdateScheduler_(*pDispatcher),
 	pExtListenerReceiver_(NULL),
@@ -677,6 +678,7 @@ KBE_POLLER_METRIC(pollerCompletionMaxBatchCount, completionMaxBatchCount)
 KBE_POLLER_METRIC(pollerCompletionBudgetExhaustionCount, completionBudgetExhaustionCount)
 KBE_POLLER_METRIC(pollerCompletionConsecutiveBudgetExhaustions, completionConsecutiveBudgetExhaustions)
 KBE_POLLER_METRIC(pollerCompletionMaxConsecutiveBudgetExhaustions, completionMaxConsecutiveBudgetExhaustions)
+KBE_POLLER_METRIC(pollerCompletionTimeBudgetExhaustionCount, completionTimeBudgetExhaustionCount)
 
 #undef KBE_POLLER_METRIC
 
@@ -697,6 +699,9 @@ uint64 NetworkInterface::kcpMaxScheduleDelayMicros() const { return kcpUpdateSch
 uint64 NetworkInterface::kcpBudgetExhaustionCount() const { return kcpUpdateScheduler_.budgetExhaustionCount(); }
 uint64 NetworkInterface::kcpConsecutiveBudgetExhaustions() const { return kcpUpdateScheduler_.consecutiveBudgetExhaustions(); }
 uint64 NetworkInterface::kcpMaxConsecutiveBudgetExhaustions() const { return kcpUpdateScheduler_.maxConsecutiveBudgetExhaustions(); }
+uint64 NetworkInterface::kcpTimeBudgetExhaustionCount() const { return kcpUpdateScheduler_.timeBudgetExhaustionCount(); }
+uint64 NetworkInterface::kcpTotalProcessingMicros() const { return kcpUpdateScheduler_.totalProcessingMicros(); }
+uint64 NetworkInterface::kcpMaxProcessingMicros() const { return kcpUpdateScheduler_.maxProcessingMicros(); }
 
 //-------------------------------------------------------------------------------------
 uint64 NetworkInterface::kcpPendingSegmentCount() const

@@ -12,6 +12,7 @@
   "connect_rate_per_second": 100,
   "reliable_udp_tick_interval_ms": 10,
   "reliable_udp_min_rto_ms": 50,
+  "runtime_log_level": "warn",
   "warmup_seconds": 30,
   "external_receive_messages": 4096,
   "external_receive_bytes": 4194304,

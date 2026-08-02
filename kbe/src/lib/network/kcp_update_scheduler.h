@@ -39,6 +39,9 @@ public:
 	uint64 budgetExhaustionCount() const { return budgetExhaustionCount_; }
 	uint64 consecutiveBudgetExhaustions() const { return consecutiveBudgetExhaustions_; }
 	uint64 maxConsecutiveBudgetExhaustions() const { return maxConsecutiveBudgetExhaustions_; }
+	uint64 timeBudgetExhaustionCount() const { return timeBudgetExhaustionCount_; }
+	uint64 totalProcessingMicros() const { return totalProcessingMicros_; }
+	uint64 maxProcessingMicros() const { return maxProcessingMicros_; }
 
 private:
 	void handleTimeout(TimerHandle handle, void* pUser) override;
@@ -60,6 +63,9 @@ private:
 	uint64 budgetExhaustionCount_;
 	uint64 consecutiveBudgetExhaustions_;
 	uint64 maxConsecutiveBudgetExhaustions_;
+	uint64 timeBudgetExhaustionCount_;
+	uint64 totalProcessingMicros_;
+	uint64 maxProcessingMicros_;
 };
 
 }

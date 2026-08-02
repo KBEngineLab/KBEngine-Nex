@@ -313,6 +313,7 @@ def assert_gameplay_stress_scenario() -> None:
     assert scenario["connect_rate_per_second"] == 100
     assert scenario["reliable_udp_tick_interval_ms"] == 10
     assert scenario["reliable_udp_min_rto_ms"] == 50
+    assert scenario["runtime_log_level"] == "warn"
     assert scenario["workload_processes"] == 4
     assert scenario["workload_cid_start"] == 10000
     assert "fixture" not in scenario
@@ -445,6 +446,21 @@ def main() -> int:
     ).read_text(encoding="utf-8")
     assert "encryptedPayloadLen % BLOCK_SIZE" in encryption_source
     assert "return REASON_CORRUPTED_PACKET;" in encryption_source
+    script_level_source = (
+        repository_root / "kbe/src/lib/helper/script_loglevel.h"
+    ).read_text(encoding="utf-8")
+    assert "SCRIPT_DBG = Level::DEBUG_INT + 1" in script_level_source
+    assert "SCRIPT_WAR = Level::WARN_INT + 1" in script_level_source
+    assert "SCRIPT_ERR = Level::ERROR_INT + 1" in script_level_source
+    channel_source = (
+        repository_root / "kbe/src/lib/network/channel.cpp"
+    ).read_text(encoding="utf-8")
+    assert "recordDiscardedPacketAfterClose" in channel_source
+    scheduler_source = (
+        repository_root / "kbe/src/lib/network/kcp_update_scheduler.cpp"
+    ).read_text(encoding="utf-8")
+    assert "KCP_MIN_UPDATES_PER_WAKEUP = 256" in scheduler_source
+    assert "KCP_MAX_UPDATES_PER_WAKEUP = 2048" in scheduler_source
     assert "WATCH_OBJECT(\"spaceSize\", this, &Cellapp::spaceSize)" in (
         repository_root / "kbe/src/server/cellapp/cellapp.cpp"
     ).read_text(encoding="utf-8")
@@ -500,6 +516,7 @@ def main() -> int:
             external_receive_bytes=1048576,
             reliable_udp_tick_interval_ms=20,
             reliable_udp_min_rto_ms=50,
+            runtime_log_level="warn",
         )
         xml_root = ET.parse(overlay).getroot()
         assert xml_root.findtext("./bots/defaultAddBots/totalCount") == "500"
@@ -507,6 +524,13 @@ def main() -> int:
         assert xml_root.findtext("./channelCommon/windowOverflow/receive/bytes/external") == "1048576"
         assert xml_root.findtext("./networkInterface/reliableUDP/tickInterval") == "20"
         assert xml_root.findtext("./networkInterface/reliableUDP/minRTO") == "50"
+        bots_log_config = (root / "run/config-overlay/res/log4j.properties").read_text(encoding="utf-8")
+        baseapp_log_config = (
+            root / "run/config-overlay/res/server/log4cxx_properties/baseapp.properties"
+        ).read_text(encoding="utf-8")
+        assert "log4j.rootLogger=warn, R" in bots_log_config
+        assert "logs/bots.${KBE_COMPONENTID}.log" in bots_log_config
+        assert "log4j.rootLogger=warn, R" in baseapp_log_config
         log_path = root / "streamed.log"
         log_path.write_text("ordinary line\nWARNING split across chunks\nERROR final\n", encoding="utf-8")
         log_collector = IncrementalLogCollector(root)

@@ -141,6 +141,7 @@ public:
 	virtual uint64 completionBudgetExhaustionCount() const;
 	virtual uint64 completionConsecutiveBudgetExhaustions() const;
 	virtual uint64 completionMaxConsecutiveBudgetExhaustions() const;
+	virtual uint64 completionTimeBudgetExhaustionCount() const;
 
 	void clearSpareTime()		{spareTime_ = 0;}
 	uint64 spareTime() const	{return spareTime_;}

@@ -35,25 +35,25 @@ ScriptLevel::ScriptLevel(int level1, const LogString& name1, int syslogEquivalen
 
 //-------------------------------------------------------------------------------------
 LevelPtr ScriptLevel::getScriptInfo() {
-  static const LevelPtr scriptlv(new ScriptLevel(ScriptLevel::SCRIPT_INT, LOG4CXX_STR("S_INFO"), 7));
+  static const LevelPtr scriptlv(new ScriptLevel(ScriptLevel::SCRIPT_INFO, LOG4CXX_STR("S_INFO"), 7));
   return scriptlv;
 }
 
 //-------------------------------------------------------------------------------------
 LevelPtr ScriptLevel::getScriptWarning() {
-  static const LevelPtr scriptlv(new ScriptLevel(ScriptLevel::SCRIPT_INT, LOG4CXX_STR("S_WAR"), 7));
+  static const LevelPtr scriptlv(new ScriptLevel(ScriptLevel::SCRIPT_WAR, LOG4CXX_STR("S_WAR"), 7));
   return scriptlv;
 }
 
 //-------------------------------------------------------------------------------------
 LevelPtr ScriptLevel::getScriptError() {
-  static const LevelPtr scriptlv(new ScriptLevel(ScriptLevel::SCRIPT_INT, LOG4CXX_STR("S_ERR"), 7));
+  static const LevelPtr scriptlv(new ScriptLevel(ScriptLevel::SCRIPT_ERR, LOG4CXX_STR("S_ERR"), 7));
   return scriptlv;
 }
 
 //-------------------------------------------------------------------------------------
 LevelPtr ScriptLevel::getScriptDebug() {
-  static const LevelPtr scriptlv(new ScriptLevel(ScriptLevel::SCRIPT_INT, LOG4CXX_STR("S_DBG"), 7));
+  static const LevelPtr scriptlv(new ScriptLevel(ScriptLevel::SCRIPT_DBG, LOG4CXX_STR("S_DBG"), 7));
   return scriptlv;
 }
 

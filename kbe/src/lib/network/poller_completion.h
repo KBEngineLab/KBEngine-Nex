@@ -17,11 +17,12 @@ namespace Network
 
 // Completion processing is bounded per tick so a burst cannot starve timers and application work.
 // 每个 tick 限制 completion 处理量，避免网络突发饿死定时器和应用逻辑。
-static const uint32 COMPLETION_MAX_COMPLETIONS_PER_TICK = 256;
+static const uint32 COMPLETION_MIN_COMPLETIONS_PER_TICK = 256;
+static const uint32 COMPLETION_MAX_COMPLETIONS_PER_TICK = 1024;
 
-// Zero keeps the time budget disabled until a runtime watcher/configuration is added.
-// 零值表示暂不启用时间预算，待运行时 watcher/配置接入后再开放动态调节。
-static const uint32 COMPLETION_MAX_PROCESSING_TIME_MS = 0;
+// Drain at least the fairness minimum, then stop at the time or hard-count bound.
+// 至少处理公平性下限，随后在时间预算或硬数量上限处停止。
+static const uint32 COMPLETION_MAX_PROCESSING_TIME_MS = 2;
 
 class CompletionPoller : public EventPoller
 {
@@ -75,6 +76,7 @@ public:
 	uint64 completionBudgetExhaustionCount() const override;
 	uint64 completionConsecutiveBudgetExhaustions() const override;
 	uint64 completionMaxConsecutiveBudgetExhaustions() const override;
+	uint64 completionTimeBudgetExhaustionCount() const override;
 
 protected:
 	enum SocketKind
@@ -243,7 +245,8 @@ protected:
 	void recordRearmAttempt(bool retryRequired);
 	// Record one poll round without scanning socket state; a zero-sized round resets a prior exhaustion streak.
 	// 记录一轮 poll，无需扫描 socket 状态；空轮次也会终止此前的连续预算耗尽。
-	void recordCompletionBatch(uint32 processedCount, bool budgetExhausted);
+	void recordCompletionBatch(uint32 processedCount, bool countBudgetExhausted,
+		bool timeBudgetExhausted);
 
 	SocketStates socketStates_;
 	AcceptedSocketMap acceptedSockets_;
@@ -270,6 +273,7 @@ protected:
 	uint64 completionBudgetExhaustionCount_;
 	uint64 completionConsecutiveBudgetExhaustions_;
 	uint64 completionMaxConsecutiveBudgetExhaustions_;
+	uint64 completionTimeBudgetExhaustionCount_;
 };
 
 }

@@ -278,6 +278,7 @@ uint64 EventPoller::completionMaxBatchCount() const { return 0; }
 uint64 EventPoller::completionBudgetExhaustionCount() const { return 0; }
 uint64 EventPoller::completionConsecutiveBudgetExhaustions() const { return 0; }
 uint64 EventPoller::completionMaxConsecutiveBudgetExhaustions() const { return 0; }
+uint64 EventPoller::completionTimeBudgetExhaustionCount() const { return 0; }
 
 //-------------------------------------------------------------------------------------
 const char* EventPoller::defaultIOModelName()

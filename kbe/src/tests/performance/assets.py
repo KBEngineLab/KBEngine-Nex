@@ -30,6 +30,7 @@ def create_config_overlay(
     external_receive_bytes: int | None = None,
     reliable_udp_tick_interval_ms: int | None = None,
     reliable_udp_min_rto_ms: int | None = None,
+    runtime_log_level: str | None = None,
 ) -> Path:
     """Write only the per-run XML override; source assets remain read-only.
     只写入本次运行的 XML 覆盖文件，源资产保持只读。
@@ -99,7 +100,58 @@ def create_config_overlay(
     destination = output_root / "config-overlay/res/server/kbengine.xml"
     destination.parent.mkdir(parents=True, exist_ok=True)
     tree.write(destination, encoding="utf-8", xml_declaration=True)
+    if runtime_log_level is not None:
+        create_log_config_overlay(output_root, runtime_log_level)
     return destination
+
+
+def create_log_config_overlay(output_root: Path, level: str) -> None:
+    """Create per-run log4cxx files without changing repository or game assets.
+    创建本轮专用 log4cxx 配置，不修改仓库默认值或业务资产。
+
+    Performance runs retain warnings and errors while suppressing high-volume
+    connection/entity INFO and DEBUG messages that would otherwise become load.
+    性能运行保留警告和错误，同时过滤会反过来形成负载的连接/实体 INFO、DEBUG 日志。
+    """
+    normalized_level = level.strip().lower()
+    if normalized_level not in {"debug", "info", "warn", "error"}:
+        raise ValueError(f"unsupported runtime log level: {level}")
+
+    resource_root = output_root / "config-overlay/res"
+    (resource_root / "log4j.properties").write_text(
+        _log4cxx_properties(normalized_level, "bots"),
+        encoding="utf-8",
+    )
+    properties_root = resource_root / "server/log4cxx_properties"
+    properties_root.mkdir(parents=True, exist_ok=True)
+    for component in (
+        "machine",
+        "logger",
+        "interfaces",
+        "dbmgr",
+        "baseappmgr",
+        "cellappmgr",
+        "baseapp",
+        "cellapp",
+        "loginapp",
+    ):
+        (properties_root / f"{component}.properties").write_text(
+            _log4cxx_properties(normalized_level, component),
+            encoding="utf-8",
+        )
+
+
+def _log4cxx_properties(level: str, component: str) -> str:
+    component_id = "${KBE_COMPONENTID}"
+    return f"""log4j.rootLogger={level}, R
+log4j.appender.R=org.apache.log4j.rolling.RollingFileAppender
+log4j.appender.R.File=logs/{component}.{component_id}.log
+log4j.appender.R.DatePattern='.'yyyy-MM-dd
+log4j.appender.R.MaxFileSize=1048576KB
+log4j.appender.R.MaxBackupIndex=10
+log4j.appender.R.layout=org.apache.log4j.PatternLayout
+log4j.appender.R.layout.ConversionPattern=%6p %c [%t] [%d] - %m
+"""
 
 
 def resolve_bots_schedule(scenario: dict[str, Any], bots: int) -> tuple[float, int]:

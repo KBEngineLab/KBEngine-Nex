@@ -153,6 +153,8 @@ public:
 	uint64 pollerCompletionBudgetExhaustionCount() const;
 	uint64 pollerCompletionConsecutiveBudgetExhaustions() const;
 	uint64 pollerCompletionMaxConsecutiveBudgetExhaustions() const;
+	uint64 pollerCompletionTimeBudgetExhaustionCount() const;
+	uint64 discardedPacketsAfterCloseCount() const { return discardedPacketsAfterCloseCount_; }
 	uint64 kcpScheduledChannelCount() const;
 	uint64 kcpSchedulerHeapEntryCount() const;
 	uint64 kcpScheduleRequestCount() const;
@@ -169,6 +171,9 @@ public:
 	uint64 kcpBudgetExhaustionCount() const;
 	uint64 kcpConsecutiveBudgetExhaustions() const;
 	uint64 kcpMaxConsecutiveBudgetExhaustions() const;
+	uint64 kcpTimeBudgetExhaustionCount() const;
+	uint64 kcpTotalProcessingMicros() const;
+	uint64 kcpMaxProcessingMicros() const;
 	uint64 kcpPendingSegmentCount() const;
 	uint64 kcpQueuedSegmentCount() const;
 	uint64 kcpUnackedSegmentCount() const;
@@ -195,6 +200,7 @@ private:
 	void cancelChannelMaintenance(const Address& address);
 	void accumulateFinalizedKcpDiagnostics(uint64 ackSent, uint64 ackReceived,
 		uint64 timeoutRetransmissions, uint64 fastRetransmissions);
+	void recordDiscardedPacketAfterClose() { ++discardedPacketsAfterCloseCount_; }
 	uint64 channelTickEpoch() const { return channelTickEpoch_; }
 
 private:
@@ -211,6 +217,7 @@ private:
 	uint64									finalizedKcpAckReceivedCount_;
 	uint64									finalizedKcpTimeoutRetransmissionCount_;
 	uint64									finalizedKcpFastRetransmissionCount_;
+	uint64									discardedPacketsAfterCloseCount_;
 
 	EventDispatcher *						pDispatcher_;
 	KcpUpdateScheduler					kcpUpdateScheduler_;

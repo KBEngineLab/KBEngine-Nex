@@ -32,11 +32,11 @@ namespace log4cxx
    public:
         enum
         {
-            SCRIPT_INT = Level::INFO_INT + 1000,
+			SCRIPT_DBG = Level::DEBUG_INT + 1,
+			SCRIPT_INT = Level::INFO_INT + 1000,
 			SCRIPT_INFO = Level::INFO_INT + 1001,
-			SCRIPT_ERR = Level::INFO_INT + 1002,
-			SCRIPT_DBG = Level::INFO_INT + 1003,
-			SCRIPT_WAR = Level::INFO_INT + 1004,
+			SCRIPT_WAR = Level::WARN_INT + 1,
+			SCRIPT_ERR = Level::ERROR_INT + 1,
         };
 
       static LevelPtr getScriptInfo();

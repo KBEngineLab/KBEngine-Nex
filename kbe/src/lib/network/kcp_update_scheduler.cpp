@@ -16,7 +16,9 @@ namespace
 {
 // Bound one wakeup so a KCP burst cannot starve packet dispatch, timers, or the game tick.
 // 限制单次唤醒的处理量，避免 KCP 突发饿死报文分发、其他定时器和游戏 Tick。
-const size_t KCP_UPDATES_PER_WAKEUP = 256;
+const size_t KCP_MIN_UPDATES_PER_WAKEUP = 256;
+const size_t KCP_MAX_UPDATES_PER_WAKEUP = 2048;
+const uint64 KCP_PROCESSING_TIME_BUDGET_MICROS = 2000;
 }
 
 KcpUpdateScheduler::KcpUpdateScheduler(EventDispatcher& dispatcher) :
@@ -32,7 +34,10 @@ KcpUpdateScheduler::KcpUpdateScheduler(EventDispatcher& dispatcher) :
 	maxScheduleDelayMicros_(0),
 	budgetExhaustionCount_(0),
 	consecutiveBudgetExhaustions_(0),
-	maxConsecutiveBudgetExhaustions_(0)
+	maxConsecutiveBudgetExhaustions_(0),
+	timeBudgetExhaustionCount_(0),
+	totalProcessingMicros_(0),
+	maxProcessingMicros_(0)
 {
 }
 
@@ -157,12 +162,21 @@ void KcpUpdateScheduler::handleTimeout(TimerHandle handle, void*)
 	++timerWakeupCount_;
 
 	processing_ = true;
-	const uint64 now = timestamp();
+	const uint64 processingStart = timestamp();
+	const uint64 processingBudget = delayToStamps(KCP_PROCESSING_TIME_BUDGET_MICROS);
+	const uint64 now = processingStart;
 	KcpUpdateQueue::Key key = 0;
 	KcpUpdateQueue::Time dueTime = 0;
 	size_t processed = 0;
-	for (; processed < KCP_UPDATES_PER_WAKEUP && queue_.takeDue(now, key, &dueTime); ++processed)
+	for (; processed < KCP_MAX_UPDATES_PER_WAKEUP; ++processed)
 	{
+		if (processed >= KCP_MIN_UPDATES_PER_WAKEUP &&
+			timestamp() - processingStart >= processingBudget)
+		{
+			break;
+		}
+		if (!queue_.takeDue(now, key, &dueTime))
+			break;
 		if (now > dueTime)
 		{
 			++deadlineMissCount_;
@@ -180,8 +194,17 @@ void KcpUpdateScheduler::handleTimeout(TimerHandle handle, void*)
 		}
 	}
 
+	const uint64 processingElapsed = timestamp() - processingStart;
+	const uint64 processingMicros = static_cast<uint64>(stampsToDelay(processingElapsed));
+	totalProcessingMicros_ += processingMicros;
+	maxProcessingMicros_ = std::max(maxProcessingMicros_, processingMicros);
+	const bool timeBudgetExhausted = processed >= KCP_MIN_UPDATES_PER_WAKEUP &&
+		processingElapsed >= processingBudget;
+	if (timeBudgetExhausted)
+		++timeBudgetExhaustionCount_;
+
 	KcpUpdateQueue::Time nextDueTime = 0;
-	const bool budgetExhausted = processed == KCP_UPDATES_PER_WAKEUP &&
+	const bool budgetExhausted = (processed == KCP_MAX_UPDATES_PER_WAKEUP || timeBudgetExhausted) &&
 		queue_.nextDue(nextDueTime) && nextDueTime <= now;
 	if (budgetExhausted)
 	{
