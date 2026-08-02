@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
@@ -143,6 +144,15 @@ def build_environment(
     # fixture 必须位于业务资产之前，才能稳定覆盖 entities.xml 与脚本；引擎公共资源仍保持最高的非配置优先级。
     # The fixture precedes game assets so its entity model is deterministic while shared engine resources remain available.
     if fixture_root is not None:
+        # 1.x derives the Python root from the first server/kbengine.xml (the per-run overlay).
+        # 将 fixture 脚本复制到该运行时脚本根，避免仅把 fixture 根加入 KBE_RES_PATH 却未进入 sys.path。
+        # The entity definitions remain resolved from fixture_root, which stays first in KBE_RES_PATH.
+        script_root = run_root / "config-overlay/scripts"
+        for component in ("common", "data", "user_type", "base", "cell", "bots", "db", "interface", "login", "logger"):
+            source = fixture_root / component
+            if source.is_dir():
+                shutil.copytree(source, script_root / component, dirs_exist_ok=True,
+                                ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"))
         resource_roots.append(fixture_root.resolve())
     resource_roots.extend(
         (

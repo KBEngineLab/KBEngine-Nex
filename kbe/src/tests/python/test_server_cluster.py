@@ -292,6 +292,21 @@ def run_cluster(args):
     resource_roots = []
     if args.config_overlay:
         resource_roots.append(args.config_overlay)
+        if args.resource_overlay:
+            # 1.x derives Python script imports from the first server/kbengine.xml,
+            # which is the per-run config overlay. Stage fixture component scripts
+            # beside that overlay so Base/Cell/Login components execute the same
+            # callbacks as Bots while entity definitions still come from the overlay.
+            script_root = args.config_overlay.parent.parent / "scripts"
+            for component in ("common", "data", "user_type", "base", "cell", "bots", "db", "interface", "login", "logger"):
+                source = args.resource_overlay[0] / component
+                if source.is_dir():
+                    shutil.copytree(
+                        source,
+                        script_root / component,
+                        dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
+                    )
     resource_roots.extend(args.resource_overlay)
     if args.database_type:
         # 数据库覆盖只写构建树并排在原 assets 前面，保证源资产只读且覆盖项优先命中。
