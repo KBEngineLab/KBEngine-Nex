@@ -602,6 +602,13 @@
 				from the active count so serialization remains bounded as connections grow; 0 is unlimited.
 			-->
 			<witness_global_bytes_per_tick> 1048576 </witness_global_bytes_per_tick>
+
+			<!-- CellApp 每 Tick 最多让多少个 Witness 执行 AOI 序列化。准入窗口跨 Tick 轮转，
+				避免固定注册顺序造成饥饿；位置状态在延后期间继续合并为最新值。0 表示不限制。
+				Maximum Witnesses admitted for AOI serialization per CellApp tick. The window rotates
+				across ticks to prevent registration-order starvation; deferred positions coalesce to latest. 0 is unlimited.
+			-->
+			<witness_global_updates_per_tick> 1024 </witness_global_updates_per_tick>
 						
 			<!-- 实体位置更新方式，
 				0：直接同步高精度浮点数据，View范围无限制。 

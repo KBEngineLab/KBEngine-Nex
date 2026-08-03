@@ -183,6 +183,7 @@ typedef struct EngineComponentInfo
 		witness_volatile_bytes_per_tick = 512;
 		witness_total_bytes_per_tick = 2048;
 		witness_global_bytes_per_tick = 1048576;
+		witness_global_updates_per_tick = 1024;
 		cellappmgr_space_assignment_max_skew = 2;
 	}
 
@@ -218,6 +219,9 @@ typedef struct EngineComponentInfo
 	// Per-Witness and whole-CellApp synchronization budgets per tick; zero means unlimited.
 	uint32 witness_total_bytes_per_tick;
 	uint32 witness_global_bytes_per_tick;
+	// 每 Tick 允许执行 AOI 序列化的 Witness 数；窗口会轮转，零表示不限制。
+	// Witnesses admitted for AOI serialization per tick; the window rotates and zero is unlimited.
+	uint32 witness_global_updates_per_tick;
 	// 自动分配的新 Space 在 CellApp 间允许的最大数量差；零关闭硬约束。
 	// Maximum automatic Space-count skew between CellApps; zero disables the hard bound.
 	uint32 cellappmgr_space_assignment_max_skew;

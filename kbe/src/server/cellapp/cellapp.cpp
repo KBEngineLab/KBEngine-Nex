@@ -309,6 +309,15 @@ bool Cellapp::initializeWatcher()
 	WATCH_OBJECT("witness/sendBytes", &Witness::sendBytesCount);
 	WATCH_OBJECT("witness/sendBudgetExhaustions", &Witness::sendBudgetExhaustionCount);
 	WATCH_OBJECT("witness/structuralProcessed", &Witness::structuralProcessedCount);
+	WATCH_OBJECT("witness/scheduler/updateLimit", &Witness::globalUpdateLimit);
+	WATCH_OBJECT("witness/scheduler/admitted", &Witness::globalAdmittedCount);
+	WATCH_OBJECT("witness/scheduler/deferred", &Witness::globalDeferredCount);
+	WATCH_OBJECT("witness/messages/enterCount", &Witness::enterUpdateCount);
+	WATCH_OBJECT("witness/messages/enterBytes", &Witness::enterBytesCount);
+	WATCH_OBJECT("witness/messages/leaveCount", &Witness::leaveUpdateCount);
+	WATCH_OBJECT("witness/messages/leaveBytes", &Witness::leaveBytesCount);
+	WATCH_OBJECT("witness/messages/volatileCount", &Witness::volatileUpdateCount);
+	WATCH_OBJECT("witness/messages/volatileBytes", &Witness::volatileUpdateBytesCount);
 	WATCH_OBJECT("witness/backpressure/activeSuppressed", &Witness::activeSuppressedCount);
 	WATCH_OBJECT("witness/backpressure/suppressionTransitions", &Witness::suppressionTransitionCount);
 	WATCH_OBJECT("witness/backpressure/resumeTransitions", &Witness::resumeTransitionCount);
@@ -453,6 +462,7 @@ void Cellapp::handleGameTick()
 
 	EntityApp<Entity>::handleGameTick();
 
+	Witness::beginUpdateTick();
 	updatables_.update();
 	Spaces::update();
 }

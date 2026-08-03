@@ -466,11 +466,14 @@ def assert_python_latency_scenario() -> None:
     assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/clientVolatileBackpressure"] == 5.0
     assert "CELLAPP_TYPE=@cellapp:root/witness/backpressure" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/witness/backpressure"] == 5.0
+    assert "CELLAPP_TYPE=@cellapp:root/witness/scheduler" in gameplay["watcher_targets"]
+    assert "CELLAPP_TYPE=@cellapp:root/witness/messages" in gameplay["watcher_targets"]
 
     defaults_path = Path(__file__).resolve().parents[3] / "res/server/kbengine_defaults.xml"
     defaults_source = defaults_path.read_text(encoding="utf-8")
     assert "<witness_total_bytes_per_tick> 2048 </witness_total_bytes_per_tick>" in defaults_source
     assert "<witness_global_bytes_per_tick> 1048576 </witness_global_bytes_per_tick>" in defaults_source
+    assert "<witness_global_updates_per_tick> 1024 </witness_global_updates_per_tick>" in defaults_source
     assert "<highSegments> 128 </highSegments>" in defaults_source
     assert "<lowSegments> 32 </lowSegments>" in defaults_source
     assert "<spaceAllocationMaxSkew> 2 </spaceAllocationMaxSkew>" in defaults_source
@@ -478,6 +481,16 @@ def assert_python_latency_scenario() -> None:
     cellapp_source = (Path(__file__).resolve().parents[2] / "server/cellapp/cellapp.cpp").read_text(encoding="utf-8")
     assert 'WATCH_OBJECT("network/clientVolatileBackpressure/activeClients"' in baseapp_source
     assert 'WATCH_OBJECT("witness/backpressure/activeSuppressed"' in cellapp_source
+    assert 'WATCH_OBJECT("witness/scheduler/deferred"' in cellapp_source
+    assert 'WATCH_OBJECT("witness/messages/enterBytes"' in cellapp_source
+
+    client_base_source = (Path(__file__).resolve().parents[2] / "lib/client_lib/clientobjectbase.cpp").read_text(encoding="utf-8")
+    client_entity_source = (Path(__file__).resolve().parents[2] / "lib/client_lib/entity.cpp").read_text(encoding="utf-8")
+    bots_source = (Path(__file__).resolve().parents[2] / "server/tools/bots/bots.cpp").read_text(encoding="utf-8")
+    assert "pEntity->pClientApp(NULL);" in client_base_source
+    assert "pGarbages->clear();" in client_base_source
+    assert "Py_XDECREF(pPrevious);" in client_entity_source
+    assert 'WATCH_OBJECT("bots/performance/clearedEntityGarbages"' in bots_source
 
 
 def assert_multi_component_cluster_manifest() -> None:

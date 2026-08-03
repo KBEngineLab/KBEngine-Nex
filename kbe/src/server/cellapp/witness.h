@@ -219,6 +219,16 @@ public:
 	static uint64 sendBytesCount();
 	static uint64 sendBudgetExhaustionCount();
 	static uint64 structuralProcessedCount();
+	static void beginUpdateTick();
+	static uint64 globalAdmittedCount();
+	static uint64 globalDeferredCount();
+	static uint64 globalUpdateLimit();
+	static uint64 enterUpdateCount();
+	static uint64 enterBytesCount();
+	static uint64 leaveUpdateCount();
+	static uint64 leaveBytesCount();
+	static uint64 volatileUpdateCount();
+	static uint64 volatileUpdateBytesCount();
 	static uint64 activeSuppressedCount();
 	static uint64 suppressionTransitionCount();
 	static uint64 resumeTransitionCount();

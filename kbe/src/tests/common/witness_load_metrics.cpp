@@ -48,6 +48,11 @@ bool testQueueAttribution()
 	metrics.recordSendBytes(91);
 	metrics.recordSendBudgetExhaustion();
 	metrics.recordStructuralProcessed();
+	metrics.recordGlobalAdmission(true);
+	metrics.recordGlobalAdmission(false);
+	metrics.recordEnter(120);
+	metrics.recordLeave(7);
+	metrics.recordVolatileUpdate(19);
 	metrics.recordBundle(2048);
 	metrics.recordBundle(1024);
 
@@ -64,6 +69,14 @@ bool testQueueAttribution()
 		require(metrics.sendBytes() == 91, "total send bytes were not accumulated") &&
 		require(metrics.sendBudgetExhaustions() == 1, "total budget exhaustion was not attributed") &&
 		require(metrics.structuralProcessed() == 1, "structural work was not attributed") &&
+		require(metrics.globalAdmitted() == 1 && metrics.globalDeferred() == 1,
+			"global scheduler attribution drifted") &&
+		require(metrics.enterUpdates() == 1 && metrics.enterBytes() == 120,
+			"enter work attribution drifted") &&
+		require(metrics.leaveUpdates() == 1 && metrics.leaveBytes() == 7,
+			"leave work attribution drifted") &&
+		require(metrics.volatileUpdates() == 1 && metrics.volatileUpdateBytes() == 19,
+			"volatile work attribution drifted") &&
 		require(metrics.bundlesSent() == 2, "bundle count was not accumulated") &&
 		require(metrics.maxBundleBytes() == 2048, "maximum bundle size was not retained");
 }

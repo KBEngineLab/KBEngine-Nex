@@ -20,6 +20,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "witness.h"
 #include "witness_volatile_budget.h"
+#include "witness_update_scheduler.h"
 #include "entity.h"	
 #include "profile.h"
 #include "cellapp.h"
@@ -55,6 +56,7 @@ namespace
 {
 uint64 g_witnessActiveCount = 0;
 WitnessLoadMetrics g_witnessLoadMetrics;
+WitnessUpdateScheduler g_witnessUpdateScheduler;
 }
 
 //-------------------------------------------------------------------------------------
@@ -1069,8 +1071,16 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 		// 外层实体转发消息尚未完成时 packetsLength() 只反映分包边界，currMsgLength() 才是连续增长的真实编码字节数。
 		// While the outer entity-forward message is open, packetsLength() reflects packet boundaries; currMsgLength() is the continuously growing encoded byte count.
 		const size_t beforeBytes = static_cast<size_t>(pSendBundle->currMsgLength());
+		const uint32 flagsBeforeUpdate = pEntityRef->flags();
 		const bool retained = processEntityRefUpdate(pSendBundle, pEntityRef);
 		const size_t afterBytes = static_cast<size_t>(pSendBundle->currMsgLength());
+		const uint64 encodedBytes = afterBytes > beforeBytes ? static_cast<uint64>(afterBytes - beforeBytes) : 0;
+		if ((flagsBeforeUpdate & ENTITYREF_FLAG_ENTER_CLIENT_PENDING) != 0)
+			g_witnessLoadMetrics.recordEnter(encodedBytes);
+		else if ((flagsBeforeUpdate & ENTITYREF_FLAG_LEAVE_CLIENT_PENDING) != 0)
+			g_witnessLoadMetrics.recordLeave(encodedBytes);
+		else
+			g_witnessLoadMetrics.recordVolatileUpdate(encodedBytes);
 		sendBudget.recordBundleGrowth(beforeBytes, afterBytes);
 		if (!structuralUpdate)
 		{
@@ -1204,6 +1214,24 @@ uint64 Witness::structuralProcessedCount()
 }
 
 //-------------------------------------------------------------------------------------
+void Witness::beginUpdateTick()
+{
+	g_witnessUpdateScheduler.beginTick(
+		g_witnessActiveCount, g_kbeSrvConfig.getCellApp().witness_global_updates_per_tick);
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::globalAdmittedCount() { return g_witnessLoadMetrics.globalAdmitted(); }
+uint64 Witness::globalDeferredCount() { return g_witnessLoadMetrics.globalDeferred(); }
+uint64 Witness::globalUpdateLimit() { return g_kbeSrvConfig.getCellApp().witness_global_updates_per_tick; }
+uint64 Witness::enterUpdateCount() { return g_witnessLoadMetrics.enterUpdates(); }
+uint64 Witness::enterBytesCount() { return g_witnessLoadMetrics.enterBytes(); }
+uint64 Witness::leaveUpdateCount() { return g_witnessLoadMetrics.leaveUpdates(); }
+uint64 Witness::leaveBytesCount() { return g_witnessLoadMetrics.leaveBytes(); }
+uint64 Witness::volatileUpdateCount() { return g_witnessLoadMetrics.volatileUpdates(); }
+uint64 Witness::volatileUpdateBytesCount() { return g_witnessLoadMetrics.volatileUpdateBytes(); }
+
+//-------------------------------------------------------------------------------------
 uint64 Witness::activeSuppressedCount()
 {
 	return g_witnessLoadMetrics.activeSuppressed();
@@ -1249,6 +1277,11 @@ uint64 Witness::maxBundleBytes()
 bool Witness::update()
 {
 	SCOPED_PROFILE(CLIENT_UPDATE_PROFILE);
+
+	const bool globallyAdmitted = g_witnessUpdateScheduler.admit();
+	g_witnessLoadMetrics.recordGlobalAdmission(globallyAdmitted);
+	if (!globallyAdmitted)
+		return true;
 
 	if(pEntity_ == NULL || !pEntity_->clientEntityCall())
 		return true;

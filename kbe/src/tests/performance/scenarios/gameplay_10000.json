@@ -45,6 +45,8 @@
     "CELLAPP_TYPE=@cellapp:root/cprofiles/default/scriptCall/latency",
     "CELLAPP_TYPE=@cellapp:root/cprofiles/default/clientUpdate/latency",
     "CELLAPP_TYPE=@cellapp:root/witness",
+    "CELLAPP_TYPE=@cellapp:root/witness/scheduler",
+    "CELLAPP_TYPE=@cellapp:root/witness/messages",
     "CELLAPP_TYPE=@cellapp:root/witness/backpressure"
   ],
   "watcher_intervals": {
@@ -65,6 +67,8 @@
     "CELLAPP_TYPE:root/network/kcp": 5.0,
     "CELLAPP_TYPE:root/network": 5.0,
     "CELLAPP_TYPE:root/witness": 5.0,
+    "CELLAPP_TYPE:root/witness/scheduler": 5.0,
+    "CELLAPP_TYPE:root/witness/messages": 5.0,
     "CELLAPP_TYPE:root/witness/backpressure": 5.0
   },
   "readiness": {

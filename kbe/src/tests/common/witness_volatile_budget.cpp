@@ -1,4 +1,5 @@
 #include "server/cellapp/witness_volatile_budget.h"
+#include "server/cellapp/witness_update_scheduler.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -48,12 +49,42 @@ bool testAdaptiveTotalBudget()
 		require(witnessEffectiveByteLimit(0, 0, 10000) == 0,
 			"fully unlimited mode did not remain unlimited");
 }
+
+bool testRotatingGlobalAdmission()
+{
+	KBEngine::WitnessUpdateScheduler scheduler;
+	bool admitted[6] = {};
+	scheduler.beginTick(6, 2);
+	for (std::size_t index = 0; index < 6; ++index)
+		admitted[index] = scheduler.admit();
+	if (!require(admitted[0] && admitted[1] && !admitted[2] && !admitted[5],
+		"first admission window was not bounded"))
+	{
+		return false;
+	}
+
+	scheduler.beginTick(6, 2);
+	for (std::size_t index = 0; index < 6; ++index)
+		admitted[index] = scheduler.admit();
+	if (!require(!admitted[0] && !admitted[1] && admitted[2] && admitted[3] && !admitted[4],
+		"admission window did not rotate"))
+	{
+		return false;
+	}
+
+	scheduler.beginTick(6, 2);
+	for (std::size_t index = 0; index < 6; ++index)
+		admitted[index] = scheduler.admit();
+	return require(!admitted[0] && admitted[4] && admitted[5],
+		"rotating admission did not reach the tail") &&
+		require(scheduler.nextStart() == 0, "admission cursor did not wrap");
+}
 }
 
 int main()
 {
 	if (!testBoundedBudgetAllowsOneCompleteUpdate() || !testUnlimitedAndShrinkingBundle() ||
-		!testAdaptiveTotalBudget())
+		!testAdaptiveTotalBudget() || !testRotatingGlobalAdmission())
 		return EXIT_FAILURE;
 
 	std::cout << "WITNESS_VOLATILE_BUDGET_TEST_PASS" << std::endl;

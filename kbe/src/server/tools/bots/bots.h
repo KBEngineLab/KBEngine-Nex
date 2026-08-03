@@ -190,6 +190,8 @@ public:
 	uint64 totalTcpFallbacks() const { return totalTcpFallbacks_; }
 	uint64 totalNetworkErrors() const { return totalNetworkErrors_; }
 	uint64 totalRemovedClients() const { return totalRemovedClients_; }
+	uint64 totalDetachedEntities() const { return totalDetachedEntities_; }
+	uint64 totalClearedEntityGarbages() const { return totalClearedEntityGarbages_; }
 	uint64 lastBotsTickMicros() const { return lastBotsTickMicros_; }
 	uint64 maxBotsTickMicros() const { return maxBotsTickMicros_; }
 	void onKcpHandshakeSucceeded() { ++totalKcpHandshakeSuccesses_; }
@@ -484,6 +486,8 @@ protected:
 	uint64											totalTcpFallbacks_;
 	uint64											totalNetworkErrors_;
 	uint64											totalRemovedClients_;
+	uint64											totalDetachedEntities_;
+	uint64											totalClearedEntityGarbages_;
 	uint64											lastBotsTickMicros_;
 	uint64											maxBotsTickMicros_;
 

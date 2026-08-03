@@ -105,6 +105,8 @@ totalTcpConnections_(0),
 totalTcpFallbacks_(0),
 totalNetworkErrors_(0),
 totalRemovedClients_(0),
+totalDetachedEntities_(0),
+totalClearedEntityGarbages_(0),
 lastBotsTickMicros_(0),
 maxBotsTickMicros_(0),
 pythonLatencyEnabled_(false),
@@ -189,6 +191,8 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/totals/tcpFallbacks", this, &Bots::totalTcpFallbacks);
 	WATCH_OBJECT("bots/totals/networkErrors", this, &Bots::totalNetworkErrors);
 	WATCH_OBJECT("bots/totals/removedClients", this, &Bots::totalRemovedClients);
+	WATCH_OBJECT("bots/totals/detachedEntities", this, &Bots::totalDetachedEntities);
+	WATCH_OBJECT("bots/totals/clearedEntityGarbages", this, &Bots::totalClearedEntityGarbages);
 	WATCH_OBJECT("bots/tick/lastMicros", this, &Bots::lastBotsTickMicros);
 	WATCH_OBJECT("bots/tick/maxMicros", this, &Bots::maxBotsTickMicros);
 	// Bots 不经过 ServerApp 的 Watcher 初始化，必须显式暴露客户端 ACK 共用的 UDP completion 队列。
@@ -229,6 +233,8 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/tcpFallbacks", this, &Bots::totalTcpFallbacks);
 	WATCH_OBJECT("bots/performance/networkErrors", this, &Bots::totalNetworkErrors);
 	WATCH_OBJECT("bots/performance/removedClients", this, &Bots::totalRemovedClients);
+	WATCH_OBJECT("bots/performance/detachedEntities", this, &Bots::totalDetachedEntities);
+	WATCH_OBJECT("bots/performance/clearedEntityGarbages", this, &Bots::totalClearedEntityGarbages);
 	WATCH_OBJECT("bots/performance/tickLastMicros", this, &Bots::lastBotsTickMicros);
 	WATCH_OBJECT("bots/performance/tickMaxMicros", this, &Bots::maxBotsTickMicros);
 	// 复用网络层无锁累计计数；压测控制器在进程外计算速率，热路径不增加统计开销。
@@ -1090,6 +1096,8 @@ bool Bots::delClient(Network::Channel * pChannel)
 		return false;
 
 	pClient->finalise();
+	totalDetachedEntities_ += pClient->detachedEntityCount();
+	totalClearedEntityGarbages_ += pClient->clearedEntityGarbageCount();
 	clients().erase(pChannel);
 	Py_DECREF(pClient);
 	++totalRemovedClients_;

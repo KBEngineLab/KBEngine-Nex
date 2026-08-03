@@ -100,21 +100,26 @@ Entity::~Entity()
 
 	script::PyGC::decTracing("Entity");
 	
-	if(pClientApp_->pEntities())
-		pClientApp_->pEntities()->pGetbages()->erase(id());
+	if (pClientApp_ != NULL)
+	{
+		if(pClientApp_->pEntities())
+			pClientApp_->pEntities()->pGetbages()->erase(id());
 
-	Py_DECREF(pClientApp_);
+		Py_DECREF(pClientApp_);
+		pClientApp_ = NULL;
+	}
 }	
 
 //-------------------------------------------------------------------------------------
 void Entity::pClientApp(ClientObjectBase* p)
 { 
-	if(p)
-		Py_INCREF(p);
-	else
-		Py_DECREF(pClientApp_);
+	if (p == pClientApp_)
+		return;
 
-	pClientApp_ = p; 
+	Py_XINCREF(p);
+	ClientObjectBase* pPrevious = pClientApp_;
+	pClientApp_ = p;
+	Py_XDECREF(pPrevious);
 }
 
 //-------------------------------------------------------------------------------------

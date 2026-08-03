@@ -67,6 +67,13 @@ public:
 	void recordSendBytes(std::uint64_t bytes) { sendBytes_ += bytes; }
 	void recordSendBudgetExhaustion() { ++sendBudgetExhaustions_; }
 	void recordStructuralProcessed() { ++structuralProcessed_; }
+	void recordGlobalAdmission(bool admitted)
+	{
+		admitted ? ++globalAdmitted_ : ++globalDeferred_;
+	}
+	void recordEnter(std::uint64_t bytes) { ++enterUpdates_; enterBytes_ += bytes; }
+	void recordLeave(std::uint64_t bytes) { ++leaveUpdates_; leaveBytes_ += bytes; }
+	void recordVolatileUpdate(std::uint64_t bytes) { ++volatileUpdates_; volatileUpdateBytes_ += bytes; }
 	void recordVolatileSuppression(bool suppressed)
 	{
 		if (suppressed)
@@ -107,6 +114,14 @@ public:
 	std::uint64_t sendBytes() const { return sendBytes_; }
 	std::uint64_t sendBudgetExhaustions() const { return sendBudgetExhaustions_; }
 	std::uint64_t structuralProcessed() const { return structuralProcessed_; }
+	std::uint64_t globalAdmitted() const { return globalAdmitted_; }
+	std::uint64_t globalDeferred() const { return globalDeferred_; }
+	std::uint64_t enterUpdates() const { return enterUpdates_; }
+	std::uint64_t enterBytes() const { return enterBytes_; }
+	std::uint64_t leaveUpdates() const { return leaveUpdates_; }
+	std::uint64_t leaveBytes() const { return leaveBytes_; }
+	std::uint64_t volatileUpdates() const { return volatileUpdates_; }
+	std::uint64_t volatileUpdateBytes() const { return volatileUpdateBytes_; }
 	std::uint64_t activeSuppressed() const { return activeSuppressed_; }
 	std::uint64_t suppressionTransitions() const { return suppressionTransitions_; }
 	std::uint64_t resumeTransitions() const { return resumeTransitions_; }
@@ -133,6 +148,14 @@ private:
 	std::uint64_t sendBytes_ = 0;
 	std::uint64_t sendBudgetExhaustions_ = 0;
 	std::uint64_t structuralProcessed_ = 0;
+	std::uint64_t globalAdmitted_ = 0;
+	std::uint64_t globalDeferred_ = 0;
+	std::uint64_t enterUpdates_ = 0;
+	std::uint64_t enterBytes_ = 0;
+	std::uint64_t leaveUpdates_ = 0;
+	std::uint64_t leaveBytes_ = 0;
+	std::uint64_t volatileUpdates_ = 0;
+	std::uint64_t volatileUpdateBytes_ = 0;
 	std::uint64_t activeSuppressed_ = 0;
 	std::uint64_t suppressionTransitions_ = 0;
 	std::uint64_t resumeTransitions_ = 0;

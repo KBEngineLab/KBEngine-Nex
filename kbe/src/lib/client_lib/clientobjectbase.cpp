@@ -64,9 +64,11 @@ appID_(0),
 pServerChannel_(NULL),
 	pEntities_(new Entities<client::Entity>()),
 	pEntityIDAliasIDList_(),
-	playerEntityChanged_(false),
-	staleViewMessageDrops_(0),
-	pyCallbackMgr_(),
+playerEntityChanged_(false),
+staleViewMessageDrops_(0),
+detachedEntityCount_(0),
+clearedEntityGarbageCount_(0),
+pyCallbackMgr_(),
 entityID_(0),
 spaceID_(0),
 dbid_(0),
@@ -123,7 +125,7 @@ void ClientObjectBase::finalise(void)
 		if(entity && entity->inWorld())
 			entity->onBecomeNonPlayer();
 
-		pEntities_->finalise();
+		releaseOwnedEntities();
 		S_RELEASE(pEntities_);
 	}
 
@@ -138,7 +140,7 @@ void ClientObjectBase::finalise(void)
 //-------------------------------------------------------------------------------------		
 void ClientObjectBase::reset(void)
 {
-	pEntities_->finalise();
+	releaseOwnedEntities();
 	pEntityIDAliasIDList_.clear();
 	playerEntityChanged_ = false;
 	staleViewMessageDrops_ = 0;
@@ -173,6 +175,38 @@ void ClientObjectBase::reset(void)
 
 	pServerChannel_ = Network::Channel::createPoolObject(OBJECTPOOL_POINT);
 	pServerChannel_->pNetworkInterface(&networkInterface_);
+}
+
+//-------------------------------------------------------------------------------------
+void ClientObjectBase::releaseOwnedEntities()
+{
+	if (pEntities_ == NULL)
+		return;
+
+	// Entities 持有 Entity，Entity 同时强引用 ClientObject。先断开反向引用，随后 destroy/clear
+	// 才能让引用计数自然归零；外部脚本仍持有的已销毁 Entity 会安全地返回 clientapp=None。
+	// Entities own Entity objects while each Entity strongly references ClientObject. Break the reverse
+	// edge before destroy/clear; externally retained destroyed entities then safely expose clientapp=None.
+	Entities<client::Entity>::ENTITYS_MAP& entities = pEntities_->getEntities();
+	for (Entities<client::Entity>::ENTITYS_MAP::iterator iter = entities.begin(); iter != entities.end(); ++iter)
+	{
+		client::Entity* pEntity = static_cast<client::Entity*>(iter->second.get());
+		if (pEntity != NULL && pEntity->pClientApp() == this)
+		{
+			pEntity->pClientApp(NULL);
+			++detachedEntityCount_;
+		}
+	}
+
+	pEntities_->finalise();
+	EntityGarbages<client::Entity>* pGarbages = pEntities_->pGetbages();
+	if (pGarbages != NULL)
+	{
+		clearedEntityGarbageCount_ += static_cast<uint64>(pGarbages->size());
+		// Owner 已结束生命周期，残留 Entity 已与 owner 解耦；继续保存裸指针既无法诊断，也会产生重复泄漏 ERROR。
+		// The owner lifetime has ended and retained entities are detached; keeping raw pointers adds no diagnosis and duplicates leak errors.
+		pGarbages->clear();
+	}
 }
 
 //-------------------------------------------------------------------------------------

@@ -66,6 +66,8 @@ public:
 	virtual void canReset(bool v){ canReset_ = v; }
 
 	Entities<client::Entity>* pEntities() const{ return pEntities_; }
+	uint64 detachedEntityCount() const { return detachedEntityCount_; }
+	uint64 clearedEntityGarbageCount() const { return clearedEntityGarbageCount_; }
 
 	/**
 		创建一个entity 
@@ -460,6 +462,12 @@ public:
 	static PyObject* __py_assert(PyObject* self, PyObject* args);
 
 protected:				
+	/**
+	 * 在 ClientObject 生命周期结束前断开 Entity 对 owner 的强引用，否则异常掉线时二者会形成 Python 引用环。
+	 * Break Entity strong references to their owner before ClientObject teardown; otherwise abnormal disconnects form a Python cycle.
+	 */
+	void releaseOwnedEntities();
+
 	int32													appID_;
 
 	// 服务端网络通道
@@ -470,6 +478,8 @@ protected:
 	std::vector<ENTITY_ID>									pEntityIDAliasIDList_;
 	bool													playerEntityChanged_;
 	uint64													staleViewMessageDrops_;
+	uint64													detachedEntityCount_;
+	uint64													clearedEntityGarbageCount_;
 
 	PY_CALLBACKMGR											pyCallbackMgr_;
 
