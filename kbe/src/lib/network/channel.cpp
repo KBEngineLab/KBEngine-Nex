@@ -464,7 +464,18 @@ void Channel::finaliseKcp()
 				static_cast<uint64>(pKCP_->timeout_retransmissions),
 				static_cast<uint64>(pKCP_->fast_retransmissions),
 				static_cast<uint64>(pKCP_->stream_coalesces),
-				static_cast<uint64>(pKCP_->stream_coalesced_bytes));
+				static_cast<uint64>(pKCP_->stream_coalesced_bytes),
+				static_cast<uint64>(pKCP_->flush_calls),
+				static_cast<uint64>(pKCP_->flush_scanned_segments),
+				static_cast<uint64>(pKCP_->flush_data_segments),
+				static_cast<uint64>(pKCP_->flush_empty_data_calls),
+				static_cast<uint64>(pKCP_->ack_output_calls),
+				static_cast<uint64>(pKCP_->ack_output_bytes),
+				static_cast<uint64>(pKCP_->data_output_calls),
+				static_cast<uint64>(pKCP_->data_output_bytes),
+				static_cast<uint64>(pKCP_->sendto_sample_calls),
+				static_cast<uint64>(pKCP_->sendto_sample_stamps),
+				static_cast<uint64>(pKCP_->sendto_max_sample_stamps));
 		}
 		ikcp_release(pKCP_);
 		pKCP_ = NULL;

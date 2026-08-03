@@ -337,6 +337,22 @@ struct IKCPCB
 	IUINT64 snd_buf_bytes;
 	IUINT64 stream_coalesces;
 	IUINT64 stream_coalesced_bytes;
+	/* Flush diagnostics distinguish list traversal from useful segment and datagram output.
+	 * Flush 诊断用于区分链表遍历、有效数据段发送和数据报输出成本。 */
+	IUINT64 flush_calls;
+	IUINT64 flush_scanned_segments;
+	IUINT64 flush_data_segments;
+	IUINT64 flush_empty_data_calls;
+	IUINT64 ack_output_calls;
+	IUINT64 ack_output_bytes;
+	IUINT64 data_output_calls;
+	IUINT64 data_output_bytes;
+	/* Direct sendto timing is sampled by the C++ transport to avoid timing every datagram.
+	 * C++ 传输层仅抽样 direct sendto，避免每个数据报都读取高精度时钟。 */
+	IUINT64 sendto_sample_calls;
+	IUINT64 sendto_sample_stamps;
+	IUINT64 sendto_max_sample_stamps;
+	IUINT64 sendto_call_sequence;
 	void *user;
 	char *buffer;
 	int fastresend;

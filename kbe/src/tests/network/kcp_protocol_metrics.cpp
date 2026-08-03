@@ -54,7 +54,15 @@ bool testAckCounters()
 			"sender rejected the KCP ACK") && ok;
 	}
 	ok = require(b->ack_sent == 1, "sent ACK counter is incorrect") &&
-		require(a->ack_received == 1, "received ACK counter is incorrect") && ok;
+		require(a->ack_received == 1, "received ACK counter is incorrect") &&
+		require(a->flush_calls == 1, "data flush call counter is incorrect") &&
+		require(a->flush_scanned_segments == 1, "flush scan counter is incorrect") &&
+		require(a->flush_data_segments == 1, "flush data segment counter is incorrect") &&
+		require(a->flush_empty_data_calls == 0, "productive flush was classified as empty") &&
+		require(a->data_output_calls == 1 && a->data_output_bytes == outboundA[0].size(),
+			"data output counters are incorrect") &&
+		require(b->ack_output_calls == 1 && b->ack_output_bytes == outboundB[0].size(),
+			"ACK output counters are incorrect") && ok;
 
 	ikcp_release(a);
 	ikcp_release(b);

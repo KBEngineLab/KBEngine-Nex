@@ -302,6 +302,18 @@ ikcpcb* ikcp_create(IUINT32 conv, void *user)
 	kcp->snd_buf_bytes = 0;
 	kcp->stream_coalesces = 0;
 	kcp->stream_coalesced_bytes = 0;
+	kcp->flush_calls = 0;
+	kcp->flush_scanned_segments = 0;
+	kcp->flush_data_segments = 0;
+	kcp->flush_empty_data_calls = 0;
+	kcp->ack_output_calls = 0;
+	kcp->ack_output_bytes = 0;
+	kcp->data_output_calls = 0;
+	kcp->data_output_bytes = 0;
+	kcp->sendto_sample_calls = 0;
+	kcp->sendto_sample_stamps = 0;
+	kcp->sendto_max_sample_stamps = 0;
+	kcp->sendto_call_sequence = 0;
 	kcp->rx_srtt = 0;
 	kcp->rx_rttval = 0;
 	kcp->rx_rto = IKCP_RTO_DEF;
@@ -972,6 +984,8 @@ void ikcp_flushacks(ikcpcb *kcp)
 	for (i = 0; i < count; i++) {
 		int size = (int)(ptr - buffer);
 		if (size + (int)IKCP_OVERHEAD > (int)kcp->mtu) {
+			kcp->ack_output_calls++;
+			kcp->ack_output_bytes += (IUINT64)size;
 			ikcp_output(kcp, buffer, size);
 			ptr = buffer;
 		}
@@ -981,7 +995,10 @@ void ikcp_flushacks(ikcpcb *kcp)
 
 	kcp->ackcount = 0;
 	if (ptr > buffer) {
-		ikcp_output(kcp, buffer, (int)(ptr - buffer));
+		int output_size = (int)(ptr - buffer);
+		kcp->ack_output_calls++;
+		kcp->ack_output_bytes += (IUINT64)output_size;
+		ikcp_output(kcp, buffer, output_size);
 	}
 }
 
@@ -1006,6 +1023,7 @@ void ikcp_flush(ikcpcb *kcp)
 
 	// 'ikcp_update' haven't been called. 
 	if (kcp->updated == 0) return;
+	kcp->flush_calls++;
 	kcp->flush_limited = 0;
 
 	seg.conv = kcp->conv;
@@ -1049,6 +1067,8 @@ void ikcp_flush(ikcpcb *kcp)
 		seg.cmd = IKCP_CMD_WASK;
 		size = (int)(ptr - buffer);
 		if (size + (int)IKCP_OVERHEAD > (int)kcp->mtu) {
+			kcp->data_output_calls++;
+			kcp->data_output_bytes += (IUINT64)size;
 			ikcp_output(kcp, buffer, size);
 			ptr = buffer;
 		}
@@ -1060,6 +1080,8 @@ void ikcp_flush(ikcpcb *kcp)
 		seg.cmd = IKCP_CMD_WINS;
 		size = (int)(ptr - buffer);
 		if (size + (int)IKCP_OVERHEAD > (int)kcp->mtu) {
+			kcp->data_output_calls++;
+			kcp->data_output_bytes += (IUINT64)size;
 			ikcp_output(kcp, buffer, size);
 			ptr = buffer;
 		}
@@ -1114,6 +1136,7 @@ void ikcp_flush(ikcpcb *kcp)
 	for (p = kcp->snd_buf.next; p != &kcp->snd_buf; p = p->next) {
 		IKCPSEG *segment = iqueue_entry(p, IKCPSEG, node);
 		int send_reason = 0;
+		kcp->flush_scanned_segments++;
 		if (segment->xmit == 0) {
 			send_reason = 1;
 		}
@@ -1168,6 +1191,8 @@ void ikcp_flush(ikcpcb *kcp)
 			need = IKCP_OVERHEAD + segment->len;
 
 			if (size + need > (int)kcp->mtu) {
+				kcp->data_output_calls++;
+				kcp->data_output_bytes += (IUINT64)size;
 				ikcp_output(kcp, buffer, size);
 				ptr = buffer;
 			}
@@ -1183,12 +1208,18 @@ void ikcp_flush(ikcpcb *kcp)
 				kcp->state = -1;
 			}
 			data_sent++;
+			kcp->flush_data_segments++;
 		}
+	}
+	if (data_sent == 0) {
+		kcp->flush_empty_data_calls++;
 	}
 
 	// flash remain segments
 	size = (int)(ptr - buffer);
 	if (size > 0) {
+		kcp->data_output_calls++;
+		kcp->data_output_bytes += (IUINT64)size;
 		ikcp_output(kcp, buffer, size);
 	}
 

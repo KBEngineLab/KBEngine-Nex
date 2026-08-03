@@ -68,6 +68,17 @@ NetworkInterface::NetworkInterface(Network::EventDispatcher * pDispatcher,
 	finalizedKcpFastRetransmissionCount_(0),
 	finalizedKcpStreamCoalesceCount_(0),
 	finalizedKcpStreamCoalescedBytes_(0),
+	finalizedKcpFlushCallCount_(0),
+	finalizedKcpFlushScannedSegmentCount_(0),
+	finalizedKcpFlushDataSegmentCount_(0),
+	finalizedKcpFlushEmptyDataCallCount_(0),
+	finalizedKcpAckOutputCallCount_(0),
+	finalizedKcpAckOutputByteCount_(0),
+	finalizedKcpDataOutputCallCount_(0),
+	finalizedKcpDataOutputByteCount_(0),
+	finalizedKcpSendtoSampleCallCount_(0),
+	finalizedKcpSendtoSampleStamps_(0),
+	finalizedKcpSendtoMaxSampleStamps_(0),
 	discardedPacketsAfterCloseCount_(0),
 	kcpInputErrorCount_(0),
 	kcpInputTooShortCount_(0),
@@ -890,13 +901,47 @@ KBE_KCP_CUMULATIVE_METRIC(kcpAckSentCount, ack_sent, finalizedKcpAckSentCount_)
 KBE_KCP_CUMULATIVE_METRIC(kcpAckReceivedCount, ack_received, finalizedKcpAckReceivedCount_)
 KBE_KCP_CUMULATIVE_METRIC(kcpStreamCoalesceCount, stream_coalesces, finalizedKcpStreamCoalesceCount_)
 KBE_KCP_CUMULATIVE_METRIC(kcpStreamCoalescedBytes, stream_coalesced_bytes, finalizedKcpStreamCoalescedBytes_)
+KBE_KCP_CUMULATIVE_METRIC(kcpFlushCallCount, flush_calls, finalizedKcpFlushCallCount_)
+KBE_KCP_CUMULATIVE_METRIC(kcpFlushScannedSegmentCount, flush_scanned_segments, finalizedKcpFlushScannedSegmentCount_)
+KBE_KCP_CUMULATIVE_METRIC(kcpFlushDataSegmentCount, flush_data_segments, finalizedKcpFlushDataSegmentCount_)
+KBE_KCP_CUMULATIVE_METRIC(kcpFlushEmptyDataCallCount, flush_empty_data_calls, finalizedKcpFlushEmptyDataCallCount_)
+KBE_KCP_CUMULATIVE_METRIC(kcpAckOutputCallCount, ack_output_calls, finalizedKcpAckOutputCallCount_)
+KBE_KCP_CUMULATIVE_METRIC(kcpAckOutputByteCount, ack_output_bytes, finalizedKcpAckOutputByteCount_)
+KBE_KCP_CUMULATIVE_METRIC(kcpDataOutputCallCount, data_output_calls, finalizedKcpDataOutputCallCount_)
+KBE_KCP_CUMULATIVE_METRIC(kcpDataOutputByteCount, data_output_bytes, finalizedKcpDataOutputByteCount_)
+KBE_KCP_CUMULATIVE_METRIC(kcpSendtoSampleCallCount, sendto_sample_calls, finalizedKcpSendtoSampleCallCount_)
+
+// Timing stays in native stamps until aggregation, preserving precision without floating-point work on the packet hot path.
+// 计时在聚合前保持原生 stamp，避免在报文热路径执行浮点换算并保留精度。
+KBE_KCP_CUMULATIVE_METRIC(kcpSendtoSampleTotalStamps, sendto_sample_stamps, finalizedKcpSendtoSampleStamps_)
 
 #undef KBE_KCP_CUMULATIVE_METRIC
+
+uint64 NetworkInterface::kcpSendtoSampleTotalMicros() const
+{
+	return static_cast<uint64>(static_cast<double>(kcpSendtoSampleTotalStamps()) * 1000000.0 / stampsPerSecondD());
+}
+
+uint64 NetworkInterface::kcpSendtoSampleMaxMicros() const
+{
+	uint64 maxStamps = finalizedKcpSendtoMaxSampleStamps_;
+	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
+	{
+		const Channel* pChannel = iter->second;
+		if (pChannel != NULL && pChannel->pKCP() != NULL)
+			maxStamps = std::max<uint64>(maxStamps, pChannel->pKCP()->sendto_max_sample_stamps);
+	}
+	return static_cast<uint64>(static_cast<double>(maxStamps) * 1000000.0 / stampsPerSecondD());
+}
 
 //-------------------------------------------------------------------------------------
 void NetworkInterface::accumulateFinalizedKcpDiagnostics(uint64 ackSent, uint64 ackReceived,
 	uint64 timeoutRetransmissions, uint64 fastRetransmissions,
-	uint64 streamCoalesces, uint64 streamCoalescedBytes)
+	uint64 streamCoalesces, uint64 streamCoalescedBytes,
+	uint64 flushCalls, uint64 flushScannedSegments, uint64 flushDataSegments,
+	uint64 flushEmptyDataCalls, uint64 ackOutputCalls, uint64 ackOutputBytes,
+	uint64 dataOutputCalls, uint64 dataOutputBytes, uint64 sendtoSampleCalls,
+	uint64 sendtoSampleStamps, uint64 sendtoMaxSampleStamps)
 {
 	// Channel 和 NetworkInterface 都属于同一 dispatcher 线程；归档销毁连接的计数不需要锁或原子操作。
 	// Channel and NetworkInterface share one dispatcher thread, so archiving a closing connection needs no lock or atomic operation.
@@ -906,6 +951,17 @@ void NetworkInterface::accumulateFinalizedKcpDiagnostics(uint64 ackSent, uint64 
 	finalizedKcpFastRetransmissionCount_ += fastRetransmissions;
 	finalizedKcpStreamCoalesceCount_ += streamCoalesces;
 	finalizedKcpStreamCoalescedBytes_ += streamCoalescedBytes;
+	finalizedKcpFlushCallCount_ += flushCalls;
+	finalizedKcpFlushScannedSegmentCount_ += flushScannedSegments;
+	finalizedKcpFlushDataSegmentCount_ += flushDataSegments;
+	finalizedKcpFlushEmptyDataCallCount_ += flushEmptyDataCalls;
+	finalizedKcpAckOutputCallCount_ += ackOutputCalls;
+	finalizedKcpAckOutputByteCount_ += ackOutputBytes;
+	finalizedKcpDataOutputCallCount_ += dataOutputCalls;
+	finalizedKcpDataOutputByteCount_ += dataOutputBytes;
+	finalizedKcpSendtoSampleCallCount_ += sendtoSampleCalls;
+	finalizedKcpSendtoSampleStamps_ += sendtoSampleStamps;
+	finalizedKcpSendtoMaxSampleStamps_ = std::max(finalizedKcpSendtoMaxSampleStamps_, sendtoMaxSampleStamps);
 }
 
 //-------------------------------------------------------------------------------------

@@ -271,6 +271,17 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/kcp/ackMaxProcessingMicros", &networkInterface_, &Network::NetworkInterface::kcpAckMaxProcessingMicros);
 	WATCH_OBJECT("network/kcp/dataTotalProcessingMicros", &networkInterface_, &Network::NetworkInterface::kcpDataTotalProcessingMicros);
 	WATCH_OBJECT("network/kcp/dataMaxProcessingMicros", &networkInterface_, &Network::NetworkInterface::kcpDataMaxProcessingMicros);
+	WATCH_OBJECT("network/kcp/flushCalls", &networkInterface_, &Network::NetworkInterface::kcpFlushCallCount);
+	WATCH_OBJECT("network/kcp/flushScannedSegments", &networkInterface_, &Network::NetworkInterface::kcpFlushScannedSegmentCount);
+	WATCH_OBJECT("network/kcp/flushDataSegments", &networkInterface_, &Network::NetworkInterface::kcpFlushDataSegmentCount);
+	WATCH_OBJECT("network/kcp/flushEmptyDataCalls", &networkInterface_, &Network::NetworkInterface::kcpFlushEmptyDataCallCount);
+	WATCH_OBJECT("network/kcp/ackOutputCalls", &networkInterface_, &Network::NetworkInterface::kcpAckOutputCallCount);
+	WATCH_OBJECT("network/kcp/ackOutputBytes", &networkInterface_, &Network::NetworkInterface::kcpAckOutputByteCount);
+	WATCH_OBJECT("network/kcp/dataOutputCalls", &networkInterface_, &Network::NetworkInterface::kcpDataOutputCallCount);
+	WATCH_OBJECT("network/kcp/dataOutputBytes", &networkInterface_, &Network::NetworkInterface::kcpDataOutputByteCount);
+	WATCH_OBJECT("network/kcp/sendtoSampleCalls", &networkInterface_, &Network::NetworkInterface::kcpSendtoSampleCallCount);
+	WATCH_OBJECT("network/kcp/sendtoSampleTotalMicros", &networkInterface_, &Network::NetworkInterface::kcpSendtoSampleTotalMicros);
+	WATCH_OBJECT("network/kcp/sendtoSampleMaxMicros", &networkInterface_, &Network::NetworkInterface::kcpSendtoSampleMaxMicros);
 	// waitsnd 指标区分 KCP 自身积压和 completion UDP 队列积压，避免只根据 4 MiB socket backlog 推断根因。
 	// The waitsnd metrics separate KCP-owned backlog from the completion UDP queue instead of inferring the cause from a 4 MiB socket backlog alone.
 	WATCH_OBJECT("network/kcp/pendingSegments", &networkInterface_, &Network::NetworkInterface::kcpPendingSegmentCount);

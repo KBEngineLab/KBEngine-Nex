@@ -33,6 +33,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/error_reporter.h"
 #include "network/tcp_packet.h"
 #include "network/udp_packet.h"
+#include <algorithm>
 #include <limits>
 
 namespace KBEngine {
@@ -203,7 +204,18 @@ int KCPPacketSender::kcp_output(const char *buf, int len, ikcpcb *kcp, Channel* 
 		// Once an overlapped send is pending, later datagrams stay on that queue so synchronous sendto cannot widen reordering by bypassing it.
 		if (!pPoller->hasPendingSend(*pEndpoint))
 		{
+			// One sample per 64 calls keeps timing overhead bounded while retaining a representative syscall distribution.
+			// 每 64 次调用抽样一次，使计时开销有界，同时保留具有代表性的系统调用分布。
+			const bool sampleSendto = (++kcp->sendto_call_sequence & 63ULL) == 0;
+			const uint64 sampleStart = sampleSendto ? timestamp() : 0;
 			const int directResult = pEndpoint->sendto(const_cast<char*>(buf), len);
+			if (sampleSendto)
+			{
+				const uint64 elapsed = timestamp() - sampleStart;
+				++kcp->sendto_sample_calls;
+				kcp->sendto_sample_stamps += elapsed;
+				kcp->sendto_max_sample_stamps = std::max(kcp->sendto_max_sample_stamps, elapsed);
+			}
 			if (directResult == len)
 			{
 				pChannel->onPacketSent(len, true);
@@ -219,7 +231,16 @@ int KCPPacketSender::kcp_output(const char *buf, int len, ikcpcb *kcp, Channel* 
 
 		return -1;
 	}
+	const bool sampleSendto = (++kcp->sendto_call_sequence & 63ULL) == 0;
+	const uint64 sampleStart = sampleSendto ? timestamp() : 0;
 	int retlen = pEndpoint->sendto((void*)buf, len);
+	if (sampleSendto)
+	{
+		const uint64 elapsed = timestamp() - sampleStart;
+		++kcp->sendto_sample_calls;
+		kcp->sendto_sample_stamps += elapsed;
+		kcp->sendto_max_sample_stamps = std::max(kcp->sendto_max_sample_stamps, elapsed);
+	}
 
 	bool sentCompleted = retlen == len;
 	pChannel->onPacketSent(retlen, sentCompleted);

@@ -821,6 +821,17 @@ def main() -> int:
         "ackMaxProcessingMicros",
         "dataTotalProcessingMicros",
         "dataMaxProcessingMicros",
+        "flushCalls",
+        "flushScannedSegments",
+        "flushDataSegments",
+        "flushEmptyDataCalls",
+        "ackOutputCalls",
+        "ackOutputBytes",
+        "dataOutputCalls",
+        "dataOutputBytes",
+        "sendtoSampleCalls",
+        "sendtoSampleTotalMicros",
+        "sendtoSampleMaxMicros",
     ):
         assert f'WATCH_OBJECT("network/kcp/{watcher}"' in serverapp_source
     assert 'WATCH_OBJECT("network/kcp/configuredExternalWriteQueueMaxBytes"' in serverapp_source

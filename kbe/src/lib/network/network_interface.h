@@ -203,6 +203,17 @@ public:
 	uint64 kcpFastRetransmissionCount() const;
 	uint64 kcpAckSentCount() const;
 	uint64 kcpAckReceivedCount() const;
+	uint64 kcpFlushCallCount() const;
+	uint64 kcpFlushScannedSegmentCount() const;
+	uint64 kcpFlushDataSegmentCount() const;
+	uint64 kcpFlushEmptyDataCallCount() const;
+	uint64 kcpAckOutputCallCount() const;
+	uint64 kcpAckOutputByteCount() const;
+	uint64 kcpDataOutputCallCount() const;
+	uint64 kcpDataOutputByteCount() const;
+	uint64 kcpSendtoSampleCallCount() const;
+	uint64 kcpSendtoSampleTotalMicros() const;
+	uint64 kcpSendtoSampleMaxMicros() const;
 	uint64 kcpMaxPendingSegmentsPerChannel() const;
 	uint64 kcpSendWindowBlockedChannelCount() const;
 	uint64 kcpAdmissionLimitedChannelCount() const;
@@ -223,13 +234,18 @@ private:
 	virtual void handleTimeout(TimerHandle handle, void * arg);
 
 	void closeSocket();
+	uint64 kcpSendtoSampleTotalStamps() const;
 	void cleanupChannel(ChannelMap::iterator iter);
 	bool registerChannel(Channel* pChannel, bool replaceExistingAcceptedChannel);
 	void requestChannelMaintenance(Channel* pChannel);
 	void cancelChannelMaintenance(const Address& address);
 	void accumulateFinalizedKcpDiagnostics(uint64 ackSent, uint64 ackReceived,
 		uint64 timeoutRetransmissions, uint64 fastRetransmissions,
-		uint64 streamCoalesces, uint64 streamCoalescedBytes);
+		uint64 streamCoalesces, uint64 streamCoalescedBytes,
+		uint64 flushCalls, uint64 flushScannedSegments, uint64 flushDataSegments,
+		uint64 flushEmptyDataCalls, uint64 ackOutputCalls, uint64 ackOutputBytes,
+		uint64 dataOutputCalls, uint64 dataOutputBytes, uint64 sendtoSampleCalls,
+		uint64 sendtoSampleStamps, uint64 sendtoMaxSampleStamps);
 	void recordDiscardedPacketAfterClose() { ++discardedPacketsAfterCloseCount_; }
 	uint64 channelTickEpoch() const { return channelTickEpoch_; }
 
@@ -249,6 +265,17 @@ private:
 	uint64									finalizedKcpFastRetransmissionCount_;
 	uint64									finalizedKcpStreamCoalesceCount_;
 	uint64									finalizedKcpStreamCoalescedBytes_;
+	uint64									finalizedKcpFlushCallCount_;
+	uint64									finalizedKcpFlushScannedSegmentCount_;
+	uint64									finalizedKcpFlushDataSegmentCount_;
+	uint64									finalizedKcpFlushEmptyDataCallCount_;
+	uint64									finalizedKcpAckOutputCallCount_;
+	uint64									finalizedKcpAckOutputByteCount_;
+	uint64									finalizedKcpDataOutputCallCount_;
+	uint64									finalizedKcpDataOutputByteCount_;
+	uint64									finalizedKcpSendtoSampleCallCount_;
+	uint64									finalizedKcpSendtoSampleStamps_;
+	uint64									finalizedKcpSendtoMaxSampleStamps_;
 	uint64									discardedPacketsAfterCloseCount_;
 	uint64									kcpInputErrorCount_;
 	uint64									kcpInputTooShortCount_;
