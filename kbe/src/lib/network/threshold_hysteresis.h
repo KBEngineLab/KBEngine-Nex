@@ -16,12 +16,12 @@ namespace Network
 class ThresholdHysteresis
 {
 public:
-	static bool next(bool active, std::uint32_t value, std::uint32_t high, std::uint32_t low)
+	static bool next(bool active, std::uint64_t value, std::uint64_t high, std::uint64_t low)
 	{
 		if (high == 0)
 			return false;
 
-		const std::uint32_t boundedLow = std::min(low, high);
+		const std::uint64_t boundedLow = std::min(low, high);
 		return active ? value > boundedLow : value >= high;
 	}
 };

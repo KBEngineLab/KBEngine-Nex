@@ -91,8 +91,12 @@ public:
 	uint64 volatileBackpressureResumes() const;
 	uint64 volatileBackpressureEvaluations() const;
 	uint64 volatileBackpressureMaxPendingSegments() const;
+	uint64 volatileBackpressureMaxPendingBytes() const;
 	uint32 volatileBackpressureHighSegments() const;
 	uint32 volatileBackpressureLowSegments() const;
+	uint32 volatileBackpressureHighBytes() const;
+	uint32 volatileBackpressureLowBytes() const;
+	uint32 kcpWriteQueueMaxBytes() const;
 	void handleBackup();
 	void handleArchive();
 
@@ -579,6 +583,7 @@ protected:
 	uint64										volatileBackpressureResumes_;
 	uint64										volatileBackpressureEvaluations_;
 	uint64										volatileBackpressureMaxPendingSegments_;
+	uint64										volatileBackpressureMaxPendingBytes_;
 };
 
 }

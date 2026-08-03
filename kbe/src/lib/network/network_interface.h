@@ -171,6 +171,7 @@ public:
 	uint32 rudpTickIntervalMs() const;
 	uint32 rudpMinRtoMs() const;
 	uint32 rudpExternalFlushSegmentsBudget() const;
+	uint32 rudpExternalWriteQueueMaxBytes() const;
 	uint64 kcpMaxScheduleDelayMicros() const;
 	uint64 kcpBudgetExhaustionCount() const;
 	uint64 kcpConsecutiveBudgetExhaustions() const;
@@ -184,6 +185,13 @@ public:
 	uint64 kcpPendingSegmentCount() const;
 	uint64 kcpQueuedSegmentCount() const;
 	uint64 kcpUnackedSegmentCount() const;
+	uint64 kcpPendingPayloadBytes() const;
+	uint64 kcpQueuedPayloadBytes() const;
+	uint64 kcpUnackedPayloadBytes() const;
+	uint64 kcpSendBufferMemoryBytes() const;
+	uint64 kcpAverageQueuedPayloadBytes() const;
+	uint64 kcpStreamCoalesceCount() const;
+	uint64 kcpStreamCoalescedBytes() const;
 	uint64 kcpAcknowledgedSegmentCount() const;
 	uint64 kcpRetransmissionCount() const;
 	uint64 kcpTimeoutRetransmissionCount() const;
@@ -215,7 +223,8 @@ private:
 	void requestChannelMaintenance(Channel* pChannel);
 	void cancelChannelMaintenance(const Address& address);
 	void accumulateFinalizedKcpDiagnostics(uint64 ackSent, uint64 ackReceived,
-		uint64 timeoutRetransmissions, uint64 fastRetransmissions);
+		uint64 timeoutRetransmissions, uint64 fastRetransmissions,
+		uint64 streamCoalesces, uint64 streamCoalescedBytes);
 	void recordDiscardedPacketAfterClose() { ++discardedPacketsAfterCloseCount_; }
 	uint64 channelTickEpoch() const { return channelTickEpoch_; }
 
@@ -233,6 +242,8 @@ private:
 	uint64									finalizedKcpAckReceivedCount_;
 	uint64									finalizedKcpTimeoutRetransmissionCount_;
 	uint64									finalizedKcpFastRetransmissionCount_;
+	uint64									finalizedKcpStreamCoalesceCount_;
+	uint64									finalizedKcpStreamCoalescedBytes_;
 	uint64									discardedPacketsAfterCloseCount_;
 	uint64									kcpInputErrorCount_;
 	uint64									kcpInputTooShortCount_;

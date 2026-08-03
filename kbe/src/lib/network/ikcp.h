@@ -328,6 +328,15 @@ struct IKCPCB
 	IUINT64 ack_received;
 	IUINT64 timeout_retransmissions;
 	IUINT64 fast_retransmissions;
+	/* Payload bytes are maintained incrementally so diagnostics never scan a
+	 * potentially million-node send backlog. Stream counters quantify avoided
+	 * segment allocations without adding work outside ikcp_send.
+	 * Payload 字节采用增量维护，诊断时无需扫描可能达到百万节点的发送积压；
+	 * stream 计数直接量化被省去的 segment 分配，不在 ikcp_send 外增加开销。 */
+	IUINT64 snd_queue_bytes;
+	IUINT64 snd_buf_bytes;
+	IUINT64 stream_coalesces;
+	IUINT64 stream_coalesced_bytes;
 	void *user;
 	char *buffer;
 	int fastresend;

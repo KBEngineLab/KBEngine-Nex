@@ -18,13 +18,16 @@ class KcpSendState
 public:
 	KcpSendState(std::uint32_t queuedSegments, std::uint32_t unackedSegments,
 		std::uint32_t sendWindow, std::uint32_t remoteWindow,
-		std::uint32_t congestionWindow, bool congestionControlEnabled) :
+		std::uint32_t congestionWindow, bool congestionControlEnabled,
+		std::uint64_t pendingPayloadBytes = 0, std::uint64_t payloadLimitBytes = 0) :
 		queuedSegments_(queuedSegments),
 		unackedSegments_(unackedSegments),
 		sendWindow_(sendWindow),
 		remoteWindow_(remoteWindow),
 		congestionWindow_(congestionWindow),
-		congestionControlEnabled_(congestionControlEnabled)
+		congestionControlEnabled_(congestionControlEnabled),
+		pendingPayloadBytes_(pendingPayloadBytes),
+		payloadLimitBytes_(payloadLimitBytes)
 	{
 	}
 
@@ -48,7 +51,8 @@ public:
 		// 与 KCPPacketSender 的保护水位保持一致，用于区分内存 admission 限制和 KCP 协议窗口限制。
 		// Match KCPPacketSender's protective watermark to distinguish memory admission limiting from KCP protocol-window limiting.
 		return static_cast<std::uint64_t>(queuedSegments_) + unackedSegments_ >
-			static_cast<std::uint64_t>(sendWindow_) * 2;
+			static_cast<std::uint64_t>(sendWindow_) * 2 ||
+			(payloadLimitBytes_ > 0 && pendingPayloadBytes_ >= payloadLimitBytes_);
 	}
 
 private:
@@ -58,6 +62,8 @@ private:
 	std::uint32_t remoteWindow_;
 	std::uint32_t congestionWindow_;
 	bool congestionControlEnabled_;
+	std::uint64_t pendingPayloadBytes_;
+	std::uint64_t payloadLimitBytes_;
 };
 
 }

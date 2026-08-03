@@ -298,6 +298,10 @@ ikcpcb* ikcp_create(IUINT32 conv, void *user)
 	kcp->ack_received = 0;
 	kcp->timeout_retransmissions = 0;
 	kcp->fast_retransmissions = 0;
+	kcp->snd_queue_bytes = 0;
+	kcp->snd_buf_bytes = 0;
+	kcp->stream_coalesces = 0;
+	kcp->stream_coalesced_bytes = 0;
 	kcp->rx_srtt = 0;
 	kcp->rx_rttval = 0;
 	kcp->rx_rto = IKCP_RTO_DEF;
@@ -524,6 +528,9 @@ int ikcp_send(ikcpcb *kcp, const char *buffer, int len)
 				len -= extend;
 				iqueue_del_init(&old->node);
 				ikcp_segment_delete(kcp, old);
+				kcp->snd_queue_bytes += (IUINT64)extend;
+				kcp->stream_coalesces++;
+				kcp->stream_coalesced_bytes += (IUINT64)extend;
 			}
 		}
 		if (len <= 0) {
@@ -554,6 +561,7 @@ int ikcp_send(ikcpcb *kcp, const char *buffer, int len)
 		iqueue_init(&seg->node);
 		iqueue_add_tail(&seg->node, &kcp->snd_queue);
 		kcp->nsnd_que++;
+		kcp->snd_queue_bytes += (IUINT64)size;
 		if (buffer) {
 			buffer += size;
 		}
@@ -607,6 +615,7 @@ static void ikcp_parse_ack(ikcpcb *kcp, IUINT32 sn)
 		next = p->next;
 		if (sn == seg->sn) {
 			iqueue_del(p);
+			kcp->snd_buf_bytes -= (IUINT64)seg->len;
 			ikcp_segment_delete(kcp, seg);
 			kcp->nsnd_buf--;
 			break;
@@ -625,6 +634,7 @@ static void ikcp_parse_una(ikcpcb *kcp, IUINT32 una)
 		next = p->next;
 		if (_itimediff(una, seg->sn) > 0) {
 			iqueue_del(p);
+			kcp->snd_buf_bytes -= (IUINT64)seg->len;
 			ikcp_segment_delete(kcp, seg);
 			kcp->nsnd_buf--;
 		}	else {
@@ -1080,6 +1090,8 @@ void ikcp_flush(ikcpcb *kcp)
 		iqueue_add_tail(&newseg->node, &kcp->snd_buf);
 		kcp->nsnd_que--;
 		kcp->nsnd_buf++;
+		kcp->snd_queue_bytes -= (IUINT64)newseg->len;
+		kcp->snd_buf_bytes += (IUINT64)newseg->len;
 		admitted++;
 
 		newseg->conv = kcp->conv;

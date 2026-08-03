@@ -129,6 +129,63 @@ bool testFlushSegmentBudget()
 	return ok;
 }
 
+bool testStreamCoalescingAndPayloadAccounting()
+{
+	Datagrams outbound;
+	ikcpcb* sender = ikcp_create(12, &outbound);
+	ikcpcb* receiver = ikcp_create(12, NULL);
+	if (!require(sender != NULL && receiver != NULL, "KCP stream allocation failed"))
+		return false;
+	sender->output = captureDatagram;
+	sender->stream = 1;
+	// Production external KCP disables congestion control; mirror that setup so
+	// the first update admits queued bytes instead of remaining at initial cwnd=0.
+	// 生产环境外部 KCP 关闭拥塞控制；测试保持相同配置，避免首轮因初始 cwnd=0 而不准入数据。
+	ikcp_nodelay(sender, 1, 10, 2, 1);
+	ikcp_nodelay(receiver, 1, 10, 2, 1);
+
+	const char first[] = "alpha";
+	const char second[] = "-beta";
+	const char third[] = "-gamma";
+	bool ok = require(ikcp_send(sender, first, 5) == 0, "first stream enqueue failed") &&
+		require(ikcp_send(sender, second, 5) == 0, "second stream enqueue failed") &&
+		require(ikcp_send(sender, third, 6) == 0, "third stream enqueue failed");
+	ok = require(sender->nsnd_que == 1, "small stream writes were not coalesced") &&
+		require(sender->snd_queue_bytes == 16, "queued payload bytes are incorrect") &&
+		require(sender->stream_coalesces == 2, "stream coalesce count is incorrect") &&
+		require(sender->stream_coalesced_bytes == 11, "stream coalesced byte count is incorrect") && ok;
+
+	ikcp_update(sender, 0);
+	ok = require(sender->snd_queue_bytes == 0 && sender->snd_buf_bytes == 16,
+		"send payload accounting did not follow queue admission") && ok;
+	for (Datagrams::const_iterator iter = outbound.begin(); iter != outbound.end(); ++iter)
+	{
+		ok = require(ikcp_input(receiver, iter->data(), static_cast<long>(iter->size())) == 0,
+			"receiver rejected coalesced stream data") && ok;
+	}
+	char received[16] = {};
+	ok = require(ikcp_recv(receiver, received, sizeof(received)) == sizeof(received),
+		"receiver did not expose the complete coalesced stream") &&
+		require(std::memcmp(received, "alpha-beta-gamma", sizeof(received)) == 0,
+			"coalesced stream changed byte ordering") && ok;
+
+	Datagrams acknowledgements;
+	receiver->user = &acknowledgements;
+	receiver->output = captureDatagram;
+	ikcp_flushacks(receiver);
+	for (Datagrams::const_iterator iter = acknowledgements.begin(); iter != acknowledgements.end(); ++iter)
+	{
+		ok = require(ikcp_input(sender, iter->data(), static_cast<long>(iter->size())) == 0,
+			"sender rejected stream acknowledgement") && ok;
+	}
+	ok = require(sender->snd_buf_bytes == 0 && sender->nsnd_buf == 0,
+		"acknowledged payload bytes were not released") && ok;
+
+	ikcp_release(sender);
+	ikcp_release(receiver);
+	return ok;
+}
+
 bool testTimeoutRetransmissionBudget()
 {
 	Datagrams outbound;
@@ -196,7 +253,8 @@ bool testThresholdHysteresis()
 int main()
 {
 	if (!testAckCounters() || !testRetransmissionCounters() || !testFlushSegmentBudget() ||
-		!testTimeoutRetransmissionBudget() || !testThresholdHysteresis())
+		!testStreamCoalescingAndPayloadAccounting() || !testTimeoutRetransmissionBudget() ||
+		!testThresholdHysteresis())
 		return EXIT_FAILURE;
 
 	std::cout << "KCP_PROTOCOL_METRICS_TEST_PASS" << std::endl;

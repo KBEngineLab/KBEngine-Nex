@@ -168,6 +168,10 @@ public:
 	{
 		return isKcpTransport() ? static_cast<uint32>(ikcp_waitsnd(pKCP_)) : 0;
 	}
+	uint64 kcpPendingPayloadBytes() const
+	{
+		return isKcpTransport() ? static_cast<uint64>(pKCP_->snd_queue_bytes + pKCP_->snd_buf_bytes) : 0;
+	}
 	// 资源验收读取调度器里的实际 active 项，不能只用 KCP Channel 数量推断。
 	// Resource validation reads the scheduler's active entry instead of inferring it only from KCP Channel count.
 	bool hasKcpUpdateTimer() const;

@@ -66,6 +66,8 @@ NetworkInterface::NetworkInterface(Network::EventDispatcher * pDispatcher,
 	finalizedKcpAckReceivedCount_(0),
 	finalizedKcpTimeoutRetransmissionCount_(0),
 	finalizedKcpFastRetransmissionCount_(0),
+	finalizedKcpStreamCoalesceCount_(0),
+	finalizedKcpStreamCoalescedBytes_(0),
 	discardedPacketsAfterCloseCount_(0),
 	kcpInputErrorCount_(0),
 	kcpInputTooShortCount_(0),
@@ -711,6 +713,7 @@ uint64 NetworkInterface::kcpProtocolTickMissCount() const { return kcpUpdateSche
 uint32 NetworkInterface::rudpTickIntervalMs() const { return g_rudp_tickInterval; }
 uint32 NetworkInterface::rudpMinRtoMs() const { return g_rudp_minRTO; }
 uint32 NetworkInterface::rudpExternalFlushSegmentsBudget() const { return g_rudp_extFlushSegmentsBudget; }
+uint32 NetworkInterface::rudpExternalWriteQueueMaxBytes() const { return g_rudp_extWriteQueueMaxBytes; }
 uint64 NetworkInterface::kcpMaxScheduleDelayMicros() const { return kcpUpdateScheduler_.maxScheduleDelayMicros(); }
 uint64 NetworkInterface::kcpBudgetExhaustionCount() const { return kcpUpdateScheduler_.budgetExhaustionCount(); }
 uint64 NetworkInterface::kcpConsecutiveBudgetExhaustions() const { return kcpUpdateScheduler_.consecutiveBudgetExhaustions(); }
@@ -783,6 +786,67 @@ uint64 NetworkInterface::kcpUnackedSegmentCount() const
 }
 
 //-------------------------------------------------------------------------------------
+uint64 NetworkInterface::kcpQueuedPayloadBytes() const
+{
+	uint64 bytes = 0;
+	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
+	{
+		const Channel* pChannel = iter->second;
+		if (pChannel != NULL && pChannel->pKCP() != NULL)
+			bytes += static_cast<uint64>(pChannel->pKCP()->snd_queue_bytes);
+	}
+	return bytes;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 NetworkInterface::kcpUnackedPayloadBytes() const
+{
+	uint64 bytes = 0;
+	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
+	{
+		const Channel* pChannel = iter->second;
+		if (pChannel != NULL && pChannel->pKCP() != NULL)
+			bytes += static_cast<uint64>(pChannel->pKCP()->snd_buf_bytes);
+	}
+	return bytes;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 NetworkInterface::kcpPendingPayloadBytes() const
+{
+	return kcpQueuedPayloadBytes() + kcpUnackedPayloadBytes();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 NetworkInterface::kcpSendBufferMemoryBytes() const
+{
+	uint64 bytes = 0;
+	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
+	{
+		const Channel* pChannel = iter->second;
+		const ikcpcb* pKcp = pChannel != NULL ? pChannel->pKCP() : NULL;
+		if (pKcp != NULL)
+		{
+			// ikcp_segment_new allocates sizeof(IKCPSEG) plus payload for every
+			// queued or unacknowledged send segment. Keep this estimate O(channels).
+			// ikcp_segment_new 为每个排队或待确认发送段分配结构体和 payload；
+			// 使用增量字节计数，使该估算保持 O(Channel)。
+			const uint64 segments = static_cast<uint64>(pKcp->nsnd_que) + pKcp->nsnd_buf;
+			bytes += pKcp->snd_queue_bytes + pKcp->snd_buf_bytes +
+				segments * static_cast<uint64>(sizeof(IKCPSEG));
+		}
+	}
+	return bytes;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 NetworkInterface::kcpAverageQueuedPayloadBytes() const
+{
+	const uint64 segments = kcpQueuedSegmentCount();
+	return segments > 0 ? kcpQueuedPayloadBytes() / segments : 0;
+}
+
+//-------------------------------------------------------------------------------------
 uint64 NetworkInterface::kcpAcknowledgedSegmentCount() const
 {
 	uint64 acknowledgedSegments = 0;
@@ -819,12 +883,15 @@ KBE_KCP_CUMULATIVE_METRIC(kcpTimeoutRetransmissionCount, timeout_retransmissions
 KBE_KCP_CUMULATIVE_METRIC(kcpFastRetransmissionCount, fast_retransmissions, finalizedKcpFastRetransmissionCount_)
 KBE_KCP_CUMULATIVE_METRIC(kcpAckSentCount, ack_sent, finalizedKcpAckSentCount_)
 KBE_KCP_CUMULATIVE_METRIC(kcpAckReceivedCount, ack_received, finalizedKcpAckReceivedCount_)
+KBE_KCP_CUMULATIVE_METRIC(kcpStreamCoalesceCount, stream_coalesces, finalizedKcpStreamCoalesceCount_)
+KBE_KCP_CUMULATIVE_METRIC(kcpStreamCoalescedBytes, stream_coalesced_bytes, finalizedKcpStreamCoalescedBytes_)
 
 #undef KBE_KCP_CUMULATIVE_METRIC
 
 //-------------------------------------------------------------------------------------
 void NetworkInterface::accumulateFinalizedKcpDiagnostics(uint64 ackSent, uint64 ackReceived,
-	uint64 timeoutRetransmissions, uint64 fastRetransmissions)
+	uint64 timeoutRetransmissions, uint64 fastRetransmissions,
+	uint64 streamCoalesces, uint64 streamCoalescedBytes)
 {
 	// Channel 和 NetworkInterface 都属于同一 dispatcher 线程；归档销毁连接的计数不需要锁或原子操作。
 	// Channel and NetworkInterface share one dispatcher thread, so archiving a closing connection needs no lock or atomic operation.
@@ -832,6 +899,8 @@ void NetworkInterface::accumulateFinalizedKcpDiagnostics(uint64 ackSent, uint64 
 	finalizedKcpAckReceivedCount_ += ackReceived;
 	finalizedKcpTimeoutRetransmissionCount_ += timeoutRetransmissions;
 	finalizedKcpFastRetransmissionCount_ += fastRetransmissions;
+	finalizedKcpStreamCoalesceCount_ += streamCoalesces;
+	finalizedKcpStreamCoalescedBytes_ += streamCoalescedBytes;
 }
 
 //-------------------------------------------------------------------------------------
@@ -874,7 +943,9 @@ uint64 NetworkInterface::kcpAdmissionLimitedChannelCount() const
 		const Channel* pChannel = iter->second;
 		const ikcpcb* pKcp = pChannel != NULL ? pChannel->pKCP() : NULL;
 		if (pKcp != NULL && KcpSendState(pKcp->nsnd_que, pKcp->nsnd_buf,
-			pKcp->snd_wnd, pKcp->rmt_wnd, pKcp->cwnd, pKcp->nocwnd == 0).isAdmissionLimited())
+			pKcp->snd_wnd, pKcp->rmt_wnd, pKcp->cwnd, pKcp->nocwnd == 0,
+			pKcp->snd_queue_bytes + pKcp->snd_buf_bytes,
+			pChannel->isExternal() ? g_rudp_extWriteQueueMaxBytes : 0).isAdmissionLimited())
 		{
 			++limitedChannels;
 		}

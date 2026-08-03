@@ -118,7 +118,12 @@ Reason KCPPacketSender::processFilterPacket(Channel* pChannel, Packet * pPacket,
 	{
 		// 队列上限是可恢复背压状态，调用方会保留 Bundle 重试；不要在热路径逐次写 ERROR 放大阻塞。
 		// The queue cap is recoverable backpressure and callers retain the Bundle for retry; avoid per-attempt ERROR amplification.
-		if (ikcp_waitsnd(pChannel->pKCP()) > (int)(pChannel->pKCP()->snd_wnd * 2))
+		const ikcpcb* pKcp = pChannel->pKCP();
+		const IUINT64 pendingBytes = pKcp->snd_queue_bytes + pKcp->snd_buf_bytes;
+		const bool byteLimitReached = pChannel->isExternal() && g_rudp_extWriteQueueMaxBytes > 0 &&
+			(pendingBytes >= g_rudp_extWriteQueueMaxBytes ||
+			static_cast<IUINT64>(pPacket->length()) > g_rudp_extWriteQueueMaxBytes - pendingBytes);
+		if (ikcp_waitsnd(pKcp) > (int)(pKcp->snd_wnd * 2) || byteLimitReached)
 			return REASON_RESOURCE_UNAVAILABLE;
 
 		const int sendResult = ikcp_send(

@@ -53,12 +53,18 @@ uint32 g_rudp_extReadPacketsQueueSize = 65535;
 // so one backlogged client cannot monopolize the component dispatcher.
 // 内部流量保留上游无限批处理；外部扇出限制单批，避免单个积压客户端独占组件 dispatcher。
 uint32 g_rudp_intFlushSegmentsBudget = 0;
-uint32 g_rudp_extFlushSegmentsBudget = 16;
+uint32 g_rudp_extFlushSegmentsBudget = 4;
+// Bound KCP-owned payload independently from segment count because stream mode
+// intentionally fills segments close to MSS. Zero disables the byte cap.
+// stream 模式会主动把 segment 填充到接近 MSS，因此必须独立限制 KCP payload；零值表示关闭字节上限。
+uint32 g_rudp_extWriteQueueMaxBytes = 64 * 1024;
 // Hysteresis stops CellApp volatile encoding before KCP reaches the hard admission
 // limit. Zero high watermark disables cross-component feedback.
 // 迟滞水位会在 KCP 到达硬准入上限前停止 CellApp 易变数据编码；高水位为零时关闭跨组件反馈。
 uint32 g_rudp_extVolatileBackpressureHighSegments = 128;
 uint32 g_rudp_extVolatileBackpressureLowSegments = 32;
+uint32 g_rudp_extVolatileBackpressureHighBytes = 32 * 1024;
+uint32 g_rudp_extVolatileBackpressureLowBytes = 8 * 1024;
 uint32 g_rudp_tickInterval = 10;
 // 500 通道 completion 排队会轻易超过 10ms；50ms 下限可抑制伪重传，fast resend 仍负责真实丢包的快速恢复。
 // Completion queuing across 500 channels easily exceeds 10ms; a 50ms floor suppresses spurious retransmits while fast resend still recovers real loss quickly.

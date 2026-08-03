@@ -797,7 +797,7 @@ def main() -> int:
         repository_root / "kbe/src/lib/network/kcp_update_scheduler.cpp"
     ).read_text(encoding="utf-8")
     assert "KCP_MIN_UPDATES_PER_WAKEUP = 4" in scheduler_source
-    assert "KCP_MIN_ACK_FLUSHES_PER_WAKEUP = 1" in scheduler_source
+    assert "KCP_MIN_ACK_FLUSHES_PER_WAKEUP = 4" in scheduler_source
     assert "KCP_MAX_UPDATES_PER_WAKEUP = 2048" in scheduler_source
     assert "KCP_BACKLOG_RETRY_DELAY_MICROS = 1000" in scheduler_source
     assert "protocolTickMissCount_" in scheduler_source
@@ -805,6 +805,30 @@ def main() -> int:
     assert 'WATCH_OBJECT("network/kcp/configuredExternalFlushSegmentsBudget"' in (
         repository_root / "kbe/src/lib/server/serverapp.cpp"
     ).read_text(encoding="utf-8")
+    serverapp_source = (
+        repository_root / "kbe/src/lib/server/serverapp.cpp"
+    ).read_text(encoding="utf-8")
+    for watcher in (
+        "pendingPayloadBytes",
+        "queuedPayloadBytes",
+        "unackedPayloadBytes",
+        "sendBufferMemoryBytes",
+        "averageQueuedPayloadBytes",
+        "streamCoalesces",
+        "streamCoalescedBytes",
+    ):
+        assert f'WATCH_OBJECT("network/kcp/{watcher}"' in serverapp_source
+    assert 'WATCH_OBJECT("network/kcp/configuredExternalWriteQueueMaxBytes"' in serverapp_source
+    baseapp_source = (
+        repository_root / "kbe/src/server/baseapp/baseapp.cpp"
+    ).read_text(encoding="utf-8")
+    for watcher in (
+        "maxPendingBytes",
+        "configuredHighBytes",
+        "configuredLowBytes",
+        "configuredWriteQueueMaxBytes",
+    ):
+        assert f'WATCH_OBJECT("network/clientVolatileBackpressure/{watcher}"' in baseapp_source
     profile_source = (
         repository_root / "kbe/src/lib/helper/profile.cpp"
     ).read_text(encoding="utf-8")

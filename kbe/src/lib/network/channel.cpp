@@ -418,6 +418,13 @@ bool Channel::initKcp()
 	}
 
 	pKCP_->output = &Channel::kcpOutput;
+	// External KBE packets form one ordered byte stream and PacketReader already
+	// supports headers and bodies spanning UDP datagrams. Coalescing only this send
+	// direction removes one IKCPSEG allocation per small packet without changing
+	// internal component message boundaries.
+	// 外部 KBE 报文天然构成有序字节流，PacketReader 已支持消息头和消息体跨 UDP 数据报；
+	// 仅合并该发送方向，可消除小包逐包分配 IKCPSEG 的开销，同时不改变内部组件消息边界。
+	pKCP_->stream = isExternal() ? 1 : 0;
 	const int sendWindow = static_cast<int>(isExternal() ? g_rudp_extWritePacketsQueueSize : g_rudp_intWritePacketsQueueSize);
 	const int receiveWindow = static_cast<int>(isExternal() ? g_rudp_extReadPacketsQueueSize : g_rudp_intReadPacketsQueueSize);
 	ikcp_wndsize(pKCP_, sendWindow, receiveWindow);
@@ -455,7 +462,9 @@ void Channel::finaliseKcp()
 				static_cast<uint64>(pKCP_->ack_sent),
 				static_cast<uint64>(pKCP_->ack_received),
 				static_cast<uint64>(pKCP_->timeout_retransmissions),
-				static_cast<uint64>(pKCP_->fast_retransmissions));
+				static_cast<uint64>(pKCP_->fast_retransmissions),
+				static_cast<uint64>(pKCP_->stream_coalesces),
+				static_cast<uint64>(pKCP_->stream_coalesced_bytes));
 		}
 		ikcp_release(pKCP_);
 		pKCP_ = NULL;

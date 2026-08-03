@@ -32,11 +32,22 @@ bool testRemoteAndCongestionWindowsConstrainSending()
 			"enabled congestion window was not enforced");
 }
 
+bool testPayloadAdmissionLimitIsIndependentFromSegmentCount()
+{
+	const KBEngine::Network::KcpSendState belowByteLimit(2, 0, 128, 128, 1, false, 65535, 65536);
+	const KBEngine::Network::KcpSendState atByteLimit(2, 0, 128, 128, 1, false, 65536, 65536);
+	const KBEngine::Network::KcpSendState byteLimitDisabled(2, 0, 128, 128, 1, false, 1048576, 0);
+	return require(!belowByteLimit.isAdmissionLimited(), "payload below byte cap was rejected") &&
+		require(atByteLimit.isAdmissionLimited(), "payload byte cap did not trigger admission limiting") &&
+		require(!byteLimitDisabled.isAdmissionLimited(), "disabled payload byte cap rejected data");
+}
+
 }
 
 int main()
 {
-	if (!testWindowAndAdmissionAreIndependent() || !testRemoteAndCongestionWindowsConstrainSending())
+	if (!testWindowAndAdmissionAreIndependent() || !testRemoteAndCongestionWindowsConstrainSending() ||
+		!testPayloadAdmissionLimitIsIndependentFromSegmentCount())
 		return EXIT_FAILURE;
 
 	std::cout << "KCP_SEND_STATE_TEST_PASS" << std::endl;

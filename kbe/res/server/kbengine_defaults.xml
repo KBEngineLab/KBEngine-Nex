@@ -181,17 +181,24 @@
 				<internal> 1024 </internal>
 				<external> 128 </external>
 			</writePacketsQueueSize>
+			<!-- 外部单通道 KCP 自有发送 payload 的硬上限；0 表示仅使用 segment 上限。
+				Hard limit for KCP-owned send payload per external channel; 0 keeps only the segment limit. -->
+			<writeQueueMaxBytes>
+				<external> 65536 </external>
+			</writeQueueMaxBytes>
 			<!-- 单通道一次 flush 输出的数据段预算（含首次发送和重传）；ACK/窗口探测不受限，0 表示无限制。
 				Data segments emitted by one channel flush, including retransmits; ACKs/probes stay unlimited, 0 means unlimited. -->
 			<flushSegmentsBudget>
 				<internal> 0 </internal>
-				<external> 16 </external>
+				<external> 4 </external>
 			</flushSegmentsBudget>
 			<!-- 外部 KCP 达到高水位时暂停对应 Cell Witness 的位置更新，降到低水位后恢复；high=0 表示关闭。
 				Pause positional updates for the matching Cell Witness at the high watermark and resume below low; high=0 disables it. -->
 			<volatileBackpressure>
 				<highSegments> 128 </highSegments>
 				<lowSegments> 32 </lowSegments>
+				<highBytes> 32768 </highBytes>
+				<lowBytes> 8192 </lowBytes>
 			</volatileBackpressure>
 			<tickInterval> 10 </tickInterval>
 			<minRTO> 50 </minRTO>

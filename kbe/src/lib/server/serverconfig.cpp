@@ -469,6 +469,14 @@ bool ServerConfig::loadConfig(std::string fileName)
 					Network::g_rudp_extFlushSegmentsBudget = KBE_MAX(0, xml->getValInt(valueNode));
 			}
 
+			childnode = xml->enterNode(rudpNode, "writeQueueMaxBytes");
+			if (childnode)
+			{
+				TiXmlNode* valueNode = xml->enterNode(childnode, "external");
+				if (valueNode)
+					Network::g_rudp_extWriteQueueMaxBytes = KBE_MAX(0, xml->getValInt(valueNode));
+			}
+
 			childnode = xml->enterNode(rudpNode, "volatileBackpressure");
 			if (childnode)
 			{
@@ -480,6 +488,14 @@ bool ServerConfig::loadConfig(std::string fileName)
 				if (valueNode)
 					Network::g_rudp_extVolatileBackpressureLowSegments = KBE_MAX(0, xml->getValInt(valueNode));
 
+				valueNode = xml->enterNode(childnode, "highBytes");
+				if (valueNode)
+					Network::g_rudp_extVolatileBackpressureHighBytes = KBE_MAX(0, xml->getValInt(valueNode));
+
+				valueNode = xml->enterNode(childnode, "lowBytes");
+				if (valueNode)
+					Network::g_rudp_extVolatileBackpressureLowBytes = KBE_MAX(0, xml->getValInt(valueNode));
+
 				// 低水位必须位于高水位内，才能形成稳定迟滞而不是每次采样反复切换。
 				// The low watermark must stay within high so sampling cannot oscillate between states.
 				if (Network::g_rudp_extVolatileBackpressureHighSegments > 0)
@@ -487,6 +503,12 @@ bool ServerConfig::loadConfig(std::string fileName)
 					Network::g_rudp_extVolatileBackpressureLowSegments = KBE_MIN(
 						Network::g_rudp_extVolatileBackpressureLowSegments,
 						Network::g_rudp_extVolatileBackpressureHighSegments);
+				}
+				if (Network::g_rudp_extVolatileBackpressureHighBytes > 0)
+				{
+					Network::g_rudp_extVolatileBackpressureLowBytes = KBE_MIN(
+						Network::g_rudp_extVolatileBackpressureLowBytes,
+						Network::g_rudp_extVolatileBackpressureHighBytes);
 				}
 			}
 

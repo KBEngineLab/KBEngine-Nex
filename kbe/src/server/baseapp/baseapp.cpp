@@ -319,7 +319,8 @@ Baseapp::Baseapp(Network::EventDispatcher& dispatcher,
 	volatileBackpressureSuppressions_(0),
 	volatileBackpressureResumes_(0),
 	volatileBackpressureEvaluations_(0),
-	volatileBackpressureMaxPendingSegments_(0)
+	volatileBackpressureMaxPendingSegments_(0),
+	volatileBackpressureMaxPendingBytes_(0)
 {
 	KBEngine::Network::MessageHandlers::pMainMessageHandlers = &BaseappInterface::messageHandlers;
 
@@ -492,8 +493,12 @@ bool Baseapp::initializeWatcher()
 	WATCH_OBJECT("network/clientVolatileBackpressure/resumes", this, &Baseapp::volatileBackpressureResumes);
 	WATCH_OBJECT("network/clientVolatileBackpressure/evaluations", this, &Baseapp::volatileBackpressureEvaluations);
 	WATCH_OBJECT("network/clientVolatileBackpressure/maxPendingSegments", this, &Baseapp::volatileBackpressureMaxPendingSegments);
+	WATCH_OBJECT("network/clientVolatileBackpressure/maxPendingBytes", this, &Baseapp::volatileBackpressureMaxPendingBytes);
 	WATCH_OBJECT("network/clientVolatileBackpressure/configuredHighSegments", this, &Baseapp::volatileBackpressureHighSegments);
 	WATCH_OBJECT("network/clientVolatileBackpressure/configuredLowSegments", this, &Baseapp::volatileBackpressureLowSegments);
+	WATCH_OBJECT("network/clientVolatileBackpressure/configuredHighBytes", this, &Baseapp::volatileBackpressureHighBytes);
+	WATCH_OBJECT("network/clientVolatileBackpressure/configuredLowBytes", this, &Baseapp::volatileBackpressureLowBytes);
+	WATCH_OBJECT("network/clientVolatileBackpressure/configuredWriteQueueMaxBytes", this, &Baseapp::kcpWriteQueueMaxBytes);
 	WATCH_OBJECT("stats/runningTime", &runningTime);
 	return EntityApp<Entity>::initializeWatcher();
 }
@@ -673,8 +678,12 @@ uint64 Baseapp::volatileBackpressureSuppressions() const { return volatileBackpr
 uint64 Baseapp::volatileBackpressureResumes() const { return volatileBackpressureResumes_; }
 uint64 Baseapp::volatileBackpressureEvaluations() const { return volatileBackpressureEvaluations_; }
 uint64 Baseapp::volatileBackpressureMaxPendingSegments() const { return volatileBackpressureMaxPendingSegments_; }
+uint64 Baseapp::volatileBackpressureMaxPendingBytes() const { return volatileBackpressureMaxPendingBytes_; }
 uint32 Baseapp::volatileBackpressureHighSegments() const { return Network::g_rudp_extVolatileBackpressureHighSegments; }
 uint32 Baseapp::volatileBackpressureLowSegments() const { return Network::g_rudp_extVolatileBackpressureLowSegments; }
+uint32 Baseapp::volatileBackpressureHighBytes() const { return Network::g_rudp_extVolatileBackpressureHighBytes; }
+uint32 Baseapp::volatileBackpressureLowBytes() const { return Network::g_rudp_extVolatileBackpressureLowBytes; }
+uint32 Baseapp::kcpWriteQueueMaxBytes() const { return Network::g_rudp_extWriteQueueMaxBytes; }
 
 //-------------------------------------------------------------------------------------
 void Baseapp::notifyCellVolatileUpdates(Proxy* pProxy, bool enabled)
@@ -721,8 +730,10 @@ void Baseapp::evaluateClientVolatileBackpressure(Proxy* pProxy, Network::Channel
 
 	++volatileBackpressureEvaluations_;
 	const bool wasSuppressed = volatileBackpressuredProxies_.find(pProxy->id()) != volatileBackpressuredProxies_.end();
-	const uint32 high = Network::g_rudp_extVolatileBackpressureHighSegments;
-	if (high == 0 || pClientChannel == NULL || !pClientChannel->isExternal() || !pClientChannel->isKcpTransport())
+	const uint32 highSegments = Network::g_rudp_extVolatileBackpressureHighSegments;
+	const uint32 highBytes = Network::g_rudp_extVolatileBackpressureHighBytes;
+	if ((highSegments == 0 && highBytes == 0) || pClientChannel == NULL ||
+		!pClientChannel->isExternal() || !pClientChannel->isKcpTransport())
 	{
 		if (wasSuppressed)
 			setClientVolatileBackpressure(pProxy, false);
@@ -732,8 +743,16 @@ void Baseapp::evaluateClientVolatileBackpressure(Proxy* pProxy, Network::Channel
 	const uint32 pendingSegments = pClientChannel->kcpPendingSegments();
 	volatileBackpressureMaxPendingSegments_ = KBE_MAX(
 		volatileBackpressureMaxPendingSegments_, static_cast<uint64>(pendingSegments));
-	const bool shouldSuppress = Network::ThresholdHysteresis::next(
-		wasSuppressed, pendingSegments, high, Network::g_rudp_extVolatileBackpressureLowSegments);
+	const uint64 pendingBytes = pClientChannel->kcpPendingPayloadBytes();
+	volatileBackpressureMaxPendingBytes_ = KBE_MAX(volatileBackpressureMaxPendingBytes_, pendingBytes);
+	// Either limit may activate suppression, while recovery requires both enabled
+	// dimensions to fall below their low watermarks.
+	// 任一维度越过高水位即可抑制；恢复则要求所有已启用维度均降到各自低水位以下。
+	const bool segmentSuppressed = Network::ThresholdHysteresis::next(wasSuppressed,
+		pendingSegments, highSegments, Network::g_rudp_extVolatileBackpressureLowSegments);
+	const bool byteSuppressed = Network::ThresholdHysteresis::next(wasSuppressed,
+		pendingBytes, highBytes, Network::g_rudp_extVolatileBackpressureLowBytes);
+	const bool shouldSuppress = segmentSuppressed || byteSuppressed;
 	if (shouldSuppress != wasSuppressed)
 		setClientVolatileBackpressure(pProxy, shouldSuppress);
 }

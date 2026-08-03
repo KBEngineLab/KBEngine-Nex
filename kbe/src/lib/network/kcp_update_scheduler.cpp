@@ -17,13 +17,13 @@ namespace
 // 积压时单个 ikcp_update 可能因大量重传而从微秒级放大到毫秒级；小批量后即检查时间预算，
 // 避免“至少 256 次”把一次 2ms 调度轮次放大成数百毫秒并继续制造超时重传。
 // A backlogged ikcp_update can grow from microseconds to milliseconds due to retransmissions.
-// Per-channel data emission is now bounded, so a small deterministic floor prevents
-// wall-clock preemption from turning a 2ms budget into one update per wakeup. The
-// upper cap and time check still bound each turn after the floor is satisfied.
-// 单通道数据输出已有上限，因此使用小型确定批次，避免线程抢占把 2ms 预算退化为每次只更新一个通道；
-// 达到下限后仍由总数量和时间预算限制本轮。
+// Per-channel output and payload are bounded. A four-channel floor amortizes the
+// coarse Windows timer quantum for both ACK and data queues; the time check after
+// this small floor still returns control to the BaseApp dispatcher promptly.
+// 单通道输出和 payload 已受限；ACK 与数据队列使用四通道下限摊薄 Windows 粗粒度
+// timer 成本，并在该小批次后检查时间预算，及时归还 BaseApp dispatcher。
 const size_t KCP_MIN_UPDATES_PER_WAKEUP = 4;
-const size_t KCP_MIN_ACK_FLUSHES_PER_WAKEUP = 1;
+const size_t KCP_MIN_ACK_FLUSHES_PER_WAKEUP = 4;
 const size_t KCP_MAX_UPDATES_PER_WAKEUP = 2048;
 const uint64 KCP_PROCESSING_TIME_BUDGET_MICROS = 2000;
 const uint64 KCP_ACK_PROCESSING_TIME_BUDGET_MICROS = 2000;

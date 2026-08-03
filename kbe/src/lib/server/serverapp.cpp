@@ -255,6 +255,7 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/kcp/configuredTickIntervalMs", &networkInterface_, &Network::NetworkInterface::rudpTickIntervalMs);
 	WATCH_OBJECT("network/kcp/configuredMinRtoMs", &networkInterface_, &Network::NetworkInterface::rudpMinRtoMs);
 	WATCH_OBJECT("network/kcp/configuredExternalFlushSegmentsBudget", &networkInterface_, &Network::NetworkInterface::rudpExternalFlushSegmentsBudget);
+	WATCH_OBJECT("network/kcp/configuredExternalWriteQueueMaxBytes", &networkInterface_, &Network::NetworkInterface::rudpExternalWriteQueueMaxBytes);
 	WATCH_OBJECT("network/kcp/maxScheduleDelayMicros", &networkInterface_, &Network::NetworkInterface::kcpMaxScheduleDelayMicros);
 	WATCH_OBJECT("network/kcp/budgetExhaustions", &networkInterface_, &Network::NetworkInterface::kcpBudgetExhaustionCount);
 	WATCH_OBJECT("network/kcp/consecutiveBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::kcpConsecutiveBudgetExhaustions);
@@ -270,6 +271,13 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/kcp/pendingSegments", &networkInterface_, &Network::NetworkInterface::kcpPendingSegmentCount);
 	WATCH_OBJECT("network/kcp/queuedSegments", &networkInterface_, &Network::NetworkInterface::kcpQueuedSegmentCount);
 	WATCH_OBJECT("network/kcp/unackedSegments", &networkInterface_, &Network::NetworkInterface::kcpUnackedSegmentCount);
+	WATCH_OBJECT("network/kcp/pendingPayloadBytes", &networkInterface_, &Network::NetworkInterface::kcpPendingPayloadBytes);
+	WATCH_OBJECT("network/kcp/queuedPayloadBytes", &networkInterface_, &Network::NetworkInterface::kcpQueuedPayloadBytes);
+	WATCH_OBJECT("network/kcp/unackedPayloadBytes", &networkInterface_, &Network::NetworkInterface::kcpUnackedPayloadBytes);
+	WATCH_OBJECT("network/kcp/sendBufferMemoryBytes", &networkInterface_, &Network::NetworkInterface::kcpSendBufferMemoryBytes);
+	WATCH_OBJECT("network/kcp/averageQueuedPayloadBytes", &networkInterface_, &Network::NetworkInterface::kcpAverageQueuedPayloadBytes);
+	WATCH_OBJECT("network/kcp/streamCoalesces", &networkInterface_, &Network::NetworkInterface::kcpStreamCoalesceCount);
+	WATCH_OBJECT("network/kcp/streamCoalescedBytes", &networkInterface_, &Network::NetworkInterface::kcpStreamCoalescedBytes);
 	WATCH_OBJECT("network/kcp/acknowledgedSegments", &networkInterface_, &Network::NetworkInterface::kcpAcknowledgedSegmentCount);
 	WATCH_OBJECT("network/kcp/retransmissions", &networkInterface_, &Network::NetworkInterface::kcpRetransmissionCount);
 	WATCH_OBJECT("network/kcp/timeoutRetransmissions", &networkInterface_, &Network::NetworkInterface::kcpTimeoutRetransmissionCount);
