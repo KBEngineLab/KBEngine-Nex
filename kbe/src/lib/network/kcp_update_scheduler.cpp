@@ -14,11 +14,18 @@ namespace Network
 {
 namespace
 {
-// Bound one wakeup so a KCP burst cannot starve packet dispatch, timers, or the game tick.
-// 限制单次唤醒的处理量，避免 KCP 突发饿死报文分发、其他定时器和游戏 Tick。
-const size_t KCP_MIN_UPDATES_PER_WAKEUP = 256;
+// 积压时单个 ikcp_update 可能因大量重传而从微秒级放大到毫秒级；小批量后即检查时间预算，
+// 避免“至少 256 次”把一次 2ms 调度轮次放大成数百毫秒并继续制造超时重传。
+// A backlogged ikcp_update can grow from microseconds to milliseconds due to retransmissions.
+// Check the time budget after every channel. Under retransmission pressure even one
+// ikcp_update may take milliseconds, so a multi-channel floor can still monopolize
+// EventDispatcher::processTimers and starve IO before the budget is observed.
+// 每个通道后都检查时间预算。重传压力下单次 ikcp_update 也可能达到毫秒级，
+// 多通道下限仍会在检查预算前独占 processTimers 并饿死 IO。
+const size_t KCP_MIN_UPDATES_PER_WAKEUP = 1;
 const size_t KCP_MAX_UPDATES_PER_WAKEUP = 2048;
 const uint64 KCP_PROCESSING_TIME_BUDGET_MICROS = 2000;
+const int64 KCP_BACKLOG_RETRY_DELAY_MICROS = 1000;
 }
 
 KcpUpdateScheduler::KcpUpdateScheduler(EventDispatcher& dispatcher) :
@@ -143,8 +150,10 @@ void KcpUpdateScheduler::armNextTimer()
 	}
 
 	const uint64 now = timestamp();
-	const uint64 remaining = dueTime > now ? dueTime - now : 1;
-	timerHandle_ = dispatcher_.addTimer(stampsToDelay(remaining), this);
+	const int64 remainingMicros = dueTime > now
+		? stampsToDelay(dueTime - now)
+		: KCP_BACKLOG_RETRY_DELAY_MICROS;
+	timerHandle_ = dispatcher_.addTimer(remainingMicros, this);
 	timerDueTime_ = dueTime;
 	++timerRearmCount_;
 }

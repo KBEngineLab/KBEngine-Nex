@@ -423,6 +423,7 @@ def assert_gameplay_stress_scenario() -> None:
     assert scenario["bots"] == 10000
     assert scenario["duration_seconds"] == 300
     assert scenario["connect_rate_per_second"] == 100
+    assert scenario["database_connections"] == 32
     assert scenario["reliable_udp_tick_interval_ms"] == 10
     assert scenario["reliable_udp_min_rto_ms"] == 50
     assert scenario["runtime_log_level"] == "warn"
@@ -450,6 +451,20 @@ def assert_gameplay_stress_scenario() -> None:
     assert comparison["name"] == "gameplay-10000-kcp20"
     assert comparison["reliable_udp_tick_interval_ms"] == 20
     assert comparison["reliable_udp_min_rto_ms"] == 50
+    sustainable = load_scenario(scenario_path.with_name("gameplay_10000_kcp50.json"))
+    assert sustainable["name"] == "gameplay-10000-kcp50"
+    assert sustainable["reliable_udp_tick_interval_ms"] == 50
+    assert sustainable["reliable_udp_min_rto_ms"] == 50
+    default_cadence = load_scenario(scenario_path.with_name("gameplay_10000_kcp100.json"))
+    assert default_cadence["name"] == "gameplay-10000-kcp100"
+    assert default_cadence["reliable_udp_tick_interval_ms"] == 100
+    assert default_cadence["reliable_udp_min_rto_ms"] == 50
+
+    cpu_sustainable = load_scenario(scenario_path.with_name("gameplay_10000_kcp250.json"))
+    assert cpu_sustainable["name"] == "gameplay-10000-kcp250"
+    assert cpu_sustainable["external_timeout_seconds"] == 120
+    assert cpu_sustainable["reliable_udp_tick_interval_ms"] == 250
+    assert cpu_sustainable["reliable_udp_min_rto_ms"] == 50
 
 
 def assert_parameterized_topology_and_manager_readiness() -> None:
@@ -504,7 +519,9 @@ def assert_bots_dev_and_manager_watcher_source_contract() -> None:
     bots_source = (source_root / "server/tools/bots/bots.cpp").read_text(encoding="utf-8")
     components_source = (source_root / "lib/server/components.cpp").read_text(encoding="utf-8")
     assert 'std::string(argv[index]) == "--dev"' in bots_main
+    assert 'std::string(argv[index]) == "--reuse-existing-accounts"' in bots_main
     assert 'WATCH_OBJECT("bots/devMode", g_botsDevMode)' in bots_source
+    assert 'WATCH_OBJECT("bots/reuseAccounts", g_botsReuseAccounts)' in bots_source
     network_index = bots_source.index("DebugHelper::getSingleton().pNetworkInterface(&networkInterface())")
     logger_index = bots_source.index("Components::getSingleton().findLogger(true)")
     assert network_index < logger_index
@@ -625,6 +642,10 @@ def main() -> int:
         repository_root / "kbe/src/server/tools/bots/clientobject.cpp"
     ).read_text(encoding="utf-8")
     assert bots_client_source.count("state_ = C_STATE_LOGIN_BASEAPP_HELLO;") == 2
+    assert "kcpHandshakeTimeoutStamps()" in bots_client_source
+    assert "Network::g_channelExternalTimeout" in bots_client_source
+    assert "onKcpHandshakeInvalidPacket()" in bots_client_source
+    assert 'fallbackToBaseappTcp("invalid KCP hello ACK")' not in bots_client_source
     assert "case C_STATE_LOGIN_BASEAPP_HELLO:" in bots_client_source
     assert "onHelloCB_ activates encryption" in bots_client_source
     encryption_source = (
@@ -632,6 +653,11 @@ def main() -> int:
     ).read_text(encoding="utf-8")
     assert "encryptedPayloadLen % BLOCK_SIZE" in encryption_source
     assert "return REASON_CORRUPTED_PACKET;" in encryption_source
+    db_task_source = (
+        repository_root / "kbe/src/lib/db_interface/db_tasks.cpp"
+    ).read_text(encoding="utf-8")
+    assert "queue delay {:.2f}s, queryBytes={}, suppressed={}" in db_task_source
+    assert "sql:({" not in db_task_source
     script_level_source = (
         repository_root / "kbe/src/lib/helper/script_loglevel.h"
     ).read_text(encoding="utf-8")
@@ -645,8 +671,14 @@ def main() -> int:
     scheduler_source = (
         repository_root / "kbe/src/lib/network/kcp_update_scheduler.cpp"
     ).read_text(encoding="utf-8")
-    assert "KCP_MIN_UPDATES_PER_WAKEUP = 256" in scheduler_source
+    assert "KCP_MIN_UPDATES_PER_WAKEUP = 1" in scheduler_source
     assert "KCP_MAX_UPDATES_PER_WAKEUP = 2048" in scheduler_source
+    assert "KCP_BACKLOG_RETRY_DELAY_MICROS = 1000" in scheduler_source
+    baseappmgr_source = (
+        repository_root / "kbe/src/server/baseappmgr/baseappmgr.cpp"
+    ).read_text(encoding="utf-8")
+    assert "equivalentLoadRange = 0.05f" in baseappmgr_source
+    assert "std::fabs(candidateLoad - minload) <= equivalentLoadRange" in baseappmgr_source
     assert "WATCH_OBJECT(\"spaceSize\", this, &Cellapp::spaceSize)" in (
         repository_root / "kbe/src/server/cellapp/cellapp.cpp"
     ).read_text(encoding="utf-8")
@@ -706,24 +738,46 @@ def main() -> int:
         assert resolved_manifest.host == "127.0.0.1" and resolved_manifest.port == 15000
         assets = root / "assets/res/server"
         assets.mkdir(parents=True)
-        (assets / "kbengine.xml").write_text("<root><bots /></root>\n", encoding="utf-8")
+        (assets / "kbengine.xml").write_text(
+            "<root><bots /><dbmgr><databaseInterfaces><default><numConnections>5</numConnections>"
+            "</default></databaseInterfaces></dbmgr></root>\n",
+            encoding="utf-8",
+        )
         overlay = create_config_overlay(
             root / "assets",
             root / "run",
             500,
             external_receive_messages=1024,
             external_receive_bytes=1048576,
+            external_timeout_seconds=120,
             reliable_udp_tick_interval_ms=20,
             reliable_udp_min_rto_ms=50,
             runtime_log_level="warn",
             server_runtime_log_level="info",
+            database_connections=32,
+            baseapp_external_port_count=10,
         )
         xml_root = ET.parse(overlay).getroot()
         assert xml_root.findtext("./bots/defaultAddBots/totalCount") == "500"
         assert xml_root.findtext("./channelCommon/windowOverflow/receive/messages/external") == "1024"
         assert xml_root.findtext("./channelCommon/windowOverflow/receive/bytes/external") == "1048576"
+        assert xml_root.findtext("./channelCommon/timeout/external") == "120"
         assert xml_root.findtext("./networkInterface/reliableUDP/tickInterval") == "20"
         assert xml_root.findtext("./networkInterface/reliableUDP/minRTO") == "50"
+        assert xml_root.findtext("./dbmgr/databaseInterfaces/default/numConnections") == "32"
+        assert xml_root.findtext("./baseapp/externalPorts_min") == "20015"
+        assert xml_root.findtext("./baseapp/externalPorts_max") == "20024"
+        deterministic_run = root / "deterministic-run"
+        create_config_overlay(
+            assets,
+            deterministic_run,
+            10,
+            bots_account_suffix_start=1,
+        )
+        deterministic_root = ET.parse(
+            deterministic_run / "config-overlay/res/server/kbengine.xml"
+        ).getroot()
+        assert deterministic_root.findtext("./bots/account_infos/account_name_suffix_inc") == "1"
         bots_log_config = (
             root / "run/config-overlay/res/server/log4cxx_properties/bots.properties"
         ).read_text(encoding="utf-8")
@@ -787,6 +841,49 @@ def main() -> int:
         assert sampled["samples"]["watcher.BOTS_TYPE.bots/tick/lastMicros"]["p99"] > 2000
         assert sampled["quality"]["status"] == "SLOW"
         assert all("tickMaxMicros" not in item for item in sampled["quality"]["slow"])
+
+        readiness_path = root / "multi-process-readiness.jsonl"
+        with JsonlRecorder(readiness_path, "test-run", "contract") as recorder:
+            for cid in range(10000, 10004):
+                recorder.record_sample(
+                    "readiness", "workload", f"bots#{cid}/root/bots/performance/clientsTotal", 2500, "count"
+                )
+            recorder.record_sample(
+                "readiness", "workload", "root/bots/performance/clientsTotal", 10000, "count"
+            )
+            for _ in range(4):
+                recorder.record_sample(
+                    "watcher", "BOTS_TYPE", "root/bots/performance/clientsTotal", 2500, "count"
+                )
+        multi_process = build_summary(
+            load_events(readiness_path),
+            readiness={"root/bots/performance/clientsTotal": "$bots"},
+            configured_bots=10000,
+            workload_processes=4,
+        )
+        assert not any("readiness metric dropped" in item for item in multi_process["quality"]["blockers"])
+        with JsonlRecorder(readiness_path, "test-run", "contract") as recorder:
+            recorder.record_sample(
+                "readiness", "workload", "bots#10000/root/bots/performance/clientsTotal", 2499, "count"
+            )
+        dropped_process = build_summary(
+            load_events(readiness_path),
+            readiness={"root/bots/performance/clientsTotal": "$bots"},
+            configured_bots=10000,
+            workload_processes=4,
+        )
+        assert any("min=2499.0, expected=2500" in item for item in dropped_process["quality"]["blockers"])
+        with JsonlRecorder(readiness_path, "test-run", "contract") as recorder:
+            recorder.record_sample(
+                "readiness", "workload", "root/bots/performance/clientsTotal", 9999, "count"
+            )
+        dropped_aggregate = build_summary(
+            load_events(readiness_path),
+            readiness={"root/bots/performance/clientsTotal": "$bots"},
+            configured_bots=10000,
+            workload_processes=4,
+        )
+        assert any("min=9999.0, expected=10000" in item for item in dropped_aggregate["quality"]["blockers"])
     print("PERFORMANCE_METRICS_CONTRACT_TEST_PASS")
     return 0
 

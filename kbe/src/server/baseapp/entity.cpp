@@ -24,6 +24,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "entity_messages_forward_handler.h"
 #include "pyscript/py_gc.h"
 #include "entitydef/entity_call.h"
+#include "entitydef/entity_events.h"
 #include "network/channel.h"	
 #include "network/fixed_messages.h"
 #include "client_lib/client_interface.h"
@@ -74,9 +75,12 @@ shouldAutoArchive_(1),
 shouldAutoBackup_(1),
 creatingCell_(false),
 createdSpace_(false),
-inRestore_(false),
-pBufferedSendToClientMessages_(NULL),
-dbInterfaceIndex_(0)
+	inRestore_(false),
+	pBufferedSendToClientMessages_(NULL),
+	pendingMigrationEnd_(false),
+	pendingMigrationSourceCellAppID_(0),
+	pendingMigrationTargetCellAppID_(0),
+	dbInterfaceIndex_(0)
 {
 	setDirty();
 
@@ -100,7 +104,25 @@ Entity::~Entity()
 		Baseapp::getSingleton().pEntities()->pGetbages()->erase(id());
 
 	script::PyGC::decTracing("Entity");
-}	
+}
+
+//-------------------------------------------------------------------------------------
+PyObject* Entity::__py_pyRegisterEvent(PyObject* self, PyObject* args)
+{
+	return EntityEvents::pyRegister(self, args);
+}
+
+//-------------------------------------------------------------------------------------
+PyObject* Entity::__py_pyDeregisterEvent(PyObject* self, PyObject* args)
+{
+	return EntityEvents::pyDeregister(self, args);
+}
+
+//-------------------------------------------------------------------------------------
+PyObject* Entity::__py_pyFireEvent(PyObject* self, PyObject* args)
+{
+	return EntityEvents::pyFire(self, args);
+}
 
 //-------------------------------------------------------------------------------------
 void Entity::onInitializeScript()
@@ -187,6 +209,10 @@ void Entity::onDestroy(bool callScript)
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 		SCRIPT_OBJECT_CALL_ARGS0(this, const_cast<char*>("onDestroy"), false);
 	}
+
+	// 绑定方法会反向持有 Entity，必须在最终 Py_DECREF 前断开事件引用环。
+	// Bound methods retain the Entity, so break the event reference cycle before the final Py_DECREF.
+	EntityEvents::clear(this);
 
 	if(this->hasDB())
 	{
@@ -1656,7 +1682,25 @@ void Entity::onMigrationCellappEnd(Network::Channel* pChannel, COMPONENT_ID sour
 	DEBUG_MSG(fmt::format("{}::onMigrationCellappEnd: {}, sourceCellAppID={}, targetCellappID={}\n",
 		scriptName(), id(), sourceCellAppID, targetCellAppID));
 
-	KBE_ASSERT(!pBufferedSendToClientMessages_);
+	if (pBufferedSendToClientMessages_)
+	{
+		// 旧迁移的客户端消息仍在按序重放时，延后处理下一次 End，不能中止进程或丢弃缓冲。
+		// Defer the next End while the previous migration replays client messages in order; never abort or drop the buffer.
+		if (targetCellAppID == pBufferedSendToClientMessages_->cellappID())
+			return;
+
+		if (pendingMigrationEnd_)
+		{
+			ERROR_MSG(fmt::format("{}::onMigrationCellappEnd: pending migration already exists, entity={}, pendingTarget={}, target={}.\n",
+				scriptName(), id(), pendingMigrationTargetCellAppID_, targetCellAppID));
+			return;
+		}
+
+		pendingMigrationEnd_ = true;
+		pendingMigrationSourceCellAppID_ = sourceCellAppID;
+		pendingMigrationTargetCellAppID_ = targetCellAppID;
+		return;
+	}
 	
 	// 某些极端情况下可能onMigrationCellappStart会慢于onMigrationCellappEnd触发，此时必须设置标记
 	// 等待onMigrationCellappEnd触发后做清理
@@ -1703,6 +1747,16 @@ void Entity::onBufferedForwardToClientMessagesOver()
 {
 	onMigrationCellappOver(pBufferedSendToClientMessages_->cellappID());
 	SAFE_RELEASE(pBufferedSendToClientMessages_);
+
+	if (pendingMigrationEnd_)
+	{
+		const COMPONENT_ID sourceCellAppID = pendingMigrationSourceCellAppID_;
+		const COMPONENT_ID targetCellAppID = pendingMigrationTargetCellAppID_;
+		pendingMigrationEnd_ = false;
+		pendingMigrationSourceCellAppID_ = 0;
+		pendingMigrationTargetCellAppID_ = 0;
+		onMigrationCellappEnd(NULL, sourceCellAppID, targetCellAppID);
+	}
 }
 
 //-------------------------------------------------------------------------------------

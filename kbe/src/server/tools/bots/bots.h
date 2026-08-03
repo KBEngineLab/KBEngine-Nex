@@ -53,6 +53,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 extern bool g_botsDevMode;
+extern bool g_botsReuseAccounts;
 
 class ClientObject;
 class PyBots;
@@ -130,8 +131,18 @@ public:
 	uint32 numKcpClients() const;
 	uint32 numTcpClients() const;
 	uint32 numKcpHandshakes() const;
+	uint32 numClientsInState(int state) const;
+	uint32 numClientsInit() const;
+	uint32 numClientsCreate() const;
+	uint32 numClientsLogin() const;
+	uint32 numClientsBaseappCreate() const;
+	uint32 numClientsKcpHandshaking() const;
+	uint32 numClientsBaseappHello() const;
+	uint32 numClientsBaseappLogin() const;
+	uint32 numClientsPlay() const;
 	uint32 numDestroyedClients() const;
 	uint64 numClientEntities() const;
+	uint64 staleViewMessageDrops() const;
 	uint64 kcpFixedAllocatedBytes() const;
 	uint64 kcpDynamicAllocatedBytes() const;
 	void recordPythonPerformanceLatency(uint64 startNs, uint64 endNs) override;
@@ -174,6 +185,7 @@ public:
 #undef KBE_DECLARE_PYTHON_LATENCY_GETTERS
 	uint32 numClients() const { return static_cast<uint32>(clients_.size()); }
 	uint64 totalKcpHandshakeSuccesses() const { return totalKcpHandshakeSuccesses_; }
+	uint64 totalKcpHandshakeInvalidPackets() const { return totalKcpHandshakeInvalidPackets_; }
 	uint64 totalTcpConnections() const { return totalTcpConnections_; }
 	uint64 totalTcpFallbacks() const { return totalTcpFallbacks_; }
 	uint64 totalNetworkErrors() const { return totalNetworkErrors_; }
@@ -181,6 +193,7 @@ public:
 	uint64 lastBotsTickMicros() const { return lastBotsTickMicros_; }
 	uint64 maxBotsTickMicros() const { return maxBotsTickMicros_; }
 	void onKcpHandshakeSucceeded() { ++totalKcpHandshakeSuccesses_; }
+	void onKcpHandshakeInvalidPacket() { ++totalKcpHandshakeInvalidPackets_; }
 	void onTcpConnected() { ++totalTcpConnections_; }
 	void onTcpFallback() { ++totalTcpFallbacks_; }
 	void onClientNetworkError() { ++totalNetworkErrors_; }
@@ -466,6 +479,7 @@ protected:
 	// 累计计数与 Tick 高水位不在客户端删除时回退，用于定位长压测中的瞬时故障和延迟尖峰。
 	// Cumulative counters and Tick high-water marks do not decrease on client removal, preserving transient failures and latency spikes during long stress runs.
 	uint64											totalKcpHandshakeSuccesses_;
+	uint64											totalKcpHandshakeInvalidPackets_;
 	uint64											totalTcpConnections_;
 	uint64											totalTcpFallbacks_;
 	uint64											totalNetworkErrors_;

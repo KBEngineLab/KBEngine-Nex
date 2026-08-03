@@ -324,8 +324,13 @@ def hold_ready_cluster(entries, stop_file):
         for entry in entries:
             result = entry["process"].poll()
             if result is not None:
+                # 子进程的 stderr 包含 KBE_ASSERT 表达式，但控制器清理后调用方可能只剩聚合日志。
+                # Preserve a bounded output tail in the controller failure so KBE_ASSERT evidence
+                # survives child-log cleanup without copying potentially huge runtime logs.
+                output_tail = component_output(entry, stop_file.parent / "server")[-4096:].strip()
                 raise RuntimeError(
-                    f"{entry['spec']['name']} exited while cluster was held with code {result}"
+                    f"{entry['spec']['name']} exited while cluster was held with code {result}; "
+                    f"output_tail={output_tail or '<empty>'}"
                 )
         time.sleep(0.25)
 

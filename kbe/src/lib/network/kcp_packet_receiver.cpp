@@ -126,13 +126,38 @@ Reason KCPPacketReceiver::processPacket(Channel* pChannel, Packet * pPacket)
 {
 	if (pChannel != NULL && pChannel->hasHandshake())
 	{
+		if (pChannel->handshake(pPacket))
+		{
+			RECLAIM_PACKET(pPacket->isTCPPacket(), pPacket);
+			return REASON_SUCCESS;
+		}
+
 		// KCP ACK 与窗口更新本身就是有效的对端活动，即使尚未重组出业务消息也必须刷新超时基准。
 		// KCP ACKs and window updates are valid peer activity, so refresh the timeout baseline even before an application message is reassembled.
 		pChannel->updateLastReceivedTime();
 		pChannel->scheduleKcpUpdate();
 
-		if (ikcp_input(pChannel->pKCP(), (const char*)pPacket->data(), toLongSize(pPacket->length())) < 0)
+		const size_t packetLength = pPacket->length();
+		const int inputResult = ikcp_input(pChannel->pKCP(), (const char*)pPacket->data(), toLongSize(packetLength));
+		if (inputResult < 0)
 		{
+			const uint8* data = reinterpret_cast<const uint8*>(pPacket->data());
+			const uint32 packetConversation = packetLength >= sizeof(uint32)
+				? static_cast<uint32>(data[0]) |
+				  (static_cast<uint32>(data[1]) << 8) |
+				  (static_cast<uint32>(data[2]) << 16) |
+				  (static_cast<uint32>(data[3]) << 24)
+				: 0;
+			const uint64 errorCount = pChannel->networkInterface().recordKcpInputError(inputResult, packetLength);
+			// 指数退避保留首个和长期异常证据，同时避免畸形报文风暴通过 Logger 放大 CPU 与 IO 压力。
+			// Exponential backoff preserves first and persistent-failure evidence without amplifying malformed traffic through Logger CPU and IO.
+			if ((errorCount & (errorCount - 1)) == 0)
+			{
+				WARNING_MSG(fmt::format(
+					"KCPPacketReceiver::processPacket: invalid input, result={}, packetLength={}, expectedConv={}, packetConv={}, addr={}, sessionEpoch={}, total={}\n",
+					inputResult, packetLength, static_cast<uint32>(pChannel->pKCP()->conv), packetConversation,
+					pChannel->c_str(), pChannel->sessionEpoch(), errorCount));
+			}
 			RECLAIM_PACKET(pPacket->isTCPPacket(), pPacket);
 			return REASON_CHANNEL_LOST;
 		}

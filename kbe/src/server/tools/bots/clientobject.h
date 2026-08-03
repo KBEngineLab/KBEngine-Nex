@@ -81,9 +81,13 @@ public:
 	ClientObject::C_ERROR lasterror() { return error_; }
 
 	bool isDestroyed() { return state_ == C_STATE_DESTROYED; }
+	C_STATE state() const { return state_; }
 	bool isKcpHandshakePending() const { return state_ == C_STATE_LOGIN_BASEAPP_KCP_HANDSHAKE; }
 	bool isKcpTransport() const;
 	bool isTcpTransport() const;
+	// 握手接收器和已激活的 KCP 接收器必须共享同一套严格 ACK 校验，避免重复 ACK 被误判为 KCP 数据。
+	// The handshake and active KCP receivers must share strict ACK validation so duplicate ACKs cannot be misclassified as KCP data.
+	static bool parseKcpHelloAck(const char* data, size_t length, uint32& channelID);
 	void destroy() { state_ = C_STATE_DESTROYED; }
 	void onNetworkError(const std::string& err);
 
@@ -127,6 +131,7 @@ protected:
 	bool completeKcpHandshake(uint32 channelID);
 	bool connectBaseappTcp();
 	bool sendKcpHello();
+	bool retryKcpTransportSetup(const char* operation, int errorCode);
 	void sendBaseappActiveTick(bool force);
 	void fallbackToBaseappTcp(const char* reason);
 	void deregisterReceiverEndPoint(Network::PacketReceiver* pPacketReceiver);
@@ -144,6 +149,7 @@ protected:
 	// 记录实际 hello 发送尝试，便于区分首包成功、重试恢复和超时回退。
 	// Track actual hello attempts so logs distinguish first-send success, retry recovery, and timeout fallback.
 	uint32 kcpHelloAttempts_;
+	uint32 kcpTransportSetupAttempts_;
 };
 
 

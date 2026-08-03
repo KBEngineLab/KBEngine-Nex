@@ -189,8 +189,20 @@ int KCPPacketSender::kcp_output(const char *buf, int len, ikcpcb *kcp, Channel* 
 	EventPoller* pPoller = pChannel->networkInterface().dispatcher().pPoller();
 	if (pPoller != NULL && pPoller->supportsCompletion())
 	{
-		// ikcp_output 在同一 tick 可调用多次；poller 保序排队且每次只挂一个 sendto completion。
-		// ikcp_output may run repeatedly in one tick; the poller preserves order and posts only one sendto completion at a time.
+		// UDP socket 已设为非阻塞；无 pending completion 时直接复制一个 datagram 进内核。
+		// 一旦存在 overlapped 发送，后续报文必须沿用同一队列，避免同步 sendto 越过未完成报文而扩大乱序窗口。
+		// UDP sockets are nonblocking; a normal sendto only copies one datagram into the kernel and never waits for wire transmission.
+		// Once an overlapped send is pending, later datagrams stay on that queue so synchronous sendto cannot widen reordering by bypassing it.
+		if (!pPoller->hasPendingSend(*pEndpoint))
+		{
+			const int directResult = pEndpoint->sendto(const_cast<char*>(buf), len);
+			if (directResult == len)
+			{
+				pChannel->onPacketSent(len, true);
+				return 0;
+			}
+		}
+
 		if (pPoller->queueUdpSend(static_cast<KBESOCKET>(*pEndpoint), buf, len, pEndpoint->addr()))
 		{
 			pChannel->onPacketSent(len, true);

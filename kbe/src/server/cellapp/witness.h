@@ -224,7 +224,7 @@ private:
 	/**
 		当update执行时view列表有改变的时候需要更新entityRef的aliasID
 	*/
-	void updateEntitiesAliasID();
+	void updateEntitiesAliasID(int removedAliasID = -1);
 	void requireFullScan();
 	void clearVolatileDirtyQueue();
 	void synchronizeViewEntityMetrics();

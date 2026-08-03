@@ -37,6 +37,7 @@ def build_summary(
     thresholds: dict[str, Any] | None = None,
     readiness: dict[str, Any] | None = None,
     configured_bots: int = 0,
+    workload_processes: int = 1,
 ) -> dict[str, Any]:
     latency: dict[str, LatencyHistogram] = defaultdict(LatencyHistogram)
     samples: dict[str, LatencyHistogram] = defaultdict(LatencyHistogram)
@@ -99,6 +100,7 @@ def build_summary(
         thresholds or {},
         readiness or {},
         configured_bots,
+        workload_processes,
     )
     return summary
 
@@ -108,6 +110,7 @@ def evaluate_quality(
     thresholds: dict[str, Any],
     readiness: dict[str, Any],
     configured_bots: int,
+    workload_processes: int = 1,
 ) -> dict[str, Any]:
     """Classify observed results without hiding missing business traffic.
     按观测结果分类；没有请求事件时明确保持 UNKNOWN，而不是伪造成功率。
@@ -167,26 +170,40 @@ def evaluate_quality(
         if value > 0:
             blockers.append(f"{metric}={value}")
     for metric, expected in readiness.items():
-        expected_value = configured_bots if expected == "$bots" else expected
         matches = [
-            values
+            (name, values)
             for name, values in summary.get("samples", {}).items()
-            if name.endswith(f".{metric}")
+            if name.endswith(metric)
         ]
         if not matches:
             blockers.append(f"readiness metric was not sampled: {metric}")
-        elif isinstance(expected_value, dict) and set(expected_value) == {"min"}:
-            minimum_expected = expected_value["min"]
-            if not isinstance(minimum_expected, (int, float)):
-                blockers.append(f"invalid readiness minimum: {metric} expected={minimum_expected!r}")
-            elif any(values["min"] < minimum_expected for values in matches):
-                minimum = min(values["min"] for values in matches)
+            continue
+
+        for name, values in matches:
+            # readiness.workload.root/... 是控制器写入的多进程总和；带 bots#CID 的样本才是进程局部值。
+            # readiness.workload.root/... is the controller aggregate; samples containing bots#CID remain process-local.
+            # 只有 readiness 控制器显式写入的 root 样本是进程总和；测量阶段同名
+            # Watcher 样本会合并为分布，但每个观测仍来自单个 Bots 进程。
+            # Only the readiness controller's explicit root sample is an aggregate;
+            # measurement Watcher observations remain process-local after histogram merging.
+            is_process_local = not name.startswith("readiness.workload.root/")
+            expected_value = (
+                configured_bots // workload_processes
+                if expected == "$bots" and is_process_local and workload_processes > 1
+                else configured_bots if expected == "$bots" else expected
+            )
+            if isinstance(expected_value, dict) and set(expected_value) == {"min"}:
+                minimum_expected = expected_value["min"]
+                if not isinstance(minimum_expected, (int, float)):
+                    blockers.append(f"invalid readiness minimum: {metric} expected={minimum_expected!r}")
+                elif values["min"] < minimum_expected:
+                    blockers.append(
+                        f"readiness metric dropped: {name} min={values['min']}, expected>={minimum_expected}"
+                    )
+            elif values["min"] != expected_value:
                 blockers.append(
-                    f"readiness metric dropped: {metric} min={minimum}, expected>={minimum_expected}"
+                    f"readiness metric dropped: {name} min={values['min']}, expected={expected_value}"
                 )
-        elif any(values["min"] != expected_value for values in matches):
-            minimum = min(values["min"] for values in matches)
-            blockers.append(f"readiness metric dropped: {metric} min={minimum}, expected={expected_value}")
 
     p99_limit = float(thresholds.get("request_latency_p99_max_ms", 0.0))
     if p99_limit > 0:

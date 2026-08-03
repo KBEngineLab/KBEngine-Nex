@@ -40,6 +40,7 @@ public:
 
 	Channel* getChannel() override;
 	Channel* findChannel(const Address& addr) override;
+	Reason processPacket(Channel* pChannel, Packet* pPacket) override;
 
 	// ClientObject 拥有接收器及其 Channel，该反向引用只在 Bots 主线程内使用。
 	// ClientObject owns the receiver and its Channel; this back-reference is used only on the Bots main thread.

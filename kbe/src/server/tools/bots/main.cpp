@@ -84,7 +84,10 @@ int KBENGINE_MAIN(int argc, char* argv[])
 		if (std::string(argv[index]) == "--dev")
 		{
 			g_botsDevMode = true;
-			break;
+		}
+		else if (std::string(argv[index]) == "--reuse-existing-accounts")
+		{
+			g_botsReuseAccounts = true;
 		}
 	}
 

@@ -62,9 +62,11 @@ ClientObjectBase::ClientObjectBase(Network::NetworkInterface& ninterface, PyType
 ScriptObject(pyType != NULL ? pyType : getScriptType(), false),
 appID_(0),
 pServerChannel_(NULL),
-pEntities_(new Entities<client::Entity>()),
-pEntityIDAliasIDList_(),
-pyCallbackMgr_(),
+	pEntities_(new Entities<client::Entity>()),
+	pEntityIDAliasIDList_(),
+	playerEntityChanged_(false),
+	staleViewMessageDrops_(0),
+	pyCallbackMgr_(),
 entityID_(0),
 spaceID_(0),
 dbid_(0),
@@ -138,6 +140,8 @@ void ClientObjectBase::reset(void)
 {
 	pEntities_->finalise();
 	pEntityIDAliasIDList_.clear();
+	playerEntityChanged_ = false;
+	staleViewMessageDrops_ = 0;
 	pyCallbackMgr_.finalise();
 
 	entityID_ = 0;
@@ -441,7 +445,12 @@ ENTITY_ID ClientObjectBase::getViewEntityIDFromStream(MemoryStream& s)
 		// 则可以忽略这个错误, 因为cellapp可能一直在向baseapp发送同步消息， 当客户端重连上时未等
 		// 服务端初始化步骤开始则收到同步信息, 此时这里就会出错。
 		if (pEntityIDAliasIDList_.size() <= aliasID)
+		{
+			// 跨组件转发可能让旧 View 更新晚于结构消息到达；计数并丢弃，后续 Enter 会恢复别名表。
+			// Cross-component forwarding may deliver an old view update after structural messages; count and drop until Enter repairs the table.
+			++staleViewMessageDrops_;
 			return 0;
+		}
 
 		id = pEntityIDAliasIDList_[aliasID];
 	}
@@ -782,6 +791,10 @@ void ClientObjectBase::onReloginBaseappSuccessfully(Network::Channel * pChannel,
 //-------------------------------------------------------------------------------------	
 void ClientObjectBase::onCreatedProxies(Network::Channel * pChannel, uint64 rndUUID, ENTITY_ID eid, std::string& entityType)
 {
+	// giveClientTo 会在同一客户端对象上切换玩家 EID；首次创建和同 EID 重连不应清理提前到达的当前视野。
+	// giveClientTo changes the player EID on one client object; initial creation and same-EID reconnects preserve early current-view data.
+	playerEntityChanged_ = entityID_ > 0 && entityID_ != eid;
+
 	if(entityID_ == 0)
 	{
 		EventData_LoginBaseappSuccess eventdata;
@@ -926,13 +939,17 @@ void ClientObjectBase::onEntityEnterWorld(Network::Channel * pChannel, MemoryStr
 
 			entity->cellEntityCall(entitycall);
 
-			// 安全起见， 这里清空一下
-			// 如果服务端上使用giveClientTo切换控制权
-			// 之前的实体已经进入世界， 切换后的实体也进入世界， 这里可能会残留之前那个实体进入世界的信息
-			pEntityIDAliasIDList_.clear();
-			std::vector<ENTITY_ID> excludes;
-			excludes.push_back(entityID_);
-			pEntities_->clear(true, excludes);
+			if (playerEntityChanged_)
+			{
+				// 只有 giveClientTo 的玩家 EID 真正改变时才清旧视野；首次登录时 CellApp 的 View Enter 可能先于玩家 Enter 到达。
+				// Clear stale views only after a real giveClientTo EID change; initial CellApp view enters may precede the player's EnterWorld.
+				pEntityIDAliasIDList_.clear();
+				std::vector<ENTITY_ID> excludes;
+				excludes.push_back(entityID_);
+				pEntities_->clear(true, excludes);
+			}
+
+			playerEntityChanged_ = false;
 		}
 	}
 
@@ -967,7 +984,14 @@ void ClientObjectBase::onEntityEnterWorld(Network::Channel * pChannel, MemoryStr
 //-------------------------------------------------------------------------------------	
 void ClientObjectBase::onEntityLeaveWorldOptimized(Network::Channel * pChannel, MemoryStream& s)
 {
-	onEntityLeaveWorld(pChannel, getViewEntityIDFromStream(s));
+	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
+
+	onEntityLeaveWorld(pChannel, eid);
 }
 
 //-------------------------------------------------------------------------------------	
@@ -1106,6 +1130,11 @@ void ClientObjectBase::onEntityDestroyed(Network::Channel * pChannel, ENTITY_ID 
 void ClientObjectBase::onRemoteMethodCallOptimized(Network::Channel * pChannel, KBEngine::MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 	onRemoteMethodCall_(eid, s);
 }
 
@@ -1143,6 +1172,11 @@ void ClientObjectBase::onUpdatePropertys(Network::Channel * pChannel, MemoryStre
 void ClientObjectBase::onUpdatePropertysOptimized(Network::Channel * pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 	onUpdatePropertys_(eid, s);
 }
 
@@ -1162,6 +1196,7 @@ void ClientObjectBase::onUpdatePropertys_(ENTITY_ID eid, MemoryStream& s)
 		}
 		else
 		{
+			s.done();
 			ERROR_MSG(fmt::format("ClientObjectBase::onUpdatePropertys: not found entity({}).\n", eid));
 		}
 
@@ -1397,6 +1432,11 @@ void ClientObjectBase::onSetEntityPosAndDir(Network::Channel* pChannel, MemorySt
 void ClientObjectBase::onUpdateData(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	client::Entity* entity = pEntities_->find(eid);
 	if(entity == NULL)
@@ -1410,6 +1450,11 @@ void ClientObjectBase::onUpdateData(Network::Channel* pChannel, MemoryStream& s)
 void ClientObjectBase::onUpdateData_ypr_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float y, p, r;
 
@@ -1431,6 +1476,11 @@ void ClientObjectBase::onUpdateData_ypr_optimized(Network::Channel* pChannel, Me
 void ClientObjectBase::onUpdateData_yp_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float y, p;
 
@@ -1449,6 +1499,11 @@ void ClientObjectBase::onUpdateData_yp_optimized(Network::Channel* pChannel, Mem
 void ClientObjectBase::onUpdateData_yr_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float y, r;
 
@@ -1467,6 +1522,11 @@ void ClientObjectBase::onUpdateData_yr_optimized(Network::Channel* pChannel, Mem
 void ClientObjectBase::onUpdateData_pr_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float p, r;
 
@@ -1485,6 +1545,11 @@ void ClientObjectBase::onUpdateData_pr_optimized(Network::Channel* pChannel, Mem
 void ClientObjectBase::onUpdateData_y_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float y;
 
@@ -1500,6 +1565,11 @@ void ClientObjectBase::onUpdateData_y_optimized(Network::Channel* pChannel, Memo
 void ClientObjectBase::onUpdateData_p_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float p;
 
@@ -1515,6 +1585,11 @@ void ClientObjectBase::onUpdateData_p_optimized(Network::Channel* pChannel, Memo
 void ClientObjectBase::onUpdateData_r_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float r;
 
@@ -1530,6 +1605,11 @@ void ClientObjectBase::onUpdateData_r_optimized(Network::Channel* pChannel, Memo
 void ClientObjectBase::onUpdateData_xz_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x,z;
 
@@ -1543,6 +1623,11 @@ void ClientObjectBase::onUpdateData_xz_optimized(Network::Channel* pChannel, Mem
 void ClientObjectBase::onUpdateData_xz_ypr_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, y, p, r;
 	
@@ -1566,6 +1651,11 @@ void ClientObjectBase::onUpdateData_xz_ypr_optimized(Network::Channel* pChannel,
 void ClientObjectBase::onUpdateData_xz_yp_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x,z, y, p;
 
@@ -1586,6 +1676,11 @@ void ClientObjectBase::onUpdateData_xz_yp_optimized(Network::Channel* pChannel, 
 void ClientObjectBase::onUpdateData_xz_yr_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, y,  r;
 	
@@ -1606,6 +1701,11 @@ void ClientObjectBase::onUpdateData_xz_yr_optimized(Network::Channel* pChannel, 
 void ClientObjectBase::onUpdateData_xz_pr_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, p, r;
 	
@@ -1626,6 +1726,11 @@ void ClientObjectBase::onUpdateData_xz_pr_optimized(Network::Channel* pChannel, 
 void ClientObjectBase::onUpdateData_xz_y_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, y;
 	
@@ -1643,6 +1748,11 @@ void ClientObjectBase::onUpdateData_xz_y_optimized(Network::Channel* pChannel, M
 void ClientObjectBase::onUpdateData_xz_p_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, p;
 	
@@ -1660,6 +1770,11 @@ void ClientObjectBase::onUpdateData_xz_p_optimized(Network::Channel* pChannel, M
 void ClientObjectBase::onUpdateData_xz_r_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, r;
 	
@@ -1677,6 +1792,11 @@ void ClientObjectBase::onUpdateData_xz_r_optimized(Network::Channel* pChannel, M
 void ClientObjectBase::onUpdateData_xyz_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, y;
 	
@@ -1690,6 +1810,11 @@ void ClientObjectBase::onUpdateData_xyz_optimized(Network::Channel* pChannel, Me
 void ClientObjectBase::onUpdateData_xyz_ypr_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, y;
 	
@@ -1716,6 +1841,11 @@ void ClientObjectBase::onUpdateData_xyz_ypr_optimized(Network::Channel* pChannel
 void ClientObjectBase::onUpdateData_xyz_yp_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, y;
 	
@@ -1739,6 +1869,11 @@ void ClientObjectBase::onUpdateData_xyz_yp_optimized(Network::Channel* pChannel,
 void ClientObjectBase::onUpdateData_xyz_yr_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, y;
 	
@@ -1762,6 +1897,11 @@ void ClientObjectBase::onUpdateData_xyz_yr_optimized(Network::Channel* pChannel,
 void ClientObjectBase::onUpdateData_xyz_pr_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, y;
 	
@@ -1785,6 +1925,11 @@ void ClientObjectBase::onUpdateData_xyz_pr_optimized(Network::Channel* pChannel,
 void ClientObjectBase::onUpdateData_xyz_y_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, y;
 	
@@ -1805,6 +1950,11 @@ void ClientObjectBase::onUpdateData_xyz_y_optimized(Network::Channel* pChannel, 
 void ClientObjectBase::onUpdateData_xyz_p_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, y;
 	
@@ -1825,6 +1975,11 @@ void ClientObjectBase::onUpdateData_xyz_p_optimized(Network::Channel* pChannel, 
 void ClientObjectBase::onUpdateData_xyz_r_optimized(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, y;
 	
@@ -1845,6 +2000,11 @@ void ClientObjectBase::onUpdateData_xyz_r_optimized(Network::Channel* pChannel, 
 void ClientObjectBase::onUpdateData_ypr(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float y, p, r;
 	s >> y;
@@ -1858,6 +2018,11 @@ void ClientObjectBase::onUpdateData_ypr(Network::Channel* pChannel, MemoryStream
 void ClientObjectBase::onUpdateData_yp(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float y, p;
 	s >> y;
@@ -1870,6 +2035,11 @@ void ClientObjectBase::onUpdateData_yp(Network::Channel* pChannel, MemoryStream&
 void ClientObjectBase::onUpdateData_yr(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float y, r;
 	s >> y;
@@ -1882,6 +2052,11 @@ void ClientObjectBase::onUpdateData_yr(Network::Channel* pChannel, MemoryStream&
 void ClientObjectBase::onUpdateData_pr(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float p, r;
 	s >> p;
@@ -1894,6 +2069,11 @@ void ClientObjectBase::onUpdateData_pr(Network::Channel* pChannel, MemoryStream&
 void ClientObjectBase::onUpdateData_y(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float y;
 	s >> y;
@@ -1905,6 +2085,11 @@ void ClientObjectBase::onUpdateData_y(Network::Channel* pChannel, MemoryStream& 
 void ClientObjectBase::onUpdateData_p(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float p;
 	s >> p;
@@ -1916,6 +2101,11 @@ void ClientObjectBase::onUpdateData_p(Network::Channel* pChannel, MemoryStream& 
 void ClientObjectBase::onUpdateData_r(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float r;
 	s >> r;
@@ -1927,6 +2117,11 @@ void ClientObjectBase::onUpdateData_r(Network::Channel* pChannel, MemoryStream& 
 void ClientObjectBase::onUpdateData_xz(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z;
 	s >> x;
@@ -1939,6 +2134,11 @@ void ClientObjectBase::onUpdateData_xz(Network::Channel* pChannel, MemoryStream&
 void ClientObjectBase::onUpdateData_xz_ypr(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, y, p, r;
 	s >> x;
@@ -1954,6 +2154,11 @@ void ClientObjectBase::onUpdateData_xz_ypr(Network::Channel* pChannel, MemoryStr
 void ClientObjectBase::onUpdateData_xz_yp(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, y, p;
 	s >> x;
@@ -1968,6 +2173,11 @@ void ClientObjectBase::onUpdateData_xz_yp(Network::Channel* pChannel, MemoryStre
 void ClientObjectBase::onUpdateData_xz_yr(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, y, r;
 	s >> x;
@@ -1982,6 +2192,11 @@ void ClientObjectBase::onUpdateData_xz_yr(Network::Channel* pChannel, MemoryStre
 void ClientObjectBase::onUpdateData_xz_pr(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, p, r;
 	s >> x;
@@ -1996,6 +2211,11 @@ void ClientObjectBase::onUpdateData_xz_pr(Network::Channel* pChannel, MemoryStre
 void ClientObjectBase::onUpdateData_xz_y(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, y;
 	s >> x;
@@ -2009,6 +2229,11 @@ void ClientObjectBase::onUpdateData_xz_y(Network::Channel* pChannel, MemoryStrea
 void ClientObjectBase::onUpdateData_xz_p(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, p;
 	s >> x;
@@ -2022,6 +2247,11 @@ void ClientObjectBase::onUpdateData_xz_p(Network::Channel* pChannel, MemoryStrea
 void ClientObjectBase::onUpdateData_xz_r(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, z, r;
 	s >> x;
@@ -2035,6 +2265,11 @@ void ClientObjectBase::onUpdateData_xz_r(Network::Channel* pChannel, MemoryStrea
 void ClientObjectBase::onUpdateData_xyz(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, y, z;
 	s >> x;
@@ -2048,6 +2283,11 @@ void ClientObjectBase::onUpdateData_xyz(Network::Channel* pChannel, MemoryStream
 void ClientObjectBase::onUpdateData_xyz_ypr(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, y, z;
 	s >> x;
@@ -2066,6 +2306,11 @@ void ClientObjectBase::onUpdateData_xyz_ypr(Network::Channel* pChannel, MemorySt
 void ClientObjectBase::onUpdateData_xyz_yp(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, y, z;
 	s >> x;
@@ -2083,6 +2328,11 @@ void ClientObjectBase::onUpdateData_xyz_yp(Network::Channel* pChannel, MemoryStr
 void ClientObjectBase::onUpdateData_xyz_yr(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, y, z;
 	s >> x;
@@ -2100,6 +2350,11 @@ void ClientObjectBase::onUpdateData_xyz_yr(Network::Channel* pChannel, MemoryStr
 void ClientObjectBase::onUpdateData_xyz_pr(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, y, z;
 	s >> x;
@@ -2117,6 +2372,11 @@ void ClientObjectBase::onUpdateData_xyz_pr(Network::Channel* pChannel, MemoryStr
 void ClientObjectBase::onUpdateData_xyz_y(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, y, z;
 	s >> x;
@@ -2133,6 +2393,11 @@ void ClientObjectBase::onUpdateData_xyz_y(Network::Channel* pChannel, MemoryStre
 void ClientObjectBase::onUpdateData_xyz_p(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, y, z;
 	s >> x;
@@ -2149,6 +2414,11 @@ void ClientObjectBase::onUpdateData_xyz_p(Network::Channel* pChannel, MemoryStre
 void ClientObjectBase::onUpdateData_xyz_r(Network::Channel* pChannel, MemoryStream& s)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(s);
+	if (eid == 0)
+	{
+		s.done();
+		return;
+	}
 
 	float x, y, z;
 	s >> x;

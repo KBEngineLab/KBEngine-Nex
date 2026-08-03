@@ -55,6 +55,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 bool g_botsDevMode = false;
+bool g_botsReuseAccounts = false;
 
 //-------------------------------------------------------------------------------------
 Bots::Bots(Network::EventDispatcher& dispatcher, 
@@ -72,6 +73,7 @@ pEventPoller_(Network::EventPoller::create()),
 pTelnetServer_(NULL),
 pActiveReportHandler_(NULL),
 totalKcpHandshakeSuccesses_(0),
+totalKcpHandshakeInvalidPackets_(0),
 totalTcpConnections_(0),
 totalTcpFallbacks_(0),
 totalNetworkErrors_(0),
@@ -148,12 +150,14 @@ bool Bots::initialize()
 bool Bots::initializeWatcher()
 {
 	WATCH_OBJECT("bots/devMode", g_botsDevMode);
+	WATCH_OBJECT("bots/reuseAccounts", g_botsReuseAccounts);
 	WATCH_OBJECT("bots/clients/total", this, &Bots::numClients);
 	WATCH_OBJECT("bots/clients/kcp", this, &Bots::numKcpClients);
 	WATCH_OBJECT("bots/clients/tcp", this, &Bots::numTcpClients);
 	WATCH_OBJECT("bots/clients/kcpHandshaking", this, &Bots::numKcpHandshakes);
 	WATCH_OBJECT("bots/clients/destroyed", this, &Bots::numDestroyedClients);
 	WATCH_OBJECT("bots/totals/kcpHandshakeSuccesses", this, &Bots::totalKcpHandshakeSuccesses);
+	WATCH_OBJECT("bots/totals/kcpHandshakeInvalidPackets", this, &Bots::totalKcpHandshakeInvalidPackets);
 	WATCH_OBJECT("bots/totals/tcpConnections", this, &Bots::totalTcpConnections);
 	WATCH_OBJECT("bots/totals/tcpFallbacks", this, &Bots::totalTcpFallbacks);
 	WATCH_OBJECT("bots/totals/networkErrors", this, &Bots::totalNetworkErrors);
@@ -183,7 +187,18 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/clientsKcp", this, &Bots::numKcpClients);
 	WATCH_OBJECT("bots/performance/clientsTcp", this, &Bots::numTcpClients);
 	WATCH_OBJECT("bots/performance/clientsDestroyed", this, &Bots::numDestroyedClients);
+	// 状态分布直接定位登录流水线积压阶段；Watcher 每五秒查询一次，单次线性扫描不进入游戏 Tick 热路径。
+	// State distribution identifies login-pipeline backlog directly; the five-second Watcher query keeps this linear scan off the game-tick hot path.
+	WATCH_OBJECT("bots/performance/clientsStateInit", this, &Bots::numClientsInit);
+	WATCH_OBJECT("bots/performance/clientsStateCreate", this, &Bots::numClientsCreate);
+	WATCH_OBJECT("bots/performance/clientsStateLogin", this, &Bots::numClientsLogin);
+	WATCH_OBJECT("bots/performance/clientsStateBaseappCreate", this, &Bots::numClientsBaseappCreate);
+	WATCH_OBJECT("bots/performance/clientsStateKcpHandshaking", this, &Bots::numClientsKcpHandshaking);
+	WATCH_OBJECT("bots/performance/clientsStateBaseappHello", this, &Bots::numClientsBaseappHello);
+	WATCH_OBJECT("bots/performance/clientsStateBaseappLogin", this, &Bots::numClientsBaseappLogin);
+	WATCH_OBJECT("bots/performance/clientsStatePlay", this, &Bots::numClientsPlay);
 	WATCH_OBJECT("bots/performance/kcpHandshakeSuccesses", this, &Bots::totalKcpHandshakeSuccesses);
+	WATCH_OBJECT("bots/performance/kcpHandshakeInvalidPackets", this, &Bots::totalKcpHandshakeInvalidPackets);
 	WATCH_OBJECT("bots/performance/tcpFallbacks", this, &Bots::totalTcpFallbacks);
 	WATCH_OBJECT("bots/performance/networkErrors", this, &Bots::totalNetworkErrors);
 	WATCH_OBJECT("bots/performance/removedClients", this, &Bots::totalRemovedClients);
@@ -229,9 +244,16 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/kcpSendWindowBlockedChannels", &networkInterface(), &Network::NetworkInterface::kcpSendWindowBlockedChannelCount);
 	WATCH_OBJECT("bots/performance/kcpAdmissionLimitedChannels", &networkInterface(), &Network::NetworkInterface::kcpAdmissionLimitedChannelCount);
 	WATCH_OBJECT("bots/performance/kcpRemoteWindowZeroChannels", &networkInterface(), &Network::NetworkInterface::kcpRemoteWindowZeroChannelCount);
+	WATCH_OBJECT("bots/performance/kcpInputErrors", &networkInterface(), &Network::NetworkInterface::kcpInputErrorCount);
+	WATCH_OBJECT("bots/performance/kcpInputTooShort", &networkInterface(), &Network::NetworkInterface::kcpInputTooShortCount);
+	WATCH_OBJECT("bots/performance/kcpInputConversationMismatches", &networkInterface(), &Network::NetworkInterface::kcpInputConversationMismatchCount);
+	WATCH_OBJECT("bots/performance/kcpInputTruncatedSegments", &networkInterface(), &Network::NetworkInterface::kcpInputTruncatedSegmentCount);
+	WATCH_OBJECT("bots/performance/kcpInputInvalidCommands", &networkInterface(), &Network::NetworkInterface::kcpInputInvalidCommandCount);
+	WATCH_OBJECT("bots/performance/kcpInputOtherErrors", &networkInterface(), &Network::NetworkInterface::kcpInputOtherErrorCount);
 	WATCH_OBJECT("bots/performance/kcpFixedAllocatedBytes", this, &Bots::kcpFixedAllocatedBytes);
 	WATCH_OBJECT("bots/performance/kcpDynamicAllocatedBytes", this, &Bots::kcpDynamicAllocatedBytes);
 	WATCH_OBJECT("bots/performance/clientEntities", this, &Bots::numClientEntities);
+	WATCH_OBJECT("bots/performance/staleViewMessageDrops", this, &Bots::staleViewMessageDrops);
 	WATCH_OBJECT("bots/performance/pythonLatencyCount", this, &Bots::pythonPerformanceLatencyCount);
 	WATCH_OBJECT("bots/performance/pythonLatencyP99Micros", this, &Bots::pythonPerformanceLatencyP99Micros);
 	WATCH_OBJECT("bots/performance/pythonLatencyWindowCount", this, &Bots::pythonPerformanceLatencyWindowCount);
@@ -567,6 +589,25 @@ uint32 Bots::numKcpHandshakes() const
 }
 
 //-------------------------------------------------------------------------------------
+uint32 Bots::numClientsInState(int state) const
+{
+	uint32 count = 0;
+	for (CLIENTS::const_iterator iter = clients_.begin(); iter != clients_.end(); ++iter)
+		count += iter->second != NULL && static_cast<int>(iter->second->state()) == state ? 1 : 0;
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint32 Bots::numClientsInit() const { return numClientsInState(ClientObject::C_STATE_INIT); }
+uint32 Bots::numClientsCreate() const { return numClientsInState(ClientObject::C_STATE_CREATE); }
+uint32 Bots::numClientsLogin() const { return numClientsInState(ClientObject::C_STATE_LOGIN); }
+uint32 Bots::numClientsBaseappCreate() const { return numClientsInState(ClientObject::C_STATE_LOGIN_BASEAPP_CREATE); }
+uint32 Bots::numClientsKcpHandshaking() const { return numClientsInState(ClientObject::C_STATE_LOGIN_BASEAPP_KCP_HANDSHAKE); }
+uint32 Bots::numClientsBaseappHello() const { return numClientsInState(ClientObject::C_STATE_LOGIN_BASEAPP_HELLO); }
+uint32 Bots::numClientsBaseappLogin() const { return numClientsInState(ClientObject::C_STATE_LOGIN_BASEAPP); }
+uint32 Bots::numClientsPlay() const { return numClientsInState(ClientObject::C_STATE_PLAY); }
+
+//-------------------------------------------------------------------------------------
 uint32 Bots::numDestroyedClients() const
 {
 	uint32 count = 0;
@@ -584,6 +625,19 @@ uint64 Bots::numClientEntities() const
 		const ClientObject* pClient = iter->second;
 		if (pClient != NULL && pClient->pEntities() != NULL)
 			count += static_cast<uint64>(pClient->pEntities()->size());
+	}
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Bots::staleViewMessageDrops() const
+{
+	uint64 count = 0;
+	for (CLIENTS::const_iterator iter = clients_.begin(); iter != clients_.end(); ++iter)
+	{
+		const ClientObject* pClient = iter->second;
+		if (pClient != NULL)
+			count += pClient->staleViewMessageDrops();
 	}
 	return count;
 }

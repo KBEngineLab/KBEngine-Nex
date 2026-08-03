@@ -206,6 +206,7 @@ void Entity::onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s)
 		DataType* pDataType = pComponentPropertyDescription->getDataType();
 		if (!pDataType || pDataType->type() != DATA_TYPE_ENTITY_COMPONENT)
 		{
+			s.done();
 			ERROR_MSG(fmt::format("{}::onRemoteMethodCall: property[{}] is not an entity component. entityID={}.\n",
 				this->scriptName(), pComponentPropertyDescription->getName(), id_));
 			return;
@@ -215,6 +216,7 @@ void Entity::onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s)
 		pyCallObject = PyObject_GetAttrString(this, pComponentPropertyDescription->getName());
 		if (!pyCallObject)
 		{
+			s.done();
 			SCRIPT_ERROR_CHECK();
 			return;
 		}
@@ -235,6 +237,7 @@ void Entity::onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s)
 
 	if(pMethodDescription == NULL)
 	{
+		s.done();
 		ERROR_MSG(fmt::format("{2}::onRemoteMethodCall: can't found method. utype={0}, methodName=unknown, callerID:{1}.\n", 
 			utype, id_, this->scriptName()));
 
@@ -407,6 +410,7 @@ void Entity::onUpdatePropertys(MemoryStream& s)
 
 			if(!pPropertyDescription || pPropertyDescription->getDataType()->type() != DATA_TYPE_ENTITY_COMPONENT)
 			{
+				s.done();
 				ERROR_MSG(fmt::format("{}::onUpdatePropertys: component parent not found, uid={}, aliasID={}!\n",
 					pScriptModule_->getName(), uid, aliasID));
 				return;
@@ -415,6 +419,7 @@ void Entity::onUpdatePropertys(MemoryStream& s)
 			setToObj = PyObject_GetAttrString(this, pPropertyDescription->getName());
 			if(!setToObj || !PyObject_TypeCheck(setToObj, EntityComponent::getScriptType()))
 			{
+				s.done();
 				Py_XDECREF(setToObj);
 				SCRIPT_ERROR_CHECK();
 				ERROR_MSG(fmt::format("{}::onUpdatePropertys: component {} is unavailable!\n",
@@ -427,6 +432,7 @@ void Entity::onUpdatePropertys(MemoryStream& s)
 
 		if(pPropertyDescription == NULL)
 		{
+			s.done();
 			ERROR_MSG(fmt::format("Entity::onUpdatePropertys: property not found, parent={}, child={}\n", uid, childUID));
 			if(setToObj != static_cast<PyObject*>(this))
 				Py_DECREF(setToObj);
@@ -436,6 +442,7 @@ void Entity::onUpdatePropertys(MemoryStream& s)
 		PyObject* pyobj = pPropertyDescription->createFromStream(&s);
 		if(!pyobj)
 		{
+			s.done();
 			if(setToObj != static_cast<PyObject*>(this))
 				Py_DECREF(setToObj);
 			SCRIPT_ERROR_CHECK();

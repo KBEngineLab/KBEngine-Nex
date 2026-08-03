@@ -451,11 +451,14 @@ void Witness::onEnterView(ViewTrigger* pViewTrigger, Entity* pEntity)
 					}
 
 					viewEntities_.push_back(pEntityRef);
-					updateEntitiesAliasID();
 				}
 			}
 
+			const int removedAliasID = pEntityRef->aliasID();
 			pEntityRef->flags(ENTITYREF_FLAG_ENTER_CLIENT_PENDING);
+			// 客户端已处理上面的 LeaveWorld 后会压紧别名表；待进入实体尚未重新加入客户端表。
+			// The client compacts its alias table after LeaveWorld; the pending entity is not visible again yet.
+			updateEntitiesAliasID(removedAliasID);
 			pEntityRef->pEntity(pEntity);
 			initializeEntityRefLifecycle(pEntityRef);
 			queueEntityRefVolatile(pEntityRef);
@@ -479,7 +482,9 @@ void Witness::onEnterView(ViewTrigger* pViewTrigger, Entity* pEntity)
 	viewEntities_map_[pEntityRef->id()] = pEntityRef;
 	synchronizeViewEntityMetrics();
 	KBE_ASSERT(viewEntities_map_.size() <= static_cast<size_t>(std::numeric_limits<int>::max()));
-	pEntityRef->aliasID(static_cast<int>(viewEntities_map_.size() - 1));
+	// pending-enter 实体尚未存在于客户端别名表，不能占用可见实体的连续编号。
+	// A pending-enter entity is absent from the client alias table and must not reserve a visible alias.
+	pEntityRef->aliasID(-1);
 	queueEntityRefVolatile(pEntityRef);
 	
 	pEntity->addWitnessed(pEntity_);
@@ -777,17 +782,22 @@ bool Witness::entityID2AliasID(ENTITY_ID id, uint8& aliasID)
 }
 
 //-------------------------------------------------------------------------------------
-void Witness::updateEntitiesAliasID()
+void Witness::updateEntitiesAliasID(int removedAliasID)
 {
-	int n = 0;
 	VIEW_ENTITIES::iterator iter = viewEntities_.begin();
 	for(; iter != viewEntities_.end(); ++iter)
 	{
 		EntityRef* pEntityRef = (*iter);
-		pEntityRef->aliasID(n++);
-		
-		if(n >= 255)
-			break;
+		if ((pEntityRef->flags() & ENTITYREF_FLAG_NORMAL) == 0)
+		{
+			pEntityRef->aliasID(-1);
+			continue;
+		}
+
+		// 客户端以 EnterWorld 处理顺序尾插，并在 LeaveWorld 时 vector::erase；空间容器顺序不能重建该表。
+		// The client appends in EnterWorld order and uses vector::erase on leave; spatial container order cannot rebuild it.
+		if (removedAliasID >= 0 && pEntityRef->aliasID() > removedAliasID)
+			pEntityRef->aliasID(pEntityRef->aliasID() - 1);
 	}
 }
 
@@ -893,6 +903,9 @@ bool Witness::processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pE
 		ENTITY_MESSAGE_FORWARD_CLIENT_END(pSendBundle, ClientInterface::onEntityEnterWorld, entityEnterWorld);
 
 		pEntityRef->flags(ENTITYREF_FLAG_NORMAL);
+		// EnterWorld 在客户端按尾插建立别名；这里必须使用发送前的客户端可见数量。
+		// EnterWorld appends to the client alias table, so use the visible count before incrementing it.
+		pEntityRef->aliasID(static_cast<int>(clientViewSize_));
 		KBE_ASSERT(clientViewSize_ != 65535);
 		++clientViewSize_;
 
@@ -938,6 +951,7 @@ bool Witness::processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pE
 //-------------------------------------------------------------------------------------
 void Witness::removeViewEntityRef(EntityRef* pEntityRef)
 {
+	const int removedAliasID = pEntityRef->aliasID();
 	viewEntities_map_.erase(pEntityRef->id());
 	for (VIEW_ENTITIES::iterator iter = viewEntities_.begin(); iter != viewEntities_.end(); ++iter)
 	{
@@ -950,7 +964,7 @@ void Witness::removeViewEntityRef(EntityRef* pEntityRef)
 
 	EntityRef::reclaimPoolObject(pEntityRef);
 	synchronizeViewEntityMetrics();
-	updateEntitiesAliasID();
+	updateEntitiesAliasID(removedAliasID);
 }
 
 //-------------------------------------------------------------------------------------

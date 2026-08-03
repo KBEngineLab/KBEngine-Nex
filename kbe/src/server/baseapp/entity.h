@@ -53,6 +53,10 @@ class Entity : public script::ScriptObject
 	BASE_SCRIPT_HREADER(Entity, ScriptObject)
 	ENTITY_HEADER(Entity)
 public:
+	static PyObject* __py_pyRegisterEvent(PyObject* self, PyObject* args);
+	static PyObject* __py_pyDeregisterEvent(PyObject* self, PyObject* args);
+	static PyObject* __py_pyFireEvent(PyObject* self, PyObject* args);
+
 	Entity(ENTITY_ID id, const ScriptDefModule* pScriptModule,
 		PyTypeObject* pyType = getScriptType(), bool isInitialised = true);
 	~Entity();
@@ -323,6 +327,9 @@ protected:
 	// 跳转前所产生的包会比cell2的enterSpace包慢到达)，因此发生这种情况时需要将cell2的包先缓存
 	// 等cell1的包到达后执行完毕再执行cell2的包
 	BaseMessagesForwardClientHandler*		pBufferedSendToClientMessages_;
+	bool									pendingMigrationEnd_;
+	COMPONENT_ID							pendingMigrationSourceCellAppID_;
+	COMPONENT_ID							pendingMigrationTargetCellAppID_;
 	
 	// 需要持久化的数据是否变脏（内存sha1），如果没有变脏不需要持久化
 	uint32									persistentDigest_[5];

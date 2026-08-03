@@ -69,6 +69,10 @@ class Entity : public script::ScriptObject
 	ENTITY_HEADER(Entity)
 
 public:
+	static PyObject* __py_pyRegisterEvent(PyObject* self, PyObject* args);
+	static PyObject* __py_pyDeregisterEvent(PyObject* self, PyObject* args);
+	static PyObject* __py_pyFireEvent(PyObject* self, PyObject* args);
+
 	Entity(ENTITY_ID id, const ScriptDefModule* pScriptModule,
 		PyTypeObject* pyType = getScriptType(), bool isInitialised = true);
 	~Entity();

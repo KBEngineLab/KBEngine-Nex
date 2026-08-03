@@ -273,6 +273,12 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/kcp/sendWindowBlockedChannels", &networkInterface_, &Network::NetworkInterface::kcpSendWindowBlockedChannelCount);
 	WATCH_OBJECT("network/kcp/admissionLimitedChannels", &networkInterface_, &Network::NetworkInterface::kcpAdmissionLimitedChannelCount);
 	WATCH_OBJECT("network/kcp/remoteWindowZeroChannels", &networkInterface_, &Network::NetworkInterface::kcpRemoteWindowZeroChannelCount);
+	WATCH_OBJECT("network/kcp/inputErrors", &networkInterface_, &Network::NetworkInterface::kcpInputErrorCount);
+	WATCH_OBJECT("network/kcp/inputTooShort", &networkInterface_, &Network::NetworkInterface::kcpInputTooShortCount);
+	WATCH_OBJECT("network/kcp/inputConversationMismatches", &networkInterface_, &Network::NetworkInterface::kcpInputConversationMismatchCount);
+	WATCH_OBJECT("network/kcp/inputTruncatedSegments", &networkInterface_, &Network::NetworkInterface::kcpInputTruncatedSegmentCount);
+	WATCH_OBJECT("network/kcp/inputInvalidCommands", &networkInterface_, &Network::NetworkInterface::kcpInputInvalidCommandCount);
+	WATCH_OBJECT("network/kcp/inputOtherErrors", &networkInterface_, &Network::NetworkInterface::kcpInputOtherErrorCount);
 
 	return Network::initializeWatcher() && Resmgr::getSingleton().initializeWatcher() &&
 		threadPool_.initializeWatcher() && WatchPool::initWatchPools();

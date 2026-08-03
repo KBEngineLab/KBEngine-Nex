@@ -28,10 +28,14 @@ def create_config_overlay(
     tick_count: int | None = None,
     external_receive_messages: int | None = None,
     external_receive_bytes: int | None = None,
+    external_timeout_seconds: float | None = None,
     reliable_udp_tick_interval_ms: int | None = None,
     reliable_udp_min_rto_ms: int | None = None,
     runtime_log_level: str | None = None,
     server_runtime_log_level: str | None = None,
+    bots_account_suffix_start: int | None = None,
+    database_connections: int | None = None,
+    baseapp_external_port_count: int | None = None,
 ) -> Path:
     """Write only the per-run XML override; source assets remain read-only.
     只写入本次运行的 XML 覆盖文件，源资产保持只读。
@@ -56,11 +60,57 @@ def create_config_overlay(
     set_xml_value(default_add, "totalCount", bots)
     set_xml_value(default_add, "tickTime", tick_time)
     set_xml_value(default_add, "tickCount", tick_count)
+    if bots_account_suffix_start is not None:
+        if bots_account_suffix_start < 1:
+            raise ValueError("Bots account suffix start must be positive")
+        # 账号名还包含唯一 Component ID，因此所有进程可共享同一起始后缀并在后续轮次稳定复用。
+        # Account names also contain the unique component ID, so processes may share one suffix start and reuse identities across runs.
+        account_infos = bots_node.find("account_infos")
+        if account_infos is None:
+            account_infos = ET.SubElement(bots_node, "account_infos")
+        set_xml_value(account_infos, "account_name_suffix_inc", bots_account_suffix_start)
 
-    if external_receive_messages is not None or external_receive_bytes is not None:
+    if database_connections is not None:
+        if not 1 <= database_connections <= 1024:
+            raise ValueError("database connections must be between 1 and 1024")
+        database_interface = root.find("./dbmgr/databaseInterfaces/default")
+        if database_interface is None:
+            raise ValueError("assets do not define the default database interface")
+        # 连接池容量属于压测拓扑的一部分；仅写隔离 overlay，避免污染业务资产配置。
+        # Pool capacity is part of the benchmark topology; only the isolated overlay is changed.
+        set_xml_value(database_interface, "numConnections", database_connections)
+
+    if baseapp_external_port_count is not None:
+        if not 1 <= baseapp_external_port_count <= 1000:
+            raise ValueError("BaseApp external port count must be between 1 and 1000")
+        baseapp = root.find("./baseapp")
+        if baseapp is None:
+            baseapp = ET.SubElement(root, "baseapp")
+        # 旧资产可能仍使用已废弃的 externalTcpPorts_*；写入当前引擎读取的键，
+        # 使 --baseapp-count 在隔离集群中有足够的 TCP 监听端口。
+        # Legacy assets may still use externalTcpPorts_*; write the keys consumed
+        # by the current engine so --baseapp-count has enough isolated TCP ports.
+        port_min = int(baseapp.findtext("externalPorts_min", "20015"))
+        if port_min < 1 or port_min + baseapp_external_port_count - 1 > 65535:
+            raise ValueError("BaseApp external TCP port range is invalid")
+        set_xml_value(baseapp, "externalPorts_min", port_min)
+        set_xml_value(baseapp, "externalPorts_max", port_min + baseapp_external_port_count - 1)
+
+    if (external_receive_messages is not None or external_receive_bytes is not None or
+            external_timeout_seconds is not None):
         channel_common = root.find("./channelCommon")
         if channel_common is None:
             channel_common = ET.SubElement(root, "channelCommon")
+
+        if external_timeout_seconds is not None:
+            if external_timeout_seconds <= 0:
+                raise ValueError("external channel timeout must be positive")
+            timeout = channel_common.find("timeout")
+            if timeout is None:
+                timeout = ET.SubElement(channel_common, "timeout")
+            set_xml_value(timeout, "external", external_timeout_seconds)
+
+    if external_receive_messages is not None or external_receive_bytes is not None:
         window_overflow = channel_common.find("windowOverflow")
         if window_overflow is None:
             window_overflow = ET.SubElement(channel_common, "windowOverflow")

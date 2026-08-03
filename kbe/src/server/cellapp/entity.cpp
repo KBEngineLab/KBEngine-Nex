@@ -41,6 +41,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "pyscript/py_gc.h"
 #include "entitydef/volatileinfo.h"
 #include "entitydef/entity_call.h"
+#include "entitydef/entity_events.h"
 #include "network/channel.h"	
 #include "network/bundle.h"	
 #include "network/fixed_messages.h"
@@ -192,6 +193,24 @@ Entity::~Entity()
 }	
 
 //-------------------------------------------------------------------------------------
+PyObject* Entity::__py_pyRegisterEvent(PyObject* self, PyObject* args)
+{
+	return EntityEvents::pyRegister(self, args);
+}
+
+//-------------------------------------------------------------------------------------
+PyObject* Entity::__py_pyDeregisterEvent(PyObject* self, PyObject* args)
+{
+	return EntityEvents::pyDeregister(self, args);
+}
+
+//-------------------------------------------------------------------------------------
+PyObject* Entity::__py_pyFireEvent(PyObject* self, PyObject* args)
+{
+	return EntityEvents::pyFire(self, args);
+}
+
+//-------------------------------------------------------------------------------------
 void Entity::onInitializeScript()
 {
 	// Cell 实体当前无需额外初始化；该钩子保证组件完成 owner 绑定后再扩展空间逻辑。
@@ -242,6 +261,10 @@ void Entity::onDestroy(bool callScript)
 			baseEntityCall_->sendCall(pBundle);
 		}
 	}
+
+	// 绑定方法会反向持有 Entity，必须在最终 Py_DECREF 前断开事件引用环。
+	// Bound methods retain the Entity, so break the event reference cycle before the final Py_DECREF.
+	EntityEvents::clear(this);
 
 	stopMove();
 

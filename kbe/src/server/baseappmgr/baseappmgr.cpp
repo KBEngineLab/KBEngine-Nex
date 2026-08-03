@@ -32,6 +32,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "helper/console_helper.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "../../server/cellappmgr/cellappmgr_interface.h"
 #include "../../server/baseapp/baseapp_interface.h"
@@ -549,6 +550,10 @@ COMPONENT_ID Baseappmgr::findFreeBaseapp()
 
 	float minload = 1.f;
 	ENTITY_ID numEntities = 0x7fffffff;
+	// 负载采样在进程饱和时会聚集在 1.0 附近，万分位噪声不应压过实体数这一稳定信号。
+	// Treat loads within five percentage points as equivalent so near-saturation sampling noise
+	// cannot pin most new logins to one BaseApp; entity count then provides the stable tie-breaker.
+	const float equivalentLoadRange = 0.05f;
 
 	for(; iter != baseapps_.end(); ++iter)
 	{
@@ -563,13 +568,15 @@ COMPONENT_ID Baseappmgr::findFreeBaseapp()
 				return iter->first;
 
 			// 比较并记录负载最小的进程最终被分配
-			if(minload > iter->second.load() || 
-				(minload == iter->second.load() && numEntities > iter->second.numEntities()))
+			const float candidateLoad = iter->second.load();
+			const ENTITY_ID candidateEntities = iter->second.numEntities();
+			if (cid == 0 || candidateLoad + equivalentLoadRange < minload ||
+				(std::fabs(candidateLoad - minload) <= equivalentLoadRange && numEntities > candidateEntities))
 			{
 				cid = iter->first;
 
-				numEntities = iter->second.numEntities();
-				minload = iter->second.load();
+				numEntities = candidateEntities;
+				minload = candidateLoad;
 			}
 		}
 	}

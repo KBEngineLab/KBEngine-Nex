@@ -412,6 +412,7 @@ public:
 
 	ENTITY_ID getViewEntityID(ENTITY_ID id);
 	ENTITY_ID getViewEntityIDFromStream(MemoryStream& s);
+	uint64 staleViewMessageDrops() const { return staleViewMessageDrops_; }
 	ENTITY_ID getViewEntityIDByAliasID(uint8 id);
 
 	/** 
@@ -467,6 +468,8 @@ protected:
 	// 存储所有的entity的容器
 	Entities<client::Entity>*								pEntities_;	
 	std::vector<ENTITY_ID>									pEntityIDAliasIDList_;
+	bool													playerEntityChanged_;
+	uint64													staleViewMessageDrops_;
 
 	PY_CALLBACKMGR											pyCallbackMgr_;
 

@@ -187,6 +187,15 @@ public:
 	uint64 kcpSendWindowBlockedChannelCount() const;
 	uint64 kcpAdmissionLimitedChannelCount() const;
 	uint64 kcpRemoteWindowZeroChannelCount() const;
+	uint64 kcpInputErrorCount() const { return kcpInputErrorCount_; }
+	uint64 kcpInputTooShortCount() const { return kcpInputTooShortCount_; }
+	uint64 kcpInputConversationMismatchCount() const { return kcpInputConversationMismatchCount_; }
+	uint64 kcpInputTruncatedSegmentCount() const { return kcpInputTruncatedSegmentCount_; }
+	uint64 kcpInputInvalidCommandCount() const { return kcpInputInvalidCommandCount_; }
+	uint64 kcpInputOtherErrorCount() const { return kcpInputOtherErrorCount_; }
+	// KCP 输入校验和网络 dispatcher 在同一线程执行，使用普通整数即可避免原子操作污染收包热路径。
+	// KCP input validation runs on the network dispatcher thread, so ordinary integers avoid atomics on the receive hot path.
+	uint64 recordKcpInputError(int result, size_t packetLength);
 
 private:
 	friend class Channel;
@@ -218,6 +227,12 @@ private:
 	uint64									finalizedKcpTimeoutRetransmissionCount_;
 	uint64									finalizedKcpFastRetransmissionCount_;
 	uint64									discardedPacketsAfterCloseCount_;
+	uint64									kcpInputErrorCount_;
+	uint64									kcpInputTooShortCount_;
+	uint64									kcpInputConversationMismatchCount_;
+	uint64									kcpInputTruncatedSegmentCount_;
+	uint64									kcpInputInvalidCommandCount_;
+	uint64									kcpInputOtherErrorCount_;
 
 	EventDispatcher *						pDispatcher_;
 	KcpUpdateScheduler					kcpUpdateScheduler_;

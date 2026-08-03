@@ -20,6 +20,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "kcp_packet_receiver_ex.h"
 #include "clientobject.h"
+#include "network/channel.h"
 
 namespace KBEngine
 {
@@ -43,6 +44,23 @@ Channel* KCPPacketReceiverEx::getChannel()
 Channel* KCPPacketReceiverEx::findChannel(const Address& addr)
 {
 	return pClientObject_->pServerChannel();
+}
+
+Reason KCPPacketReceiverEx::processPacket(Channel* pChannel, Packet* pPacket)
+{
+	uint32 channelID = 0;
+	if (pChannel != NULL && pChannel->hasHandshake() &&
+		ClientObject::parseKcpHelloAck(reinterpret_cast<const char*>(pPacket->data() + pPacket->rpos()), pPacket->length(), channelID) &&
+		channelID == static_cast<uint32>(pChannel->id()))
+	{
+		// 服务端会为客户端重试的 hello 幂等重发 ACK；激活 KCP 后排队到达的同一 ACK 只是握手控制报文。
+		// The server idempotently ACKs retried hellos; the same queued ACK arriving after KCP activation remains handshake control traffic.
+		pChannel->updateLastReceivedTime();
+		RECLAIM_PACKET(pPacket->isTCPPacket(), pPacket);
+		return REASON_SUCCESS;
+	}
+
+	return KCPPacketReceiver::processPacket(pChannel, pPacket);
 }
 
 }

@@ -110,7 +110,9 @@ size_t Channel::getPoolObjectBytes()
 		+ sizeof(flags_) + sizeof(numPacketsSent_) + sizeof(numPacketsReceived_) + sizeof(numBytesSent_) + sizeof(numBytesReceived_)
 		+ sizeof(lastTickBytesReceived_) + sizeof(lastTickBytesSent_) + sizeof(lastTickEpoch_) + sizeof(pFilter_) + sizeof(pEndPoint_) + sizeof(pPacketReceiver_) + sizeof(pPacketSender_)
 		+ sizeof(proxyID_) + strextra_.size() + sizeof(channelType_)
-		+ sizeof(componentID_) + sizeof(sessionEpoch_) + sizeof(pMsgHandlers_) + sizeof(pKCP_) + condemnReason_.size();
+		+ sizeof(componentID_) + sizeof(sessionEpoch_) + sizeof(pMsgHandlers_) + sizeof(pKCP_) + condemnReason_.size()
+		+ sizeof(sendWindowMessagesOverflowWarningActive_) + sizeof(sendWindowBytesOverflowWarningActive_)
+		+ sizeof(receiveWindowMessagesOverflowWarningActive_);
 
 	return bytes;
 }
@@ -170,6 +172,9 @@ Channel::Channel(NetworkInterface & networkInterface,
 	flags_(0),
 	pKCP_(NULL),
 	condemnReason_(),
+	sendWindowMessagesOverflowWarningActive_(false),
+	sendWindowBytesOverflowWarningActive_(false),
+	receiveWindowMessagesOverflowWarningActive_(false),
 	tlsDetectionPrefix_(),
 	gracefulCloseStarted_(false),
 	webSocketCloseSent_(false),
@@ -215,6 +220,9 @@ Channel::Channel():
 	flags_(0),
 	pKCP_(NULL),
 	condemnReason_(),
+	sendWindowMessagesOverflowWarningActive_(false),
+	sendWindowBytesOverflowWarningActive_(false),
+	receiveWindowMessagesOverflowWarningActive_(false),
 	tlsDetectionPrefix_(),
 	gracefulCloseStarted_(false),
 	webSocketCloseSent_(false),
@@ -598,6 +606,9 @@ void Channel::clearState( bool warnOnDiscard /*=false*/ )
 	strextra_ = "";
 	channelType_ = CHANNEL_NORMAL;
 	condemnReason_ = "";
+	sendWindowMessagesOverflowWarningActive_ = false;
+	sendWindowBytesOverflowWarningActive_ = false;
+	receiveWindowMessagesOverflowWarningActive_ = false;
 	tlsDetectionPrefix_.clear();
 	gracefulCloseStarted_ = false;
 	webSocketCloseSent_ = false;
@@ -775,12 +786,31 @@ void Channel::send(Bundle * pBundle)
 		}
 	}
 
+	// 同步发送可能已经排空队列，窗口判定必须使用发送后的实际积压。
+	// A synchronous send may drain the queue, so overflow checks must use the actual post-send backlog.
+	bundleSize = (uint32)bundles_.size();
+	if (bundleSize == 0)
+	{
+		sendWindowMessagesOverflowWarningActive_ = false;
+		sendWindowBytesOverflowWarningActive_ = false;
+		return;
+	}
+
+	const bool messagesWarningOverflowed = Network::g_sendWindowMessagesOverflowCritical > 0 &&
+		bundleSize > Network::g_sendWindowMessagesOverflowCritical;
+	if (!messagesWarningOverflowed)
+		sendWindowMessagesOverflowWarningActive_ = false;
+
 	if(this->isExternal())
 	{
-		if (Network::g_sendWindowMessagesOverflowCritical > 0 && bundleSize > Network::g_sendWindowMessagesOverflowCritical)
+		if (messagesWarningOverflowed)
 		{
-			WARNING_MSG(fmt::format("Channel::send[{:p}]: external channel({}), send-window bufferedMessages has overflowed({} > {}).\n",
-				(void*)this, this->c_str(), bundleSize, Network::g_sendWindowMessagesOverflowCritical));
+			if (!sendWindowMessagesOverflowWarningActive_)
+			{
+				sendWindowMessagesOverflowWarningActive_ = true;
+				WARNING_MSG(fmt::format("Channel::send[{:p}]: external channel({}), send-window bufferedMessages has overflowed({} > {}).\n",
+					(void*)this, this->c_str(), bundleSize, Network::g_sendWindowMessagesOverflowCritical));
+			}
 
 			if (Network::g_extSendWindowMessagesOverflow > 0 &&
 				bundleSize >  Network::g_extSendWindowMessagesOverflow)
@@ -795,6 +825,8 @@ void Channel::send(Bundle * pBundle)
 		if (g_extSendWindowBytesOverflow > 0)
 		{
 			uint32 bundleBytes = bundlesLength();
+			if (bundleBytes < g_extSendWindowBytesOverflow)
+				sendWindowBytesOverflowWarningActive_ = false;
 			if(bundleBytes >= g_extSendWindowBytesOverflow)
 			{
 				ERROR_MSG(fmt::format("Channel::send[{:p}]: external channel({}), bufferedBytes has overflowed({} > {}), Try adjusting the kbengine[_defs].xml->windowOverflow->send->bytes.\n",
@@ -806,7 +838,7 @@ void Channel::send(Bundle * pBundle)
 	}
 	else
 	{
-		if (Network::g_sendWindowMessagesOverflowCritical > 0 && bundleSize > Network::g_sendWindowMessagesOverflowCritical)
+		if (messagesWarningOverflowed)
 		{
 			if (Network::g_intSendWindowMessagesOverflow > 0 &&
 				bundleSize > Network::g_intSendWindowMessagesOverflow)
@@ -818,18 +850,28 @@ void Channel::send(Bundle * pBundle)
 			}
 			else
 			{
-				WARNING_MSG(fmt::format("Channel::send[{:p}]: internal channel({}), send-window bufferedMessages has overflowed({} > {}).\n",
-					(void*)this, this->c_str(), bundleSize, Network::g_sendWindowMessagesOverflowCritical));
+				if (!sendWindowMessagesOverflowWarningActive_)
+				{
+					sendWindowMessagesOverflowWarningActive_ = true;
+					WARNING_MSG(fmt::format("Channel::send[{:p}]: internal channel({}), send-window bufferedMessages has overflowed({} > {}).\n",
+						(void*)this, this->c_str(), bundleSize, Network::g_sendWindowMessagesOverflowCritical));
+				}
 			}
 		}
 
 		if (g_intSendWindowBytesOverflow > 0)
 		{
 			uint32 bundleBytes = bundlesLength();
+			if (bundleBytes < g_intSendWindowBytesOverflow)
+				sendWindowBytesOverflowWarningActive_ = false;
 			if (bundleBytes >= g_intSendWindowBytesOverflow)
 			{
-				WARNING_MSG(fmt::format("Channel::send[{:p}]: internal channel({}), bufferedBytes has overflowed({} > {}).\n",
-					(void*)this, this->c_str(), bundleBytes, g_intSendWindowBytesOverflow));
+				if (!sendWindowBytesOverflowWarningActive_)
+				{
+					sendWindowBytesOverflowWarningActive_ = true;
+					WARNING_MSG(fmt::format("Channel::send[{:p}]: internal channel({}), bufferedBytes has overflowed({} > {}).\n",
+						(void*)this, this->c_str(), bundleBytes, g_intSendWindowBytesOverflow));
+				}
 			}
 		}
 	}
@@ -995,8 +1037,12 @@ void Channel::addReceiveWindow(Packet* pPacket)
 			}
 			else
 			{
-				WARNING_MSG(fmt::format("Channel::addReceiveWindow[{:p}]: external channel({}), receive window has overflowed({} > {}).\n", 
-					(void*)this, this->c_str(), lastTickBufferedReceives_, Network::g_receiveWindowMessagesOverflowCritical));
+				if (!receiveWindowMessagesOverflowWarningActive_)
+				{
+					receiveWindowMessagesOverflowWarningActive_ = true;
+					WARNING_MSG(fmt::format("Channel::addReceiveWindow[{:p}]: external channel({}), receive window has overflowed({} > {}).\n",
+						(void*)this, this->c_str(), lastTickBufferedReceives_, Network::g_receiveWindowMessagesOverflowCritical));
+				}
 			}
 		}
 		else
@@ -1004,8 +1050,12 @@ void Channel::addReceiveWindow(Packet* pPacket)
 			if(Network::g_intReceiveWindowMessagesOverflow > 0 && 
 				lastTickBufferedReceives_ > Network::g_intReceiveWindowMessagesOverflow)
 			{
-				WARNING_MSG(fmt::format("Channel::addReceiveWindow[{:p}]: internal channel({}), receive window has overflowed({} > {}).\n", 
-					(void*)this, this->c_str(), lastTickBufferedReceives_, Network::g_intReceiveWindowMessagesOverflow));
+				if (!receiveWindowMessagesOverflowWarningActive_)
+				{
+					receiveWindowMessagesOverflowWarningActive_ = true;
+					WARNING_MSG(fmt::format("Channel::addReceiveWindow[{:p}]: internal channel({}), receive window has overflowed({} > {}).\n",
+						(void*)this, this->c_str(), lastTickBufferedReceives_, Network::g_intReceiveWindowMessagesOverflow));
+				}
 			}
 		}
 	}
@@ -1035,22 +1085,25 @@ void Channel::condemn(const std::string& reason, bool waitSendCompletedDestroy)
 //-------------------------------------------------------------------------------------
 bool Channel::handshake(Packet* pPacket)
 {
-	if(hasHandshake())
-		return false;
-
 	if (protocolSubtype_ == SUB_PROTOCOL_KCP)
 	{
+		const bool alreadyHandshaken = hasHandshake();
 		const size_t helloLength = std::strlen(UDP_HELLO);
 		const bool validHello = pPacket->length() == helloLength &&
 			std::memcmp(pPacket->data() + pPacket->rpos(), UDP_HELLO, helloLength) == 0;
-		pPacket->clear(false);
 
 		if (!validHello)
 		{
+			if (hasHandshake())
+				return false;
+
+			pPacket->clear(false);
 			// 断线探测期间可能有迟到的 KCP 数据报，丢弃它但保留该远端重新握手的机会。
 			// Late KCP datagrams may arrive during disconnect detection; discard them while allowing the peer to retry the handshake.
 			return true;
 		}
+
+		pPacket->clear(false);
 
 		UDPPacket* pAckPacket = UDPPacket::createPoolObject(OBJECTPOOL_POINT);
 		(*pAckPacket) << UDP_HELLO_ACK << KBEVersion::versionString() << static_cast<uint32>(id());
@@ -1059,10 +1112,16 @@ bool Channel::handshake(Packet* pPacket)
 		EventPoller* pPoller = this->networkInterface().dispatcher().pPoller();
 		if (pPoller != NULL && pPoller->supportsCompletion())
 		{
-			// ACK 必须进入 completion UDP 队列；KBESOCKET 在 Win64 上不能缩窄为 int。
-			// The ACK must use the completion UDP queue, and KBESOCKET must not be narrowed to int on Win64.
-			sent = pPoller->queueUdpSend(static_cast<KBESOCKET>(*pEndPoint_), pAckPacket->data(),
-				static_cast<int>(pAckPacket->length()), pEndPoint_->addr());
+			// 无 pending completion 时优先直发握手 ACK；已有发送时保持同一队列，不能用同步调用越过在途报文。
+			// Send the handshake ACK directly when no completion is pending; otherwise preserve one queue so a synchronous call cannot bypass in-flight datagrams.
+			const int ackLength = static_cast<int>(pAckPacket->length());
+			sent = !pPoller->hasPendingSend(*pEndPoint_) &&
+				pEndPoint_->sendto(pAckPacket->data(), ackLength) == ackLength;
+			if (!sent)
+			{
+				sent = pPoller->queueUdpSend(static_cast<KBESOCKET>(*pEndPoint_), pAckPacket->data(),
+					ackLength, pEndPoint_->addr());
+			}
 		}
 		else
 		{
@@ -1079,10 +1138,18 @@ bool Channel::handshake(Packet* pPacket)
 			pPacketReader_ = new KCPPacketReader(this);
 		}
 
+		// ACK 可能因服务端调度积压晚于客户端重试；重复 hello 必须幂等重发同一 conv，而不能交给 ikcp_input 当作畸形数据。
+		// The ACK may lag a client retry under server load; duplicate hellos must resend the same conv idempotently instead of entering ikcp_input as malformed data.
 		flags_ |= FLAG_HANDSHAKE;
-		DEBUG_MSG(fmt::format("Channel::handshake: kcp({}) successfully!\n", this->c_str()));
+		if (alreadyHandshaken)
+			updateLastReceivedTime();
+		else
+			DEBUG_MSG(fmt::format("Channel::handshake: kcp({}) successfully!\n", this->c_str()));
 		return true;
 	}
+
+	if(hasHandshake())
+		return false;
 
 	// https/wss
 	if (!pEndPoint_->isSSL())
@@ -1377,6 +1444,14 @@ void Channel::prepareTickCounters()
 	const uint64 currentEpoch = pNetworkInterface_->channelTickEpoch();
 	if (lastTickEpoch_ == currentEpoch)
 		return;
+
+	// 持续超限只报告一次；上一活跃 Tick 已恢复或中间存在空闲 Tick 时才重新武装告警。
+	// Report one sustained overflow episode; rearm only after the previous active tick recovered or an idle tick intervened.
+	if (lastTickEpoch_ + 1 < currentEpoch ||
+		lastTickBufferedReceives_ <= Network::g_receiveWindowMessagesOverflowCritical)
+	{
+		receiveWindowMessagesOverflowWarningActive_ = false;
+	}
 
 	// 只在本 Tick 首次活动时写 Channel cache line，空闲连接不再被主循环触碰。
 	// Touch the Channel cache line only on its first activity in this tick; idle connections remain untouched by the main loop.

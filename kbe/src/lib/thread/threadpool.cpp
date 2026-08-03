@@ -138,6 +138,9 @@ extraNewAddThreadCount_(0),
 currentThreadCount_(0),
 currentFreeThreadCount_(0),
 normalThreadCount_(0),
+lastBacklogWarningTime_(0),
+suppressedBacklogWarnings_(0),
+peakBufferedTaskCount_(0),
 isDestroyed_(false)
 {		
 	THREAD_MUTEX_INIT(threadStateList_mutex_);	
@@ -307,6 +310,9 @@ void ThreadPool::destroy()
 TPTask* ThreadPool::popbufferTask(void)
 {
 	TPTask* tptask = NULL;
+	bool reportBacklog = false;
+	uint64 suppressedWarnings = 0;
+	size_t peakBufferedTasks = 0;
 	THREAD_MUTEX_LOCK(bufferedTaskList_mutex_);
 
 	size_t size = bufferedTaskList_.size();
@@ -317,12 +323,31 @@ TPTask* ThreadPool::popbufferTask(void)
 	
 		if(size > THREAD_BUSY_SIZE)
 		{
-			WARNING_MSG(fmt::format("ThreadPool::popbufferTask: task buffered({0})!\n", 
-				size));
+			peakBufferedTaskCount_ = std::max(peakBufferedTaskCount_, size);
+			const uint64 now = timestamp();
+			if(lastBacklogWarningTime_ == 0 ||
+				now - lastBacklogWarningTime_ >= static_cast<uint64>(stampsPerSecondD()))
+			{
+				lastBacklogWarningTime_ = now;
+				suppressedWarnings = suppressedBacklogWarnings_;
+				peakBufferedTasks = peakBufferedTaskCount_;
+				suppressedBacklogWarnings_ = 0;
+				peakBufferedTaskCount_ = size;
+				reportBacklog = true;
+			}
+			else
+			{
+				++suppressedBacklogWarnings_;
+			}
 		}
 	}
 
-	THREAD_MUTEX_UNLOCK(bufferedTaskList_mutex_);	
+	THREAD_MUTEX_UNLOCK(bufferedTaskList_mutex_);
+	if(reportBacklog)
+	{
+		WARNING_MSG(fmt::format("ThreadPool::taskBacklog: buffered={}, peak={}, suppressed={}.\n",
+			size, peakBufferedTasks, suppressedWarnings));
+	}
 
 	return tptask;
 }
@@ -424,6 +449,9 @@ void ThreadPool::onMainThreadTick()
 //-------------------------------------------------------------------------------------
 void ThreadPool::bufferTask(TPTask* tptask)
 {
+	bool reportBacklog = false;
+	uint64 suppressedWarnings = 0;
+	size_t peakBufferedTasks = 0;
 	THREAD_MUTEX_LOCK(bufferedTaskList_mutex_);
 
 	bufferedTaskList_.push(tptask);
@@ -431,11 +459,30 @@ void ThreadPool::bufferTask(TPTask* tptask)
 	size_t size = bufferedTaskList_.size();
 	if(size > THREAD_BUSY_SIZE)
 	{
-		WARNING_MSG(fmt::format("ThreadPool::bufferTask: task buffered({0})!\n", 
-			size));
+		peakBufferedTaskCount_ = std::max(peakBufferedTaskCount_, size);
+		const uint64 now = timestamp();
+		if(lastBacklogWarningTime_ == 0 ||
+			now - lastBacklogWarningTime_ >= static_cast<uint64>(stampsPerSecondD()))
+		{
+			lastBacklogWarningTime_ = now;
+			suppressedWarnings = suppressedBacklogWarnings_;
+			peakBufferedTasks = peakBufferedTaskCount_;
+			suppressedBacklogWarnings_ = 0;
+			peakBufferedTaskCount_ = size;
+			reportBacklog = true;
+		}
+		else
+		{
+			++suppressedBacklogWarnings_;
+		}
 	}
 
 	THREAD_MUTEX_UNLOCK(bufferedTaskList_mutex_);
+	if(reportBacklog)
+	{
+		WARNING_MSG(fmt::format("ThreadPool::taskBacklog: buffered={}, peak={}, suppressed={}.\n",
+			size, peakBufferedTasks, suppressedWarnings));
+	}
 }
 
 //-------------------------------------------------------------------------------------

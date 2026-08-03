@@ -5,11 +5,13 @@
   "workload_processes": 4,
   "workload_cid_start": 10000,
   "workload_gus_start": 40,
+  "bots_account_suffix_start": 1,
   "watcher_component_ids": {
     "baseapp": [7001, 7002, 7003],
     "cellapp": [8001, 8002, 8003, 8004, 8005, 8006]
   },
   "connect_rate_per_second": 100,
+  "database_connections": 32,
   "reliable_udp_tick_interval_ms": 10,
   "reliable_udp_min_rto_ms": 50,
   "runtime_log_level": "warn",

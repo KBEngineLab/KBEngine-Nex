@@ -1,0 +1,6 @@
+{
+  "extends": "gameplay_10000.json",
+  "name": "gameplay-10000-kcp50",
+  "reliable_udp_tick_interval_ms": 50,
+  "reliable_udp_min_rto_ms": 50
+}

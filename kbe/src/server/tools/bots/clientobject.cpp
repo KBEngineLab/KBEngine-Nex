@@ -45,16 +45,28 @@ namespace KBEngine{
 
 namespace
 {
-const uint64 KCP_HANDSHAKE_TIMEOUT = 30 * stampsPerSecond();
+const float KCP_MIN_HANDSHAKE_TIMEOUT_SECONDS = 30.f;
 const uint64 KCP_HELLO_RETRY_INTERVAL = stampsPerSecond();
 const int KCP_MAX_ACKS_PER_TICK = 4;
+const uint32 KCP_MAX_TRANSPORT_SETUP_ATTEMPTS = 30;
+const uint64 KCP_TRANSPORT_SETUP_RETRY_DELAY = stampsPerSecond() / 10;
+
+uint64 kcpHandshakeTimeoutStamps()
+{
+	// 握手属于外部 Channel 建立阶段，复用同一超时配置可避免压测工具保留另一个不可调的 30 秒门槛。
+	// Handshake is part of external Channel establishment; sharing its timeout avoids a second, fixed 30-second load-test limit.
+	const float seconds = KBE_MAX(KCP_MIN_HANDSHAKE_TIMEOUT_SECONDS,
+		Network::g_channelExternalTimeout);
+	return static_cast<uint64>(seconds * stampsPerSecond());
+}
 
 bool isTransientSocketError(int errorCode)
 {
 #if KBE_PLATFORM == PLATFORM_WIN32
-	return errorCode == WSAEWOULDBLOCK || errorCode == WSAEINTR;
+	return errorCode == WSAEWOULDBLOCK || errorCode == WSAEINTR || errorCode == WSAENOBUFS;
 #else
-	return errorCode == EAGAIN || errorCode == EWOULDBLOCK || errorCode == EINTR;
+	return errorCode == EAGAIN || errorCode == EWOULDBLOCK || errorCode == EINTR ||
+		errorCode == ENOBUFS || errorCode == ENOMEM;
 #endif
 }
 
@@ -67,7 +79,9 @@ int lastSocketError()
 #endif
 }
 
-bool parseKcpHelloAck(const char* data, size_t length, uint32& channelID)
+}
+
+bool ClientObject::parseKcpHelloAck(const char* data, size_t length, uint32& channelID)
 {
 	const size_t ackLength = std::strlen(Network::UDP_HELLO_ACK);
 	const std::string& version = KBEVersion::versionString();
@@ -92,7 +106,6 @@ bool parseKcpHelloAck(const char* data, size_t length, uint32& channelID)
 		(static_cast<uint32>(encodedID[3]) << 24);
 	return channelID != 0;
 }
-}
 
 SCRIPT_METHOD_DECLARE_BEGIN(ClientObject)
 SCRIPT_METHOD_DECLARE_END()
@@ -116,7 +129,8 @@ pKCPPacketSenderEx_(NULL),
 pKCPPacketReceiverEx_(NULL),
 kcpHandshakeStartTime_(0),
 kcpHelloSentTime_(0),
-kcpHelloAttempts_(0)
+kcpHelloAttempts_(0),
+kcpTransportSetupAttempts_(0)
 {
 	name_ = name;
 	typeClient_ = CLIENT_TYPE_BOTS;
@@ -151,6 +165,7 @@ void ClientObject::reset(void)
 	clientDatas_ = "bots";
 	state_ = C_STATE_INIT;
 	connectedBaseapp_ = false;
+	kcpTransportSetupAttempts_ = 0;
 }
 
 //-------------------------------------------------------------------------------------
@@ -351,8 +366,12 @@ bool ClientObject::startKcpHandshake()
 	pEndpoint->socket(SOCK_DGRAM);
 	if (!pEndpoint->good())
 	{
-		WARNING_MSG("ClientObject::startKcpHandshake: couldn't create a UDP socket, falling back to TCP.\n");
+		const int errorCode = lastSocketError();
 		Network::EndPoint::reclaimPoolObject(pEndpoint);
+		if (retryKcpTransportSetup("socket", errorCode))
+			return true;
+		WARNING_MSG(fmt::format("ClientObject::startKcpHandshake: couldn't create a UDP socket, name={}, error={}\n",
+			name_, errorCode));
 		return false;
 	}
 
@@ -360,9 +379,12 @@ bool ClientObject::startKcpHandshake()
 	// UDP connect pins the peer and filters spoofed ACKs; false avoids applying TCP_NODELAY to a UDP socket.
 	if (pEndpoint->connect(htons(udp_port_), address, false) == -1)
 	{
-		WARNING_MSG(fmt::format("ClientObject::startKcpHandshake: UDP connect failed, name={}, error={}\n",
-			name_, lastSocketError()));
+		const int errorCode = lastSocketError();
 		Network::EndPoint::reclaimPoolObject(pEndpoint);
+		if (retryKcpTransportSetup("connect", errorCode))
+			return true;
+		WARNING_MSG(fmt::format("ClientObject::startKcpHandshake: UDP connect failed, name={}, error={}\n",
+			name_, errorCode));
 		return false;
 	}
 
@@ -373,6 +395,7 @@ bool ClientObject::startKcpHandshake()
 	kcpHandshakeStartTime_ = timestamp();
 	kcpHelloSentTime_ = 0;
 	kcpHelloAttempts_ = 0;
+	kcpTransportSetupAttempts_ = 0;
 
 	if (!sendKcpHello())
 	{
@@ -380,6 +403,32 @@ bool ClientObject::startKcpHandshake()
 		return false;
 	}
 
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
+bool ClientObject::retryKcpTransportSetup(const char* operation, int errorCode)
+{
+	if (!isTransientSocketError(errorCode) ||
+		++kcpTransportSetupAttempts_ > KCP_MAX_TRANSPORT_SETUP_ATTEMPTS)
+	{
+		kcpTransportSetupAttempts_ = 0;
+		return false;
+	}
+
+	// 并发爬升可能短暂耗尽 Windows 非分页池。延后重试可保留 KCP 传输，
+	// 同时用次数上限保证永久资源故障最终仍能降级到 TCP。
+	// Concurrent ramp-up may briefly exhaust the Windows nonpaged pool. A delayed
+	// retry preserves KCP while the attempt bound still permits eventual TCP fallback.
+	if ((kcpTransportSetupAttempts_ & (kcpTransportSetupAttempts_ - 1)) == 0)
+	{
+		WARNING_MSG(fmt::format(
+			"ClientObject::retryKcpTransportSetup: name={}, operation={}, error={}, attempt={}\n",
+			name_, operation, errorCode, kcpTransportSetupAttempts_));
+	}
+
+	state_ = C_STATE_LOGIN_BASEAPP_CREATE;
+	locktime(timestamp() + KCP_TRANSPORT_SETUP_RETRY_DELAY);
 	return true;
 }
 
@@ -438,10 +487,14 @@ void ClientObject::processKcpHandshake()
 		}
 
 		uint32 channelID = 0;
-		if (received == 0 || !parseKcpHelloAck(ack, static_cast<size_t>(received), channelID))
+		if (received == 0 || !ClientObject::parseKcpHelloAck(ack, static_cast<size_t>(received), channelID))
 		{
-			fallbackToBaseappTcp("invalid KCP hello ACK");
-			return;
+			// UDP connect 已将来源限制为目标 BaseApp。乱序到达的非 ACK 数据报不能永久改变传输协议；
+			// 丢弃并继续等待合法 ACK，最终仍由有界握手超时负责回退。
+			// UDP connect already pins the BaseApp peer. An out-of-order non-ACK datagram must not
+			// permanently change transport; discard it and let the bounded handshake timeout decide fallback.
+			Bots::getSingleton().onKcpHandshakeInvalidPacket();
+			continue;
 		}
 
 		if (!completeKcpHandshake(channelID))
@@ -452,7 +505,7 @@ void ClientObject::processKcpHandshake()
 	}
 
 	const uint64 now = timestamp();
-	if (now - kcpHandshakeStartTime_ >= KCP_HANDSHAKE_TIMEOUT)
+	if (now - kcpHandshakeStartTime_ >= kcpHandshakeTimeoutStamps())
 	{
 		fallbackToBaseappTcp("KCP handshake timed out");
 		return;
@@ -528,6 +581,7 @@ bool ClientObject::completeKcpHandshake(uint32 channelID)
 	// Channel takes Bundle ownership, and the reliable flag queues the BaseApp hello through KCP.
 	pServerChannel_->sendTo(true, pBundle);
 	Bots::getSingleton().onKcpHandshakeSucceeded();
+	kcpTransportSetupAttempts_ = 0;
 	const double elapsedSeconds = static_cast<double>(timestamp() - kcpHandshakeStartTime_) /
 		static_cast<double>(stampsPerSecond());
 	INFO_MSG(fmt::format("ClientObject::completeKcpHandshake: name={}, address={}:{}, channelID={}, attempts={}, elapsed={:.3f}s\n",
@@ -543,6 +597,7 @@ void ClientObject::fallbackToBaseappTcp(const char* reason)
 	WARNING_MSG(fmt::format("ClientObject::fallbackToBaseappTcp: name={}, reason={}, attempts={}, elapsed={:.3f}s\n",
 		name_, reason, kcpHelloAttempts_, elapsedSeconds));
 	Bots::getSingleton().onTcpFallback();
+	kcpTransportSetupAttempts_ = 0;
 	clearStates();
 	connectedBaseapp_ = false;
 	state_ = C_STATE_PLAY;
@@ -748,7 +803,9 @@ void ClientObject::onHelloCB_(Network::Channel* pChannel, const std::string& ver
 
 	if(componentType == LOGINAPP_TYPE)
 	{
-		state_ = C_STATE_CREATE;
+		// 确定性压测账号已在准备轮创建时可直接认证，避免每次正式稳态测试重复执行账号存在性写路径。
+		// Deterministic load-test identities may authenticate directly after provisioning, avoiding account-creation writes on every steady run.
+		state_ = g_botsReuseAccounts ? C_STATE_LOGIN : C_STATE_CREATE;
 	}
 	else
 	{

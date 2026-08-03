@@ -39,9 +39,15 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <algorithm>
 
-namespace KBEngine { 
+namespace KBEngine {
 namespace Network
 {
+namespace
+{
+// ikcp.c 将该协议常量保持为私有宏；诊断分类只需要辨别 -1 是短头还是 conv 不匹配。
+// ikcp.c keeps this protocol constant private; diagnostics only need it to split a short header from a conv mismatch.
+const size_t KCP_INPUT_HEADER_BYTES = 24;
+}
 
 //-------------------------------------------------------------------------------------
 NetworkInterface::NetworkInterface(Network::EventDispatcher * pDispatcher,
@@ -61,6 +67,12 @@ NetworkInterface::NetworkInterface(Network::EventDispatcher * pDispatcher,
 	finalizedKcpTimeoutRetransmissionCount_(0),
 	finalizedKcpFastRetransmissionCount_(0),
 	discardedPacketsAfterCloseCount_(0),
+	kcpInputErrorCount_(0),
+	kcpInputTooShortCount_(0),
+	kcpInputConversationMismatchCount_(0),
+	kcpInputTruncatedSegmentCount_(0),
+	kcpInputInvalidCommandCount_(0),
+	kcpInputOtherErrorCount_(0),
 	pDispatcher_(pDispatcher),
 	kcpUpdateScheduler_(*pDispatcher),
 	pExtListenerReceiver_(NULL),
@@ -702,6 +714,27 @@ uint64 NetworkInterface::kcpMaxConsecutiveBudgetExhaustions() const { return kcp
 uint64 NetworkInterface::kcpTimeBudgetExhaustionCount() const { return kcpUpdateScheduler_.timeBudgetExhaustionCount(); }
 uint64 NetworkInterface::kcpTotalProcessingMicros() const { return kcpUpdateScheduler_.totalProcessingMicros(); }
 uint64 NetworkInterface::kcpMaxProcessingMicros() const { return kcpUpdateScheduler_.maxProcessingMicros(); }
+
+//-------------------------------------------------------------------------------------
+uint64 NetworkInterface::recordKcpInputError(int result, size_t packetLength)
+{
+	++kcpInputErrorCount_;
+	if (result == -1)
+	{
+		if (packetLength < KCP_INPUT_HEADER_BYTES)
+			++kcpInputTooShortCount_;
+		else
+			++kcpInputConversationMismatchCount_;
+	}
+	else if (result == -2)
+		++kcpInputTruncatedSegmentCount_;
+	else if (result == -3)
+		++kcpInputInvalidCommandCount_;
+	else
+		++kcpInputOtherErrorCount_;
+
+	return kcpInputErrorCount_;
+}
 
 //-------------------------------------------------------------------------------------
 uint64 NetworkInterface::kcpPendingSegmentCount() const

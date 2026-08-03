@@ -63,6 +63,8 @@ def parse_args() -> argparse.Namespace:
                         help="Seconds between Bots connection batches")
     parser.add_argument("--bots-dev", action="store_true",
                         help="Enable Bots Logger forwarding for IDE development")
+    parser.add_argument("--reuse-existing-accounts", action="store_true",
+                        help="Skip account creation and authenticate pre-provisioned deterministic Bots accounts")
     parser.add_argument("--tools-root", type=Path, help="kbe/tools/server root for Watcher queries")
     parser.add_argument("--watcher-target", action="append", default=[], metavar="TYPE=HOST:PORT:PATH|TYPE=@COMPONENT:PATH")
     parser.add_argument("--watcher-timeout", type=float, default=2.0)
@@ -135,16 +137,23 @@ def main() -> int:
             args.cluster_components = generated_components
         if not args.command:
             dev_argument = " --dev" if args.bots_dev else ""
+            reuse_accounts = args.reuse_existing_accounts or bool(
+                scenario.get("reuse_existing_accounts", False)
+            )
+            reuse_argument = " --reuse-existing-accounts" if reuse_accounts else ""
             args.command = (
                 f'"{args.server_binary_dir / "bots.exe"}" '
-                f"--cid={{cid}} --gus={{gus}} --hide=1{dev_argument}"
+                f"--cid={{cid}} --gus={{gus}} --hide=1{dev_argument}{reuse_argument}"
             )
         scenario = dict(scenario)
         scenario["watcher_component_ids"] = generated_component_ids
-    elif args.bots_dev:
+    elif args.bots_dev or args.reuse_existing_accounts:
         if not args.command:
-            raise ValueError("--bots-dev requires --server-binary-dir or --command")
-        args.command = f"{args.command} --dev"
+            raise ValueError("Bots mode flags require --server-binary-dir or --command")
+        if args.bots_dev:
+            args.command = f"{args.command} --dev"
+        if args.reuse_existing_accounts:
+            args.command = f"{args.command} --reuse-existing-accounts"
 
     bots_per_process = partition_workload_bots(configured_bots, workload_process_count)
     interval = max(float(args.sample_interval), 0.1)
@@ -200,10 +209,14 @@ def main() -> int:
             bots_tick_count,
             int(scenario["external_receive_messages"]) if "external_receive_messages" in scenario else None,
             int(scenario["external_receive_bytes"]) if "external_receive_bytes" in scenario else None,
+            float(scenario["external_timeout_seconds"]) if "external_timeout_seconds" in scenario else None,
             int(scenario["reliable_udp_tick_interval_ms"]) if "reliable_udp_tick_interval_ms" in scenario else None,
             int(scenario["reliable_udp_min_rto_ms"]) if "reliable_udp_min_rto_ms" in scenario else None,
             str(scenario["runtime_log_level"]) if "runtime_log_level" in scenario else None,
             str(scenario["server_runtime_log_level"]) if "server_runtime_log_level" in scenario else None,
+            int(scenario["bots_account_suffix_start"]) if "bots_account_suffix_start" in scenario else None,
+            int(scenario["database_connections"]) if "database_connections" in scenario else None,
+            baseapp_count,
         )
         environment = build_environment(_repository_root(), args.assets_root, output, fixture_root)
         environment.update(scenario_environment(scenario))
@@ -472,6 +485,7 @@ def main() -> int:
         load_thresholds(args.scenario, scenario, args.thresholds),
         dict(scenario.get("readiness", {})),
         configured_bots,
+        workload_process_count,
     )
     if readiness_failure is not None:
         summary["failure"] = {"phase": "readiness", "message": str(readiness_failure)}

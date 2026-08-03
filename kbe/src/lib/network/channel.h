@@ -347,6 +347,11 @@ private:
 	ikcpcb*						pKCP_;
 
 	std::string					condemnReason_;
+	// 窗口告警采用状态边沿触发，避免积压期间每个 Bundle 都产生日志并进一步放大拥塞。
+	// Window warnings are edge-triggered so every Bundle cannot amplify an existing backlog through logging.
+	bool						sendWindowMessagesOverflowWarningActive_;
+	bool						sendWindowBytesOverflowWarningActive_;
+	bool						receiveWindowMessagesOverflowWarningActive_;
 	// 只缓存不足以判定 TLS record header 的前 1-2 字节，避免首个 completion 过短时误判原生协议。
 	// Retain only the first 1-2 bytes needed to classify a TLS record header when the initial completion is too short.
 	std::vector<char>			tlsDetectionPrefix_;

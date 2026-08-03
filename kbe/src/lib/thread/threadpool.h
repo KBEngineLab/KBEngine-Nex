@@ -384,7 +384,13 @@ protected:
 	uint32 currentThreadCount_;										// 当前线程数
 	uint32 currentFreeThreadCount_;									// 当前闲置的线程数
 	uint32 normalThreadCount_;										// 标准状态下的线程总数 即：默认情况下一启动服务器就开启这么多线程
-																	// 如果线程不足够，则会新创建一些线程， 最大能够到maxThreadNum.
+																			// 如果线程不足够，则会新创建一些线程， 最大能够到maxThreadNum.
+
+	// 积压告警状态与任务队列共用互斥锁，避免高并发下逐任务日志反过来放大线程池拥塞。
+	// Backlog warning state shares the task-queue mutex so per-task logging cannot amplify contention under load.
+	uint64 lastBacklogWarningTime_;
+	uint64 suppressedBacklogWarnings_;
+	size_t peakBufferedTaskCount_;
 
 	bool isDestroyed_;
 };

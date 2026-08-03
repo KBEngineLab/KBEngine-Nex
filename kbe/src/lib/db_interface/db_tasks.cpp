@@ -23,8 +23,34 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "entity_table.h"
 #include "thread/threadpool.h"
 #include "common/memorystream.h"
+#include <atomic>
 
 namespace KBEngine{
+
+namespace
+{
+std::atomic<uint64> g_lastDbQueueWarning(0);
+std::atomic<uint64> g_suppressedDbQueueWarnings(0);
+std::atomic<uint64> g_lastDbExecutionWarning(0);
+std::atomic<uint64> g_suppressedDbExecutionWarnings(0);
+
+bool claimSlowTaskWarning(std::atomic<uint64>& lastWarning, std::atomic<uint64>& suppressed,
+	uint64 now, uint64& suppressedCount)
+{
+	uint64 previous = lastWarning.load(std::memory_order_relaxed);
+	while (previous == 0 || now - previous >= stampsPerSecond())
+	{
+		if (lastWarning.compare_exchange_weak(previous, now, std::memory_order_relaxed))
+		{
+			suppressedCount = suppressed.exchange(0, std::memory_order_relaxed);
+			return true;
+		}
+	}
+
+	suppressed.fetch_add(1, std::memory_order_relaxed);
+	return false;
+}
+}
 
 //-------------------------------------------------------------------------------------
 bool DBTaskBase::process()
@@ -36,15 +62,28 @@ bool DBTaskBase::process()
 	uint64 duration = startTime - initTime_;
 	if(duration > stampsPerSecond())
 	{
-		WARNING_MSG(fmt::format("DBTask::process(): delay {0:.2f} seconds, try adjusting the kbengine[_defs].xml(numConnections) and MySQL(my.cnf->max_connections or innodb_flush_log_at_trx_commit)!\nsql:({1})\n", 
-			(double(duration)/stampsPerSecondD()), pdbi_->lastquery()));
+		uint64 suppressedCount = 0;
+		if (claimSlowTaskWarning(g_lastDbQueueWarning, g_suppressedDbQueueWarnings,
+			startTime, suppressedCount))
+		{
+			// 完整 SQL 可能包含账号凭据且会让唯一语句绕过日志聚合；只保留定位容量问题所需的时延、长度和抑制数。
+			// Full SQL may contain credentials and defeats duplicate-log aggregation; retain only latency, size, and suppression count.
+			WARNING_MSG(fmt::format("DBTask::process(): queue delay {:.2f}s, queryBytes={}, suppressed={}, check database connection capacity.\n",
+				(double(duration) / stampsPerSecondD()), pdbi_->lastquery().size(), suppressedCount));
+		}
 	}
 
 	duration = timestamp() - startTime;
 	if (duration > stampsPerSecond() * 0.2f)
 	{
-		WARNING_MSG(fmt::format("DBTask::process(): took {:.2f} seconds\nsql:({})\n", 
-			(double(duration)/stampsPerSecondD()), pdbi_->lastquery()));
+		uint64 suppressedCount = 0;
+		const uint64 now = timestamp();
+		if (claimSlowTaskWarning(g_lastDbExecutionWarning, g_suppressedDbExecutionWarnings,
+			now, suppressedCount))
+		{
+			WARNING_MSG(fmt::format("DBTask::process(): execution took {:.2f}s, queryBytes={}, suppressed={}.\n",
+				(double(duration) / stampsPerSecondD()), pdbi_->lastquery().size(), suppressedCount));
+		}
 	}
 
 	return ret;
