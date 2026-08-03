@@ -30,6 +30,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "common/common.h"
 #include "common/objectpool.h"
 #include "math/math.h"
+#include <set>
 
 // #define NDEBUG
 // windows include	
@@ -198,6 +199,7 @@ public:
 	/** 标记可见实体的易变数据需要在下一个更新批次同步。 */
 	/** Marks a visible entity's volatile data for synchronization in the next update batch. */
 	void markViewEntityVolatileDirty(ENTITY_ID entityID);
+	void setVolatileUpdatesEnabled(bool enabled);
 
 	static uint64 activeCount();
 	static uint64 dirtyQueuedCount();
@@ -217,6 +219,11 @@ public:
 	static uint64 sendBytesCount();
 	static uint64 sendBudgetExhaustionCount();
 	static uint64 structuralProcessedCount();
+	static uint64 activeSuppressedCount();
+	static uint64 suppressionTransitionCount();
+	static uint64 resumeTransitionCount();
+	static uint64 suppressedUpdateSkipCount();
+	static uint64 structuralWhileSuppressedCount();
 	static uint64 bundlesSentCount();
 	static uint64 maxBundleBytes();
 
@@ -264,6 +271,8 @@ private:
 	size_t								trackedViewEntityCount_;
 	uint64									nextEntityRefGeneration_;
 	WitnessDirtyQueue						volatileDirtyQueue_;
+	std::set<std::pair<ENTITY_ID, uint64> >	pendingStructuralUpdates_;
+	bool									volatileUpdatesEnabled_;
 };
 
 }

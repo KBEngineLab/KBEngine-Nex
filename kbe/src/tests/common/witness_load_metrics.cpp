@@ -77,11 +77,31 @@ bool testFullScanWorkAccounting()
 	return require(metrics.fullScans() == 2, "full scan count was not maintained") &&
 		require(metrics.fullScanEntities() == 7, "full scan work was not accumulated");
 }
+
+bool testVolatileBackpressureAccounting()
+{
+	KBEngine::WitnessLoadMetrics metrics;
+	metrics.recordVolatileSuppression(true);
+	metrics.recordSuppressedUpdateSkip();
+	metrics.recordStructuralWhileSuppressed();
+	if (!require(metrics.activeSuppressed() == 1, "active suppression count was not maintained") ||
+		!require(metrics.suppressionTransitions() == 1, "suppression transition was not attributed") ||
+		!require(metrics.suppressedUpdateSkips() == 1, "suppressed update skip was not attributed") ||
+		!require(metrics.structuralWhileSuppressed() == 1, "structural bypass was not attributed"))
+	{
+		return false;
+	}
+
+	metrics.recordVolatileSuppression(false);
+	return require(metrics.activeSuppressed() == 0, "resumed Witness remained suppressed") &&
+		require(metrics.resumeTransitions() == 1, "resume transition was not attributed");
+}
 }
 
 int main()
 {
-	if (!testIncrementalViewAccounting() || !testQueueAttribution() || !testFullScanWorkAccounting())
+	if (!testIncrementalViewAccounting() || !testQueueAttribution() || !testFullScanWorkAccounting() ||
+		!testVolatileBackpressureAccounting())
 		return EXIT_FAILURE;
 
 	std::cout << "WITNESS_LOAD_METRICS_TEST_PASS" << std::endl;

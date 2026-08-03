@@ -30,6 +30,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "server/pendingLoginmgr.h"
 #include "server/forward_messagebuffer.h"
 #include "network/endpoint.h"
+#include <set>
 
 //#define NDEBUG
 // windows include	
@@ -81,6 +82,17 @@ public:
 	virtual void handleTimeout(TimerHandle handle, void * arg);
 	virtual void handleGameTick();
 	void handleCheckStatusTick();
+	void evaluateClientVolatileBackpressure(Proxy* pProxy, Network::Channel* pClientChannel);
+	void refreshClientVolatileBackpressure();
+	void setClientVolatileBackpressure(Proxy* pProxy, bool suppressed);
+	void notifyCellVolatileUpdates(Proxy* pProxy, bool enabled);
+	uint64 volatileBackpressuredClients() const;
+	uint64 volatileBackpressureSuppressions() const;
+	uint64 volatileBackpressureResumes() const;
+	uint64 volatileBackpressureEvaluations() const;
+	uint64 volatileBackpressureMaxPendingSegments() const;
+	uint32 volatileBackpressureHighSegments() const;
+	uint32 volatileBackpressureLowSegments() const;
 	void handleBackup();
 	void handleArchive();
 
@@ -559,6 +571,14 @@ protected:
 
 	// 用于客户端动态导入entitydef协议
 	Network::Bundle*										pBundleImportEntityDefDatas_;
+
+	// 只扫描当前受背压的 Proxy，正常运行时不为所有客户端增加周期遍历成本。
+	// Scan only currently backpressured proxies so healthy clients add no periodic traversal cost.
+	std::set<ENTITY_ID>								volatileBackpressuredProxies_;
+	uint64										volatileBackpressureSuppressions_;
+	uint64										volatileBackpressureResumes_;
+	uint64										volatileBackpressureEvaluations_;
+	uint64										volatileBackpressureMaxPendingSegments_;
 };
 
 }

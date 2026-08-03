@@ -262,6 +262,9 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/kcp/timeBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::kcpTimeBudgetExhaustionCount);
 	WATCH_OBJECT("network/kcp/totalProcessingMicros", &networkInterface_, &Network::NetworkInterface::kcpTotalProcessingMicros);
 	WATCH_OBJECT("network/kcp/maxProcessingMicros", &networkInterface_, &Network::NetworkInterface::kcpMaxProcessingMicros);
+	WATCH_OBJECT("network/kcp/ackScheduledChannels", &networkInterface_, &Network::NetworkInterface::kcpAckScheduledChannelCount);
+	WATCH_OBJECT("network/kcp/ackFlushCalls", &networkInterface_, &Network::NetworkInterface::kcpAckFlushCallCount);
+	WATCH_OBJECT("network/kcp/ackBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::kcpAckBudgetExhaustionCount);
 	// waitsnd 指标区分 KCP 自身积压和 completion UDP 队列积压，避免只根据 4 MiB socket backlog 推断根因。
 	// The waitsnd metrics separate KCP-owned backlog from the completion UDP queue instead of inferring the cause from a 4 MiB socket backlog alone.
 	WATCH_OBJECT("network/kcp/pendingSegments", &networkInterface_, &Network::NetworkInterface::kcpPendingSegmentCount);

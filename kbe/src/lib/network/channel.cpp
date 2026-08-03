@@ -482,6 +482,22 @@ void Channel::scheduleKcpUpdate(int64 microseconds)
 }
 
 //-------------------------------------------------------------------------------------
+void Channel::scheduleKcpAck()
+{
+	if (!pKCP_ || pKCP_->ackcount == 0 || isDestroyed() || !pNetworkInterface_)
+		return;
+
+	pNetworkInterface_->kcpUpdateScheduler_.scheduleAck(*this);
+}
+
+//-------------------------------------------------------------------------------------
+void Channel::flushKcpAcks()
+{
+	if (pKCP_ && !isDestroyed())
+		ikcp_flushacks(pKCP_);
+}
+
+//-------------------------------------------------------------------------------------
 bool Channel::hasKcpUpdateTimer() const
 {
 	return pNetworkInterface_ != NULL && pNetworkInterface_->kcpUpdateScheduler_.isScheduled(*this);

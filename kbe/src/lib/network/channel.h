@@ -163,10 +163,17 @@ public:
 	void delayedSend();
 
 	ikcpcb* pKCP() const { return pKCP_; }
+	bool isKcpTransport() const { return protocolSubtype_ == SUB_PROTOCOL_KCP && pKCP_ != NULL; }
+	uint32 kcpPendingSegments() const
+	{
+		return isKcpTransport() ? static_cast<uint32>(ikcp_waitsnd(pKCP_)) : 0;
+	}
 	// 资源验收读取调度器里的实际 active 项，不能只用 KCP Channel 数量推断。
 	// Resource validation reads the scheduler's active entry instead of inferring it only from KCP Channel count.
 	bool hasKcpUpdateTimer() const;
 	void scheduleKcpUpdate(int64 microseconds = 0);
+	void scheduleKcpAck();
+	void flushKcpAcks();
 
 
 	INLINE PacketReader* pPacketReader() const;

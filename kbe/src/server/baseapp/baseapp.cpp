@@ -45,6 +45,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/udp_packet.h"
 #include "network/fixed_messages.h"
 #include "network/encryption_filter.h"
+#include "network/threshold_hysteresis.h"
 #include "server/components.h"
 #include "server/telnet_server.h"
 #include "server/py_file_descriptor.h"
@@ -313,7 +314,12 @@ Baseapp::Baseapp(Network::EventDispatcher& dispatcher,
 	pResmgrTimerHandle_(),
 	pInitProgressHandler_(NULL),
 	flags_(APP_FLAGS_NONE),
-	pBundleImportEntityDefDatas_(NULL)
+	pBundleImportEntityDefDatas_(NULL),
+	volatileBackpressuredProxies_(),
+	volatileBackpressureSuppressions_(0),
+	volatileBackpressureResumes_(0),
+	volatileBackpressureEvaluations_(0),
+	volatileBackpressureMaxPendingSegments_(0)
 {
 	KBEngine::Network::MessageHandlers::pMainMessageHandlers = &BaseappInterface::messageHandlers;
 
@@ -481,6 +487,13 @@ bool Baseapp::initializeWatcher()
 	WATCH_OBJECT("numProxices", this, &Baseapp::numProxices);
 	WATCH_OBJECT("numClients", this, &Baseapp::numClients);
 	WATCH_OBJECT("load", this, &Baseapp::_getLoad);
+	WATCH_OBJECT("network/clientVolatileBackpressure/activeClients", this, &Baseapp::volatileBackpressuredClients);
+	WATCH_OBJECT("network/clientVolatileBackpressure/suppressions", this, &Baseapp::volatileBackpressureSuppressions);
+	WATCH_OBJECT("network/clientVolatileBackpressure/resumes", this, &Baseapp::volatileBackpressureResumes);
+	WATCH_OBJECT("network/clientVolatileBackpressure/evaluations", this, &Baseapp::volatileBackpressureEvaluations);
+	WATCH_OBJECT("network/clientVolatileBackpressure/maxPendingSegments", this, &Baseapp::volatileBackpressureMaxPendingSegments);
+	WATCH_OBJECT("network/clientVolatileBackpressure/configuredHighSegments", this, &Baseapp::volatileBackpressureHighSegments);
+	WATCH_OBJECT("network/clientVolatileBackpressure/configuredLowSegments", this, &Baseapp::volatileBackpressureLowSegments);
 	WATCH_OBJECT("stats/runningTime", &runningTime);
 	return EntityApp<Entity>::initializeWatcher();
 }
@@ -646,6 +659,104 @@ void Baseapp::handleTimeout(TimerHandle handle, void * arg)
 void Baseapp::handleCheckStatusTick()
 {
 	pendingLoginMgr_.process();
+	refreshClientVolatileBackpressure();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Baseapp::volatileBackpressuredClients() const
+{
+	return static_cast<uint64>(volatileBackpressuredProxies_.size());
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Baseapp::volatileBackpressureSuppressions() const { return volatileBackpressureSuppressions_; }
+uint64 Baseapp::volatileBackpressureResumes() const { return volatileBackpressureResumes_; }
+uint64 Baseapp::volatileBackpressureEvaluations() const { return volatileBackpressureEvaluations_; }
+uint64 Baseapp::volatileBackpressureMaxPendingSegments() const { return volatileBackpressureMaxPendingSegments_; }
+uint32 Baseapp::volatileBackpressureHighSegments() const { return Network::g_rudp_extVolatileBackpressureHighSegments; }
+uint32 Baseapp::volatileBackpressureLowSegments() const { return Network::g_rudp_extVolatileBackpressureLowSegments; }
+
+//-------------------------------------------------------------------------------------
+void Baseapp::notifyCellVolatileUpdates(Proxy* pProxy, bool enabled)
+{
+	if (pProxy == NULL || pProxy->cellEntityCall() == NULL)
+		return;
+
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	(*pBundle).newMessage(CellappInterface::setWitnessVolatileUpdatesEnabled);
+	(*pBundle) << pProxy->id() << static_cast<uint8>(enabled ? 1 : 0);
+	pProxy->sendToCellapp(pBundle);
+}
+
+//-------------------------------------------------------------------------------------
+void Baseapp::setClientVolatileBackpressure(Proxy* pProxy, bool suppressed)
+{
+	if (pProxy == NULL)
+		return;
+
+	const ENTITY_ID entityID = pProxy->id();
+	const bool wasSuppressed = volatileBackpressuredProxies_.find(entityID) != volatileBackpressuredProxies_.end();
+	if (wasSuppressed == suppressed)
+		return;
+
+	if (suppressed)
+	{
+		volatileBackpressuredProxies_.insert(entityID);
+		++volatileBackpressureSuppressions_;
+	}
+	else
+	{
+		volatileBackpressuredProxies_.erase(entityID);
+		++volatileBackpressureResumes_;
+	}
+
+	notifyCellVolatileUpdates(pProxy, !suppressed);
+}
+
+//-------------------------------------------------------------------------------------
+void Baseapp::evaluateClientVolatileBackpressure(Proxy* pProxy, Network::Channel* pClientChannel)
+{
+	if (pProxy == NULL)
+		return;
+
+	++volatileBackpressureEvaluations_;
+	const bool wasSuppressed = volatileBackpressuredProxies_.find(pProxy->id()) != volatileBackpressuredProxies_.end();
+	const uint32 high = Network::g_rudp_extVolatileBackpressureHighSegments;
+	if (high == 0 || pClientChannel == NULL || !pClientChannel->isExternal() || !pClientChannel->isKcpTransport())
+	{
+		if (wasSuppressed)
+			setClientVolatileBackpressure(pProxy, false);
+		return;
+	}
+
+	const uint32 pendingSegments = pClientChannel->kcpPendingSegments();
+	volatileBackpressureMaxPendingSegments_ = KBE_MAX(
+		volatileBackpressureMaxPendingSegments_, static_cast<uint64>(pendingSegments));
+	const bool shouldSuppress = Network::ThresholdHysteresis::next(
+		wasSuppressed, pendingSegments, high, Network::g_rudp_extVolatileBackpressureLowSegments);
+	if (shouldSuppress != wasSuppressed)
+		setClientVolatileBackpressure(pProxy, shouldSuppress);
+}
+
+//-------------------------------------------------------------------------------------
+void Baseapp::refreshClientVolatileBackpressure()
+{
+	// setClientVolatileBackpressure 会修改集合，因此每轮先复制有限的拥塞 ID 集合。
+	// setClientVolatileBackpressure mutates the set, so iterate over a bounded snapshot of congested IDs.
+	const std::vector<ENTITY_ID> entityIDs(volatileBackpressuredProxies_.begin(), volatileBackpressuredProxies_.end());
+	for (std::vector<ENTITY_ID>::const_iterator iter = entityIDs.begin(); iter != entityIDs.end(); ++iter)
+	{
+		Proxy* pProxy = static_cast<Proxy*>(pEntities_->find(*iter));
+		if (pProxy == NULL)
+		{
+			volatileBackpressuredProxies_.erase(*iter);
+			continue;
+		}
+
+		Network::Channel* pClientChannel = pProxy->clientEntityCall() != NULL
+			? pProxy->clientEntityCall()->getChannel() : NULL;
+		evaluateClientVolatileBackpressure(pProxy, pClientChannel);
+	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -946,6 +1057,7 @@ void Baseapp::onChannelDeregister(Network::Channel * pChannel)
 		Proxy* proxy = static_cast<Proxy*>(this->findEntity(pid));
 		if(proxy)
 		{
+			setClientVolatileBackpressure(proxy, false);
 			proxy->onClientDeath();
 		}
 	}
@@ -3428,6 +3540,8 @@ void Baseapp::onEntityGetCell(Network::Channel* pChannel, ENTITY_ID id,
 	}
 
 	pEntity->onGetCell(pChannel, componentID);
+	if (volatileBackpressuredProxies_.find(id) != volatileBackpressuredProxies_.end())
+		notifyCellVolatileUpdates(static_cast<Proxy*>(pEntity), false);
 }
 
 //-------------------------------------------------------------------------------------
@@ -4689,6 +4803,9 @@ void Baseapp::forwardMessageToClientFromCellapp(Network::Channel* pChannel,
 	BaseMessagesForwardClientHandler* pBufferedSendToClientMessages = pEntity->pBufferedSendToClientMessages();
 
 	Network::Channel* pClientChannel = entitycall->getChannel();
+	Proxy* pProxy = static_cast<Proxy*>(pEntity);
+	const bool volatileUpdatesSuppressed =
+		volatileBackpressuredProxies_.find(pProxy->id()) != volatileBackpressuredProxies_.end();
 	Network::Bundle* pSendBundle = NULL;
 	
 	static Network::MessageHandler* pMessageHandler = NULL;
@@ -4712,7 +4829,12 @@ void Baseapp::forwardMessageToClientFromCellapp(Network::Channel* pChannel,
 
 	if (!pBufferedSendToClientMessages)
 	{
-		static_cast<Proxy*>(pEntity)->sendToClient(pSendBundle, true);
+		pProxy->sendToClient(pSendBundle, true);
+		// Congested clients are re-evaluated by the bounded status-tick scan. The hot
+		// forwarding path only detects a new high-watermark crossing after admission.
+		// 拥塞客户端由有限的状态 Tick 扫描恢复；转发热路径只在入队后检测新的高水位越界。
+		if (!volatileUpdatesSuppressed)
+			evaluateClientVolatileBackpressure(pProxy, pClientChannel);
 	}
 	else
 	{

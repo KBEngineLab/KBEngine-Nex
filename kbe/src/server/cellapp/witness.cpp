@@ -70,7 +70,9 @@ clientViewSize_(0),
 fullScanRequired_(true),
 trackedViewEntityCount_(0),
 nextEntityRefGeneration_(1),
-volatileDirtyQueue_()
+volatileDirtyQueue_(),
+pendingStructuralUpdates_(),
+volatileUpdatesEnabled_(true)
 {
 	updatableName = "Witness";
 }
@@ -242,6 +244,7 @@ void Witness::clear(Entity* pEntity)
 		EntityRef::reclaimPoolObject((*iter));
 	}
 	
+	setVolatileUpdatesEnabled(true);
 	pEntity_ = NULL;
 	viewRadius_ = 0.0f;
 	viewHysteresisArea_ = 5.0f;
@@ -301,6 +304,7 @@ Witness::SmartPoolObjectPtr Witness::createSmartPoolObj(const std::string& logPo
 //-------------------------------------------------------------------------------------
 void Witness::onReclaimObject()
 {
+	setVolatileUpdatesEnabled(true);
 	synchronizeViewEntityMetrics();
 	clearVolatileDirtyQueue();
 	fullScanRequired_ = true;
@@ -834,6 +838,7 @@ void Witness::clearVolatileDirtyQueue()
 	const size_t queuedCount = volatileDirtyQueue_.size();
 	g_witnessLoadMetrics.recordDirtyDequeued(queuedCount);
 	volatileDirtyQueue_.clear();
+	pendingStructuralUpdates_.clear();
 }
 
 //-------------------------------------------------------------------------------------
@@ -864,8 +869,21 @@ void Witness::queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue)
 	if (!pEntityRef || pEntityRef->flags() == ENTITYREF_FLAG_UNKONWN)
 		return;
 
+	if (isStructuralUpdate(pEntityRef))
+		pendingStructuralUpdates_.insert(std::make_pair(pEntityRef->id(), pEntityRef->generation()));
+
 	if (volatileDirtyQueue_.enqueue(pEntityRef->id(), pEntityRef->generation(), pEntityRef->volatileQueuedRef()))
 		g_witnessLoadMetrics.recordDirtyEnqueued(volatileDirtyQueue_.size(), requeue);
+}
+
+//-------------------------------------------------------------------------------------
+void Witness::setVolatileUpdatesEnabled(bool enabled)
+{
+	if (volatileUpdatesEnabled_ == enabled)
+		return;
+
+	volatileUpdatesEnabled_ = enabled;
+	g_witnessLoadMetrics.recordVolatileSuppression(!enabled);
 }
 
 //-------------------------------------------------------------------------------------
@@ -987,6 +1005,14 @@ void Witness::removeViewEntityRef(EntityRef* pEntityRef)
 //-------------------------------------------------------------------------------------
 void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 {
+	if (!volatileUpdatesEnabled_ && pendingStructuralUpdates_.empty())
+	{
+		// 没有结构事件时保持整条去重队列静止，避免拥塞期间每 Tick 扫描并重排所有可见实体。
+		// Keep the deduplicated queue stationary when no structural event exists, avoiding a full visible-set scan every congested tick.
+		g_witnessLoadMetrics.recordSuppressedUpdateSkip();
+		return;
+	}
+
 	const EngineComponentInfo& config = g_kbeSrvConfig.getCellApp();
 	WitnessVolatileBudget volatileBudget(config.witness_volatile_bytes_per_tick);
 	WitnessVolatileBudget sendBudget(witnessEffectiveByteLimit(
@@ -1013,6 +1039,7 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 		VIEW_ENTITIES_MAP::iterator iter = viewEntities_map_.find(entry.entityID);
 		if (iter == viewEntities_map_.end() || iter->second->generation() != entry.generation)
 		{
+			pendingStructuralUpdates_.erase(std::make_pair(entry.entityID, entry.generation));
 			g_witnessLoadMetrics.recordStaleDiscard();
 			continue;
 		}
@@ -1020,6 +1047,11 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 		EntityRef* pEntityRef = iter->second;
 		pEntityRef->volatileQueued(false);
 		const bool structuralUpdate = isStructuralUpdate(pEntityRef);
+		if (!volatileUpdatesEnabled_ && !structuralUpdate)
+		{
+			queueEntityRefVolatile(pEntityRef, true);
+			continue;
+		}
 		if (!volatileBudget.canSend(structuralUpdate))
 		{
 			// Tick 快照仍继续向后检查结构消息；普通易变更新回队后会在下 Tick 读取实体最新状态。
@@ -1045,10 +1077,18 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 			volatileBudget.recordBundleGrowth(beforeBytes, afterBytes);
 		}
 		else
+		{
+			pendingStructuralUpdates_.erase(std::make_pair(entry.entityID, entry.generation));
 			g_witnessLoadMetrics.recordStructuralProcessed();
+			if (!volatileUpdatesEnabled_)
+				g_witnessLoadMetrics.recordStructuralWhileSuppressed();
+		}
 		g_witnessLoadMetrics.recordDirtyProcessed();
 		if (!retained)
 			removeViewEntityRef(pEntityRef);
+
+		if (!volatileUpdatesEnabled_ && pendingStructuralUpdates_.empty())
+			break;
 	}
 
 	g_witnessLoadMetrics.recordVolatileBytes(volatileBudget.bytesSent());
@@ -1164,6 +1204,36 @@ uint64 Witness::structuralProcessedCount()
 }
 
 //-------------------------------------------------------------------------------------
+uint64 Witness::activeSuppressedCount()
+{
+	return g_witnessLoadMetrics.activeSuppressed();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::suppressionTransitionCount()
+{
+	return g_witnessLoadMetrics.suppressionTransitions();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::resumeTransitionCount()
+{
+	return g_witnessLoadMetrics.resumeTransitions();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::suppressedUpdateSkipCount()
+{
+	return g_witnessLoadMetrics.suppressedUpdateSkips();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::structuralWhileSuppressedCount()
+{
+	return g_witnessLoadMetrics.structuralWhileSuppressed();
+}
+
+//-------------------------------------------------------------------------------------
 uint64 Witness::bundlesSentCount()
 {
 	return g_witnessLoadMetrics.bundlesSent();
@@ -1209,6 +1279,9 @@ bool Witness::update()
 
 	if (viewEntities_map_.size() > 0 || pEntity_->isControlledNotSelfClient())
 	{
+		if (fullScanRequired_)
+			prepareFullScanQueue();
+
 		Network::Bundle* pSendBundle = pChannel->createSendBundle();
 		
 		// 得到当前pSendBundle中是否有数据，如果有数据表示该bundle是重用的缓存的数据包
@@ -1216,10 +1289,8 @@ bool Witness::update()
 			(pSendBundle->pCurrPacket() && pSendBundle->pCurrPacket()->length() > 0);
 		
 		NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pEntity_->id(), (*pSendBundle));
-		addBaseDataToStream(pSendBundle);
-
-		if (fullScanRequired_)
-			prepareFullScanQueue();
+		if (volatileUpdatesEnabled_)
+			addBaseDataToStream(pSendBundle);
 
 		processVolatileDirtyQueue(pSendBundle);
 

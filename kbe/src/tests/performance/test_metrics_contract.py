@@ -462,12 +462,22 @@ def assert_python_latency_scenario() -> None:
     assert gameplay["watcher_intervals"]["BASEAPPMGR_TYPE:root/allocation"] == 5.0
     assert "CELLAPPMGR_TYPE=@cellappmgr:root/allocation" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["CELLAPPMGR_TYPE:root/allocation"] == 5.0
+    assert "BASEAPP_TYPE=@baseapp:root/network/clientVolatileBackpressure" in gameplay["watcher_targets"]
+    assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/clientVolatileBackpressure"] == 5.0
+    assert "CELLAPP_TYPE=@cellapp:root/witness/backpressure" in gameplay["watcher_targets"]
+    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/witness/backpressure"] == 5.0
 
     defaults_path = Path(__file__).resolve().parents[3] / "res/server/kbengine_defaults.xml"
     defaults_source = defaults_path.read_text(encoding="utf-8")
     assert "<witness_total_bytes_per_tick> 2048 </witness_total_bytes_per_tick>" in defaults_source
     assert "<witness_global_bytes_per_tick> 1048576 </witness_global_bytes_per_tick>" in defaults_source
+    assert "<highSegments> 128 </highSegments>" in defaults_source
+    assert "<lowSegments> 32 </lowSegments>" in defaults_source
     assert "<spaceAllocationMaxSkew> 2 </spaceAllocationMaxSkew>" in defaults_source
+    baseapp_source = (Path(__file__).resolve().parents[2] / "server/baseapp/baseapp.cpp").read_text(encoding="utf-8")
+    cellapp_source = (Path(__file__).resolve().parents[2] / "server/cellapp/cellapp.cpp").read_text(encoding="utf-8")
+    assert 'WATCH_OBJECT("network/clientVolatileBackpressure/activeClients"' in baseapp_source
+    assert 'WATCH_OBJECT("witness/backpressure/activeSuppressed"' in cellapp_source
 
 
 def assert_multi_component_cluster_manifest() -> None:
@@ -771,7 +781,8 @@ def main() -> int:
     scheduler_source = (
         repository_root / "kbe/src/lib/network/kcp_update_scheduler.cpp"
     ).read_text(encoding="utf-8")
-    assert "KCP_MIN_UPDATES_PER_WAKEUP = 1" in scheduler_source
+    assert "KCP_MIN_UPDATES_PER_WAKEUP = 4" in scheduler_source
+    assert "KCP_MIN_ACK_FLUSHES_PER_WAKEUP = 1" in scheduler_source
     assert "KCP_MAX_UPDATES_PER_WAKEUP = 2048" in scheduler_source
     assert "KCP_BACKLOG_RETRY_DELAY_MICROS = 1000" in scheduler_source
     assert "protocolTickMissCount_" in scheduler_source

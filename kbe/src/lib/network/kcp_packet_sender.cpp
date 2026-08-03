@@ -116,22 +116,25 @@ Reason KCPPacketSender::processFilterPacket(Channel* pChannel, Packet * pPacket,
 
 	if (userarg > 0)
 	{
-		pChannel->scheduleKcpUpdate();
+		// 队列上限是可恢复背压状态，调用方会保留 Bundle 重试；不要在热路径逐次写 ERROR 放大阻塞。
+		// The queue cap is recoverable backpressure and callers retain the Bundle for retry; avoid per-attempt ERROR amplification.
+		if (ikcp_waitsnd(pChannel->pKCP()) > (int)(pChannel->pKCP()->snd_wnd * 2))
+			return REASON_RESOURCE_UNAVAILABLE;
 
-		// 队列超过发送窗口两倍时主动背压，避免持续堆积扩大 Channel 内存。
-		// Apply backpressure above twice the send window to prevent unbounded Channel memory growth.
-		if (ikcp_waitsnd(pChannel->pKCP()) > (int)(pChannel->pKCP()->snd_wnd * 2) ||
-			ikcp_send(pChannel->pKCP(), (const char*)pPacket->data(), toIntSize(pPacket->length())) < 0)
+		const int sendResult = ikcp_send(
+			pChannel->pKCP(), (const char*)pPacket->data(), toIntSize(pPacket->length()));
+		if (sendResult < 0)
 		{
-			if (pChannel->isInternal())
-			{
-				ERROR_MSG(fmt::format("KCPPacketSender::ikcp_send: send error! currPacketSize={}, ikcp_waitsnd={}, snd_wndsize={}\n",
-					pPacket->length(), ikcp_waitsnd(pChannel->pKCP()), pChannel->pKCP()->snd_wnd));
-			}
+			ERROR_MSG(fmt::format("KCPPacketSender::ikcp_send: rejected packet, result={}, currPacketSize={}, ikcp_waitsnd={}, snd_wndsize={}\n",
+				sendResult, pPacket->length(), ikcp_waitsnd(pChannel->pKCP()), pChannel->pKCP()->snd_wnd));
 
 			return REASON_RESOURCE_UNAVAILABLE;
 		}
 
+		// Only successful admissions need an immediate wakeup. Pending KCP data already
+		// owns a scheduler entry, so retries rejected by the cap must not reschedule it.
+		// 只有成功入队才需要立即唤醒；已有 KCP 数据已持有调度项，队列上限拒绝的重试不得重复调度。
+		pChannel->scheduleKcpUpdate();
 		pPacket->sentSize += toUint32Size(pPacket->length());
 	}
 	else

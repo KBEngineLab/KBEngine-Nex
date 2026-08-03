@@ -210,6 +210,11 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
 
 	//entity丢失了一个观察者(客户端)
 	ENTITY_MESSAGE_DECLARE_ARGS0(onLoseWitness,										NETWORK_FIXED_MESSAGE)
+
+	// BaseApp 根据外部 KCP 迟滞水位启停该 Witness 的易变位置更新；可靠结构消息不受影响。
+	// BaseApp toggles volatile positional updates using external-KCP hysteresis; reliable structural messages remain enabled.
+	ENTITY_MESSAGE_DECLARE_ARGS1(setWitnessVolatileUpdatesEnabled,				NETWORK_FIXED_MESSAGE,
+									uint8,									enabled)
 NETWORK_INTERFACE_DECLARE_END()
 
 #ifdef DEFINE_IN_INTERFACE

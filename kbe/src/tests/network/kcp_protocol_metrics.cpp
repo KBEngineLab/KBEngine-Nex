@@ -1,4 +1,5 @@
 #include "network/ikcp.h"
+#include "network/threshold_hysteresis.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -42,8 +43,11 @@ bool testAckCounters()
 	bool ok = require(outboundA.size() == 1, "initial KCP payload was not emitted") &&
 		require(ikcp_input(b, outboundA[0].data(), static_cast<long>(outboundA[0].size())) == 0,
 			"peer rejected the KCP payload");
-	ikcp_update(b, 0);
+	ikcp_flushacks(b);
 	ok = require(outboundB.size() == 1, "KCP ACK was not emitted") && ok;
+	ok = require(b->ackcount == 0, "dedicated ACK flush did not clear pending ACKs") && ok;
+	ikcp_flushacks(b);
+	ok = require(outboundB.size() == 1, "empty ACK flush emitted a duplicate datagram") && ok;
 	if (!outboundB.empty())
 	{
 		ok = require(ikcp_input(a, outboundB[0].data(), static_cast<long>(outboundB[0].size())) == 0,
@@ -124,11 +128,75 @@ bool testFlushSegmentBudget()
 	ikcp_release(kcp);
 	return ok;
 }
+
+bool testTimeoutRetransmissionBudget()
+{
+	Datagrams outbound;
+	ikcpcb* kcp = ikcp_create(11, &outbound);
+	if (!require(kcp != NULL, "KCP allocation failed"))
+		return false;
+	kcp->output = captureDatagram;
+	ikcp_nodelay(kcp, 1, 10, 2, 1);
+	kcp->rx_rto = 20;
+	bool ok = require(ikcp_setflushlimit(kcp, 2) == 0, "flush limit was rejected");
+	const char payload[] = "retransmission-budget";
+	for (int index = 0; index < 5; ++index)
+		ok = require(ikcp_send(kcp, payload, static_cast<int>(sizeof(payload))) == 0,
+			"KCP payload enqueue failed") && ok;
+
+	// Drain initial admissions first, then align all deadlines to exercise only
+	// timeout retransmission fairness. / 先完成首次发送，再对齐截止时间，只验证超时重传公平性。
+	ikcp_update(kcp, 0);
+	ikcp_update(kcp, 1);
+	ikcp_update(kcp, 2);
+	for (struct IQUEUEHEAD* node = kcp->snd_buf.next; node != &kcp->snd_buf; node = node->next)
+	{
+		IKCPSEG* segment = iqueue_entry(node, IKCPSEG, node);
+		segment->resendts = 20;
+	}
+	kcp->timeout_retransmissions = 0;
+	outbound.clear();
+
+	ikcp_update(kcp, 20);
+	ok = require(kcp->timeout_retransmissions == 2,
+		"first retransmission flush did not emit exactly two segments") && ok;
+	ok = require(ikcp_check(kcp, 20) == 21,
+		"limited retransmission flush did not request a one-millisecond continuation") && ok;
+	ikcp_update(kcp, 21);
+	ok = require(kcp->timeout_retransmissions == 4,
+		"second retransmission flush did not emit exactly two segments") && ok;
+	ok = require(ikcp_check(kcp, 21) == 22,
+		"second limited retransmission flush did not request a continuation") && ok;
+	ikcp_update(kcp, 22);
+	ok = require(kcp->timeout_retransmissions == 5,
+		"final retransmission flush did not emit the remaining segment") && ok;
+
+	ikcp_release(kcp);
+	return ok;
+}
+
+bool testThresholdHysteresis()
+{
+	using KBEngine::Network::ThresholdHysteresis;
+	return require(!ThresholdHysteresis::next(false, 127, 128, 32),
+		"hysteresis activated below the high watermark") &&
+		require(ThresholdHysteresis::next(false, 128, 128, 32),
+			"hysteresis did not activate at the high watermark") &&
+		require(ThresholdHysteresis::next(true, 33, 128, 32),
+			"hysteresis did not retain state inside the band") &&
+		require(!ThresholdHysteresis::next(true, 32, 128, 32),
+			"hysteresis did not clear at the low watermark") &&
+		require(!ThresholdHysteresis::next(true, 1000, 0, 32),
+			"disabled hysteresis retained active state") &&
+		require(!ThresholdHysteresis::next(true, 64, 64, 128),
+			"low watermark above high was not bounded");
+}
 }
 
 int main()
 {
-	if (!testAckCounters() || !testRetransmissionCounters() || !testFlushSegmentBudget())
+	if (!testAckCounters() || !testRetransmissionCounters() || !testFlushSegmentBudget() ||
+		!testTimeoutRetransmissionBudget() || !testThresholdHysteresis())
 		return EXIT_FAILURE;
 
 	std::cout << "KCP_PROTOCOL_METRICS_TEST_PASS" << std::endl;

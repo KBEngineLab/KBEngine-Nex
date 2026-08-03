@@ -441,6 +441,7 @@ public:
 
 	*/
 	void onLoseWitness(Network::Channel* pChannel);
+	void setWitnessVolatileUpdatesEnabled(Network::Channel* pChannel, uint8 enabled);
 
 	/** 
 		client更新数据

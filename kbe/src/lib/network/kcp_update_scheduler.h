@@ -20,6 +20,7 @@ public:
 	~KcpUpdateScheduler() override;
 
 	void schedule(Channel& channel, int64 microseconds);
+	void scheduleAck(Channel& channel);
 	void cancel(Channel& channel);
 	bool isScheduled(const Channel& channel) const;
 
@@ -43,6 +44,9 @@ public:
 	uint64 timeBudgetExhaustionCount() const { return timeBudgetExhaustionCount_; }
 	uint64 totalProcessingMicros() const { return totalProcessingMicros_; }
 	uint64 maxProcessingMicros() const { return maxProcessingMicros_; }
+	uint64 ackScheduledChannelCount() const { return static_cast<uint64>(ackQueue_.scheduledCount()); }
+	uint64 ackFlushCallCount() const { return ackFlushCallCount_; }
+	uint64 ackBudgetExhaustionCount() const { return ackBudgetExhaustionCount_; }
 
 private:
 	void handleTimeout(TimerHandle handle, void* pUser) override;
@@ -53,6 +57,7 @@ private:
 
 	EventDispatcher& dispatcher_;
 	KcpUpdateQueue queue_;
+	KcpUpdateQueue ackQueue_;
 	TimerHandle timerHandle_;
 	uint64 timerDueTime_;
 	bool processing_;
@@ -68,6 +73,8 @@ private:
 	uint64 timeBudgetExhaustionCount_;
 	uint64 totalProcessingMicros_;
 	uint64 maxProcessingMicros_;
+	uint64 ackFlushCallCount_;
+	uint64 ackBudgetExhaustionCount_;
 };
 
 }

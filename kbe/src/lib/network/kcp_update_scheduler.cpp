@@ -17,20 +17,23 @@ namespace
 // 积压时单个 ikcp_update 可能因大量重传而从微秒级放大到毫秒级；小批量后即检查时间预算，
 // 避免“至少 256 次”把一次 2ms 调度轮次放大成数百毫秒并继续制造超时重传。
 // A backlogged ikcp_update can grow from microseconds to milliseconds due to retransmissions.
-// Check the time budget after every channel. Under retransmission pressure even one
-// ikcp_update may take milliseconds, so a multi-channel floor can still monopolize
-// EventDispatcher::processTimers and starve IO before the budget is observed.
-// 每个通道后都检查时间预算。重传压力下单次 ikcp_update 也可能达到毫秒级，
-// 多通道下限仍会在检查预算前独占 processTimers 并饿死 IO。
-const size_t KCP_MIN_UPDATES_PER_WAKEUP = 1;
+// Per-channel data emission is now bounded, so a small deterministic floor prevents
+// wall-clock preemption from turning a 2ms budget into one update per wakeup. The
+// upper cap and time check still bound each turn after the floor is satisfied.
+// 单通道数据输出已有上限，因此使用小型确定批次，避免线程抢占把 2ms 预算退化为每次只更新一个通道；
+// 达到下限后仍由总数量和时间预算限制本轮。
+const size_t KCP_MIN_UPDATES_PER_WAKEUP = 4;
+const size_t KCP_MIN_ACK_FLUSHES_PER_WAKEUP = 1;
 const size_t KCP_MAX_UPDATES_PER_WAKEUP = 2048;
 const uint64 KCP_PROCESSING_TIME_BUDGET_MICROS = 2000;
+const uint64 KCP_ACK_PROCESSING_TIME_BUDGET_MICROS = 2000;
 const int64 KCP_BACKLOG_RETRY_DELAY_MICROS = 1000;
 }
 
 KcpUpdateScheduler::KcpUpdateScheduler(EventDispatcher& dispatcher) :
 	dispatcher_(dispatcher),
 	queue_(),
+	ackQueue_(),
 	timerHandle_(),
 	timerDueTime_(0),
 	processing_(false),
@@ -45,7 +48,9 @@ KcpUpdateScheduler::KcpUpdateScheduler(EventDispatcher& dispatcher) :
 	maxConsecutiveBudgetExhaustions_(0),
 	timeBudgetExhaustionCount_(0),
 	totalProcessingMicros_(0),
-	maxProcessingMicros_(0)
+	maxProcessingMicros_(0),
+	ackFlushCallCount_(0),
+	ackBudgetExhaustionCount_(0)
 {
 }
 
@@ -110,9 +115,21 @@ void KcpUpdateScheduler::schedule(Channel& channel, int64 microseconds)
 }
 
 //-------------------------------------------------------------------------------------
+void KcpUpdateScheduler::scheduleAck(Channel& channel)
+{
+	const uint64 dueTime = timestamp() + delayToStamps(1);
+	if (ackQueue_.schedule(channelKey(channel), dueTime) && !processing_)
+		armNextTimer();
+}
+
+//-------------------------------------------------------------------------------------
 void KcpUpdateScheduler::cancel(Channel& channel)
 {
-	if (queue_.cancel(channelKey(channel)) && !processing_)
+	const KcpUpdateQueue::Key key = channelKey(channel);
+	const bool dataChanged = queue_.cancel(key);
+	const bool ackChanged = ackQueue_.cancel(key);
+	const bool changed = dataChanged || ackChanged;
+	if (changed && !processing_)
 	{
 		armNextTimer();
 	}
@@ -127,8 +144,11 @@ bool KcpUpdateScheduler::isScheduled(const Channel& channel) const
 //-------------------------------------------------------------------------------------
 void KcpUpdateScheduler::armNextTimer()
 {
-	uint64 dueTime = 0;
-	if (!queue_.nextDue(dueTime))
+	uint64 dataDueTime = 0;
+	uint64 ackDueTime = 0;
+	const bool hasData = queue_.nextDue(dataDueTime);
+	const bool hasAck = ackQueue_.nextDue(ackDueTime);
+	if (!hasData && !hasAck)
 	{
 		if (timerHandle_.isSet())
 		{
@@ -137,6 +157,8 @@ void KcpUpdateScheduler::armNextTimer()
 		timerDueTime_ = 0;
 		return;
 	}
+	const uint64 dueTime = hasData && hasAck
+		? std::min(dataDueTime, ackDueTime) : (hasData ? dataDueTime : ackDueTime);
 
 	// An already armed earlier timer is a harmless early wakeup and avoids another global timer cancellation/allocation.
 	// 已投递的更早 timer 只会产生一次无害的提前唤醒，保留它可避免再次取消和分配全局 timer。
@@ -173,15 +195,38 @@ void KcpUpdateScheduler::handleTimeout(TimerHandle handle, void*)
 
 	processing_ = true;
 	const uint64 processingStart = timestamp();
-	const uint64 processingBudget = delayToStamps(KCP_PROCESSING_TIME_BUDGET_MICROS);
-	const uint64 now = processingStart;
+	const uint64 ackBudget = delayToStamps(KCP_ACK_PROCESSING_TIME_BUDGET_MICROS);
 	KcpUpdateQueue::Key key = 0;
 	KcpUpdateQueue::Time dueTime = 0;
+	size_t ackProcessed = 0;
+	for (; ackProcessed < KCP_MAX_UPDATES_PER_WAKEUP; ++ackProcessed)
+	{
+		if (ackProcessed >= KCP_MIN_ACK_FLUSHES_PER_WAKEUP &&
+			timestamp() - processingStart >= ackBudget)
+			break;
+		if (!ackQueue_.takeDue(processingStart, key, &dueTime))
+			break;
+		Channel* channel = reinterpret_cast<Channel*>(key);
+		++ackFlushCallCount_;
+		channel->flushKcpAcks();
+		ackQueue_.cancel(key);
+	}
+	if (ackProcessed >= KCP_MAX_UPDATES_PER_WAKEUP ||
+		(ackProcessed >= KCP_MIN_ACK_FLUSHES_PER_WAKEUP && timestamp() - processingStart >= ackBudget))
+	{
+		KcpUpdateQueue::Time nextAckDue = 0;
+		if (ackQueue_.nextDue(nextAckDue) && nextAckDue <= processingStart)
+			++ackBudgetExhaustionCount_;
+	}
+
+	const uint64 dataProcessingStart = timestamp();
+	const uint64 processingBudget = delayToStamps(KCP_PROCESSING_TIME_BUDGET_MICROS);
+	const uint64 now = dataProcessingStart;
 	size_t processed = 0;
 	for (; processed < KCP_MAX_UPDATES_PER_WAKEUP; ++processed)
 	{
 		if (processed >= KCP_MIN_UPDATES_PER_WAKEUP &&
-			timestamp() - processingStart >= processingBudget)
+			timestamp() - dataProcessingStart >= processingBudget)
 		{
 			break;
 		}
@@ -202,6 +247,7 @@ void KcpUpdateScheduler::handleTimeout(TimerHandle handle, void*)
 				++protocolTickMissCount_;
 		}
 		Channel* channel = reinterpret_cast<Channel*>(key);
+		ackQueue_.cancel(key);
 		++updateCallCount_;
 		channel->updateKcp();
 		if (!queue_.isScheduled(key))
@@ -213,11 +259,12 @@ void KcpUpdateScheduler::handleTimeout(TimerHandle handle, void*)
 	}
 
 	const uint64 processingElapsed = timestamp() - processingStart;
+	const uint64 dataProcessingElapsed = timestamp() - dataProcessingStart;
 	const uint64 processingMicros = static_cast<uint64>(stampsToDelay(processingElapsed));
 	totalProcessingMicros_ += processingMicros;
 	maxProcessingMicros_ = std::max(maxProcessingMicros_, processingMicros);
 	const bool timeBudgetExhausted = processed >= KCP_MIN_UPDATES_PER_WAKEUP &&
-		processingElapsed >= processingBudget;
+		dataProcessingElapsed >= processingBudget;
 	if (timeBudgetExhausted)
 		++timeBudgetExhaustionCount_;
 

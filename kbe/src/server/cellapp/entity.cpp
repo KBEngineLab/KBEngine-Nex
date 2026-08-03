@@ -2317,6 +2317,31 @@ void Entity::onLoseWitness(Network::Channel* pChannel)
 }
 
 //-------------------------------------------------------------------------------------
+void Entity::setWitnessVolatileUpdatesEnabled(Network::Channel* pChannel, uint8 enabled)
+{
+	if (pChannel == NULL || pChannel->isExternal())
+		return;
+
+	if (!isReal())
+	{
+		// 跨 Cell 迁移期间 BaseApp 可能仍命中旧 Ghost；沿现有 GhostManager 路由到当前 Real。
+		// During cross-cell migration BaseApp may still reach the old ghost; route through GhostManager to the current real.
+		GhostManager* gm = Cellapp::getSingleton().pGhostManager();
+		if (gm)
+		{
+			Network::Bundle* pBundle = gm->createSendBundle(realCell());
+			pBundle->newMessage(CellappInterface::setWitnessVolatileUpdatesEnabled);
+			(*pBundle) << id() << enabled;
+			gm->pushMessage(realCell(), pBundle);
+		}
+		return;
+	}
+
+	if (pWitness_)
+		pWitness_->setVolatileUpdatesEnabled(enabled != 0);
+}
+
+//-------------------------------------------------------------------------------------
 int Entity::pySetLayer(PyObject *value)
 {
 	if(isDestroyed())	

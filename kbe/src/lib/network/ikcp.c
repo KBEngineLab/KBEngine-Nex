@@ -937,6 +937,46 @@ static int ikcp_wnd_unused(const ikcpcb *kcp)
 
 
 //---------------------------------------------------------------------
+// ikcp_flushacks
+//---------------------------------------------------------------------
+void ikcp_flushacks(ikcpcb *kcp)
+{
+	char *buffer = kcp->buffer;
+	char *ptr = buffer;
+	int count = kcp->ackcount;
+	int i;
+	IKCPSEG seg;
+
+	if (count <= 0) return;
+
+	seg.conv = kcp->conv;
+	seg.cmd = IKCP_CMD_ACK;
+	seg.frg = 0;
+	seg.wnd = ikcp_wnd_unused(kcp);
+	seg.una = kcp->rcv_nxt;
+	seg.len = 0;
+	seg.sn = 0;
+	seg.ts = 0;
+
+	kcp->ack_sent += (IUINT64)count;
+	for (i = 0; i < count; i++) {
+		int size = (int)(ptr - buffer);
+		if (size + (int)IKCP_OVERHEAD > (int)kcp->mtu) {
+			ikcp_output(kcp, buffer, size);
+			ptr = buffer;
+		}
+		ikcp_ack_get(kcp, i, &seg.sn, &seg.ts);
+		ptr = ikcp_encode_seg(ptr, &seg);
+	}
+
+	kcp->ackcount = 0;
+	if (ptr > buffer) {
+		ikcp_output(kcp, buffer, (int)(ptr - buffer));
+	}
+}
+
+
+//---------------------------------------------------------------------
 // ikcp_flush
 //---------------------------------------------------------------------
 void ikcp_flush(ikcpcb *kcp)
@@ -944,8 +984,9 @@ void ikcp_flush(ikcpcb *kcp)
 	IUINT32 current = kcp->current;
 	char *buffer = kcp->buffer;
 	char *ptr = buffer;
-	int count, size, i;
+	int size;
 	IUINT32 admitted = 0;
+	IUINT32 data_sent = 0;
 	IUINT32 resent, cwnd;
 	IUINT32 rtomin;
 	struct IQUEUEHEAD *p;
@@ -966,20 +1007,10 @@ void ikcp_flush(ikcpcb *kcp)
 	seg.sn = 0;
 	seg.ts = 0;
 
-	// flush acknowledges
-	count = kcp->ackcount;
-	kcp->ack_sent += (IUINT64)count;
-	for (i = 0; i < count; i++) {
-		size = (int)(ptr - buffer);
-		if (size + (int)IKCP_OVERHEAD > (int)kcp->mtu) {
-			ikcp_output(kcp, buffer, size);
-			ptr = buffer;
-		}
-		ikcp_ack_get(kcp, i, &seg.sn, &seg.ts);
-		ptr = ikcp_encode_seg(ptr, &seg);
-	}
-
-	kcp->ackcount = 0;
+	// ACKs use a separate bounded scheduler under backlog. A normal protocol
+	// update still drains them here when it wins the race.
+	// 积压时 ACK 使用独立有界调度器；普通协议更新先执行时仍会在此清空 ACK。
+	ikcp_flushacks(kcp);
 
 	// probe window size (if remote window size equals zero)
 	if (kcp->rmt_wnd == 0) {
@@ -1070,15 +1101,32 @@ void ikcp_flush(ikcpcb *kcp)
 	// flush data segments
 	for (p = kcp->snd_buf.next; p != &kcp->snd_buf; p = p->next) {
 		IKCPSEG *segment = iqueue_entry(p, IKCPSEG, node);
-		int needsend = 0;
+		int send_reason = 0;
 		if (segment->xmit == 0) {
-			needsend = 1;
+			send_reason = 1;
+		}
+		else if (_itimediff(current, segment->resendts) >= 0) {
+			send_reason = 2;
+		}
+		else if (segment->fastack >= resent) {
+			send_reason = 3;
+		}
+
+		if (send_reason && kcp->flush_segment_limit > 0 &&
+			data_sent >= kcp->flush_segment_limit) {
+			/* ACKs and probes were already flushed. Continue overdue data in a bounded
+			 * follow-up so one channel cannot monopolize the global scheduler.
+			 * ACK 与探测已优先发送；逾期数据在有界后续批次继续，避免单通道独占全局调度器。 */
+			kcp->flush_limited = 1;
+			break;
+		}
+
+		if (send_reason == 1) {
 			segment->xmit++;
 			segment->rto = kcp->rx_rto;
 			segment->resendts = current + segment->rto + rtomin;
 		}
-		else if (_itimediff(current, segment->resendts) >= 0) {
-			needsend = 1;
+		else if (send_reason == 2) {
 			segment->xmit++;
 			kcp->xmit++;
 			kcp->timeout_retransmissions++;
@@ -1090,8 +1138,7 @@ void ikcp_flush(ikcpcb *kcp)
 			segment->resendts = current + segment->rto;
 			lost = 1;
 		}
-		else if (segment->fastack >= resent) {
-			needsend = 1;
+		else if (send_reason == 3) {
 			segment->xmit++;
 			segment->fastack = 0;
 			segment->resendts = current + segment->rto;
@@ -1099,7 +1146,7 @@ void ikcp_flush(ikcpcb *kcp)
 			kcp->fast_retransmissions++;
 		}
 
-		if (needsend) {
+		if (send_reason) {
 			int size, need;
 			segment->ts = current;
 			segment->wnd = seg.wnd;
@@ -1123,6 +1170,7 @@ void ikcp_flush(ikcpcb *kcp)
 			if (segment->xmit >= kcp->dead_link) {
 				kcp->state = -1;
 			}
+			data_sent++;
 		}
 	}
 
@@ -1227,6 +1275,12 @@ IUINT32 ikcp_check(const ikcpcb *kcp, IUINT32 current)
 	}
 
 	tm_flush = _itimediff(ts_flush, current);
+	if (kcp->flush_limited) {
+		/* Overdue segments intentionally remain after a bounded flush. Honor the
+		 * continuation deadline instead of busy-rescheduling before it can run.
+		 * 有界 flush 后会刻意保留逾期段；应遵守续传时刻，避免可执行前空转调度。 */
+		return current + (IUINT32)tm_flush;
+	}
 
 	for (p = kcp->snd_buf.next; p != &kcp->snd_buf; p = p->next) {
 		const IKCPSEG *seg = iqueue_entry(p, const IKCPSEG, node);

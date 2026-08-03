@@ -67,6 +67,22 @@ public:
 	void recordSendBytes(std::uint64_t bytes) { sendBytes_ += bytes; }
 	void recordSendBudgetExhaustion() { ++sendBudgetExhaustions_; }
 	void recordStructuralProcessed() { ++structuralProcessed_; }
+	void recordVolatileSuppression(bool suppressed)
+	{
+		if (suppressed)
+		{
+			++activeSuppressed_;
+			++suppressionTransitions_;
+		}
+		else
+		{
+			assert(activeSuppressed_ > 0);
+			--activeSuppressed_;
+			++resumeTransitions_;
+		}
+	}
+	void recordSuppressedUpdateSkip() { ++suppressedUpdateSkips_; }
+	void recordStructuralWhileSuppressed() { ++structuralWhileSuppressed_; }
 	void recordBundle(std::size_t bytes)
 	{
 		++bundlesSent_;
@@ -91,6 +107,11 @@ public:
 	std::uint64_t sendBytes() const { return sendBytes_; }
 	std::uint64_t sendBudgetExhaustions() const { return sendBudgetExhaustions_; }
 	std::uint64_t structuralProcessed() const { return structuralProcessed_; }
+	std::uint64_t activeSuppressed() const { return activeSuppressed_; }
+	std::uint64_t suppressionTransitions() const { return suppressionTransitions_; }
+	std::uint64_t resumeTransitions() const { return resumeTransitions_; }
+	std::uint64_t suppressedUpdateSkips() const { return suppressedUpdateSkips_; }
+	std::uint64_t structuralWhileSuppressed() const { return structuralWhileSuppressed_; }
 	std::uint64_t bundlesSent() const { return bundlesSent_; }
 	std::uint64_t maxBundleBytes() const { return maxBundleBytes_; }
 
@@ -112,6 +133,11 @@ private:
 	std::uint64_t sendBytes_ = 0;
 	std::uint64_t sendBudgetExhaustions_ = 0;
 	std::uint64_t structuralProcessed_ = 0;
+	std::uint64_t activeSuppressed_ = 0;
+	std::uint64_t suppressionTransitions_ = 0;
+	std::uint64_t resumeTransitions_ = 0;
+	std::uint64_t suppressedUpdateSkips_ = 0;
+	std::uint64_t structuralWhileSuppressed_ = 0;
 	std::uint64_t bundlesSent_ = 0;
 	std::uint64_t maxBundleBytes_ = 0;
 };

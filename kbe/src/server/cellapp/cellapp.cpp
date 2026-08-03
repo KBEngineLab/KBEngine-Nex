@@ -309,6 +309,11 @@ bool Cellapp::initializeWatcher()
 	WATCH_OBJECT("witness/sendBytes", &Witness::sendBytesCount);
 	WATCH_OBJECT("witness/sendBudgetExhaustions", &Witness::sendBudgetExhaustionCount);
 	WATCH_OBJECT("witness/structuralProcessed", &Witness::structuralProcessedCount);
+	WATCH_OBJECT("witness/backpressure/activeSuppressed", &Witness::activeSuppressedCount);
+	WATCH_OBJECT("witness/backpressure/suppressionTransitions", &Witness::suppressionTransitionCount);
+	WATCH_OBJECT("witness/backpressure/resumeTransitions", &Witness::resumeTransitionCount);
+	WATCH_OBJECT("witness/backpressure/suppressedUpdateSkips", &Witness::suppressedUpdateSkipCount);
+	WATCH_OBJECT("witness/backpressure/structuralWhileSuppressed", &Witness::structuralWhileSuppressedCount);
 	WATCH_OBJECT("witness/bundlesSent", &Witness::bundlesSentCount);
 	WATCH_OBJECT("witness/maxBundleBytes", &Witness::maxBundleBytes);
 	return EntityApp<Entity>::initializeWatcher() && WatchObjectPool::initWatchPools();

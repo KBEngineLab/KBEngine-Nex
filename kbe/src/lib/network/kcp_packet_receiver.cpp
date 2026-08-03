@@ -161,6 +161,7 @@ Reason KCPPacketReceiver::processPacket(Channel* pChannel, Packet * pPacket)
 			RECLAIM_PACKET(pPacket->isTCPPacket(), pPacket);
 			return REASON_CHANNEL_LOST;
 		}
+		pChannel->scheduleKcpAck();
 
 		RECLAIM_PACKET(pPacket->isTCPPacket(), pPacket);
 
