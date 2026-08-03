@@ -124,6 +124,11 @@ def create_config_overlay(
             messages = receive.find("messages")
             if messages is None:
                 messages = ET.SubElement(receive, "messages")
+            # critical 只是软告警门槛；若仍保留默认 24，高吞吐 KCP 在未接近外部
+            # 硬上限前就会为大量正常突发写 WARNING，反过来放大 Logger 和磁盘 IO。
+            # critical is only a warning threshold. Keeping the default 24 would log
+            # normal KCP bursts long before the external hard limit and distort the run.
+            set_xml_value(messages, "critical", external_receive_messages)
             set_xml_value(messages, "external", external_receive_messages)
         if external_receive_bytes is not None:
             if external_receive_bytes < 1:

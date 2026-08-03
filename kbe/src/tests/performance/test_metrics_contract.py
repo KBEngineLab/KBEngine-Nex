@@ -830,6 +830,7 @@ def main() -> int:
         xml_root = ET.parse(overlay).getroot()
         assert xml_root.findtext("./bots/defaultAddBots/totalCount") == "500"
         assert xml_root.findtext("./channelCommon/windowOverflow/receive/messages/external") == "1024"
+        assert xml_root.findtext("./channelCommon/windowOverflow/receive/messages/critical") == "1024"
         assert xml_root.findtext("./channelCommon/windowOverflow/receive/bytes/external") == "1048576"
         assert xml_root.findtext("./channelCommon/timeout/external") == "120"
         assert xml_root.findtext("./channelCommon/reliableUDP/tickInterval") == "20"
