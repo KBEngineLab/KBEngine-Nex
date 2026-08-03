@@ -214,6 +214,11 @@ public:
 	static uint64 volatileBytesSentCount();
 	static uint64 volatileBudgetDeferredCount();
 	static uint64 volatileBudgetExhaustionCount();
+	static uint64 sendBytesCount();
+	static uint64 sendBudgetExhaustionCount();
+	static uint64 structuralProcessedCount();
+	static uint64 bundlesSentCount();
+	static uint64 maxBundleBytes();
 
 private:
 	/**
@@ -226,6 +231,7 @@ private:
 	*/
 	void updateEntitiesAliasID(int removedAliasID = -1);
 	void requireFullScan();
+	void prepareFullScanQueue();
 	void clearVolatileDirtyQueue();
 	void synchronizeViewEntityMetrics();
 	void initializeEntityRefLifecycle(EntityRef* pEntityRef);

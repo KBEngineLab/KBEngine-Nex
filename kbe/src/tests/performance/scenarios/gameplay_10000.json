@@ -24,6 +24,7 @@
   "external_receive_bytes": 4194304,
   "watcher_targets": [
     "BOTS_TYPE=@bots:root/bots/performance",
+    "CELLAPPMGR_TYPE=@cellappmgr:root/allocation",
     "BASEAPP_TYPE=@baseapp:root",
     "BASEAPP_TYPE=@baseapp:root/stats",
     "BASEAPP_TYPE=@baseapp:root/network/channels",
@@ -45,6 +46,7 @@
   ],
   "watcher_intervals": {
     "BOTS_TYPE:root/bots/performance": 5.0,
+    "CELLAPPMGR_TYPE:root/allocation": 5.0,
     "BASEAPP_TYPE:root": 5.0,
     "BASEAPP_TYPE:root/stats": 5.0,
     "BASEAPP_TYPE:root/network/channels": 5.0,
@@ -61,7 +63,8 @@
   },
   "readiness": {
     "root/bots/performance/clientsTotal": "$bots",
-    "root/bots/performance/clientsKcp": "$bots"
+    "root/bots/performance/clientsKcp": "$bots",
+    "root/witness/active": "$bots"
   },
   "thresholds": "../thresholds.json"
 }

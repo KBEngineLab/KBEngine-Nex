@@ -306,6 +306,11 @@ bool Cellapp::initializeWatcher()
 	WATCH_OBJECT("witness/volatileBytesSent", &Witness::volatileBytesSentCount);
 	WATCH_OBJECT("witness/volatileBudgetDeferred", &Witness::volatileBudgetDeferredCount);
 	WATCH_OBJECT("witness/volatileBudgetExhaustions", &Witness::volatileBudgetExhaustionCount);
+	WATCH_OBJECT("witness/sendBytes", &Witness::sendBytesCount);
+	WATCH_OBJECT("witness/sendBudgetExhaustions", &Witness::sendBudgetExhaustionCount);
+	WATCH_OBJECT("witness/structuralProcessed", &Witness::structuralProcessedCount);
+	WATCH_OBJECT("witness/bundlesSent", &Witness::bundlesSentCount);
+	WATCH_OBJECT("witness/maxBundleBytes", &Witness::maxBundleBytes);
 	return EntityApp<Entity>::initializeWatcher() && WatchObjectPool::initWatchPools();
 }
 

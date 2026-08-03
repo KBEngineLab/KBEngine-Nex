@@ -27,6 +27,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "helper/debug_helper.h"
 #include "helper/watcher.h"
 
+#include <set>
+
 namespace KBEngine{ 
 
 class Cellapp
@@ -47,6 +49,11 @@ public:
 	ENTITY_ID numEntities() const { return numEntities_; }
 	void numEntities(ENTITY_ID num) { numEntities_ = num; }
 	void incNumEntities() { ++numEntities_; }
+
+	std::size_t pendingSpaceCreations() const { return pendingSpaceCreations_.size(); }
+	void reserveSpaceCreation(SPACE_ID spaceID) { pendingSpaceCreations_.insert(spaceID); }
+	void confirmSpaceCreation(SPACE_ID spaceID) { pendingSpaceCreations_.erase(spaceID); }
+	std::size_t assignedSpaces() const { return numSpaces() + pendingSpaceCreations_.size(); }
 
 	uint32 flags() const { return flags_; }
 	void flags(uint32 v) { flags_ = v; }
@@ -78,6 +85,10 @@ protected:
 	COMPONENT_ORDER globalOrderID_;
 
 	COMPONENT_ORDER groupOrderID_;
+
+	// CellApp 上报确认前保留异步创建请求，防止负载快照覆盖分配器的在途决策。
+	// Retain asynchronous placement reservations until CellApp confirms the Space.
+	std::set<SPACE_ID> pendingSpaceCreations_;
 };
 
 }

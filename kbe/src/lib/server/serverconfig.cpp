@@ -710,6 +710,18 @@ bool ServerConfig::loadConfig(std::string fileName)
 				_cellAppInfo.witness_volatile_bytes_per_tick = xml->getValInt(childnode);
 			}
 
+			childnode = xml->enterNode(node, "witness_total_bytes_per_tick");
+			if (childnode)
+			{
+				_cellAppInfo.witness_total_bytes_per_tick = xml->getValInt(childnode);
+			}
+
+			childnode = xml->enterNode(node, "witness_global_bytes_per_tick");
+			if (childnode)
+			{
+				_cellAppInfo.witness_global_bytes_per_tick = xml->getValInt(childnode);
+			}
+
 			childnode = xml->enterNode(node, "entity_posdir_updates");
 			if (childnode)
 			{
@@ -1420,6 +1432,10 @@ bool ServerConfig::loadConfig(std::string fileName)
 		if(node != NULL){
 			_cellAppMgrInfo.tcp_SOMAXCONN = xml->getValInt(node);
 		}
+
+		node = xml->enterNode(rootNode, "spaceAllocationMaxSkew");
+		if (node != NULL)
+			_cellAppMgrInfo.cellappmgr_space_assignment_max_skew = xml->getValInt(node);
 	}
 	
 	rootNode = xml->getRootNode("baseappmgr");

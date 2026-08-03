@@ -115,6 +115,10 @@ public:
 	bool readyForLogin();
 
 	uint32 numLoadBalancingApp();
+	uint64 confirmedSpaceCount() const;
+	uint64 pendingSpaceCount() const;
+	uint64 minAssignedSpaceCount() const;
+	uint64 maxAssignedSpaceCount() const;
 
 	/* 以groupOrderID为排序基准，
 	   増加一个cellapp component id到cellapp_cids_列表中

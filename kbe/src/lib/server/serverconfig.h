@@ -181,6 +181,9 @@ typedef struct EngineComponentInfo
 		isOnInitCallPropertysSetMethods = true;
 		forceInternalLogin = false;
 		witness_volatile_bytes_per_tick = 512;
+		witness_total_bytes_per_tick = 2048;
+		witness_global_bytes_per_tick = 1048576;
+		cellappmgr_space_assignment_max_skew = 2;
 	}
 
 	~EngineComponentInfo()
@@ -211,6 +214,13 @@ typedef struct EngineComponentInfo
 	// 每个 Witness 每 Tick 的位置方向字节预算，零表示不限制。
 	// Per-Witness position and direction byte budget per tick; zero means unlimited.
 	uint32 witness_volatile_bytes_per_tick;
+	// 每个 Witness 以及整个 CellApp 每 Tick 的总同步预算，零表示不限制。
+	// Per-Witness and whole-CellApp synchronization budgets per tick; zero means unlimited.
+	uint32 witness_total_bytes_per_tick;
+	uint32 witness_global_bytes_per_tick;
+	// 自动分配的新 Space 在 CellApp 间允许的最大数量差；零关闭硬约束。
+	// Maximum automatic Space-count skew between CellApps; zero disables the hard bound.
+	uint32 cellappmgr_space_assignment_max_skew;
 	uint16 entity_posdir_updates_type;						// 实体位置更新方式，0：非优化高精度同步, 1:优化同步, 2:智能选择模式
 	uint16 entity_posdir_updates_smart_threshold;			// 实体位置更新智能模式下的同屏人数阈值
 

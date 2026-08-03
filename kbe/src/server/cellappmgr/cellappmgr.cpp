@@ -20,6 +20,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include "cellappmgr.h"
+#include "cellapp_placement.h"
 #include "server/component_routing_guard.h"
 #include "server/bounded_stream_reader.h"
 #include "cellappmgr_interface.h"
@@ -32,6 +33,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "helper/console_helper.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "../../server/baseapp/baseapp_interface.h"
 #include "../../server/cellapp/cellapp_interface.h"
@@ -235,6 +237,10 @@ bool Cellappmgr::initializeWatcher()
 	WATCH_OBJECT("readiness/readyApps", this, &Cellappmgr::readyForLoginApps);
 	WATCH_OBJECT("readiness/totalApps", this, &Cellappmgr::totalReadyForLoginApps);
 	WATCH_OBJECT("readiness/minProgress", this, &Cellappmgr::minReadyForLoginProgress);
+	WATCH_OBJECT("allocation/confirmedSpaces", this, &Cellappmgr::confirmedSpaceCount);
+	WATCH_OBJECT("allocation/pendingSpaces", this, &Cellappmgr::pendingSpaceCount);
+	WATCH_OBJECT("allocation/minAssignedSpaces", this, &Cellappmgr::minAssignedSpaceCount);
+	WATCH_OBJECT("allocation/maxAssignedSpaces", this, &Cellappmgr::maxAssignedSpaceCount);
 	return ServerApp::initializeWatcher();
 }
 
@@ -404,13 +410,30 @@ void Cellappmgr::forwardMessage(Network::Channel* pChannel, MemoryStream& s)
 //-------------------------------------------------------------------------------------
 COMPONENT_ID Cellappmgr::findFreeCellapp(void)
 {
-	std::map< COMPONENT_ID, Cellapp >::iterator iter = cellapps_.begin();
+	std::map< COMPONENT_ID, Cellapp >::iterator iter;
 	COMPONENT_ID cid = 0;
+	std::size_t appCount = 0;
+	std::size_t totalAssignedSpaces = 0;
+	std::size_t minimumAssignedSpaces = std::numeric_limits<std::size_t>::max();
 
-	float minload = 1.f;
-	ENTITY_ID numEntities = 0x7fffffff;
+	for (iter = cellapps_.begin(); iter != cellapps_.end(); ++iter)
+	{
+		if ((iter->second.flags() & APP_FLAGS_NOT_PARTCIPATING_LOAD_BALANCING) > 0 ||
+			iter->second.isDestroyed() || iter->second.initProgress() <= 1.f)
+		{
+			continue;
+		}
 
-	for(; iter != cellapps_.end(); ++iter)
+		++appCount;
+		totalAssignedSpaces += iter->second.assignedSpaces();
+		minimumAssignedSpaces = std::min(minimumAssignedSpaces, iter->second.assignedSpaces());
+	}
+
+	double bestScore = std::numeric_limits<double>::max();
+	std::size_t bestAssignedSpaces = std::numeric_limits<std::size_t>::max();
+	ENTITY_ID bestNumEntities = std::numeric_limits<ENTITY_ID>::max();
+
+	for (iter = cellapps_.begin(); iter != cellapps_.end(); ++iter)
 	{
 		if ((iter->second.flags() & APP_FLAGS_NOT_PARTCIPATING_LOAD_BALANCING) > 0)
 			continue;
@@ -418,18 +441,26 @@ COMPONENT_ID Cellappmgr::findFreeCellapp(void)
 		// 首先进程必须活着且初始化完毕
 		if(!iter->second.isDestroyed() && iter->second.initProgress() > 1.f)
 		{
-			// 如果没有任何实体则无条件分配
-			if(iter->second.numEntities() == 0)
-				return iter->first;
-
-			// 比较并记录负载最小的进程最终被分配
-			if(minload > iter->second.load() || 
-				(minload == iter->second.load() && numEntities > iter->second.numEntities()))
+			const std::size_t assignedSpaces = iter->second.assignedSpaces();
+			if (!cellappPlacementWithinSkew(
+				assignedSpaces,
+				minimumAssignedSpaces,
+				g_serverConfig.getCellAppMgr().cellappmgr_space_assignment_max_skew))
+			{
+				continue;
+			}
+			const double score = cellappPlacementScore(
+				iter->second.load(), assignedSpaces, totalAssignedSpaces, appCount);
+			const bool equalScore = std::abs(score - bestScore) <= 0.000001;
+			if (score < bestScore ||
+				(equalScore && assignedSpaces < bestAssignedSpaces) ||
+				(equalScore && assignedSpaces == bestAssignedSpaces &&
+					iter->second.numEntities() < bestNumEntities))
 			{
 				cid = iter->first;
-
-				numEntities = iter->second.numEntities();
-				minload = iter->second.load();
+				bestScore = score;
+				bestAssignedSpaces = assignedSpaces;
+				bestNumEntities = iter->second.numEntities();
 			}
 		}
 	}
@@ -479,6 +510,45 @@ uint32 Cellappmgr::numLoadBalancingApp()
 }
 
 //-------------------------------------------------------------------------------------
+uint64 Cellappmgr::confirmedSpaceCount() const
+{
+	uint64 count = 0;
+	for (std::map<COMPONENT_ID, Cellapp>::const_iterator iter = cellapps_.begin(); iter != cellapps_.end(); ++iter)
+		count += static_cast<uint64>(iter->second.numSpaces());
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Cellappmgr::pendingSpaceCount() const
+{
+	uint64 count = 0;
+	for (std::map<COMPONENT_ID, Cellapp>::const_iterator iter = cellapps_.begin(); iter != cellapps_.end(); ++iter)
+		count += static_cast<uint64>(iter->second.pendingSpaceCreations());
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Cellappmgr::minAssignedSpaceCount() const
+{
+	if (cellapps_.empty())
+		return 0;
+
+	uint64 count = std::numeric_limits<uint64>::max();
+	for (std::map<COMPONENT_ID, Cellapp>::const_iterator iter = cellapps_.begin(); iter != cellapps_.end(); ++iter)
+		count = std::min<uint64>(count, static_cast<uint64>(iter->second.assignedSpaces()));
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Cellappmgr::maxAssignedSpaceCount() const
+{
+	uint64 count = 0;
+	for (std::map<COMPONENT_ID, Cellapp>::const_iterator iter = cellapps_.begin(); iter != cellapps_.end(); ++iter)
+		count = std::max<uint64>(count, static_cast<uint64>(iter->second.assignedSpaces()));
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
 void Cellappmgr::reqCreateCellEntityInNewSpace(Network::Channel* pChannel, MemoryStream& s) 
 {
 	if (!validateCreateSpaceRequest(s))
@@ -518,12 +588,13 @@ void Cellappmgr::reqCreateCellEntityInNewSpace(Network::Channel* pChannel, Memor
 	}
 
 	static SPACE_ID spaceID = 1;
+	const SPACE_ID assignedSpaceID = spaceID++;
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(CellappInterface::onCreateCellEntityInNewSpaceFromBaseapp);
 	(*pBundle) << entityType;
 	(*pBundle) << id;
-	(*pBundle) << spaceID++;
+	(*pBundle) << assignedSpaceID;
 	(*pBundle) << componentID;
 	(*pBundle) << hasClient;
 
@@ -583,6 +654,7 @@ void Cellappmgr::reqCreateCellEntityInNewSpace(Network::Channel* pChannel, Memor
 			entityType, id, componentID, bestCellappID_, cellapp_iter->second.load(), cellapp_iter->second.numEntities()));
 
 		cellapp_iter->second.incNumEntities();
+		cellapp_iter->second.reserveSpaceCreation(assignedSpaceID);
 	}
 	else
 	{
@@ -640,6 +712,7 @@ void Cellappmgr::reqRestoreSpaceInCell(Network::Channel* pChannel, MemoryStream&
 	DEBUG_MSG(fmt::format("Cellappmgr::reqRestoreSpaceInCell: entityType={0}, entityID={1}, componentID={2}, spaceID={3}.\n",
 		entityType, id, componentID, spaceID));
 
+	updateBestCellapp();
 	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(CELLAPP_TYPE, bestCellappID_);
 	if (!isAvailableCellappTarget(cinfos, true))
 	{
@@ -660,6 +733,7 @@ void Cellappmgr::reqRestoreSpaceInCell(Network::Channel* pChannel, MemoryStream&
 	if (cellapp_iter != cellapps_.end())
 	{
 		cellapp_iter->second.incNumEntities();
+		cellapp_iter->second.reserveSpaceCreation(spaceID);
 	}
 }
 
@@ -857,8 +931,10 @@ void Cellappmgr::updateSpaceData(Network::Channel* pChannel, MemoryStream& s)
 		return;
 
 	Cellapp& cellappref = iter->second;
-
+	const bool isNewSpace = !delspace && cellappref.spaces().getSpace(spaceID) == NULL;
 	cellappref.spaces().updateSpaceData(spaceID, scriptModuleName, geomappingPath, delspace);
+	if (isNewSpace)
+		cellappref.confirmSpaceCreation(spaceID);
 }
 
 //-------------------------------------------------------------------------------------

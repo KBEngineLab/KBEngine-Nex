@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <algorithm>
 
 namespace KBEngine
 {
@@ -40,6 +41,24 @@ private:
 	std::uint32_t byteLimit_;
 	std::uint64_t bytesSent_ = 0;
 };
+
+/**
+ * 将单 Witness 上限与 CellApp 总目标合成为公平配额。返回 0 仍表示无限制；
+ * 有全局目标时至少允许处理一条完整消息，避免活跃连接数超过字节目标后永久饥饿。
+ * Combine the per-Witness limit with the CellApp target. Zero remains unlimited;
+ * an enabled global target grants at least one byte so one complete message can always make progress.
+ */
+inline std::uint32_t witnessEffectiveByteLimit(
+	std::uint32_t perWitnessLimit, std::uint32_t globalLimit, std::uint64_t activeWitnesses)
+{
+	if (globalLimit == 0 || activeWitnesses == 0)
+		return perWitnessLimit;
+
+	const std::uint64_t fairShare64 = std::max<std::uint64_t>(1, globalLimit / activeWitnesses);
+	const std::uint32_t fairShare = static_cast<std::uint32_t>(
+		std::min<std::uint64_t>(fairShare64, UINT32_MAX));
+	return perWitnessLimit == 0 ? fairShare : std::min(perWitnessLimit, fairShare);
+}
 
 }
 

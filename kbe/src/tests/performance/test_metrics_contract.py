@@ -438,6 +438,18 @@ def assert_python_latency_scenario() -> None:
     else:
         raise AssertionError("unrestricted cluster environment key must fail")
 
+    gameplay_path = Path(__file__).resolve().parent / "scenarios/gameplay_10000.json"
+    gameplay = load_scenario(gameplay_path)
+    assert gameplay["readiness"]["root/witness/active"] == "$bots"
+    assert "CELLAPPMGR_TYPE=@cellappmgr:root/allocation" in gameplay["watcher_targets"]
+    assert gameplay["watcher_intervals"]["CELLAPPMGR_TYPE:root/allocation"] == 5.0
+
+    defaults_path = Path(__file__).resolve().parents[3] / "res/server/kbengine_defaults.xml"
+    defaults_source = defaults_path.read_text(encoding="utf-8")
+    assert "<witness_total_bytes_per_tick> 2048 </witness_total_bytes_per_tick>" in defaults_source
+    assert "<witness_global_bytes_per_tick> 1048576 </witness_global_bytes_per_tick>" in defaults_source
+    assert "<spaceAllocationMaxSkew> 2 </spaceAllocationMaxSkew>" in defaults_source
+
 
 def assert_multi_component_cluster_manifest() -> None:
     with tempfile.TemporaryDirectory() as directory:

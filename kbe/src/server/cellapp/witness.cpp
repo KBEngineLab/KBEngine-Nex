@@ -808,6 +808,23 @@ void Witness::requireFullScan()
 }
 
 //-------------------------------------------------------------------------------------
+void Witness::prepareFullScanQueue()
+{
+	// 全量恢复只重建待发送顺序，不在一个 Tick 内直接序列化整个视野。
+	// A full recovery rebuilds send order only; it must not serialize the entire view in one tick.
+	clearVolatileDirtyQueue();
+	const size_t scannedEntities = viewEntities_.size();
+	for (VIEW_ENTITIES::iterator iter = viewEntities_.begin(); iter != viewEntities_.end(); ++iter)
+	{
+		(*iter)->volatileQueued(false);
+		queueEntityRefVolatile(*iter);
+	}
+
+	fullScanRequired_ = false;
+	g_witnessLoadMetrics.recordFullScan(scannedEntities);
+}
+
+//-------------------------------------------------------------------------------------
 void Witness::clearVolatileDirtyQueue()
 {
 	VIEW_ENTITIES::iterator iter = viewEntities_.begin();
@@ -970,11 +987,24 @@ void Witness::removeViewEntityRef(EntityRef* pEntityRef)
 //-------------------------------------------------------------------------------------
 void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 {
-	WitnessVolatileBudget budget(g_kbeSrvConfig.getCellApp().witness_volatile_bytes_per_tick);
-	bool exhaustionRecorded = false;
+	const EngineComponentInfo& config = g_kbeSrvConfig.getCellApp();
+	WitnessVolatileBudget volatileBudget(config.witness_volatile_bytes_per_tick);
+	WitnessVolatileBudget sendBudget(witnessEffectiveByteLimit(
+		config.witness_total_bytes_per_tick,
+		config.witness_global_bytes_per_tick,
+		g_witnessActiveCount));
+	bool volatileExhaustionRecorded = false;
 	const size_t batchSize = volatileDirtyQueue_.batchSize();
 	for (size_t i = 0; i < batchSize; ++i)
 	{
+		// 总预算采用软上限：上一条完整消息达到上限后停止，绝不拆断协议消息。
+		// The total budget is soft: stop after the previous complete message reaches it; never split protocol messages.
+		if (!sendBudget.canSend(false))
+		{
+			g_witnessLoadMetrics.recordSendBudgetExhaustion();
+			break;
+		}
+
 		WitnessDirtyQueue::Entry entry;
 		if (!volatileDirtyQueue_.pop(entry))
 			break;
@@ -990,16 +1020,16 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 		EntityRef* pEntityRef = iter->second;
 		pEntityRef->volatileQueued(false);
 		const bool structuralUpdate = isStructuralUpdate(pEntityRef);
-		if (!budget.canSend(structuralUpdate))
+		if (!volatileBudget.canSend(structuralUpdate))
 		{
 			// Tick 快照仍继续向后检查结构消息；普通易变更新回队后会在下 Tick 读取实体最新状态。
 			// Continue scanning the tick snapshot for structural messages; deferred volatile entries read the entity's latest state next tick.
 			queueEntityRefVolatile(pEntityRef, true);
 			g_witnessLoadMetrics.recordVolatileBudgetDeferred();
-			if (!exhaustionRecorded)
+			if (!volatileExhaustionRecorded)
 			{
 				g_witnessLoadMetrics.recordVolatileBudgetExhaustion();
-				exhaustionRecorded = true;
+				volatileExhaustionRecorded = true;
 			}
 			continue;
 		}
@@ -1008,16 +1038,21 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 		// While the outer entity-forward message is open, packetsLength() reflects packet boundaries; currMsgLength() is the continuously growing encoded byte count.
 		const size_t beforeBytes = static_cast<size_t>(pSendBundle->currMsgLength());
 		const bool retained = processEntityRefUpdate(pSendBundle, pEntityRef);
+		const size_t afterBytes = static_cast<size_t>(pSendBundle->currMsgLength());
+		sendBudget.recordBundleGrowth(beforeBytes, afterBytes);
 		if (!structuralUpdate)
 		{
-			budget.recordBundleGrowth(beforeBytes, static_cast<size_t>(pSendBundle->currMsgLength()));
+			volatileBudget.recordBundleGrowth(beforeBytes, afterBytes);
 		}
+		else
+			g_witnessLoadMetrics.recordStructuralProcessed();
 		g_witnessLoadMetrics.recordDirtyProcessed();
 		if (!retained)
 			removeViewEntityRef(pEntityRef);
 	}
 
-	g_witnessLoadMetrics.recordVolatileBytes(budget.bytesSent());
+	g_witnessLoadMetrics.recordVolatileBytes(volatileBudget.bytesSent());
+	g_witnessLoadMetrics.recordSendBytes(sendBudget.bytesSent());
 }
 
 //-------------------------------------------------------------------------------------
@@ -1111,6 +1146,36 @@ uint64 Witness::volatileBudgetExhaustionCount()
 }
 
 //-------------------------------------------------------------------------------------
+uint64 Witness::sendBytesCount()
+{
+	return g_witnessLoadMetrics.sendBytes();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::sendBudgetExhaustionCount()
+{
+	return g_witnessLoadMetrics.sendBudgetExhaustions();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::structuralProcessedCount()
+{
+	return g_witnessLoadMetrics.structuralProcessed();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::bundlesSentCount()
+{
+	return g_witnessLoadMetrics.bundlesSent();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::maxBundleBytes()
+{
+	return g_witnessLoadMetrics.maxBundleBytes();
+}
+
+//-------------------------------------------------------------------------------------
 bool Witness::update()
 {
 	SCOPED_PROFILE(CLIENT_UPDATE_PROFILE);
@@ -1153,41 +1218,17 @@ bool Witness::update()
 		NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pEntity_->id(), (*pSendBundle));
 		addBaseDataToStream(pSendBundle);
 
-		const bool performFullScan = fullScanRequired_;
-		if (performFullScan)
-		{
-			// 在扫描前消费标志，使回调重入产生的新结构变化能够保留到下一 Tick。
-			// Consume the flag before scanning so structural changes caused by callback re-entry remain scheduled for the next tick.
-			fullScanRequired_ = false;
-			clearVolatileDirtyQueue();
-			size_t scannedEntities = 0;
-			VIEW_ENTITIES::iterator iter = viewEntities_.begin();
-			for(; iter != viewEntities_.end(); )
-			{
-				++scannedEntities;
-				EntityRef* pEntityRef = (*iter);
-				++iter;
-				pEntityRef->volatileQueued(false);
-				if (!processEntityRefUpdate(pSendBundle, pEntityRef))
-					removeViewEntityRef(pEntityRef);
-			}
-			synchronizeViewEntityMetrics();
-			g_witnessLoadMetrics.recordFullScan(scannedEntities);
-		}
-		else
-		{
-			processVolatileDirtyQueue(pSendBundle);
-		}
+		if (fullScanRequired_)
+			prepareFullScanQueue();
+
+		processVolatileDirtyQueue(pSendBundle);
 
 		size_t pSendBundleMessageLength = pSendBundle->currMsgLength();
 		if (pSendBundleMessageLength > 8/*NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN产生的基础包大小*/)
 		{
-			if(pSendBundleMessageLength > PACKET_MAX_SIZE_TCP)
-			{
-				WARNING_MSG(fmt::format("Witness::update({}): sendToClient {} Bytes.\n", 
-					pEntity_->id(), pSendBundleMessageLength));
-			}
-
+			// 超过单包大小会由网络层正常分包；热路径只累计 Watcher 指标，避免日志 IO 放大拥塞。
+			// The network layer fragments oversized bundles normally; retain metrics without hot-path log amplification.
+			g_witnessLoadMetrics.recordBundle(pSendBundleMessageLength);
 			AUTO_SCOPED_PROFILE("sendToClient");
 			pChannel->send(pSendBundle);
 		}

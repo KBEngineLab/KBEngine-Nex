@@ -64,6 +64,15 @@ public:
 	void recordVolatileBytes(std::uint64_t bytes) { volatileBytesSent_ += bytes; }
 	void recordVolatileBudgetDeferred() { ++volatileBudgetDeferred_; }
 	void recordVolatileBudgetExhaustion() { ++volatileBudgetExhaustions_; }
+	void recordSendBytes(std::uint64_t bytes) { sendBytes_ += bytes; }
+	void recordSendBudgetExhaustion() { ++sendBudgetExhaustions_; }
+	void recordStructuralProcessed() { ++structuralProcessed_; }
+	void recordBundle(std::size_t bytes)
+	{
+		++bundlesSent_;
+		if (bytes > maxBundleBytes_)
+			maxBundleBytes_ = static_cast<std::uint64_t>(bytes);
+	}
 
 	std::uint64_t viewEntities() const { return viewEntities_; }
 	std::uint64_t maxViewEntities() const { return maxViewEntities_; }
@@ -79,6 +88,11 @@ public:
 	std::uint64_t volatileBytesSent() const { return volatileBytesSent_; }
 	std::uint64_t volatileBudgetDeferred() const { return volatileBudgetDeferred_; }
 	std::uint64_t volatileBudgetExhaustions() const { return volatileBudgetExhaustions_; }
+	std::uint64_t sendBytes() const { return sendBytes_; }
+	std::uint64_t sendBudgetExhaustions() const { return sendBudgetExhaustions_; }
+	std::uint64_t structuralProcessed() const { return structuralProcessed_; }
+	std::uint64_t bundlesSent() const { return bundlesSent_; }
+	std::uint64_t maxBundleBytes() const { return maxBundleBytes_; }
 
 private:
 	std::uint64_t viewEntities_ = 0;
@@ -95,6 +109,11 @@ private:
 	std::uint64_t volatileBytesSent_ = 0;
 	std::uint64_t volatileBudgetDeferred_ = 0;
 	std::uint64_t volatileBudgetExhaustions_ = 0;
+	std::uint64_t sendBytes_ = 0;
+	std::uint64_t sendBudgetExhaustions_ = 0;
+	std::uint64_t structuralProcessed_ = 0;
+	std::uint64_t bundlesSent_ = 0;
+	std::uint64_t maxBundleBytes_ = 0;
 };
 
 }

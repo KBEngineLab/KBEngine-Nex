@@ -33,11 +33,27 @@ bool testUnlimitedAndShrinkingBundle()
 	return require(budget.canSend(false), "zero byte limit did not preserve unlimited mode") &&
 		require(budget.bytesSent() == 99988, "bundle growth accounting underflowed or drifted");
 }
+
+bool testAdaptiveTotalBudget()
+{
+	using KBEngine::witnessEffectiveByteLimit;
+	return require(witnessEffectiveByteLimit(2048, 1048576, 1000) == 1048,
+		"global target did not reduce the per-Witness limit") &&
+		require(witnessEffectiveByteLimit(512, 1048576, 1000) == 512,
+			"global target incorrectly raised the per-Witness limit") &&
+		require(witnessEffectiveByteLimit(0, 1048576, 2000000) == 1,
+			"oversubscribed global target did not preserve forward progress") &&
+		require(witnessEffectiveByteLimit(2048, 0, 10000) == 2048,
+			"disabled global target changed the configured limit") &&
+		require(witnessEffectiveByteLimit(0, 0, 10000) == 0,
+			"fully unlimited mode did not remain unlimited");
+}
 }
 
 int main()
 {
-	if (!testBoundedBudgetAllowsOneCompleteUpdate() || !testUnlimitedAndShrinkingBundle())
+	if (!testBoundedBudgetAllowsOneCompleteUpdate() || !testUnlimitedAndShrinkingBundle() ||
+		!testAdaptiveTotalBudget())
 		return EXIT_FAILURE;
 
 	std::cout << "WITNESS_VOLATILE_BUDGET_TEST_PASS" << std::endl;

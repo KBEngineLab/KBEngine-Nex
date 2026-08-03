@@ -45,6 +45,11 @@ bool testQueueAttribution()
 	metrics.recordVolatileBytes(37);
 	metrics.recordVolatileBudgetDeferred();
 	metrics.recordVolatileBudgetExhaustion();
+	metrics.recordSendBytes(91);
+	metrics.recordSendBudgetExhaustion();
+	metrics.recordStructuralProcessed();
+	metrics.recordBundle(2048);
+	metrics.recordBundle(1024);
 
 	return require(metrics.dirtyQueued() == 1, "current dirty queue depth was not maintained") &&
 		require(metrics.dirtyEnqueued() == 2, "cumulative enqueue count was not maintained") &&
@@ -55,7 +60,12 @@ bool testQueueAttribution()
 		require(metrics.stateSkips() == 1, "state skip was not attributed") &&
 		require(metrics.volatileBytesSent() == 37, "volatile byte count was not accumulated") &&
 		require(metrics.volatileBudgetDeferred() == 1, "deferred volatile update was not attributed") &&
-		require(metrics.volatileBudgetExhaustions() == 1, "budget exhaustion was not attributed");
+		require(metrics.volatileBudgetExhaustions() == 1, "volatile budget exhaustion was not attributed") &&
+		require(metrics.sendBytes() == 91, "total send bytes were not accumulated") &&
+		require(metrics.sendBudgetExhaustions() == 1, "total budget exhaustion was not attributed") &&
+		require(metrics.structuralProcessed() == 1, "structural work was not attributed") &&
+		require(metrics.bundlesSent() == 2, "bundle count was not accumulated") &&
+		require(metrics.maxBundleBytes() == 2048, "maximum bundle size was not retained");
 }
 
 bool testFullScanWorkAccounting()

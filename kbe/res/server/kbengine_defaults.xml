@@ -576,6 +576,20 @@
 				Maximum position and direction bytes sent per Witness per tick. Structural messages are exempt; 0 disables the budget.
 			-->
 			<witness_volatile_bytes_per_tick> 512 </witness_volatile_bytes_per_tick>
+
+			<!-- 每个 Witness 每 Tick 的全部 AOI 同步软预算，包括进入、离开、属性和易变数据。
+				单条完整消息允许超过剩余预算，下一条延后，避免消息截断或永久饥饿。0 表示不限制。
+				Per-Witness soft byte budget per tick for all AOI synchronization, including enter, leave,
+				properties and volatile data. One complete message may exceed the remaining budget; 0 is unlimited.
+			-->
+			<witness_total_bytes_per_tick> 2048 </witness_total_bytes_per_tick>
+
+			<!-- CellApp 每 Tick 的 Witness 总发送目标。底层按活跃 Witness 数换算公平配额，
+				从而使连接数增长时总序列化工作保持有界。0 表示不限制。
+				Target aggregate Witness bytes per CellApp tick. The engine derives a fair per-Witness share
+				from the active count so serialization remains bounded as connections grow; 0 is unlimited.
+			-->
+			<witness_global_bytes_per_tick> 1048576 </witness_global_bytes_per_tick>
 						
 			<!-- 实体位置更新方式，
 				0：直接同步高精度浮点数据，View范围无限制。 
@@ -771,6 +785,13 @@
 			（Interface address specified, configurable NIC/MAC/IP） 
 		-->
 		<internalInterface>  </internalInterface>
+
+		<!-- 自动分配 Space 时，各 CellApp 已确认加待确认的 Space 数量最大差值。
+			候选范围内仍按实时 CPU load 和实体数选择；0 表示仅使用负载评分。
+			Maximum confirmed-plus-pending Space-count skew for automatic placement.
+			Live CPU load and entity count still choose within the candidate set; 0 disables the hard bound.
+		-->
+		<spaceAllocationMaxSkew> 2 </spaceAllocationMaxSkew>
 	</cellappmgr>
 	
 	<baseappmgr>
