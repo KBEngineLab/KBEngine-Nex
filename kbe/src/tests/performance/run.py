@@ -334,9 +334,10 @@ def main() -> int:
             ] = {}
             if watcher_collector:
                 for target in watcher_targets:
+                    instance = watcher_instance(target)
                     recorder.record_sample(
                         "watcher",
-                        target.component_type,
+                        instance,
                         f"{target.path}/sampling/configuredIntervalMs",
                         watcher_schedule.interval(target) * 1000.0 if watcher_schedule else interval * 1000.0,
                         "ms",
@@ -357,12 +358,13 @@ def main() -> int:
                 if watcher_collector:
                     sample_now = time.monotonic()
                     for target in watcher_targets:
+                        instance = watcher_instance(target)
                         target_id = (target.component_type, target.host, target.port, target.path)
-                        operation = f"watcher:{target.component_type}:{target.path}"
+                        operation = f"watcher:{instance}:{target.path}"
                         if watcher_schedule is not None and not watcher_schedule.due(target, sample_now):
                             recorder.record(
                                 "watcher",
-                                target.component_type,
+                                instance,
                                 "schedule.skipped.count",
                                 1,
                                 "count",
@@ -371,7 +373,7 @@ def main() -> int:
                             continue
                         recorder.record(
                             "watcher",
-                            target.component_type,
+                            instance,
                             "schedule.due.count",
                             1,
                             "count",
@@ -381,7 +383,7 @@ def main() -> int:
                         if previous_sample is not None:
                             recorder.record_sample(
                                 "watcher",
-                                target.component_type,
+                                instance,
                                 f"{target.path}/sampling/actualIntervalMs",
                                 (sample_now - previous_sample) * 1000.0,
                                 "ms",
@@ -393,7 +395,7 @@ def main() -> int:
                         except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
                             recorder.record_request_latency(
                                 "watcher",
-                                target.component_type,
+                                instance,
                                 operation,
                                 request_started_ms,
                                 monotonic_milliseconds(),
@@ -401,11 +403,11 @@ def main() -> int:
                                 type(exc).__name__,
                                 float(scenario.get("slow_request_threshold_ms", 0.0)) or None,
                             )
-                            recorder.record("watcher", target.component_type, "query.error.count", 1, "count", {"kind": "counter", "error": type(exc).__name__})
+                            recorder.record("watcher", instance, "query.error.count", 1, "count", {"kind": "counter", "error": type(exc).__name__})
                         else:
                             recorder.record_request_latency(
                                 "watcher",
-                                target.component_type,
+                                instance,
                                 operation,
                                 request_started_ms,
                                 monotonic_milliseconds(),
@@ -425,21 +427,21 @@ def main() -> int:
                             if query_stats is not None:
                                 recorder.record_sample(
                                     "watcher",
-                                    target.component_type,
+                                    instance,
                                     f"{target.path}/sampling/responseValues",
                                     query_stats.value_count,
                                     "count",
                                 )
                                 recorder.record_sample(
                                     "watcher",
-                                    target.component_type,
+                                    instance,
                                     f"{target.path}/sampling/responseBytesEstimated",
                                     query_stats.response_bytes_estimated,
                                     "bytes_estimated",
                                 )
                                 recorder.record_sample(
                                     "watcher",
-                                    target.component_type,
+                                    instance,
                                     f"{target.path}/sampling/connectionReused",
                                     int(query_stats.connection_reused),
                                     "count",
@@ -822,6 +824,19 @@ def watcher_unit(metric: str) -> str:
     return ""
 
 
+def watcher_instance(target: WatcherTarget) -> str:
+    """Preserve the resolved process identity in raw performance samples.
+    在原始性能样本中保留已解析的进程身份，避免同类型多实例被提前合并。
+
+    Direct endpoint targets predate component discovery and retain their historical
+    type label for report compatibility. Expanded discovery targets carry a stable
+    ``name#componentID`` selector that distinguishes every process.
+    直连目标为兼容旧报告继续使用类型标签；发现并展开的目标携带稳定的
+    ``名称#组件ID`` 选择器，可区分每个进程。
+    """
+    return target.component_name or target.component_type
+
+
 def record_watcher_samples(
     recorder: JsonlRecorder,
     target: WatcherTarget,
@@ -834,6 +849,7 @@ def record_watcher_samples(
     """Record raw Watcher values and normalized cprofile window metrics.
     记录原始 Watcher 值，并把 cprofile 累计 stamp 归一化为可发布的窗口指标。
     """
+    instance = watcher_instance(target)
     endpoint = target.component_name or target.host
     endpoint_port = 0 if target.component_name else target.port
     component_key = (target.component_type, endpoint, endpoint_port)
@@ -873,7 +889,7 @@ def record_watcher_samples(
         metric_name = f"{target.path}/{metric}".replace("//", "/")
         recorder.record_sample(
             "watcher",
-            target.component_type,
+            instance,
             metric_name,
             value,
             watcher_unit(metric_name),
@@ -891,7 +907,7 @@ def record_watcher_samples(
                 elapsed = max(current[1] - previous_counter[1], 1e-6)
                 recorder.record_sample(
                     "watcher",
-                    target.component_type,
+                    instance,
                     f"{target.path}/rates/{rate_definition[0]}",
                     (current[0] - previous_counter[0]) / elapsed,
                     rate_definition[1],
@@ -904,7 +920,7 @@ def record_watcher_samples(
         ):
             recorder.record_sample(
                 "watcher",
-                target.component_type,
+                instance,
                 f"{target.path}/{metric}Micros",
                 float(value) / stamp_rate * 1_000_000.0,
                 "micros",
@@ -928,13 +944,13 @@ def record_watcher_samples(
     delta_self_micros = max(current[2] - previous[2], 0.0) / stamp_rate * 1_000_000.0
     elapsed = max(sample_now - previous[3], 1e-6)
     prefix = f"{target.path}/window"
-    recorder.record_sample("watcher", target.component_type, f"{prefix}/callCount", delta_count, "count")
-    recorder.record_sample("watcher", target.component_type, f"{prefix}/callsPerSecond", delta_count / elapsed, "count/s")
-    recorder.record_sample("watcher", target.component_type, f"{prefix}/totalMicros", delta_sum_micros, "micros")
-    recorder.record_sample("watcher", target.component_type, f"{prefix}/selfMicros", delta_self_micros, "micros")
+    recorder.record_sample("watcher", instance, f"{prefix}/callCount", delta_count, "count")
+    recorder.record_sample("watcher", instance, f"{prefix}/callsPerSecond", delta_count / elapsed, "count/s")
+    recorder.record_sample("watcher", instance, f"{prefix}/totalMicros", delta_sum_micros, "micros")
+    recorder.record_sample("watcher", instance, f"{prefix}/selfMicros", delta_self_micros, "micros")
     if delta_count > 0:
-        recorder.record_sample("watcher", target.component_type, f"{prefix}/meanMicros", delta_sum_micros / delta_count, "micros")
-        recorder.record_sample("watcher", target.component_type, f"{prefix}/meanSelfMicros", delta_self_micros / delta_count, "micros")
+        recorder.record_sample("watcher", instance, f"{prefix}/meanMicros", delta_sum_micros / delta_count, "micros")
+        recorder.record_sample("watcher", instance, f"{prefix}/meanSelfMicros", delta_self_micros / delta_count, "micros")
 
 
 def record_process_samples(recorder: JsonlRecorder, collector: ProcessGroupCollector) -> None:

@@ -370,11 +370,24 @@ def assert_network_counter_rates() -> None:
                 previous,
             )
         samples = build_summary(load_events(path))["samples"]
-        prefix = "watcher.BASEAPP_TYPE.root/network/rates"
+        prefix = "watcher.baseapp#7001.root/network/rates"
         assert samples[f"{prefix}/packetsSentPerSecond"]["max"] == 20
         assert samples[f"{prefix}/packetsReceivedPerSecond"]["max"] == 10
         assert samples[f"{prefix}/bytesSentPerSecond"]["max"] == 400
         assert samples[f"{prefix}/bytesReceivedPerSecond"]["max"] == 200
+
+
+def assert_watcher_instance_isolation() -> None:
+    first = parse_target("BASEAPP_TYPE=@baseapp#7001:root/network/kcp")
+    second = parse_target("BASEAPP_TYPE=@baseapp#7002:root/network/kcp")
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "watcher-instances.jsonl"
+        with JsonlRecorder(path, "test-run", "contract") as recorder:
+            record_watcher_samples(recorder, first, {"overdueChannels": 3}, 1.0, {}, {})
+            record_watcher_samples(recorder, second, {"overdueChannels": 9}, 1.0, {}, {})
+        samples = build_summary(load_events(path))["samples"]
+        assert samples["watcher.baseapp#7001.root/network/kcp/overdueChannels"]["max"] == 3
+        assert samples["watcher.baseapp#7002.root/network/kcp/overdueChannels"]["max"] == 9
 
 
 def assert_fixture_callbacks() -> None:
@@ -714,6 +727,7 @@ def main() -> int:
     assert_watcher_schedule()
     assert_cprofile_window_metrics()
     assert_network_counter_rates()
+    assert_watcher_instance_isolation()
     assert_fixture_callbacks()
     assert_python_latency_scenario()
     assert_multi_component_cluster_manifest()
