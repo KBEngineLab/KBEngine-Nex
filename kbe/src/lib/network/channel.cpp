@@ -424,6 +424,9 @@ bool Channel::initKcp()
 	ikcp_nodelay(pKCP_, g_rudp_nodelay ? 1 : 0, static_cast<int>(g_rudp_tickInterval),
 		static_cast<int>(g_rudp_missAcksResend), g_rudp_congestionControl ? 0 : 1);
 	pKCP_->rx_minrto = static_cast<IUINT32>(g_rudp_minRTO);
+	const uint32 flushSegmentsBudget = isExternal()
+		? g_rudp_extFlushSegmentsBudget : g_rudp_intFlushSegmentsBudget;
+	ikcp_setflushlimit(pKCP_, static_cast<int>(flushSegmentsBudget));
 
 	const int mtu = isExternal() && g_rudp_mtu > 0 && g_rudp_mtu < PACKET_MAX_SIZE_UDP * 4
 		? static_cast<int>(g_rudp_mtu) : PACKET_MAX_SIZE_UDP - 72;

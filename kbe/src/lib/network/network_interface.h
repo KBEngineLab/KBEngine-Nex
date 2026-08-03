@@ -170,6 +170,7 @@ public:
 	uint64 kcpProtocolTickMissCount() const;
 	uint32 rudpTickIntervalMs() const;
 	uint32 rudpMinRtoMs() const;
+	uint32 rudpExternalFlushSegmentsBudget() const;
 	uint64 kcpMaxScheduleDelayMicros() const;
 	uint64 kcpBudgetExhaustionCount() const;
 	uint64 kcpConsecutiveBudgetExhaustions() const;

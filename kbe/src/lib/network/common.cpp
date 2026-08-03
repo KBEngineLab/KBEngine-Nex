@@ -49,6 +49,11 @@ uint32 g_rudp_intWritePacketsQueueSize = 65535;
 uint32 g_rudp_intReadPacketsQueueSize = 65535;
 uint32 g_rudp_extWritePacketsQueueSize = 65535;
 uint32 g_rudp_extReadPacketsQueueSize = 65535;
+// Internal traffic keeps upstream unlimited batching; external fan-out is bounded
+// so one backlogged client cannot monopolize the component dispatcher.
+// 内部流量保留上游无限批处理；外部扇出限制单批，避免单个积压客户端独占组件 dispatcher。
+uint32 g_rudp_intFlushSegmentsBudget = 0;
+uint32 g_rudp_extFlushSegmentsBudget = 16;
 uint32 g_rudp_tickInterval = 10;
 // 500 通道 completion 排队会轻易超过 10ms；50ms 下限可抑制伪重传，fast resend 仍负责真实丢包的快速恢复。
 // Completion queuing across 500 channels easily exceeds 10ms; a 50ms floor suppresses spurious retransmits while fast resend still recovers real loss quickly.

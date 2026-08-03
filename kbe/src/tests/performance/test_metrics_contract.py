@@ -776,6 +776,9 @@ def main() -> int:
     assert "KCP_BACKLOG_RETRY_DELAY_MICROS = 1000" in scheduler_source
     assert "protocolTickMissCount_" in scheduler_source
     assert "g_rudp_tickInterval > 0 ? g_rudp_tickInterval : 100" in scheduler_source
+    assert 'WATCH_OBJECT("network/kcp/configuredExternalFlushSegmentsBudget"' in (
+        repository_root / "kbe/src/lib/server/serverapp.cpp"
+    ).read_text(encoding="utf-8")
     profile_source = (
         repository_root / "kbe/src/lib/helper/profile.cpp"
     ).read_text(encoding="utf-8")

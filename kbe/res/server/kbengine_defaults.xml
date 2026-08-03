@@ -181,6 +181,12 @@
 				<internal> 1024 </internal>
 				<external> 128 </external>
 			</writePacketsQueueSize>
+			<!-- 单通道一次 flush 新发送的数据段预算；0 表示无限制。
+				New data segments admitted by one channel flush; 0 means unlimited. -->
+			<flushSegmentsBudget>
+				<internal> 0 </internal>
+				<external> 16 </external>
+			</flushSegmentsBudget>
 			<tickInterval> 10 </tickInterval>
 			<minRTO> 50 </minRTO>
 			<missAcksResend> 2 </missAcksResend>

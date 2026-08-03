@@ -307,6 +307,8 @@ ikcpcb* ikcp_create(IUINT32 conv, void *user)
 	kcp->ts_flush = IKCP_INTERVAL;
 	kcp->nodelay = 0;
 	kcp->updated = 0;
+	kcp->flush_segment_limit = 0;
+	kcp->flush_limited = 0;
 	kcp->logmask = 0;
 	kcp->ssthresh = IKCP_THRESH_INIT;
 	kcp->fastresend = 0;
@@ -943,6 +945,7 @@ void ikcp_flush(ikcpcb *kcp)
 	char *buffer = kcp->buffer;
 	char *ptr = buffer;
 	int count, size, i;
+	IUINT32 admitted = 0;
 	IUINT32 resent, cwnd;
 	IUINT32 rtomin;
 	struct IQUEUEHEAD *p;
@@ -952,6 +955,7 @@ void ikcp_flush(ikcpcb *kcp)
 
 	// 'ikcp_update' haven't been called. 
 	if (kcp->updated == 0) return;
+	kcp->flush_limited = 0;
 
 	seg.conv = kcp->conv;
 	seg.cmd = IKCP_CMD_ACK;
@@ -1031,6 +1035,13 @@ void ikcp_flush(ikcpcb *kcp)
 	while (_itimediff(kcp->snd_nxt, kcp->snd_una + cwnd) < 0) {
 		IKCPSEG *newseg;
 		if (iqueue_is_empty(&kcp->snd_queue)) break;
+		if (kcp->flush_segment_limit > 0 && admitted >= kcp->flush_segment_limit) {
+			/* The window still has capacity, so this is fairness throttling rather
+			 * than peer backpressure. ikcp_update schedules a prompt continuation.
+			 * 发送窗口仍有容量，说明这是公平性限流而非对端背压；ikcp_update 会尽快续传。 */
+			kcp->flush_limited = 1;
+			break;
+		}
 
 		newseg = iqueue_entry(kcp->snd_queue.next, IKCPSEG, node);
 
@@ -1038,6 +1049,7 @@ void ikcp_flush(ikcpcb *kcp)
 		iqueue_add_tail(&newseg->node, &kcp->snd_buf);
 		kcp->nsnd_que--;
 		kcp->nsnd_buf++;
+		admitted++;
 
 		newseg->conv = kcp->conv;
 		newseg->cmd = IKCP_CMD_PUSH;
@@ -1174,6 +1186,12 @@ void ikcp_update(ikcpcb *kcp, IUINT32 current)
 			kcp->ts_flush = kcp->current + kcp->interval;
 		}
 		ikcp_flush(kcp);
+		if (kcp->flush_limited) {
+			/* A one-millisecond continuation lets the global scheduler rotate other
+			 * channels between bounded chunks without waiting a full protocol tick.
+			 * 1ms 续传让全局调度器在有限批次之间轮转其他通道，无需等待完整协议 tick。 */
+			kcp->ts_flush = kcp->current + 1;
+		}
 	}
 }
 
@@ -1239,6 +1257,14 @@ int ikcp_setmtu(ikcpcb *kcp, int mtu)
 	kcp->mss = kcp->mtu - IKCP_OVERHEAD;
 	ikcp_free(kcp->buffer);
 	kcp->buffer = buffer;
+	return 0;
+}
+
+int ikcp_setflushlimit(ikcpcb *kcp, int segments)
+{
+	if (kcp == NULL || segments < 0)
+		return -1;
+	kcp->flush_segment_limit = (IUINT32)segments;
 	return 0;
 }
 

@@ -457,6 +457,18 @@ bool ServerConfig::loadConfig(std::string fileName)
 					Network::g_rudp_extWritePacketsQueueSize = KBE_MAX(0, xml->getValInt(valueNode));
 			}
 
+			childnode = xml->enterNode(rudpNode, "flushSegmentsBudget");
+			if (childnode)
+			{
+				TiXmlNode* valueNode = xml->enterNode(childnode, "internal");
+				if (valueNode)
+					Network::g_rudp_intFlushSegmentsBudget = KBE_MAX(0, xml->getValInt(valueNode));
+
+				valueNode = xml->enterNode(childnode, "external");
+				if (valueNode)
+					Network::g_rudp_extFlushSegmentsBudget = KBE_MAX(0, xml->getValInt(valueNode));
+			}
+
 			childnode = xml->enterNode(rudpNode, "tickInterval");
 			if (childnode)
 				Network::g_rudp_tickInterval = KBE_MAX(0, xml->getValInt(childnode));

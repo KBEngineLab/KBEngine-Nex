@@ -309,6 +309,10 @@ struct IKCPCB
 	IUINT32 nrcv_buf, nsnd_buf;
 	IUINT32 nrcv_que, nsnd_que;
 	IUINT32 nodelay, updated;
+	/* Zero preserves upstream unlimited flush behavior. A positive limit bounds only
+	 * newly admitted data segments; ACKs and retransmissions remain unbounded.
+	 * 零值保留上游无限 flush 行为；正值只限制新进入发送窗口的数据段，ACK 与重传不受限。 */
+	IUINT32 flush_segment_limit, flush_limited;
 	IUINT32 ts_probe, probe_wait;
 	IUINT32 dead_link, incr;
 	struct IQUEUEHEAD snd_queue;
@@ -400,6 +404,10 @@ int ikcp_peeksize(const ikcpcb *kcp);
 
 // change MTU size, default is 1400
 int ikcp_setmtu(ikcpcb *kcp, int mtu);
+
+// limit newly admitted data segments per flush, zero means unlimited
+// 限制单次 flush 新进入发送窗口的数据段数，零表示无限制
+int ikcp_setflushlimit(ikcpcb *kcp, int segments);
 
 // set maximum window size: sndwnd=32, rcvwnd=32 by default
 int ikcp_wndsize(ikcpcb *kcp, int sndwnd, int rcvwnd);

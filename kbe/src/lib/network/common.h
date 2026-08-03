@@ -64,6 +64,8 @@ extern uint32 g_rudp_intWritePacketsQueueSize;
 extern uint32 g_rudp_intReadPacketsQueueSize;
 extern uint32 g_rudp_extWritePacketsQueueSize;
 extern uint32 g_rudp_extReadPacketsQueueSize;
+extern uint32 g_rudp_intFlushSegmentsBudget;
+extern uint32 g_rudp_extFlushSegmentsBudget;
 extern uint32 g_rudp_tickInterval;
 extern uint32 g_rudp_minRTO;
 extern uint32 g_rudp_missAcksResend;

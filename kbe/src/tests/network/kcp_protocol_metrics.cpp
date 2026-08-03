@@ -94,11 +94,41 @@ bool testRetransmissionCounters()
 	ikcp_release(kcp);
 	return ok;
 }
+
+bool testFlushSegmentBudget()
+{
+	Datagrams outbound;
+	ikcpcb* kcp = ikcp_create(10, &outbound);
+	if (!require(kcp != NULL, "KCP allocation failed"))
+		return false;
+	kcp->output = captureDatagram;
+	ikcp_nodelay(kcp, 1, 10, 2, 1);
+	bool ok = require(ikcp_setflushlimit(kcp, 2) == 0, "flush limit was rejected");
+	const char payload[] = "budget";
+	for (int index = 0; index < 5; ++index)
+		ok = require(ikcp_send(kcp, payload, static_cast<int>(sizeof(payload))) == 0,
+			"KCP payload enqueue failed") && ok;
+
+	ikcp_update(kcp, 0);
+	ok = require(kcp->nsnd_que == 3 && kcp->nsnd_buf == 2,
+		"first flush did not admit exactly two segments") && ok;
+	ok = require(ikcp_check(kcp, 0) == 1,
+		"limited flush did not request a prompt continuation") && ok;
+	ikcp_update(kcp, 1);
+	ok = require(kcp->nsnd_que == 1 && kcp->nsnd_buf == 4,
+		"second flush did not admit exactly two segments") && ok;
+	ikcp_update(kcp, 2);
+	ok = require(kcp->nsnd_que == 0 && kcp->nsnd_buf == 5,
+		"final flush did not drain the remaining segment") && ok;
+
+	ikcp_release(kcp);
+	return ok;
+}
 }
 
 int main()
 {
-	if (!testAckCounters() || !testRetransmissionCounters())
+	if (!testAckCounters() || !testRetransmissionCounters() || !testFlushSegmentBudget())
 		return EXIT_FAILURE;
 
 	std::cout << "KCP_PROTOCOL_METRICS_TEST_PASS" << std::endl;
