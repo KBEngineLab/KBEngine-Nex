@@ -816,6 +816,11 @@ def main() -> int:
         "averageQueuedPayloadBytes",
         "streamCoalesces",
         "streamCoalescedBytes",
+        "ackScheduleRequests",
+        "ackTotalProcessingMicros",
+        "ackMaxProcessingMicros",
+        "dataTotalProcessingMicros",
+        "dataMaxProcessingMicros",
     ):
         assert f'WATCH_OBJECT("network/kcp/{watcher}"' in serverapp_source
     assert 'WATCH_OBJECT("network/kcp/configuredExternalWriteQueueMaxBytes"' in serverapp_source

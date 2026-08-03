@@ -45,8 +45,13 @@ public:
 	uint64 totalProcessingMicros() const { return totalProcessingMicros_; }
 	uint64 maxProcessingMicros() const { return maxProcessingMicros_; }
 	uint64 ackScheduledChannelCount() const { return static_cast<uint64>(ackQueue_.scheduledCount()); }
+	uint64 ackScheduleRequestCount() const { return ackQueue_.scheduleRequestCount(); }
 	uint64 ackFlushCallCount() const { return ackFlushCallCount_; }
 	uint64 ackBudgetExhaustionCount() const { return ackBudgetExhaustionCount_; }
+	uint64 ackTotalProcessingMicros() const { return ackTotalProcessingMicros_; }
+	uint64 ackMaxProcessingMicros() const { return ackMaxProcessingMicros_; }
+	uint64 dataTotalProcessingMicros() const { return dataTotalProcessingMicros_; }
+	uint64 dataMaxProcessingMicros() const { return dataMaxProcessingMicros_; }
 
 private:
 	void handleTimeout(TimerHandle handle, void* pUser) override;
@@ -75,6 +80,10 @@ private:
 	uint64 maxProcessingMicros_;
 	uint64 ackFlushCallCount_;
 	uint64 ackBudgetExhaustionCount_;
+	uint64 ackTotalProcessingMicros_;
+	uint64 ackMaxProcessingMicros_;
+	uint64 dataTotalProcessingMicros_;
+	uint64 dataMaxProcessingMicros_;
 };
 
 }

@@ -722,8 +722,13 @@ uint64 NetworkInterface::kcpTimeBudgetExhaustionCount() const { return kcpUpdate
 uint64 NetworkInterface::kcpTotalProcessingMicros() const { return kcpUpdateScheduler_.totalProcessingMicros(); }
 uint64 NetworkInterface::kcpMaxProcessingMicros() const { return kcpUpdateScheduler_.maxProcessingMicros(); }
 uint64 NetworkInterface::kcpAckScheduledChannelCount() const { return kcpUpdateScheduler_.ackScheduledChannelCount(); }
+uint64 NetworkInterface::kcpAckScheduleRequestCount() const { return kcpUpdateScheduler_.ackScheduleRequestCount(); }
 uint64 NetworkInterface::kcpAckFlushCallCount() const { return kcpUpdateScheduler_.ackFlushCallCount(); }
 uint64 NetworkInterface::kcpAckBudgetExhaustionCount() const { return kcpUpdateScheduler_.ackBudgetExhaustionCount(); }
+uint64 NetworkInterface::kcpAckTotalProcessingMicros() const { return kcpUpdateScheduler_.ackTotalProcessingMicros(); }
+uint64 NetworkInterface::kcpAckMaxProcessingMicros() const { return kcpUpdateScheduler_.ackMaxProcessingMicros(); }
+uint64 NetworkInterface::kcpDataTotalProcessingMicros() const { return kcpUpdateScheduler_.dataTotalProcessingMicros(); }
+uint64 NetworkInterface::kcpDataMaxProcessingMicros() const { return kcpUpdateScheduler_.dataMaxProcessingMicros(); }
 
 //-------------------------------------------------------------------------------------
 uint64 NetworkInterface::recordKcpInputError(int result, size_t packetLength)

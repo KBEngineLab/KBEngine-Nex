@@ -50,7 +50,11 @@ KcpUpdateScheduler::KcpUpdateScheduler(EventDispatcher& dispatcher) :
 	totalProcessingMicros_(0),
 	maxProcessingMicros_(0),
 	ackFlushCallCount_(0),
-	ackBudgetExhaustionCount_(0)
+	ackBudgetExhaustionCount_(0),
+	ackTotalProcessingMicros_(0),
+	ackMaxProcessingMicros_(0),
+	dataTotalProcessingMicros_(0),
+	dataMaxProcessingMicros_(0)
 {
 }
 
@@ -218,6 +222,9 @@ void KcpUpdateScheduler::handleTimeout(TimerHandle handle, void*)
 		if (ackQueue_.nextDue(nextAckDue) && nextAckDue <= processingStart)
 			++ackBudgetExhaustionCount_;
 	}
+	const uint64 ackProcessingMicros = static_cast<uint64>(stampsToDelay(timestamp() - processingStart));
+	ackTotalProcessingMicros_ += ackProcessingMicros;
+	ackMaxProcessingMicros_ = std::max(ackMaxProcessingMicros_, ackProcessingMicros);
 
 	const uint64 dataProcessingStart = timestamp();
 	const uint64 processingBudget = delayToStamps(KCP_PROCESSING_TIME_BUDGET_MICROS);
@@ -261,8 +268,11 @@ void KcpUpdateScheduler::handleTimeout(TimerHandle handle, void*)
 	const uint64 processingElapsed = timestamp() - processingStart;
 	const uint64 dataProcessingElapsed = timestamp() - dataProcessingStart;
 	const uint64 processingMicros = static_cast<uint64>(stampsToDelay(processingElapsed));
+	const uint64 dataProcessingMicros = static_cast<uint64>(stampsToDelay(dataProcessingElapsed));
 	totalProcessingMicros_ += processingMicros;
 	maxProcessingMicros_ = std::max(maxProcessingMicros_, processingMicros);
+	dataTotalProcessingMicros_ += dataProcessingMicros;
+	dataMaxProcessingMicros_ = std::max(dataMaxProcessingMicros_, dataProcessingMicros);
 	const bool timeBudgetExhausted = processed >= KCP_MIN_UPDATES_PER_WAKEUP &&
 		dataProcessingElapsed >= processingBudget;
 	if (timeBudgetExhausted)

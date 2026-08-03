@@ -180,8 +180,13 @@ public:
 	uint64 kcpTotalProcessingMicros() const;
 	uint64 kcpMaxProcessingMicros() const;
 	uint64 kcpAckScheduledChannelCount() const;
+	uint64 kcpAckScheduleRequestCount() const;
 	uint64 kcpAckFlushCallCount() const;
 	uint64 kcpAckBudgetExhaustionCount() const;
+	uint64 kcpAckTotalProcessingMicros() const;
+	uint64 kcpAckMaxProcessingMicros() const;
+	uint64 kcpDataTotalProcessingMicros() const;
+	uint64 kcpDataMaxProcessingMicros() const;
 	uint64 kcpPendingSegmentCount() const;
 	uint64 kcpQueuedSegmentCount() const;
 	uint64 kcpUnackedSegmentCount() const;
