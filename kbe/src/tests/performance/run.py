@@ -992,6 +992,7 @@ def wait_for_workload_ready(
     deadline = time.monotonic() + timeout_seconds
     last_error: Exception | None = None
     last_observed: dict[str, object] = {}
+    last_resolved_targets: list[WatcherTarget] = []
     while time.monotonic() < deadline:
         if cluster is not None:
             cluster.assert_running("workload readiness")
@@ -1010,6 +1011,7 @@ def wait_for_workload_ready(
                 )
                 for target in watcher_targets
             ]
+            last_resolved_targets = resolved_targets
             observed: dict[str, object] = {}
             readiness_targets = select_readiness_targets(resolved_targets, readiness)
             aggregate_readiness = len(readiness_targets) > 1
@@ -1040,10 +1042,60 @@ def wait_for_workload_ready(
         except (LookupError, OSError, RuntimeError, TimeoutError, ValueError) as exc:
             last_error = exc
             time.sleep(0.25)
+    failure_snapshot = collect_readiness_failure_snapshot(
+        watcher_collector, last_resolved_targets, last_observed
+    )
     raise WorkloadReadinessError(
         f"workload readiness timed out after {timeout_seconds:.1f}s: {last_error}",
-        last_observed,
+        failure_snapshot,
     )
+
+
+def collect_readiness_failure_snapshot(
+    watcher_collector: WatcherCollector,
+    resolved_targets: list[WatcherTarget],
+    readiness_observed: dict[str, object],
+) -> dict[str, object]:
+    """Collect one per-component diagnostic snapshot after readiness has failed.
+    readiness 失败后采集一次按组件区分的诊断快照。
+
+    Normal polling deliberately queries only readiness owners. At failure time the
+    KCP/IOCP state is more valuable than another blind retry, but querying both
+    ``root`` and all of its children would duplicate work. Keep only leaf targets
+    for each resolved component and preserve the original aggregate readiness keys.
+    正常轮询只查询 readiness 所属目标；失败时再保留每个组件的 KCP/IOCP 状态。
+    同一组件只查询叶子路径，避免同时读取 ``root`` 及其全部子树造成重复开销。
+    """
+    snapshot = dict(readiness_observed)
+    leaf_targets = [
+        target
+        for target in resolved_targets
+        if not any(
+            other is not target
+            and _watcher_component_identity(other) == _watcher_component_identity(target)
+            and other.path.startswith(f"{target.path}/")
+            for other in resolved_targets
+        )
+    ]
+    for target in leaf_targets:
+        try:
+            values = watcher_collector.query(target)
+        except (LookupError, OSError, RuntimeError, TimeoutError, ValueError):
+            continue
+        instance = target.component_name or (
+            f"{target.component_type}@{target.host}:{target.port}"
+        )
+        for metric, value in values.items():
+            full_metric = f"{target.path}/{metric}".replace("//", "/")
+            snapshot[f"{instance}/{full_metric}"] = value
+    return snapshot
+
+
+def _watcher_component_identity(target: WatcherTarget) -> tuple[str, str, int, str]:
+    """Return the resolved component identity independently of its Watcher path.
+    返回与 Watcher 路径无关的已解析组件身份。
+    """
+    return target.component_type, target.host, target.port, target.component_name
 
 
 def select_readiness_targets(

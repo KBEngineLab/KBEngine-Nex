@@ -240,6 +240,11 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/udpSendBacklogBytes", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBacklogBytes);
 	WATCH_OBJECT("bots/performance/udpSendBacklogPeakBytes", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBacklogPeakBytes);
 	WATCH_OBJECT("bots/performance/udpSendBackpressure", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBackpressureCount);
+	// 少量 UDP 通道永久失联时，需要区分内核没有可读数据与 completion read 未能重新投递；这些 getter 只读取聚合计数。
+	// When a few UDP channels stop receiving permanently, these aggregate counters distinguish absent kernel data from a failed completion-read rearm.
+	WATCH_OBJECT("bots/performance/pendingPollerRearms", &networkInterface(), &Network::NetworkInterface::pendingPollerRearms);
+	WATCH_OBJECT("bots/performance/pollerRearmAttempts", &networkInterface(), &Network::NetworkInterface::pollerRearmAttempts);
+	WATCH_OBJECT("bots/performance/pollerRearmRetries", &networkInterface(), &Network::NetworkInterface::pollerRearmRetries);
 	WATCH_OBJECT("bots/performance/completionProcessed", &networkInterface(), &Network::NetworkInterface::pollerCompletionProcessedCount);
 	WATCH_OBJECT("bots/performance/completionLastBatch", &networkInterface(), &Network::NetworkInterface::pollerCompletionLastBatchCount);
 	WATCH_OBJECT("bots/performance/completionMaxBatch", &networkInterface(), &Network::NetworkInterface::pollerCompletionMaxBatchCount);

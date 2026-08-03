@@ -19,6 +19,7 @@ from performance.process_metrics import ProcessCollector, _parse_windows_process
 from performance.report import build_summary, load_events, validate_event
 from performance.run import (
     _repository_root,
+    collect_readiness_failure_snapshot,
     expand_bots_watcher_targets,
     expand_component_watcher_targets,
     load_scenario,
@@ -441,6 +442,9 @@ def assert_python_latency_scenario() -> None:
     gameplay_path = Path(__file__).resolve().parent / "scenarios/gameplay_10000.json"
     gameplay = load_scenario(gameplay_path)
     assert gameplay["readiness"]["root/witness/active"] == "$bots"
+    assert gameplay["readiness"]["root/bots/performance/clientsStatePlay"] == "$bots"
+    assert gameplay["readiness"]["root/bots/performance/clientsDestroyed"] == 0
+    assert gameplay["readiness"]["root/bots/performance/networkErrors"] == 0
     assert "BASEAPPMGR_TYPE=@baseappmgr:root/allocation" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["BASEAPPMGR_TYPE:root/allocation"] == 5.0
     assert "CELLAPPMGR_TYPE=@cellappmgr:root/allocation" in gameplay["watcher_targets"]
@@ -679,6 +683,28 @@ def assert_readiness_target_ownership() -> None:
     )
     assert ready_targets == aggregate_targets
 
+    class FailureCollector:
+        @staticmethod
+        def query(target):
+            return {"value": target.port}
+
+    failure_targets = [
+        parse_target("BASEAPP_TYPE=127.0.0.1:12001:root"),
+        parse_target("BASEAPP_TYPE=127.0.0.1:12001:root/network/kcp"),
+        parse_target("BASEAPP_TYPE=127.0.0.1:12001:root/network/poller"),
+    ]
+    snapshot = collect_readiness_failure_snapshot(
+        FailureCollector(), failure_targets, {"root/witness/active": 9999}
+    )
+    assert snapshot["root/witness/active"] == 9999
+    assert "BASEAPP_TYPE@127.0.0.1:12001/root/value" not in snapshot
+    assert snapshot[
+        "BASEAPP_TYPE@127.0.0.1:12001/root/network/kcp/value"
+    ] == 12001
+    assert snapshot[
+        "BASEAPP_TYPE@127.0.0.1:12001/root/network/poller/value"
+    ] == 12001
+
 
 def main() -> int:
     assert_centralized_discovery_matching()
@@ -760,6 +786,12 @@ def main() -> int:
     assert "updateBaseappArgs6" in (
         repository_root / "kbe/src/server/baseapp/baseapp.cpp"
     ).read_text(encoding="utf-8")
+    bots_source = (
+        repository_root / "kbe/src/server/tools/bots/bots.cpp"
+    ).read_text(encoding="utf-8")
+    assert 'WATCH_OBJECT("bots/performance/pendingPollerRearms"' in bots_source
+    assert 'WATCH_OBJECT("bots/performance/pollerRearmAttempts"' in bots_source
+    assert 'WATCH_OBJECT("bots/performance/pollerRearmRetries"' in bots_source
     assert "WATCH_OBJECT(\"spaceSize\", this, &Cellapp::spaceSize)" in (
         repository_root / "kbe/src/server/cellapp/cellapp.cpp"
     ).read_text(encoding="utf-8")

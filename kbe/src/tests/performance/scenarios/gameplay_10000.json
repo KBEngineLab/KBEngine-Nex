@@ -66,6 +66,9 @@
   "readiness": {
     "root/bots/performance/clientsTotal": "$bots",
     "root/bots/performance/clientsKcp": "$bots",
+    "root/bots/performance/clientsStatePlay": "$bots",
+    "root/bots/performance/clientsDestroyed": 0,
+    "root/bots/performance/networkErrors": 0,
     "root/witness/active": "$bots"
   },
   "thresholds": "../thresholds.json"
