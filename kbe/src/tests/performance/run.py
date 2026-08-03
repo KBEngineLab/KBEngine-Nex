@@ -245,6 +245,7 @@ def main() -> int:
             output / "config-overlay/res",
             fixture_root,
             args.cluster_startup_timeout,
+            scenario_cluster_environment(scenario),
         )
         try:
             owned_processes.update({f"cluster:{item.name}": item.pid for item in cluster.start()})
@@ -328,6 +329,9 @@ def main() -> int:
             watcher_sample_times: dict[tuple[str, str, int, str], float] = {}
             watcher_stamps_per_second: dict[tuple[str, str, int], float] = {}
             cprofile_previous: dict[tuple[str, str, int, str], tuple[int, float, float, float]] = {}
+            watcher_counter_previous: dict[
+                tuple[str, str, int, str], tuple[float, float]
+            ] = {}
             if watcher_collector:
                 for target in watcher_targets:
                     recorder.record_sample(
@@ -415,6 +419,7 @@ def main() -> int:
                                 sample_now,
                                 watcher_stamps_per_second,
                                 cprofile_previous,
+                                watcher_counter_previous,
                             )
                             query_stats = watcher_collector.last_query_stats(target)
                             if query_stats is not None:
@@ -773,6 +778,24 @@ def scenario_environment(scenario: dict[str, object]) -> dict[str, str]:
     return environment
 
 
+def scenario_cluster_environment(scenario: dict[str, object]) -> dict[str, str]:
+    """Validate performance-only variables inherited by server components.
+    校验由服务端组件继承的压测专用环境变量。
+    """
+    configured = scenario.get("cluster_environment", {})
+    if not isinstance(configured, dict):
+        raise ValueError("cluster_environment must be an object")
+    environment: dict[str, str] = {}
+    for key, value in configured.items():
+        name = str(key)
+        if not name.startswith("KBE_PERF_"):
+            raise ValueError(f"unsupported cluster environment key: {name}")
+        if not isinstance(value, (str, int, float)):
+            raise ValueError(f"cluster environment value must be scalar: {name}")
+        environment[name] = str(value)
+    return environment
+
+
 def _repository_root() -> Path:
     return Path(__file__).resolve().parents[4]
 
@@ -806,6 +829,7 @@ def record_watcher_samples(
     sample_now: float,
     stamps_per_second: dict[tuple[str, str, int], float],
     cprofile_previous: dict[tuple[str, str, int, str], tuple[int, float, float, float]],
+    counter_previous: dict[tuple[str, str, int, str], tuple[float, float]] | None = None,
 ) -> None:
     """Record raw Watcher values and normalized cprofile window metrics.
     记录原始 Watcher 值，并把 cprofile 累计 stamp 归一化为可发布的窗口指标。
@@ -831,6 +855,12 @@ def record_watcher_samples(
         metric in values for metric in latency_stat_metrics
     )
     latency_count = values.get("count") if has_latency_distribution else None
+    network_counter_rates = {
+        "numPacketsSent": ("packetsSentPerSecond", "packets/s"),
+        "numPacketsReceived": ("packetsReceivedPerSecond", "packets/s"),
+        "numBytesSent": ("bytesSentPerSecond", "bytes/s"),
+        "numBytesReceived": ("bytesReceivedPerSecond", "bytes/s"),
+    }
     for metric, value in values.items():
         if not isinstance(value, (int, float)):
             continue
@@ -848,6 +878,24 @@ def record_watcher_samples(
             value,
             watcher_unit(metric_name),
         )
+        rate_definition = network_counter_rates.get(metric) if target.path in (
+            "root/network",
+            "root/bots/performance",
+        ) else None
+        if counter_previous is not None and rate_definition is not None:
+            counter_key = (*component_key, metric)
+            current = (float(value), sample_now)
+            previous_counter = counter_previous.get(counter_key)
+            counter_previous[counter_key] = current
+            if previous_counter is not None and current[0] >= previous_counter[0]:
+                elapsed = max(current[1] - previous_counter[1], 1e-6)
+                recorder.record_sample(
+                    "watcher",
+                    target.component_type,
+                    f"{target.path}/rates/{rate_definition[0]}",
+                    (current[0] - previous_counter[0]) / elapsed,
+                    rate_definition[1],
+                )
         if stamp_rate and "/cprofiles/" in target.path and metric in (
             "lastTime",
             "sumTime",

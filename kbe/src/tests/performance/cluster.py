@@ -36,6 +36,7 @@ class PerformanceCluster:
         config_overlay_root: Path,
         fixture_root: Path | None = None,
         startup_timeout_seconds: int = 90,
+        environment: dict[str, str] | None = None,
     ):
         self.repository_root = repository_root.resolve()
         self.assets_root = assets_root.resolve()
@@ -45,6 +46,7 @@ class PerformanceCluster:
         self.config_overlay_root = config_overlay_root.resolve()
         self.fixture_root = fixture_root.resolve() if fixture_root is not None else None
         self.startup_timeout_seconds = startup_timeout_seconds
+        self.environment = dict(environment or {})
         self.stop_file = self.run_root / "stop.requested"
         self.stdout_path = self.run_root / "cluster-controller.stdout.log"
         self.stderr_path = self.run_root / "cluster-controller.stderr.log"
@@ -88,6 +90,8 @@ class PerformanceCluster:
         if self.fixture_root is not None:
             command.extend(("--resource-overlay", str(self.fixture_root)))
         creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        child_environment = os.environ.copy()
+        child_environment.update(self.environment)
         self.process = subprocess.Popen(
             tuple(command),
             cwd=self.run_root,
@@ -95,6 +99,7 @@ class PerformanceCluster:
             stdout=self._stdout_handle,
             stderr=self._stderr_handle,
             creationflags=creation_flags,
+            env=child_environment,
         )
         try:
             self._wait_until_ready()

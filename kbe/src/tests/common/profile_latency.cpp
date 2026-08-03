@@ -55,12 +55,12 @@ bool testCapacityAndP999Gate()
 	}
 
 	KBEngine::ProfileLatencyWindow publishable(10000, 1000);
-	for (KBEngine::uint64 value = 1; value <= 10000; ++value)
+	for (KBEngine::uint64 value = 1; value <= 1000; ++value)
 		publishable.record(value, 100);
 
 	const KBEngine::ProfileLatencyWindow::Snapshot full = publishable.snapshot(100);
-	return require(full.p999Available, "P99.9 was unavailable at 10000 samples") &&
-		require(full.p999Stamps == 9990, "P99.9 nearest-rank value was incorrect") &&
+	return require(full.p999Available, "P99.9 was unavailable at 1000 samples") &&
+		require(full.p999Stamps == 999, "P99.9 nearest-rank value was incorrect") &&
 		require(publishable.allocatedBytes() >= 240000,
 			"latency window did not report its fixed storage cost");
 }

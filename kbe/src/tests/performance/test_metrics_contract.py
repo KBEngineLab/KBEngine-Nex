@@ -28,6 +28,7 @@ from performance.run import (
     record_watcher_samples,
     readiness_value_matches,
     select_readiness_targets,
+    scenario_cluster_environment,
     scenario_environment,
     start_command,
     wait_for_workload_ready,
@@ -341,6 +342,40 @@ def assert_cprofile_window_metrics() -> None:
         assert summary["samples"][f"{prefix}/latency/p999Micros"]["max"] == 123
 
 
+def assert_network_counter_rates() -> None:
+    target = parse_target("BASEAPP_TYPE=@baseapp#7001:root/network")
+    previous = {}
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "network-rates.jsonl"
+        with JsonlRecorder(path, "test-run", "contract") as recorder:
+            record_watcher_samples(
+                recorder,
+                target,
+                {"numPacketsSent": 100, "numPacketsReceived": 80,
+                 "numBytesSent": 1000, "numBytesReceived": 800},
+                10.0,
+                {},
+                {},
+                previous,
+            )
+            record_watcher_samples(
+                recorder,
+                target,
+                {"numPacketsSent": 140, "numPacketsReceived": 100,
+                 "numBytesSent": 1800, "numBytesReceived": 1200},
+                12.0,
+                {},
+                {},
+                previous,
+            )
+        samples = build_summary(load_events(path))["samples"]
+        prefix = "watcher.BASEAPP_TYPE.root/network/rates"
+        assert samples[f"{prefix}/packetsSentPerSecond"]["max"] == 20
+        assert samples[f"{prefix}/packetsReceivedPerSecond"]["max"] == 10
+        assert samples[f"{prefix}/bytesSentPerSecond"]["max"] == 400
+        assert samples[f"{prefix}/bytesReceivedPerSecond"]["max"] == 200
+
+
 def assert_fixture_callbacks() -> None:
     fixture_root = resolve_fixture_root("network-baseline")
     required = {
@@ -376,9 +411,11 @@ def assert_python_latency_scenario() -> None:
     scenario_path = Path(__file__).resolve().parent / "scenarios/python_latency.json"
     scenario = load_scenario(scenario_path)
     assert scenario["name"] == "python-latency"
-    assert len(scenario["watcher_targets"]) == 31
+    assert scenario["duration_seconds"] == 150
+    assert len(scenario["watcher_targets"]) == 33
     assert scenario["watcher_intervals"]["BOTS_TYPE:root/bots/performance"] == 5.0
     assert scenario["workload_environment"]["KBE_PERF_PYTHON_RTT_SAMPLE_EVERY"] == "50"
+    assert scenario["workload_environment"]["KBE_PERF_PYTHON_LATENCY_WINDOW_SECONDS"] == "180"
     assert scenario["readiness"]["root/bots/pythonLatency/control/successes"] == {"min": 1}
     assert readiness_value_matches(1, {"min": 1}, 2000)
     assert not readiness_value_matches(0, {"min": 1}, 2000)
@@ -386,12 +423,20 @@ def assert_python_latency_scenario() -> None:
     assert scenario["watcher_intervals"]["BOTS_TYPE:root/bots/pythonLatency/roundTrip"] == 2.0
     environment = scenario_environment(scenario)
     assert environment["KBE_PERF_PYTHON_CHAIN"] == "1"
+    cluster_environment = scenario_cluster_environment(scenario)
+    assert cluster_environment["KBE_PERF_PROFILE_LATENCY_WINDOW_SECONDS"] == "180"
     try:
         scenario_environment({"workload_environment": {"PATH": "invalid"}})
     except ValueError:
         pass
     else:
         raise AssertionError("unrestricted workload environment key must fail")
+    try:
+        scenario_cluster_environment({"cluster_environment": {"PATH": "invalid"}})
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("unrestricted cluster environment key must fail")
 
 
 def assert_multi_component_cluster_manifest() -> None:
@@ -628,6 +673,7 @@ def main() -> int:
     assert_watcher_connection_reuse()
     assert_watcher_schedule()
     assert_cprofile_window_metrics()
+    assert_network_counter_rates()
     assert_fixture_callbacks()
     assert_python_latency_scenario()
     assert_multi_component_cluster_manifest()
@@ -674,6 +720,18 @@ def main() -> int:
     assert "KCP_MIN_UPDATES_PER_WAKEUP = 1" in scheduler_source
     assert "KCP_MAX_UPDATES_PER_WAKEUP = 2048" in scheduler_source
     assert "KCP_BACKLOG_RETRY_DELAY_MICROS = 1000" in scheduler_source
+    assert "protocolTickMissCount_" in scheduler_source
+    assert "g_rudp_tickInterval > 0 ? g_rudp_tickInterval : 100" in scheduler_source
+    profile_source = (
+        repository_root / "kbe/src/lib/helper/profile.cpp"
+    ).read_text(encoding="utf-8")
+    assert "KBE_PERF_PROFILE_LATENCY_WINDOW_SECONDS" in profile_source
+    bots_source = (
+        repository_root / "kbe/src/server/tools/bots/bots.cpp"
+    ).read_text(encoding="utf-8")
+    assert "KBE_PERF_PYTHON_LATENCY_WINDOW_SECONDS" in bots_source
+    assert "seconds * 1000000000.0" in bots_source
+    assert 'WATCH_OBJECT("bots/performance/numPacketsSent"' in bots_source
     baseappmgr_source = (
         repository_root / "kbe/src/server/baseappmgr/baseappmgr.cpp"
     ).read_text(encoding="utf-8")
@@ -762,8 +820,9 @@ def main() -> int:
         assert xml_root.findtext("./channelCommon/windowOverflow/receive/messages/external") == "1024"
         assert xml_root.findtext("./channelCommon/windowOverflow/receive/bytes/external") == "1048576"
         assert xml_root.findtext("./channelCommon/timeout/external") == "120"
-        assert xml_root.findtext("./networkInterface/reliableUDP/tickInterval") == "20"
-        assert xml_root.findtext("./networkInterface/reliableUDP/minRTO") == "50"
+        assert xml_root.findtext("./channelCommon/reliableUDP/tickInterval") == "20"
+        assert xml_root.findtext("./channelCommon/reliableUDP/minRTO") == "50"
+        assert xml_root.find("./networkInterface/reliableUDP") is None
         assert xml_root.findtext("./dbmgr/databaseInterfaces/default/numConnections") == "32"
         assert xml_root.findtext("./baseapp/externalPorts_min") == "20015"
         assert xml_root.findtext("./baseapp/externalPorts_max") == "20024"
@@ -884,6 +943,19 @@ def main() -> int:
             workload_processes=4,
         )
         assert any("min=9999.0, expected=10000" in item for item in dropped_aggregate["quality"]["blockers"])
+
+        distributed_path = root / "distributed-readiness.jsonl"
+        with JsonlRecorder(distributed_path, "test-run", "contract") as recorder:
+            recorder.record_sample("watcher", "CELLAPP_TYPE", "root/witness/active", 2000, "count")
+            recorder.record_sample("watcher", "CELLAPP_TYPE", "root/witness/active", 0, "count")
+            recorder.record_request_latency("watcher", "CELLAPP_TYPE", "witness", 0, 1, True)
+        distributed = build_summary(
+            load_events(distributed_path),
+            readiness={"root/witness/active": "$bots"},
+            configured_bots=2000,
+            workload_processes=2,
+        )
+        assert distributed["quality"]["status"] == "PASS"
     print("PERFORMANCE_METRICS_CONTRACT_TEST_PASS")
     return 0
 

@@ -25,7 +25,9 @@ class ProfileLatencyWindow
 {
 public:
 	static const size_t DEFAULT_CAPACITY = 10000;
-	static const uint64 P999_MIN_SAMPLES = 10000;
+	// 最近秩 P99.9 至少需要 1000 个样本，才能让尾部秩落到一个真实观测值上。
+	// Nearest-rank P99.9 needs at least 1000 samples so its tail rank maps to an observation.
+	static const uint64 P999_MIN_SAMPLES = 1000;
 
 	struct Snapshot
 	{

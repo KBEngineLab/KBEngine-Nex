@@ -167,6 +167,9 @@ public:
 	uint64 kcpDueChannelCount() const;
 	uint64 kcpOverdueChannelCount() const;
 	uint64 kcpDeadlineMissCount() const;
+	uint64 kcpProtocolTickMissCount() const;
+	uint32 rudpTickIntervalMs() const;
+	uint32 rudpMinRtoMs() const;
 	uint64 kcpMaxScheduleDelayMicros() const;
 	uint64 kcpBudgetExhaustionCount() const;
 	uint64 kcpConsecutiveBudgetExhaustions() const;

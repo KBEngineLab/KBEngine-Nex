@@ -707,6 +707,9 @@ uint64 NetworkInterface::kcpTimerRearmCount() const { return kcpUpdateScheduler_
 uint64 NetworkInterface::kcpDueChannelCount() const { return kcpUpdateScheduler_.dueChannelCount(); }
 uint64 NetworkInterface::kcpOverdueChannelCount() const { return kcpUpdateScheduler_.overdueChannelCount(); }
 uint64 NetworkInterface::kcpDeadlineMissCount() const { return kcpUpdateScheduler_.deadlineMissCount(); }
+uint64 NetworkInterface::kcpProtocolTickMissCount() const { return kcpUpdateScheduler_.protocolTickMissCount(); }
+uint32 NetworkInterface::rudpTickIntervalMs() const { return g_rudp_tickInterval; }
+uint32 NetworkInterface::rudpMinRtoMs() const { return g_rudp_minRTO; }
 uint64 NetworkInterface::kcpMaxScheduleDelayMicros() const { return kcpUpdateScheduler_.maxScheduleDelayMicros(); }
 uint64 NetworkInterface::kcpBudgetExhaustionCount() const { return kcpUpdateScheduler_.budgetExhaustionCount(); }
 uint64 NetworkInterface::kcpConsecutiveBudgetExhaustions() const { return kcpUpdateScheduler_.consecutiveBudgetExhaustions(); }

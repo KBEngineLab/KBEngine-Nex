@@ -251,6 +251,9 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/kcp/dueChannels", &networkInterface_, &Network::NetworkInterface::kcpDueChannelCount);
 	WATCH_OBJECT("network/kcp/overdueChannels", &networkInterface_, &Network::NetworkInterface::kcpOverdueChannelCount);
 	WATCH_OBJECT("network/kcp/deadlineMisses", &networkInterface_, &Network::NetworkInterface::kcpDeadlineMissCount);
+	WATCH_OBJECT("network/kcp/protocolTickMisses", &networkInterface_, &Network::NetworkInterface::kcpProtocolTickMissCount);
+	WATCH_OBJECT("network/kcp/configuredTickIntervalMs", &networkInterface_, &Network::NetworkInterface::rudpTickIntervalMs);
+	WATCH_OBJECT("network/kcp/configuredMinRtoMs", &networkInterface_, &Network::NetworkInterface::rudpMinRtoMs);
 	WATCH_OBJECT("network/kcp/maxScheduleDelayMicros", &networkInterface_, &Network::NetworkInterface::kcpMaxScheduleDelayMicros);
 	WATCH_OBJECT("network/kcp/budgetExhaustions", &networkInterface_, &Network::NetworkInterface::kcpBudgetExhaustionCount);
 	WATCH_OBJECT("network/kcp/consecutiveBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::kcpConsecutiveBudgetExhaustions);

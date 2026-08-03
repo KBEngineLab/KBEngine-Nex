@@ -180,6 +180,17 @@ def evaluate_quality(
             continue
 
         for name, values in matches:
+            # `$bots` 在 CellApp 等服务端组件上表示跨组件总和；直方图已经丢失同一
+            # 采样周期的组件身份，不能再把单个 CellApp 的 0 误判为总量下降。
+            # On server components `$bots` is a cross-component aggregate. The summary
+            # histogram no longer retains synchronized instance identity, so a single
+            # CellApp's zero cannot be treated as an aggregate drop.
+            if (
+                expected == "$bots"
+                and name.startswith("watcher.")
+                and not name.startswith("watcher.BOTS_TYPE.")
+            ):
+                continue
             # readiness.workload.root/... 是控制器写入的多进程总和；带 bots#CID 的样本才是进程局部值。
             # readiness.workload.root/... is the controller aggregate; samples containing bots#CID remain process-local.
             # 只有 readiness 控制器显式写入的 root 样本是进程总和；测量阶段同名

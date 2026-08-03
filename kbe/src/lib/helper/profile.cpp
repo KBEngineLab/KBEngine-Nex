@@ -20,6 +20,10 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "profile.h"
 #include "profile_latency.h"
+
+#include <cerrno>
+#include <cmath>
+#include <cstdlib>
 #include "helper/watcher.h"
 
 #ifndef CODE_INLINE
@@ -29,6 +33,31 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine
 {
+
+namespace
+{
+uint64 profileLatencyMaxAgeStamps()
+{
+	const double defaultSeconds = 10.0;
+	const char* configured = std::getenv("KBE_PERF_PROFILE_LATENCY_WINDOW_SECONDS");
+	if (configured == NULL || configured[0] == '\0')
+		return static_cast<uint64>(defaultSeconds * stampsPerSecondD());
+
+	char* end = NULL;
+	errno = 0;
+	const double seconds = std::strtod(configured, &end);
+	if (errno != 0 || end == configured || *end != '\0' || !std::isfinite(seconds) ||
+		seconds < 1.0 || seconds > 1800.0)
+	{
+		WARNING_MSG(fmt::format(
+			"ProfileVal: ignoring invalid KBE_PERF_PROFILE_LATENCY_WINDOW_SECONDS='{}'\n",
+			configured));
+		return static_cast<uint64>(defaultSeconds * stampsPerSecondD());
+	}
+
+	return static_cast<uint64>(seconds * stampsPerSecondD());
+}
+}
 
 ProfileGroup* g_pDefaultGroup = NULL;
 TimeStamp ProfileVal::warningPeriod_;
@@ -102,7 +131,7 @@ ProfileVal::ProfileVal(std::string name, ProfileGroup * pGroup, bool collectLate
 	initWatcher_(false),
 	pLatencyWindow_(collectLatency ? new ProfileLatencyWindow(
 		ProfileLatencyWindow::DEFAULT_CAPACITY,
-		stampsPerSecond() * 10) : NULL)
+		profileLatencyMaxAgeStamps()) : NULL)
 {
 	if (pProfileGroup_ == NULL)
 	{

@@ -1,12 +1,22 @@
 {
   "extends": "stress.json",
   "name": "python-latency",
-  "duration_seconds": 60,
+  "duration_seconds": 150,
+  "database_connections": 16,
+  "external_timeout_seconds": 120,
+  "reliable_udp_tick_interval_ms": 250,
+  "reliable_udp_min_rto_ms": 50,
+  "runtime_log_level": "warn",
+  "server_runtime_log_level": "warn",
   "workload_environment": {
     "KBE_PERF_PYTHON_CHAIN": "1",
     "KBE_PERF_PYTHON_RTT_INTERVAL": "2.0",
     "KBE_PERF_PYTHON_RTT_SAMPLE_EVERY": "50",
-    "KBE_PERF_PYTHON_RTT_TIMEOUT": "5.0"
+    "KBE_PERF_PYTHON_RTT_TIMEOUT": "5.0",
+    "KBE_PERF_PYTHON_LATENCY_WINDOW_SECONDS": "180"
+  },
+  "cluster_environment": {
+    "KBE_PERF_PROFILE_LATENCY_WINDOW_SECONDS": "180"
   },
   "watcher_targets_add": [
     "BOTS_TYPE=@bots:root/bots/pythonLatency/control",
@@ -14,7 +24,9 @@
     "BOTS_TYPE=@bots:root/bots/pythonLatency/clientToBase",
     "BOTS_TYPE=@bots:root/bots/pythonLatency/baseToCell",
     "BOTS_TYPE=@bots:root/bots/pythonLatency/cellToBase",
-    "BOTS_TYPE=@bots:root/bots/pythonLatency/baseToClient"
+    "BOTS_TYPE=@bots:root/bots/pythonLatency/baseToClient",
+    "BASEAPP_TYPE=@baseapp:root/network",
+    "CELLAPP_TYPE=@cellapp:root/network"
   ],
   "watcher_intervals": {
     "BOTS_TYPE:root/bots/pythonLatency/control": 2.0,
@@ -22,7 +34,9 @@
     "BOTS_TYPE:root/bots/pythonLatency/clientToBase": 2.0,
     "BOTS_TYPE:root/bots/pythonLatency/baseToCell": 2.0,
     "BOTS_TYPE:root/bots/pythonLatency/cellToBase": 2.0,
-    "BOTS_TYPE:root/bots/pythonLatency/baseToClient": 2.0
+    "BOTS_TYPE:root/bots/pythonLatency/baseToClient": 2.0,
+    "BASEAPP_TYPE:root/network": 5.0,
+    "CELLAPP_TYPE:root/network": 5.0
   },
   "readiness": {
     "root/bots/performance/clientsTotal": "$bots",

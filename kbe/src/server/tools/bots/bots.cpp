@@ -46,6 +46,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "helper/profile_handler.h"
 #include "pyscript/pyprofile_handler.h"
 #include <algorithm>
+#include <cerrno>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 
@@ -53,6 +55,31 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "../../../server/loginapp/loginapp_interface.h"
 
 namespace KBEngine{
+
+namespace
+{
+uint64 pythonLatencyWindowNanoseconds()
+{
+	const double defaultSeconds = 10.0;
+	const char* configured = std::getenv("KBE_PERF_PYTHON_LATENCY_WINDOW_SECONDS");
+	if (configured == NULL || configured[0] == '\0')
+		return static_cast<uint64>(defaultSeconds * 1000000000.0);
+
+	char* end = NULL;
+	errno = 0;
+	const double seconds = std::strtod(configured, &end);
+	if (errno != 0 || end == configured || *end != '\0' || !std::isfinite(seconds) ||
+		seconds < 1.0 || seconds > 1800.0)
+	{
+		WARNING_MSG(fmt::format(
+			"Bots: ignoring invalid KBE_PERF_PYTHON_LATENCY_WINDOW_SECONDS='{}'\n",
+			configured));
+		return static_cast<uint64>(defaultSeconds * 1000000000.0);
+	}
+
+	return static_cast<uint64>(seconds * 1000000000.0);
+}
+}
 
 bool g_botsDevMode = false;
 bool g_botsReuseAccounts = false;
@@ -93,7 +120,7 @@ pythonLatencyInvalidResponses_(0)
 	for (size_t index = 0; index < PYTHON_LATENCY_OPERATION_COUNT; ++index)
 	{
 		pythonLatencyWindows_[index] = pythonLatencyEnabled_ ? new ProfileLatencyWindow(
-			PYTHON_LATENCY_WINDOW_CAPACITY, 10ULL * 1000ULL * 1000ULL * 1000ULL) : NULL;
+			PYTHON_LATENCY_WINDOW_CAPACITY, pythonLatencyWindowNanoseconds()) : NULL;
 	}
 
 	// Bots 同时承载多个客户端，组件 owner 查找必须先通过 componentID 路由到对应的 ClientObject。
@@ -204,6 +231,12 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/removedClients", this, &Bots::totalRemovedClients);
 	WATCH_OBJECT("bots/performance/tickLastMicros", this, &Bots::lastBotsTickMicros);
 	WATCH_OBJECT("bots/performance/tickMaxMicros", this, &Bots::maxBotsTickMicros);
+	// 复用网络层无锁累计计数；压测控制器在进程外计算速率，热路径不增加统计开销。
+	// Reuse lock-free network totals; the controller derives rates out of process with no hot-path cost.
+	WATCH_OBJECT("bots/performance/numPacketsSent", Network::g_numPacketsSent);
+	WATCH_OBJECT("bots/performance/numPacketsReceived", Network::g_numPacketsReceived);
+	WATCH_OBJECT("bots/performance/numBytesSent", Network::g_numBytesSent);
+	WATCH_OBJECT("bots/performance/numBytesReceived", Network::g_numBytesReceived);
 	WATCH_OBJECT("bots/performance/udpSendBacklogBytes", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBacklogBytes);
 	WATCH_OBJECT("bots/performance/udpSendBacklogPeakBytes", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBacklogPeakBytes);
 	WATCH_OBJECT("bots/performance/udpSendBackpressure", &networkInterface(), &Network::NetworkInterface::pollerUdpSendBackpressureCount);
@@ -226,6 +259,9 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/kcpDueChannels", &networkInterface(), &Network::NetworkInterface::kcpDueChannelCount);
 	WATCH_OBJECT("bots/performance/kcpOverdueChannels", &networkInterface(), &Network::NetworkInterface::kcpOverdueChannelCount);
 	WATCH_OBJECT("bots/performance/kcpDeadlineMisses", &networkInterface(), &Network::NetworkInterface::kcpDeadlineMissCount);
+	WATCH_OBJECT("bots/performance/kcpProtocolTickMisses", &networkInterface(), &Network::NetworkInterface::kcpProtocolTickMissCount);
+	WATCH_OBJECT("bots/performance/kcpConfiguredTickIntervalMs", &networkInterface(), &Network::NetworkInterface::rudpTickIntervalMs);
+	WATCH_OBJECT("bots/performance/kcpConfiguredMinRtoMs", &networkInterface(), &Network::NetworkInterface::rudpMinRtoMs);
 	WATCH_OBJECT("bots/performance/kcpMaxScheduleDelayMicros", &networkInterface(), &Network::NetworkInterface::kcpMaxScheduleDelayMicros);
 	WATCH_OBJECT("bots/performance/kcpBudgetExhaustions", &networkInterface(), &Network::NetworkInterface::kcpBudgetExhaustionCount);
 	WATCH_OBJECT("bots/performance/kcpConsecutiveBudgetExhaustions", &networkInterface(), &Network::NetworkInterface::kcpConsecutiveBudgetExhaustions);

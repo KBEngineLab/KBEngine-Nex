@@ -97,7 +97,8 @@ def create_config_overlay(
         set_xml_value(baseapp, "externalPorts_max", port_min + baseapp_external_port_count - 1)
 
     if (external_receive_messages is not None or external_receive_bytes is not None or
-            external_timeout_seconds is not None):
+            external_timeout_seconds is not None or reliable_udp_tick_interval_ms is not None or
+            reliable_udp_min_rto_ms is not None):
         channel_common = root.find("./channelCommon")
         if channel_common is None:
             channel_common = ET.SubElement(root, "channelCommon")
@@ -133,12 +134,13 @@ def create_config_overlay(
             set_xml_value(receive_bytes, "external", external_receive_bytes)
 
     if reliable_udp_tick_interval_ms is not None or reliable_udp_min_rto_ms is not None:
-        network_interface = root.find("./networkInterface")
-        if network_interface is None:
-            network_interface = ET.SubElement(root, "networkInterface")
-        reliable_udp = network_interface.find("./reliableUDP")
+        # ServerConfig 从 channelCommon/reliableUDP 读取 KCP 参数；写入其他同名
+        # 节点不会报错但也不会生效，因此必须与引擎配置契约保持一致。
+        # ServerConfig reads KCP settings from channelCommon/reliableUDP. A same-named
+        # node elsewhere is silently ignored, so the overlay must match that contract.
+        reliable_udp = channel_common.find("./reliableUDP")
         if reliable_udp is None:
-            reliable_udp = ET.SubElement(network_interface, "reliableUDP")
+            reliable_udp = ET.SubElement(channel_common, "reliableUDP")
         if reliable_udp_tick_interval_ms is not None:
             if not 1 <= reliable_udp_tick_interval_ms <= 1000:
                 raise ValueError("reliable UDP tick interval must be between 1 and 1000 milliseconds")

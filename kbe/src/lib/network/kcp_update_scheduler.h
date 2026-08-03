@@ -35,6 +35,7 @@ public:
 	uint64 dueChannelCount() const;
 	uint64 overdueChannelCount() const;
 	uint64 deadlineMissCount() const { return deadlineMissCount_; }
+	uint64 protocolTickMissCount() const { return protocolTickMissCount_; }
 	uint64 maxScheduleDelayMicros() const { return maxScheduleDelayMicros_; }
 	uint64 budgetExhaustionCount() const { return budgetExhaustionCount_; }
 	uint64 consecutiveBudgetExhaustions() const { return consecutiveBudgetExhaustions_; }
@@ -59,6 +60,7 @@ private:
 	uint64 timerWakeupCount_;
 	uint64 timerRearmCount_;
 	uint64 deadlineMissCount_;
+	uint64 protocolTickMissCount_;
 	uint64 maxScheduleDelayMicros_;
 	uint64 budgetExhaustionCount_;
 	uint64 consecutiveBudgetExhaustions_;

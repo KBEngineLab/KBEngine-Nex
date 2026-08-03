@@ -38,6 +38,7 @@ KcpUpdateScheduler::KcpUpdateScheduler(EventDispatcher& dispatcher) :
 	timerWakeupCount_(0),
 	timerRearmCount_(0),
 	deadlineMissCount_(0),
+	protocolTickMissCount_(0),
 	maxScheduleDelayMicros_(0),
 	budgetExhaustionCount_(0),
 	consecutiveBudgetExhaustions_(0),
@@ -189,8 +190,16 @@ void KcpUpdateScheduler::handleTimeout(TimerHandle handle, void*)
 		if (now > dueTime)
 		{
 			++deadlineMissCount_;
-			maxScheduleDelayMicros_ = std::max<uint64>(maxScheduleDelayMicros_,
-				static_cast<uint64>(stampsToDelay(now - dueTime)));
+			const uint64 scheduleDelayMicros = static_cast<uint64>(stampsToDelay(now - dueTime));
+			maxScheduleDelayMicros_ = std::max<uint64>(maxScheduleDelayMicros_, scheduleDelayMicros);
+			// deadlineMisses 包含正常的微秒级定时器抖动；只有超过一个完整 KCP tick
+			// 才表示协议调度已真正落后一轮。tickInterval=0 对应 KCP 默认 100ms。
+			// deadlineMisses includes ordinary microsecond timer jitter. Only a delay beyond
+			// one full KCP tick means protocol scheduling has actually fallen a cycle behind.
+			const uint64 protocolTickMicros = static_cast<uint64>(
+				g_rudp_tickInterval > 0 ? g_rudp_tickInterval : 100) * 1000ULL;
+			if (scheduleDelayMicros > protocolTickMicros)
+				++protocolTickMissCount_;
 		}
 		Channel* channel = reinterpret_cast<Channel*>(key);
 		++updateCallCount_;
