@@ -1061,7 +1061,7 @@ def probe_body(probe_case, component_uid):
     if probe_case == "baseappmgr-spoofed-pending-login":
         return b"login\0account\0\0" + struct.pack("=BQIQiBI", 0, 0, 0, 0, 0, 0, 0)
     if probe_case == "baseappmgr-spoofed-update":
-        return struct.pack("=QiifI", 7001, 0, 0, float("nan"), 0)
+        return struct.pack("=QiiifI", 7001, 0, 0, 0, float("nan"), 0)
     if probe_case == "cellappmgr-zero-forward":
         return struct.pack("=QQ", 0, 8001)
     if probe_case in {

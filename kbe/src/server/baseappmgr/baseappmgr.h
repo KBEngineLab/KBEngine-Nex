@@ -134,7 +134,8 @@ public:
 		更新baseapp情况。
 	*/
 	void updateBaseapp(Network::Channel* pChannel, COMPONENT_ID componentID,
-								ENTITY_ID numEntitys, ENTITY_ID numProxices, float load, uint32 flags);
+								ENTITY_ID numEntitys, ENTITY_ID numProxices, ENTITY_ID numClients,
+								float load, uint32 flags);
 
 	/** 网络接口
 		baseapp同步自己的初始化信息
@@ -158,6 +159,11 @@ public:
 	uint32 totalReadyForLoginApps();
 	float minReadyForLoginProgress();
 	bool readyForLogin();
+	uint64 confirmedProxyCount() const;
+	uint64 confirmedClientCount() const;
+	uint64 pendingLoginCount() const;
+	uint64 minAssignedClientCount() const;
+	uint64 maxAssignedClientCount() const;
 
 	uint32 numLoadBalancingApp();
 
@@ -179,6 +185,18 @@ public:
 		SERVER_ERROR_CODE failedcode, std::string& code, std::string& loginappCBHost, uint16 loginappCBPort);
 
 protected:
+	struct PendingLogin
+	{
+		PendingLogin(COMPONENT_ID loginapp = 0, COMPONENT_ID baseapp = 0) :
+			loginappID(loginapp),
+			baseappID(baseapp)
+		{
+		}
+
+		COMPONENT_ID loginappID;
+		COMPONENT_ID baseappID;
+	};
+
 	TimerHandle													gameTimer_;
 
 	ForwardAnywhere_MessageBuffer								forward_anywhere_baseapp_messagebuffer_;
@@ -188,7 +206,7 @@ protected:
 
 	std::map< COMPONENT_ID, Baseapp >							baseapps_;
 
-	KBEUnordered_map< std::string, COMPONENT_ID >				pending_logins_;
+	KBEUnordered_map< std::string, PendingLogin >				pending_logins_;
 
 	float														baseappsInitProgress_;
 };

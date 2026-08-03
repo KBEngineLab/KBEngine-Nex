@@ -68,6 +68,15 @@ set_tests_properties(source.watcher_protocol_contract PROPERTIES
     LABELS "network;source;watcher"
 )
 
+add_test(NAME source.teleport_state_contract
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_CELLAPP_ENTITY_SOURCE=${CMAKE_SOURCE_DIR}/server/cellapp/entity.cpp"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyTeleportState.cmake"
+)
+set_tests_properties(source.teleport_state_contract PROPERTIES
+    LABELS "cellapp;source;teleport"
+)
+
 set(KBE_TEST_ASSETS "" CACHE PATH "Assets directory used by CMake integration tests")
 option(KBE_TEST_SERVER_CLUSTER "Enable the server cluster integration test" OFF)
 set(KBE_TEST_DATABASE_HOST "127.0.0.1" CACHE STRING "Database host used by CMake integration tests")

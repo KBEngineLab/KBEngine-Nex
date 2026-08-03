@@ -20,6 +20,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include "baseappmgr.h"
+#include "baseapp_placement.h"
 #include "server/bounded_stream_reader.h"
 #include "server/component_routing_guard.h"
 #include "baseappmgr_interface.h"
@@ -32,7 +33,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "helper/console_helper.h"
 
 #include <algorithm>
-#include <cmath>
+#include <limits>
 
 #include "../../server/cellappmgr/cellappmgr_interface.h"
 #include "../../server/baseapp/baseapp_interface.h"
@@ -302,7 +303,60 @@ bool Baseappmgr::initializeWatcher()
 	WATCH_OBJECT("readiness/readyApps", this, &Baseappmgr::readyForLoginApps);
 	WATCH_OBJECT("readiness/totalApps", this, &Baseappmgr::totalReadyForLoginApps);
 	WATCH_OBJECT("readiness/minProgress", this, &Baseappmgr::minReadyForLoginProgress);
+	WATCH_OBJECT("allocation/confirmedProxies", this, &Baseappmgr::confirmedProxyCount);
+	WATCH_OBJECT("allocation/confirmedClients", this, &Baseappmgr::confirmedClientCount);
+	WATCH_OBJECT("allocation/pendingLogins", this, &Baseappmgr::pendingLoginCount);
+	WATCH_OBJECT("allocation/minAssignedClients", this, &Baseappmgr::minAssignedClientCount);
+	WATCH_OBJECT("allocation/maxAssignedClients", this, &Baseappmgr::maxAssignedClientCount);
 	return ServerApp::initializeWatcher();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Baseappmgr::confirmedProxyCount() const
+{
+	uint64 count = 0;
+	for (std::map<COMPONENT_ID, Baseapp>::const_iterator iter = baseapps_.begin(); iter != baseapps_.end(); ++iter)
+		count += static_cast<uint64>(iter->second.numProxices());
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Baseappmgr::confirmedClientCount() const
+{
+	uint64 count = 0;
+	for (std::map<COMPONENT_ID, Baseapp>::const_iterator iter = baseapps_.begin(); iter != baseapps_.end(); ++iter)
+		count += static_cast<uint64>(iter->second.numClients());
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Baseappmgr::pendingLoginCount() const
+{
+	uint64 count = 0;
+	for (std::map<COMPONENT_ID, Baseapp>::const_iterator iter = baseapps_.begin(); iter != baseapps_.end(); ++iter)
+		count += static_cast<uint64>(iter->second.pendingLogins());
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Baseappmgr::minAssignedClientCount() const
+{
+	if (baseapps_.empty())
+		return 0;
+
+	uint64 count = std::numeric_limits<uint64>::max();
+	for (std::map<COMPONENT_ID, Baseapp>::const_iterator iter = baseapps_.begin(); iter != baseapps_.end(); ++iter)
+		count = std::min<uint64>(count, static_cast<uint64>(iter->second.assignedClients()));
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Baseappmgr::maxAssignedClientCount() const
+{
+	uint64 count = 0;
+	for (std::map<COMPONENT_ID, Baseapp>::const_iterator iter = baseapps_.begin(); iter != baseapps_.end(); ++iter)
+		count = std::max<uint64>(count, static_cast<uint64>(iter->second.assignedClients()));
+	return count;
 }
 
 //-------------------------------------------------------------------------------------
@@ -515,7 +569,8 @@ uint32 Baseappmgr::numLoadBalancingApp()
 
 //-------------------------------------------------------------------------------------
 void Baseappmgr::updateBaseapp(Network::Channel* pChannel, COMPONENT_ID componentID,
-							ENTITY_ID numEntitys, ENTITY_ID numProxices, float load, uint32 flags)
+							ENTITY_ID numEntitys, ENTITY_ID numProxices, ENTITY_ID numClients,
+							float load, uint32 flags)
 {
 	Components& components = Components::getSingleton();
 	Components::ComponentInfos* sourceInfos =
@@ -523,7 +578,8 @@ void Baseappmgr::updateBaseapp(Network::Channel* pChannel, COMPONENT_ID componen
 	std::map<COMPONENT_ID, Baseapp>::iterator baseappIter = baseapps_.find(componentID);
 	if (pChannel == NULL || pChannel->isExternal() ||
 		!Security::isBoundComponentSource(componentID, sourceInfos, pChannel) ||
-		baseappIter == baseapps_.end() || !Security::isValidComponentMetric(load))
+		baseappIter == baseapps_.end() || numEntitys < 0 || numProxices < 0 || numClients < 0 ||
+		!Security::isValidComponentMetric(load))
 	{
 		WARNING_MSG(fmt::format("Baseappmgr::updateBaseapp: rejected componentID({}), load({})!\n",
 			componentID, load));
@@ -534,6 +590,7 @@ void Baseappmgr::updateBaseapp(Network::Channel* pChannel, COMPONENT_ID componen
 	
 	baseapp.load(load);
 	baseapp.numProxices(numProxices);
+	baseapp.updateConfirmedClients(numClients);
 	baseapp.numEntitys(numEntitys);
 	baseapp.flags(flags);
 
@@ -545,17 +602,30 @@ void Baseappmgr::updateBaseapp(Network::Channel* pChannel, COMPONENT_ID componen
 //-------------------------------------------------------------------------------------
 COMPONENT_ID Baseappmgr::findFreeBaseapp()
 {
-	std::map< COMPONENT_ID, Baseapp >::iterator iter = baseapps_.begin();
+	const uint64 now = timestamp();
+	const float reservationSeconds = std::max(30.f, Network::g_channelExternalTimeout);
+	const uint64 reservationMaximumAge = static_cast<uint64>(reservationSeconds * stampsPerSecond());
+	for (std::map<COMPONENT_ID, Baseapp>::iterator iter = baseapps_.begin(); iter != baseapps_.end(); ++iter)
+		iter->second.expirePendingLogins(now, reservationMaximumAge);
+
+	std::size_t totalAssignedClients = 0;
+	std::size_t appCount = 0;
+	for (std::map<COMPONENT_ID, Baseapp>::const_iterator iter = baseapps_.begin(); iter != baseapps_.end(); ++iter)
+	{
+		if ((iter->second.flags() & APP_FLAGS_NOT_PARTCIPATING_LOAD_BALANCING) == 0 &&
+			!iter->second.isDestroyed() && iter->second.initProgress() > 1.f)
+		{
+			totalAssignedClients += iter->second.assignedClients();
+			++appCount;
+		}
+	}
+
 	COMPONENT_ID cid = 0;
+	double bestScore = std::numeric_limits<double>::max();
+	std::size_t bestAssignedClients = std::numeric_limits<std::size_t>::max();
+	ENTITY_ID bestConfirmedEntities = std::numeric_limits<ENTITY_ID>::max();
 
-	float minload = 1.f;
-	ENTITY_ID numEntities = 0x7fffffff;
-	// 负载采样在进程饱和时会聚集在 1.0 附近，万分位噪声不应压过实体数这一稳定信号。
-	// Treat loads within five percentage points as equivalent so near-saturation sampling noise
-	// cannot pin most new logins to one BaseApp; entity count then provides the stable tie-breaker.
-	const float equivalentLoadRange = 0.05f;
-
-	for(; iter != baseapps_.end(); ++iter)
+	for (std::map<COMPONENT_ID, Baseapp>::iterator iter = baseapps_.begin(); iter != baseapps_.end(); ++iter)
 	{
 		if ((iter->second.flags() & APP_FLAGS_NOT_PARTCIPATING_LOAD_BALANCING) > 0)
 			continue;
@@ -563,20 +633,18 @@ COMPONENT_ID Baseappmgr::findFreeBaseapp()
 		// 首先进程必须活着且初始化完毕
 		if(!iter->second.isDestroyed() && iter->second.initProgress() > 1.f)
 		{
-			// 如果没有任何实体则无条件分配
-			if(iter->second.numEntities() == 0)
-				return iter->first;
-
-			// 比较并记录负载最小的进程最终被分配
-			const float candidateLoad = iter->second.load();
-			const ENTITY_ID candidateEntities = iter->second.numEntities();
-			if (cid == 0 || candidateLoad + equivalentLoadRange < minload ||
-				(std::fabs(candidateLoad - minload) <= equivalentLoadRange && numEntities > candidateEntities))
+			const std::size_t assignedClients = iter->second.assignedClients();
+			const double score = baseappPlacementScore(
+				iter->second.load(), assignedClients, totalAssignedClients, appCount);
+			if (score < bestScore ||
+				(score == bestScore && assignedClients < bestAssignedClients) ||
+				(score == bestScore && assignedClients == bestAssignedClients &&
+					iter->second.numEntities() < bestConfirmedEntities))
 			{
 				cid = iter->first;
-
-				numEntities = candidateEntities;
-				minload = candidateLoad;
+				bestScore = score;
+				bestAssignedClients = assignedClients;
+				bestConfirmedEntities = iter->second.numEntities();
 			}
 		}
 	}
@@ -959,7 +1027,7 @@ void Baseappmgr::registerPendingAccountToBaseapp(Network::Channel* pChannel, Mem
 		return;
 	}
 
-	pending_logins_[loginName] = sourceInfos->cid;
+	pending_logins_[loginName] = PendingLogin(sourceInfos->cid, 0);
 
 	updateBestBaseapp();
 
@@ -1006,10 +1074,12 @@ void Baseappmgr::registerPendingAccountToBaseapp(Network::Channel* pChannel, Mem
 	pBundle->appendBlob(datas);
 	cinfos->pChannel->send(pBundle);
 
-	// 预先将实体数量增加
+	// 待确认登录必须独立于 BaseApp 周期上报保留，否则状态覆盖会让突发登录持续命中同一实例。
+	// Pending logins stay separate from periodic BaseApp reports so a status update cannot erase burst reservations.
 	if (baseapps_iter != baseapps_.end())
 	{
-		baseapps_iter->second.incNumProxices();
+		baseapps_iter->second.reservePendingLogin(timestamp());
+		pending_logins_[loginName].baseappID = bestBaseappID_;
 	}
 }
 
@@ -1059,7 +1129,7 @@ void Baseappmgr::registerPendingAccountToBaseappAddr(Network::Channel* pChannel,
 		return;
 	}
 
-	pending_logins_[loginName] = sourceInfos->cid;
+	pending_logins_[loginName] = PendingLogin(sourceInfos->cid, 0);
 
 	Components::ComponentInfos* cinfos =
 		Components::getSingleton().findComponent(BASEAPP_TYPE, componentID);
@@ -1075,6 +1145,13 @@ void Baseappmgr::registerPendingAccountToBaseappAddr(Network::Channel* pChannel,
 	(*pBundle) << loginName << accountName << password << needCheckPassword << entityID << entityDBID << flags << deadline << clientType << forceInternalLogin;
 	pBundle->appendBlob(datas);
 	cinfos->pChannel->send(pBundle);
+
+	std::map<COMPONENT_ID, Baseapp>::iterator baseappIter = baseapps_.find(componentID);
+	if (baseappIter != baseapps_.end())
+	{
+		baseappIter->second.reservePendingLogin(timestamp());
+		pending_logins_[loginName].baseappID = componentID;
+	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -1088,17 +1165,24 @@ void Baseappmgr::onPendingAccountGetBaseappAddr(Network::Channel* pChannel,
 void Baseappmgr::sendAllocatedBaseappAddr(Network::Channel* pChannel, 
 							  std::string& loginName, std::string& accountName, const std::string& addr, uint16 tcp_port, uint16 udp_port)
 {
-	KBEUnordered_map< std::string, COMPONENT_ID >::iterator iter = pending_logins_.find(loginName);
+	KBEUnordered_map< std::string, PendingLogin >::iterator iter = pending_logins_.find(loginName);
 	if(iter == pending_logins_.end())
 	{
 		ERROR_MSG(fmt::format("Baseappmgr::sendAllocatedBaseappAddr: not found accountName({}), pending_logins error!\n", loginName));
 		return;
 	}
 	
-	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(iter->second);
+	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(iter->second.loginappID);
 	if(cinfos == NULL || cinfos->pChannel == NULL)
 	{
 		ERROR_MSG(fmt::format("Baseappmgr::sendAllocatedBaseappAddr: not found loginapp! accountName={}\n", loginName));
+		if (iter->second.baseappID != 0)
+		{
+			std::map<COMPONENT_ID, Baseapp>::iterator baseappIter = baseapps_.find(iter->second.baseappID);
+			if (baseappIter != baseapps_.end())
+				baseappIter->second.releasePendingLogin();
+		}
+		pending_logins_.erase(iter);
 		return;
 	}
 
@@ -1109,6 +1193,12 @@ void Baseappmgr::sendAllocatedBaseappAddr(Network::Channel* pChannel,
 		accountName, addr, tcp_port, udp_port);
 
 	cinfos->pChannel->send(pBundleToLoginapp);
+	if ((addr.empty() || (tcp_port == 0 && udp_port == 0)) && iter->second.baseappID != 0)
+	{
+		std::map<COMPONENT_ID, Baseapp>::iterator baseappIter = baseapps_.find(iter->second.baseappID);
+		if (baseappIter != baseapps_.end())
+			baseappIter->second.releasePendingLogin();
+	}
 	pending_logins_.erase(iter);
 }
 

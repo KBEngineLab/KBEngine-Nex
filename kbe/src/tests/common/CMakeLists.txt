@@ -111,6 +111,25 @@ set_tests_properties(cellapp.placement PROPERTIES
 	PASS_REGULAR_EXPRESSION "CELLAPP_PLACEMENT_TEST_PASS"
 )
 
+add_executable(kbe_test_baseapp_placement baseapp_placement.cpp)
+target_include_directories(kbe_test_baseapp_placement PRIVATE
+	"${CMAKE_SOURCE_DIR}"
+	"${CMAKE_SOURCE_DIR}/lib"
+)
+set_target_properties(kbe_test_baseapp_placement PROPERTIES FOLDER "Tests/Common")
+
+if(MSVC)
+	target_compile_options(kbe_test_baseapp_placement PRIVATE /W4 /WX /utf-8)
+else()
+	target_compile_options(kbe_test_baseapp_placement PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
+add_test(NAME baseapp.placement COMMAND kbe_test_baseapp_placement)
+set_tests_properties(baseapp.placement PROPERTIES
+	LABELS "baseappmgr;cxx;unit;portable;performance"
+	PASS_REGULAR_EXPRESSION "BASEAPP_PLACEMENT_TEST_PASS"
+)
+
 add_custom_target(kbe_common_tests DEPENDS
 	kbe_test_common_pooling
 	kbe_test_profile_latency
@@ -118,5 +137,6 @@ add_custom_target(kbe_common_tests DEPENDS
 	kbe_test_witness_load_metrics
 	kbe_test_witness_volatile_budget
 	kbe_test_cellapp_placement
+	kbe_test_baseapp_placement
 )
 set_target_properties(kbe_common_tests PROPERTIES FOLDER "Tests/Common")

@@ -441,6 +441,8 @@ def assert_python_latency_scenario() -> None:
     gameplay_path = Path(__file__).resolve().parent / "scenarios/gameplay_10000.json"
     gameplay = load_scenario(gameplay_path)
     assert gameplay["readiness"]["root/witness/active"] == "$bots"
+    assert "BASEAPPMGR_TYPE=@baseappmgr:root/allocation" in gameplay["watcher_targets"]
+    assert gameplay["watcher_intervals"]["BASEAPPMGR_TYPE:root/allocation"] == 5.0
     assert "CELLAPPMGR_TYPE=@cellappmgr:root/allocation" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["CELLAPPMGR_TYPE:root/allocation"] == 5.0
 
@@ -747,8 +749,17 @@ def main() -> int:
     baseappmgr_source = (
         repository_root / "kbe/src/server/baseappmgr/baseappmgr.cpp"
     ).read_text(encoding="utf-8")
-    assert "equivalentLoadRange = 0.05f" in baseappmgr_source
-    assert "std::fabs(candidateLoad - minload) <= equivalentLoadRange" in baseappmgr_source
+    assert "baseappPlacementScore(" in baseappmgr_source
+    assert "reservePendingLogin(timestamp())" in baseappmgr_source
+    assert 'WATCH_OBJECT("allocation/pendingLogins"' in baseappmgr_source
+    baseapp_state_source = (
+        repository_root / "kbe/src/server/baseappmgr/baseapp.h"
+    ).read_text(encoding="utf-8")
+    assert "updateConfirmedClients" in baseapp_state_source
+    assert "expirePendingLogins" in baseapp_state_source
+    assert "updateBaseappArgs6" in (
+        repository_root / "kbe/src/server/baseapp/baseapp.cpp"
+    ).read_text(encoding="utf-8")
     assert "WATCH_OBJECT(\"spaceSize\", this, &Cellapp::spaceSize)" in (
         repository_root / "kbe/src/server/cellapp/cellapp.cpp"
     ).read_text(encoding="utf-8")

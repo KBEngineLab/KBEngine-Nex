@@ -613,8 +613,9 @@ void Baseapp::onUpdateLoad()
 	{
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(BaseappmgrInterface::updateBaseapp);
-		BaseappmgrInterface::updateBaseappArgs5::staticAddToBundle((*pBundle), 
-			componentID_, (ENTITY_ID)(pEntities_->getEntities().size() - numProxices()), (ENTITY_ID)numProxices(), getLoad(), flags_);
+		BaseappmgrInterface::updateBaseappArgs6::staticAddToBundle((*pBundle),
+			componentID_, (ENTITY_ID)(pEntities_->getEntities().size() - numProxices()),
+			(ENTITY_ID)numProxices(), (ENTITY_ID)numClients(), getLoad(), flags_);
 
 		pChannel->send(pBundle);
 	}

@@ -25,6 +25,8 @@ namespace KBEngine{
 Baseapp::Baseapp():
 numEntitys_(0),
 numProxices_(0),
+numClients_(0),
+pendingLoginTimes_(),
 load_(0.f),
 isDestroyed_(false),
 watchers_(),

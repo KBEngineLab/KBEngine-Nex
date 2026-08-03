@@ -3679,12 +3679,13 @@ void Entity::teleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Dir
 {
 	if(hasFlags(ENTITY_FLAGS_TELEPORT_START))
 	{
-		PyErr_Format(PyExc_Exception, "%s::teleport: %d, In transit!\n", 
-			scriptName(), id());
-
-		PyErr_PrintEx(0);
+		// BaseApp 尚未确认上一次迁移时，当前 Cell 仍是协议状态的一部分；继续迁移会让旧完成包命中已销毁的 Entity。
+		// While BaseApp is still confirming the previous migration, this Cell remains part of that protocol state; another migration would leave the old completion targeting a destroyed Entity.
+		WARNING_MSG(fmt::format("{}::teleport: entity={} rejected while migration is in progress.\n",
+			scriptName(), id()));
 
 		onTeleportFailure();
+		return;
 	}
 	
 	if (!nearbyMBRef->isCellReal())
@@ -4025,7 +4026,9 @@ bool Entity::onTeleport()
 //-------------------------------------------------------------------------------------
 void Entity::onTeleportFailure()
 {
-	ERROR_MSG(fmt::format("{}::onTeleportFailure(): entityID={}\n", 
+	// 失败回调本身是正常控制流；各拒绝点负责记录可操作的具体原因，避免重复 ERROR 放大日志和质量指标。
+	// The failure callback itself is normal control flow; rejection sites log actionable causes so this notification must not duplicate them as an ERROR.
+	DEBUG_MSG(fmt::format("{}::onTeleportFailure(): entityID={}\n",
 		this->scriptName(), id()));
 
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);

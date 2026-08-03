@@ -109,10 +109,11 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappmgrInterface)
 	BASEAPPMGR_MESSAGE_DECLARE_STREAM(reqCloseServer,									NETWORK_VARIABLE_MESSAGE)
 
 	// 更新baseapp信息。
-	BASEAPPMGR_MESSAGE_DECLARE_ARGS5(updateBaseapp,										NETWORK_FIXED_MESSAGE,
+	BASEAPPMGR_MESSAGE_DECLARE_ARGS6(updateBaseapp,										NETWORK_FIXED_MESSAGE,
 									COMPONENT_ID,										componentID,
 									ENTITY_ID,											numBases,
 									ENTITY_ID,											numProxices,
+									ENTITY_ID,											numClients,
 									float,												load,
 									uint32,												flags)
 
