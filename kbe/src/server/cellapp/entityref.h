@@ -57,7 +57,7 @@ public:
 		size_t bytes = sizeof(id_)
 			+ sizeof(aliasID_) + sizeof(pEntity_)
 			+ sizeof(flags_) + sizeof(generation_)
-			+ sizeof(volatileQueued_);
+			+ sizeof(volatileQueued_) + sizeof(structuralQueued_);
 
 		return bytes;
 	}
@@ -79,6 +79,9 @@ public:
 	bool volatileQueued() const { return volatileQueued_; }
 	bool& volatileQueuedRef() { return volatileQueued_; }
 	void volatileQueued(bool value) { volatileQueued_ = value; }
+	bool structuralQueued() const { return structuralQueued_; }
+	bool& structuralQueuedRef() { return structuralQueued_; }
+	void structuralQueued(bool value) { structuralQueued_ = value; }
 
 	void addToStream(KBEngine::MemoryStream& s);
 	void createFromStream(KBEngine::MemoryStream& s);
@@ -90,6 +93,7 @@ private:
 	uint32 flags_;
 	uint64 generation_;
 	bool volatileQueued_;
+	bool structuralQueued_;
 };
 
 }

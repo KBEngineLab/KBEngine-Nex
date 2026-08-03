@@ -136,6 +136,7 @@ topSpeed_(-0.1f),
 topSpeedY_(-0.1f),
 witnesses_(),
 witnesses_count_(0),
+witnessesVolatileBroadcastPending_(false),
 pWitness_(NULL),
 allClients_(new AllClients(pScriptModule, id, false)),
 otherClients_(new AllClients(pScriptModule, id, true)),
@@ -299,8 +300,8 @@ void Entity::onDestroy(bool callScript)
 		ERROR_MSG(fmt::format("{}::onDestroy(): id={}, witnesses_count({}/{}) != 0, isReal={}, spaceID={}, position=({},{},{})\n", 
 			scriptName(), id(), witnesses_count_, witnesses_.size(), isReal(), this->spaceID(), position().x, position().y, position().z));
 
-		std::list<ENTITY_ID> witnesses_copy = witnesses_;
-		std::list<ENTITY_ID>::iterator it = witnesses_copy.begin();
+		WITNESS_IDS witnesses_copy = witnesses_;
+		WITNESS_IDS::iterator it = witnesses_copy.begin();
 		for (; it != witnesses_copy.end(); ++it)
 		{
 			Entity *ent = Cellapp::getSingleton().findEntity((*it));
@@ -783,7 +784,7 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent,
 	{
 		DETAIL_TYPE propertyDetailLevel = propertyDescription->getDetailLevel();
 
-		std::list<ENTITY_ID>::iterator witer = witnesses_.begin();
+		WITNESS_IDS::iterator witer = witnesses_.begin();
 		for(; witer != witnesses_.end(); ++witer)
 		{
 			Entity* pEntity = Cellapp::getSingleton().findEntity((*witer));
@@ -1537,6 +1538,9 @@ void Entity::addWitnessed(Entity* entity)
 
 	witnesses_.push_back(entity->id());
 	++witnesses_count_;
+	// 关系集合变化后保守地允许一次重新广播，避免新观察者错过最新位姿。
+	// Conservatively allow one rebroadcast after relation changes so a new observer cannot miss the latest pose.
+	witnessesVolatileBroadcastPending_ = false;
 
 	/*
 	int8 detailLevel = pScriptModule_->getDetailLevel().getLevelByRange(range);
@@ -1577,8 +1581,19 @@ void Entity::delWitnessed(Entity* entity)
 		return;
 	}
 
-	witnesses_.remove(entity->id());
+	WITNESS_IDS::iterator observer = std::find(witnesses_.begin(), witnesses_.end(), entity->id());
+	if (observer == witnesses_.end())
+	{
+		ERROR_MSG(fmt::format("{}::delWitnessed({}): observer {} was not registered!\n",
+			scriptName(), id(), entity->id()));
+		return;
+	}
+
+	// 保持观察者遍历顺序与迁移序列化稳定；连续搬移 32 位 ID 比逐节点释放更适合离开低频、广播高频的负载。
+	// Preserve observer iteration and migration order; shifting contiguous 32-bit IDs suits infrequent leaves and frequent broadcasts.
+	witnesses_.erase(observer);
 	--witnesses_count_;
+	witnessesVolatileBroadcastPending_ = false;
 
 	if (controlledBy_ != NULL && entity->id() == controlledBy_->id())
 	{
@@ -1601,6 +1616,12 @@ void Entity::delWitnessed(Entity* entity)
 }
 
 //-------------------------------------------------------------------------------------
+void Entity::onWitnessVolatileDequeued()
+{
+	witnessesVolatileBroadcastPending_ = false;
+}
+
+//-------------------------------------------------------------------------------------
 void Entity::onDelWitnessed()
 {
 	if(witnesses_count_ == 0)
@@ -1615,7 +1636,7 @@ void Entity::onDelWitnessed()
 //-------------------------------------------------------------------------------------
 bool Entity::entityInWitnessed(ENTITY_ID entityID)
 {
-	std::list<ENTITY_ID>::iterator it = witnesses_.begin();
+	WITNESS_IDS::iterator it = witnesses_.begin();
 	for (; it != witnesses_.end(); ++it)
 	{
 		if (*it == entityID)
@@ -2148,15 +2169,26 @@ void Entity::onDirectionChanged()
 //-------------------------------------------------------------------------------------
 void Entity::markWitnessesVolatileDataDirty()
 {
+	// 队列条目在消费时读取实体当前坐标，因此所有观察关系仍在排队时，重复变化只需保留最新值。
+	// Queue entries read the entity's current pose when consumed, so repeated changes coalesce while every observer relation remains queued.
+	if (witnessesVolatileBroadcastPending_)
+	{
+		Witness::recordProducerCoalesced();
+		return;
+	}
+
 	// Witness 仅保存实体 ID；变化时重新解析观察者可避免跨 Entity/Witness 生命周期持有悬空指针。
 	// Witnesses are stored by entity ID; resolving observers on change avoids retaining dangling pointers across Entity/Witness lifetimes.
-	std::list<ENTITY_ID>::const_iterator witnessIter = witnesses_.begin();
+	WITNESS_IDS::const_iterator witnessIter = witnesses_.begin();
 	for (; witnessIter != witnesses_.end(); ++witnessIter)
 	{
 		Entity* pWitnessEntity = Cellapp::getSingleton().findEntity(*witnessIter);
 		if (pWitnessEntity && pWitnessEntity->pWitness())
 			pWitnessEntity->pWitness()->markViewEntityVolatileDirty(id());
 	}
+
+	if (witnesses_count_ > 0)
+		witnessesVolatileBroadcastPending_ = true;
 }
 
 //-------------------------------------------------------------------------------------
@@ -2595,7 +2627,7 @@ PyObject* Entity::pyGetWitnesses()
 {
 	std::vector<Entity*> entities;
 
-	std::list<ENTITY_ID>::iterator witer = witnesses_.begin();
+	WITNESS_IDS::iterator witer = witnesses_.begin();
 	for (; witer != witnesses_.end(); ++witer)
 	{
 		Entity* pEntity = Cellapp::getSingleton().findEntity((*witer));
@@ -3839,7 +3871,7 @@ void Entity::teleportLocal(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3
 
 	currspace->addEntityToNode(this);
 
-	std::list<ENTITY_ID>::iterator witer = witnesses_.begin();
+	WITNESS_IDS::iterator witer = witnesses_.begin();
 	for (; witer != witnesses_.end(); ++witer)
 	{
 		Entity* pEntity = Cellapp::getSingleton().findEntity((*witer));
@@ -4456,7 +4488,7 @@ void Entity::addWitnessToStream(KBEngine::MemoryStream& s)
 	const uint32 size = static_cast<uint32>(witnesses_count_);
 	s << size;
 
-	std::list<ENTITY_ID>::iterator iter = witnesses_.begin();
+	WITNESS_IDS::iterator iter = witnesses_.begin();
 	for(; iter != witnesses_.end(); ++iter)
 	{
 		s << (*iter);
@@ -4485,7 +4517,7 @@ void Entity::createWitnessFromStream(KBEngine::MemoryStream& s)
 			scriptName(), witnesses_.size(), witnesses_count_, id(), isReal()));
 
 		/*
-		std::list<ENTITY_ID>::iterator it = witnesses_.begin();
+		WITNESS_IDS::iterator it = witnesses_.begin();
 		for (; it != witnesses_.end(); ++it)
 		{
 			Entity *ent = Cellapp::getSingleton().findEntity((*it));
@@ -4527,6 +4559,7 @@ void Entity::createWitnessFromStream(KBEngine::MemoryStream& s)
 	}
 	else
 	{
+		witnesses_.reserve(witnesses_.size() + size);
 		for (uint32 i = 0; i < size; ++i)
 		{
 			ENTITY_ID entityID;

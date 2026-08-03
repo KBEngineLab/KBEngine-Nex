@@ -36,9 +36,14 @@ bool testIncrementalViewAccounting()
 bool testQueueAttribution()
 {
 	KBEngine::WitnessLoadMetrics metrics;
-	metrics.recordDirtyEnqueued(1, false);
+	metrics.recordDirtyEnqueued(1, false, false, false);
 	metrics.recordDirtyEnqueued(2, true);
-	metrics.recordDirtyDequeued();
+	metrics.recordDirtyEnqueued(3, false, true, true);
+	metrics.recordQueueDeduplicated();
+	metrics.recordProducerCoalesced();
+	metrics.recordPromotedVolatileSkip();
+	metrics.recordDirtyDequeued(1, false);
+	metrics.recordDirtyDequeued(1, true);
 	metrics.recordDirtyProcessed();
 	metrics.recordStaleDiscard();
 	metrics.recordStateSkip();
@@ -57,9 +62,16 @@ bool testQueueAttribution()
 	metrics.recordBundle(1024);
 
 	return require(metrics.dirtyQueued() == 1, "current dirty queue depth was not maintained") &&
-		require(metrics.dirtyEnqueued() == 2, "cumulative enqueue count was not maintained") &&
+		require(metrics.dirtyEnqueued() == 3, "cumulative enqueue count was not maintained") &&
 		require(metrics.dirtyRequeues() == 1, "requeue count was not attributed") &&
-		require(metrics.maxQueueDepth() == 2, "maximum queue depth was not retained") &&
+		require(metrics.maxQueueDepth() == 3, "maximum queue depth was not retained") &&
+		require(metrics.structuralQueued() == 0 && metrics.volatileQueued() == 1,
+			"split queue depths were not maintained") &&
+		require(metrics.structuralEnqueued() == 1 && metrics.volatileEnqueued() == 2,
+			"split queue enqueue totals were not attributed") &&
+		require(metrics.queueDeduplicated() == 1 && metrics.producerCoalesced() == 1 &&
+			metrics.structuralPromotions() == 1 &&
+			metrics.promotedVolatileSkips() == 1, "queue amplification counters drifted") &&
 		require(metrics.dirtyProcessed() == 1, "processed count was not maintained") &&
 		require(metrics.staleDiscards() == 1, "stale discard was not attributed") &&
 		require(metrics.stateSkips() == 1, "state skip was not attributed") &&

@@ -30,7 +30,6 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "common/common.h"
 #include "common/objectpool.h"
 #include "math/math.h"
-#include <set>
 
 // #define NDEBUG
 // windows include	
@@ -219,6 +218,15 @@ public:
 	static uint64 sendBytesCount();
 	static uint64 sendBudgetExhaustionCount();
 	static uint64 structuralProcessedCount();
+	static uint64 structuralQueuedCount();
+	static uint64 volatileQueuedCount();
+	static uint64 structuralEnqueuedCount();
+	static uint64 volatileEnqueuedCount();
+	static uint64 queueDeduplicatedCount();
+	static uint64 producerCoalescedCount();
+	static void recordProducerCoalesced();
+	static uint64 structuralPromotionCount();
+	static uint64 promotedVolatileSkipCount();
 	static void beginUpdateTick();
 	static uint64 globalAdmittedCount();
 	static uint64 globalDeferredCount();
@@ -281,7 +289,7 @@ private:
 	size_t								trackedViewEntityCount_;
 	uint64									nextEntityRefGeneration_;
 	WitnessDirtyQueue						volatileDirtyQueue_;
-	std::set<std::pair<ENTITY_ID, uint64> >	pendingStructuralUpdates_;
+	WitnessDirtyQueue						structuralDirtyQueue_;
 	bool									volatileUpdatesEnabled_;
 };
 

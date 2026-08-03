@@ -88,7 +88,7 @@ PyObject* ClientsRemoteEntityMethod::callmethod(PyObject* args, PyObject* kwds)
 		S_Return;
 	}
 	
-	const std::list<ENTITY_ID>& entities = pEntity->witnesses();
+	const Entity::WITNESS_IDS& entities = pEntity->witnesses();
 
 	if(otherClients_)
 	{
@@ -182,7 +182,7 @@ PyObject* ClientsRemoteEntityMethod::callmethod(PyObject* args, PyObject* kwds)
 		}
 
 		// 广播给其他人
-		std::list<ENTITY_ID>::const_iterator iter = entities.begin();
+		Entity::WITNESS_IDS::const_iterator iter = entities.begin();
 		for(; iter != entities.end(); ++iter)
 		{
 			Entity* pViewEntity = Cellapp::getSingleton().findEntity((*iter));

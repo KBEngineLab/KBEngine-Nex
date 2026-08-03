@@ -309,6 +309,14 @@ bool Cellapp::initializeWatcher()
 	WATCH_OBJECT("witness/sendBytes", &Witness::sendBytesCount);
 	WATCH_OBJECT("witness/sendBudgetExhaustions", &Witness::sendBudgetExhaustionCount);
 	WATCH_OBJECT("witness/structuralProcessed", &Witness::structuralProcessedCount);
+	WATCH_OBJECT("witness/queues/structuralQueued", &Witness::structuralQueuedCount);
+	WATCH_OBJECT("witness/queues/volatileQueued", &Witness::volatileQueuedCount);
+	WATCH_OBJECT("witness/queues/structuralEnqueued", &Witness::structuralEnqueuedCount);
+	WATCH_OBJECT("witness/queues/volatileEnqueued", &Witness::volatileEnqueuedCount);
+	WATCH_OBJECT("witness/queues/deduplicated", &Witness::queueDeduplicatedCount);
+	WATCH_OBJECT("witness/queues/producerCoalesced", &Witness::producerCoalescedCount);
+	WATCH_OBJECT("witness/queues/structuralPromotions", &Witness::structuralPromotionCount);
+	WATCH_OBJECT("witness/queues/promotedVolatileSkips", &Witness::promotedVolatileSkipCount);
 	WATCH_OBJECT("witness/scheduler/updateLimit", &Witness::globalUpdateLimit);
 	WATCH_OBJECT("witness/scheduler/admitted", &Witness::globalAdmittedCount);
 	WATCH_OBJECT("witness/scheduler/deferred", &Witness::globalDeferredCount);

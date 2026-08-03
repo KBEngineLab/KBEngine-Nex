@@ -73,7 +73,7 @@ fullScanRequired_(true),
 trackedViewEntityCount_(0),
 nextEntityRefGeneration_(1),
 volatileDirtyQueue_(),
-pendingStructuralUpdates_(),
+structuralDirtyQueue_(),
 volatileUpdatesEnabled_(true)
 {
 	updatableName = "Witness";
@@ -823,6 +823,7 @@ void Witness::prepareFullScanQueue()
 	for (VIEW_ENTITIES::iterator iter = viewEntities_.begin(); iter != viewEntities_.end(); ++iter)
 	{
 		(*iter)->volatileQueued(false);
+		(*iter)->structuralQueued(false);
 		queueEntityRefVolatile(*iter);
 	}
 
@@ -835,12 +836,19 @@ void Witness::clearVolatileDirtyQueue()
 {
 	VIEW_ENTITIES::iterator iter = viewEntities_.begin();
 	for (; iter != viewEntities_.end(); ++iter)
+	{
+		if ((*iter)->volatileQueued() && (*iter)->pEntity())
+			(*iter)->pEntity()->onWitnessVolatileDequeued();
 		(*iter)->volatileQueued(false);
+		(*iter)->structuralQueued(false);
+	}
 
-	const size_t queuedCount = volatileDirtyQueue_.size();
-	g_witnessLoadMetrics.recordDirtyDequeued(queuedCount);
+	const size_t volatileQueuedCount = volatileDirtyQueue_.size();
+	const size_t structuralQueuedCount = structuralDirtyQueue_.size();
+	g_witnessLoadMetrics.recordDirtyDequeued(volatileQueuedCount, false);
+	g_witnessLoadMetrics.recordDirtyDequeued(structuralQueuedCount, true);
 	volatileDirtyQueue_.clear();
-	pendingStructuralUpdates_.clear();
+	structuralDirtyQueue_.clear();
 }
 
 //-------------------------------------------------------------------------------------
@@ -859,23 +867,45 @@ void Witness::initializeEntityRefLifecycle(EntityRef* pEntityRef)
 
 	pEntityRef->generation(nextEntityRefGeneration_++);
 	pEntityRef->volatileQueued(false);
+	pEntityRef->structuralQueued(false);
 }
 
 //-------------------------------------------------------------------------------------
 void Witness::queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue)
 {
-	// 同一队列同时承载结构事件和易变数据事件。generation + queued 去重保证
-	// Enter/Leave 与移动更新按发生顺序处理，同时避免同一 EntityRef 在单 Tick 内重复膨胀。
-	// The same queue carries structural and volatile-data events. Generation plus queued deduplication
-	// preserves Enter/Leave and movement ordering without allowing one EntityRef to grow the queue repeatedly in a tick.
+	// 结构消息必须绕过 volatile 背压，因此使用独立优先队列；generation + 双 queued 标记
+	// 允许结构事件提升已经排队的 volatile 项，而不需要在线性容器中搜索和删除旧条目。
+	// Structural messages must bypass volatile backpressure, so they use a dedicated priority queue.
+	// Generation plus two queued flags promotes an already queued volatile item without searching a linear container.
 	if (!pEntityRef || pEntityRef->flags() == ENTITYREF_FLAG_UNKONWN)
 		return;
 
 	if (isStructuralUpdate(pEntityRef))
-		pendingStructuralUpdates_.insert(std::make_pair(pEntityRef->id(), pEntityRef->generation()));
+	{
+		const bool promoted = pEntityRef->volatileQueued();
+		if (structuralDirtyQueue_.enqueue(
+			pEntityRef->id(), pEntityRef->generation(), pEntityRef->structuralQueuedRef()))
+		{
+			g_witnessLoadMetrics.recordDirtyEnqueued(
+				volatileDirtyQueue_.size() + structuralDirtyQueue_.size(), requeue, true, promoted);
+		}
+		else
+		{
+			g_witnessLoadMetrics.recordQueueDeduplicated();
+		}
+		return;
+	}
 
-	if (volatileDirtyQueue_.enqueue(pEntityRef->id(), pEntityRef->generation(), pEntityRef->volatileQueuedRef()))
-		g_witnessLoadMetrics.recordDirtyEnqueued(volatileDirtyQueue_.size(), requeue);
+	if (volatileDirtyQueue_.enqueue(
+		pEntityRef->id(), pEntityRef->generation(), pEntityRef->volatileQueuedRef()))
+	{
+		g_witnessLoadMetrics.recordDirtyEnqueued(
+			volatileDirtyQueue_.size() + structuralDirtyQueue_.size(), requeue, false, false);
+	}
+	else
+	{
+		g_witnessLoadMetrics.recordQueueDeduplicated();
+	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -1007,10 +1037,10 @@ void Witness::removeViewEntityRef(EntityRef* pEntityRef)
 //-------------------------------------------------------------------------------------
 void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 {
-	if (!volatileUpdatesEnabled_ && pendingStructuralUpdates_.empty())
+	if (!volatileUpdatesEnabled_ && structuralDirtyQueue_.size() == 0)
 	{
-		// 没有结构事件时保持整条去重队列静止，避免拥塞期间每 Tick 扫描并重排所有可见实体。
-		// Keep the deduplicated queue stationary when no structural event exists, avoiding a full visible-set scan every congested tick.
+		// 没有结构事件时保持 volatile 队列静止，避免拥塞期间扫描任何普通位姿项。
+		// Keep the volatile queue stationary when no structural event exists, avoiding all normal-position scans while congested.
 		g_witnessLoadMetrics.recordSuppressedUpdateSkip();
 		return;
 	}
@@ -1022,6 +1052,66 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 		config.witness_global_bytes_per_tick,
 		g_witnessActiveCount));
 	bool volatileExhaustionRecorded = false;
+
+	// Enter/Leave 独立排队并始终先于 volatile 项处理。结构队列只消费 Tick 开始时的快照，
+	// 回调中新产生的结构事件留到下一 Tick，保持单 Tick 工作量有界。
+	// Enter/Leave use a separate priority queue. Only the tick-start snapshot is consumed;
+	// structural work created by callbacks remains for the next tick, keeping one tick bounded.
+	const size_t structuralBatchSize = structuralDirtyQueue_.batchSize();
+	for (size_t i = 0; i < structuralBatchSize; ++i)
+	{
+		if (!sendBudget.canSend(false))
+		{
+			g_witnessLoadMetrics.recordSendBudgetExhaustion();
+			break;
+		}
+
+		WitnessDirtyQueue::Entry entry;
+		if (!structuralDirtyQueue_.pop(entry))
+			break;
+		g_witnessLoadMetrics.recordDirtyDequeued(1, true);
+
+		VIEW_ENTITIES_MAP::iterator iter = viewEntities_map_.find(entry.entityID);
+		if (iter == viewEntities_map_.end() || iter->second->generation() != entry.generation)
+		{
+			g_witnessLoadMetrics.recordStaleDiscard();
+			continue;
+		}
+
+		EntityRef* pEntityRef = iter->second;
+		pEntityRef->structuralQueued(false);
+		if (!isStructuralUpdate(pEntityRef))
+		{
+			g_witnessLoadMetrics.recordStateSkip();
+			continue;
+		}
+
+		const size_t beforeBytes = static_cast<size_t>(pSendBundle->currMsgLength());
+		const uint32 flagsBeforeUpdate = pEntityRef->flags();
+		const bool retained = processEntityRefUpdate(pSendBundle, pEntityRef);
+		const size_t afterBytes = static_cast<size_t>(pSendBundle->currMsgLength());
+		const uint64 encodedBytes = afterBytes > beforeBytes ? static_cast<uint64>(afterBytes - beforeBytes) : 0;
+		if ((flagsBeforeUpdate & ENTITYREF_FLAG_ENTER_CLIENT_PENDING) != 0)
+			g_witnessLoadMetrics.recordEnter(encodedBytes);
+		else
+			g_witnessLoadMetrics.recordLeave(encodedBytes);
+
+		sendBudget.recordBundleGrowth(beforeBytes, afterBytes);
+		g_witnessLoadMetrics.recordStructuralProcessed();
+		if (!volatileUpdatesEnabled_)
+			g_witnessLoadMetrics.recordStructuralWhileSuppressed();
+		g_witnessLoadMetrics.recordDirtyProcessed();
+		if (!retained)
+			removeViewEntityRef(pEntityRef);
+	}
+
+	if (!volatileUpdatesEnabled_)
+	{
+		g_witnessLoadMetrics.recordVolatileBytes(volatileBudget.bytesSent());
+		g_witnessLoadMetrics.recordSendBytes(sendBudget.bytesSent());
+		return;
+	}
+
 	const size_t batchSize = volatileDirtyQueue_.batchSize();
 	for (size_t i = 0; i < batchSize; ++i)
 	{
@@ -1036,28 +1126,34 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 		WitnessDirtyQueue::Entry entry;
 		if (!volatileDirtyQueue_.pop(entry))
 			break;
-		g_witnessLoadMetrics.recordDirtyDequeued();
+		g_witnessLoadMetrics.recordDirtyDequeued(1, false);
 
 		VIEW_ENTITIES_MAP::iterator iter = viewEntities_map_.find(entry.entityID);
 		if (iter == viewEntities_map_.end() || iter->second->generation() != entry.generation)
 		{
-			pendingStructuralUpdates_.erase(std::make_pair(entry.entityID, entry.generation));
 			g_witnessLoadMetrics.recordStaleDiscard();
 			continue;
 		}
 
 		EntityRef* pEntityRef = iter->second;
+		if (pEntityRef->volatileQueued() && pEntityRef->pEntity())
+			pEntityRef->pEntity()->onWitnessVolatileDequeued();
 		pEntityRef->volatileQueued(false);
-		const bool structuralUpdate = isStructuralUpdate(pEntityRef);
-		if (!volatileUpdatesEnabled_ && !structuralUpdate)
+		if (isStructuralUpdate(pEntityRef))
 		{
-			queueEntityRefVolatile(pEntityRef, true);
+			// 该项已被提升到结构队列。保留的旧 volatile 环形条目只需跳过一次，
+			// 不再执行出队再入队的 O(queue) 放大路径。
+			// This item was promoted to the structural queue. Its retained volatile ring entry
+			// is skipped once instead of entering the dequeue/requeue amplification path.
+			if (!pEntityRef->structuralQueued())
+				queueEntityRefVolatile(pEntityRef, true);
+			g_witnessLoadMetrics.recordPromotedVolatileSkip();
 			continue;
 		}
-		if (!volatileBudget.canSend(structuralUpdate))
+		if (!volatileBudget.canSend(false))
 		{
-			// Tick 快照仍继续向后检查结构消息；普通易变更新回队后会在下 Tick 读取实体最新状态。
-			// Continue scanning the tick snapshot for structural messages; deferred volatile entries read the entity's latest state next tick.
+			// 普通易变更新回队后在下 Tick 读取实体最新状态，不保留中间位置快照。
+			// Deferred volatile entries read the entity's latest state next tick without retaining intermediate positions.
 			queueEntityRefVolatile(pEntityRef, true);
 			g_witnessLoadMetrics.recordVolatileBudgetDeferred();
 			if (!volatileExhaustionRecorded)
@@ -1071,34 +1167,15 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 		// 外层实体转发消息尚未完成时 packetsLength() 只反映分包边界，currMsgLength() 才是连续增长的真实编码字节数。
 		// While the outer entity-forward message is open, packetsLength() reflects packet boundaries; currMsgLength() is the continuously growing encoded byte count.
 		const size_t beforeBytes = static_cast<size_t>(pSendBundle->currMsgLength());
-		const uint32 flagsBeforeUpdate = pEntityRef->flags();
 		const bool retained = processEntityRefUpdate(pSendBundle, pEntityRef);
 		const size_t afterBytes = static_cast<size_t>(pSendBundle->currMsgLength());
 		const uint64 encodedBytes = afterBytes > beforeBytes ? static_cast<uint64>(afterBytes - beforeBytes) : 0;
-		if ((flagsBeforeUpdate & ENTITYREF_FLAG_ENTER_CLIENT_PENDING) != 0)
-			g_witnessLoadMetrics.recordEnter(encodedBytes);
-		else if ((flagsBeforeUpdate & ENTITYREF_FLAG_LEAVE_CLIENT_PENDING) != 0)
-			g_witnessLoadMetrics.recordLeave(encodedBytes);
-		else
-			g_witnessLoadMetrics.recordVolatileUpdate(encodedBytes);
+		g_witnessLoadMetrics.recordVolatileUpdate(encodedBytes);
 		sendBudget.recordBundleGrowth(beforeBytes, afterBytes);
-		if (!structuralUpdate)
-		{
-			volatileBudget.recordBundleGrowth(beforeBytes, afterBytes);
-		}
-		else
-		{
-			pendingStructuralUpdates_.erase(std::make_pair(entry.entityID, entry.generation));
-			g_witnessLoadMetrics.recordStructuralProcessed();
-			if (!volatileUpdatesEnabled_)
-				g_witnessLoadMetrics.recordStructuralWhileSuppressed();
-		}
+		volatileBudget.recordBundleGrowth(beforeBytes, afterBytes);
 		g_witnessLoadMetrics.recordDirtyProcessed();
 		if (!retained)
 			removeViewEntityRef(pEntityRef);
-
-		if (!volatileUpdatesEnabled_ && pendingStructuralUpdates_.empty())
-			break;
 	}
 
 	g_witnessLoadMetrics.recordVolatileBytes(volatileBudget.bytesSent());
@@ -1212,6 +1289,17 @@ uint64 Witness::structuralProcessedCount()
 {
 	return g_witnessLoadMetrics.structuralProcessed();
 }
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::structuralQueuedCount() { return g_witnessLoadMetrics.structuralQueued(); }
+uint64 Witness::volatileQueuedCount() { return g_witnessLoadMetrics.volatileQueued(); }
+uint64 Witness::structuralEnqueuedCount() { return g_witnessLoadMetrics.structuralEnqueued(); }
+uint64 Witness::volatileEnqueuedCount() { return g_witnessLoadMetrics.volatileEnqueued(); }
+uint64 Witness::queueDeduplicatedCount() { return g_witnessLoadMetrics.queueDeduplicated(); }
+uint64 Witness::producerCoalescedCount() { return g_witnessLoadMetrics.producerCoalesced(); }
+void Witness::recordProducerCoalesced() { g_witnessLoadMetrics.recordProducerCoalesced(); }
+uint64 Witness::structuralPromotionCount() { return g_witnessLoadMetrics.structuralPromotions(); }
+uint64 Witness::promotedVolatileSkipCount() { return g_witnessLoadMetrics.promotedVolatileSkips(); }
 
 //-------------------------------------------------------------------------------------
 void Witness::beginUpdateTick()

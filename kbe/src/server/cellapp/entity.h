@@ -69,6 +69,8 @@ class Entity : public script::ScriptObject
 	ENTITY_HEADER(Entity)
 
 public:
+	typedef std::vector<ENTITY_ID> WITNESS_IDS;
+
 	static PyObject* __py_pyRegisterEvent(PyObject* self, PyObject* args);
 	static PyObject* __py_pyDeregisterEvent(PyObject* self, PyObject* args);
 	static PyObject* __py_pyFireEvent(PyObject* self, PyObject* args);
@@ -420,12 +422,16 @@ public:
 	void delWitnessed(Entity* entity);
 	void onDelWitnessed();
 
+	/** 某个观察关系已消费待发送位姿，允许下一次变化重新通知所有观察者。 */
+	/** Allows the next change to notify all observers after one relation consumes its pending pose. */
+	void onWitnessVolatileDequeued();
+
 	/**
 		 指定的entity是否是观察自己的人之一
 	*/
 	bool entityInWitnessed(ENTITY_ID entityID);
 
-	INLINE const std::list<ENTITY_ID>&	witnesses();
+	INLINE const WITNESS_IDS&	witnesses();
 	INLINE size_t witnessesSize() const;
 
 	/** 网络接口
@@ -697,8 +703,12 @@ protected:
 	SPACE_ENTITIES::size_type								spaceEntityIdx_;
 
 	// 是否被任何观察者监视到
-	std::list<ENTITY_ID>									witnesses_;
+	// 移动广播频繁遍历观察者；连续 ID 存储减少每条 AOI 关系的节点分配和缓存未命中。
+	// Movement broadcasts traverse observers frequently; contiguous IDs avoid per-relation nodes and pointer chasing.
+	WITNESS_IDS										witnesses_;
 	size_t													witnesses_count_;
+
+	bool											witnessesVolatileBroadcastPending_;
 
 	// 观察者对象
 	Witness*												pWitness_;

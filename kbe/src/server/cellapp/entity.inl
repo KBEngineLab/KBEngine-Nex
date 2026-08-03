@@ -34,7 +34,7 @@ INLINE bool Entity::hasWitness(void) const
 }
 
 //-------------------------------------------------------------------------------------
-INLINE const std::list<ENTITY_ID>&	Entity::witnesses()
+INLINE const Entity::WITNESS_IDS& Entity::witnesses()
 {
 	return witnesses_;
 }

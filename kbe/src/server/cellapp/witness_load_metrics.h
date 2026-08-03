@@ -41,10 +41,22 @@ public:
 		fullScanEntities_ += static_cast<std::uint64_t>(scannedEntities);
 	}
 
-	void recordDirtyEnqueued(std::size_t queueDepth, bool requeue)
+	void recordDirtyEnqueued(std::size_t queueDepth, bool requeue, bool structural = false, bool promotion = false)
 	{
 		++dirtyQueued_;
 		++dirtyEnqueued_;
+		if (structural)
+		{
+			++structuralQueued_;
+			++structuralEnqueued_;
+			if (promotion)
+				++structuralPromotions_;
+		}
+		else
+		{
+			++volatileQueued_;
+			++volatileEnqueued_;
+		}
 		if (requeue)
 			++dirtyRequeues_;
 
@@ -52,11 +64,17 @@ public:
 			maxQueueDepth_ = static_cast<std::uint64_t>(queueDepth);
 	}
 
-	void recordDirtyDequeued(std::size_t count = 1)
+	void recordDirtyDequeued(std::size_t count = 1, bool structural = false)
 	{
 		assert(dirtyQueued_ >= count);
 		dirtyQueued_ -= static_cast<std::uint64_t>(count);
+		std::uint64_t& queueDepth = structural ? structuralQueued_ : volatileQueued_;
+		assert(queueDepth >= count);
+		queueDepth -= static_cast<std::uint64_t>(count);
 	}
+	void recordQueueDeduplicated() { ++queueDeduplicated_; }
+	void recordProducerCoalesced() { ++producerCoalesced_; }
+	void recordPromotedVolatileSkip() { ++promotedVolatileSkips_; }
 
 	void recordDirtyProcessed() { ++dirtyProcessed_; }
 	void recordStaleDiscard() { ++staleDiscards_; }
@@ -102,6 +120,14 @@ public:
 	std::uint64_t dirtyQueued() const { return dirtyQueued_; }
 	std::uint64_t dirtyEnqueued() const { return dirtyEnqueued_; }
 	std::uint64_t dirtyRequeues() const { return dirtyRequeues_; }
+	std::uint64_t structuralQueued() const { return structuralQueued_; }
+	std::uint64_t volatileQueued() const { return volatileQueued_; }
+	std::uint64_t structuralEnqueued() const { return structuralEnqueued_; }
+	std::uint64_t volatileEnqueued() const { return volatileEnqueued_; }
+	std::uint64_t queueDeduplicated() const { return queueDeduplicated_; }
+	std::uint64_t producerCoalesced() const { return producerCoalesced_; }
+	std::uint64_t structuralPromotions() const { return structuralPromotions_; }
+	std::uint64_t promotedVolatileSkips() const { return promotedVolatileSkips_; }
 	std::uint64_t fullScans() const { return fullScans_; }
 	std::uint64_t fullScanEntities() const { return fullScanEntities_; }
 	std::uint64_t dirtyProcessed() const { return dirtyProcessed_; }
@@ -136,6 +162,14 @@ private:
 	std::uint64_t dirtyQueued_ = 0;
 	std::uint64_t dirtyEnqueued_ = 0;
 	std::uint64_t dirtyRequeues_ = 0;
+	std::uint64_t structuralQueued_ = 0;
+	std::uint64_t volatileQueued_ = 0;
+	std::uint64_t structuralEnqueued_ = 0;
+	std::uint64_t volatileEnqueued_ = 0;
+	std::uint64_t queueDeduplicated_ = 0;
+	std::uint64_t producerCoalesced_ = 0;
+	std::uint64_t structuralPromotions_ = 0;
+	std::uint64_t promotedVolatileSkips_ = 0;
 	std::uint64_t fullScans_ = 0;
 	std::uint64_t fullScanEntities_ = 0;
 	std::uint64_t dirtyProcessed_ = 0;

@@ -99,12 +99,37 @@ bool testRingWrapAndGrowthPreserveFifo()
 
 	return require(queue.size() == 0, "ring queue did not drain completely");
 }
+
+bool testStructuralQueueDoesNotScanVolatileBacklog()
+{
+	KBEngine::WitnessDirtyQueue volatileQueue;
+	KBEngine::WitnessDirtyQueue structuralQueue;
+	bool volatileQueued[101]{};
+	for (std::uint32_t id = 1; id <= 100; ++id)
+		volatileQueue.enqueue(id, id, volatileQueued[id]);
+
+	bool structuralQueued = false;
+	if (!require(structuralQueue.enqueue(100, 100, structuralQueued),
+		"structural promotion was not queued") ||
+		!require(!structuralQueue.enqueue(100, 100, structuralQueued),
+			"duplicate structural promotion was queued"))
+	{
+		return false;
+	}
+
+	KBEngine::WitnessDirtyQueue::Entry entry{};
+	return require(structuralQueue.pop(entry) && entry.entityID == 100,
+		"structural queue did not bypass the volatile backlog") &&
+		require(volatileQueue.size() == 100,
+			"structural processing scanned or reordered the volatile backlog");
+}
 }
 
 int main()
 {
 	if (!testDeduplicationAndFifo() || !testGenerationIsolation() ||
-		!testBatchSnapshotDefersRequeue() || !testRingWrapAndGrowthPreserveFifo())
+		!testBatchSnapshotDefersRequeue() || !testRingWrapAndGrowthPreserveFifo() ||
+		!testStructuralQueueDoesNotScanVolatileBacklog())
 		return EXIT_FAILURE;
 
 	std::cout << "WITNESS_DIRTY_QUEUE_TEST_PASS" << std::endl;

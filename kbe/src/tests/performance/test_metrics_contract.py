@@ -468,6 +468,8 @@ def assert_python_latency_scenario() -> None:
     assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/witness/backpressure"] == 5.0
     assert "CELLAPP_TYPE=@cellapp:root/witness/scheduler" in gameplay["watcher_targets"]
     assert "CELLAPP_TYPE=@cellapp:root/witness/messages" in gameplay["watcher_targets"]
+    assert "CELLAPP_TYPE=@cellapp:root/witness/queues" in gameplay["watcher_targets"]
+    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/witness/queues"] == 5.0
 
     defaults_path = Path(__file__).resolve().parents[3] / "res/server/kbengine_defaults.xml"
     defaults_source = defaults_path.read_text(encoding="utf-8")

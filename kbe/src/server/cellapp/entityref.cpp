@@ -31,7 +31,8 @@ aliasID_(0),
 pEntity_(pEntity),
 flags_(ENTITYREF_FLAG_UNKONWN),
 generation_(0),
-volatileQueued_(false)
+volatileQueued_(false),
+structuralQueued_(false)
 {
 	id_ = pEntity->id();
 }
@@ -43,7 +44,8 @@ aliasID_(0),
 pEntity_(NULL),
 flags_(ENTITYREF_FLAG_UNKONWN),
 generation_(0),
-volatileQueued_(false)
+volatileQueued_(false),
+structuralQueued_(false)
 {
 }
 
@@ -95,6 +97,7 @@ void EntityRef::onReclaimObject()
 	flags_ = ENTITYREF_FLAG_UNKONWN;
 	generation_ = 0;
 	volatileQueued_ = false;
+	structuralQueued_ = false;
 }
 
 //-------------------------------------------------------------------------------------
