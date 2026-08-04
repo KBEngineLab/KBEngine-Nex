@@ -328,6 +328,18 @@ bool Cellapp::initializeWatcher()
 	WATCH_OBJECT("witness/messages/enterBytes", &Witness::enterBytesCount);
 	WATCH_OBJECT("witness/messages/leaveCount", &Witness::leaveUpdateCount);
 	WATCH_OBJECT("witness/messages/leaveBytes", &Witness::leaveBytesCount);
+	WATCH_OBJECT("witness/messages/enterProcessingSampleRate", &Witness::enterProcessingSampleRate);
+	WATCH_OBJECT("witness/messages/enterProcessingSamples", &Witness::enterProcessingSamples);
+	WATCH_OBJECT("witness/messages/enterProcessingTotalNanos", &Witness::enterProcessingTotalNanos);
+	WATCH_OBJECT("witness/messages/enterProcessingAverageNanos", &Witness::enterProcessingAverageNanos);
+	WATCH_OBJECT("witness/messages/enterProcessingMaxNanos", &Witness::enterProcessingMaxNanos);
+	WATCH_OBJECT("witness/messages/enterProcessingSlowSamplesOver1ms", &Witness::enterProcessingSlowSamplesOver1ms);
+	WATCH_OBJECT("witness/messages/leaveProcessingSampleRate", &Witness::leaveProcessingSampleRate);
+	WATCH_OBJECT("witness/messages/leaveProcessingSamples", &Witness::leaveProcessingSamples);
+	WATCH_OBJECT("witness/messages/leaveProcessingTotalNanos", &Witness::leaveProcessingTotalNanos);
+	WATCH_OBJECT("witness/messages/leaveProcessingAverageNanos", &Witness::leaveProcessingAverageNanos);
+	WATCH_OBJECT("witness/messages/leaveProcessingMaxNanos", &Witness::leaveProcessingMaxNanos);
+	WATCH_OBJECT("witness/messages/leaveProcessingSlowSamplesOver1ms", &Witness::leaveProcessingSlowSamplesOver1ms);
 	WATCH_OBJECT("witness/messages/volatileCount", &Witness::volatileUpdateCount);
 	WATCH_OBJECT("witness/messages/volatileBytes", &Witness::volatileUpdateBytesCount);
 	WATCH_OBJECT("witness/backpressure/activeSuppressed", &Witness::activeSuppressedCount);

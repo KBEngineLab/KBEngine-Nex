@@ -25,6 +25,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "common/smartpointer.h"
 #include "helper/debug_helper.h"
 #include "network/common.h"
+#include "network/message_processing_metrics.h"
 
 namespace KBEngine{
 
@@ -77,6 +78,7 @@ public:
 	int32 msgLen;					// 如果长度为-1则为非固定长度消息
 	bool exposed;
 	MessageHandlers* pMessageHandlers;
+	MessageProcessingCategory processingCategory;
 
 	// stats
 	volatile mutable uint32 send_size;
@@ -138,6 +140,7 @@ public:
 	
 	static void finalise(void);
 	static std::vector<MessageHandlers*>& messageHandlers();
+	static MessageProcessingMetrics& processingMetrics();
 
 	const MessageHandlerMap& msgHandlers(){ return msgHandlers_; }
 

@@ -236,6 +236,18 @@ public:
 	static uint64 enterBytesCount();
 	static uint64 leaveUpdateCount();
 	static uint64 leaveBytesCount();
+	static uint64 enterProcessingSampleRate();
+	static uint64 enterProcessingSamples();
+	static uint64 enterProcessingTotalNanos();
+	static uint64 enterProcessingAverageNanos();
+	static uint64 enterProcessingMaxNanos();
+	static uint64 enterProcessingSlowSamplesOver1ms();
+	static uint64 leaveProcessingSampleRate();
+	static uint64 leaveProcessingSamples();
+	static uint64 leaveProcessingTotalNanos();
+	static uint64 leaveProcessingAverageNanos();
+	static uint64 leaveProcessingMaxNanos();
+	static uint64 leaveProcessingSlowSamplesOver1ms();
 	static uint64 volatileUpdateCount();
 	static uint64 volatileUpdateBytesCount();
 	static uint64 activeSuppressedCount();

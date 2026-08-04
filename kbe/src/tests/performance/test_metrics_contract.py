@@ -489,6 +489,10 @@ def assert_python_latency_scenario() -> None:
     assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/clientVolatileBackpressure"] == 5.0
     assert "BASEAPP_TYPE=@baseapp:root/network/clientInput" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/clientInput"] == 5.0
+    assert "BASEAPP_TYPE=@baseapp:root/network/messageProcessing" in gameplay["watcher_targets"]
+    assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/messageProcessing"] == 5.0
+    assert "CELLAPP_TYPE=@cellapp:root/network/messageProcessing" in gameplay["watcher_targets"]
+    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/network/messageProcessing"] == 5.0
     assert "CELLAPP_TYPE=@cellapp:root/witness/backpressure" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/witness/backpressure"] == 5.0
     assert "CELLAPP_TYPE=@cellapp:root/witness/scheduler" in gameplay["watcher_targets"]
@@ -510,12 +514,17 @@ def assert_python_latency_scenario() -> None:
     profile_source = (Path(__file__).resolve().parents[2] / "lib/helper/profile.cpp").read_text(encoding="utf-8")
     profile_inline = (Path(__file__).resolve().parents[2] / "lib/helper/profile.inl").read_text(encoding="utf-8")
     entity_app_source = (Path(__file__).resolve().parents[2] / "lib/server/entity_app.h").read_text(encoding="utf-8")
+    server_app_source = (Path(__file__).resolve().parents[2] / "lib/server/serverapp.cpp").read_text(encoding="utf-8")
     assert 'WATCH_OBJECT("network/clientVolatileBackpressure/activeClients"' in baseapp_source
     assert 'WATCH_OBJECT("network/clientInput/staleNoCellDrops"' in baseapp_source
     assert "++staleClientInputNoCellDrops_;" in baseapp_source
     assert 'WATCH_OBJECT("witness/backpressure/activeSuppressed"' in cellapp_source
     assert 'WATCH_OBJECT("witness/scheduler/deferred"' in cellapp_source
     assert 'WATCH_OBJECT("witness/messages/enterBytes"' in cellapp_source
+    assert 'WATCH_OBJECT("witness/messages/enterProcessingMaxNanos"' in cellapp_source
+    assert 'WATCH_OBJECT("witness/messages/leaveProcessingMaxNanos"' in cellapp_source
+    assert 'prefix + "SampledMaxNanos"' in server_app_source
+    assert 'categoryName(category) + "/"' not in server_app_source
     assert 'WATCH_OBJECT("witness/queues/cancelledPendingLeaves"' in cellapp_source
     assert 'WATCH_OBJECT("witness/backpressure/staleControlDrops"' in cellapp_source
     assert "++staleWitnessVolatileControlDrops_;" in cellapp_source

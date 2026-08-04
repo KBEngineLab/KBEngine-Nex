@@ -31,6 +31,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/network_stats.h"
 #include "math/math.h"
 #include "client_lib/client_interface.h"
+#include "common/timestamp.h"
 
 #include "../../server/baseapp/baseapp_interface.h"
 
@@ -1051,10 +1052,25 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 
 		const size_t beforeBytes = static_cast<size_t>(pSendBundle->currMsgLength());
 		const uint32 flagsBeforeUpdate = pEntityRef->flags();
+		const bool isEnter = (flagsBeforeUpdate & ENTITYREF_FLAG_ENTER_CLIENT_PENDING) != 0;
+		const bool sampleProcessing = isEnter ?
+			g_witnessLoadMetrics.beginEnterProcessing() :
+			g_witnessLoadMetrics.beginLeaveProcessing();
+		const uint64 processingStarted = sampleProcessing ? timestamp() : 0;
 		const bool retained = processEntityRefUpdate(pSendBundle, pEntityRef);
+		if (sampleProcessing)
+		{
+			const uint64 durationNanos = static_cast<uint64>(
+				static_cast<long double>(timestamp() - processingStarted) * 1000000000.0L /
+				stampsPerSecondD());
+			if (isEnter)
+				g_witnessLoadMetrics.recordEnterProcessing(durationNanos);
+			else
+				g_witnessLoadMetrics.recordLeaveProcessing(durationNanos);
+		}
 		const size_t afterBytes = static_cast<size_t>(pSendBundle->currMsgLength());
 		const uint64 encodedBytes = afterBytes > beforeBytes ? static_cast<uint64>(afterBytes - beforeBytes) : 0;
-		if ((flagsBeforeUpdate & ENTITYREF_FLAG_ENTER_CLIENT_PENDING) != 0)
+		if (isEnter)
 			g_witnessLoadMetrics.recordEnter(encodedBytes);
 		else
 			g_witnessLoadMetrics.recordLeave(encodedBytes);
@@ -1280,6 +1296,18 @@ uint64 Witness::enterUpdateCount() { return g_witnessLoadMetrics.enterUpdates();
 uint64 Witness::enterBytesCount() { return g_witnessLoadMetrics.enterBytes(); }
 uint64 Witness::leaveUpdateCount() { return g_witnessLoadMetrics.leaveUpdates(); }
 uint64 Witness::leaveBytesCount() { return g_witnessLoadMetrics.leaveBytes(); }
+uint64 Witness::enterProcessingSampleRate() { return g_witnessLoadMetrics.enterProcessing().sampleRate(); }
+uint64 Witness::enterProcessingSamples() { return g_witnessLoadMetrics.enterProcessing().sampledCalls(); }
+uint64 Witness::enterProcessingTotalNanos() { return g_witnessLoadMetrics.enterProcessing().sampledTotalNanos(); }
+uint64 Witness::enterProcessingAverageNanos() { return g_witnessLoadMetrics.enterProcessing().sampledAverageNanos(); }
+uint64 Witness::enterProcessingMaxNanos() { return g_witnessLoadMetrics.enterProcessing().sampledMaxNanos(); }
+uint64 Witness::enterProcessingSlowSamplesOver1ms() { return g_witnessLoadMetrics.enterProcessing().slowSamplesOver1ms(); }
+uint64 Witness::leaveProcessingSampleRate() { return g_witnessLoadMetrics.leaveProcessing().sampleRate(); }
+uint64 Witness::leaveProcessingSamples() { return g_witnessLoadMetrics.leaveProcessing().sampledCalls(); }
+uint64 Witness::leaveProcessingTotalNanos() { return g_witnessLoadMetrics.leaveProcessing().sampledTotalNanos(); }
+uint64 Witness::leaveProcessingAverageNanos() { return g_witnessLoadMetrics.leaveProcessing().sampledAverageNanos(); }
+uint64 Witness::leaveProcessingMaxNanos() { return g_witnessLoadMetrics.leaveProcessing().sampledMaxNanos(); }
+uint64 Witness::leaveProcessingSlowSamplesOver1ms() { return g_witnessLoadMetrics.leaveProcessing().slowSamplesOver1ms(); }
 uint64 Witness::volatileUpdateCount() { return g_witnessLoadMetrics.volatileUpdates(); }
 uint64 Witness::volatileUpdateBytesCount() { return g_witnessLoadMetrics.volatileUpdateBytes(); }
 

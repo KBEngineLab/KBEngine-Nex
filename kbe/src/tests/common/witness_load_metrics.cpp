@@ -121,12 +121,50 @@ bool testVolatileBackpressureAccounting()
 	return require(metrics.activeSuppressed() == 0, "resumed Witness remained suppressed") &&
 		require(metrics.resumeTransitions() == 1, "resume transition was not attributed");
 }
+
+bool testStructuralProcessingSampling()
+{
+	KBEngine::WitnessLoadMetrics metrics;
+	if (!require(metrics.beginEnterProcessing(), "first Enter event was not sampled") ||
+		!require(metrics.beginLeaveProcessing(), "first Leave event was not sampled"))
+	{
+		return false;
+	}
+
+	for (std::size_t i = 1; i < 31; ++i)
+	{
+		if (!require(!metrics.beginEnterProcessing(), "Enter event sampled before configured period") ||
+			!require(!metrics.beginLeaveProcessing(), "Leave event sampled before configured period"))
+		{
+			return false;
+		}
+	}
+
+	if (!require(metrics.beginEnterProcessing(), "periodic Enter event was not sampled") ||
+		!require(metrics.beginLeaveProcessing(), "periodic Leave event was not sampled"))
+	{
+		return false;
+	}
+
+	metrics.recordEnterProcessing(750000);
+	metrics.recordEnterProcessing(2250000);
+	metrics.recordLeaveProcessing(1000000);
+	metrics.recordLeaveProcessing(3000000);
+	return require(metrics.enterProcessing().sampleRate() == 32, "Enter sample rate drifted") &&
+		require(metrics.enterProcessing().sampledCalls() == 2, "Enter sample count drifted") &&
+		require(metrics.enterProcessing().sampledAverageNanos() == 1500000, "Enter average drifted") &&
+		require(metrics.enterProcessing().sampledMaxNanos() == 2250000, "Enter maximum drifted") &&
+		require(metrics.enterProcessing().slowSamplesOver1ms() == 1, "Enter slow count drifted") &&
+		require(metrics.leaveProcessing().sampledAverageNanos() == 2000000, "Leave average drifted") &&
+		require(metrics.leaveProcessing().sampledMaxNanos() == 3000000, "Leave maximum drifted") &&
+		require(metrics.leaveProcessing().slowSamplesOver1ms() == 2, "Leave slow count drifted");
+}
 }
 
 int main()
 {
 	if (!testIncrementalViewAccounting() || !testQueueAttribution() || !testFullScanWorkAccounting() ||
-		!testVolatileBackpressureAccounting())
+		!testVolatileBackpressureAccounting() || !testStructuralProcessingSampling())
 		return EXIT_FAILURE;
 
 	std::cout << "WITNESS_LOAD_METRICS_TEST_PASS" << std::endl;

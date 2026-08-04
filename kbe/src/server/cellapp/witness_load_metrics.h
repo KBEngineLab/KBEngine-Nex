@@ -8,6 +8,58 @@
 namespace KBEngine
 {
 
+class WitnessProcessingStats
+{
+public:
+	explicit WitnessProcessingStats(std::uint32_t sampleRate = 32) :
+		calls_(0),
+		sampledCalls_(0),
+		sampledTotalNanos_(0),
+		sampledMaxNanos_(0),
+		slowSamplesOver1ms_(0),
+		sampleRate_(sampleRate)
+	{
+		assert(sampleRate_ > 0);
+	}
+
+	bool beginCall()
+	{
+		++calls_;
+		// 首次事件始终采样，使低频 Enter/Leave 在短窗口内仍可观测。
+		// Always sample the first event so rare Enter/Leave work remains visible in short windows.
+		return calls_ == 1 || calls_ % sampleRate_ == 0;
+	}
+
+	void recordSample(std::uint64_t durationNanos)
+	{
+		++sampledCalls_;
+		sampledTotalNanos_ += durationNanos;
+		if (durationNanos > sampledMaxNanos_)
+			sampledMaxNanos_ = durationNanos;
+		if (durationNanos >= 1000000)
+			++slowSamplesOver1ms_;
+	}
+
+	std::uint64_t calls() const { return calls_; }
+	std::uint64_t sampledCalls() const { return sampledCalls_; }
+	std::uint64_t sampledTotalNanos() const { return sampledTotalNanos_; }
+	std::uint64_t sampledAverageNanos() const
+	{
+		return sampledCalls_ == 0 ? 0 : sampledTotalNanos_ / sampledCalls_;
+	}
+	std::uint64_t sampledMaxNanos() const { return sampledMaxNanos_; }
+	std::uint64_t slowSamplesOver1ms() const { return slowSamplesOver1ms_; }
+	std::uint32_t sampleRate() const { return sampleRate_; }
+
+private:
+	std::uint64_t calls_;
+	std::uint64_t sampledCalls_;
+	std::uint64_t sampledTotalNanos_;
+	std::uint64_t sampledMaxNanos_;
+	std::uint64_t slowSamplesOver1ms_;
+	std::uint32_t sampleRate_;
+};
+
 /**
  * CellApp 在组件主线程更新 Witness 并处理 Watcher 查询，因此这里使用无锁累计值，避免给每次 AOI 变化增加原子读改写开销。
  * CellApp updates Witness instances and serves Watcher queries on its component thread, so lock-free plain counters avoid atomic read-modify-write overhead on every AOI change.
@@ -92,6 +144,10 @@ public:
 	}
 	void recordEnter(std::uint64_t bytes) { ++enterUpdates_; enterBytes_ += bytes; }
 	void recordLeave(std::uint64_t bytes) { ++leaveUpdates_; leaveBytes_ += bytes; }
+	bool beginEnterProcessing() { return enterProcessing_.beginCall(); }
+	bool beginLeaveProcessing() { return leaveProcessing_.beginCall(); }
+	void recordEnterProcessing(std::uint64_t durationNanos) { enterProcessing_.recordSample(durationNanos); }
+	void recordLeaveProcessing(std::uint64_t durationNanos) { leaveProcessing_.recordSample(durationNanos); }
 	void recordVolatileUpdate(std::uint64_t bytes) { ++volatileUpdates_; volatileUpdateBytes_ += bytes; }
 	void recordVolatileSuppression(bool suppressed)
 	{
@@ -148,6 +204,8 @@ public:
 	std::uint64_t enterBytes() const { return enterBytes_; }
 	std::uint64_t leaveUpdates() const { return leaveUpdates_; }
 	std::uint64_t leaveBytes() const { return leaveBytes_; }
+	const WitnessProcessingStats& enterProcessing() const { return enterProcessing_; }
+	const WitnessProcessingStats& leaveProcessing() const { return leaveProcessing_; }
 	std::uint64_t volatileUpdates() const { return volatileUpdates_; }
 	std::uint64_t volatileUpdateBytes() const { return volatileUpdateBytes_; }
 	std::uint64_t activeSuppressed() const { return activeSuppressed_; }
@@ -191,6 +249,8 @@ private:
 	std::uint64_t enterBytes_ = 0;
 	std::uint64_t leaveUpdates_ = 0;
 	std::uint64_t leaveBytes_ = 0;
+	WitnessProcessingStats enterProcessing_;
+	WitnessProcessingStats leaveProcessing_;
 	std::uint64_t volatileUpdates_ = 0;
 	std::uint64_t volatileUpdateBytes_ = 0;
 	std::uint64_t activeSuppressed_ = 0;

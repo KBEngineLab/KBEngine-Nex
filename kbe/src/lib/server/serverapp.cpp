@@ -28,6 +28,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/channel.h"
 #include "network/bundle.h"
 #include "network/common.h"
+#include "network/message_handler.h"
 #include "common/memorystream.h"
 #include "helper/console_helper.h"
 #include "helper/sys_info.h"
@@ -237,6 +238,30 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/poller/completionMaxConsecutiveBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::pollerCompletionMaxConsecutiveBudgetExhaustions);
 	WATCH_OBJECT("network/poller/completionTimeBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::pollerCompletionTimeBudgetExhaustionCount);
 	WATCH_OBJECT("network/poller/discardedPacketsAfterClose", &networkInterface_, &Network::NetworkInterface::discardedPacketsAfterCloseCount);
+
+	// Message categories are classified once when handlers are installed. Watcher reads
+	// process-local counters directly, so collection does not scan handlers or channels.
+	// 消息类别仅在安装 handler 时判定一次；Watcher 直接读取进程内累计值，采集时不扫描 handler 或 Channel。
+	Network::MessageProcessingMetrics& messageMetrics = Network::MessageHandlers::processingMetrics();
+	for (int categoryValue = 0;
+		categoryValue < Network::MESSAGE_PROCESSING_CATEGORY_COUNT; ++categoryValue)
+	{
+		const Network::MessageProcessingCategory category =
+			static_cast<Network::MessageProcessingCategory>(categoryValue);
+		Network::MessageProcessingCategoryStats* pStats = &messageMetrics.stats(category);
+		// Watcher directory reads are intentionally non-recursive. Keep category values as
+		// direct leaves so one query retrieves every category without five extra round trips.
+		// Watcher 目录读取不递归；类别指标保持为直属叶子，使单次查询即可取得全部类别。
+		const std::string prefix = std::string("network/messageProcessing/") +
+			Network::MessageProcessingMetrics::categoryName(category);
+		WATCH_OBJECT(prefix + "Calls", pStats, &Network::MessageProcessingCategoryStats::calls);
+		WATCH_OBJECT(prefix + "SampledCalls", pStats, &Network::MessageProcessingCategoryStats::sampledCalls);
+		WATCH_OBJECT(prefix + "SampleRate", pStats, &Network::MessageProcessingCategoryStats::sampleRate);
+		WATCH_OBJECT(prefix + "SampledTotalNanos", pStats, &Network::MessageProcessingCategoryStats::sampledTotalNanos);
+		WATCH_OBJECT(prefix + "SampledAverageNanos", pStats, &Network::MessageProcessingCategoryStats::sampledAverageNanos);
+		WATCH_OBJECT(prefix + "SampledMaxNanos", pStats, &Network::MessageProcessingCategoryStats::sampledMaxNanos);
+		WATCH_OBJECT(prefix + "SlowSamplesOver1ms", pStats, &Network::MessageProcessingCategoryStats::slowSamplesOver1ms);
+	}
 	// Compare active channels, heap entries, wakeups, and updates together to quantify scheduler aggregation without assuming aligned deadlines.
 	// 联合观察活动 Channel、堆项、唤醒和更新次数，用于量化调度聚合效果，不假设各 Channel 截止时间天然对齐。
 	WATCH_OBJECT("network/kcp/scheduledChannels", &networkInterface_, &Network::NetworkInterface::kcpScheduledChannelCount);

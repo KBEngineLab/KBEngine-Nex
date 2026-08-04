@@ -22,8 +22,41 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/channel.h"
 #include "network/message_handler.h"
 #include "network/network_stats.h"
+#include "common/timestamp.h"
 
-namespace KBEngine { 
+namespace
+{
+class ScopedMessageProcessingSample
+{
+public:
+	explicit ScopedMessageProcessingSample(KBEngine::Network::MessageHandler& handler) :
+		metrics_(KBEngine::Network::MessageHandlers::processingMetrics()),
+		category_(handler.processingCategory),
+		sampled_(metrics_.beginCall(category_)),
+		started_(sampled_ ? KBEngine::timestamp() : 0)
+	{
+	}
+
+	~ScopedMessageProcessingSample()
+	{
+		if (!sampled_)
+			return;
+
+		const std::uint64_t elapsed = KBEngine::timestamp() - started_;
+		const std::uint64_t nanos = static_cast<std::uint64_t>(
+			static_cast<double>(elapsed) * 1000000000.0 / KBEngine::stampsPerSecondD());
+		metrics_.recordSample(category_, nanos);
+	}
+
+private:
+	KBEngine::Network::MessageProcessingMetrics& metrics_;
+	KBEngine::Network::MessageProcessingCategory category_;
+	bool sampled_;
+	std::uint64_t started_;
+};
+}
+
+namespace KBEngine {
 namespace Network
 {
 
@@ -188,7 +221,10 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 			if(pFragmentStream_ != NULL)
 			{
 				TRACE_MESSAGE_PACKET(true, pFragmentStream_, pMsgHandler, currMsgLen_, pChannel_->c_str(), false);
-				pMsgHandler->handle(pChannel_, *pFragmentStream_);
+				{
+					ScopedMessageProcessingSample processingSample(*pMsgHandler);
+					pMsgHandler->handle(pChannel_, *pFragmentStream_);
+				}
 				MemoryStream::reclaimPoolObject(pFragmentStream_);
 				pFragmentStream_ = NULL;
 			}
@@ -207,7 +243,10 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 				pPacket->wpos(frpos);
 
 				TRACE_MESSAGE_PACKET(true, pPacket, pMsgHandler, currMsgLen_, pChannel_->c_str(), true);
-				pMsgHandler->handle(pChannel_, *pPacket);
+				{
+					ScopedMessageProcessingSample processingSample(*pMsgHandler);
+					pMsgHandler->handle(pChannel_, *pPacket);
+				}
 
 				// 如果handler没有处理完数据则输出一个警告
 				if(currMsgLen_ > 0)

@@ -88,6 +88,7 @@ MessageHandlers::~MessageHandlers()
 MessageHandler::MessageHandler():
 pArgs(NULL),
 pMessageHandlers(NULL),
+processingCategory(MESSAGE_PROCESSING_OTHER),
 send_size(0),
 send_count(0),
 recv_size(0),
@@ -204,7 +205,8 @@ MessageHandler* MessageHandlers::add(std::string ihName, MessageArgs* args,
 	if (g_packetAlwaysContainLength)
 		msgLen = NETWORK_VARIABLE_MESSAGE;
 
-	msgHandler->name = ihName;					
+	msgHandler->name = ihName;
+	msgHandler->processingCategory = MessageProcessingMetrics::classify(ihName);
 	msgHandler->pArgs = args;
 	msgHandler->msgLen = msgLen;	
 	msgHandler->exposed = false;
@@ -258,6 +260,17 @@ MessageHandler* MessageHandlers::add(std::string ihName, MessageArgs* args,
 	//	printf("\t\t!!!message is fixed.!!!\n");
 
 	return msgHandler;
+}
+
+//-------------------------------------------------------------------------------------
+MessageProcessingMetrics& MessageHandlers::processingMetrics()
+{
+	// Message dispatch and Watcher queries run on the component thread. Keeping the
+	// accumulator process-local and non-atomic avoids adding cache-line contention to
+	// every inbound message. / 消息分发和 Watcher 查询均在组件线程执行；使用进程内
+	// 非原子累计，避免给每条入站消息增加 cache line 竞争。
+	static MessageProcessingMetrics metrics;
+	return metrics;
 }
 
 //-------------------------------------------------------------------------------------

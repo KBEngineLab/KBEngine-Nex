@@ -146,6 +146,17 @@ request/response producer that emits the same JSONL request contract.
 当前报告的请求延迟是 Watcher 控制面往返时间，不代表游戏业务 RPC 的延迟或成功率。
 玩法 SLA 仍需要资产专用的关联请求/响应生产器，并输出相同 JSONL 请求契约。
 
+`root/network/messageProcessing` publishes sampled synchronous handler time for client movement,
+Python methods, Cell migration, Watcher control, and other inbound messages. Client movement is sampled
+1/64, Python methods 1/8, migration and Watcher control in full, and other messages 1/256. Cell AOI
+Enter/Leave encoding time is sampled independently at 1/32 under `root/witness/messages` because it is
+not entered through an inbound message handler. Totals, averages, maxima, and slow-sample counts are
+sample statistics and must not be multiplied into exact request totals.
+`root/network/messageProcessing` 发布客户端移动、Python 方法、跨 Cell 迁移、Watcher 控制和其他入站
+消息的同步 handler 采样耗时；采样率依次为 1/64、1/8、完整、完整和 1/256。Cell AOI Enter/Leave
+编码不经过入站 handler，因此在 `root/witness/messages` 下独立按 1/32 采样。累计、平均、最大值及
+慢样本数均属于采样统计，不能直接外推为精确请求总量。
+
 For cprofile targets, the runner preserves raw stamp counters, converts time counters to microseconds
 using `root/stats/stampsPerSecond`, and derives interval call count, calls/second, total/self time, and
 mean total/self time. The dedicated `/latency` targets are different: selected BaseApp/CellApp profiles
