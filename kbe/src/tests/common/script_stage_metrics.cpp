@@ -65,11 +65,34 @@ bool testSameHandlerKeepsMaximum()
 		require(metrics.slow(0).durationNanos == 3000000, "same handler did not retain its maximum") &&
 		require(metrics.slow(1).durationNanos == 0, "same handler occupied multiple slots");
 }
+
+bool testMigrationSubstageNames()
+{
+	return require(std::string(KBEngine::ScriptStageMetrics::stageName(
+			KBEngine::SCRIPT_STAGE_MIGRATION_ENTITY_CONSTRUCT)) == "migrationEntityConstruct",
+		"migration entity construction stage name drifted") &&
+		require(std::string(KBEngine::ScriptStageMetrics::stageName(
+			KBEngine::SCRIPT_STAGE_MIGRATION_STREAM_RESTORE)) == "migrationStreamRestore",
+			"migration stream restore stage name drifted") &&
+		require(std::string(KBEngine::ScriptStageMetrics::stageName(
+			KBEngine::SCRIPT_STAGE_MIGRATION_SPACE_AOI)) == "migrationSpaceAoi",
+			"migration Space/AOI stage name drifted") &&
+		require(std::string(KBEngine::ScriptStageMetrics::stageName(
+			KBEngine::SCRIPT_STAGE_MIGRATION_CALLBACK_SETUP)) == "migrationCallbackSetup",
+			"migration callback setup stage name drifted") &&
+		require(std::string(KBEngine::ScriptStageMetrics::stageName(
+			KBEngine::SCRIPT_STAGE_MIGRATION_OWNER_CALLBACK)) == "migrationOwnerCallback",
+			"migration owner callback stage name drifted") &&
+		require(std::string(KBEngine::ScriptStageMetrics::stageName(
+			KBEngine::SCRIPT_STAGE_MIGRATION_COMPONENT_CALLBACK)) == "migrationComponentCallback",
+			"migration component callback stage name drifted");
+}
 }
 
 int main()
 {
-	if (!testSamplingAndStages() || !testBoundedSlowTop() || !testSameHandlerKeepsMaximum())
+	if (!testSamplingAndStages() || !testBoundedSlowTop() || !testSameHandlerKeepsMaximum() ||
+		!testMigrationSubstageNames())
 		return EXIT_FAILURE;
 
 	std::cout << "SCRIPT_STAGE_METRICS_TEST_PASS" << std::endl;

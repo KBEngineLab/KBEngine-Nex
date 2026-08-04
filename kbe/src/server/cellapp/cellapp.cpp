@@ -2596,7 +2596,10 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 	// Target-Cell deserialize/create timing starts at construction and stops on entering the new Space; callbacks are measured separately.
 	const uint64 deserializeCreateStart = timestamp();
 	// 创建entity
+	const uint64 entityConstructStart = timestamp();
 	Entity* e = createEntity(EntityDef::findScriptModule(entityType)->getName(), NULL, false, teleportEntityID, false);
+	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_ENTITY_CONSTRUCT,
+		scriptStageDurationNanos(entityConstructStart), true, "reqTeleportToCellApp");
 	if (e == NULL)
 	{
 		s.rpos((int)rpos);
@@ -2615,9 +2618,12 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 		s.done();
 		return;
 	}
-	
+
 	Py_INCREF(e);
+	const uint64 streamRestoreStart = timestamp();
 	e->createFromStream(s);
+	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_STREAM_RESTORE,
+		scriptStageDurationNanos(streamRestoreStart), true, "reqTeleportToCellApp");
 
 	// 有可能序列化过来的ghost内容包含移动控制器，之所以序列化过来是为了
 	// 在传送失败时可以用于恢复现场, 那么传送成功了我们应该停止以前的移动行为
@@ -2658,7 +2664,10 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 	}
 
 	// 进入新的space中
+	const uint64 spaceAoiStart = timestamp();
 	space->addEntityAndEnterWorld(e);
+	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_SPACE_AOI,
+		scriptStageDurationNanos(spaceAoiStart), true, "reqTeleportToCellApp");
 	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_DESERIALIZE_CREATE,
 		scriptStageDurationNanos(deserializeCreateStart), true, "reqTeleportToCellApp");
 

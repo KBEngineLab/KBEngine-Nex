@@ -620,7 +620,8 @@ public:
 	/**
 		调用实体的回调函数，有可能被缓存
 	*/
-	bool bufferOrExeCallback(const char * funcName, PyObject * funcArgs, bool notFoundIsOK = true);
+	bool bufferOrExeCallback(const char * funcName, PyObject * funcArgs,
+		bool notFoundIsOK = true, bool recordMigrationDispatchStages = false);
 	static void bufferCallback(bool enable);
 
 private:
@@ -644,6 +645,9 @@ private:
 		// 缓冲可能跨越多个 Tick，复制方法名可避免调用方临时字符串失效。
 		// Buffering may span multiple ticks, so copy the method name instead of retaining caller-owned storage.
 		std::string		funcName;
+		// 迁移回调可能延迟到缓冲回放时执行，标记必须随调用保存才能记录真实耗时。
+		// Migration callbacks may execute during replay, so retain the flag to measure actual dispatch time.
+		bool			recordMigrationDispatchStages;
 	};
 
 	typedef std::list<BufferedScriptCall*>					BufferedScriptCallArray;

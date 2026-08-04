@@ -1381,7 +1381,8 @@ void Entity::onWriteToDB()
 }
 
 //-------------------------------------------------------------------------------------
-bool Entity::bufferOrExeCallback(const char* funcName, PyObject* funcArgs, bool notFoundIsOK)
+bool Entity::bufferOrExeCallback(const char* funcName, PyObject* funcArgs,
+	bool notFoundIsOK, bool recordMigrationDispatchStages)
 {
 	bool canBuffer = _scriptCallbacksBufferCount > 0;
 
@@ -1406,6 +1407,7 @@ bool Entity::bufferOrExeCallback(const char* funcName, PyObject* funcArgs, bool 
 		pBufferedScriptCall->pyFuncArgs = funcArgs;
 		pBufferedScriptCall->pyCallable = pyCallable;
 		pBufferedScriptCall->funcName = funcName;
+		pBufferedScriptCall->recordMigrationDispatchStages = recordMigrationDispatchStages;
 		_scriptCallbacksBuffer.push_back(pBufferedScriptCall);
 		++_scriptCallbacksBufferNum;
 		return hasEntityCallable;
@@ -1417,6 +1419,7 @@ bool Entity::bufferOrExeCallback(const char* funcName, PyObject* funcArgs, bool 
 
 	if (hasEntityCallable)
 	{
+		const uint64 ownerCallbackStart = recordMigrationDispatchStages ? timestamp() : 0;
 		PyObject* pyResult = PyObject_CallObject(pyCallable, funcArgs);
 
 		Py_DECREF(pyCallable);
@@ -1430,10 +1433,17 @@ bool Entity::bufferOrExeCallback(const char* funcName, PyObject* funcArgs, bool 
 		{
 			PyErr_PrintEx(0);
 		}
+
+		if (recordMigrationDispatchStages)
+		{
+			scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_OWNER_CALLBACK,
+				scriptStageDurationNanos(ownerCallbackStart), true, funcName);
+		}
 	}
 
 	// owner 是否实现回调与组件是否实现回调相互独立，不能用 owner 的查找结果提前结束分发。
 	// Owner and component callback availability are independent, so an owner lookup miss must not terminate component dispatch.
+	const uint64 componentCallbackStart = recordMigrationDispatchStages ? timestamp() : 0;
 	ScriptDefModule::COMPONENTDESCRIPTION_MAP& componentDescrs = pScriptModule_->getComponentDescrs();
 	for (ScriptDefModule::COMPONENTDESCRIPTION_MAP::iterator iter = componentDescrs.begin();
 		iter != componentDescrs.end(); ++iter)
@@ -1470,6 +1480,11 @@ bool Entity::bufferOrExeCallback(const char* funcName, PyObject* funcArgs, bool 
 			PyErr_PrintEx(0);
 		}
 	}
+	if (recordMigrationDispatchStages)
+	{
+		scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_COMPONENT_CALLBACK,
+			scriptStageDurationNanos(componentCallbackStart), true, funcName);
+	}
 
 	if (funcArgs)
 		Py_DECREF(funcArgs);
@@ -1500,6 +1515,7 @@ void Entity::bufferCallback(bool enable)
 
 				if (pBufferedScriptCall->pyCallable)
 				{
+					const uint64 ownerCallbackStart = pBufferedScriptCall->recordMigrationDispatchStages ? timestamp() : 0;
 					PyObject* pyResult = PyObject_CallObject(
 						pBufferedScriptCall->pyCallable, pBufferedScriptCall->pyFuncArgs);
 					if (pyResult)
@@ -1511,10 +1527,18 @@ void Entity::bufferCallback(bool enable)
 					{
 						PyErr_PrintEx(0);
 					}
+
+					if (pBufferedScriptCall->recordMigrationDispatchStages)
+					{
+						scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_OWNER_CALLBACK,
+							scriptStageDurationNanos(ownerCallbackStart), true,
+							pBufferedScriptCall->funcName.c_str());
+					}
 				}
 
 				// 组件在回放时重新解析，确保使用当前仍挂载的组件对象，并保持与 owner 相同的缓冲顺序。
 				// Resolve components during replay so the currently attached objects run in the same buffered order as the owner.
+				const uint64 componentCallbackStart = pBufferedScriptCall->recordMigrationDispatchStages ? timestamp() : 0;
 				ScriptDefModule::COMPONENTDESCRIPTION_MAP& componentDescrs =
 					pBufferedScriptCall->entityPtr->pScriptModule()->getComponentDescrs();
 				for (ScriptDefModule::COMPONENTDESCRIPTION_MAP::iterator iter = componentDescrs.begin();
@@ -1554,6 +1578,12 @@ void Entity::bufferCallback(bool enable)
 					}
 
 					Py_DECREF(pyComponent);
+				}
+				if (pBufferedScriptCall->recordMigrationDispatchStages)
+				{
+					scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_COMPONENT_CALLBACK,
+						scriptStageDurationNanos(componentCallbackStart), true,
+						pBufferedScriptCall->funcName.c_str());
 				}
 
 				Py_XDECREF(pBufferedScriptCall->pyCallable);
@@ -4157,6 +4187,7 @@ void Entity::onTeleportFailure()
 void Entity::onTeleportSuccess(PyObject* nearbyEntity, SPACE_ID lastSpaceID)
 {
 	const uint64 callbackStart = timestamp();
+	const uint64 callbackSetupStart = timestamp();
 	EntityCall* mb = this->baseEntityCall();
 	if(mb)
 	{
@@ -4165,11 +4196,13 @@ void Entity::onTeleportSuccess(PyObject* nearbyEntity, SPACE_ID lastSpaceID)
 
 	// 如果身上有trap等触发器还得重新添加进去
 	restoreProximitys();
+	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_CALLBACK_SETUP,
+		scriptStageDurationNanos(callbackSetupStart), true, "onTeleportSuccess");
 
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
 	bufferOrExeCallback(const_cast<char*>("onTeleportSuccess"),
-		Py_BuildValue(const_cast<char*>("(O)"), nearbyEntity));
+		Py_BuildValue(const_cast<char*>("(O)"), nearbyEntity), true, true);
 	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_CALLBACK,
 		scriptStageDurationNanos(callbackStart), true, "onTeleportSuccess");
 }

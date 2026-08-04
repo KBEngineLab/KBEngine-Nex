@@ -21,6 +21,12 @@ enum ScriptStage
 	SCRIPT_STAGE_MIGRATION_FORWARD,
 	SCRIPT_STAGE_MIGRATION_DESERIALIZE_CREATE,
 	SCRIPT_STAGE_MIGRATION_CALLBACK,
+	SCRIPT_STAGE_MIGRATION_ENTITY_CONSTRUCT,
+	SCRIPT_STAGE_MIGRATION_STREAM_RESTORE,
+	SCRIPT_STAGE_MIGRATION_SPACE_AOI,
+	SCRIPT_STAGE_MIGRATION_CALLBACK_SETUP,
+	SCRIPT_STAGE_MIGRATION_OWNER_CALLBACK,
+	SCRIPT_STAGE_MIGRATION_COMPONENT_CALLBACK,
 	SCRIPT_STAGE_COUNT
 };
 
@@ -133,7 +139,9 @@ public:
 	{
 		static const char* const names[SCRIPT_STAGE_COUNT] = {
 			"rpcLookup", "pythonLookup", "argumentDecode", "pythonCall", "cleanup",
-			"migrationSerialize", "migrationForward", "migrationDeserializeCreate", "migrationCallback"
+			"migrationSerialize", "migrationForward", "migrationDeserializeCreate", "migrationCallback",
+			"migrationEntityConstruct", "migrationStreamRestore", "migrationSpaceAoi",
+			"migrationCallbackSetup", "migrationOwnerCallback", "migrationComponentCallback"
 		};
 		return names[static_cast<std::size_t>(stage)];
 	}
