@@ -1735,11 +1735,18 @@ PyObject* Entity::pyHasWitness()
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::restoreProximitys()
+void Entity::restoreProximitys(bool recordMigrationStages)
 {
+	const uint64 witnessTriggerStart = recordMigrationStages ? timestamp() : 0;
 	if(this->pWitness())
 		this->pWitness()->installViewTrigger();
+	if (recordMigrationStages)
+	{
+		scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_WITNESS_TRIGGER_RESTORE,
+			scriptStageDurationNanos(witnessTriggerStart), true, "onTeleportSuccess");
+	}
 
+	const uint64 proximityRestoreStart = recordMigrationStages ? timestamp() : 0;
 	Controllers::CONTROLLERS_MAP& objects = pControllers_->objects();
 	Controllers::CONTROLLERS_MAP::iterator iter = objects.begin();
 	for(; iter != objects.end(); ++iter)
@@ -1749,6 +1756,11 @@ void Entity::restoreProximitys()
 			ProximityController* pProximityController = static_cast<ProximityController*>(iter->second.get());
 			pProximityController->reinstall(static_cast<CoordinateNode*>(this->pEntityCoordinateNode()));
 		}
+	}
+	if (recordMigrationStages)
+	{
+		scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_PROXIMITY_RESTORE,
+			scriptStageDurationNanos(proximityRestoreStart), true, "onTeleportSuccess");
 	}
 }
 
@@ -4188,14 +4200,17 @@ void Entity::onTeleportSuccess(PyObject* nearbyEntity, SPACE_ID lastSpaceID)
 {
 	const uint64 callbackStart = timestamp();
 	const uint64 callbackSetupStart = timestamp();
+	const uint64 baseNotifyStart = timestamp();
 	EntityCall* mb = this->baseEntityCall();
 	if(mb)
 	{
 		_sendBaseTeleportResult(this->id(), mb->componentID(), this->spaceID(), lastSpaceID, true);
 	}
+	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_BASE_NOTIFY,
+		scriptStageDurationNanos(baseNotifyStart), true, "onTeleportSuccess");
 
 	// 如果身上有trap等触发器还得重新添加进去
-	restoreProximitys();
+	restoreProximitys(true);
 	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_CALLBACK_SETUP,
 		scriptStageDurationNanos(callbackSetupStart), true, "onTeleportSuccess");
 

@@ -27,6 +27,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "entitydef/entities.h"
 #include "client_lib/client_interface.h"
 #include "network/network_stats.h"
+#include "server/script_stage_timing.h"
 
 #include "../../server/baseappmgr/baseappmgr_interface.h"
 #include "../../server/cellappmgr/cellappmgr_interface.h"
@@ -402,20 +403,49 @@ bool Space::update()
 }
 
 //-------------------------------------------------------------------------------------
-void Space::addEntityAndEnterWorld(Entity* pEntity, bool isRestore)
+void Space::addEntityAndEnterWorld(Entity* pEntity, bool isRestore, bool recordMigrationStages)
 {
-	addEntity(pEntity);
+	// 计时仅由跨 Cell 目标端显式开启，普通实体进场不读取时钟。
+	// Only target-Cell migration opts into timing; ordinary entity entry does not read the clock.
+	addEntity(pEntity, recordMigrationStages);
+
+	const uint64 coordinateInstallStart = recordMigrationStages ? timestamp() : 0;
 	addEntityToNode(pEntity);
-	onEnterWorld(pEntity);
+	if (recordMigrationStages)
+	{
+		scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_COORDINATE_INSTALL,
+			scriptStageDurationNanos(coordinateInstallStart), true, "reqTeleportToCellApp");
+	}
+
+	const uint64 witnessEnterWorldStart = recordMigrationStages ? timestamp() : 0;
+	onEnterWorld(pEntity, recordMigrationStages);
+	if (recordMigrationStages)
+	{
+		scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_WITNESS_ENTER_WORLD,
+			scriptStageDurationNanos(witnessEnterWorldStart), true, "reqTeleportToCellApp");
+	}
 }
 
 //-------------------------------------------------------------------------------------
-void Space::addEntity(Entity* pEntity)
+void Space::addEntity(Entity* pEntity, bool recordMigrationStages)
 {
+	const uint64 spaceRegisterStart = recordMigrationStages ? timestamp() : 0;
 	pEntity->spaceID(this->id_);
 	pEntity->spaceEntityIdx(entities_.size());
 	entities_.push_back(pEntity);
+	if (recordMigrationStages)
+	{
+		scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_SPACE_REGISTER,
+			scriptStageDurationNanos(spaceRegisterStart), true, "reqTeleportToCellApp");
+	}
+
+	const uint64 enterSpaceCallbackStart = recordMigrationStages ? timestamp() : 0;
 	pEntity->onEnterSpace(this);
+	if (recordMigrationStages)
+	{
+		scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_ENTER_SPACE_CALLBACK,
+			scriptStageDurationNanos(enterSpaceCallbackStart), true, "reqTeleportToCellApp");
+	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -458,20 +488,26 @@ void Space::removeEntity(Entity* pEntity)
 }
 
 //-------------------------------------------------------------------------------------
-void Space::_onEnterWorld(Entity* pEntity)
+void Space::_onEnterWorld(Entity* pEntity, bool recordMigrationStages)
 {
 	if(!pEntity->isReal() || !pEntity->pScriptModule()->hasClient())
 		return;
 
 	if(pEntity->hasWitness())
 	{
+		const uint64 spaceDataStart = recordMigrationStages ? timestamp() : 0;
 		_addSpaceDatasToEntityClient(pEntity);
-		pEntity->pWitness()->onEnterSpace(this);
+		if (recordMigrationStages)
+		{
+			scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_WITNESS_SPACE_DATA,
+				scriptStageDurationNanos(spaceDataStart), true, "reqTeleportToCellApp");
+		}
+		pEntity->pWitness()->onEnterSpace(this, recordMigrationStages);
 	}
 }
 
 //-------------------------------------------------------------------------------------
-void Space::onEnterWorld(Entity* pEntity)
+void Space::onEnterWorld(Entity* pEntity, bool recordMigrationStages)
 {
 	KBE_ASSERT(pEntity != NULL);
 	
@@ -479,7 +515,7 @@ void Space::onEnterWorld(Entity* pEntity)
 	// 否则是一个普通的entity进入世界， 那么需要将这个entity广播给所有看见他的有Witness的entity。
 	if(pEntity->hasWitness())
 	{
-		_onEnterWorld(pEntity);
+		_onEnterWorld(pEntity, recordMigrationStages);
 	}
 }
 

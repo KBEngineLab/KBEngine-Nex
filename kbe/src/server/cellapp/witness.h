@@ -141,7 +141,7 @@ public:
 
 	bool update();
 	
-	void onEnterSpace(Space* pSpace);
+	void onEnterSpace(Space* pSpace, bool recordMigrationStages = false);
 	void onLeaveSpace(Space* pSpace);
 
 	void onEnterView(ViewTrigger* pViewTrigger, Entity* pEntity);

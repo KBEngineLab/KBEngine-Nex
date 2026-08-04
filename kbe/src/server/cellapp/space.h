@@ -49,17 +49,18 @@ public:
 	*/
 	bool update();
 
-	void addEntity(Entity* pEntity);
+	void addEntity(Entity* pEntity, bool recordMigrationStages = false);
 	void addEntityToNode(Entity* pEntity);
 
-	void addEntityAndEnterWorld(Entity* pEntity, bool isRestore = false);
+	void addEntityAndEnterWorld(Entity* pEntity, bool isRestore = false,
+		bool recordMigrationStages = false);
 	void removeEntity(Entity* pEntity);
 
 	/**
 		一个entity进入了游戏世界
 	*/
-	void onEnterWorld(Entity* pEntity);
-	void _onEnterWorld(Entity* pEntity);
+	void onEnterWorld(Entity* pEntity, bool recordMigrationStages = false);
+	void _onEnterWorld(Entity* pEntity, bool recordMigrationStages = false);
 	void onLeaveWorld(Entity* pEntity);
 
 	void onEntityAttachWitness(Entity* pEntity);

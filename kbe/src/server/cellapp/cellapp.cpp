@@ -2665,7 +2665,7 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 
 	// 进入新的space中
 	const uint64 spaceAoiStart = timestamp();
-	space->addEntityAndEnterWorld(e);
+	space->addEntityAndEnterWorld(e, false, true);
 	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_SPACE_AOI,
 		scriptStageDurationNanos(spaceAoiStart), true, "reqTeleportToCellApp");
 	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_DESERIALIZE_CREATE,

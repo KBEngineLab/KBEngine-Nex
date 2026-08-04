@@ -78,8 +78,38 @@ bool testMigrationSubstageNames()
 			KBEngine::SCRIPT_STAGE_MIGRATION_SPACE_AOI)) == "migrationSpaceAoi",
 			"migration Space/AOI stage name drifted") &&
 		require(std::string(KBEngine::ScriptStageMetrics::stageName(
+			KBEngine::SCRIPT_STAGE_MIGRATION_SPACE_REGISTER)) == "migrationSpaceRegister",
+			"migration Space registration stage name drifted") &&
+		require(std::string(KBEngine::ScriptStageMetrics::stageName(
+			KBEngine::SCRIPT_STAGE_MIGRATION_ENTER_SPACE_CALLBACK)) == "migrationEnterSpaceCallback",
+			"migration enter-Space callback stage name drifted") &&
+		require(std::string(KBEngine::ScriptStageMetrics::stageName(
+			KBEngine::SCRIPT_STAGE_MIGRATION_COORDINATE_INSTALL)) == "migrationCoordinateInstall",
+			"migration coordinate installation stage name drifted") &&
+		require(std::string(KBEngine::ScriptStageMetrics::stageName(
+			KBEngine::SCRIPT_STAGE_MIGRATION_WITNESS_ENTER_WORLD)) == "migrationWitnessEnterWorld",
+			"migration Witness enter-world stage name drifted") &&
+		require(std::string(KBEngine::ScriptStageMetrics::stageName(
+			KBEngine::SCRIPT_STAGE_MIGRATION_WITNESS_SPACE_DATA)) == "migrationWitnessSpaceData",
+			"migration Witness SpaceData stage name drifted") &&
+		require(std::string(KBEngine::ScriptStageMetrics::stageName(
+			KBEngine::SCRIPT_STAGE_MIGRATION_WITNESS_NETWORK_NOTIFY)) == "migrationWitnessNetworkNotify",
+			"migration Witness network notification stage name drifted") &&
+		require(std::string(KBEngine::ScriptStageMetrics::stageName(
+			KBEngine::SCRIPT_STAGE_MIGRATION_WITNESS_VIEW_TRIGGER_INSTALL)) == "migrationWitnessViewTriggerInstall",
+			"migration Witness view-trigger installation stage name drifted") &&
+		require(std::string(KBEngine::ScriptStageMetrics::stageName(
 			KBEngine::SCRIPT_STAGE_MIGRATION_CALLBACK_SETUP)) == "migrationCallbackSetup",
 			"migration callback setup stage name drifted") &&
+		require(std::string(KBEngine::ScriptStageMetrics::stageName(
+			KBEngine::SCRIPT_STAGE_MIGRATION_BASE_NOTIFY)) == "migrationBaseNotify",
+			"migration Base notification stage name drifted") &&
+		require(std::string(KBEngine::ScriptStageMetrics::stageName(
+			KBEngine::SCRIPT_STAGE_MIGRATION_WITNESS_TRIGGER_RESTORE)) == "migrationWitnessTriggerRestore",
+			"migration Witness trigger restoration stage name drifted") &&
+		require(std::string(KBEngine::ScriptStageMetrics::stageName(
+			KBEngine::SCRIPT_STAGE_MIGRATION_PROXIMITY_RESTORE)) == "migrationProximityRestore",
+			"migration proximity restoration stage name drifted") &&
 		require(std::string(KBEngine::ScriptStageMetrics::stageName(
 			KBEngine::SCRIPT_STAGE_MIGRATION_OWNER_CALLBACK)) == "migrationOwnerCallback",
 			"migration owner callback stage name drifted") &&

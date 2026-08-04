@@ -470,7 +470,7 @@ public:
 		恢复所有的范围触发器 
 		在teleport时会出现这样的情况
 	*/
-	void restoreProximitys();
+	void restoreProximitys(bool recordMigrationStages = false);
 
 	/** 
 		删除一个控制器 

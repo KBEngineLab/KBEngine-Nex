@@ -26,6 +26,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "cellapp.h"
 #include "view_trigger.h"
 #include "server/asyncio_helper.h"
+#include "server/script_stage_timing.h"
 #include "network/channel.h"	
 #include "network/bundle.h"
 #include "network/network_stats.h"
@@ -534,8 +535,9 @@ void Witness::resetViewEntities()
 }
 
 //-------------------------------------------------------------------------------------
-void Witness::onEnterSpace(Space* pSpace)
+void Witness::onEnterSpace(Space* pSpace, bool recordMigrationStages)
 {
+	const uint64 networkNotifyStart = recordMigrationStages ? timestamp() : 0;
 	Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pEntity_->id(), (*pSendBundle));
 
@@ -560,8 +562,19 @@ void Witness::onEnterSpace(Space* pSpace)
 
 	// 发送消息并清理
 	pEntity_->clientEntityCall()->sendCall(pSendBundle);
+	if (recordMigrationStages)
+	{
+		scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_WITNESS_NETWORK_NOTIFY,
+			scriptStageDurationNanos(networkNotifyStart), true, "reqTeleportToCellApp");
+	}
 
+	const uint64 viewTriggerInstallStart = recordMigrationStages ? timestamp() : 0;
 	installViewTrigger();
+	if (recordMigrationStages)
+	{
+		scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_WITNESS_VIEW_TRIGGER_INSTALL,
+			scriptStageDurationNanos(viewTriggerInstallStart), true, "reqTeleportToCellApp");
+	}
 }
 
 //-------------------------------------------------------------------------------------

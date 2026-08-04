@@ -162,14 +162,18 @@ argument decoding, Python execution, and cleanup. CellApp additionally publishes
 serialization, cross-Cell forwarding, target deserialize/create, and callback time. Target creation
 is further split into entity construction, stream restore, and Space/AOI entry. Teleport-success
 callback time is split into Base notification plus proximity restore, owner callback, and component
-callbacks. RPC stages use the same deterministic 1/8 sampling policy; migration stages are sampled
-in full. Eight fixed slow slots retain only observations at or above 1 ms and publish handler name,
-stage, and duration without growing with uptime.
+callbacks. Space/AOI entry exposes container registration, the enter-Space callback, coordinate-node
+installation, SpaceData delivery, client entry notification, and ViewTrigger installation. Trigger
+recovery separates Witness and Proximity work. RPC stages use the same deterministic 1/8 sampling
+policy; migration stages are sampled in full. Eight fixed slow slots retain only observations at or
+above 1 ms and publish handler name, stage, and duration without growing with uptime.
 `root/scriptStages` 将 BaseApp/CellApp RPC 拆为方法查找、Python 属性查找、参数解包、Python 执行和
 清理阶段；CellApp 还发布迁移序列化、跨 Cell 转发、目标端反序列化/创建及回调耗时。目标端创建继续拆为
 实体构造、流恢复和进入 Space/AOI；传送成功回调继续拆为 Base 通知与 proximity 恢复、owner 回调和
-EntityComponent 回调。RPC 阶段按确定性的 1/8 采样，迁移阶段全量采样。8 个固定慢样本槽只保留不低于
-1 ms 的 handler 名称、阶段和耗时，内存不会随运行时间增长。
+EntityComponent 回调。Space/AOI 进场又细分为容器注册、进入 Space 回调、坐标节点安装、SpaceData
+下发、客户端进场通知和 ViewTrigger 安装；触发器恢复则区分 Witness 与 Proximity。RPC 阶段按确定性的
+1/8 采样，迁移阶段全量采样。8 个固定慢样本槽只保留不低于 1 ms 的 handler 名称、阶段和耗时，
+内存不会随运行时间增长。
 慢样本的名称和阶段以 `kind=label` 写入 JSONL，并在 `summary.json`/`report.md` 的 Labels 中保留
 每个组件槽位的最新非空值；它们不会进入数值直方图或质量门计算。
 

@@ -24,7 +24,17 @@ enum ScriptStage
 	SCRIPT_STAGE_MIGRATION_ENTITY_CONSTRUCT,
 	SCRIPT_STAGE_MIGRATION_STREAM_RESTORE,
 	SCRIPT_STAGE_MIGRATION_SPACE_AOI,
+	SCRIPT_STAGE_MIGRATION_SPACE_REGISTER,
+	SCRIPT_STAGE_MIGRATION_ENTER_SPACE_CALLBACK,
+	SCRIPT_STAGE_MIGRATION_COORDINATE_INSTALL,
+	SCRIPT_STAGE_MIGRATION_WITNESS_ENTER_WORLD,
+	SCRIPT_STAGE_MIGRATION_WITNESS_SPACE_DATA,
+	SCRIPT_STAGE_MIGRATION_WITNESS_NETWORK_NOTIFY,
+	SCRIPT_STAGE_MIGRATION_WITNESS_VIEW_TRIGGER_INSTALL,
 	SCRIPT_STAGE_MIGRATION_CALLBACK_SETUP,
+	SCRIPT_STAGE_MIGRATION_BASE_NOTIFY,
+	SCRIPT_STAGE_MIGRATION_WITNESS_TRIGGER_RESTORE,
+	SCRIPT_STAGE_MIGRATION_PROXIMITY_RESTORE,
 	SCRIPT_STAGE_MIGRATION_OWNER_CALLBACK,
 	SCRIPT_STAGE_MIGRATION_COMPONENT_CALLBACK,
 	SCRIPT_STAGE_COUNT
@@ -141,7 +151,11 @@ public:
 			"rpcLookup", "pythonLookup", "argumentDecode", "pythonCall", "cleanup",
 			"migrationSerialize", "migrationForward", "migrationDeserializeCreate", "migrationCallback",
 			"migrationEntityConstruct", "migrationStreamRestore", "migrationSpaceAoi",
-			"migrationCallbackSetup", "migrationOwnerCallback", "migrationComponentCallback"
+			"migrationSpaceRegister", "migrationEnterSpaceCallback", "migrationCoordinateInstall",
+			"migrationWitnessEnterWorld", "migrationWitnessSpaceData", "migrationWitnessNetworkNotify",
+			"migrationWitnessViewTriggerInstall", "migrationCallbackSetup", "migrationBaseNotify",
+			"migrationWitnessTriggerRestore", "migrationProximityRestore",
+			"migrationOwnerCallback", "migrationComponentCallback"
 		};
 		return names[static_cast<std::size_t>(stage)];
 	}
