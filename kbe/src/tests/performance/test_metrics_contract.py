@@ -497,6 +497,8 @@ def assert_python_latency_scenario() -> None:
     assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/network/messageProcessing"] == 5.0
     assert "CELLAPP_TYPE=@cellapp:root/scriptStages" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/scriptStages"] == 5.0
+    assert "CELLAPP_TYPE=@cellapp:root/coordinateSystem" in gameplay["watcher_targets"]
+    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/coordinateSystem"] == 5.0
     assert "CELLAPP_TYPE=@cellapp:root/witness/backpressure" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/witness/backpressure"] == 5.0
     assert "CELLAPP_TYPE=@cellapp:root/witness/scheduler" in gameplay["watcher_targets"]
@@ -527,6 +529,8 @@ def assert_python_latency_scenario() -> None:
     assert 'WATCH_OBJECT("witness/messages/enterBytes"' in cellapp_source
     assert 'WATCH_OBJECT("witness/messages/enterProcessingMaxNanos"' in cellapp_source
     assert 'WATCH_OBJECT("witness/messages/leaveProcessingMaxNanos"' in cellapp_source
+    assert 'WATCH_OBJECT("coordinateSystem/equalCorrectionMoves"' in cellapp_source
+    assert 'WATCH_OBJECT("coordinateSystem/equalCorrectionCallbacksSuppressed"' in cellapp_source
     assert 'prefix + "SampledMaxNanos"' in server_app_source
     assert 'categoryName(category) + "/"' not in server_app_source
     assert 'WATCH_OBJECT("witness/queues/cancelledPendingLeaves"' in cellapp_source

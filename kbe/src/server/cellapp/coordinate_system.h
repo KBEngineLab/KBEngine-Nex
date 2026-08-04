@@ -74,6 +74,9 @@ public:
 	void moveNodeY(CoordinateNode* pNode, float py, CoordinateNode* pCurrNode);
 	void moveNodeZ(CoordinateNode* pNode, float pz, CoordinateNode* pCurrNode);
 
+	static uint64 equalCoordinateCorrectionMoves();
+	static uint64 equalCoordinateCallbacksSuppressed();
+
 	INLINE CoordinateNode * pFirstXNode() const;
 	INLINE CoordinateNode * pFirstYNode() const;
 	INLINE CoordinateNode * pFirstZNode() const;
@@ -88,6 +91,13 @@ public:
 	INLINE void decUpdating();
 
 private:
+	void moveNodeX(CoordinateNode* pNode, float px, CoordinateNode* pCurrNode,
+		bool notifyPassCallbacks);
+	void moveNodeY(CoordinateNode* pNode, float py, CoordinateNode* pCurrNode,
+		bool notifyPassCallbacks);
+	void moveNodeZ(CoordinateNode* pNode, float pz, CoordinateNode* pCurrNode,
+		bool notifyPassCallbacks);
+
 	uint32 size_;
 
 	// 链表的首尾指针

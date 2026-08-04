@@ -89,6 +89,10 @@ bool isSortedZ(const KBEngine::CoordinateSystem& system)
 
 bool testNearInsertSkipsUnrelatedPrefix(bool hasY)
 {
+	const KBEngine::uint64 correctionsBefore =
+		KBEngine::CoordinateSystem::equalCoordinateCorrectionMoves();
+	const KBEngine::uint64 callbacksBefore =
+		KBEngine::CoordinateSystem::equalCoordinateCallbacksSuppressed();
 	KBEngine::CoordinateSystem::hasY = hasY;
 	KBEngine::CoordinateSystem system;
 	std::vector<TestNode*> nodes;
@@ -138,14 +142,21 @@ bool testNearInsertSkipsUnrelatedPrefix(bool hasY)
 
 	negativeBoundary->target(-5.0f, hasY ? -5.0f : 0.0f, -5.0f);
 	negativeBoundary->update();
-	// 旧等值排序会在每个轴上对目标端点先反向越过、再正向越回一次；保留该
-	// 兼容顺序，但断言扫描仍局限于 origin 到目标端点之间。
-	// Legacy equal-coordinate ordering crosses the target endpoint backward and
-	// then forward once per axis. Preserve that compatibility while asserting
-	// that scanning remains bounded to the origin-to-target interval.
-	const std::size_t expectedNegativePasses = hasY ? 21 : 14;
+	// 每个轴仍执行一次等坐标排序纠正，但纠正阶段不再重复发送第一次穿越已经
+	// 产生的回调，因此端点只进入一次 RangeTrigger 状态机。
+	// Each axis still performs one equal-coordinate ordering correction, but the
+	// correction no longer repeats the callback already emitted by the first pass,
+	// so the endpoint enters the RangeTrigger state machine exactly once.
+	const std::size_t axisCount = hasY ? 3 : 2;
+	const std::size_t expectedNegativePasses = hasY ? 18 : 12;
 	return require(negativeBoundary->passCount() == expectedNegativePasses,
 		"negative range expansion visited an unexpected coordinate interval") &&
+		require(KBEngine::CoordinateSystem::equalCoordinateCorrectionMoves() -
+			correctionsBefore == axisCount,
+			"equal-coordinate correction count did not match active axes") &&
+		require(KBEngine::CoordinateSystem::equalCoordinateCallbacksSuppressed() -
+			callbacksBefore == axisCount,
+			"equal-coordinate correction did not suppress one duplicate callback per axis") &&
 		require(isSortedX(system) && isSortedZ(system) && (!hasY || isSortedY(system)),
 			"negative expansion broke coordinate ordering") &&
 		require(system.size() == 203, "near insertions did not preserve system size");
@@ -163,13 +174,44 @@ bool testNearInsertRejectsUnsafeNodes()
 	delete visible;
 	return require(rejected, "near insertion accepted a visible node");
 }
+
+bool testVisibleEqualCorrectionNotifiesOnce()
+{
+	KBEngine::CoordinateSystem::hasY = false;
+	KBEngine::CoordinateSystem system;
+	TestNode* stationary = new TestNode(0.0f, 0.0f, 0.0f);
+	TestNode* moving = new TestNode(1.0f, 0.0f, 10.0f);
+	system.insert(stationary);
+	system.insert(moving);
+
+	const KBEngine::uint64 correctionsBefore =
+		KBEngine::CoordinateSystem::equalCoordinateCorrectionMoves();
+	const KBEngine::uint64 callbacksBefore =
+		KBEngine::CoordinateSystem::equalCoordinateCallbacksSuppressed();
+	const std::size_t stationaryPassesBefore = stationary->passCount();
+	const std::size_t movingPassesBefore = moving->passCount();
+	moving->target(0.0f, 0.0f, 10.0f);
+	moving->update();
+
+	return require(stationary->passCount() - stationaryPassesBefore == 1 &&
+		moving->passCount() - movingPassesBefore == 1,
+		"visible equal-coordinate nodes received duplicate pass callbacks") &&
+		require(KBEngine::CoordinateSystem::equalCoordinateCorrectionMoves() -
+			correctionsBefore == 1,
+			"visible equal-coordinate move did not record its ordering correction") &&
+		require(KBEngine::CoordinateSystem::equalCoordinateCallbacksSuppressed() -
+			callbacksBefore == 2,
+			"visible equal-coordinate correction did not suppress both duplicate callbacks") &&
+		require(isSortedX(system), "visible equal-coordinate correction broke X ordering");
+}
 }
 
 int main()
 {
 	if (!testNearInsertSkipsUnrelatedPrefix(false) ||
 		!testNearInsertSkipsUnrelatedPrefix(true) ||
-		!testNearInsertRejectsUnsafeNodes())
+		!testNearInsertRejectsUnsafeNodes() ||
+		!testVisibleEqualCorrectionNotifiesOnce())
 	{
 		return EXIT_FAILURE;
 	}

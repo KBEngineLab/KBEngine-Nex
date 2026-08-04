@@ -31,6 +31,26 @@ namespace KBEngine{
 
 bool CoordinateSystem::hasY = false;
 
+namespace
+{
+uint64 g_equalCoordinateCorrectionMoves = 0;
+uint64 g_equalCoordinateCallbacksSuppressed = 0;
+
+// 等坐标纠正只恢复既有链表排序；首次穿越已经发布过关系变化，因此纠正阶段
+// 再次通知只会重复 AOI/Python 工作。计数仅发生在该稀有分支，不污染普通移动热路径。
+// Equal-coordinate correction only restores the established list ordering. The
+// first pass has already published the relationship change, so notifying again
+// would duplicate AOI/Python work. Counters run only on this uncommon branch and
+// do not add writes to ordinary movement.
+void recordEqualCoordinateCorrection(CoordinateNode* pNode, CoordinateNode* pCurrNode)
+{
+	++g_equalCoordinateCorrectionMoves;
+	g_equalCoordinateCallbacksSuppressed +=
+		(pNode->hasFlags(COORDINATE_NODE_FLAG_HIDE_OR_REMOVED) ? 0 : 1) +
+		(pCurrNode->hasFlags(COORDINATE_NODE_FLAG_HIDE_OR_REMOVED) ? 0 : 1);
+}
+}
+
 //-------------------------------------------------------------------------------------
 CoordinateSystem::CoordinateSystem():
 size_(0),
@@ -343,6 +363,13 @@ bool CoordinateSystem::removeReal(CoordinateNode* pNode)
 //-------------------------------------------------------------------------------------
 void CoordinateSystem::moveNodeX(CoordinateNode* pNode, float px, CoordinateNode* pCurrNode)
 {
+	moveNodeX(pNode, px, pCurrNode, true);
+}
+
+//-------------------------------------------------------------------------------------
+void CoordinateSystem::moveNodeX(CoordinateNode* pNode, float px, CoordinateNode* pCurrNode,
+	bool notifyPassCallbacks)
+{
 	if (pCurrNode != NULL)
 	{
 		pNode->x(pCurrNode->x());
@@ -405,7 +432,7 @@ void CoordinateSystem::moveNodeX(CoordinateNode* pNode, float px, CoordinateNode
 			}
 		}
 
-		if (!pNode->hasFlags(COORDINATE_NODE_FLAG_HIDE_OR_REMOVED))
+		if (notifyPassCallbacks && !pNode->hasFlags(COORDINATE_NODE_FLAG_HIDE_OR_REMOVED))
 		{
 #ifdef DEBUG_COORDINATE_SYSTEM
 			DEBUG_MSG(fmt::format("CoordinateSystem::update1: [{}X] ({}), passNode=>({})\n",
@@ -415,7 +442,7 @@ void CoordinateSystem::moveNodeX(CoordinateNode* pNode, float px, CoordinateNode
 			pCurrNode->onNodePassX(pNode, true);
 		}
 
-		if (!pCurrNode->hasFlags(COORDINATE_NODE_FLAG_HIDE_OR_REMOVED))
+		if (notifyPassCallbacks && !pCurrNode->hasFlags(COORDINATE_NODE_FLAG_HIDE_OR_REMOVED))
 		{
 #ifdef DEBUG_COORDINATE_SYSTEM
 			DEBUG_MSG(fmt::format("CoordinateSystem::update2: [{}X] ({}), passNode=>({})\n",
@@ -424,6 +451,9 @@ void CoordinateSystem::moveNodeX(CoordinateNode* pNode, float px, CoordinateNode
 
 			pNode->onNodePassX(pCurrNode, false);
 		}
+
+		if (!notifyPassCallbacks)
+			recordEqualCoordinateCorrection(pNode, pCurrNode);
 
 #ifdef DEBUG_COORDINATE_SYSTEM
 		DEBUG_MSG(fmt::format("CoordinateSystem::update end: [{}X] ({}), pCurrNode=>({})\n",
@@ -434,6 +464,13 @@ void CoordinateSystem::moveNodeX(CoordinateNode* pNode, float px, CoordinateNode
 
 //-------------------------------------------------------------------------------------
 void CoordinateSystem::moveNodeY(CoordinateNode* pNode, float py, CoordinateNode* pCurrNode)
+{
+	moveNodeY(pNode, py, pCurrNode, true);
+}
+
+//-------------------------------------------------------------------------------------
+void CoordinateSystem::moveNodeY(CoordinateNode* pNode, float py, CoordinateNode* pCurrNode,
+	bool notifyPassCallbacks)
 {
 	if (pCurrNode != NULL)
 	{
@@ -497,7 +534,7 @@ void CoordinateSystem::moveNodeY(CoordinateNode* pNode, float py, CoordinateNode
 			}
 		}
 
-		if (!pNode->hasFlags(COORDINATE_NODE_FLAG_HIDE_OR_REMOVED))
+		if (notifyPassCallbacks && !pNode->hasFlags(COORDINATE_NODE_FLAG_HIDE_OR_REMOVED))
 		{
 #ifdef DEBUG_COORDINATE_SYSTEM
 			DEBUG_MSG(fmt::format("CoordinateSystem::update1: [{}Y] ({}), passNode=>({})\n",
@@ -507,7 +544,7 @@ void CoordinateSystem::moveNodeY(CoordinateNode* pNode, float py, CoordinateNode
 			pCurrNode->onNodePassY(pNode, true);
 		}
 
-		if (!pCurrNode->hasFlags(COORDINATE_NODE_FLAG_HIDE_OR_REMOVED))
+		if (notifyPassCallbacks && !pCurrNode->hasFlags(COORDINATE_NODE_FLAG_HIDE_OR_REMOVED))
 		{
 #ifdef DEBUG_COORDINATE_SYSTEM
 			DEBUG_MSG(fmt::format("CoordinateSystem::update2: [{}Y] ({}), passNode=>({})\n",
@@ -516,6 +553,9 @@ void CoordinateSystem::moveNodeY(CoordinateNode* pNode, float py, CoordinateNode
 
 			pNode->onNodePassY(pCurrNode, false);
 		}
+
+		if (!notifyPassCallbacks)
+			recordEqualCoordinateCorrection(pNode, pCurrNode);
 
 #ifdef DEBUG_COORDINATE_SYSTEM
 		DEBUG_MSG(fmt::format("CoordinateSystem::update end: [{}Y] ({}), pCurrNode=>({})\n",
@@ -526,6 +566,13 @@ void CoordinateSystem::moveNodeY(CoordinateNode* pNode, float py, CoordinateNode
 
 //-------------------------------------------------------------------------------------
 void CoordinateSystem::moveNodeZ(CoordinateNode* pNode, float pz, CoordinateNode* pCurrNode)
+{
+	moveNodeZ(pNode, pz, pCurrNode, true);
+}
+
+//-------------------------------------------------------------------------------------
+void CoordinateSystem::moveNodeZ(CoordinateNode* pNode, float pz, CoordinateNode* pCurrNode,
+	bool notifyPassCallbacks)
 {
 	if (pCurrNode != NULL)
 	{
@@ -589,7 +636,7 @@ void CoordinateSystem::moveNodeZ(CoordinateNode* pNode, float pz, CoordinateNode
 			}
 		}
 
-		if (!pNode->hasFlags(COORDINATE_NODE_FLAG_HIDE_OR_REMOVED))
+		if (notifyPassCallbacks && !pNode->hasFlags(COORDINATE_NODE_FLAG_HIDE_OR_REMOVED))
 		{
 #ifdef DEBUG_COORDINATE_SYSTEM
 			DEBUG_MSG(fmt::format("CoordinateSystem::update1: [{}Z] ({}), passNode=>({})\n",
@@ -599,7 +646,7 @@ void CoordinateSystem::moveNodeZ(CoordinateNode* pNode, float pz, CoordinateNode
 			pCurrNode->onNodePassZ(pNode, true);
 		}
 
-		if (!pCurrNode->hasFlags(COORDINATE_NODE_FLAG_HIDE_OR_REMOVED))
+		if (notifyPassCallbacks && !pCurrNode->hasFlags(COORDINATE_NODE_FLAG_HIDE_OR_REMOVED))
 		{
 #ifdef DEBUG_COORDINATE_SYSTEM
 			DEBUG_MSG(fmt::format("CoordinateSystem::update2: [{}Z] ({}), passNode=>({})\n",
@@ -608,6 +655,9 @@ void CoordinateSystem::moveNodeZ(CoordinateNode* pNode, float pz, CoordinateNode
 
 			pNode->onNodePassZ(pCurrNode, false);
 		}
+
+		if (!notifyPassCallbacks)
+			recordEqualCoordinateCorrection(pNode, pCurrNode);
 
 #ifdef DEBUG_COORDINATE_SYSTEM
 		DEBUG_MSG(fmt::format("CoordinateSystem::update end: [{}Z] ({}), pCurrNode=>({})\n",
@@ -634,21 +684,35 @@ void CoordinateSystem::update(CoordinateNode* pNode)
 
 	if (pNode->xx() != pNode->old_xx())
 	{
+		CoordinateNode* pEqualCorrectionEnd = NULL;
 		CoordinateNode* pCurrNode = pNode->pPrevX();
-		while (pCurrNode && pCurrNode != pNode &&
-			((pCurrNode->x() > pNode->xx()) ||
-			(pCurrNode->x() == pNode->xx() && !pCurrNode->hasFlags(COORDINATE_NODE_FLAG_NEGATIVE_BOUNDARY))))
+		while (pCurrNode && pCurrNode != pNode && pCurrNode->x() > pNode->xx())
 		{
+			moveNodeX(pNode, pNode->xx(), pCurrNode);
+			pCurrNode = pNode->pPrevX();
+		}
+		while (pCurrNode && pCurrNode != pNode && pCurrNode->x() == pNode->xx() &&
+			!pCurrNode->hasFlags(COORDINATE_NODE_FLAG_NEGATIVE_BOUNDARY))
+		{
+			if (!pEqualCorrectionEnd)
+				pEqualCorrectionEnd = pCurrNode;
 			moveNodeX(pNode, pNode->xx(), pCurrNode);
 			pCurrNode = pNode->pPrevX();
 		}
 
 		pCurrNode = pNode->pNextX();
-		while (pCurrNode && pCurrNode != pNode &&
-			((pCurrNode->x() < pNode->xx()) ||
-			(pCurrNode->x() == pNode->xx() && !pCurrNode->hasFlags(COORDINATE_NODE_FLAG_POSITIVE_BOUNDARY))))
+		while (pCurrNode && pCurrNode != pNode && pCurrNode->x() < pNode->xx())
 		{
 			moveNodeX(pNode, pNode->xx(), pCurrNode);
+			pCurrNode = pNode->pNextX();
+		}
+		while (pCurrNode && pCurrNode != pNode && pCurrNode->x() == pNode->xx() &&
+			!pCurrNode->hasFlags(COORDINATE_NODE_FLAG_POSITIVE_BOUNDARY))
+		{
+			const bool isEqualCorrection = pEqualCorrectionEnd != NULL;
+			moveNodeX(pNode, pNode->xx(), pCurrNode, !isEqualCorrection);
+			if (pCurrNode == pEqualCorrectionEnd)
+				pEqualCorrectionEnd = NULL;
 			pCurrNode = pNode->pNextX();
 		}
 
@@ -657,21 +721,35 @@ void CoordinateSystem::update(CoordinateNode* pNode)
 
 	if (CoordinateSystem::hasY && pNode->yy() != pNode->old_yy())
 	{
+		CoordinateNode* pEqualCorrectionEnd = NULL;
 		CoordinateNode* pCurrNode = pNode->pPrevY();
-		while (pCurrNode && pCurrNode != pNode &&
-			((pCurrNode->y() > pNode->yy()) ||
-			(pCurrNode->y() == pNode->yy() && !pCurrNode->hasFlags(COORDINATE_NODE_FLAG_NEGATIVE_BOUNDARY))))
+		while (pCurrNode && pCurrNode != pNode && pCurrNode->y() > pNode->yy())
 		{
+			moveNodeY(pNode, pNode->yy(), pCurrNode);
+			pCurrNode = pNode->pPrevY();
+		}
+		while (pCurrNode && pCurrNode != pNode && pCurrNode->y() == pNode->yy() &&
+			!pCurrNode->hasFlags(COORDINATE_NODE_FLAG_NEGATIVE_BOUNDARY))
+		{
+			if (!pEqualCorrectionEnd)
+				pEqualCorrectionEnd = pCurrNode;
 			moveNodeY(pNode, pNode->yy(), pCurrNode);
 			pCurrNode = pNode->pPrevY();
 		}
 
 		pCurrNode = pNode->pNextY();
-		while (pCurrNode && pCurrNode != pNode &&
-			((pCurrNode->y() < pNode->yy()) ||
-			(pCurrNode->y() == pNode->yy() && !pCurrNode->hasFlags(COORDINATE_NODE_FLAG_POSITIVE_BOUNDARY))))
+		while (pCurrNode && pCurrNode != pNode && pCurrNode->y() < pNode->yy())
 		{
 			moveNodeY(pNode, pNode->yy(), pCurrNode);
+			pCurrNode = pNode->pNextY();
+		}
+		while (pCurrNode && pCurrNode != pNode && pCurrNode->y() == pNode->yy() &&
+			!pCurrNode->hasFlags(COORDINATE_NODE_FLAG_POSITIVE_BOUNDARY))
+		{
+			const bool isEqualCorrection = pEqualCorrectionEnd != NULL;
+			moveNodeY(pNode, pNode->yy(), pCurrNode, !isEqualCorrection);
+			if (pCurrNode == pEqualCorrectionEnd)
+				pEqualCorrectionEnd = NULL;
 			pCurrNode = pNode->pNextY();
 		}
 
@@ -680,21 +758,35 @@ void CoordinateSystem::update(CoordinateNode* pNode)
 
 	if (pNode->zz() != pNode->old_zz())
 	{
+		CoordinateNode* pEqualCorrectionEnd = NULL;
 		CoordinateNode* pCurrNode = pNode->pPrevZ();
-		while (pCurrNode && pCurrNode != pNode &&
-			((pCurrNode->z() > pNode->zz()) ||
-			(pCurrNode->z() == pNode->zz() && !pCurrNode->hasFlags(COORDINATE_NODE_FLAG_NEGATIVE_BOUNDARY))))
+		while (pCurrNode && pCurrNode != pNode && pCurrNode->z() > pNode->zz())
 		{
+			moveNodeZ(pNode, pNode->zz(), pCurrNode);
+			pCurrNode = pNode->pPrevZ();
+		}
+		while (pCurrNode && pCurrNode != pNode && pCurrNode->z() == pNode->zz() &&
+			!pCurrNode->hasFlags(COORDINATE_NODE_FLAG_NEGATIVE_BOUNDARY))
+		{
+			if (!pEqualCorrectionEnd)
+				pEqualCorrectionEnd = pCurrNode;
 			moveNodeZ(pNode, pNode->zz(), pCurrNode);
 			pCurrNode = pNode->pPrevZ();
 		}
 
 		pCurrNode = pNode->pNextZ();
-		while (pCurrNode && pCurrNode != pNode &&
-			((pCurrNode->z() < pNode->zz()) ||
-			(pCurrNode->z() == pNode->zz() && !pCurrNode->hasFlags(COORDINATE_NODE_FLAG_POSITIVE_BOUNDARY))))
+		while (pCurrNode && pCurrNode != pNode && pCurrNode->z() < pNode->zz())
 		{
 			moveNodeZ(pNode, pNode->zz(), pCurrNode);
+			pCurrNode = pNode->pNextZ();
+		}
+		while (pCurrNode && pCurrNode != pNode && pCurrNode->z() == pNode->zz() &&
+			!pCurrNode->hasFlags(COORDINATE_NODE_FLAG_POSITIVE_BOUNDARY))
+		{
+			const bool isEqualCorrection = pEqualCorrectionEnd != NULL;
+			moveNodeZ(pNode, pNode->zz(), pCurrNode, !isEqualCorrection);
+			if (pCurrNode == pEqualCorrectionEnd)
+				pEqualCorrectionEnd = NULL;
 			pCurrNode = pNode->pNextZ();
 		}
 
@@ -716,6 +808,18 @@ void CoordinateSystem::update(CoordinateNode* pNode)
 	DEBUG_MSG(fmt::format("CoordinateSystem::debugZ[ z ]:[{:p}]\n", (void*)pNode));
 	first_z_coordinateNode_->debugZ();
 #endif
+}
+
+//-------------------------------------------------------------------------------------
+uint64 CoordinateSystem::equalCoordinateCorrectionMoves()
+{
+	return g_equalCoordinateCorrectionMoves;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 CoordinateSystem::equalCoordinateCallbacksSuppressed()
+{
+	return g_equalCoordinateCallbacksSuppressed;
 }
 
 //-------------------------------------------------------------------------------------

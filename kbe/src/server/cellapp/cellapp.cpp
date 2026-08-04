@@ -25,6 +25,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "profile.h"
 #include "witness.h"
 #include "coordinate_node.h"
+#include "coordinate_system.h"
 #include "view_trigger.h"
 #include "watch_obj_pools.h"
 #include "cellapp_interface.h"
@@ -367,6 +368,10 @@ bool Cellapp::initializeWatcher()
 	WATCH_OBJECT("witness/messages/leaveProcessingSlowSamplesOver1ms", &Witness::leaveProcessingSlowSamplesOver1ms);
 	WATCH_OBJECT("witness/messages/volatileCount", &Witness::volatileUpdateCount);
 	WATCH_OBJECT("witness/messages/volatileBytes", &Witness::volatileUpdateBytesCount);
+	WATCH_OBJECT("coordinateSystem/equalCorrectionMoves",
+		&CoordinateSystem::equalCoordinateCorrectionMoves);
+	WATCH_OBJECT("coordinateSystem/equalCorrectionCallbacksSuppressed",
+		&CoordinateSystem::equalCoordinateCallbacksSuppressed);
 	WATCH_OBJECT("witness/backpressure/activeSuppressed", &Witness::activeSuppressedCount);
 	WATCH_OBJECT("witness/backpressure/suppressionTransitions", &Witness::suppressionTransitionCount);
 	WATCH_OBJECT("witness/backpressure/resumeTransitions", &Witness::resumeTransitionCount);

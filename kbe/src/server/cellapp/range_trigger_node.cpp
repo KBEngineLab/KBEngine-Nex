@@ -98,8 +98,8 @@ bool RangeTriggerNode::wasInYRange(CoordinateNode * pNode)
 
 	float originY = old_yy() - old_range_y_;
 
-	volatile float lowerBound = originY - fabs(old_range_y_);
-	volatile float upperBound = originY + fabs(old_range_y_);
+	const float lowerBound = originY - fabs(old_range_y_);
+	const float upperBound = originY + fabs(old_range_y_);
 	return (pNode->old_yy() >= lowerBound) && (pNode->old_yy() <= upperBound);
 }
 
@@ -133,21 +133,24 @@ float RangeTriggerNode::zz() const
 //-------------------------------------------------------------------------------------
 void RangeTriggerNode::onNodePassX(CoordinateNode* pNode, bool isfront)
 {
-	if (!hasFlags(COORDINATE_NODE_FLAG_REMOVED) && pRangeTrigger_)
+	if (!hasFlags(COORDINATE_NODE_FLAG_REMOVED) && pRangeTrigger_ &&
+		pNode != pRangeTrigger_->origin())
 		pRangeTrigger_->onNodePassX(this, pNode, isfront);
 }
 
 //-------------------------------------------------------------------------------------
 void RangeTriggerNode::onNodePassY(CoordinateNode* pNode, bool isfront)
 {
-	if (!hasFlags(COORDINATE_NODE_FLAG_REMOVED) && pRangeTrigger_)
+	if (!hasFlags(COORDINATE_NODE_FLAG_REMOVED) && pRangeTrigger_ &&
+		pNode != pRangeTrigger_->origin())
 		pRangeTrigger_->onNodePassY(this, pNode, isfront);
 }
 
 //-------------------------------------------------------------------------------------
 void RangeTriggerNode::onNodePassZ(CoordinateNode* pNode, bool isfront)
 {
-	if (!hasFlags(COORDINATE_NODE_FLAG_REMOVED) && pRangeTrigger_)
+	if (!hasFlags(COORDINATE_NODE_FLAG_REMOVED) && pRangeTrigger_ &&
+		pNode != pRangeTrigger_->origin())
 		pRangeTrigger_->onNodePassZ(this, pNode, isfront);
 }
 
