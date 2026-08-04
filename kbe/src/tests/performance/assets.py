@@ -304,7 +304,7 @@ def build_environment(
         {
             "KBE_ROOT": str(repository_root),
             "KBE_RES_PATH": os.pathsep.join(str(path) for path in resource_roots),
-            "KBE_BIN_PATH": str(repository_root / "kbe/src/out/cmake/bin/Release"),
+            "KBE_BIN_PATH": str(repository_root / "kbe/bin/server"),
         }
     )
     return environment

@@ -12,7 +12,7 @@ import xml.etree.ElementTree as ET
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from performance.assets import create_config_overlay, resolve_bots_schedule, resolve_fixture_root
+from performance.assets import build_environment, create_config_overlay, resolve_bots_schedule, resolve_fixture_root
 from performance.cluster import PerformanceCluster
 from performance.log_metrics import IncrementalLogCollector
 from performance.metrics import JsonlRecorder
@@ -29,6 +29,7 @@ from performance.run import (
     partition_workload_bots,
     record_watcher_samples,
     readiness_value_matches,
+    resolve_server_binary_dir,
     select_readiness_targets,
     scenario_cluster_environment,
     scenario_environment,
@@ -145,6 +146,21 @@ def assert_windows_command_line_preserves_quoted_executable() -> None:
     finally:
         globals_["subprocess"].Popen = original_popen
         globals_["os"].name = original_name
+
+
+def assert_server_binary_directory_resolution() -> None:
+    repository_root = _repository_root()
+    expected = (repository_root / "kbe/bin/server").resolve()
+    assert resolve_server_binary_dir(None, True) == expected
+    assert resolve_server_binary_dir(None, False) is None
+    configured = Path("explicit/server/runtime")
+    assert resolve_server_binary_dir(configured, True) == configured.resolve()
+    environment = build_environment(
+        repository_root,
+        repository_root / "test-assets",
+        repository_root / "test-run",
+    )
+    assert Path(environment["KBE_BIN_PATH"]) == expected
 
 
 def assert_watcher_connection_reuse() -> None:
@@ -899,6 +915,7 @@ def main() -> int:
     assert_centralized_discovery_matching()
     assert_partial_workload_start_cleanup()
     assert_windows_command_line_preserves_quoted_executable()
+    assert_server_binary_directory_resolution()
     assert_watcher_connection_reuse()
     assert_watcher_schedule()
     assert_cprofile_window_metrics()

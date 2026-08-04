@@ -16,7 +16,6 @@ Run the formal gameplay workload with a generated local topology:
 python -B -m performance.run `
   --scenario performance/scenarios/gameplay_10000.json `
   --assets-root D:\KBELAB\KBEProject\kbengine_stresstest\mmorpg\server_assets `
-  --server-binary-dir D:\KBELAB\kbengine\kbengine1x\kbe\src\out\cmake\windows-ninja\bin\Release `
   --build-root D:\KBELAB\kbengine\kbengine1x\kbe\src\out\build\windows-ninja-multi `
   --tools-root D:\KBELAB\kbengine\kbengine1x\kbe\tools\server `
   --start-cluster `
@@ -30,15 +29,28 @@ python -B -m performance.run `
   --workload-ready-timeout 300
 ```
 
-`--server-binary-dir` generates the singleton components plus the requested BaseApp/CellApp
-processes and supplies the Bots executable automatically. `--bots-batch-size` is the aggregate
+With `--start-cluster`, the runner defaults `--server-binary-dir` to the repository's stable
+`kbe/bin/server` directory, generates the singleton components plus the requested BaseApp/CellApp
+processes, and supplies the Bots executable automatically. Pass `--server-binary-dir` only to
+override that location. `--bots-batch-size` is the aggregate
 batch across all Bots processes and must divide evenly; the example creates about 100 Bots/second.
 Server startup waits for BaseAppMgr and CellAppMgr `root/readiness` values derived from
 `onReadyForLogin`, including exact expected process counts. It does not depend on game Space logs.
-`--server-binary-dir` 会自动生成单例组件和指定数量的 BaseApp/CellApp，并自动选择 Bots 可执行文件。
+使用 `--start-cluster` 时，运行器默认从仓库稳定目录 `kbe/bin/server` 生成单例组件和指定数量的
+BaseApp/CellApp，并自动选择 Bots 可执行文件；只有覆盖该位置时才需要传 `--server-binary-dir`。
 `--bots-batch-size` 表示全部 Bots 进程合计的单批数量且必须可整除；示例约为每秒 100 Bots。
 服务端启动通过 BaseAppMgr/CellAppMgr 的 `root/readiness` 等待底层 `onReadyForLogin` 聚合结果，
 同时校验精确进程数，不再依赖业务 Space 日志。
+
+Server Debug and Release executables link into configuration-specific CMake directories without a
+`_d` suffix, then deploy to `kbe/bin/server`. Building an individual server target deploys that
+target after linking; building `kbe_servers` or `kbe_runtime` redeploys the complete selected
+configuration even when it was already up to date. The tracked `log4j.properties` in that directory
+is runtime configuration, not generated output, and must remain in source control.
+服务端 Debug/Release 程序先在 CMake 配置隔离目录中以无 `_d` 名称链接，再部署到
+`kbe/bin/server`。单独编译服务端目标会在链接后部署该程序；编译 `kbe_servers` 或
+`kbe_runtime` 会重新部署完整的当前配置，即使链接产物已经是最新状态。目录中受版本控制的
+`log4j.properties` 是运行时配置而非生成物，必须保留。
 
 Bots write their own rotating log by default and do not connect to Logger. Add `--bots-dev` to the
 runner, or `--dev` when launching `bots.exe` directly, only when centralized IDE/PyCharm log display

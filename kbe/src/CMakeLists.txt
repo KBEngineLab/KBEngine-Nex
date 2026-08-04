@@ -16,9 +16,17 @@ project(KBEngineNex VERSION 2.8.2 LANGUAGES C CXX)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "_CMake")
 
-# CMake 构建与现有 VS 工程并行存在；独立输出目录避免两套构建互相覆盖产物。
-# The CMake build coexists with the existing VS projects; isolated output directories prevent either build from overwriting the other.
+# 库和测试继续使用隔离输出根目录；正式服务端程序使用 assets 启动脚本约定的稳定目录。
+# Libraries and tests retain an isolated output root, while production server programs use the stable directory expected by assets launchers.
 set(KBE_CMAKE_OUTPUT_ROOT "${CMAKE_SOURCE_DIR}/out/cmake" CACHE PATH "CMake output root")
+set(KBE_SERVER_RUNTIME_DIR "${CMAKE_SOURCE_DIR}/../bin/server" CACHE PATH
+    "Stable output directory for server executables")
+cmake_path(ABSOLUTE_PATH KBE_SERVER_RUNTIME_DIR
+    BASE_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    NORMALIZE
+    OUTPUT_VARIABLE _kbe_server_runtime_dir)
+set(KBE_SERVER_RUNTIME_DIR "${_kbe_server_runtime_dir}" CACHE PATH
+    "Stable output directory for server executables" FORCE)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${KBE_CMAKE_OUTPUT_ROOT}/lib")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${KBE_CMAKE_OUTPUT_ROOT}/lib")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${KBE_CMAKE_OUTPUT_ROOT}/bin")

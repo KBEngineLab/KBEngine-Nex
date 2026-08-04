@@ -1,7 +1,7 @@
 include_guard(GLOBAL)
 
 function(kbe_configure_runtime)
-    set(KBE_RUNTIME_BIN_DIR "${KBE_CMAKE_OUTPUT_ROOT}/bin/$<CONFIG>" PARENT_SCOPE)
+    set(KBE_RUNTIME_BIN_DIR "${KBE_SERVER_RUNTIME_DIR}" PARENT_SCOPE)
     set(_kbe_python_scripts_dir "${CMAKE_SOURCE_DIR}/../res/scripts/common")
     set(_kbe_stdlib_stamp "${KBE_CMAKE_OUTPUT_ROOT}/runtime/python-stdlib-${KBE_PYTHON_TRIPLET}.stamp")
 
@@ -56,11 +56,21 @@ function(kbe_configure_runtime)
     add_custom_target(kbe_python_stdlib DEPENDS "${_kbe_stdlib_stamp}")
 
     set(_kbe_runtime_commands
-        COMMAND "${CMAKE_COMMAND}" -E make_directory "${KBE_CMAKE_OUTPUT_ROOT}/bin/$<CONFIG>"
-        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-            "${CMAKE_SOURCE_DIR}/../bin/server/log4j.properties"
-            "${KBE_CMAKE_OUTPUT_ROOT}/bin/$<CONFIG>"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${KBE_SERVER_RUNTIME_DIR}"
     )
+    # 默认输出目录已经保存 log4j 配置；自定义输出目录时才复制，避免源和目标为同一文件。
+    # The default output already owns the log4j configuration; copy only for custom output directories to avoid a source-to-self operation.
+    set(_kbe_log4j_source "${CMAKE_SOURCE_DIR}/../bin/server/log4j.properties")
+    cmake_path(NORMAL_PATH _kbe_log4j_source)
+    set(_kbe_log4j_destination "${KBE_SERVER_RUNTIME_DIR}/log4j.properties")
+    cmake_path(NORMAL_PATH _kbe_log4j_destination)
+    if(NOT _kbe_log4j_source STREQUAL _kbe_log4j_destination)
+        list(APPEND _kbe_runtime_commands
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+                "${_kbe_log4j_source}"
+                "${KBE_SERVER_RUNTIME_DIR}"
+        )
+    endif()
     foreach(_kbe_runtime_file IN LISTS _kbe_python_runtime_files)
         if(NOT EXISTS "${_kbe_runtime_file}")
             message(FATAL_ERROR "Python runtime file does not exist: ${_kbe_runtime_file}")
@@ -68,7 +78,7 @@ function(kbe_configure_runtime)
         list(APPEND _kbe_runtime_commands
             COMMAND "${CMAKE_COMMAND}" -E copy_if_different
                 "${_kbe_runtime_file}"
-                "${KBE_CMAKE_OUTPUT_ROOT}/bin/$<CONFIG>"
+                "${KBE_SERVER_RUNTIME_DIR}"
         )
     endforeach()
 
@@ -106,6 +116,23 @@ function(kbe_configure_runtime)
         )
     endforeach()
 
+    # 聚合目标每次构建都重新部署所选配置，即使该配置的链接产物本身已经是最新状态。
+    # The aggregate target redeploys the selected configuration on every build even when its link artifacts are already up to date.
+    set(_kbe_server_deploy_commands
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${KBE_SERVER_RUNTIME_DIR}"
+    )
+    foreach(_kbe_runtime_target IN LISTS _kbe_runtime_targets)
+        list(APPEND _kbe_server_deploy_commands
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+                "$<TARGET_FILE:${_kbe_runtime_target}>"
+                "${KBE_SERVER_RUNTIME_DIR}"
+        )
+    endforeach()
+    add_custom_command(TARGET kbe_servers POST_BUILD
+        ${_kbe_server_deploy_commands}
+        VERBATIM
+    )
+
     # 聚合目标保留为完整运行时入口，但部署正确性不再依赖调用方必须记住构建该目标。
     # The aggregate target remains the complete runtime entry point, while deployment correctness no longer depends on callers remembering to build it.
     add_custom_target(kbe_runtime
@@ -115,7 +142,7 @@ function(kbe_configure_runtime)
             kbe_python_stdlib
     )
 
-    set(KBE_RUNTIME_BIN_DIR "${KBE_CMAKE_OUTPUT_ROOT}/bin/$<CONFIG>" CACHE INTERNAL "CMake server runtime binary directory" FORCE)
+    set(KBE_RUNTIME_BIN_DIR "${KBE_SERVER_RUNTIME_DIR}" CACHE INTERNAL "CMake server runtime binary directory" FORCE)
     set(KBE_RUNTIME_PYTHON_STDLIB "${_kbe_python_scripts_dir}/Lib/os.py" CACHE INTERNAL "Python standard-library runtime probe" FORCE)
     set(KBE_RUNTIME_PYTHON_EXTENSION "${_kbe_python_extension_probe}" CACHE INTERNAL "Python extension runtime probe" FORCE)
 endfunction()

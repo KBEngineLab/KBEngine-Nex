@@ -1,15 +1,15 @@
 set(_kbe_runtime_executables
-    "$<TARGET_FILE:machine>"
-    "$<TARGET_FILE:baseappmgr>"
-    "$<TARGET_FILE:cellappmgr>"
-    "$<TARGET_FILE:dbmgr>"
-    "$<TARGET_FILE:loginapp>"
-    "$<TARGET_FILE:baseapp>"
-    "$<TARGET_FILE:cellapp>"
-    "$<TARGET_FILE:bots>"
-    "$<TARGET_FILE:logger>"
-    "$<TARGET_FILE:interfaces>"
-    "$<TARGET_FILE:kbcmd>"
+    "${KBE_RUNTIME_BIN_DIR}/machine${CMAKE_EXECUTABLE_SUFFIX}"
+    "${KBE_RUNTIME_BIN_DIR}/baseappmgr${CMAKE_EXECUTABLE_SUFFIX}"
+    "${KBE_RUNTIME_BIN_DIR}/cellappmgr${CMAKE_EXECUTABLE_SUFFIX}"
+    "${KBE_RUNTIME_BIN_DIR}/dbmgr${CMAKE_EXECUTABLE_SUFFIX}"
+    "${KBE_RUNTIME_BIN_DIR}/loginapp${CMAKE_EXECUTABLE_SUFFIX}"
+    "${KBE_RUNTIME_BIN_DIR}/baseapp${CMAKE_EXECUTABLE_SUFFIX}"
+    "${KBE_RUNTIME_BIN_DIR}/cellapp${CMAKE_EXECUTABLE_SUFFIX}"
+    "${KBE_RUNTIME_BIN_DIR}/bots${CMAKE_EXECUTABLE_SUFFIX}"
+    "${KBE_RUNTIME_BIN_DIR}/logger${CMAKE_EXECUTABLE_SUFFIX}"
+    "${KBE_RUNTIME_BIN_DIR}/interfaces${CMAKE_EXECUTABLE_SUFFIX}"
+    "${KBE_RUNTIME_BIN_DIR}/kbcmd${CMAKE_EXECUTABLE_SUFFIX}"
 )
 list(JOIN _kbe_runtime_executables "|" _kbe_runtime_executables_arg)
 
@@ -18,20 +18,22 @@ add_test(NAME runtime.layout
         "-DKBE_EXECUTABLES=${_kbe_runtime_executables_arg}"
         "-DKBE_PYTHON_STDLIB=${KBE_RUNTIME_PYTHON_STDLIB}"
         "-DKBE_PYTHON_EXTENSION=${KBE_RUNTIME_PYTHON_EXTENSION}"
-        "-DKBE_PYTHON_DLL_DIR=$<TARGET_FILE_DIR:kbcmd>"
+        "-DKBE_PYTHON_DLL_DIR=${KBE_RUNTIME_BIN_DIR}"
+        "-DKBE_RUNTIME_DIR=${KBE_RUNTIME_BIN_DIR}"
+        "-DKBE_LOG4J_CONFIG=${KBE_RUNTIME_BIN_DIR}/log4j.properties"
         "-DKBE_PYTHON_ABI=${_kbe_python_abi}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyRuntime.cmake"
 )
 set_tests_properties(runtime.layout PROPERTIES LABELS "smoke;runtime")
 
 add_test(NAME runtime.kbcmd_getuid
-    COMMAND "$<TARGET_FILE:kbcmd>" --getuid
+    COMMAND "${KBE_RUNTIME_BIN_DIR}/kbcmd${CMAKE_EXECUTABLE_SUFFIX}" --getuid
 )
 set_tests_properties(runtime.kbcmd_getuid PROPERTIES
     LABELS "smoke;runtime"
     PASS_REGULAR_EXPRESSION "[0-9]+"
     FAIL_REGULAR_EXPRESSION "\\[ERROR\\];Traceback"
-    ENVIRONMENT "KBE_ROOT=${CMAKE_SOURCE_DIR}/../..;KBE_RES_PATH=${CMAKE_SOURCE_DIR}/../res;KBE_BIN_PATH=$<TARGET_FILE_DIR:kbcmd>"
+    ENVIRONMENT "KBE_ROOT=${CMAKE_SOURCE_DIR}/../..;KBE_RES_PATH=${CMAKE_SOURCE_DIR}/../res;KBE_BIN_PATH=${KBE_RUNTIME_BIN_DIR}"
 )
 
 add_test(NAME source.macos_sigar_contract

@@ -16,6 +16,20 @@ function(kbe_add_server_executable target_name component_definition)
 
     add_executable(${target_name} ${KBE_SERVER_TARGET_SOURCES})
     kbe_configure_target(${target_name})
+    # 各配置必须保留独立链接产物，避免多配置生成器把较新的 Debug 文件误判为已完成的 Release 输出。
+    # Configurations retain separate link artifacts so a multi-config generator cannot mistake a newer Debug file for a completed Release output.
+    set_target_properties(${target_name} PROPERTIES
+        DEBUG_POSTFIX ""
+    )
+    # 单目标构建完成后立即部署，满足 assets 启动脚本的固定目录契约。
+    # Deploy immediately after an individual target links to satisfy the assets launchers' stable-directory contract.
+    add_custom_command(TARGET ${target_name} POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${KBE_SERVER_RUNTIME_DIR}"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "$<TARGET_FILE:${target_name}>"
+            "${KBE_SERVER_RUNTIME_DIR}"
+        VERBATIM
+    )
     target_compile_definitions(${target_name} PRIVATE
         KBE_SERVER
         ${component_definition}

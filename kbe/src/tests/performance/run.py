@@ -72,7 +72,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--thresholds", type=Path, help="Quality thresholds JSON; defaults to the scenario reference")
     parser.add_argument("--start-cluster", action="store_true", help="Start and own an isolated server cluster")
     parser.add_argument("--server-binary-dir", type=Path,
-                        help="Release binary directory used to generate the local cluster and Bots command")
+                        help="Server binary directory; defaults to kbe/bin/server with --start-cluster")
     parser.add_argument("--baseapp-count", type=int, help="Number of local BaseApp processes")
     parser.add_argument("--cellapp-count", type=int, help="Number of local CellApp processes")
     parser.add_argument("--cluster-components", help="Pipe-separated NAME::EXE::CID::GUS component specification")
@@ -100,8 +100,10 @@ def main() -> int:
         args.thresholds = args.thresholds.resolve()
     if args.cluster_binary_root:
         args.cluster_binary_root = args.cluster_binary_root.resolve()
-    if args.server_binary_dir:
-        args.server_binary_dir = args.server_binary_dir.resolve()
+    args.server_binary_dir = resolve_server_binary_dir(
+        args.server_binary_dir,
+        args.start_cluster,
+    )
     scenario = load_scenario(args.scenario)
     fixture_root = resolve_fixture_root(str(scenario["fixture"])) if scenario.get("fixture") else None
     name = str(scenario["name"])
@@ -816,6 +818,17 @@ def scenario_cluster_environment(scenario: dict[str, object]) -> dict[str, str]:
 
 def _repository_root() -> Path:
     return Path(__file__).resolve().parents[4]
+
+
+def resolve_server_binary_dir(configured: Path | None, start_cluster: bool) -> Path | None:
+    """Resolve the stable runtime only when the runner owns the cluster.
+    仅在运行器接管集群时解析稳定运行目录，避免覆盖自定义 workload 命令。
+    """
+    if configured is not None:
+        return configured.resolve()
+    if start_cluster:
+        return (_repository_root() / "kbe/bin/server").resolve()
+    return None
 
 
 def load_thresholds(scenario_path: Path, scenario: dict[str, object], explicit: Path | None) -> dict[str, object]:
