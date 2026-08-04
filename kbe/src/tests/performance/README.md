@@ -90,9 +90,14 @@ Scenarios may lower the steady-state frequency of an expensive target without ch
 
 Keys use `COMPONENT_TYPE:PATH`; values are seconds and must be at least `0.1`. Unknown keys fail
 before the cluster starts. Each target keeps an independent monotonic deadline, failed queries wait
-for their next period, and missed periods are not replayed as a burst.
+for their next period, and missed periods are not replayed as a burst. Targets slower than the base
+sampling interval receive deterministic phase offsets across their available slots. For example,
+five-second targets are spread over five one-second slots instead of interrupting every component on
+the same tick. The offset is published as `sampling/configuredPhaseOffsetMs`.
 键格式为 `COMPONENT_TYPE:PATH`，值为秒且不得小于 `0.1`。未知目标会在集群启动前失败。
-每个目标使用独立单调时钟截止点；失败查询等待下一周期，错过的周期不会集中补发。
+每个目标使用独立单调时钟截止点；失败查询等待下一周期，错过的周期不会集中补发。慢于基础
+采样周期的目标会确定性分散到可用槽位，例如五秒目标分散到五个一秒槽，而不是在同一 Tick
+打断所有组件；具体偏移通过 `sampling/configuredPhaseOffsetMs` 发布。
 
 The standard targets cover Bots performance; BaseApp root, stats, channels, poller, KCP, Tick health,
 client input, gameTick, scriptCall, and onTimer; and CellApp root, stats, channels, poller, Tick health,
@@ -117,8 +122,8 @@ The standard publication set includes:
 - `process.workload:*`: Bots process resources when an external workload is owned;
 - `process.controller:*`: the sampler/controller's own CPU, memory, threads, and handles;
 - `watcher.*.<path>/*`: engine metrics returned by each target;
-- `watcher.*.<path>/sampling/*`: configured and actual interval, response value count,
-  protocol-neutral estimated response bytes, and connection reuse;
+- `watcher.*.<path>/sampling/*`: configured interval and phase offset, actual interval, response
+  value count, protocol-neutral estimated response bytes, and connection reuse;
 - request latency `mean`, `p50`, `p95`, `p99`, `p99.9`, `max`, and `total`, plus operation-level
   success/error/due/skipped counters.
 

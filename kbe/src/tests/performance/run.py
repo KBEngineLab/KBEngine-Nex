@@ -346,7 +346,17 @@ def main() -> int:
                         watcher_schedule.interval(target) * 1000.0 if watcher_schedule else interval * 1000.0,
                         "ms",
                     )
+                    if watcher_schedule is not None:
+                        recorder.record_sample(
+                            "watcher",
+                            instance,
+                            f"{target.path}/sampling/configuredPhaseOffsetMs",
+                            watcher_schedule.phase_offset(target) * 1000.0,
+                            "ms",
+                        )
             started = time.monotonic()
+            if watcher_schedule is not None:
+                watcher_schedule.start(started)
             next_sample = started
             while time.monotonic() - started < duration:
                 workload_exit = first_workload_exit(processes)

@@ -231,7 +231,39 @@ class WatcherSchedule:
             )
             for target in targets
         }
+        self._phase_offsets: dict[tuple[str, str, int, str], float] = {}
+        targets_by_interval: dict[float, list[WatcherTarget]] = {}
+        for target in targets:
+            targets_by_interval.setdefault(
+                self._intervals[_watcher_target_identity(target)], []
+            ).append(target)
+
+        for interval, interval_targets in targets_by_interval.items():
+            # The runner can only dispatch on its base sampling cadence. Distribute
+            # slower targets over those observable slots so a five-second target set
+            # does not synchronously interrupt every server on the same tick.
+            # Runner 只能在基础采样周期上调度。将低频目标分散到可观测秒槽，避免
+            # 五秒目录在同一 Tick 同步打断全部服务进程。
+            slot_count = max(1, int(math.floor(interval / default_interval + 1e-9)))
+            for index, target in enumerate(interval_targets):
+                self._phase_offsets[_watcher_target_identity(target)] = (
+                    index % slot_count
+                ) * default_interval
         self._next_due: dict[tuple[str, str, int, str], float] = {}
+
+    def start(self, now: float | None = None) -> None:
+        """Anchor deterministic phase offsets at measurement start.
+        在测量开始时锚定确定性的错峰偏移。
+
+        Readiness queries deliberately do not use this schedule. Keeping phase
+        initialization explicit prevents startup duration from changing which slot a
+        target receives and makes repeated A/B runs comparable.
+        Readiness 查询不使用该调度器。显式初始化可避免启动耗时改变目标槽位，
+        保证多轮 A/B 压测使用相同采样相位。
+        """
+        current = time.monotonic() if now is None else now
+        for key, offset in self._phase_offsets.items():
+            self._next_due.setdefault(key, current + offset)
 
     def due(self, target: WatcherTarget, now: float | None = None) -> bool:
         """Return whether target may be sampled at the supplied monotonic time.
@@ -262,6 +294,10 @@ class WatcherSchedule:
     def interval(self, target: WatcherTarget) -> float:
         """Return the effective interval for one target. / 返回目标的实际采样周期。"""
         return self._intervals[_watcher_target_identity(target)]
+
+    def phase_offset(self, target: WatcherTarget) -> float:
+        """Return the measurement phase offset. / 返回测量阶段的错峰偏移。"""
+        return self._phase_offsets[_watcher_target_identity(target)]
 
 
 def _watcher_target_identity(target: WatcherTarget) -> tuple[str, str, int, str]:

@@ -265,6 +265,28 @@ def assert_watcher_schedule() -> None:
     )
     assert discovered_schedule.interval(resolved_discovered) == 1.0
     assert discovered_schedule.due(resolved_discovered, 100.0)
+
+    staggered_targets = [
+        parse_target(f"CELLAPP_TYPE=127.0.0.1:{13000 + index}:root/network/poller")
+        for index in range(7)
+    ]
+    staggered = WatcherSchedule(
+        staggered_targets,
+        1.0,
+        {"CELLAPP_TYPE:root/network/poller": 5.0},
+    )
+    assert [staggered.phase_offset(target) for target in staggered_targets] == [
+        0.0, 1.0, 2.0, 3.0, 4.0, 0.0, 1.0,
+    ]
+    staggered.start(200.0)
+    assert staggered.due(staggered_targets[0], 200.0)
+    assert not staggered.due(staggered_targets[1], 200.0)
+    assert staggered.due(staggered_targets[1], 200.9)
+    assert not staggered.due(staggered_targets[4], 203.8)
+    assert staggered.due(staggered_targets[4], 203.9)
+    staggered.mark_sampled(staggered_targets[1], 200.9)
+    assert not staggered.due(staggered_targets[1], 205.8)
+    assert staggered.due(staggered_targets[1], 205.9)
     try:
         WatcherSchedule([bots], 1.0, {"BOTS_TYPE:root/unknown": 5.0})
     except ValueError as exc:
