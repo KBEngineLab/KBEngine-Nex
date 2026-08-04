@@ -391,7 +391,8 @@ public:
 	void onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s);
 	void onRemoteCallMethodFromClient(Network::Channel* pChannel, ENTITY_ID srcEntityID, MemoryStream& s);
 	void onRemoteMethodCall_(PropertyDescription* pComponentPropertyDescription,
-		MethodDescription* pMethodDescription, ENTITY_ID srcEntityID, MemoryStream& s);
+		MethodDescription* pMethodDescription, ENTITY_ID srcEntityID, MemoryStream& s,
+		bool sampleStages, uint64 lookupNanos);
 
 	/**
 		观察者

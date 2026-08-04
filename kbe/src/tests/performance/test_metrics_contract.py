@@ -491,8 +491,12 @@ def assert_python_latency_scenario() -> None:
     assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/clientInput"] == 5.0
     assert "BASEAPP_TYPE=@baseapp:root/network/messageProcessing" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/messageProcessing"] == 5.0
+    assert "BASEAPP_TYPE=@baseapp:root/scriptStages" in gameplay["watcher_targets"]
+    assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/scriptStages"] == 5.0
     assert "CELLAPP_TYPE=@cellapp:root/network/messageProcessing" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/network/messageProcessing"] == 5.0
+    assert "CELLAPP_TYPE=@cellapp:root/scriptStages" in gameplay["watcher_targets"]
+    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/scriptStages"] == 5.0
     assert "CELLAPP_TYPE=@cellapp:root/witness/backpressure" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/witness/backpressure"] == 5.0
     assert "CELLAPP_TYPE=@cellapp:root/witness/scheduler" in gameplay["watcher_targets"]
@@ -526,6 +530,14 @@ def assert_python_latency_scenario() -> None:
     assert 'prefix + "SampledMaxNanos"' in server_app_source
     assert 'categoryName(category) + "/"' not in server_app_source
     assert 'WATCH_OBJECT("witness/queues/cancelledPendingLeaves"' in cellapp_source
+    assert 'WATCH_OBJECT("scriptStages/rpcCalls"' in baseapp_source
+    assert 'WATCH_OBJECT("scriptStages/rpcCalls"' in cellapp_source
+    assert '&pSlow->' not in baseapp_source
+    assert '&pSlow->' not in cellapp_source
+    script_metrics = (Path(__file__).resolve().parents[2] / "lib/server/script_stage_metrics.h").read_text(encoding="utf-8")
+    assert "SLOW_TOP_CAPACITY = 8" in script_metrics
+    assert "RPC_SAMPLE_RATE = 8" in script_metrics
+    assert "durationNanos >= 1000000" in script_metrics
     assert 'WATCH_OBJECT("witness/backpressure/staleControlDrops"' in cellapp_source
     assert "++staleWitnessVolatileControlDrops_;" in cellapp_source
     assert 'WATCH_OBJECT("network/clientInput/staleEntityDrops"' in cellapp_source
@@ -1173,6 +1185,14 @@ def main() -> int:
             recorder.record_sample("watcher", "BOTS_TYPE", "bots/tick/lastMicros", 1000, "micros")
             recorder.record_sample("watcher", "BOTS_TYPE", "bots/tick/lastMicros", 3000, "micros")
             recorder.record_sample("watcher", "BOTS_TYPE", "bots/performance/tickMaxMicros", 100000, "micros")
+            record_watcher_samples(
+                recorder,
+                parse_target("CELLAPP_TYPE=127.0.0.1:1:root/scriptStages"),
+                {"slow0Name": "Avatar.move", "slow0Stage": "pythonCall", "slow0DurationNanos": 2000000},
+                1.0,
+                {},
+                {},
+            )
         sampled = build_summary(load_events(recorder_path), {"tick_p99_max_ms": 2.0})
         assert sampled["samples"]["watcher.BOTS_TYPE.bots/tick/lastMicros"]["count"] == 2
         assert sampled["samples"]["watcher.BOTS_TYPE.bots/tick/lastMicros"]["mean"] == 2000
@@ -1180,6 +1200,8 @@ def main() -> int:
         assert sampled["samples"]["watcher.BOTS_TYPE.bots/tick/lastMicros"]["p99"] > 2000
         assert sampled["quality"]["status"] == "SLOW"
         assert all("tickMaxMicros" not in item for item in sampled["quality"]["slow"])
+        assert sampled["labels"]["watcher.CELLAPP_TYPE.root/scriptStages/slow0Name"] == "Avatar.move"
+        assert sampled["labels"]["watcher.CELLAPP_TYPE.root/scriptStages/slow0Stage"] == "pythonCall"
 
         readiness_path = root / "multi-process-readiness.jsonl"
         with JsonlRecorder(readiness_path, "test-run", "contract") as recorder:

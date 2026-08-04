@@ -157,6 +157,19 @@ sample statistics and must not be multiplied into exact request totals.
 编码不经过入站 handler，因此在 `root/witness/messages` 下独立按 1/32 采样。累计、平均、最大值及
 慢样本数均属于采样统计，不能直接外推为精确请求总量。
 
+`root/scriptStages` splits BaseApp/CellApp RPC work into method lookup, Python attribute lookup,
+argument decoding, Python execution, and cleanup. CellApp additionally publishes migration
+serialization, cross-Cell forwarding, target deserialize/create, and callback time. RPC stages use
+the same deterministic 1/8 sampling policy; migration stages are sampled in full. Eight fixed slow
+slots retain only observations at or above 1 ms and publish handler name, stage, and duration without
+growing with uptime.
+`root/scriptStages` 将 BaseApp/CellApp RPC 拆为方法查找、Python 属性查找、参数解包、Python 执行和
+清理阶段；CellApp 还发布迁移序列化、跨 Cell 转发、目标端反序列化/创建及回调耗时。RPC 阶段按
+确定性的 1/8 采样，迁移阶段全量采样。8 个固定慢样本槽只保留不低于 1 ms 的 handler 名称、阶段和
+耗时，内存不会随运行时间增长。
+慢样本的名称和阶段以 `kind=label` 写入 JSONL，并在 `summary.json`/`report.md` 的 Labels 中保留
+每个组件槽位的最新非空值；它们不会进入数值直方图或质量门计算。
+
 For cprofile targets, the runner preserves raw stamp counters, converts time counters to microseconds
 using `root/stats/stampsPerSecond`, and derives interval call count, calls/second, total/self time, and
 mean total/self time. The dedicated `/latency` targets are different: selected BaseApp/CellApp profiles

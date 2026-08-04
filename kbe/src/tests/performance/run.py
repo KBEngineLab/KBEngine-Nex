@@ -894,6 +894,17 @@ def record_watcher_samples(
         "numBytesReceived": ("bytesReceivedPerSecond", "bytes/s"),
     }
     for metric, value in values.items():
+        metric_name = f"{target.path}/{metric}".replace("//", "/")
+        if isinstance(value, str):
+            if value:
+                recorder.record(
+                    "watcher",
+                    instance,
+                    metric_name,
+                    value,
+                    tags={"kind": "label"},
+                )
+            continue
         if not isinstance(value, (int, float)):
             continue
         if latency_count == 0 and metric in latency_stat_metrics:
@@ -902,7 +913,6 @@ def record_watcher_samples(
             metric.replace("p999Micros", "p999Available"), False
         ):
             continue
-        metric_name = f"{target.path}/{metric}".replace("//", "/")
         recorder.record_sample(
             "watcher",
             instance,

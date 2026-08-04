@@ -38,6 +38,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "rotator_handler.h"
 #include "turn_controller.h"
 #include "server/asyncio_helper.h"
+#include "server/script_stage_timing.h"
 #include "pyscript/py_gc.h"
 #include "entitydef/volatileinfo.h"
 #include "entitydef/entity_call.h"
@@ -957,6 +958,10 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent,
 //-------------------------------------------------------------------------------------
 void Entity::onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s)
 {
+	ScriptStageMetrics& stageMetrics = scriptStageMetrics();
+	const bool sampleStages = stageMetrics.beginRpcCall();
+	const uint64 lookupStart = sampleStages ? timestamp() : 0;
+
 	// Nex 2.8 的 Cell RPC 与 Base RPC 使用同一双 UID 帧，避免实体方法与组件方法发生歧义。
 	// Nex 2.8 Cell and Base RPCs share the same two-UID frame to disambiguate entity and component methods.
 	ENTITY_PROPERTY_UID componentPropertyUID = 0;
@@ -994,12 +999,18 @@ void Entity::onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s)
 		return;
 	}
 
-	onRemoteMethodCall_(pComponentPropertyDescription, pMethodDescription, id(), s);
+	const uint64 lookupNanos = sampleStages ? scriptStageDurationNanos(lookupStart) : 0;
+	onRemoteMethodCall_(pComponentPropertyDescription, pMethodDescription, id(), s,
+		sampleStages, lookupNanos);
 }
 
 //-------------------------------------------------------------------------------------
 void Entity::onRemoteCallMethodFromClient(Network::Channel* pChannel, ENTITY_ID srcEntityID, MemoryStream& s)
 {
+	ScriptStageMetrics& stageMetrics = scriptStageMetrics();
+	const bool sampleStages = stageMetrics.beginRpcCall();
+	const uint64 lookupStart = sampleStages ? timestamp() : 0;
+
 	ENTITY_PROPERTY_UID componentPropertyUID = 0;
 	s >> componentPropertyUID;
 
@@ -1045,12 +1056,15 @@ void Entity::onRemoteCallMethodFromClient(Network::Channel* pChannel, ENTITY_ID 
 		return;
 	}
 
-	onRemoteMethodCall_(pComponentPropertyDescription, pMethodDescription, srcEntityID, s);
+	const uint64 lookupNanos = sampleStages ? scriptStageDurationNanos(lookupStart) : 0;
+	onRemoteMethodCall_(pComponentPropertyDescription, pMethodDescription, srcEntityID, s,
+		sampleStages, lookupNanos);
 }
 
 //-------------------------------------------------------------------------------------
 void Entity::onRemoteMethodCall_(PropertyDescription* pComponentPropertyDescription,
-	MethodDescription* pMethodDescription, ENTITY_ID srcEntityID, MemoryStream& s)
+	MethodDescription* pMethodDescription, ENTITY_ID srcEntityID, MemoryStream& s,
+	bool sampleStages, uint64 lookupNanos)
 {
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
@@ -1071,6 +1085,10 @@ void Entity::onRemoteMethodCall_(PropertyDescription* pComponentPropertyDescript
 		return;
 	}
 
+	ScriptStageMetrics& stageMetrics = scriptStageMetrics();
+	const char* handlerName = pMethodDescription->getName();
+	stageMetrics.record(SCRIPT_STAGE_RPC_LOOKUP, lookupNanos, sampleStages, handlerName);
+
 	if(g_debugEntity)
 	{
 		DEBUG_MSG(fmt::format("Entity::onRemoteMethodCall: {}, {}::{}{}(utype={}).\n",
@@ -1083,12 +1101,16 @@ void Entity::onRemoteMethodCall_(PropertyDescription* pComponentPropertyDescript
 	// Component RPC arguments must bind to the real caller entity to avoid ownerless objects during stream decoding.
 	EntityDef::context().currEntityID = srcEntityID;
 
+	const uint64 pythonLookupStart = sampleStages ? timestamp() : 0;
 	PyObject* pyCallObject = this;
 	if (pComponentPropertyDescription)
 	{
 		pyCallObject = PyObject_GetAttrString(this, pComponentPropertyDescription->getName());
 		if (pyCallObject == NULL)
 		{
+			stageMetrics.record(SCRIPT_STAGE_PYTHON_LOOKUP,
+				sampleStages ? scriptStageDurationNanos(pythonLookupStart) : 0,
+				sampleStages, handlerName);
 			SCRIPT_ERROR_CHECK();
 			s.done();
 			return;
@@ -1097,19 +1119,38 @@ void Entity::onRemoteMethodCall_(PropertyDescription* pComponentPropertyDescript
 
 	PyObject* pyFunc = PyObject_GetAttrString(pyCallObject, const_cast<char*>
 						(pMethodDescription->getName()));
+	stageMetrics.record(SCRIPT_STAGE_PYTHON_LOOKUP,
+		sampleStages ? scriptStageDurationNanos(pythonLookupStart) : 0,
+		sampleStages, handlerName);
+	uint64 cleanupStart = 0;
 
 	if(pMethodDescription != NULL)
 	{
 		if(!pMethodDescription->isExposed() && pMethodDescription->getArgSize() == 0)
 		{
+			stageMetrics.record(SCRIPT_STAGE_ARGUMENT_DECODE, 0, sampleStages, handlerName);
+			const uint64 pythonCallStart = sampleStages ? timestamp() : 0;
 			pMethodDescription->call(pyFunc, NULL);
+			stageMetrics.record(SCRIPT_STAGE_PYTHON_CALL,
+				sampleStages ? scriptStageDurationNanos(pythonCallStart) : 0,
+				sampleStages, handlerName);
+			cleanupStart = sampleStages ? timestamp() : 0;
 		}
 		else
 		{
+			const uint64 decodeStart = sampleStages ? timestamp() : 0;
 			PyObject* pyargs = pMethodDescription->createFromStream(&s);
+			stageMetrics.record(SCRIPT_STAGE_ARGUMENT_DECODE,
+				sampleStages ? scriptStageDurationNanos(decodeStart) : 0,
+				sampleStages, handlerName);
 			if(pyargs)
 			{
+				const uint64 pythonCallStart = sampleStages ? timestamp() : 0;
 				pMethodDescription->call(pyFunc, pyargs);
+				stageMetrics.record(SCRIPT_STAGE_PYTHON_CALL,
+					sampleStages ? scriptStageDurationNanos(pythonCallStart) : 0,
+					sampleStages, handlerName);
+				cleanupStart = sampleStages ? timestamp() : 0;
 				Py_XDECREF(pyargs);
 			}
 			else
@@ -1124,11 +1165,16 @@ void Entity::onRemoteMethodCall_(PropertyDescription* pComponentPropertyDescript
 		s.done();
 	}
 
+	if (sampleStages && cleanupStart == 0)
+		cleanupStart = timestamp();
 	Py_XDECREF(pyFunc);
 	if (pyCallObject != static_cast<PyObject*>(this))
 		Py_DECREF(pyCallObject);
 
 	SCRIPT_ERROR_CHECK();
+	stageMetrics.record(SCRIPT_STAGE_CLEANUP,
+		sampleStages ? scriptStageDurationNanos(cleanupStart) : 0,
+		sampleStages, handlerName);
 }
 
 //-------------------------------------------------------------------------------------
@@ -3800,6 +3846,7 @@ void Entity::teleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Dir
 //-------------------------------------------------------------------------------------
 void Entity::onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Direction3D& dir)
 {
+	const uint64 serializeStart = timestamp();
 	// 我们需要将entity打包发往目的cellapp
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(CellappInterface::reqTeleportToCellApp);
@@ -3824,18 +3871,25 @@ void Entity::onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, D
 
 		MemoryStream::reclaimPoolObject(s);
 		Network::Bundle::reclaimPoolObject(pBundle);
+		scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_SERIALIZE,
+			scriptStageDurationNanos(serializeStart), true, scriptName());
 		return;
 	}
 
 	(*pBundle).append(s);
 	MemoryStream::reclaimPoolObject(s);
+	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_SERIALIZE,
+		scriptStageDurationNanos(serializeStart), true, scriptName());
 
 	// 暂时不销毁这个entity, 等那边成功创建之后再回来销毁
 	// 此期间的消息可以通过ghost转发给real
 	// 如果未能正确传输过去则可以从当前cell继续恢复entity.
 	// Cellapp::getSingleton().destroyEntity(id(), false);
 
+	const uint64 forwardStart = timestamp();
 	nearbyMBRef->sendCall(pBundle);
+	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_FORWARD,
+		scriptStageDurationNanos(forwardStart), true, scriptName());
 
 	// 序列化后将entity先停止移动， 如果传送失败了则可以根据序列化的内容进行恢复
 	stopMove();
@@ -3992,6 +4046,7 @@ void Entity::teleport(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& di
 bool Entity::onTeleport()
 {
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
+	const uint64 callbackStart = timestamp();
 
 	bool allowed = true;
 
@@ -4077,12 +4132,15 @@ bool Entity::onTeleport()
 	}
 
 	Py_DECREF(this);
+	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_CALLBACK,
+		scriptStageDurationNanos(callbackStart), true, "onTeleport");
 	return allowed;
 }
 
 //-------------------------------------------------------------------------------------
 void Entity::onTeleportFailure()
 {
+	const uint64 callbackStart = timestamp();
 	// 失败回调本身是正常控制流；各拒绝点负责记录可操作的具体原因，避免重复 ERROR 放大日志和质量指标。
 	// The failure callback itself is normal control flow; rejection sites log actionable causes so this notification must not duplicate them as an ERROR.
 	DEBUG_MSG(fmt::format("{}::onTeleportFailure(): entityID={}\n",
@@ -4091,11 +4149,14 @@ void Entity::onTeleportFailure()
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
 	bufferOrExeCallback(const_cast<char*>("onTeleportFailure"), NULL);
+	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_CALLBACK,
+		scriptStageDurationNanos(callbackStart), true, "onTeleportFailure");
 }
 
 //-------------------------------------------------------------------------------------
 void Entity::onTeleportSuccess(PyObject* nearbyEntity, SPACE_ID lastSpaceID)
 {
+	const uint64 callbackStart = timestamp();
 	EntityCall* mb = this->baseEntityCall();
 	if(mb)
 	{
@@ -4109,6 +4170,8 @@ void Entity::onTeleportSuccess(PyObject* nearbyEntity, SPACE_ID lastSpaceID)
 
 	bufferOrExeCallback(const_cast<char*>("onTeleportSuccess"),
 		Py_BuildValue(const_cast<char*>("(O)"), nearbyEntity));
+	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_CALLBACK,
+		scriptStageDurationNanos(callbackStart), true, "onTeleportSuccess");
 }
 
 //-------------------------------------------------------------------------------------
@@ -4243,6 +4306,10 @@ void Entity::onUpdateGhostPropertys(KBEngine::MemoryStream& s)
 //-------------------------------------------------------------------------------------
 void Entity::onRemoteRealMethodCall(KBEngine::MemoryStream& s)
 {
+	ScriptStageMetrics& stageMetrics = scriptStageMetrics();
+	const bool sampleStages = stageMetrics.beginRpcCall();
+	const uint64 lookupStart = sampleStages ? timestamp() : 0;
+
 	ENTITY_PROPERTY_UID componentPropertyUID = 0;
 	s >> componentPropertyUID;
 
@@ -4277,7 +4344,9 @@ void Entity::onRemoteRealMethodCall(KBEngine::MemoryStream& s)
 		return;
 	}
 
-	onRemoteMethodCall_(pComponentPropertyDescription, pMethodDescription, id(), s);
+	const uint64 lookupNanos = sampleStages ? scriptStageDurationNanos(lookupStart) : 0;
+	onRemoteMethodCall_(pComponentPropertyDescription, pMethodDescription, id(), s,
+		sampleStages, lookupNanos);
 }
 
 //-------------------------------------------------------------------------------------

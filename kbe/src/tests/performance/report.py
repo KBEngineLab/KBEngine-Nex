@@ -46,6 +46,7 @@ def build_summary(
     operation_counters: dict[str, Counter[str]] = defaultdict(Counter)
     phase_counters: dict[str, Counter[str]] = defaultdict(Counter)
     gauges: dict[str, float] = {}
+    labels: dict[str, str] = {}
     metadata: dict[str, str] = {}
     for event in events:
         metric = str(event["metric"])
@@ -57,6 +58,8 @@ def build_summary(
             sample_key = f"{event['component']}.{event['instance']}.{metric}"
             samples[sample_key].observe(float(event["value"]))
             sample_units.setdefault(sample_key, str(event.get("unit", "")))
+        elif tags.get("kind") == "label":
+            labels[f"{event['component']}.{event['instance']}.{metric}"] = str(event["value"])
         elif metric.startswith("log.") or tags.get("kind") == "counter":
             counters[metric] += int(float(event["value"]))
             if operation != "default":
@@ -88,6 +91,7 @@ def build_summary(
             for phase, values in sorted(phase_counters.items())
         },
         "gauges": dict(sorted(gauges.items())),
+        "labels": dict(sorted(labels.items())),
         "requests": {
             "total": total_requests,
             "success": success,
@@ -288,5 +292,9 @@ def write_report(summary: dict[str, Any], json_path: Path, markdown_path: Path) 
     lines.extend(["", "## Gauges", "", "| Metric | Value |", "| --- | ---: |"])
     for metric, value in summary.get("gauges", {}).items():
         lines.append(f"| `{metric}` | {value:.2f} |")
+    if summary.get("labels"):
+        lines.extend(["", "## Labels", "", "| Metric | Value |", "| --- | --- |"])
+        for metric, value in summary["labels"].items():
+            lines.append(f"| `{metric}` | `{value}` |")
     markdown_path.parent.mkdir(parents=True, exist_ok=True)
     markdown_path.write_text("\n".join(lines) + "\n", encoding="utf-8")

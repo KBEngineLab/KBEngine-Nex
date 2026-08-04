@@ -37,6 +37,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "forward_message_over_handler.h"
 #include "sync_entitystreamtemplate_handler.h"
 #include "server/asyncio_helper.h"
+#include "server/script_stage_metrics.h"
 #include "common/timestamp.h"
 #include "common/kbeversion.h"
 #include "common/sha1.h"
@@ -485,6 +486,30 @@ bool Baseapp::initializeWatcher()
 	// 在首次脚本或 Timer 回调前发布零样本延迟窗口，避免空载场景缺少指标目录。
 	SCRIPTCALL_PROFILE.initializeWatcher();
 	ONTIMER_PROFILE.initializeWatcher();
+
+	ScriptStageMetrics& scriptMetrics = scriptStageMetrics();
+	WATCH_OBJECT("scriptStages/rpcCalls", &scriptMetrics, &ScriptStageMetrics::rpcCalls);
+	WATCH_OBJECT("scriptStages/rpcSampleRate", &scriptMetrics, &ScriptStageMetrics::rpcSampleRate);
+	for (int stageValue = 0; stageValue < SCRIPT_STAGE_COUNT; ++stageValue)
+	{
+		const ScriptStage stage = static_cast<ScriptStage>(stageValue);
+		ScriptStageStats* pStats = &scriptMetrics.stats(stage);
+		const std::string prefix = std::string("scriptStages/") + ScriptStageMetrics::stageName(stage);
+		WATCH_OBJECT(prefix + "Calls", pStats, &ScriptStageStats::calls);
+		WATCH_OBJECT(prefix + "SampledCalls", pStats, &ScriptStageStats::sampledCalls);
+		WATCH_OBJECT(prefix + "TotalNanos", pStats, &ScriptStageStats::totalNanos);
+		WATCH_OBJECT(prefix + "AverageNanos", pStats, &ScriptStageStats::averageNanos);
+		WATCH_OBJECT(prefix + "MaxNanos", pStats, &ScriptStageStats::maxNanos);
+		WATCH_OBJECT(prefix + "SlowOver1ms", pStats, &ScriptStageStats::slowOver1ms);
+	}
+	for (size_t slot = 0; slot < ScriptStageMetrics::SLOW_TOP_CAPACITY; ++slot)
+	{
+		SlowScriptStage* pSlow = const_cast<SlowScriptStage*>(&scriptMetrics.slow(slot));
+		const std::string prefix = std::string("scriptStages/slow") + std::to_string(slot);
+		WATCH_OBJECT(prefix + "Name", pSlow->name);
+		WATCH_OBJECT(prefix + "Stage", pSlow->stageName);
+		WATCH_OBJECT(prefix + "DurationNanos", pSlow->durationNanos);
+	}
 
 	WATCH_OBJECT("numProxices", this, &Baseapp::numProxices);
 	WATCH_OBJECT("numClients", this, &Baseapp::numClients);

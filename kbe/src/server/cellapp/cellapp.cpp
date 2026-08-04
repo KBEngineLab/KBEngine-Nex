@@ -40,6 +40,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "server/components.h"
 #include "server/telnet_server.h"
 #include "server/py_file_descriptor.h"
+#include "server/script_stage_timing.h"
 #include "dbmgr/dbmgr_interface.h"
 #include "navigation/navigation.h"
 #include "client_lib/client_interface.h"
@@ -290,6 +291,30 @@ bool Cellapp::initializeWatcher()
 	SCRIPTCALL_PROFILE.initializeWatcher();
 	ONTIMER_PROFILE.initializeWatcher();
 	CLIENT_UPDATE_PROFILE.initializeWatcher();
+
+	ScriptStageMetrics& scriptMetrics = scriptStageMetrics();
+	WATCH_OBJECT("scriptStages/rpcCalls", &scriptMetrics, &ScriptStageMetrics::rpcCalls);
+	WATCH_OBJECT("scriptStages/rpcSampleRate", &scriptMetrics, &ScriptStageMetrics::rpcSampleRate);
+	for (int stageValue = 0; stageValue < SCRIPT_STAGE_COUNT; ++stageValue)
+	{
+		const ScriptStage stage = static_cast<ScriptStage>(stageValue);
+		ScriptStageStats* pStats = &scriptMetrics.stats(stage);
+		const std::string prefix = std::string("scriptStages/") + ScriptStageMetrics::stageName(stage);
+		WATCH_OBJECT(prefix + "Calls", pStats, &ScriptStageStats::calls);
+		WATCH_OBJECT(prefix + "SampledCalls", pStats, &ScriptStageStats::sampledCalls);
+		WATCH_OBJECT(prefix + "TotalNanos", pStats, &ScriptStageStats::totalNanos);
+		WATCH_OBJECT(prefix + "AverageNanos", pStats, &ScriptStageStats::averageNanos);
+		WATCH_OBJECT(prefix + "MaxNanos", pStats, &ScriptStageStats::maxNanos);
+		WATCH_OBJECT(prefix + "SlowOver1ms", pStats, &ScriptStageStats::slowOver1ms);
+	}
+	for (size_t slot = 0; slot < ScriptStageMetrics::SLOW_TOP_CAPACITY; ++slot)
+	{
+		SlowScriptStage* pSlow = const_cast<SlowScriptStage*>(&scriptMetrics.slow(slot));
+		const std::string prefix = std::string("scriptStages/slow") + std::to_string(slot);
+		WATCH_OBJECT(prefix + "Name", pSlow->name);
+		WATCH_OBJECT(prefix + "Stage", pSlow->stageName);
+		WATCH_OBJECT(prefix + "DurationNanos", pSlow->durationNanos);
+	}
 
 	WATCH_OBJECT("load", this, &Cellapp::_getLoad);
 	WATCH_OBJECT("spaceSize", this, &Cellapp::spaceSize);
@@ -2567,6 +2592,9 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 		return;
 	}
 
+	// 目标 Cell 的反序列化/创建阶段从实体构造开始，到进入新 Space 为止；回调单独计量。
+	// Target-Cell deserialize/create timing starts at construction and stops on entering the new Space; callbacks are measured separately.
+	const uint64 deserializeCreateStart = timestamp();
 	// 创建entity
 	Entity* e = createEntity(EntityDef::findScriptModule(entityType)->getName(), NULL, false, teleportEntityID, false);
 	if (e == NULL)
@@ -2582,6 +2610,8 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 		pChannel->send(pBundle);
 
 		ERROR_MSG(fmt::format("Cellapp::reqTeleportToCellApp: create reqTeleportEntity({}) error!\n", teleportEntityID));
+		scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_DESERIALIZE_CREATE,
+			scriptStageDurationNanos(deserializeCreateStart), true, "reqTeleportToCellApp");
 		s.done();
 		return;
 	}
@@ -2629,6 +2659,8 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 
 	// 进入新的space中
 	space->addEntityAndEnterWorld(e);
+	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_DESERIALIZE_CREATE,
+		scriptStageDurationNanos(deserializeCreateStart), true, "reqTeleportToCellApp");
 
 	Entity* nearbyMBRef = Cellapp::getSingleton().findEntity(nearbyMBRefID);
 	e->onTeleportSuccess(nearbyMBRef, space->id());
@@ -2679,6 +2711,7 @@ void Cellapp::reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s
 		s.done();
 		return;
 	}
+	const uint64 callbackStart = timestamp();
 
 	// 正常情况下， 应该传送结果返回时传送前的实体应该在当前cell上， 如果到其他cellapp上了， 说明在此期间被迁移走了
 	// 此时被迁移很可能会有问题
@@ -2694,6 +2727,8 @@ void Cellapp::reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s
 	if(success)
 	{
 		destroyEntity(teleportEntityID, false);
+		scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_CALLBACK,
+			scriptStageDurationNanos(callbackStart), true, "reqTeleportToCellAppCB");
 		return;
 	}
 
@@ -2745,6 +2780,8 @@ void Cellapp::reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s
 	entity->changeToReal(0, s);
 	entity->onTeleportFailure();
 	Py_DECREF(entity);
+	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_CALLBACK,
+		scriptStageDurationNanos(callbackStart), true, "reqTeleportToCellAppCB");
 	
 	s.done();
 }

@@ -25,6 +25,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "pyscript/py_gc.h"
 #include "entitydef/entity_call.h"
 #include "entitydef/entity_events.h"
+#include "server/script_stage_timing.h"
 #include "network/channel.h"	
 #include "network/fixed_messages.h"
 #include "client_lib/client_interface.h"
@@ -954,6 +955,9 @@ void Entity::onCreateCellFailure(void)
 void Entity::onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s)
 {
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
+	ScriptStageMetrics& stageMetrics = scriptStageMetrics();
+	const bool sampleStages = stageMetrics.beginRpcCall();
+	const uint64 lookupStart = sampleStages ? timestamp() : 0;
 
 	if(isDestroyed())																				
 	{																										
@@ -1048,25 +1052,50 @@ void Entity::onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s)
 			pComponentPropertyDescription ? "::" : "", pMethodDescription->getName(), utype));
 	}
 
+	const char* handlerName = pMethodDescription->getName();
+	stageMetrics.record(SCRIPT_STAGE_RPC_LOOKUP,
+		sampleStages ? scriptStageDurationNanos(lookupStart) : 0,
+		sampleStages, handlerName);
+
 	pMethodDescription->currCallerID(this->id());
 	// RPC 参数可能包含组件值，反序列化前绑定当前实体以保证组件 owner 正确。
 	// RPC arguments may contain component values; bind the current entity before deserialization to preserve ownership.
 	EntityDef::context().currEntityID = this->id();
+	const uint64 pythonLookupStart = sampleStages ? timestamp() : 0;
 	PyObject* pyFunc = PyObject_GetAttrString(pyCallObject, const_cast<char*>
 						(pMethodDescription->getName()));
+	stageMetrics.record(SCRIPT_STAGE_PYTHON_LOOKUP,
+		sampleStages ? scriptStageDurationNanos(pythonLookupStart) : 0,
+		sampleStages, handlerName);
+	uint64 cleanupStart = 0;
 
 	if(pMethodDescription != NULL)
 	{
 		if(pMethodDescription->getArgSize() == 0)
 		{
+			stageMetrics.record(SCRIPT_STAGE_ARGUMENT_DECODE, 0, sampleStages, handlerName);
+			const uint64 pythonCallStart = sampleStages ? timestamp() : 0;
 			pMethodDescription->call(pyFunc, NULL);
+			stageMetrics.record(SCRIPT_STAGE_PYTHON_CALL,
+				sampleStages ? scriptStageDurationNanos(pythonCallStart) : 0,
+				sampleStages, handlerName);
+			cleanupStart = sampleStages ? timestamp() : 0;
 		}
 		else
 		{
+			const uint64 decodeStart = sampleStages ? timestamp() : 0;
 			PyObject* pyargs = pMethodDescription->createFromStream(&s);
+			stageMetrics.record(SCRIPT_STAGE_ARGUMENT_DECODE,
+				sampleStages ? scriptStageDurationNanos(decodeStart) : 0,
+				sampleStages, handlerName);
 			if(pyargs)
 			{
+				const uint64 pythonCallStart = sampleStages ? timestamp() : 0;
 				pMethodDescription->call(pyFunc, pyargs);
+				stageMetrics.record(SCRIPT_STAGE_PYTHON_CALL,
+					sampleStages ? scriptStageDurationNanos(pythonCallStart) : 0,
+					sampleStages, handlerName);
+				cleanupStart = sampleStages ? timestamp() : 0;
 				Py_XDECREF(pyargs);
 			}
 			else
@@ -1076,10 +1105,15 @@ void Entity::onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s)
 		}
 	}
 	
+	if (sampleStages && cleanupStart == 0)
+		cleanupStart = timestamp();
 	Py_XDECREF(pyFunc);
 
 	if (pyCallObject != static_cast<PyObject*>(this))
 		Py_DECREF(pyCallObject);
+	stageMetrics.record(SCRIPT_STAGE_CLEANUP,
+		sampleStages ? scriptStageDurationNanos(cleanupStart) : 0,
+		sampleStages, handlerName);
 }
 
 //-------------------------------------------------------------------------------------
