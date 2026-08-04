@@ -147,13 +147,17 @@ void ScriptCallbacks::releaseCallback( TimerHandle handle )
 //-------------------------------------------------------------------------------------
 void ScriptCallbacks::cancelAll()
 {
-	Map::size_type size = map_.size();
-
-	for (Map::size_type i = 0; i < size; ++i)
+	while (!map_.empty())
 	{
-		KBE_ASSERT( i + map_.size() == size );
+		// Releasing a bound Entity method may synchronously destroy that Entity and cancel another
+		// callback (for example its movement controller). Require progress instead of assuming one
+		// erased map entry per iteration.
+		// 释放 Entity 绑定方法可能同步析构 Entity，并取消另一个回调（例如移动控制器）；
+		// 因此只要求每轮有进展，不能假定每次恰好删除一个条目。
+		Map::size_type sizeBeforeCancel = map_.size();
 		TimerHandle handle = map_.begin()->second;
 		handle.cancel();
+		KBE_ASSERT(map_.size() < sizeBeforeCancel);
 	}
 }
 

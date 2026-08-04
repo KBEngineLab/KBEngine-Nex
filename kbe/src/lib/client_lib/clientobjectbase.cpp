@@ -116,6 +116,10 @@ ClientObjectBase::~ClientObjectBase()
 //-------------------------------------------------------------------------------------		
 void ClientObjectBase::finalise(void)
 {
+	// Python callbacks may retain bound Entity methods. Cancel them while Entity owner links are
+	// still valid so callback destruction cannot outlive the ClientObject lifecycle.
+	// Python 回调可能持有 Entity 绑定方法；必须在 owner 链接仍有效时取消，避免回调析构越过 ClientObject 生命周期。
+	scriptCallbacks_.cancelAll();
 	pyCallbackMgr_.finalise();
 
 	if(pEntities_)
@@ -140,11 +144,15 @@ void ClientObjectBase::finalise(void)
 //-------------------------------------------------------------------------------------		
 void ClientObjectBase::reset(void)
 {
+	// The callback managers can own the final Python reference to an Entity. Release callbacks
+	// before detaching entities so a bound-method DECREF cannot destroy an ownerless Entity.
+	// 回调管理器可能持有 Entity 的最后一个 Python 引用；先释放回调，避免绑定方法 DECREF 析构已解绑 Entity。
+	scriptCallbacks_.cancelAll();
+	pyCallbackMgr_.finalise();
 	releaseOwnedEntities();
 	pEntityIDAliasIDList_.clear();
 	playerEntityChanged_ = false;
 	staleViewMessageDrops_ = 0;
-	pyCallbackMgr_.finalise();
 
 	entityID_ = 0;
 	dbid_ = 0;
@@ -1186,8 +1194,11 @@ void ClientObjectBase::onRemoteMethodCall_(ENTITY_ID eid, KBEngine::MemoryStream
 	client::Entity* entity = pEntities_->find(eid);
 	if(entity == NULL)
 	{	
+		// CellApp streams converge at BaseApp, so a semantic event from the old CellApp can arrive
+		// after LeaveWorld from the new stream. RPCs cannot be replayed safely without an Entity.
+		// 多个 CellApp 流在 BaseApp 汇聚，旧 CellApp 的语义事件可能晚于 LeaveWorld；无 Entity 时 RPC 无法安全重放。
+		++staleViewMessageDrops_;
 		s.done();
-		ERROR_MSG(fmt::format("ClientObjectBase::onRemoteMethodCall: not found entity({}).\n", eid));
 		return;
 	}
 
@@ -1205,13 +1216,40 @@ void ClientObjectBase::onUpdatePropertys(Network::Channel * pChannel, MemoryStre
 //-------------------------------------------------------------------------------------
 void ClientObjectBase::onUpdatePropertysOptimized(Network::Channel * pChannel, MemoryStream& s)
 {
-	ENTITY_ID eid = getViewEntityIDFromStream(s);
-	if (eid == 0)
+	const size_t messageStart = s.rpos();
+	ENTITY_ID eid = 0;
+	try
 	{
-		s.done();
-		return;
+		eid = getViewEntityIDFromStream(s);
+		if (eid == 0)
+		{
+			s.done();
+			return;
+		}
+
+		onUpdatePropertys_(eid, s);
 	}
-	onUpdatePropertys_(eid, s);
+	catch (const MemoryStreamException&)
+	{
+		// Malformed optimized updates are isolated to one framed message. The payload and resolved
+		// Entity type make alias-table drift diagnosable without enabling global packet tracing.
+		// 非法优化属性更新只隔离当前定长帧；记录载荷与解析出的 Entity 类型，无需开启全局封包跟踪即可诊断别名漂移。
+		std::string payloadHex;
+		for (size_t pos = messageStart; pos < s.wpos(); ++pos)
+		{
+			if (!payloadHex.empty())
+				payloadHex += ' ';
+			payloadHex += fmt::format("{:02x}", static_cast<unsigned int>(s.data()[pos]));
+		}
+
+		client::Entity* pEntity = pEntities_ ? pEntities_->find(eid) : NULL;
+		WARNING_MSG(fmt::format(
+			"ClientObjectBase::onUpdatePropertysOptimized: malformed payload, eid={}, entityType={}, "
+			"viewAliases={}, payloadBytes={}, payload=[{}].\n",
+			eid, pEntity ? pEntity->scriptName() : "unknown", pEntityIDAliasIDList_.size(),
+			s.wpos() - messageStart, payloadHex));
+		s.done();
+	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -1220,20 +1258,24 @@ void ClientObjectBase::onUpdatePropertys_(ENTITY_ID eid, MemoryStream& s)
 	client::Entity* entity = pEntities_->find(eid);
 	if(entity == NULL)
 	{	
-		if(bufferedCreateEntityMessage_.find(eid) == bufferedCreateEntityMessage_.end())
+		BUFFEREDMESSAGE::iterator iter = bufferedCreateEntityMessage_.find(eid);
+		if(iter == bufferedCreateEntityMessage_.end())
 		{
 			MemoryStream* buffered = new MemoryStream();
 			(*buffered) << eid;
 			(*buffered).append(s.data() + s.rpos(), s.length());
 			bufferedCreateEntityMessage_[eid].reset(buffered);
-			s.done();
 		}
 		else
 		{
-			s.done();
-			ERROR_MSG(fmt::format("ClientObjectBase::onUpdatePropertys: not found entity({}).\n", eid));
+			// Multiple property updates may precede EnterWorld when messages from CellApps converge at
+			// BaseApp. Concatenating complete property fields preserves their wire order for replay.
+			// 多个属性更新可能在 CellApp 消息汇聚时先于 EnterWorld；拼接完整属性字段可按线序重放。
+			iter->second->append(s.data() + s.rpos(), s.length());
 		}
 
+		++staleViewMessageDrops_;
+		s.done();
 		return;
 	}
 

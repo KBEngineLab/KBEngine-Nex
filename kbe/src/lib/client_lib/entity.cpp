@@ -116,6 +116,12 @@ void Entity::pClientApp(ClientObjectBase* p)
 	if (p == pClientApp_)
 		return;
 
+	// Move callbacks belong to the current ClientObject timer set. Cancel them before changing
+	// owners; otherwise a later callback release can re-enter an Entity with no valid owner.
+	// 移动回调归当前 ClientObject 的定时器集合所有；切换 owner 前取消，避免延迟释放重入无有效 owner 的 Entity。
+	if (pClientApp_ != NULL)
+		stopMove();
+
 	Py_XINCREF(p);
 	ClientObjectBase* pPrevious = pClientApp_;
 	pClientApp_ = p;
@@ -697,8 +703,14 @@ bool Entity::stopMove()
 {
 	if(pMoveHandlerID_ > 0)
 	{
-		pClientApp_->scriptCallbacks().delCallback(pMoveHandlerID_);
+		// Clear first because cancel() synchronously releases its handler and may re-enter Python.
+		// cancel() 会同步释放 handler 并可能重入 Python，因此先清零以保证停止操作幂等。
+		ScriptID moveHandlerID = pMoveHandlerID_;
 		pMoveHandlerID_ = 0;
+
+		if (pClientApp_ != NULL)
+			pClientApp_->scriptCallbacks().delCallback(moveHandlerID);
+
 		return true;
 	}
 

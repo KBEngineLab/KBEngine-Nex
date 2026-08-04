@@ -481,17 +481,56 @@ def assert_python_latency_scenario() -> None:
     assert "<spaceAllocationMaxSkew> 2 </spaceAllocationMaxSkew>" in defaults_source
     baseapp_source = (Path(__file__).resolve().parents[2] / "server/baseapp/baseapp.cpp").read_text(encoding="utf-8")
     cellapp_source = (Path(__file__).resolve().parents[2] / "server/cellapp/cellapp.cpp").read_text(encoding="utf-8")
+    witness_source = (Path(__file__).resolve().parents[2] / "server/cellapp/witness.cpp").read_text(encoding="utf-8")
     assert 'WATCH_OBJECT("network/clientVolatileBackpressure/activeClients"' in baseapp_source
     assert 'WATCH_OBJECT("witness/backpressure/activeSuppressed"' in cellapp_source
     assert 'WATCH_OBJECT("witness/scheduler/deferred"' in cellapp_source
     assert 'WATCH_OBJECT("witness/messages/enterBytes"' in cellapp_source
+    semantic_message_handler = witness_source.split(
+        "const Network::MessageHandler& Witness::getViewEntityMessageHandler", 1
+    )[1].split("bool Witness::entityID2AliasID", 1)[0]
+    assert "ialiasID = -1;" in semantic_message_handler
+    assert "return normalMsgHandler;" in semantic_message_handler
+    assert "return optimizedMsgHandler;" not in semantic_message_handler
 
     client_base_source = (Path(__file__).resolve().parents[2] / "lib/client_lib/clientobjectbase.cpp").read_text(encoding="utf-8")
     client_entity_source = (Path(__file__).resolve().parents[2] / "lib/client_lib/entity.cpp").read_text(encoding="utf-8")
+    script_callbacks_source = (Path(__file__).resolve().parents[2] / "lib/client_lib/script_callbacks.cpp").read_text(encoding="utf-8")
     bots_source = (Path(__file__).resolve().parents[2] / "server/tools/bots/bots.cpp").read_text(encoding="utf-8")
     assert "pEntity->pClientApp(NULL);" in client_base_source
     assert "pGarbages->clear();" in client_base_source
+
+    # Client callbacks can hold an Entity's final Python reference. Both finalise() and reset()
+    # must cancel those callbacks before owner detachment, and Entity detachment must stop movement.
+    # 客户端回调可能持有 Entity 的最后一个 Python 引用；finalise/reset 必须先取消回调，解绑时也必须停止移动。
+    finalise_body = client_base_source.split("void ClientObjectBase::finalise(void)", 1)[1].split(
+        "void ClientObjectBase::reset(void)", 1
+    )[0]
+    reset_body = client_base_source.split("void ClientObjectBase::reset(void)", 1)[1].split(
+        "void ClientObjectBase::releaseOwnedEntities()", 1
+    )[0]
+    for lifecycle_body in (finalise_body, reset_body):
+        assert lifecycle_body.index("scriptCallbacks_.cancelAll();") < lifecycle_body.index("releaseOwnedEntities();")
+        assert lifecycle_body.index("pyCallbackMgr_.finalise();") < lifecycle_body.index("releaseOwnedEntities();")
+    owner_setter = client_entity_source.split("void Entity::pClientApp(ClientObjectBase* p)", 1)[1].split(
+        "PyObject* Entity::pyGetBaseEntityCall()", 1
+    )[0]
+    assert owner_setter.index("stopMove();") < owner_setter.index("pClientApp_ = p;")
+    stop_move_body = client_entity_source.split("bool Entity::stopMove()", 1)[1].split(
+        "uint32 Entity::moveToPoint", 1
+    )[0]
+    assert stop_move_body.index("pMoveHandlerID_ = 0;") < stop_move_body.index("delCallback(moveHandlerID)")
+    assert "if (pClientApp_ != NULL)" in stop_move_body
+    cancel_all_body = script_callbacks_source.split("void ScriptCallbacks::cancelAll()", 1)[1].split(
+        "ScriptID ScriptCallbacks::getIDForHandle", 1
+    )[0]
+    assert "while (!map_.empty())" in cancel_all_body
+    assert "map_.size() < sizeBeforeCancel" in cancel_all_body
     assert "Py_XDECREF(pPrevious);" in client_entity_source
+    assert "++staleViewMessageDrops_;" in client_base_source
+    assert "iter->second->append(s.data() + s.rpos(), s.length());" in client_base_source
+    assert 'ClientObjectBase::onRemoteMethodCall: not found entity' not in client_base_source
+    assert 'ClientObjectBase::onUpdatePropertys: not found entity' not in client_base_source
     assert 'WATCH_OBJECT("bots/performance/clearedEntityGarbages"' in bots_source
 
 

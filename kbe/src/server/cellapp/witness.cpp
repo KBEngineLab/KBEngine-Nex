@@ -730,32 +730,16 @@ void Witness::_addViewEntityIDToBundle(Network::Bundle* pBundle, EntityRef* pEnt
 const Network::MessageHandler& Witness::getViewEntityMessageHandler(const Network::MessageHandler& normalMsgHandler,
 	const Network::MessageHandler& optimizedMsgHandler, ENTITY_ID entityID, int& ialiasID)
 {
+	(void)optimizedMsgHandler;
+	(void)entityID;
 	ialiasID = -1;
-	if(!EntityDef::entityAliasID())
-	{
-		return normalMsgHandler;
-	}
-	else
-	{
-		if (clientViewSize_ > 255)
-		{
-			return normalMsgHandler;
-		}
-		else
-		{
-			uint8 aliasID = 0;
-			if(entityID2AliasID(entityID, aliasID))
-			{
-				ialiasID = aliasID;
-				return optimizedMsgHandler;
-			}
-			else
-			{
-				return normalMsgHandler;
-			}
-		}
-	}
-	
+
+	// Property updates and RPCs are produced independently from the deferred AOI structural queue.
+	// A compacted one-byte view alias can therefore identify a different Entity during intense
+	// Enter/Leave churn. Preserve aliases for high-frequency volatile movement, but carry the full
+	// EID for semantic messages where misdelivery corrupts state or dispatches the wrong method.
+	// 属性更新和 RPC 与延迟 AOI 结构队列独立产生；高频 Enter/Leave 中压紧的一字节别名可能指向另一实体。
+	// 高频位姿仍使用别名，而会修改状态或调用方法的语义消息固定携带完整 EID。
 	return normalMsgHandler;
 }
 
