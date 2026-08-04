@@ -23,6 +23,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "debug_helper.h"
 #include "common/common.h"
+#include "profile_warning_limiter.h"
 #include "common/timer.h"
 #include "common/timestamp.h"
 
@@ -174,8 +175,19 @@ public:
 	uint64 latencyWindowCapacity();
 	double latencyWindowMaxAgeSeconds();
 	uint64 latencyWindowAllocatedBytes();
+	uint64 slowCallCount() const { return warningLimiter_.slowCallCount(); }
+	uint64 warningLogCount() const { return warningLimiter_.warningLogCount(); }
+	uint64 suppressedWarningCount() const { return warningLimiter_.suppressedWarningCount(); }
+	double maxSlowMicros() const;
 
-	static void setWarningPeriod(TimeStamp warningPeriod) { warningPeriod_ = warningPeriod; }
+	static void setWarningPeriod(TimeStamp warningPeriod)
+	{
+		warningPeriod_ = warningPeriod;
+		// A slow call remains observable immediately, while repeated stalls at the same
+		// call site are summarized instead of turning overload into synchronous disk IO.
+		// 首次慢调用仍立即可见；同一调用点的重复阻塞改为汇总，避免过载继续放大同步磁盘 IO。
+		warningLogInterval_ = static_cast<uint64>(10.0 * stampsPerSecondD());
+	}
 
 	// 名称
 	std::string		name_;
@@ -204,9 +216,11 @@ public:
 
 	bool			initWatcher_;
 	ProfileLatencyWindow*	pLatencyWindow_;
+	ProfileWarningLimiter	warningLimiter_;
 
 private:
 	static TimeStamp warningPeriod_;
+	static TimeStamp warningLogInterval_;
 
 };
 

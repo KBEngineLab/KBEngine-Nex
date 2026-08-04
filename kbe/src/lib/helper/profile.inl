@@ -71,11 +71,20 @@ INLINE bool ProfileVal::stop(const char * filename, int lineNum, uint32 qty)
 
 	if (tooLong)
 	{
-		WARNING_MSG(fmt::format("{}:{}: Profile {} took {:.2f} seconds\n",
-			filename,
-			lineNum,
-			name_.c_str(),
-			(lastTime_  / stampsPerSecondD())));
+		const ProfileWarningLimiter::Decision decision = warningLimiter_.record(
+			timestamp(), lastTime_, warningLogInterval_.stamp());
+		if (decision.shouldLog)
+		{
+			WARNING_MSG(fmt::format(
+				"{}:{}: Profile {} took {:.2f} seconds (slowCalls={}, suppressedSinceLast={}, intervalMax={:.2f} seconds)\n",
+				filename,
+				lineNum,
+				name_.c_str(),
+				(lastTime_ / stampsPerSecondD()),
+				warningLimiter_.slowCallCount(),
+				decision.suppressedSinceLastLog,
+				(decision.intervalMaxDuration / stampsPerSecondD())));
+		}
 	}
 
 	return true;

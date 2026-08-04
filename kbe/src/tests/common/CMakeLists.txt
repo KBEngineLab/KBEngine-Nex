@@ -35,6 +35,25 @@ set_tests_properties(performance.profile_latency PROPERTIES
 	PASS_REGULAR_EXPRESSION "PROFILE_LATENCY_TEST_PASS"
 )
 
+add_executable(kbe_test_profile_warning_limiter profile_warning_limiter.cpp)
+target_include_directories(kbe_test_profile_warning_limiter PRIVATE
+	"${CMAKE_SOURCE_DIR}"
+	"${CMAKE_SOURCE_DIR}/lib"
+)
+set_target_properties(kbe_test_profile_warning_limiter PROPERTIES FOLDER "Tests/Common")
+
+if(MSVC)
+	target_compile_options(kbe_test_profile_warning_limiter PRIVATE /W4 /WX /utf-8)
+else()
+	target_compile_options(kbe_test_profile_warning_limiter PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
+add_test(NAME performance.profile_warning_limiter COMMAND kbe_test_profile_warning_limiter)
+set_tests_properties(performance.profile_warning_limiter PROPERTIES
+	LABELS "common;cxx;unit;portable;performance"
+	PASS_REGULAR_EXPRESSION "PROFILE_WARNING_LIMITER_TEST_PASS"
+)
+
 add_executable(kbe_test_witness_dirty_queue witness_dirty_queue.cpp)
 target_include_directories(kbe_test_witness_dirty_queue PRIVATE
 	"${CMAKE_SOURCE_DIR}"
@@ -133,6 +152,7 @@ set_tests_properties(baseapp.placement PROPERTIES
 add_custom_target(kbe_common_tests DEPENDS
 	kbe_test_common_pooling
 	kbe_test_profile_latency
+	kbe_test_profile_warning_limiter
 	kbe_test_witness_dirty_queue
 	kbe_test_witness_load_metrics
 	kbe_test_witness_volatile_budget

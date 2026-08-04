@@ -61,6 +61,7 @@ uint64 profileLatencyMaxAgeStamps()
 
 ProfileGroup* g_pDefaultGroup = NULL;
 TimeStamp ProfileVal::warningPeriod_;
+TimeStamp ProfileVal::warningLogInterval_;
 
 //-------------------------------------------------------------------------------------
 uint64 runningTime()
@@ -188,6 +189,18 @@ bool ProfileVal::initializeWatcher()
 	kbe_snprintf(buf, MAX_BUF, "cprofiles/%s/%s/inProgress", pProfileGroup_->name(), name_.c_str());
 	WATCH_OBJECT(buf, inProgress_);
 
+	kbe_snprintf(buf, MAX_BUF, "cprofiles/%s/%s/latency/slowCalls", pProfileGroup_->name(), name_.c_str());
+	WATCH_OBJECT(buf, this, &ProfileVal::slowCallCount);
+
+	kbe_snprintf(buf, MAX_BUF, "cprofiles/%s/%s/latency/warningLogs", pProfileGroup_->name(), name_.c_str());
+	WATCH_OBJECT(buf, this, &ProfileVal::warningLogCount);
+
+	kbe_snprintf(buf, MAX_BUF, "cprofiles/%s/%s/latency/suppressedWarnings", pProfileGroup_->name(), name_.c_str());
+	WATCH_OBJECT(buf, this, &ProfileVal::suppressedWarningCount);
+
+	kbe_snprintf(buf, MAX_BUF, "cprofiles/%s/%s/latency/slowMaxMicros", pProfileGroup_->name(), name_.c_str());
+	WATCH_OBJECT(buf, this, &ProfileVal::maxSlowMicros);
+
 	if (pLatencyWindow_)
 	{
 		kbe_snprintf(buf, MAX_BUF, "cprofiles/%s/%s/latency/count", pProfileGroup_->name(), name_.c_str());
@@ -310,6 +323,12 @@ double ProfileVal::latencyWindowMaxAgeSeconds()
 uint64 ProfileVal::latencyWindowAllocatedBytes()
 {
 	return pLatencyWindow_ ? pLatencyWindow_->allocatedBytes() : 0;
+}
+
+//-------------------------------------------------------------------------------------
+double ProfileVal::maxSlowMicros() const
+{
+	return latencyStampsToMicros(static_cast<double>(warningLimiter_.maxSlowDuration()));
 }
 
 //-------------------------------------------------------------------------------------
