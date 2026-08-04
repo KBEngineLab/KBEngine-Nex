@@ -85,6 +85,26 @@ bool testLocallyBoundReverseChannelIsAccepted()
 		"unbound reverse Channel was accepted");
 }
 
+bool testManagerPairHasExactlyOneConnectionInitiator()
+{
+	const bool baseInitiates = KBEngine::Security::shouldInitiateSingleRoute(
+		KBEngine::BASEAPPMGR_TYPE, KBEngine::CELLAPPMGR_TYPE);
+	const bool cellInitiates = KBEngine::Security::shouldInitiateSingleRoute(
+		KBEngine::CELLAPPMGR_TYPE, KBEngine::BASEAPPMGR_TYPE);
+
+	return require(KBEngine::Security::isSingleRouteManagerPair(
+			KBEngine::BASEAPPMGR_TYPE, KBEngine::CELLAPPMGR_TYPE),
+		"BaseAppMgr/CellAppMgr pair was not recognized as a single route") &&
+		require(baseInitiates != cellInitiates,
+			"manager pair did not select exactly one connection initiator") &&
+		require(!KBEngine::Security::isSingleRouteManagerPair(
+			KBEngine::BASEAPP_TYPE, KBEngine::CELLAPP_TYPE),
+			"EntityApp dual-route topology was changed by manager arbitration") &&
+		require(KBEngine::Security::shouldInitiateSingleRoute(
+			KBEngine::BASEAPP_TYPE, KBEngine::CELLAPP_TYPE),
+			"non-manager connection was unexpectedly suppressed");
+}
+
 bool testMalformedMetricsFailClosed()
 {
 	return require(KBEngine::Security::isValidComponentMetric(0.f),
@@ -122,6 +142,7 @@ int main()
 	if (!testMutatedTargetsFailClosed() ||
 		!testPayloadSenderMustMatchChannel() ||
 		!testLocallyBoundReverseChannelIsAccepted() ||
+		!testManagerPairHasExactlyOneConnectionInitiator() ||
 		!testMalformedMetricsFailClosed() ||
 		!testMalformedDatabaseRequestsFailClosed())
 		return EXIT_FAILURE;

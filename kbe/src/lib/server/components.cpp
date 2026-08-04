@@ -1467,6 +1467,27 @@ RESTART_RECV:
 			INFO_MSG(fmt::format("Components::findComponents: register self to {}...\n",
 				COMPONENT_NAME_EX((COMPONENT_TYPE)findComponentType)));
 
+			ComponentInfos* target = findComponent(
+				static_cast<COMPONENT_TYPE>(findComponentType), getUserUID(), 0);
+			if (target != NULL && Security::isSingleRouteManagerPair(
+				componentType_, target->componentType) &&
+				!Security::shouldInitiateSingleRoute(componentType_, target->componentType))
+			{
+				// 非拨号方必须等首选入站 Channel 完成注册后再结束组件发现。
+				// 只跳过 connectComponent 而直接完成启动会留下短暂无路由窗口。
+				// The non-initiator must wait until the preferred inbound Channel is
+				// registered. Merely skipping connectComponent would finish startup
+				// with a transiently unroutable manager entry.
+				if (target->pChannel == NULL || target->pChannel->isDestroyed())
+					return false;
+
+				INFO_MSG(fmt::format(
+					"Components::findComponents: using designated inbound {}({}).\n",
+					COMPONENT_NAME_EX(target->componentType), target->cid));
+				findIdx_++;
+				return false;
+			}
+
 			if(connectComponent(static_cast<COMPONENT_TYPE>(findComponentType), getUserUID(), 0) != 0)
 			{
 				ERROR_MSG(fmt::format("Components::findComponents: register self to {} error!\n",

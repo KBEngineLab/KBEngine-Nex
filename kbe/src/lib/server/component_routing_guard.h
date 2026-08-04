@@ -19,6 +19,40 @@ class Channel;
 namespace Security
 {
 
+/** Return whether two components are the manager pair that shares one TCP route.
+ *  判断两个组件是否为只需一条 TCP 路由的管理器组合。
+ *
+ * BaseAppMgr and CellAppMgr discover each other during the same startup phase. If
+ * both dial, each side can replace its outbound Channel with the opposite inbound
+ * Channel and then close the physical connection selected by its peer. Keep this
+ * policy narrowly scoped because EntityApps still rely on historical dual routes.
+ * BaseAppMgr 与 CellAppMgr 会在同一启动阶段发现对方；如果双方同时拨号，双方可能
+ * 各自用入站 Channel 替换出站 Channel，并关闭对端刚选中的物理连接。该策略必须
+ * 仅作用于管理器组合，因为 EntityApp 仍依赖历史双路由语义。
+ */
+inline bool isSingleRouteManagerPair(COMPONENT_TYPE lhs, COMPONENT_TYPE rhs) noexcept
+{
+	return (lhs == BASEAPPMGR_TYPE && rhs == CELLAPPMGR_TYPE) ||
+		(lhs == CELLAPPMGR_TYPE && rhs == BASEAPPMGR_TYPE);
+}
+
+/** Select exactly one initiator for the BaseAppMgr/CellAppMgr TCP route.
+ *  为 BaseAppMgr/CellAppMgr TCP 路由确定唯一主动连接方。
+ *
+ * Component type is stable across processes and sufficient because this policy is
+ * intentionally restricted to two different manager types.
+ * 组件类型在进程间稳定；该策略被严格限制在两种不同的管理器类型，因此类型本身
+ * 足以完成确定性裁决。
+ */
+inline bool shouldInitiateSingleRoute(COMPONENT_TYPE localType,
+	COMPONENT_TYPE remoteType) noexcept
+{
+	if (!isSingleRouteManagerPair(localType, remoteType))
+		return true;
+
+	return localType < remoteType;
+}
+
 /**
  * Convert component discovery output into a concrete message-routing target.
  * 将组件发现结果转换为确定的消息路由目标。
