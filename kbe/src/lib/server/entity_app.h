@@ -234,6 +234,14 @@ public:
 	virtual void onUpdateLoad(){}
 	virtual void calcLoad(float spareTime);
 	uint64 checkTickPeriod();
+	uint64 slowTickCount() const { return tickWarningLimiter_.slowCallCount(); }
+	uint64 tickWarningLogCount() const { return tickWarningLimiter_.warningLogCount(); }
+	uint64 suppressedTickWarningCount() const { return tickWarningLimiter_.suppressedWarningCount(); }
+	double slowTickMaxMicros() const
+	{
+		return static_cast<double>(tickWarningLimiter_.maxSlowDuration()) *
+			1000000.0 / stampsPerSecondD();
+	}
 
 protected:
 	KBEngine::script::Script								script_;
@@ -257,6 +265,10 @@ protected:
 
 	// 进程当前负载
 	float													load_;
+
+	// Slow Tick totals remain observable even when repeated warning IO is summarized.
+	// 即使重复慢 Tick 告警被汇总，完整计数仍通过 Watcher 保持可观测。
+	ProfileWarningLimiter								tickWarningLimiter_;
 };
 
 
@@ -275,7 +287,8 @@ gameTimer_(),
 pGlobalData_(NULL),
 pyCallbackMgr_(),
 lastTimestamp_(timestamp()),
-load_(0.f)
+load_(0.f),
+tickWarningLimiter_()
 {
 	ScriptTimers::initialize(*this);
 	idClient_.pApp(this);
@@ -331,6 +344,10 @@ template<class E>
 bool EntityApp<E>::initializeWatcher()
 {
 	WATCH_OBJECT("entitiesSize", this, &EntityApp<E>::entitiesSize);
+	WATCH_OBJECT("tick/slowPeriods", this, &EntityApp<E>::slowTickCount);
+	WATCH_OBJECT("tick/warningLogs", this, &EntityApp<E>::tickWarningLogCount);
+	WATCH_OBJECT("tick/suppressedWarnings", this, &EntityApp<E>::suppressedTickWarningCount);
+	WATCH_OBJECT("tick/slowMaxMicros", this, &EntityApp<E>::slowTickMaxMicros);
 	return ServerApp::initializeWatcher();
 }
 
@@ -1417,16 +1434,28 @@ int EntityApp<E>::tickPassedPercent(uint64 curr)
 template<class E>
 uint64 EntityApp<E>::checkTickPeriod()
 {
-	uint64 curr = timestamp();
-	int percent = tickPassedPercent(curr);
+	const uint64 curr = timestamp();
+	const uint64 elapsed = curr - lastTimestamp_;
+	const int percent = tickPassedPercent(curr);
 
 	if (percent > 200)
 	{
-		WARNING_MSG(fmt::format("EntityApp::checkTickPeriod: tick took {0}% ({1:.2f} seconds)!\n",
-					percent, (float(percent)/1000.f)));
+		const uint64 warningInterval = static_cast<uint64>(10.0 * stampsPerSecondD());
+		const ProfileWarningLimiter::Decision decision = tickWarningLimiter_.record(
+			curr, elapsed, warningInterval);
+		if (decision.shouldLog)
+		{
+			WARNING_MSG(fmt::format(
+				"EntityApp::checkTickPeriod: tick took {}% ({:.2f} seconds) "
+				"(slowPeriods={}, suppressedSinceLast={}, intervalMax={:.2f} seconds)!\n",
+				percent,
+				(static_cast<double>(elapsed) / stampsPerSecondD()),
+				tickWarningLimiter_.slowCallCount(),
+				decision.suppressedSinceLastLog,
+				(static_cast<double>(decision.intervalMaxDuration) / stampsPerSecondD())));
+		}
 	}
 
-	uint64 elapsed = curr - lastTimestamp_;
 	lastTimestamp_ = curr;
 	return elapsed;
 }

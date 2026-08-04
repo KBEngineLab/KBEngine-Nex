@@ -305,6 +305,10 @@ def main() -> int:
     readiness_failure: WorkloadReadinessError | None = None
     with JsonlRecorder(events_path, run_id, name) as recorder:
         try:
+            # Capture initialization separately from the potentially long readiness window.
+            # 将初始化日志与可能持续较久的负载就绪阶段分开记录。
+            for log_collector in log_collectors:
+                record_log_samples(recorder, log_collector, "startup")
             watcher_targets = wait_for_workload_ready(
                 processes,
                 watcher_collector,
@@ -315,17 +319,17 @@ def main() -> int:
                 configured_bots,
                 cluster,
             )
+            for log_collector in log_collectors:
+                record_log_samples(recorder, log_collector, "readiness")
             wait_for_warmup(
                 processes,
                 max(float(scenario.get("warmup_seconds", 0.0)), 0.0),
                 cluster,
             )
+            for log_collector in log_collectors:
+                record_log_samples(recorder, log_collector, "warmup")
             if watcher_collector:
                 drain_watcher_windows(watcher_collector, watcher_targets)
-            # 丢弃启动阶段日志，避免初始化告警污染稳态质量门；测量和关闭阶段仍分别保留。
-            # Drain startup logs so initialization noise cannot fail the steady-state gate; measurement and shutdown remain visible.
-            for log_collector in log_collectors:
-                record_log_samples(recorder, log_collector, "startup")
             watcher_sample_times: dict[tuple[str, str, int, str], float] = {}
             watcher_stamps_per_second: dict[tuple[str, str, int], float] = {}
             cprofile_previous: dict[tuple[str, str, int, str], tuple[int, float, float, float]] = {}
@@ -461,6 +465,8 @@ def main() -> int:
                     next_sample = time.monotonic()
         except WorkloadReadinessError as exc:
             readiness_failure = exc
+            for log_collector in log_collectors:
+                record_log_samples(recorder, log_collector, "readiness")
             recorder.record(
                 "runner",
                 "workload",

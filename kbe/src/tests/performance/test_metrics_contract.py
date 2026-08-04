@@ -2,6 +2,7 @@
 
 import ast
 import importlib.util
+import json
 import types
 import tempfile
 import sys
@@ -486,6 +487,7 @@ def assert_python_latency_scenario() -> None:
     witness_source = (Path(__file__).resolve().parents[2] / "server/cellapp/witness.cpp").read_text(encoding="utf-8")
     profile_source = (Path(__file__).resolve().parents[2] / "lib/helper/profile.cpp").read_text(encoding="utf-8")
     profile_inline = (Path(__file__).resolve().parents[2] / "lib/helper/profile.inl").read_text(encoding="utf-8")
+    entity_app_source = (Path(__file__).resolve().parents[2] / "lib/server/entity_app.h").read_text(encoding="utf-8")
     assert 'WATCH_OBJECT("network/clientVolatileBackpressure/activeClients"' in baseapp_source
     assert 'WATCH_OBJECT("network/clientInput/staleNoCellDrops"' in baseapp_source
     assert "++staleClientInputNoCellDrops_;" in baseapp_source
@@ -495,10 +497,28 @@ def assert_python_latency_scenario() -> None:
     assert 'WATCH_OBJECT("witness/queues/cancelledPendingLeaves"' in cellapp_source
     assert 'WATCH_OBJECT("witness/backpressure/staleControlDrops"' in cellapp_source
     assert "++staleWitnessVolatileControlDrops_;" in cellapp_source
+    assert 'WATCH_OBJECT("network/clientInput/staleEntityDrops"' in cellapp_source
+    assert 'WATCH_OBJECT("network/clientInput/staleControlledEntityDrops"' in cellapp_source
+    assert "++staleClientInputEntityDrops_;" in cellapp_source
+    assert "++staleControlledClientInputEntityDrops_;" in cellapp_source
+    assert "onUpdateDataFromClient: not found entity" not in cellapp_source
+    assert "onUpdateDataFromClientForControlledEntity: not found entity" not in cellapp_source
     for metric in ("slowCalls", "warningLogs", "suppressedWarnings", "slowMaxMicros"):
         assert f"latency/{metric}" in profile_source
     assert "suppressedSinceLast" in profile_inline
     assert "warningLimiter_.record" in profile_inline
+    for metric in ("tick/slowPeriods", "tick/warningLogs", "tick/suppressedWarnings", "tick/slowMaxMicros"):
+        assert metric in entity_app_source
+    assert "tickWarningLimiter_.record" in entity_app_source
+    gameplay_scenario = json.loads(
+        (Path(__file__).resolve().parent / "scenarios/gameplay_10000.json").read_text(encoding="utf-8")
+    )
+    for target in (
+        "BASEAPP_TYPE=@baseapp:root/tick",
+        "CELLAPP_TYPE=@cellapp:root/tick",
+        "CELLAPP_TYPE=@cellapp:root/network/clientInput",
+    ):
+        assert target in gameplay_scenario["watcher_targets"]
     semantic_message_handler = witness_source.split(
         "const Network::MessageHandler& Witness::getViewEntityMessageHandler", 1
     )[1].split("bool Witness::entityID2AliasID", 1)[0]
@@ -1097,11 +1117,17 @@ def main() -> int:
         assert summary["phase_counters"] == {}
         phase_path = Path(directory) / "phase.jsonl"
         with JsonlRecorder(phase_path, "test-run", "contract") as recorder:
+            recorder.record("logs", "all", "log.warning.count", 5, "count", {"kind": "counter", "phase": "startup"})
+            recorder.record("logs", "all", "log.error.count", 2, "count", {"kind": "counter", "phase": "readiness"})
+            recorder.record("logs", "all", "log.warning.count", 4, "count", {"kind": "counter", "phase": "warmup"})
             recorder.record("logs", "all", "log.error.count", 3, "count", {"kind": "counter", "phase": "shutdown"})
             recorder.record("logs", "all", "log.error.count", 1, "count", {"kind": "counter", "phase": "measurement"})
             recorder.record("runner", "workload", "process.exit.count", 1, "count", {"kind": "counter"})
         phase_summary = build_summary(load_events(phase_path), {"max_log_errors": 0})
-        assert phase_summary["counters"]["log.error.count"] == 4
+        assert phase_summary["counters"]["log.error.count"] == 6
+        assert phase_summary["phase_counters"]["startup"]["log.warning.count"] == 5
+        assert phase_summary["phase_counters"]["readiness"]["log.error.count"] == 2
+        assert phase_summary["phase_counters"]["warmup"]["log.warning.count"] == 4
         assert phase_summary["phase_counters"]["shutdown"]["log.error.count"] == 3
         assert phase_summary["quality"]["status"] == "BLOCKER"
         assert "workload process exits=1" in phase_summary["quality"]["blockers"]

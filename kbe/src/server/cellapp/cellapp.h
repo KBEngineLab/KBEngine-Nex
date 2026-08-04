@@ -81,6 +81,8 @@ public:
 
 	float _getLoad() const { return getLoad(); }
 	virtual void onUpdateLoad();
+	uint64 staleClientInputEntityDrops() const { return staleClientInputEntityDrops_; }
+	uint64 staleControlledClientInputEntityDrops() const { return staleControlledClientInputEntityDrops_; }
 
 	/**  网络接口
 		dbmgr告知已经启动的其他baseapp或者cellapp的地址
@@ -298,6 +300,12 @@ protected:
 	// lifecycle races without turning them into log errors.
 	// BaseApp 控制消息可能晚于 Cell 迁移目标生命周期；计数该正常竞态，避免放大为错误日志。
 	uint64								staleWitnessVolatileControlDrops_;
+
+	// Volatile client movement can arrive at the previous Cell after migration. The
+	// authenticated BaseApp source is checked before these lifecycle races are counted.
+	// 客户端易变移动可能在迁移后到达旧 Cell；先验证 BaseApp 来源，再计数该生命周期竞态。
+	uint64								staleClientInputEntityDrops_;
+	uint64								staleControlledClientInputEntityDrops_;
 };
 
 }

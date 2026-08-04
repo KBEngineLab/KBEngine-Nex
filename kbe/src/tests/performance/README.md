@@ -94,14 +94,14 @@ for their next period, and missed periods are not replayed as a burst.
 键格式为 `COMPONENT_TYPE:PATH`，值为秒且不得小于 `0.1`。未知目标会在集群启动前失败。
 每个目标使用独立单调时钟截止点；失败查询等待下一周期，错过的周期不会集中补发。
 
-The standard targets cover Bots performance; BaseApp root, stats, channels, poller, KCP, gameTick,
-scriptCall, and onTimer; and CellApp root, stats, channels, poller, gameTick, scriptCall, onTimer,
-clientUpdate, and Witness. Seven additional `/latency` targets publish the exact recent distributions
+The standard targets cover Bots performance; BaseApp root, stats, channels, poller, KCP, Tick health,
+client input, gameTick, scriptCall, and onTimer; and CellApp root, stats, channels, poller, Tick health,
+client input, gameTick, scriptCall, onTimer, clientUpdate, and Witness. Seven additional `/latency` targets publish the exact recent distributions
 for the BaseApp/CellApp profiles. Readiness queries only the targets that contain a configured
 readiness metric. Other targets begin sampling in the steady-state window, avoiding unnecessary startup load.
-标准目标覆盖 Bots performance；BaseApp root、stats、channels、poller、KCP、gameTick、
-scriptCall、onTimer；以及 CellApp root、stats、channels、poller、gameTick、scriptCall、onTimer、
-clientUpdate 和 Witness；另有 7 个 `/latency` 子目标发布 BaseApp/CellApp Profile 的真实近期分布。
+标准目标覆盖 Bots performance；BaseApp root、stats、channels、poller、KCP、Tick 健康度、客户端输入、
+gameTick、scriptCall、onTimer；以及 CellApp root、stats、channels、poller、Tick 健康度、客户端输入、
+gameTick、scriptCall、onTimer、clientUpdate 和 Witness；另有 7 个 `/latency` 子目标发布 BaseApp/CellApp Profile 的真实近期分布。
 readiness 只查询能够覆盖已配置就绪指标的目标，其余目标在稳态窗口开始采样，避免给启动阶段增加无关控制面负载。
 
 Watcher protocol responses do not carry a request ID. The collector therefore reuses one connection

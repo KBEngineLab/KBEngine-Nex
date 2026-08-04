@@ -671,7 +671,7 @@ PROBES = (
         "internal",
         "CELLAPP_TYPE",
         "Cellapp::onUpdateDataFromClient",
-        r"Cellapp::onUpdateDataFromClient: rejected incomplete fixed header",
+        r"Cellapp::onUpdateDataFromClient: rejected non-BaseApp source",
     ),
     (
         "cellapp-truncated-controlled-update",
@@ -679,7 +679,7 @@ PROBES = (
         "internal",
         "CELLAPP_TYPE",
         "Cellapp::onUpdateDataFromClientForControlledEntity",
-        r"Cellapp::onUpdateDataFromClientForControlledEntity: rejected incomplete fixed header",
+        r"Cellapp::onUpdateDataFromClientForControlledEntity: rejected non-BaseApp source",
     ),
     (
         "cellapp-truncated-ghost-property",

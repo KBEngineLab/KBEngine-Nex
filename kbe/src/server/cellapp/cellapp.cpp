@@ -196,7 +196,9 @@ Cellapp::Cellapp(Network::EventDispatcher& dispatcher,
 	flags_(APP_FLAGS_NONE),
 	spaceViewers_(),
 	pInitProgressHandler_(NULL),
-	staleWitnessVolatileControlDrops_(0)
+	staleWitnessVolatileControlDrops_(0),
+	staleClientInputEntityDrops_(0),
+	staleControlledClientInputEntityDrops_(0)
 {
 	KBEngine::Network::MessageHandlers::pMainMessageHandlers = &CellappInterface::messageHandlers;
 
@@ -332,6 +334,8 @@ bool Cellapp::initializeWatcher()
 	WATCH_OBJECT("witness/backpressure/suppressionTransitions", &Witness::suppressionTransitionCount);
 	WATCH_OBJECT("witness/backpressure/resumeTransitions", &Witness::resumeTransitionCount);
 	WATCH_OBJECT("witness/backpressure/staleControlDrops", this, &Cellapp::staleWitnessVolatileControlDrops);
+	WATCH_OBJECT("network/clientInput/staleEntityDrops", this, &Cellapp::staleClientInputEntityDrops);
+	WATCH_OBJECT("network/clientInput/staleControlledEntityDrops", this, &Cellapp::staleControlledClientInputEntityDrops);
 	WATCH_OBJECT("witness/backpressure/suppressedUpdateSkips", &Witness::suppressedUpdateSkipCount);
 	WATCH_OBJECT("witness/backpressure/structuralWhileSuppressed", &Witness::structuralWhileSuppressedCount);
 	WATCH_OBJECT("witness/bundlesSent", &Witness::bundlesSentCount);
@@ -1886,6 +1890,15 @@ void Cellapp::onRemoteCallMethodFromClient(Network::Channel* pChannel, KBEngine:
 //-------------------------------------------------------------------------------------
 void Cellapp::onUpdateDataFromClient(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (!Components::getSingleton().isExpectedComponentChannel(BASEAPP_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format(
+			"Cellapp::onUpdateDataFromClient: rejected non-BaseApp source, addr={}.\n",
+			pChannel != NULL ? pChannel->c_str() : "none"));
+		s.done();
+		return;
+	}
+
 	if (s.length() < sizeof(ENTITY_ID))
 	{
 		WARNING_MSG("Cellapp::onUpdateDataFromClient: rejected incomplete fixed header.\n");
@@ -1906,8 +1919,11 @@ void Cellapp::onUpdateDataFromClient(Network::Channel* pChannel, KBEngine::Memor
 
 	if(e == NULL)
 	{
-		WARNING_MSG(fmt::format("Cellapp::onUpdateDataFromClient: not found entity {}!\n", srcEntityID));
-		
+		// Movement is volatile and cannot be replayed after the BaseApp route changes.
+		// A missing target from an authenticated BaseApp is therefore a migration/lifecycle
+		// race, not a per-packet warning. / 移动数据不可重放；认证 BaseApp 发来的缺失目标
+		// 属于迁移或生命周期竞态，不应逐包放大为 WARNING。
+		++staleClientInputEntityDrops_;
 		s.done();
 		return;
 	}
@@ -1951,6 +1967,15 @@ void Cellapp::setWitnessVolatileUpdatesEnabled(Network::Channel* pChannel,
 //-------------------------------------------------------------------------------------
 void Cellapp::onUpdateDataFromClientForControlledEntity(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
+	if (!Components::getSingleton().isExpectedComponentChannel(BASEAPP_TYPE, pChannel))
+	{
+		WARNING_MSG(fmt::format(
+			"Cellapp::onUpdateDataFromClientForControlledEntity: rejected non-BaseApp source, addr={}.\n",
+			pChannel != NULL ? pChannel->c_str() : "none"));
+		s.done();
+		return;
+	}
+
 	if (s.length() < sizeof(ENTITY_ID) * 2)
 	{
 		WARNING_MSG("Cellapp::onUpdateDataFromClientForControlledEntity: rejected incomplete fixed header.\n");
@@ -1979,8 +2004,7 @@ void Cellapp::onUpdateDataFromClientForControlledEntity(Network::Channel* pChann
 
 	if(e == NULL)
 	{
-		ERROR_MSG(fmt::format("Cellapp::onUpdateDataFromClientForControlledEntity: not found entity {}!\n", srcEntityID));
-		
+		++staleControlledClientInputEntityDrops_;
 		s.done();
 		return;
 	}
