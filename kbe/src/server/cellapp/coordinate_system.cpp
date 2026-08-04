@@ -19,7 +19,9 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "coordinate_node.h"
 #include "coordinate_system.h"
+#ifndef KBE_COORDINATE_SYSTEM_DISABLE_PROFILE
 #include "profile.h"
+#endif
 
 #ifndef CODE_INLINE
 #include "coordinate_system.inl"
@@ -138,6 +140,66 @@ bool CoordinateSystem::insert(CoordinateNode* pNode)
 	++size_;
 
 	update(pNode);
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
+bool CoordinateSystem::insertNear(CoordinateNode* pNode, CoordinateNode* pAnchorNode)
+{
+	if (!pNode || !pAnchorNode || pNode == pAnchorNode ||
+		!pNode->hasFlags(COORDINATE_NODE_FLAG_HIDE) ||
+		pNode->pCoordinateSystem() || pAnchorNode->pCoordinateSystem() != this)
+	{
+		return false;
+	}
+
+	// RangeTrigger 边界以零范围创建，因此可以直接挂在 origin 后方。这样避免从
+	// 全局链表头移动到 origin 时扫描无关节点；真实范围随后仍由 update() 展开，
+	// 穿越回调的方向、顺序和可重入销毁语义不变。
+	// RangeTrigger boundaries are created with zero range and can therefore be
+	// linked immediately after the origin. This avoids scanning unrelated nodes
+	// from the global head; update() still expands the real range afterwards and
+	// preserves pass direction, callback order, and re-entrant destruction semantics.
+	CoordinateNode* pNextNode = pAnchorNode->pNextX();
+	pNode->pPrevX(pAnchorNode);
+	pNode->pNextX(pNextNode);
+	pAnchorNode->pNextX(pNode);
+	if (pNextNode)
+		pNextNode->pPrevX(pNode);
+	pNode->x(pAnchorNode->x());
+
+	if (CoordinateSystem::hasY)
+	{
+		pNextNode = pAnchorNode->pNextY();
+		pNode->pPrevY(pAnchorNode);
+		pNode->pNextY(pNextNode);
+		pAnchorNode->pNextY(pNode);
+		if (pNextNode)
+			pNextNode->pPrevY(pNode);
+		pNode->y(pAnchorNode->y());
+	}
+	else
+	{
+		pNode->pPrevY(NULL);
+		pNode->pNextY(NULL);
+		pNode->y(pAnchorNode->y());
+	}
+
+	pNextNode = pAnchorNode->pNextZ();
+	pNode->pPrevZ(pAnchorNode);
+	pNode->pNextZ(pNextNode);
+	pAnchorNode->pNextZ(pNode);
+	if (pNextNode)
+		pNextNode->pPrevZ(pNode);
+	pNode->z(pAnchorNode->z());
+
+	// old_* 必须反映当前挂接位置，而不是辅助节点未来的目标位置。
+	// old_* must describe the linked position, not the helper's future target.
+	pNode->old_xx(pAnchorNode->x());
+	pNode->old_yy(pAnchorNode->y());
+	pNode->old_zz(pAnchorNode->z());
+	pNode->pCoordinateSystem(this);
+	++size_;
 	return true;
 }
 
@@ -557,7 +619,9 @@ void CoordinateSystem::moveNodeZ(CoordinateNode* pNode, float pz, CoordinateNode
 //-------------------------------------------------------------------------------------
 void CoordinateSystem::update(CoordinateNode* pNode)
 {
+#ifndef KBE_COORDINATE_SYSTEM_DISABLE_PROFILE
 	AUTO_SCOPED_PROFILE("coordinateSystemUpdates");
+#endif
 
 #ifdef DEBUG_COORDINATE_SYSTEM
 	DEBUG_MSG(fmt::format("CoordinateSystem::update enter:[{:p}]:  ({}  {}  {})\n", (void*)pNode, pNode->xx(), pNode->yy(), pNode->zz()));

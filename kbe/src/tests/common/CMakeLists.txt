@@ -187,6 +187,39 @@ set_tests_properties(baseapp.placement PROPERTIES
 	PASS_REGULAR_EXPRESSION "BASEAPP_PLACEMENT_TEST_PASS"
 )
 
+add_executable(kbe_test_coordinate_system_near_insert
+	debug_helper_stubs.cpp
+	coordinate_system_near_insert.cpp
+	${CMAKE_SOURCE_DIR}/server/cellapp/coordinate_node.cpp
+	${CMAKE_SOURCE_DIR}/server/cellapp/coordinate_system.cpp
+)
+target_include_directories(kbe_test_coordinate_system_near_insert PRIVATE
+	"${CMAKE_SOURCE_DIR}"
+	"${CMAKE_SOURCE_DIR}/lib"
+	"${CMAKE_SOURCE_DIR}/server/cellapp"
+)
+target_compile_definitions(kbe_test_coordinate_system_near_insert PRIVATE
+	KBE_COORDINATE_SYSTEM_DISABLE_PROFILE
+)
+target_link_libraries(kbe_test_coordinate_system_near_insert PRIVATE common)
+set_target_properties(kbe_test_coordinate_system_near_insert PROPERTIES FOLDER "Tests/Common")
+
+if(MSVC)
+	target_compile_options(kbe_test_coordinate_system_near_insert PRIVATE /W4 /WX /utf-8)
+else()
+	target_compile_options(kbe_test_coordinate_system_near_insert PRIVATE
+		-Wall -Wextra -Wpedantic -Werror
+	)
+endif()
+
+add_test(NAME cellapp.coordinate_system_near_insert
+	COMMAND kbe_test_coordinate_system_near_insert
+)
+set_tests_properties(cellapp.coordinate_system_near_insert PROPERTIES
+	LABELS "cellapp;cxx;unit;portable;performance"
+	PASS_REGULAR_EXPRESSION "COORDINATE_SYSTEM_NEAR_INSERT_TEST_PASS"
+)
+
 add_custom_target(kbe_common_tests DEPENDS
 	kbe_test_common_pooling
 	kbe_test_profile_latency
@@ -198,5 +231,6 @@ add_custom_target(kbe_common_tests DEPENDS
 	kbe_test_witness_volatile_budget
 	kbe_test_cellapp_placement
 	kbe_test_baseapp_placement
+	kbe_test_coordinate_system_near_insert
 )
 set_target_properties(kbe_common_tests PROPERTIES FOLDER "Tests/Common")

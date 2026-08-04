@@ -70,8 +70,31 @@ bool RangeTrigger::install()
 	positiveBoundary_->addFlags(COORDINATE_NODE_FLAG_INSTALLING);
 	negativeBoundary_->addFlags(COORDINATE_NODE_FLAG_INSTALLING);
 
-	origin_->pCoordinateSystem()->insert(positiveBoundary_);
-	origin_->pCoordinateSystem()->insert(negativeBoundary_);
+	CoordinateSystem* pCoordinateSystem = origin_->pCoordinateSystem();
+	if (!pCoordinateSystem || !pCoordinateSystem->insertNear(positiveBoundary_, origin_))
+	{
+		positiveBoundary_->onTriggerUninstall();
+		negativeBoundary_->onTriggerUninstall();
+		delete positiveBoundary_;
+		delete negativeBoundary_;
+		positiveBoundary_ = NULL;
+		negativeBoundary_ = NULL;
+		return false;
+	}
+
+	if (!pCoordinateSystem->insertNear(negativeBoundary_, origin_))
+	{
+		// 第二条边界失败时，先解除未入链节点的 origin 引用，再由统一卸载
+		// 路径延迟回收已入链节点，避免留下 watcher 悬挂引用。
+		// If the second boundary fails, detach its origin reference first. The
+		// normal uninstall path then defers reclamation of the linked boundary and
+		// cannot leave a dangling watcher reference behind.
+		negativeBoundary_->onTriggerUninstall();
+		delete negativeBoundary_;
+		negativeBoundary_ = NULL;
+		uninstall();
+		return false;
+	}
 	
 	/*
 	注意：此处必须是先安装negativeBoundary_再安装positiveBoundary_，如果调换顺序则会导致View的BUG，例如：在一个实体enterView触发时销毁了进入View的实体

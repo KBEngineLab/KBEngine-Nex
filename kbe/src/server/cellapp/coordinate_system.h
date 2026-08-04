@@ -42,6 +42,18 @@ public:
 	bool insert(CoordinateNode* pNode);
 
 	/**
+		在已安装节点附近插入隐藏的辅助节点，不触发节点穿越回调。
+		Insert a hidden helper node beside an installed anchor without firing pass callbacks.
+
+		该入口用于 RangeTrigger 的零范围边界。调用者随后仍需通过 update()
+		展开真实范围，确保 Enter/Leave 事件只来自实际覆盖的坐标区间。
+		This entry is for zero-range RangeTrigger boundaries. The caller must still
+		expand the real range through update(), so Enter/Leave events only come from
+		the coordinate interval that is actually covered.
+	*/
+	bool insertNear(CoordinateNode* pNode, CoordinateNode* pAnchorNode);
+
+	/**
 		将节点从list中移除
 	*/
 	bool remove(CoordinateNode* pNode);
