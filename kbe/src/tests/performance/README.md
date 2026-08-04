@@ -22,9 +22,7 @@ python -B -m performance.run `
   --baseapp-count 3 `
   --cellapp-count 6 `
   --bots 10000 `
-  --bots-processes 4 `
-  --bots-batch-size 8 `
-  --bots-batch-interval 0.08 `
+  --bots-processes 40 `
   --server-ready-timeout 300 `
   --workload-ready-timeout 300
 ```
@@ -32,13 +30,15 @@ python -B -m performance.run `
 With `--start-cluster`, the runner defaults `--server-binary-dir` to the repository's stable
 `kbe/bin/server` directory, generates the singleton components plus the requested BaseApp/CellApp
 processes, and supplies the Bots executable automatically. Pass `--server-binary-dir` only to
-override that location. `--bots-batch-size` is the aggregate
-batch across all Bots processes and must divide evenly; the example creates about 100 Bots/second.
+override that location. `--bots-batch-size` is the aggregate batch across all Bots processes and
+must divide evenly. Without explicit batch arguments, the scenario's aggregate connection rate is
+partitioned across all Bots processes; the example creates about 100 Bots/second.
 Server startup waits for BaseAppMgr and CellAppMgr `root/readiness` values derived from
 `onReadyForLogin`, including exact expected process counts. It does not depend on game Space logs.
 使用 `--start-cluster` 时，运行器默认从仓库稳定目录 `kbe/bin/server` 生成单例组件和指定数量的
 BaseApp/CellApp，并自动选择 Bots 可执行文件；只有覆盖该位置时才需要传 `--server-binary-dir`。
-`--bots-batch-size` 表示全部 Bots 进程合计的单批数量且必须可整除；示例约为每秒 100 Bots。
+`--bots-batch-size` 表示全部 Bots 进程合计的单批数量且必须可整除。未显式传入批次参数时，
+运行器会把场景的聚合连接速率分摊给全部 Bots 进程；示例约为每秒 100 Bots。
 服务端启动通过 BaseAppMgr/CellAppMgr 的 `root/readiness` 等待底层 `onReadyForLogin` 聚合结果，
 同时校验精确进程数，不再依赖业务 Space 日志。
 
@@ -63,6 +63,15 @@ Bots 默认只写自身滚动日志且不连接 Logger。只有需要 IDE/PyChar
 The runner writes `raw.jsonl`, `summary.json`, and `report.md` below the repository-root
 `kbe/src/out/performance-runs/`, regardless of the caller's current directory. Pass
 `--output-root` to override it explicitly.
+
+Dynamic Watcher endpoints are resolved as one batch: the runner indexes owned manifests and
+logs once, then uses at most one cached Machine broadcast for unresolved components. The resolved
+list is reused throughout readiness. On Windows, CPU and memory sampling calls Win32 APIs directly
+instead of starting `Get-Process` every second, so a saturated host cannot silently lose all
+process metrics to PowerShell startup timeouts.
+动态 Watcher 端点按批解析：运行器只索引一次本轮清单和日志，剩余组件最多触发一次缓存的
+Machine 广播，并在整个 readiness 阶段复用解析结果。Windows 的 CPU/内存采样直接调用
+Win32 API，不再每秒启动 `Get-Process`，避免主机饱和时因 PowerShell 启动超时而丢失全部进程指标。
 运行器默认把 `raw.jsonl`、`summary.json` 和 `report.md` 写入仓库根目录下的
 `kbe/src/out/performance-runs/`，与启动时的当前目录无关；需要时可用 `--output-root` 覆盖。
 

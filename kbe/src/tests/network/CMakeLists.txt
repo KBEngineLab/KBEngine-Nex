@@ -34,6 +34,10 @@ add_executable(kbe_test_network_udp_send_backpressure
     ${CMAKE_SOURCE_DIR}/lib/network/udp_send_backpressure.cpp
 )
 
+add_executable(kbe_test_network_channel_index_identity
+    channel_index_identity.cpp
+)
+
 # These focused fixtures compile selected network implementation files directly.
 # common.h publicly includes fmt headers, so inherit fmt usage requirements without
 # linking the full common library and its unrelated runtime initialization.
@@ -48,6 +52,7 @@ set(_kbe_network_test_targets
     kbe_test_network_kcp_send_state
     kbe_test_network_kcp_protocol_metrics
     kbe_test_network_udp_send_backpressure
+	 kbe_test_network_channel_index_identity
 )
 foreach(_kbe_network_test_target IN LISTS _kbe_network_test_targets)
     target_link_libraries(${_kbe_network_test_target} PRIVATE fmt::fmt)
@@ -67,6 +72,8 @@ target_include_directories(kbe_test_network_kcp_protocol_metrics SYSTEM PRIVATE 
 set_target_properties(kbe_test_network_kcp_protocol_metrics PROPERTIES FOLDER "Tests/Network")
 target_include_directories(kbe_test_network_udp_send_backpressure SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/lib)
 set_target_properties(kbe_test_network_udp_send_backpressure PROPERTIES FOLDER "Tests/Network")
+target_include_directories(kbe_test_network_channel_index_identity SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/lib)
+set_target_properties(kbe_test_network_channel_index_identity PROPERTIES FOLDER "Tests/Network")
 target_include_directories(kbe_test_network_completion_rearm SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/lib)
 set_target_properties(kbe_test_network_completion_rearm PROPERTIES FOLDER "Tests/Network")
 
@@ -82,6 +89,7 @@ if(MSVC)
         $<$<COMPILE_LANGUAGE:C>:/W3;/utf-8>
     )
     target_compile_options(kbe_test_network_udp_send_backpressure PRIVATE /W4 /WX /utf-8)
+	 target_compile_options(kbe_test_network_channel_index_identity PRIVATE /W4 /WX /utf-8)
 else()
     target_compile_options(kbe_test_network_completion_rearm PRIVATE
         -Wall -Wextra -Wpedantic -Werror
@@ -107,6 +115,9 @@ else()
     target_compile_options(kbe_test_network_udp_send_backpressure PRIVATE
         -Wall -Wextra -Wpedantic -Werror
     )
+	 target_compile_options(kbe_test_network_channel_index_identity PRIVATE
+		-Wall -Wextra -Wpedantic -Werror
+	 )
 endif()
 
 add_test(NAME network.completion_rearm_queue COMMAND kbe_test_network_completion_rearm)
@@ -157,6 +168,12 @@ set_tests_properties(network.udp_send_backpressure PROPERTIES
     PASS_REGULAR_EXPRESSION "UDP_SEND_BACKPRESSURE_TEST_PASS"
 )
 
+add_test(NAME network.channel_index_identity COMMAND kbe_test_network_channel_index_identity)
+set_tests_properties(network.channel_index_identity PROPERTIES
+	LABELS "network;cxx;unit;portable;security"
+	PASS_REGULAR_EXPRESSION "CHANNEL_INDEX_IDENTITY_TEST_PASS"
+)
+
 add_custom_target(kbe_network_tests DEPENDS
     kbe_test_network_completion_rearm
     kbe_test_network_completion_send_queue
@@ -166,5 +183,6 @@ add_custom_target(kbe_network_tests DEPENDS
     kbe_test_network_kcp_send_state
     kbe_test_network_kcp_protocol_metrics
     kbe_test_network_udp_send_backpressure
+	 kbe_test_network_channel_index_identity
 )
 set_target_properties(kbe_network_tests PROPERTIES FOLDER "Tests/Network")

@@ -19,6 +19,44 @@ set_tests_properties(common.pooling PROPERTIES
     PASS_REGULAR_EXPRESSION "COMMON_POOLING_TEST_PASS"
 )
 
+add_executable(kbe_test_timer_fairness
+	debug_helper_stubs.cpp
+	timer_fairness.cpp
+)
+target_link_libraries(kbe_test_timer_fairness PRIVATE common)
+set_target_properties(kbe_test_timer_fairness PROPERTIES FOLDER "Tests/Common")
+
+add_executable(kbe_test_receive_window_policy
+	debug_helper_stubs.cpp
+	receive_window_policy.cpp
+)
+target_include_directories(kbe_test_receive_window_policy PRIVATE
+	"${CMAKE_SOURCE_DIR}"
+	"${CMAKE_SOURCE_DIR}/lib"
+)
+target_link_libraries(kbe_test_receive_window_policy PRIVATE common)
+set_target_properties(kbe_test_receive_window_policy PROPERTIES FOLDER "Tests/Common")
+
+if(MSVC)
+	target_compile_options(kbe_test_timer_fairness PRIVATE /W4 /WX /utf-8)
+	target_compile_options(kbe_test_receive_window_policy PRIVATE /W4 /WX /utf-8)
+else()
+	target_compile_options(kbe_test_timer_fairness PRIVATE -Wall -Wextra -Wpedantic -Werror)
+	target_compile_options(kbe_test_receive_window_policy PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
+add_test(NAME common.timer_fairness COMMAND kbe_test_timer_fairness)
+set_tests_properties(common.timer_fairness PROPERTIES
+	LABELS "common;cxx;unit;portable;performance"
+	PASS_REGULAR_EXPRESSION "TIMER_FAIRNESS_TEST_PASS"
+)
+
+add_test(NAME security.receive_window_policy COMMAND kbe_test_receive_window_policy)
+set_tests_properties(security.receive_window_policy PROPERTIES
+	LABELS "network;cxx;unit;portable;security;performance"
+	PASS_REGULAR_EXPRESSION "RECEIVE_WINDOW_POLICY_TEST_PASS"
+)
+
 add_executable(kbe_test_profile_latency profile_latency.cpp)
 target_link_libraries(kbe_test_profile_latency PRIVATE helper)
 set_target_properties(kbe_test_profile_latency PROPERTIES FOLDER "Tests/Common")
@@ -222,6 +260,8 @@ set_tests_properties(cellapp.coordinate_system_near_insert PROPERTIES
 
 add_custom_target(kbe_common_tests DEPENDS
 	kbe_test_common_pooling
+	kbe_test_timer_fairness
+	kbe_test_receive_window_policy
 	kbe_test_profile_latency
 	kbe_test_profile_warning_limiter
 	kbe_test_message_processing_metrics

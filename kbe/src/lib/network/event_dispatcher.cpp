@@ -142,6 +142,13 @@ void EventDispatcher::clearSpareTime()
 }
 
 //-------------------------------------------------------------------------------------
+uint64 EventDispatcher::systemTimerMaxLatenessMicros() const
+{
+	return static_cast<uint64>((static_cast<double>(pTimers_->maxLateness()) * 1000000.0) /
+		stampsPerSecondD());
+}
+
+//-------------------------------------------------------------------------------------
 void EventDispatcher::addTask(Task * pTask)
 {
 	pTasks_->add(pTask);
@@ -177,7 +184,9 @@ void EventDispatcher::processTasks()
 void EventDispatcher::processTimers()
 {
 	AUTO_SCOPED_PROFILE("callSystemTimers")
-	numTimerCalls_ += pTimers_->process(timestamp());
+	// 每轮保留网络轮询机会；过期周期 Timer 会跳过陈旧周期，不会在后续轮次补跑。
+	// Preserve a network-poll opportunity each round; overdue periodic timers skip stale intervals instead of replaying them later.
+	numTimerCalls_ += pTimers_->process(timestamp(), 256);
 }
 
 //-------------------------------------------------------------------------------------

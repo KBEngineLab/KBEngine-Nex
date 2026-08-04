@@ -112,7 +112,8 @@ size_t Channel::getPoolObjectBytes()
 		+ sizeof(proxyID_) + strextra_.size() + sizeof(channelType_)
 		+ sizeof(componentID_) + sizeof(sessionEpoch_) + sizeof(pMsgHandlers_) + sizeof(pKCP_) + condemnReason_.size()
 		+ sizeof(sendWindowMessagesOverflowWarningActive_) + sizeof(sendWindowBytesOverflowWarningActive_)
-		+ sizeof(receiveWindowMessagesOverflowWarningActive_);
+		+ sizeof(receiveWindowMessagesOverflowWarningActive_) + sizeof(receiveWindowMessagesOverflowState_)
+		+ sizeof(registeredInNetworkInterface_);
 
 	return bytes;
 }
@@ -126,6 +127,9 @@ Channel::SmartPoolObjectPtr Channel::createSmartPoolObj(const std::string& logPo
 //-------------------------------------------------------------------------------------
 void Channel::onReclaimObject()
 {
+	// 对象池复用必须切断旧地址索引身份；NetworkInterface 会在正常注销时提前清除同一标记。
+	// Pool reuse must invalidate the old address-index identity; normal NetworkInterface removal clears it earlier.
+	registeredInNetworkInterface_ = false;
 	this->clearState();
 }
 
@@ -142,6 +146,7 @@ Channel::Channel(NetworkInterface & networkInterface,
 		const EndPoint * pEndPoint, Traits traits, ProtocolType pt,
 		PacketFilterPtr pFilter, ChannelID id, ProtocolSubType protocolSubtype):
 	pNetworkInterface_(NULL),
+	registeredInNetworkInterface_(false),
 	traits_(traits),
 	protocoltype_(pt),
 	protocolSubtype_(protocolSubtype),
@@ -175,6 +180,7 @@ Channel::Channel(NetworkInterface & networkInterface,
 	sendWindowMessagesOverflowWarningActive_(false),
 	sendWindowBytesOverflowWarningActive_(false),
 	receiveWindowMessagesOverflowWarningActive_(false),
+	receiveWindowMessagesOverflowState_(),
 	tlsDetectionPrefix_(),
 	gracefulCloseStarted_(false),
 	webSocketCloseSent_(false),
@@ -189,6 +195,7 @@ Channel::Channel(NetworkInterface & networkInterface,
 //-------------------------------------------------------------------------------------
 Channel::Channel():
 	pNetworkInterface_(NULL),
+	registeredInNetworkInterface_(false),
 	traits_(EXTERNAL),
 	protocoltype_(PROTOCOL_TCP),
 	protocolSubtype_(SUB_PROTOCOL_DEFAULT),
@@ -223,6 +230,7 @@ Channel::Channel():
 	sendWindowMessagesOverflowWarningActive_(false),
 	sendWindowBytesOverflowWarningActive_(false),
 	receiveWindowMessagesOverflowWarningActive_(false),
+	receiveWindowMessagesOverflowState_(),
 	tlsDetectionPrefix_(),
 	gracefulCloseStarted_(false),
 	webSocketCloseSent_(false),
@@ -648,6 +656,7 @@ void Channel::clearState( bool warnOnDiscard /*=false*/ )
 	sendWindowMessagesOverflowWarningActive_ = false;
 	sendWindowBytesOverflowWarningActive_ = false;
 	receiveWindowMessagesOverflowWarningActive_ = false;
+	receiveWindowMessagesOverflowState_ = ReceiveWindowOverflowState();
 	tlsDetectionPrefix_.clear();
 	gracefulCloseStarted_ = false;
 	webSocketCloseSent_ = false;
@@ -1069,10 +1078,30 @@ void Channel::addReceiveWindow(Packet* pPacket)
 			if(Network::g_extReceiveWindowMessagesOverflow > 0 && 
 				lastTickBufferedReceives_ > Network::g_extReceiveWindowMessagesOverflow)
 			{
-				ERROR_MSG(fmt::format("Channel::addReceiveWindow[{:p}]: external channel({}), receive window has overflowed({} > {}), Try adjusting the kbengine[_defs].xml->windowOverflow->receive->messages->external.\n", 
-					(void*)this, this->c_str(), lastTickBufferedReceives_, Network::g_extReceiveWindowMessagesOverflow));
+				const ReceiveWindowOverflowDecision decision = evaluateReceiveWindowOverflow(
+					proxyID_ > 0, lastTickEpoch_, receiveWindowMessagesOverflowState_);
 
-				this->condemn("Channel::addReceiveWindow: receive window has overflowed!");
+				if (decision != RECEIVE_WINDOW_OVERFLOW_ALREADY_RECORDED)
+				{
+					pNetworkInterface_->recordReceiveWindowOverflow(
+						decision == RECEIVE_WINDOW_OVERFLOW_DEFER,
+						decision == RECEIVE_WINDOW_OVERFLOW_CONDEMN);
+				}
+
+				if (decision == RECEIVE_WINDOW_OVERFLOW_CONDEMN)
+				{
+					ERROR_MSG(fmt::format("Channel::addReceiveWindow[{:p}]: external channel({}), receive window has overflowed({} > {}, consecutiveTicks={}), closing channel.\n",
+						(void*)this, this->c_str(), lastTickBufferedReceives_, Network::g_extReceiveWindowMessagesOverflow,
+						receiveWindowMessagesOverflowState_.consecutiveTicks));
+					this->condemn("Channel::addReceiveWindow: receive window has overflowed!");
+				}
+				else if (decision == RECEIVE_WINDOW_OVERFLOW_DEFER &&
+					!receiveWindowMessagesOverflowWarningActive_)
+				{
+					receiveWindowMessagesOverflowWarningActive_ = true;
+					WARNING_MSG(fmt::format("Channel::addReceiveWindow[{:p}]: authenticated external channel({}), transient receive burst deferred({} > {}).\n",
+						(void*)this, this->c_str(), lastTickBufferedReceives_, Network::g_extReceiveWindowMessagesOverflow));
+				}
 			}
 			else
 			{

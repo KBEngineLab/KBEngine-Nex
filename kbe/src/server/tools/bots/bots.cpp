@@ -1949,6 +1949,10 @@ void Bots::delSpaceData(Network::Channel* pChannel, SPACE_ID spaceID, const std:
 //-------------------------------------------------------------------------------------		
 void Bots::queryWatcher(Network::Channel* pChannel, MemoryStream& s)
 {
+	// Bots 的连接创建/重试会高频复用 Channel 对象；统计扫描前清除失效地址索引。
+	// Bots creation and retry reuse Channel objects aggressively; remove stale address entries before metric scans.
+	networkInterface().purgeStaleChannelIndexEntries();
+
 	AUTO_SCOPED_PROFILE("watchers");
 
 	std::string path;

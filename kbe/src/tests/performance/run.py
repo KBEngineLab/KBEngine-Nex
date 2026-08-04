@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 import shlex
@@ -67,7 +68,10 @@ def parse_args() -> argparse.Namespace:
                         help="Skip account creation and authenticate pre-provisioned deterministic Bots accounts")
     parser.add_argument("--tools-root", type=Path, help="kbe/tools/server root for Watcher queries")
     parser.add_argument("--watcher-target", action="append", default=[], metavar="TYPE=HOST:PORT:PATH|TYPE=@COMPONENT:PATH")
-    parser.add_argument("--watcher-timeout", type=float, default=2.0)
+    parser.add_argument("--watcher-timeout", type=float,
+                        help="Watcher request timeout; defaults to watcher_timeout_seconds in the scenario")
+    parser.add_argument("--watcher-concurrency", type=int,
+                        help="Parallel Watcher queries; defaults to watcher_concurrency in the scenario")
     parser.add_argument("--workload-ready-timeout", type=float, default=60.0)
     parser.add_argument("--thresholds", type=Path, help="Quality thresholds JSON; defaults to the scenario reference")
     parser.add_argument("--start-cluster", action="store_true", help="Start and own an isolated server cluster")
@@ -105,6 +109,20 @@ def main() -> int:
         args.start_cluster,
     )
     scenario = load_scenario(args.scenario)
+    args.watcher_timeout = float(
+        args.watcher_timeout
+        if args.watcher_timeout is not None
+        else scenario.get("watcher_timeout_seconds", 2.0)
+    )
+    if args.watcher_timeout <= 0:
+        raise ValueError("--watcher-timeout must be positive")
+    args.watcher_concurrency = int(
+        args.watcher_concurrency
+        if args.watcher_concurrency is not None
+        else scenario.get("watcher_concurrency", 1)
+    )
+    if args.watcher_concurrency <= 0:
+        raise ValueError("--watcher-concurrency must be positive")
     fixture_root = resolve_fixture_root(str(scenario["fixture"])) if scenario.get("fixture") else None
     name = str(scenario["name"])
     duration = float(args.duration if args.duration is not None else scenario.get("duration_seconds", 30))
@@ -320,6 +338,7 @@ def main() -> int:
                 dict(scenario.get("readiness", {})),
                 configured_bots,
                 cluster,
+                args.watcher_concurrency,
             )
             for log_collector in log_collectors:
                 record_log_samples(recorder, log_collector, "readiness")
@@ -373,6 +392,7 @@ def main() -> int:
                     record_log_samples(recorder, log_collector, "measurement")
                 if watcher_collector:
                     sample_now = time.monotonic()
+                    due_targets: list[WatcherTarget] = []
                     for target in watcher_targets:
                         instance = watcher_instance(target)
                         target_id = (target.component_type, target.host, target.port, target.path)
@@ -405,28 +425,38 @@ def main() -> int:
                                 "ms",
                             )
                         watcher_sample_times[target_id] = sample_now
-                        request_started_ms = monotonic_milliseconds()
-                        try:
-                            values = watcher_collector.query(target)
-                        except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
+                        due_targets.append(target)
+                        if watcher_schedule is not None:
+                            # 查询并发时截止时间必须在投递前统一推进，避免快响应目标改变同轮判断。
+                            # Advance deadlines before dispatch so fast responses cannot alter this cycle's due set.
+                            watcher_schedule.mark_sampled(target, sample_now)
+
+                    for target, request_started_ms, request_finished_ms, values, error in query_watcher_batch(
+                        watcher_collector,
+                        due_targets,
+                        args.watcher_concurrency,
+                    ):
+                        instance = watcher_instance(target)
+                        operation = f"watcher:{instance}:{target.path}"
+                        if error is not None:
                             recorder.record_request_latency(
                                 "watcher",
                                 instance,
                                 operation,
                                 request_started_ms,
-                                monotonic_milliseconds(),
+                                request_finished_ms,
                                 False,
-                                type(exc).__name__,
+                                type(error).__name__,
                                 float(scenario.get("slow_request_threshold_ms", 0.0)) or None,
                             )
-                            recorder.record("watcher", instance, "query.error.count", 1, "count", {"kind": "counter", "error": type(exc).__name__})
+                            recorder.record("watcher", instance, "query.error.count", 1, "count", {"kind": "counter", "error": type(error).__name__})
                         else:
                             recorder.record_request_latency(
                                 "watcher",
                                 instance,
                                 operation,
                                 request_started_ms,
-                                monotonic_milliseconds(),
+                                request_finished_ms,
                                 True,
                                 slow_threshold_ms=float(scenario.get("slow_request_threshold_ms", 0.0)) or None,
                             )
@@ -462,12 +492,6 @@ def main() -> int:
                                     int(query_stats.connection_reused),
                                     "count",
                                 )
-                        finally:
-                            if watcher_schedule is not None:
-                                # Anchor deadlines to the sampling cycle so query RTT cannot
-                                # accidentally halve a one-second target's effective cadence.
-                                # 截止时间锚定采样周期，避免查询 RTT 把一秒目标意外降成隔轮采样。
-                                watcher_schedule.mark_sampled(target, sample_now)
                 recorder.flush()
                 next_sample += interval
                 delay = next_sample - time.monotonic()
@@ -866,6 +890,32 @@ def watcher_instance(target: WatcherTarget) -> str:
     return target.component_name or target.component_type
 
 
+def query_watcher_batch(
+    collector: WatcherCollector,
+    targets: list[WatcherTarget],
+    concurrency: int,
+) -> list[tuple[WatcherTarget, float, float, dict[str, object] | None, Exception | None]]:
+    """Query independent component/path connections concurrently and preserve target order.
+    并行查询相互独立的组件/路径连接，并按输入顺序返回，保证报告可复现。
+    """
+    if not targets:
+        return []
+
+    def query_one(
+        target: WatcherTarget,
+    ) -> tuple[WatcherTarget, float, float, dict[str, object] | None, Exception | None]:
+        started = monotonic_milliseconds()
+        try:
+            values = collector.query(target)
+        except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
+            return target, started, monotonic_milliseconds(), None, exc
+        return target, started, monotonic_milliseconds(), values, None
+
+    worker_count = min(max(int(concurrency), 1), len(targets))
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        return list(executor.map(query_one, targets))
+
+
 def record_watcher_samples(
     recorder: JsonlRecorder,
     target: WatcherTarget,
@@ -1038,6 +1088,7 @@ def wait_for_workload_ready(
     readiness: dict[str, object],
     configured_bots: int,
     cluster: PerformanceCluster | None = None,
+    query_concurrency: int = 1,
 ) -> list[WatcherTarget]:
     """Exclude process and Watcher startup from the measured request window.
     将进程和 Watcher 启动期排除在请求成功率与延迟窗口之外。
@@ -1048,6 +1099,7 @@ def wait_for_workload_ready(
     last_error: Exception | None = None
     last_observed: dict[str, object] = {}
     last_resolved_targets: list[WatcherTarget] = []
+    resolved_targets: list[WatcherTarget] | None = None
     while time.monotonic() < deadline:
         if cluster is not None:
             cluster.assert_running("workload readiness")
@@ -1058,20 +1110,39 @@ def wait_for_workload_ready(
                 last_observed,
             )
         try:
-            resolved_targets = [
-                (
-                    watcher_collector.resolve_target(target, log_roots)
-                    if hasattr(watcher_collector, "resolve_target")
-                    else resolve_target(target, log_roots)
-                )
-                for target in watcher_targets
-            ]
+            if resolved_targets is None:
+                if hasattr(watcher_collector, "resolve_targets"):
+                    resolved_targets = watcher_collector.resolve_targets(
+                        watcher_targets, log_roots, deadline,
+                    )
+                else:
+                    resolved_targets = [
+                        (
+                            watcher_collector.resolve_target(target, log_roots)
+                            if hasattr(watcher_collector, "resolve_target")
+                            else resolve_target(target, log_roots)
+                        )
+                        for target in watcher_targets
+                    ]
             last_resolved_targets = resolved_targets
             observed: dict[str, object] = {}
             readiness_targets = select_readiness_targets(resolved_targets, readiness)
             aggregate_readiness = len(readiness_targets) > 1
-            for target in readiness_targets:
-                values = watcher_collector.query(target)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("workload readiness deadline exhausted")
+
+            # 每个目标拥有独立 Watcher 连接，因此可按组件并行读取；聚合仍在主线程按稳定顺序完成。
+            # Every target owns a separate Watcher connection, so component reads may run in
+            # parallel while deterministic aggregation remains on the controller thread.
+            worker_count = min(max(query_concurrency, 1), max(len(readiness_targets), 1))
+            with ThreadPoolExecutor(max_workers=worker_count) as executor:
+                query_results = list(executor.map(
+                    lambda target: watcher_collector.query(target, remaining),
+                    readiness_targets,
+                ))
+
+            for target, values in zip(readiness_targets, query_results):
                 for metric, value in values.items():
                     full_metric = f"{target.path}/{metric}".replace("//", "/")
                     if aggregate_readiness and full_metric in readiness:
@@ -1098,7 +1169,10 @@ def wait_for_workload_ready(
             last_error = exc
             time.sleep(0.25)
     failure_snapshot = collect_readiness_failure_snapshot(
-        watcher_collector, last_resolved_targets, last_observed
+        watcher_collector,
+        last_resolved_targets,
+        last_observed,
+        time.monotonic() + min(watcher_collector.timeout_seconds, 10.0),
     )
     raise WorkloadReadinessError(
         f"workload readiness timed out after {timeout_seconds:.1f}s: {last_error}",
@@ -1110,6 +1184,7 @@ def collect_readiness_failure_snapshot(
     watcher_collector: WatcherCollector,
     resolved_targets: list[WatcherTarget],
     readiness_observed: dict[str, object],
+    deadline: float | None = None,
 ) -> dict[str, object]:
     """Collect one per-component diagnostic snapshot after readiness has failed.
     readiness 失败后采集一次按组件区分的诊断快照。
@@ -1133,8 +1208,11 @@ def collect_readiness_failure_snapshot(
         )
     ]
     for target in leaf_targets:
+        remaining = None if deadline is None else deadline - time.monotonic()
+        if remaining is not None and remaining <= 0:
+            break
         try:
-            values = watcher_collector.query(target)
+            values = watcher_collector.query(target, remaining)
         except (LookupError, OSError, RuntimeError, TimeoutError, ValueError):
             continue
         instance = target.component_name or (

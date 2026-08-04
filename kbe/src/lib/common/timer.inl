@@ -25,7 +25,12 @@ TimersT<TIME_STAMP>::TimersT():
 	timeQueue_(),
 	pProcessingNode_( NULL ),
 	lastProcessTime_( 0 ),
-	numCancelled_( 0 )
+	numCancelled_( 0 ),
+	skippedIntervals_( 0 ),
+	budgetExhaustions_( 0 ),
+	maxLateness_( 0 ),
+	lastFired_( 0 ),
+	maxFired_( 0 )
 {
 }
 
@@ -122,21 +127,33 @@ void TimersT< TIME_STAMP >::purgeCancelledTimes()
 }
 
 template <class TIME_STAMP>
-int TimersT< TIME_STAMP >::process(TimeStamp now)
+int TimersT< TIME_STAMP >::process(TimeStamp now, size_t maxCallbacks)
 {
 	int numFired = 0;
+	lastFired_ = 0;
 
 	while ((!timeQueue_.empty()) && (
 		timeQueue_.top()->time() <= now ||
 		timeQueue_.top()->isCancelled()))
 	{
+		// 已取消节点不占用回调预算，否则取消洪峰会阻塞仍然有效的定时器。
+		// Cancelled nodes do not consume callback budget, so cancellation bursts cannot block live timers.
+		if (!timeQueue_.top()->isCancelled() && maxCallbacks > 0 &&
+			static_cast<size_t>(numFired) >= maxCallbacks)
+		{
+			++budgetExhaustions_;
+			break;
+		}
+
 		Time * pTime = pProcessingNode_ = timeQueue_.top();
 		timeQueue_.pop();
 
 		if (!pTime->isCancelled())
 		{
+			const uint64 lateness = static_cast<uint64>(now - pTime->time());
+			maxLateness_ = std::max(maxLateness_, lateness);
 			++numFired;
-			pTime->triggerTimer();
+			skippedIntervals_ += pTime->triggerTimer(now);
 		}
 
 		if (!pTime->isCancelled())
@@ -154,6 +171,8 @@ int TimersT< TIME_STAMP >::process(TimeStamp now)
 
 	pProcessingNode_ = NULL;
 	lastProcessTime_ = now;
+	lastFired_ = static_cast<uint64>(numFired);
+	maxFired_ = std::max(maxFired_, lastFired_);
 	return numFired;
 }
 
@@ -258,8 +277,10 @@ TimersT< TIME_STAMP >::Time::Time( TimersBase & owner,
 }
 
 template <class TIME_STAMP>
-void TimersT< TIME_STAMP >::Time::triggerTimer()
+uint64 TimersT< TIME_STAMP >::Time::triggerTimer(TimeStamp now)
 {
+	uint64 skippedIntervals = 0;
+
 	if (!this->isCancelled())
 	{
 		state_ = TIME_EXECUTING;
@@ -275,8 +296,22 @@ void TimersT< TIME_STAMP >::Time::triggerTimer()
 	if (!this->isCancelled())
 	{
 		time_ += interval_;
+
+		// 实时服务器不能逐次补跑已经失去时效性的周期回调。保留原相位并直接跳到未来，
+		// 避免慢 Tick 触发 Timer 洪峰并进一步拖慢网络和脚本主循环。
+		// Real-time servers must not replay stale periodic callbacks one by one. Preserve phase and
+		// jump directly into the future to prevent a slow tick from amplifying timer, network, and script backlog.
+		if (interval_ > 0 && time_ <= now)
+		{
+			const TimeStamp intervals = ((now - time_) / interval_) + 1;
+			time_ += intervals * interval_;
+			skippedIntervals = static_cast<uint64>(intervals);
+		}
+
 		state_ = TIME_PENDING;
 	}
+
+	return skippedIntervals;
 }
 
 }

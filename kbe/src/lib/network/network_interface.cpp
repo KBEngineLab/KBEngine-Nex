@@ -80,6 +80,10 @@ NetworkInterface::NetworkInterface(Network::EventDispatcher * pDispatcher,
 	finalizedKcpSendtoSampleStamps_(0),
 	finalizedKcpSendtoMaxSampleStamps_(0),
 	discardedPacketsAfterCloseCount_(0),
+	receiveWindowOverflowBurstCount_(0),
+	receiveWindowOverflowDeferredCount_(0),
+	receiveWindowOverflowCondemnedCount_(0),
+	channelIndexMismatchCount_(0),
 	kcpInputErrorCount_(0),
 	kcpInputTooShortCount_(0),
 	kcpInputConversationMismatchCount_(0),
@@ -145,8 +149,12 @@ NetworkInterface::~NetworkInterface()
 	{
 		ChannelMap::iterator oldIter = iter++;
 		Channel * pChannel = oldIter->second;
-		pChannel->destroy();
-		delete pChannel;
+		if (currentRegisteredChannel(oldIter) != NULL)
+		{
+			pChannel->registeredInNetworkInterface(false);
+			pChannel->destroy();
+			delete pChannel;
+		}
 	}
 
 	channelMap_.clear();
@@ -193,10 +201,18 @@ void NetworkInterface::cleanupChannel(ChannelMap::iterator iter)
 {
 	cancelChannelMaintenance(iter->first);
 	Channel* pChannel = iter->second;
+	const bool ownsCurrentEntry = pChannel != NULL && pChannel->registeredInNetworkInterface() &&
+		pChannel->pNetworkInterface() == this && pChannel->pEndPoint() != NULL &&
+		pChannel->addr() == iter->first;
 	channelMap_.erase(iter);
 
-	if (pChannel == NULL)
+	if (!ownsCurrentEntry)
+	{
+		++channelIndexMismatchCount_;
 		return;
+	}
+
+	pChannel->registeredInNetworkInterface(false);
 
 	if (pChannel->isExternal())
 	{
@@ -423,7 +439,7 @@ Channel * NetworkInterface::findChannel(const Address & addr)
 		return NULL;
 
 	Channel* pChannel = iter->second;
-	if (pChannel != NULL && pChannel->isDestroyed())
+	if (currentRegisteredChannel(iter) == NULL || pChannel->isDestroyed())
 	{
 		cleanupChannel(iter);
 		return NULL;
@@ -439,7 +455,7 @@ Channel * NetworkInterface::findChannel(KBESOCKET fd)
 	while (iter != channelMap_.end())
 	{
 		Channel* pChannel = iter->second;
-		if (pChannel != NULL && pChannel->isDestroyed())
+		if (currentRegisteredChannel(iter) == NULL || pChannel->isDestroyed())
 		{
 			ChannelMap::iterator current = iter++;
 			cleanupChannel(current);
@@ -453,6 +469,24 @@ Channel * NetworkInterface::findChannel(KBESOCKET fd)
 	}
 
 	return NULL;
+}
+
+//-------------------------------------------------------------------------------------
+uint32 NetworkInterface::purgeStaleChannelIndexEntries()
+{
+	uint32 purged = 0;
+	ChannelMap::iterator iter = channelMap_.begin();
+	while (iter != channelMap_.end())
+	{
+		ChannelMap::iterator current = iter++;
+		if (currentRegisteredChannel(current) == NULL)
+		{
+			cleanupChannel(current);
+			++purged;
+		}
+	}
+
+	return purged;
 }
 
 //-------------------------------------------------------------------------------------
@@ -475,6 +509,12 @@ bool NetworkInterface::registerChannel(Channel* pChannel, bool replaceExistingAc
 	KBE_ASSERT(&pChannel->networkInterface() == this);
 	ChannelMap::iterator iter = channelMap_.find(addr);
 	Channel * pExisting = iter != channelMap_.end() ? iter->second : NULL;
+	if (pExisting != NULL && currentRegisteredChannel(iter) == NULL)
+	{
+		cleanupChannel(iter);
+		iter = channelMap_.end();
+		pExisting = NULL;
+	}
 
 	if(pExisting)
 	{
@@ -502,7 +542,8 @@ bool NetworkInterface::registerChannel(Channel* pChannel, bool replaceExistingAc
 		cleanupChannel(iter);
 	}
 
-	channelMap_[addr] = pChannel;
+	channelMap_[addr] = ChannelIndexEntry(pChannel, pChannel->sessionEpoch());
+	pChannel->registeredInNetworkInterface(true);
 	if (pChannel->isDestroyed() || pChannel->condemn() > 0)
 		requestChannelMaintenance(pChannel);
 
@@ -521,8 +562,19 @@ bool NetworkInterface::deregisterAllChannels()
 	{
 		ChannelMap::iterator oldIter = iter++;
 		Channel * pChannel = oldIter->second;
-		pChannel->destroy();
-		Network::Channel::reclaimPoolObject(pChannel);
+		const bool ownsCurrentEntry = pChannel != NULL && pChannel->registeredInNetworkInterface() &&
+			pChannel->pNetworkInterface() == this && pChannel->pEndPoint() != NULL &&
+			pChannel->addr() == oldIter->first;
+		if (ownsCurrentEntry)
+		{
+			pChannel->registeredInNetworkInterface(false);
+			pChannel->destroy();
+			Network::Channel::reclaimPoolObject(pChannel);
+		}
+		else
+		{
+			++channelIndexMismatchCount_;
+		}
 	}
 
 	channelMap_.clear();
@@ -538,6 +590,16 @@ bool NetworkInterface::deregisterChannel(Channel* pChannel)
 	const Address & addr = pChannel->addr();
 	KBE_ASSERT(pChannel->pEndPoint() != NULL);
 	cancelChannelMaintenance(addr);
+	ChannelMap::iterator iter = channelMap_.find(addr);
+
+	if (iter == channelMap_.end() || !iter->second.matches(pChannel, pChannel->sessionEpoch()) ||
+		!pChannel->registeredInNetworkInterface() || pChannel->pNetworkInterface() != this)
+	{
+		++channelIndexMismatchCount_;
+		WARNING_MSG(fmt::format("NetworkInterface::deregisterChannel: stale channel index ignored for {}.\n",
+			pChannel->c_str()));
+		return false;
+	}
 
 	if(pChannel->isExternal())
 		numExtChannels_--;
@@ -545,14 +607,8 @@ bool NetworkInterface::deregisterChannel(Channel* pChannel)
 	//INFO_MSG(fmt::format("NetworkInterface::deregisterChannel: del channel: {}\n",
 	//	pChannel->c_str()));
 
-	if (!channelMap_.erase(addr))
-	{
-		CRITICAL_MSG(fmt::format("NetworkInterface::deregisterChannel: "
-				"Channel not found {}!\n",
-			pChannel->c_str()));
-
-		return false;
-	}
+	channelMap_.erase(iter);
+	pChannel->registeredInNetworkInterface(false);
 
 	if(pChannelDeregisterHandler_)
 	{
@@ -560,6 +616,21 @@ bool NetworkInterface::deregisterChannel(Channel* pChannel)
 	}	
 
 	return true;
+}
+
+//-------------------------------------------------------------------------------------
+const Channel* NetworkInterface::currentRegisteredChannel(ChannelMap::const_iterator iter) const
+{
+	const Channel* pChannel = iter->second;
+	if (pChannel == NULL || !pChannel->registeredInNetworkInterface() ||
+		pChannel->pNetworkInterface() != this || pChannel->pEndPoint() == NULL ||
+		pChannel->addr() != iter->first ||
+		!iter->second.matches(pChannel, pChannel->sessionEpoch()))
+	{
+		return NULL;
+	}
+
+	return pChannel;
 }
 
 //-------------------------------------------------------------------------------------
@@ -598,9 +669,9 @@ void NetworkInterface::processChannels(KBEngine::Network::MessageHandlers* pMsgH
 
 		Network::Channel* pChannel = iter->second;
 
-		if(pChannel == NULL)
+		if(currentRegisteredChannel(iter) == NULL)
 		{
-			channelMap_.erase(iter);
+			cleanupChannel(iter);
 		}
 		else if(pChannel->isDestroyed())
 		{

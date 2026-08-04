@@ -192,6 +192,18 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("globalOrder", this, &ServerApp::globalOrder);
 	WATCH_OBJECT("groupOrder", this, &ServerApp::groupOrder);
 	WATCH_OBJECT("gametime", this, &ServerApp::time);
+	WATCH_OBJECT("timers/system/active", &dispatcher_, &Network::EventDispatcher::systemTimerActiveCount);
+	WATCH_OBJECT("timers/system/skippedIntervals", &dispatcher_, &Network::EventDispatcher::systemTimerSkippedIntervals);
+	WATCH_OBJECT("timers/system/budgetExhaustions", &dispatcher_, &Network::EventDispatcher::systemTimerBudgetExhaustions);
+	WATCH_OBJECT("timers/system/maxLatenessMicros", &dispatcher_, &Network::EventDispatcher::systemTimerMaxLatenessMicros);
+	WATCH_OBJECT("timers/system/lastFired", &dispatcher_, &Network::EventDispatcher::systemTimerLastFired);
+	WATCH_OBJECT("timers/system/maxFired", &dispatcher_, &Network::EventDispatcher::systemTimerMaxFired);
+	WATCH_OBJECT("timers/script/active", this, &ServerApp::scriptTimerActiveCount);
+	WATCH_OBJECT("timers/script/skippedIntervals", this, &ServerApp::scriptTimerSkippedIntervals);
+	WATCH_OBJECT("timers/script/budgetExhaustions", this, &ServerApp::scriptTimerBudgetExhaustions);
+	WATCH_OBJECT("timers/script/maxLatenessTicks", this, &ServerApp::scriptTimerMaxLatenessTicks);
+	WATCH_OBJECT("timers/script/lastFired", this, &ServerApp::scriptTimerLastFired);
+	WATCH_OBJECT("timers/script/maxFired", this, &ServerApp::scriptTimerMaxFired);
 	WATCH_OBJECT("network/channels/external", &networkInterface_, &Network::NetworkInterface::numExtChannels);
 	WATCH_OBJECT("network/channels/externalTcp", &networkInterface_, &Network::NetworkInterface::numExternalTcpChannels);
 	WATCH_OBJECT("network/channels/externalWebSocket", &networkInterface_, &Network::NetworkInterface::numExternalWebSocketChannels);
@@ -202,6 +214,10 @@ bool ServerApp::initializeWatcher()
 	// 关闭维护队列应远小于总 Channel 数，持续增长表示优雅关闭或回收流程没有收敛。
 	// The close-maintenance queue should remain far smaller than the Channel population; sustained growth exposes a stalled close or reclamation path.
 	WATCH_OBJECT("network/channels/pendingMaintenance", &networkInterface_, &Network::NetworkInterface::pendingChannelMaintenanceCount);
+	WATCH_OBJECT("network/channels/indexMismatches", &networkInterface_, &Network::NetworkInterface::channelIndexMismatchCount);
+	WATCH_OBJECT("network/receiveWindow/overflowBursts", &networkInterface_, &Network::NetworkInterface::receiveWindowOverflowBurstCount);
+	WATCH_OBJECT("network/receiveWindow/deferredBursts", &networkInterface_, &Network::NetworkInterface::receiveWindowOverflowDeferredCount);
+	WATCH_OBJECT("network/receiveWindow/condemnedChannels", &networkInterface_, &Network::NetworkInterface::receiveWindowOverflowCondemnedCount);
 	// completion 重投递队列应只包含暂时失败项；持续非零或 retry 快速增长表示 SQ/驱动资源或 socket 生命周期异常。
 	// The completion rearm queue should contain only transient failures; sustained backlog or rapidly growing retries signals SQ/driver pressure or a socket lifecycle fault.
 	WATCH_OBJECT("network/poller/pendingRearms", &networkInterface_, &Network::NetworkInterface::pendingPollerRearms);
@@ -345,6 +361,10 @@ void ServerApp::queryWatcher(Network::Channel* pChannel, MemoryStream& s)
 {
 	if(pChannel->isExternal())
 		return;
+
+	// Watcher 会线性读取 Channel/KCP 指标，先移除对象池复用后遗留的旧地址索引，避免诊断路径解引用已复用对象。
+	// Watcher reads Channel/KCP metrics linearly; purge stale address identities first so diagnostics never dereference pooled reuse.
+	networkInterface_.purgeStaleChannelIndexEntries();
 	
 	AUTO_SCOPED_PROFILE("watchers");
 
@@ -413,7 +433,9 @@ void ServerApp::handleTimeout(TimerHandle, void * arg)
 void ServerApp::handleTimers()
 {
 	AUTO_SCOPED_PROFILE("callScriptTimers");
-	timers().process(g_kbetime);
+	// 脚本 Timer 与 Entity、网络共享单线程 Tick，限制单 Tick 回调数可阻止 AI 到期洪峰独占主循环。
+	// Script timers share the single-threaded tick with entities and networking; cap callbacks so an AI expiry burst cannot monopolize it.
+	timers().process(g_kbetime, 512);
 }
 
 //-------------------------------------------------------------------------------------		

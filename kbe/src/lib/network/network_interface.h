@@ -43,10 +43,30 @@ class Packet;
 class EventDispatcher;
 class MessageHandlers;
 
+// Channel 使用对象池后，裸指针地址会被后续会话复用。索引必须同时保存会话代次，
+// 否则旧地址条目可能把新对象误判成原连接并在 Watcher 扫描时解引用错误的传输状态。
+// Channel addresses are reused by the object pool, so the index must snapshot the
+// session generation or a stale entry may treat a later object as the old connection.
+struct ChannelIndexEntry
+{
+	ChannelIndexEntry(Channel* channel = NULL, uint64 epoch = 0) :
+		pChannel(channel), sessionEpoch(epoch) {}
+
+	bool matches(const Channel* channel, uint64 epoch) const
+	{
+		return pChannel == channel && sessionEpoch != 0 && sessionEpoch == epoch;
+	}
+
+	operator Channel*() const { return pChannel; }
+
+	Channel* pChannel;
+	uint64 sessionEpoch;
+};
+
 class NetworkInterface : public TimerHandler
 {
 public:
-	typedef std::map<Address, Channel *>	ChannelMap;
+	typedef std::map<Address, ChannelIndexEntry>	ChannelMap;
 	typedef std::set<Address>			ChannelMaintenanceSet;
 	
 	NetworkInterface(EventDispatcher * pDispatcher,
@@ -72,6 +92,7 @@ public:
 	bool registerAcceptedChannel(Channel* pChannel);
 	bool deregisterChannel(Channel* pChannel);
 	bool deregisterAllChannels();
+	uint32 purgeStaleChannelIndexEntries();
 	Channel * findChannel(const Address & addr);
 	Channel * findChannel(KBESOCKET fd);
 
@@ -155,6 +176,10 @@ public:
 	uint64 pollerCompletionMaxConsecutiveBudgetExhaustions() const;
 	uint64 pollerCompletionTimeBudgetExhaustionCount() const;
 	uint64 discardedPacketsAfterCloseCount() const { return discardedPacketsAfterCloseCount_; }
+	uint64 receiveWindowOverflowBurstCount() const { return receiveWindowOverflowBurstCount_; }
+	uint64 receiveWindowOverflowDeferredCount() const { return receiveWindowOverflowDeferredCount_; }
+	uint64 receiveWindowOverflowCondemnedCount() const { return receiveWindowOverflowCondemnedCount_; }
+	uint64 channelIndexMismatchCount() const { return channelIndexMismatchCount_; }
 	uint64 kcpScheduledChannelCount() const;
 	uint64 kcpSchedulerHeapEntryCount() const;
 	uint64 kcpScheduleRequestCount() const;
@@ -236,6 +261,7 @@ private:
 	void closeSocket();
 	uint64 kcpSendtoSampleTotalStamps() const;
 	void cleanupChannel(ChannelMap::iterator iter);
+	const Channel* currentRegisteredChannel(ChannelMap::const_iterator iter) const;
 	bool registerChannel(Channel* pChannel, bool replaceExistingAcceptedChannel);
 	void requestChannelMaintenance(Channel* pChannel);
 	void cancelChannelMaintenance(const Address& address);
@@ -247,6 +273,14 @@ private:
 		uint64 dataOutputCalls, uint64 dataOutputBytes, uint64 sendtoSampleCalls,
 		uint64 sendtoSampleStamps, uint64 sendtoMaxSampleStamps);
 	void recordDiscardedPacketAfterClose() { ++discardedPacketsAfterCloseCount_; }
+	void recordReceiveWindowOverflow(bool deferred, bool condemned)
+	{
+		++receiveWindowOverflowBurstCount_;
+		if (deferred)
+			++receiveWindowOverflowDeferredCount_;
+		if (condemned)
+			++receiveWindowOverflowCondemnedCount_;
+	}
 	uint64 channelTickEpoch() const { return channelTickEpoch_; }
 
 private:
@@ -277,6 +311,10 @@ private:
 	uint64									finalizedKcpSendtoSampleStamps_;
 	uint64									finalizedKcpSendtoMaxSampleStamps_;
 	uint64									discardedPacketsAfterCloseCount_;
+	uint64									receiveWindowOverflowBurstCount_;
+	uint64									receiveWindowOverflowDeferredCount_;
+	uint64									receiveWindowOverflowCondemnedCount_;
+	uint64									channelIndexMismatchCount_;
 	uint64									kcpInputErrorCount_;
 	uint64									kcpInputTooShortCount_;
 	uint64									kcpInputConversationMismatchCount_;

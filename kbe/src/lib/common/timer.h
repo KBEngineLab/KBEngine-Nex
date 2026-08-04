@@ -133,7 +133,12 @@ public:
 	inline size_t size() const	{ return timeQueue_.size(); }
 	inline bool empty() const	{ return timeQueue_.empty(); }
 	
-	int	process(TimeStamp now);
+	int	process(TimeStamp now, size_t maxCallbacks = 0);
+	inline uint64 skippedIntervals() const { return skippedIntervals_; }
+	inline uint64 budgetExhaustions() const { return budgetExhaustions_; }
+	inline uint64 maxLateness() const { return maxLateness_; }
+	inline uint64 lastFired() const { return lastFired_; }
+	inline uint64 maxFired() const { return maxFired_; }
 	bool legal( TimerHandle handle ) const;
 	TIME_STAMP nextExp( TimeStamp now ) const;
 	void clear( bool shouldCallCancel = true );
@@ -163,7 +168,7 @@ private:
 		TIME_STAMP time() const			{ return time_; }
 		TIME_STAMP interval() const		{ return interval_; }
 
-		void triggerTimer();
+		uint64 triggerTimer(TimeStamp now);
 
 	private:
 		TimeStamp			time_;
@@ -231,6 +236,11 @@ private:
 	Time * 			pProcessingNode_;
 	TimeStamp 		lastProcessTime_;
 	int				numCancelled_;
+	uint64			skippedIntervals_;
+	uint64			budgetExhaustions_;
+	uint64			maxLateness_;
+	uint64			lastFired_;
+	uint64			maxFired_;
 
 	TimersT( const TimersT & );
 	TimersT & operator=( const TimersT & );

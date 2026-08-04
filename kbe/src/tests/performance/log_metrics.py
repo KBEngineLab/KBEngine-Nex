@@ -7,8 +7,10 @@ from pathlib import Path
 
 
 DEFAULT_PATTERNS = {
-    "error": re.compile(r"\bERROR\b|\[ERROR\]", re.IGNORECASE),
-    "warning": re.compile(r"\bWARN(?:ING)?\b|\[WARNING\]", re.IGNORECASE),
+    # 日志级别只允许出现在行首；业务字段中的 error=... 不是 ERROR 日志。
+    # Severity belongs at the start of a log line; an error=... payload field is not an ERROR record.
+    "error": re.compile(r"^\s*(?:ERROR\b|\[ERROR\])", re.IGNORECASE | re.MULTILINE),
+    "warning": re.compile(r"^\s*(?:WARN(?:ING)?\b|\[WARNING\])", re.IGNORECASE | re.MULTILINE),
     "not_found_msgid": re.compile(r"not found msgID", re.IGNORECASE),
     "resource_unavailable": re.compile(r"REASON_RESOURCE_UNAVAILABLE", re.IGNORECASE),
     "abnormal_exit": re.compile(r"Abnormal exit|abnormal exit", re.IGNORECASE),

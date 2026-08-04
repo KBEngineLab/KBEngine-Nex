@@ -103,6 +103,12 @@ public:
 	Timers & timers() { return timers_; }
 	double gameTimeInSeconds() const;
 	void handleTimers();
+	uint64 scriptTimerActiveCount() const { return timers_.size(); }
+	uint64 scriptTimerSkippedIntervals() const { return timers_.skippedIntervals(); }
+	uint64 scriptTimerBudgetExhaustions() const { return timers_.budgetExhaustions(); }
+	uint64 scriptTimerMaxLatenessTicks() const { return timers_.maxLateness(); }
+	uint64 scriptTimerLastFired() const { return timers_.lastFired(); }
+	uint64 scriptTimerMaxFired() const { return timers_.maxFired(); }
 
 	thread::ThreadPool& threadPool() { return threadPool_; }
 

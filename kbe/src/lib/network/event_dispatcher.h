@@ -72,6 +72,12 @@ public:
 
 	uint64 getSpareTime() const;
 	void clearSpareTime();
+	uint64 systemTimerActiveCount() const { return pTimers_->size(); }
+	uint64 systemTimerSkippedIntervals() const { return pTimers_->skippedIntervals(); }
+	uint64 systemTimerBudgetExhaustions() const { return pTimers_->budgetExhaustions(); }
+	uint64 systemTimerMaxLatenessMicros() const;
+	uint64 systemTimerLastFired() const { return pTimers_->lastFired(); }
+	uint64 systemTimerMaxFired() const { return pTimers_->maxFired(); }
 
 	ErrorReporter & errorReporter()	{ return *pErrorReporter_; }
 

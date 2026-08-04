@@ -3,6 +3,7 @@
 import ast
 import importlib.util
 import json
+import os
 import types
 import tempfile
 import sys
@@ -16,7 +17,7 @@ from performance.assets import build_environment, create_config_overlay, resolve
 from performance.cluster import PerformanceCluster
 from performance.log_metrics import IncrementalLogCollector
 from performance.metrics import JsonlRecorder
-from performance.process_metrics import ProcessCollector, _parse_windows_process_row
+from performance.process_metrics import ProcessCollector, ProcessGroupCollector, _parse_windows_process_row
 from performance.report import build_summary, load_events, validate_event
 from performance.run import (
     _repository_root,
@@ -521,6 +522,12 @@ def assert_python_latency_scenario() -> None:
     assert "CELLAPP_TYPE=@cellapp:root/witness/messages" in gameplay["watcher_targets"]
     assert "CELLAPP_TYPE=@cellapp:root/witness/queues" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/witness/queues"] == 5.0
+    for component in ("BASEAPP_TYPE", "CELLAPP_TYPE"):
+        component_name = component.split("_", 1)[0].lower()
+        assert f"{component}=@{component_name}:root/timers" in gameplay["watcher_targets"]
+        assert gameplay["watcher_intervals"][f"{component}:root/timers"] == 5.0
+        assert f"{component}=@{component_name}:root/network/receiveWindow" in gameplay["watcher_targets"]
+        assert gameplay["watcher_intervals"][f"{component}:root/network/receiveWindow"] == 5.0
 
     defaults_path = Path(__file__).resolve().parents[3] / "res/server/kbengine_defaults.xml"
     defaults_source = defaults_path.read_text(encoding="utf-8")
@@ -537,6 +544,9 @@ def assert_python_latency_scenario() -> None:
     profile_inline = (Path(__file__).resolve().parents[2] / "lib/helper/profile.inl").read_text(encoding="utf-8")
     entity_app_source = (Path(__file__).resolve().parents[2] / "lib/server/entity_app.h").read_text(encoding="utf-8")
     server_app_source = (Path(__file__).resolve().parents[2] / "lib/server/serverapp.cpp").read_text(encoding="utf-8")
+    assert 'WATCH_OBJECT("timers/system/skippedIntervals"' in server_app_source
+    assert 'WATCH_OBJECT("timers/script/budgetExhaustions"' in server_app_source
+    assert 'WATCH_OBJECT("network/receiveWindow/condemnedChannels"' in server_app_source
     assert 'WATCH_OBJECT("network/clientVolatileBackpressure/activeClients"' in baseapp_source
     assert 'WATCH_OBJECT("network/clientInput/staleNoCellDrops"' in baseapp_source
     assert "++staleClientInputNoCellDrops_;" in baseapp_source
@@ -696,7 +706,9 @@ def assert_gameplay_stress_scenario() -> None:
     assert scenario["reliable_udp_min_rto_ms"] == 50
     assert scenario["runtime_log_level"] == "warn"
     assert scenario["server_runtime_log_level"] == "warn"
-    assert scenario["workload_processes"] == 4
+    assert scenario["workload_processes"] == 40
+    assert scenario["watcher_timeout_seconds"] == 10
+    assert scenario["watcher_concurrency"] == 8
     assert scenario["workload_cid_start"] == 10000
     assert "fixture" not in scenario
     assert "server_readiness" not in scenario
@@ -864,8 +876,9 @@ def assert_readiness_target_ownership() -> None:
 
     class AggregateCollector:
         @staticmethod
-        def query(target):
+        def query(target, _timeout_seconds=None):
             assert target.component_type == "BOTS_TYPE"
+            assert _timeout_seconds is not None and 0 < _timeout_seconds <= 0.1
             return {"clientsTotal": 2500, "clientsKcp": 2500}
 
     aggregate_targets = [
@@ -890,7 +903,7 @@ def assert_readiness_target_ownership() -> None:
 
     class FailureCollector:
         @staticmethod
-        def query(target):
+        def query(target, _timeout_seconds=None):
             return {"value": target.port}
 
     failure_targets = [
@@ -1062,6 +1075,13 @@ def main() -> int:
     assert process_sample.private_bytes == 102
     assert process_sample.peak_working_set_bytes == 103
     assert process_sample.thread_count == 7 and process_sample.handle_count == 19
+    if os.name == "nt":
+        # The formal runner must not depend on spawning PowerShell while the host
+        # is CPU saturated. Exercise the direct Win32 process path in the contract.
+        # 正式压测在 CPU 饱和时不能依赖创建 PowerShell；契约直接覆盖 Win32 采样路径。
+        native_samples = ProcessGroupCollector({"self": os.getpid()}).sample()
+        assert native_samples["self"].working_set_bytes > 0
+        assert native_samples["self"].private_bytes > 0
     target = parse_target("BOTS_TYPE=127.0.0.1:11000:root/bots/network/poller")
     assert target.component_type == "BOTS_TYPE"
     assert target.port == 11000
@@ -1156,11 +1176,16 @@ def main() -> int:
         assert bots_log_config == legacy_bots_log_config
         assert "log4j.rootLogger=info, R" in baseapp_log_config
         log_path = root / "streamed.log"
-        log_path.write_text("ordinary line\nWARNING split across chunks\nERROR final\n", encoding="utf-8")
+        log_path.write_text(
+            "ordinary line\nWARNING split across chunks\n"
+            "WARN root - ClientObject::onNetworkError: error=channel inactivity timeout\n"
+            "ERROR final\n",
+            encoding="utf-8",
+        )
         log_collector = IncrementalLogCollector(root)
         log_collector.READ_CHUNK_CHARS = 7
         log_counts = log_collector.sample()
-        assert log_counts["warning"] == 1 and log_counts["error"] == 1
+        assert log_counts["warning"] == 2 and log_counts["error"] == 1
         assert log_collector.sample()["warning"] == 0
         path = Path(directory) / "raw.jsonl"
         with JsonlRecorder(path, "test-run", "contract") as recorder:

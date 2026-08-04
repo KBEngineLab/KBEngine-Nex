@@ -32,6 +32,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/endpoint.h"
 #include "network/packet.h"
 #include "network/common.h"
+#include "network/receive_window_policy.h"
 #include "network/bundle.h"
 #include "network/interfaces.h"
 #include "network/packet_filter.h"
@@ -122,7 +123,10 @@ public:
 
 	NetworkInterface & networkInterface()			{ return *pNetworkInterface_; }
 	NetworkInterface* pNetworkInterface()			{ return pNetworkInterface_; }
+	const NetworkInterface* pNetworkInterface() const { return pNetworkInterface_; }
 	void pNetworkInterface(NetworkInterface* pNetworkInterface) { pNetworkInterface_ = pNetworkInterface; }
+	bool registeredInNetworkInterface() const { return registeredInNetworkInterface_; }
+	void registeredInNetworkInterface(bool value) { registeredInNetworkInterface_ = value; }
 
 	INLINE const Address& addr() const;
 	void pEndPoint(const EndPoint* pEndPoint);
@@ -306,6 +310,7 @@ private:
 
 private:
 	NetworkInterface * 			pNetworkInterface_;
+	bool						registeredInNetworkInterface_;
 	Traits						traits_;
 	ProtocolType				protocoltype_;
 	ProtocolSubType			protocolSubtype_;
@@ -363,6 +368,7 @@ private:
 	bool						sendWindowMessagesOverflowWarningActive_;
 	bool						sendWindowBytesOverflowWarningActive_;
 	bool						receiveWindowMessagesOverflowWarningActive_;
+	ReceiveWindowOverflowState receiveWindowMessagesOverflowState_;
 	// 只缓存不足以判定 TLS record header 的前 1-2 字节，避免首个 completion 过短时误判原生协议。
 	// Retain only the first 1-2 bytes needed to classify a TLS record header when the initial completion is too short.
 	std::vector<char>			tlsDetectionPrefix_;

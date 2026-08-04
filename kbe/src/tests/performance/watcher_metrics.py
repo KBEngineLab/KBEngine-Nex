@@ -147,7 +147,11 @@ class MachineEndpointResolver:
                 self._cache[(name, int(info.componentID))] = endpoint
                 self._cache.setdefault((name, None), endpoint)
 
-    def _refresh(self, desired: tuple[str, int | None]) -> None:
+    def _refresh(
+        self,
+        desired: set[tuple[str, int | None]],
+        deadline: float | None = None,
+    ) -> None:
         self._initialize()
         assert self._machines is not None
         assert self._machines_module is not None and self._message_stream is not None
@@ -158,40 +162,68 @@ class MachineEndpointResolver:
         message.writeInt32(self._machines.uid)
         message.writeString(self._machines.username)
         message.writeUint16(socket.htons(self._machines.replyPort))
-        started = time.monotonic()
-
         def on_response(data: bytes, _address: tuple[str, int]) -> bool:
             self._machines.parseQueryData(data)
             self._index_discovered_components()
-            return desired in self._cache or time.monotonic() - started >= 10.0
+            return desired.issubset(self._cache) or (
+                deadline is not None and time.monotonic() >= deadline
+            )
 
         # Stop as soon as the desired component arrives. Machines.queryAllInterfaces
         # waits for UDP silence, which is unbounded while a large response stream is
         # active and can defeat the runner's outer readiness timeout.
         # 找到目标组件后立即停止；Machines.queryAllInterfaces 会等待 UDP 静默，
         # 大响应流下时长无上限，会使运行器外层 readiness 超时失效。
+        remaining = 0.5 if deadline is None else max(deadline - time.monotonic(), 0.01)
         self._machines.sendAndReceive(
-            message.build(), "<broadcast>", trycount=0, timeout=0.5, callback=on_response,
+            message.build(), "<broadcast>", trycount=0,
+            timeout=min(0.5, remaining), callback=on_response,
         )
 
-    def resolve(self, target: WatcherTarget) -> WatcherTarget:
+    @staticmethod
+    def _target_key(target: WatcherTarget) -> tuple[str, int | None]:
         component_name, separator, component_id = target.component_name.partition("#")
-        key = (component_name.lower(), int(component_id) if separator else None)
-        endpoint = self._cache.get(key)
-        if endpoint is None:
-            self._refresh(key)
+        return component_name.lower(), int(component_id) if separator else None
+
+    def resolve_many(
+        self,
+        targets: list[WatcherTarget],
+        deadline: float | None = None,
+    ) -> list[WatcherTarget]:
+        """Resolve all dynamic endpoints with at most one Machine broadcast.
+        最多通过一次 Machine 广播解析本批全部动态端点。
+
+        A high-process-count run may contain dozens of Bots component IDs. Querying
+        each ID separately multiplies Machine work and can consume the entire
+        readiness window before the first Watcher request is sent.
+        高进程数压测会包含数十个 Bots 组件 ID；逐 ID 广播会放大 Machine 工作量，
+        甚至在首次 Watcher 请求前耗尽整个 readiness 窗口。
+        """
+        keys = [self._target_key(target) for target in targets]
+        missing = {key for key in keys if key not in self._cache}
+        if missing:
+            if deadline is not None and time.monotonic() >= deadline:
+                raise TimeoutError("component endpoint discovery deadline exhausted")
+            self._refresh(missing, deadline)
+
+        resolved: list[WatcherTarget] = []
+        for target, key in zip(targets, keys):
             endpoint = self._cache.get(key)
-        if endpoint is None:
-            raise LookupError(
-                f"component endpoint is not registered with Machine: {target.component_name}"
-            )
-        return WatcherTarget(
-            target.component_type,
-            endpoint[0],
-            endpoint[1],
-            target.path,
-            target.component_name,
-        )
+            if endpoint is None:
+                raise LookupError(
+                    f"component endpoint is not registered with Machine: {target.component_name}"
+                )
+            resolved.append(WatcherTarget(
+                target.component_type,
+                endpoint[0],
+                endpoint[1],
+                target.path,
+                target.component_name,
+            ))
+        return resolved
+
+    def resolve(self, target: WatcherTarget) -> WatcherTarget:
+        return self.resolve_many([target])[0]
 
     def close(self) -> None:
         if self._machines is not None:
@@ -344,6 +376,98 @@ class WatcherCollector:
         """
         return resolve_target(target, log_roots, self._machine_resolver)
 
+    def resolve_targets(
+        self,
+        targets: list[WatcherTarget],
+        log_roots: list[Path],
+        deadline: float | None = None,
+    ) -> list[WatcherTarget]:
+        """Resolve manifests/logs first, then batch unresolved Machine targets.
+        优先解析清单和日志，再批量发现剩余的 Machine 目标。
+        """
+        endpoints: dict[tuple[str, int | None], tuple[str, int]] = {}
+        manifest_paths = {
+            root.parent / "components.json" for root in log_roots
+            if (root.parent / "components.json").is_file()
+        }
+        for path in manifest_paths:
+            if deadline is not None and time.monotonic() >= deadline:
+                raise TimeoutError("component endpoint discovery deadline exhausted")
+            try:
+                manifest = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            for item in manifest:
+                name = str(item.get("name", "")).lower()
+                host = str(item.get("intaddr", ""))
+                port = int(item.get("intport", 0))
+                component_id = int(item.get("component_id", 0))
+                if name and host and port > 0:
+                    endpoints[(name, component_id)] = (host, port)
+                    endpoints.setdefault((name, None), (host, port))
+
+        # Runtime logs are indexed once for the whole target set. Bots commonly
+        # run with WARN logging, so missing entries intentionally fall through to
+        # the single Machine broadcast below.
+        # 本轮日志只建立一次索引；Bots 常以 WARN 级别运行，没有端点日志时统一
+        # 交给下方的一次 Machine 广播发现。
+        endpoint_pattern = re.compile(
+            r"componentType:([^,\s]+)(?:,|\s).*?componentID:(\d+)(?:,|\s).*?"
+            r"intaddr:([^,]+), intport:(\d+)",
+            re.IGNORECASE,
+        )
+        scanned_logs: set[Path] = set()
+        for root in log_roots:
+            if not root.exists():
+                continue
+            for path in root.rglob("*.log"):
+                if path in scanned_logs:
+                    continue
+                scanned_logs.add(path)
+                if deadline is not None and time.monotonic() >= deadline:
+                    raise TimeoutError("component endpoint discovery deadline exhausted")
+                try:
+                    content = path.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                for match in endpoint_pattern.finditer(content):
+                    name = match.group(1).lower()
+                    endpoint = (match.group(3).strip(), int(match.group(4)))
+                    endpoints[(name, int(match.group(2)))] = endpoint
+                    endpoints.setdefault((name, None), endpoint)
+
+        resolved: list[WatcherTarget | None] = [None] * len(targets)
+        unresolved: list[WatcherTarget] = []
+        unresolved_indexes: list[int] = []
+        for index, target in enumerate(targets):
+            if not target.component_name:
+                resolved[index] = target
+                continue
+            component_name, separator, component_id = target.component_name.partition("#")
+            if separator and (not component_id or not component_id.isdigit()):
+                raise ValueError(f"invalid component selector: {target.component_name}")
+            key = (
+                component_name.lower(),
+                int(component_id) if separator and component_id.isdigit() else None,
+            )
+            endpoint = endpoints.get(key)
+            if endpoint is not None:
+                resolved[index] = WatcherTarget(
+                    target.component_type, endpoint[0], endpoint[1], target.path,
+                    target.component_name,
+                )
+            else:
+                unresolved.append(target)
+                unresolved_indexes.append(index)
+
+        if unresolved:
+            dynamic = self._machine_resolver.resolve_many(unresolved, deadline)
+            for index, target in zip(unresolved_indexes, dynamic):
+                resolved[index] = target
+        if any(target is None for target in resolved):
+            raise LookupError("one or more component endpoints could not be resolved")
+        return [target for target in resolved if target is not None]
+
     def _get_watcher(self, target: WatcherTarget) -> tuple[Any, bool]:
         """Return a connected Watcher for one endpoint, creating it lazily.
         按端点复用控制连接，减少每次采样的 TCP 建连和调度抖动。
@@ -364,15 +488,24 @@ class WatcherCollector:
         finally:
             sys.path.pop(0)
 
-    def query(self, target: WatcherTarget) -> dict[str, Any]:
-        """Query one snapshot outside the server process. / 在服务进程外查询一次快照。"""
+    def query(
+        self,
+        target: WatcherTarget,
+        timeout_seconds: float | None = None,
+    ) -> dict[str, Any]:
+        """Query one snapshot without exceeding an optional caller deadline.
+        查询一次快照，并允许调用方用剩余全局预算收紧单次超时。
+        """
         key = (target.component_type, target.host, target.port, target.path)
         watcher, connection_reused = self._get_watcher(target)
         try:
             if hasattr(watcher, "clearWatchData"):
                 watcher.clearWatchData()
             watcher.requireQueryWatcher(target.path)
-            deadline = time.monotonic() + self.timeout_seconds
+            effective_timeout = self.timeout_seconds
+            if timeout_seconds is not None:
+                effective_timeout = min(effective_timeout, max(float(timeout_seconds), 0.01))
+            deadline = time.monotonic() + effective_timeout
             while time.monotonic() < deadline and not watcher.watchData:
                 watcher.processOne(min(0.25, max(deadline - time.monotonic(), 0.01)))
             if not watcher.watchData:

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import os
-import subprocess
 import time
+import ctypes
+from ctypes import wintypes
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -18,6 +18,126 @@ class ProcessSample:
     peak_working_set_bytes: int | None
     thread_count: int
     handle_count: int | None
+
+
+if os.name == "nt":
+    class _ProcessMemoryCountersEx(ctypes.Structure):
+        _fields_ = [
+            ("cb", wintypes.DWORD),
+            ("PageFaultCount", wintypes.DWORD),
+            ("PeakWorkingSetSize", ctypes.c_size_t),
+            ("WorkingSetSize", ctypes.c_size_t),
+            ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+            ("PagefileUsage", ctypes.c_size_t),
+            ("PeakPagefileUsage", ctypes.c_size_t),
+            ("PrivateUsage", ctypes.c_size_t),
+        ]
+
+
+    class _ThreadEntry32(ctypes.Structure):
+        _fields_ = [
+            ("dwSize", wintypes.DWORD),
+            ("cntUsage", wintypes.DWORD),
+            ("th32ThreadID", wintypes.DWORD),
+            ("th32OwnerProcessID", wintypes.DWORD),
+            ("tpBasePri", wintypes.LONG),
+            ("tpDeltaPri", wintypes.LONG),
+            ("dwFlags", wintypes.DWORD),
+        ]
+
+
+    _kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    _psapi = ctypes.WinDLL("psapi", use_last_error=True)
+    _kernel32.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
+    _kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+    _kernel32.Thread32First.argtypes = [wintypes.HANDLE, ctypes.POINTER(_ThreadEntry32)]
+    _kernel32.Thread32First.restype = wintypes.BOOL
+    _kernel32.Thread32Next.argtypes = [wintypes.HANDLE, ctypes.POINTER(_ThreadEntry32)]
+    _kernel32.Thread32Next.restype = wintypes.BOOL
+    _kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    _kernel32.OpenProcess.restype = wintypes.HANDLE
+    _kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    _kernel32.CloseHandle.restype = wintypes.BOOL
+    _kernel32.GetProcessTimes.argtypes = [
+        wintypes.HANDLE,
+        ctypes.POINTER(wintypes.FILETIME), ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME), ctypes.POINTER(wintypes.FILETIME),
+    ]
+    _kernel32.GetProcessTimes.restype = wintypes.BOOL
+    _kernel32.GetProcessHandleCount.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    _kernel32.GetProcessHandleCount.restype = wintypes.BOOL
+    _psapi.GetProcessMemoryInfo.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD]
+    _psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+
+
+def _filetime_seconds(value: wintypes.FILETIME) -> float:
+    ticks = (int(value.dwHighDateTime) << 32) | int(value.dwLowDateTime)
+    return ticks / 10_000_000.0
+
+
+def _windows_thread_counts(pids: set[int]) -> dict[int, int]:
+    """Count owned threads with one system snapshot for the whole process group.
+    通过一次系统线程快照统计整组进程，避免逐进程调用 PowerShell。
+    """
+    if os.name != "nt" or not pids:
+        return {}
+    invalid_handle = ctypes.c_void_p(-1).value
+    snapshot = _kernel32.CreateToolhelp32Snapshot(0x00000004, 0)
+    if snapshot == invalid_handle:
+        return {}
+    counts = {pid: 0 for pid in pids}
+    entry = _ThreadEntry32()
+    entry.dwSize = ctypes.sizeof(entry)
+    try:
+        has_entry = bool(_kernel32.Thread32First(snapshot, ctypes.byref(entry)))
+        while has_entry:
+            owner = int(entry.th32OwnerProcessID)
+            if owner in counts:
+                counts[owner] += 1
+            has_entry = bool(_kernel32.Thread32Next(snapshot, ctypes.byref(entry)))
+    finally:
+        _kernel32.CloseHandle(snapshot)
+    return counts
+
+
+def _windows_process_row(pid: int, thread_count: int) -> tuple[float, int, int, int, int, int] | None:
+    """Read one process through Win32 APIs without spawning a helper process.
+    直接通过 Win32 API 读取进程，避免高负载时创建辅助 PowerShell 进程。
+    """
+    if os.name != "nt":
+        return None
+    handle = _kernel32.OpenProcess(0x1000 | 0x0010, False, pid)
+    if not handle:
+        return None
+    creation = wintypes.FILETIME()
+    exit_time = wintypes.FILETIME()
+    kernel = wintypes.FILETIME()
+    user = wintypes.FILETIME()
+    memory = _ProcessMemoryCountersEx()
+    memory.cb = ctypes.sizeof(memory)
+    handle_count = wintypes.DWORD()
+    try:
+        if not _kernel32.GetProcessTimes(
+            handle, ctypes.byref(creation), ctypes.byref(exit_time),
+            ctypes.byref(kernel), ctypes.byref(user),
+        ):
+            return None
+        if not _psapi.GetProcessMemoryInfo(handle, ctypes.byref(memory), memory.cb):
+            return None
+        has_handle_count = _kernel32.GetProcessHandleCount(handle, ctypes.byref(handle_count))
+        return (
+            _filetime_seconds(kernel) + _filetime_seconds(user),
+            int(memory.WorkingSetSize),
+            int(memory.PrivateUsage),
+            int(memory.PeakWorkingSetSize),
+            thread_count,
+            int(handle_count.value) if has_handle_count else 0,
+        )
+    finally:
+        _kernel32.CloseHandle(handle)
 
 
 def _parse_windows_process_row(row: dict[str, object]) -> tuple[float, int, int, int, int, int]:
@@ -46,24 +166,9 @@ class ProcessCollector:
         return self._sample_procfs()
 
     def _sample_windows(self) -> ProcessSample | None:
-        command = (
-            "Get-Process -Id "
-            + str(self.pid)
-            + " | Select-Object CPU,WorkingSet64,PrivateMemorySize64,PeakWorkingSet64,Handles,"
-            + "@{Name='ThreadCount';Expression={$_.Threads.Count}} | ConvertTo-Json -Compress"
-        )
-        try:
-            result = subprocess.run(
-                ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
-                capture_output=True,
-                text=True,
-                timeout=2,
-                check=True,
-            )
-            data = json.loads(result.stdout)
-            return self._finish(*_parse_windows_process_row(data))
-        except (OSError, ValueError, subprocess.SubprocessError, json.JSONDecodeError):
-            return None
+        thread_counts = _windows_thread_counts({self.pid})
+        row = _windows_process_row(self.pid, thread_counts.get(self.pid, 0))
+        return self._finish(*row) if row is not None else None
 
     def _sample_procfs(self) -> ProcessSample | None:
         stat_path = Path(f"/proc/{self.pid}/stat")
@@ -149,32 +254,15 @@ class ProcessGroupCollector:
             }
         if not self._collectors:
             return {}
-        pids = ",".join(str(collector.pid) for collector in self._collectors.values())
-        command = (
-            f"Get-Process -Id {pids} | "
-            "Select-Object Id,CPU,WorkingSet64,PrivateMemorySize64,PeakWorkingSet64,Handles,"
-            "@{Name='ThreadCount';Expression={$_.Threads.Count}} | "
-            "ConvertTo-Json -Compress"
-        )
-        try:
-            result = subprocess.run(
-                ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
-                capture_output=True,
-                text=True,
-                timeout=3,
-                check=True,
-            )
-            rows = json.loads(result.stdout)
-            if isinstance(rows, dict):
-                rows = [rows]
-            by_pid = {int(row["Id"]): row for row in rows}
-        except (OSError, ValueError, subprocess.SubprocessError, json.JSONDecodeError, KeyError):
-            return {}
+        pids = {collector.pid for collector in self._collectors.values()}
+        thread_counts = _windows_thread_counts(pids)
         samples: dict[str, ProcessSample] = {}
         for name, collector in self._collectors.items():
-            row = by_pid.get(collector.pid)
+            row = _windows_process_row(
+                collector.pid, thread_counts.get(collector.pid, 0),
+            )
             if row is None:
                 continue
-            samples[name] = collector._finish(*_parse_windows_process_row(row))
+            samples[name] = collector._finish(*row)
         return samples
 
