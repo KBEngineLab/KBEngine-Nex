@@ -1095,6 +1095,23 @@ def main() -> int:
             workload_processes=2,
         )
         assert distributed["quality"]["status"] == "PASS"
+    windows_cpu_profiler = (
+        repository_root / "kbe/src/tests/performance/windows_cpu_profile.ps1"
+    ).read_text(encoding="utf-8")
+    for contract in (
+        "Team Tools\\DiagnosticsHub\\Collector",
+        "VSDiagnostics.exe",
+        "CpuUsageLow.json",
+        "cpu-summary.json",
+        "target_usage_percent",
+        "target_modules",
+        "DownloadMicrosoftSymbols",
+        "Sort-Object { [double]$_['usage_percent'] } -Descending",
+    ):
+        assert contract in windows_cpu_profiler
+    assert "Stop-Service" not in windows_cpu_profiler
+    assert "Stop-Process" not in windows_cpu_profiler
+
     print("PERFORMANCE_METRICS_CONTRACT_TEST_PASS")
     return 0
 

@@ -211,3 +211,32 @@ network errors, and process health remain valid. Treat it separately from gamepl
 Watcher round trip is an external diagnostic measurement, not a business request latency.
 `quality.status=SLOW` 可能只是 Watcher 控制面偶发尖峰，而 readiness、网络错误和进程健康仍然有效。
 必须与业务 RPC SLA 分开解释；Watcher 往返是外部诊断指标，不是业务请求延迟。
+
+## Windows CPU profile
+
+`windows_cpu_profile.ps1` records a low-frequency CPU ETL with Visual Studio DiagnosticsHub and
+exports both a raw xperf module report and a machine-readable `cpu-summary.json`. It does not need
+the elevated WPR system-profile policy. Use exact PIDs when several test clusters may coexist:
+
+```powershell
+$baseappPids = @(Get-Process baseapp | Select-Object -ExpandProperty Id)
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File .\kbe\src\tests\performance\windows_cpu_profile.ps1 `
+  -ProcessId $baseappPids `
+  -DurationSeconds 60 `
+  -OutputDirectory .\kbe\src\out\performance-runs\cpu-profile `
+  -IncludeStacks `
+  -DownloadMicrosoftSymbols
+```
+
+The module report covers the whole machine so Bots, server components, security software, and
+diagnostic tools remain separate process groups. `target_modules` in the JSON summary contains only
+the selected PIDs. Stack export is opt-in because symbol download and HTML generation are slower and
+larger than module aggregation. Visual Studio DiagnosticsHub and the Windows Performance Toolkit
+(`xperf.exe`) must be installed; the script never stops security software or network filter drivers.
+
+`windows_cpu_profile.ps1` 使用 Visual Studio DiagnosticsHub 低频采集 CPU ETL，并同时导出 xperf
+模块报告与机器可读的 `cpu-summary.json`，不依赖需要管理员权限的 WPR 系统性能策略。模块报告覆盖
+整机，使 Bots、服务端、安全软件和诊断工具保持独立进程分组；JSON 的 `target_modules` 只汇总指定
+PID。调用栈和微软符号下载默认关闭，因为其耗时和产物体积明显高于模块汇总。脚本只采集和报告，
+不会停止安全软件或网络过滤驱动。
