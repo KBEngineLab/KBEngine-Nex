@@ -293,7 +293,13 @@ void EntityGarbages<T>::add(ENTITY_ID id, T* entity)
 	ENTITYS_MAP::const_iterator iter = _entities.find(id);
 	if(iter != _entities.end())
 	{
-		ERROR_MSG(fmt::format("EntityGarbages::add: entityID:{} has exist\n.", id));
+		// This container is leak diagnostics, not entity ownership. A new generation may reuse
+		// an ID while Python still retains the older destroyed object; keep tracking the oldest
+		// generation without replacing its pointer, and report the diagnostic limitation once.
+		// 该容器只用于泄漏诊断，不拥有 Entity。同一 ID 的新一代对象可能在旧销毁对象仍被
+		// Python 引用时出现；保留最老一代指针，避免覆盖后被旧析构误删，并仅提示诊断局限。
+		WARNING_MSG(fmt::format(
+			"EntityGarbages::add: entityID:{} already tracks an older generation.\n", id));
 		return;
 	}
 

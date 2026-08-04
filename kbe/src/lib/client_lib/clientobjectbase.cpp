@@ -1042,8 +1042,13 @@ void ClientObjectBase::onEntityLeaveWorld(Network::Channel * pChannel, ENTITY_ID
 	bufferedCreateEntityMessage_.erase(eid);
 	client::Entity* entity = pEntities_->find(eid);
 	if(entity == NULL)
-	{	
-		ERROR_MSG(fmt::format("ClientObjectBase::onEntityLeaveWorld: not found entity({}), appID({}).\n", eid, appID()));
+	{
+		// CellApp streams converge at BaseApp and a lifecycle cleanup can arrive after the same
+		// Entity was already removed, or while its buffered Enter is being cancelled. Leave is
+		// idempotent, so count the stale transition without turning it into a protocol error.
+		// 多个 CellApp 流在 BaseApp 汇聚，同一实体可能已被旧流移除，或其缓冲 Enter 正被取消。
+		// Leave 是幂等清理操作，因此只统计过期生命周期转换，不将其放大为协议错误。
+		++staleViewMessageDrops_;
 		return;
 	}
 
@@ -1469,7 +1474,12 @@ void ClientObjectBase::onSetEntityPosAndDir(Network::Channel* pChannel, MemorySt
 	client::Entity* entity = pEntities_->find(eid);
 	if(entity == NULL)
 	{
-		ERROR_MSG(fmt::format("ClientObjectBase::onSetEntityPosAndDir: not found entity({}).\n", eid));
+		// A force-position update from an old Cell stream may arrive after LeaveWorld from the
+		// current stream. Position is volatile and cannot recreate the Entity, so discard it as
+		// a stale lifecycle message while retaining malformed-payload errors elsewhere.
+		// 旧 Cell 流的强制位置可能晚于当前流的 LeaveWorld 到达。位置属于易变数据且不能重建
+		// Entity，因此按过期生命周期消息丢弃；其他位置仍保留非法载荷错误检查。
+		++staleViewMessageDrops_;
 		s.done();
 		return;
 	}

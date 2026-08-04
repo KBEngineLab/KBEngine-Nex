@@ -195,7 +195,8 @@ Cellapp::Cellapp(Network::EventDispatcher& dispatcher,
 	pGhostManager_(NULL),
 	flags_(APP_FLAGS_NONE),
 	spaceViewers_(),
-	pInitProgressHandler_(NULL)
+	pInitProgressHandler_(NULL),
+	staleWitnessVolatileControlDrops_(0)
 {
 	KBEngine::Network::MessageHandlers::pMainMessageHandlers = &CellappInterface::messageHandlers;
 
@@ -317,6 +318,7 @@ bool Cellapp::initializeWatcher()
 	WATCH_OBJECT("witness/queues/producerCoalesced", &Witness::producerCoalescedCount);
 	WATCH_OBJECT("witness/queues/structuralPromotions", &Witness::structuralPromotionCount);
 	WATCH_OBJECT("witness/queues/promotedVolatileSkips", &Witness::promotedVolatileSkipCount);
+	WATCH_OBJECT("witness/queues/cancelledPendingLeaves", &Witness::cancelledPendingLeaveCount);
 	WATCH_OBJECT("witness/scheduler/updateLimit", &Witness::globalUpdateLimit);
 	WATCH_OBJECT("witness/scheduler/admitted", &Witness::globalAdmittedCount);
 	WATCH_OBJECT("witness/scheduler/deferred", &Witness::globalDeferredCount);
@@ -329,6 +331,7 @@ bool Cellapp::initializeWatcher()
 	WATCH_OBJECT("witness/backpressure/activeSuppressed", &Witness::activeSuppressedCount);
 	WATCH_OBJECT("witness/backpressure/suppressionTransitions", &Witness::suppressionTransitionCount);
 	WATCH_OBJECT("witness/backpressure/resumeTransitions", &Witness::resumeTransitionCount);
+	WATCH_OBJECT("witness/backpressure/staleControlDrops", this, &Cellapp::staleWitnessVolatileControlDrops);
 	WATCH_OBJECT("witness/backpressure/suppressedUpdateSkips", &Witness::suppressedUpdateSkipCount);
 	WATCH_OBJECT("witness/backpressure/structuralWhileSuppressed", &Witness::structuralWhileSuppressedCount);
 	WATCH_OBJECT("witness/bundlesSent", &Witness::bundlesSentCount);
@@ -1923,6 +1926,26 @@ void Cellapp::onUpdateDataFromClient(Network::Channel* pChannel, KBEngine::Memor
 
 	e->onUpdateDataFromClient(s);
 	s.done();
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::setWitnessVolatileUpdatesEnabled(Network::Channel* pChannel,
+	ENTITY_ID entityID, uint8 enabled)
+{
+	if (pChannel == NULL || pChannel->isExternal())
+		return;
+
+	Entity* entity = findEntity(entityID);
+	if (entity == NULL)
+	{
+		// Backpressure transitions race with Cell migration and destruction. The next evaluation
+		// targets the current Cell, so a stale control message is idempotently discarded.
+		// 背压状态切换可能与 Cell 迁移或销毁竞态；下一轮评估会命中当前 Cell，因此旧控制消息可幂等丢弃。
+		++staleWitnessVolatileControlDrops_;
+		return;
+	}
+
+	entity->setWitnessVolatileUpdatesEnabled(pChannel, enabled);
 }
 
 //-------------------------------------------------------------------------------------

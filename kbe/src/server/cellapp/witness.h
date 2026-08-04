@@ -227,6 +227,7 @@ public:
 	static void recordProducerCoalesced();
 	static uint64 structuralPromotionCount();
 	static uint64 promotedVolatileSkipCount();
+	static uint64 cancelledPendingLeaveCount();
 	static void beginUpdateTick();
 	static uint64 globalAdmittedCount();
 	static uint64 globalDeferredCount();

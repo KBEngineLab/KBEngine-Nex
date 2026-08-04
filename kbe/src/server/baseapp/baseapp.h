@@ -97,6 +97,7 @@ public:
 	uint32 volatileBackpressureHighBytes() const;
 	uint32 volatileBackpressureLowBytes() const;
 	uint32 kcpWriteQueueMaxBytes() const;
+	uint64 staleClientInputNoCellDrops() const { return staleClientInputNoCellDrops_; }
 	void handleBackup();
 	void handleArchive();
 
@@ -584,6 +585,7 @@ protected:
 	uint64										volatileBackpressureEvaluations_;
 	uint64										volatileBackpressureMaxPendingSegments_;
 	uint64										volatileBackpressureMaxPendingBytes_;
+	uint64										staleClientInputNoCellDrops_;
 };
 
 }

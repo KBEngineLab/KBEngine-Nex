@@ -464,6 +464,8 @@ def assert_python_latency_scenario() -> None:
     assert gameplay["watcher_intervals"]["CELLAPPMGR_TYPE:root/allocation"] == 5.0
     assert "BASEAPP_TYPE=@baseapp:root/network/clientVolatileBackpressure" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/clientVolatileBackpressure"] == 5.0
+    assert "BASEAPP_TYPE=@baseapp:root/network/clientInput" in gameplay["watcher_targets"]
+    assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/clientInput"] == 5.0
     assert "CELLAPP_TYPE=@cellapp:root/witness/backpressure" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/witness/backpressure"] == 5.0
     assert "CELLAPP_TYPE=@cellapp:root/witness/scheduler" in gameplay["watcher_targets"]
@@ -483,9 +485,14 @@ def assert_python_latency_scenario() -> None:
     cellapp_source = (Path(__file__).resolve().parents[2] / "server/cellapp/cellapp.cpp").read_text(encoding="utf-8")
     witness_source = (Path(__file__).resolve().parents[2] / "server/cellapp/witness.cpp").read_text(encoding="utf-8")
     assert 'WATCH_OBJECT("network/clientVolatileBackpressure/activeClients"' in baseapp_source
+    assert 'WATCH_OBJECT("network/clientInput/staleNoCellDrops"' in baseapp_source
+    assert "++staleClientInputNoCellDrops_;" in baseapp_source
     assert 'WATCH_OBJECT("witness/backpressure/activeSuppressed"' in cellapp_source
     assert 'WATCH_OBJECT("witness/scheduler/deferred"' in cellapp_source
     assert 'WATCH_OBJECT("witness/messages/enterBytes"' in cellapp_source
+    assert 'WATCH_OBJECT("witness/queues/cancelledPendingLeaves"' in cellapp_source
+    assert 'WATCH_OBJECT("witness/backpressure/staleControlDrops"' in cellapp_source
+    assert "++staleWitnessVolatileControlDrops_;" in cellapp_source
     semantic_message_handler = witness_source.split(
         "const Network::MessageHandler& Witness::getViewEntityMessageHandler", 1
     )[1].split("bool Witness::entityID2AliasID", 1)[0]
@@ -493,7 +500,39 @@ def assert_python_latency_scenario() -> None:
     assert "return normalMsgHandler;" in semantic_message_handler
     assert "return optimizedMsgHandler;" not in semantic_message_handler
 
+    pending_leave_reentry = witness_source.split(
+        "void Witness::onEnterView", 1
+    )[1].split("void Witness::onLeaveView", 1)[0]
+    assert "recordCancelledPendingLeave" in pending_leave_reentry
+    assert "wasVisibleToClient" in pending_leave_reentry
+    assert "sendCall(pSendBundle)" not in pending_leave_reentry
+
+    pending_leave_send = witness_source.split(
+        "bool Witness::processEntityRefUpdate", 1
+    )[1].split("void Witness::removeViewEntityRef", 1)[0]
+    assert "ClientInterface::onEntityLeaveWorld, leaveWorld" in pending_leave_send
+    assert "ClientInterface::onEntityLeaveWorldOptimized" not in pending_leave_send
+
     client_base_source = (Path(__file__).resolve().parents[2] / "lib/client_lib/clientobjectbase.cpp").read_text(encoding="utf-8")
+    idempotent_leave = client_base_source.split(
+        "void ClientObjectBase::onEntityLeaveWorld(Network::Channel * pChannel, ENTITY_ID eid)", 1
+    )[1].split("void ClientObjectBase::onEntityDestroyed", 1)[0]
+    assert "++staleViewMessageDrops_;" in idempotent_leave
+    assert "ClientObjectBase::onEntityLeaveWorld: not found entity" not in idempotent_leave
+    stale_force_position = client_base_source.split(
+        "void ClientObjectBase::onSetEntityPosAndDir", 1
+    )[1].split("void ClientObjectBase::onUpdateData", 1)[0]
+    assert "++staleViewMessageDrops_;" in stale_force_position
+    assert "ClientObjectBase::onSetEntityPosAndDir: not found entity" not in stale_force_position
+
+    entity_garbages_source = (
+        Path(__file__).resolve().parents[2] / "lib/entitydef/entity_garbages.h"
+    ).read_text(encoding="utf-8")
+    duplicate_garbage_add = entity_garbages_source.split(
+        "void EntityGarbages<T>::add", 1
+    )[1].split("if(_entities.size() == 0)", 1)[0]
+    assert "already tracks an older generation" in duplicate_garbage_add
+    assert "ERROR_MSG" not in duplicate_garbage_add
     client_entity_source = (Path(__file__).resolve().parents[2] / "lib/client_lib/entity.cpp").read_text(encoding="utf-8")
     script_callbacks_source = (Path(__file__).resolve().parents[2] / "lib/client_lib/script_callbacks.cpp").read_text(encoding="utf-8")
     bots_source = (Path(__file__).resolve().parents[2] / "server/tools/bots/bots.cpp").read_text(encoding="utf-8")

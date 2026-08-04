@@ -75,6 +75,7 @@ public:
 	void recordQueueDeduplicated() { ++queueDeduplicated_; }
 	void recordProducerCoalesced() { ++producerCoalesced_; }
 	void recordPromotedVolatileSkip() { ++promotedVolatileSkips_; }
+	void recordCancelledPendingLeave() { ++cancelledPendingLeaves_; }
 
 	void recordDirtyProcessed() { ++dirtyProcessed_; }
 	void recordStaleDiscard() { ++staleDiscards_; }
@@ -128,6 +129,7 @@ public:
 	std::uint64_t producerCoalesced() const { return producerCoalesced_; }
 	std::uint64_t structuralPromotions() const { return structuralPromotions_; }
 	std::uint64_t promotedVolatileSkips() const { return promotedVolatileSkips_; }
+	std::uint64_t cancelledPendingLeaves() const { return cancelledPendingLeaves_; }
 	std::uint64_t fullScans() const { return fullScans_; }
 	std::uint64_t fullScanEntities() const { return fullScanEntities_; }
 	std::uint64_t dirtyProcessed() const { return dirtyProcessed_; }
@@ -170,6 +172,7 @@ private:
 	std::uint64_t producerCoalesced_ = 0;
 	std::uint64_t structuralPromotions_ = 0;
 	std::uint64_t promotedVolatileSkips_ = 0;
+	std::uint64_t cancelledPendingLeaves_ = 0;
 	std::uint64_t fullScans_ = 0;
 	std::uint64_t fullScanEntities_ = 0;
 	std::uint64_t dirtyProcessed_ = 0;

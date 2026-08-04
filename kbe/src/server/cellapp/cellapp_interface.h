@@ -213,7 +213,8 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
 
 	// BaseApp 根据外部 KCP 迟滞水位启停该 Witness 的易变位置更新；可靠结构消息不受影响。
 	// BaseApp toggles volatile positional updates using external-KCP hysteresis; reliable structural messages remain enabled.
-	ENTITY_MESSAGE_DECLARE_ARGS1(setWitnessVolatileUpdatesEnabled,				NETWORK_FIXED_MESSAGE,
+	CELLAPP_MESSAGE_DECLARE_ARGS2(setWitnessVolatileUpdatesEnabled,				NETWORK_FIXED_MESSAGE,
+									ENTITY_ID,								entityID,
 									uint8,									enabled)
 NETWORK_INTERFACE_DECLARE_END()
 

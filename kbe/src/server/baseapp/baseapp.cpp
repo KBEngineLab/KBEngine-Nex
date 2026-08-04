@@ -320,7 +320,8 @@ Baseapp::Baseapp(Network::EventDispatcher& dispatcher,
 	volatileBackpressureResumes_(0),
 	volatileBackpressureEvaluations_(0),
 	volatileBackpressureMaxPendingSegments_(0),
-	volatileBackpressureMaxPendingBytes_(0)
+	volatileBackpressureMaxPendingBytes_(0),
+	staleClientInputNoCellDrops_(0)
 {
 	KBEngine::Network::MessageHandlers::pMainMessageHandlers = &BaseappInterface::messageHandlers;
 
@@ -499,6 +500,7 @@ bool Baseapp::initializeWatcher()
 	WATCH_OBJECT("network/clientVolatileBackpressure/configuredHighBytes", this, &Baseapp::volatileBackpressureHighBytes);
 	WATCH_OBJECT("network/clientVolatileBackpressure/configuredLowBytes", this, &Baseapp::volatileBackpressureLowBytes);
 	WATCH_OBJECT("network/clientVolatileBackpressure/configuredWriteQueueMaxBytes", this, &Baseapp::kcpWriteQueueMaxBytes);
+	WATCH_OBJECT("network/clientInput/staleNoCellDrops", this, &Baseapp::staleClientInputNoCellDrops);
 	WATCH_OBJECT("stats/runningTime", &runningTime);
 	return EntityApp<Entity>::initializeWatcher();
 }
@@ -5137,9 +5139,12 @@ void Baseapp::onUpdateDataFromClient(Network::Channel* pChannel, KBEngine::Memor
 
 	if(e == NULL || e->cellEntityCall() == NULL)
 	{
-		ERROR_MSG(fmt::format("Baseapp::onUpdateDataFromClient: {} {} no cell.\n",
-			(e == NULL ? "unknown" : e->scriptName()), srcEntityID));
-		
+		// The external channel is already bound to srcEntityID, but volatile movement can race
+		// with Cell creation, migration, destruction, or Proxy teardown. It cannot be replayed
+		// safely, so drop and count it; malformed sizes remain hard protocol errors above.
+		// 外部频道已绑定 srcEntityID，但易变移动输入可能与 Cell 创建、迁移、销毁或 Proxy
+		// 清理竞态。该输入无法安全重放，因此丢弃并计数；上方非法长度仍是硬协议错误。
+		++staleClientInputNoCellDrops_;
 		s.done();
 		return;
 	}
@@ -5184,9 +5189,7 @@ void Baseapp::onUpdateDataFromClientForControlledEntity(Network::Channel* pChann
 
 	if(e == NULL || e->cellEntityCall() == NULL)
 	{
-		ERROR_MSG(fmt::format("Baseapp::onUpdateDataFromClientForControlledEntity: {} {} has no cell.\n",
-			(e == NULL ? "unknown" : e->scriptName()), srcEntityID));
-		
+		++staleClientInputNoCellDrops_;
 		s.done();
 		return;
 	}

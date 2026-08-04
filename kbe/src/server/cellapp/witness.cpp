@@ -428,46 +428,20 @@ void Witness::onEnterView(ViewTrigger* pViewTrigger, Entity* pEntity)
 			//DEBUG_MSG(fmt::format("Witness::onEnterView: {} entity={}\n", 
 			//	pEntity_->id(), pEntity->id()));
 
-			// 如果flags是ENTITYREF_FLAG_LEAVE_CLIENT_PENDING | ENTITYREF_FLAG_NORMAL状态那么我们
-			// 只需要撤销离开状态并将其还原到ENTITYREF_FLAG_NORMAL即可
-			// 如果是ENTITYREF_FLAG_LEAVE_CLIENT_PENDING状态那么此时应该将它设置为进入状态 ENTITYREF_FLAG_ENTER_CLIENT_PENDING
-			if ((pEntityRef->flags() & ENTITYREF_FLAG_NORMAL) > 0)
-			{
-				EntityCall* pClientMB = pEntity_->clientEntityCall();
-				if (pClientMB)
-				{
-					Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-					NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pEntity_->id(), (*pSendBundle));
-					ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onEntityLeaveWorldOptimized, leaveWorld);
-					_addViewEntityIDToBundle(pSendBundle, pEntityRef);
-					ENTITY_MESSAGE_FORWARD_CLIENT_END(pSendBundle, ClientInterface::onEntityLeaveWorldOptimized, leaveWorld);
-					pClientMB->sendCall(pSendBundle);
-
-					KBE_ASSERT(clientViewSize_ > 0);
-					--clientViewSize_;
-
-					VIEW_ENTITIES::iterator iter1 = viewEntities_.begin();
-					for (; iter1 != viewEntities_.end(); iter1++)
-					{
-						if ((*iter1)->id() == pEntityRef->id())
-						{
-							viewEntities_.erase(iter1);
-							break;
-						}
-					}
-
-					viewEntities_.push_back(pEntityRef);
-				}
-			}
-
-			const int removedAliasID = pEntityRef->aliasID();
-			pEntityRef->flags(ENTITYREF_FLAG_ENTER_CLIENT_PENDING);
-			// 客户端已处理上面的 LeaveWorld 后会压紧别名表；待进入实体尚未重新加入客户端表。
-			// The client compacts its alias table after LeaveWorld; the pending entity is not visible again yet.
-			updateEntitiesAliasID(removedAliasID);
+			// Leave is still queued and has not reached the client. Coalesce the reversal instead of
+			// emitting a synthetic Leave+Enter pair, which shifts every later alias and amplifies AOI
+			// churn. Keep the current generation and queue ownership: the retained structural entry
+			// becomes a state-skip, while queueEntityRefVolatile adds at most one missing volatile item.
+			// Leave 仍在队列中且尚未到达客户端；直接合并反向状态，避免额外 Leave+Enter 使后续
+			// 所有别名移位并放大 AOI 抖动。保留当前 generation 与队列所有权：旧结构项自然变为
+			// state-skip，queueEntityRefVolatile 最多只补入一个缺失的 volatile 项。
+			const bool wasVisibleToClient =
+				(pEntityRef->flags() & ENTITYREF_FLAG_NORMAL) > 0;
+			pEntityRef->flags(wasVisibleToClient ?
+				ENTITYREF_FLAG_NORMAL : ENTITYREF_FLAG_ENTER_CLIENT_PENDING);
 			pEntityRef->pEntity(pEntity);
-			initializeEntityRefLifecycle(pEntityRef);
 			queueEntityRefVolatile(pEntityRef);
+			g_witnessLoadMetrics.recordCancelledPendingLeave();
 			pEntity->addWitnessed(pEntity_);
 			pSelfEntity->onEnteredView(pEntity);
 		}
@@ -971,9 +945,14 @@ bool Witness::processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pE
 		pEntityRef->removeflags(ENTITYREF_FLAG_LEAVE_CLIENT_PENDING);
 		if ((pEntityRef->flags() & ENTITYREF_FLAG_NORMAL) > 0)
 		{
-			ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onEntityLeaveWorldOptimized, leaveWorld);
-			_addViewEntityIDToBundle(pSendBundle, pEntityRef);
-			ENTITY_MESSAGE_FORWARD_CLIENT_END(pSendBundle, ClientInterface::onEntityLeaveWorldOptimized, leaveWorld);
+			// Leave changes the client's alias table and therefore must identify the entity by its
+			// stable ID. A stale one-byte alias can erase a different entity and corrupt every later
+			// alias; the three-byte saving is not worth that structural risk under heavy AOI churn.
+			// Leave 会改变客户端别名表，因此必须使用稳定的完整实体 ID。过期的一字节别名会
+			// 删除错误实体并污染后续所有别名；在高频 AOI 抖动下不值得为节省三字节承担该风险。
+			ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onEntityLeaveWorld, leaveWorld);
+			(*pSendBundle) << pEntityRef->id();
+			ENTITY_MESSAGE_FORWARD_CLIENT_END(pSendBundle, ClientInterface::onEntityLeaveWorld, leaveWorld);
 
 			KBE_ASSERT(clientViewSize_ > 0);
 			--clientViewSize_;
@@ -1284,6 +1263,7 @@ uint64 Witness::producerCoalescedCount() { return g_witnessLoadMetrics.producerC
 void Witness::recordProducerCoalesced() { g_witnessLoadMetrics.recordProducerCoalesced(); }
 uint64 Witness::structuralPromotionCount() { return g_witnessLoadMetrics.structuralPromotions(); }
 uint64 Witness::promotedVolatileSkipCount() { return g_witnessLoadMetrics.promotedVolatileSkips(); }
+uint64 Witness::cancelledPendingLeaveCount() { return g_witnessLoadMetrics.cancelledPendingLeaves(); }
 
 //-------------------------------------------------------------------------------------
 void Witness::beginUpdateTick()

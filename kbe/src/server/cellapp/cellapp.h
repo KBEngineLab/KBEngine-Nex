@@ -169,6 +169,8 @@ public:
 	*/
 	void onUpdateDataFromClient(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 	void onUpdateDataFromClientForControlledEntity(Network::Channel* pChannel, KBEngine::MemoryStream& s);
+	void setWitnessVolatileUpdatesEnabled(Network::Channel* pChannel, ENTITY_ID entityID, uint8 enabled);
+	uint64 staleWitnessVolatileControlDrops() const { return staleWitnessVolatileControlDrops_; }
 
 	/** 网络接口
 		real请求更新属性到ghost
@@ -291,6 +293,11 @@ protected:
 	SpaceViewers						spaceViewers_;
 
 	InitProgressHandler*				pInitProgressHandler_;
+
+	// BaseApp control messages can legitimately outlive a Cell migration target; count those
+	// lifecycle races without turning them into log errors.
+	// BaseApp 控制消息可能晚于 Cell 迁移目标生命周期；计数该正常竞态，避免放大为错误日志。
+	uint64								staleWitnessVolatileControlDrops_;
 };
 
 }
