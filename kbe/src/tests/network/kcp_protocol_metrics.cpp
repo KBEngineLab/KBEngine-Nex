@@ -190,6 +190,8 @@ bool testStreamCoalescingAndPayloadAccounting()
 		require(ikcp_send(sender, third, 6) == 0, "third stream enqueue failed");
 	ok = require(sender->nsnd_que == 1, "small stream writes were not coalesced") &&
 		require(sender->snd_queue_bytes == 16, "queued payload bytes are incorrect") &&
+		require(sender->allocated_segment_bytes == sizeof(IKCPSEG) + 16,
+			"allocated segment bytes are incorrect after stream coalescing") &&
 		require(sender->stream_coalesces == 2, "stream coalesce count is incorrect") &&
 		require(sender->stream_coalesced_bytes == 11, "stream coalesced byte count is incorrect") && ok;
 
@@ -217,7 +219,9 @@ bool testStreamCoalescingAndPayloadAccounting()
 			"sender rejected stream acknowledgement") && ok;
 	}
 	ok = require(sender->snd_buf_bytes == 0 && sender->nsnd_buf == 0,
-		"acknowledged payload bytes were not released") && ok;
+		"acknowledged payload bytes were not released") &&
+		require(sender->allocated_segment_bytes == 0,
+			"acknowledged segment allocation was not released") && ok;
 
 	ikcp_release(sender);
 	ikcp_release(receiver);

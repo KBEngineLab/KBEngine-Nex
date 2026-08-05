@@ -29,6 +29,20 @@ namespace KBEngine{
 namespace client
 {
 
+// These counters are updated by the client event-loop thread and read by Bots Watchers
+// on the same thread. Keeping them process-wide avoids per-Entity allocations in the
+// movement hot path while still exposing whether scheduler lateness affects movement.
+// 这些计数由客户端事件循环线程更新，并由同线程的 Bots Watcher 读取。使用进程级
+// 计数可避免在移动热路径给每个 Entity 增加分配，同时仍能观测调度迟到对移动的影响。
+extern uint64 g_moveControllerStarts;
+extern uint64 g_moveControllerReplacements;
+extern uint64 g_moveControllerCompletions;
+extern uint64 g_moveUpdateCalls;
+extern uint64 g_moveDelayedUpdates;
+extern uint64 g_moveSkippedTicks;
+extern uint64 g_moveCatchupClamps;
+extern uint64 g_moveMaxElapsedMicros;
+
 class Entity;
 class MoveToPointHandler : public ScriptCallbackHandler
 {
@@ -69,6 +83,7 @@ protected:
 	float distance_;
 	int layer_;
 	client::Entity* pEntity_;
+	uint64 lastUpdateTimestamp_;
 };
  
 }

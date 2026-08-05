@@ -721,6 +721,9 @@ bool Entity::stopMove()
 uint32 Entity::moveToPoint(const Position3D& destination, float velocity, float distance, PyObject* userData, 
 						 bool faceMovement, bool moveVertically)
 {
+	if (pMoveHandlerID_ > 0)
+		++g_moveControllerReplacements;
+
 	stopMove();
 
 	int hertz = 0;
@@ -733,6 +736,8 @@ uint32 Entity::moveToPoint(const Position3D& destination, float velocity, float 
 
 	pMoveHandlerID_ = pClientApp_->scriptCallbacks().addCallback(0.0f, 0.1f, new MoveToPointHandler(pClientApp_->scriptCallbacks(), this, 0, destination, velocity, 
 		distance, faceMovement, moveVertically, userData));
+	if (pMoveHandlerID_ > 0)
+		++g_moveControllerStarts;
 
 	return pMoveHandlerID_;
 }
@@ -790,7 +795,15 @@ void Entity::onMoveOver(uint32 controllerId, int layer, const Position3D& oldPos
 	if(this->isDestroyed())
 		return;
 
-	stopMove();
+	// The movement handler owns its Timer and cancels it after this callback returns. Calling
+	// stopMove() here synchronously deleted that handler while its requestMoveOver() frame was
+	// still executing. Clear only the matching ID so Python may safely start the next movement;
+	// the old handler then releases itself through its normal Timer lifecycle.
+	// 移动 handler 持有 Timer，并会在本回调返回后自行取消。此处调用 stopMove() 会在
+	// requestMoveOver() 尚未返回时同步删除 handler。这里只清除匹配 ID，使 Python 可安全
+	// 启动下一段移动，旧 handler 随后按正常 Timer 生命周期释放自身。
+	if (controllerId == static_cast<uint32>(pMoveHandlerID_))
+		pMoveHandlerID_ = 0;
 
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	SCRIPT_OBJECT_CALL_ARGS2(this, const_cast<char*>("onMoveOver"), 

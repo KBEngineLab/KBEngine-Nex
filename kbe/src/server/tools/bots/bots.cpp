@@ -26,6 +26,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "server/asyncio_helper.h"
 #include "server/plugin_runtime.h"
 #include "client_lib/entity.h"
+#include "client_lib/moveto_point_handler.h"
 #include "entitydef/entity_component.h"
 #include "clientobject.h"
 #include "bots_interface.h"
@@ -301,6 +302,17 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/kcpDynamicAllocatedBytes", this, &Bots::kcpDynamicAllocatedBytes);
 	WATCH_OBJECT("bots/performance/clientEntities", this, &Bots::numClientEntities);
 	WATCH_OBJECT("bots/performance/staleViewMessageDrops", this, &Bots::staleViewMessageDrops);
+	// Movement counters distinguish service/network delay from Bots-local timer starvation and
+	// excessive script retargeting without adding per-Avatar sampling work.
+	// 移动计数用于区分服务端/网络延迟、Bots 本地 Timer 饥饿和脚本频繁换目标，且不增加逐 Avatar 采样。
+	WATCH_OBJECT("bots/performance/moveControllerStarts", client::g_moveControllerStarts);
+	WATCH_OBJECT("bots/performance/moveControllerReplacements", client::g_moveControllerReplacements);
+	WATCH_OBJECT("bots/performance/moveControllerCompletions", client::g_moveControllerCompletions);
+	WATCH_OBJECT("bots/performance/moveUpdateCalls", client::g_moveUpdateCalls);
+	WATCH_OBJECT("bots/performance/moveDelayedUpdates", client::g_moveDelayedUpdates);
+	WATCH_OBJECT("bots/performance/moveSkippedTicks", client::g_moveSkippedTicks);
+	WATCH_OBJECT("bots/performance/moveCatchupClamps", client::g_moveCatchupClamps);
+	WATCH_OBJECT("bots/performance/moveMaxElapsedMicros", client::g_moveMaxElapsedMicros);
 	WATCH_OBJECT("bots/performance/pythonLatencyCount", this, &Bots::pythonPerformanceLatencyCount);
 	WATCH_OBJECT("bots/performance/pythonLatencyP99Micros", this, &Bots::pythonPerformanceLatencyP99Micros);
 	WATCH_OBJECT("bots/performance/pythonLatencyWindowCount", this, &Bots::pythonPerformanceLatencyWindowCount);
@@ -825,51 +837,13 @@ KBE_DEFINE_PYTHON_LATENCY_GETTERS(BaseToClient, PYTHON_LATENCY_BASE_TO_CLIENT)
 //-------------------------------------------------------------------------------------
 uint64 Bots::kcpFixedAllocatedBytes() const
 {
-	uint64 allocatedBytes = 0;
-	for (CLIENTS::const_iterator iter = clients_.begin(); iter != clients_.end(); ++iter)
-	{
-		const Network::Channel* pChannel = iter->second != NULL ? iter->second->pServerChannel() : NULL;
-		const ikcpcb* pKcp = pChannel != NULL ? pChannel->pKCP() : NULL;
-		if (pKcp == NULL)
-			continue;
-
-		// ikcp_create()/ikcp_setmtu() allocate the control block and a three-datagram
-		// flush buffer. ACK storage grows by ackblock pairs and remains allocated.
-		// ikcp_create()/ikcp_setmtu() 固定分配控制块和三份数据报 flush buffer；
-		// ACK 存储按 ackblock 对扩容，并在连接生命周期内保留容量。
-		allocatedBytes += sizeof(ikcpcb);
-		const IUINT32 protocolOverhead = pKcp->mtu - pKcp->mss;
-		allocatedBytes += static_cast<uint64>(pKcp->mtu + protocolOverhead) * 3;
-		allocatedBytes += static_cast<uint64>(pKcp->ackblock) * 2 * sizeof(IUINT32);
-	}
-	return allocatedBytes;
+	return networkInterface().kcpFixedAllocatedBytes();
 }
 
 //-------------------------------------------------------------------------------------
 uint64 Bots::kcpDynamicAllocatedBytes() const
 {
-	uint64 allocatedBytes = 0;
-	for (CLIENTS::const_iterator iter = clients_.begin(); iter != clients_.end(); ++iter)
-	{
-		const Network::Channel* pChannel = iter->second != NULL ? iter->second->pServerChannel() : NULL;
-		const ikcpcb* pKcp = pChannel != NULL ? pChannel->pKCP() : NULL;
-		if (pKcp == NULL)
-			continue;
-
-		const IQUEUEHEAD* queues[] = {
-			&pKcp->snd_queue, &pKcp->rcv_queue, &pKcp->snd_buf, &pKcp->rcv_buf
-		};
-		for (size_t queueIndex = 0; queueIndex < sizeof(queues) / sizeof(queues[0]); ++queueIndex)
-		{
-			const IQUEUEHEAD* head = queues[queueIndex];
-			for (const IQUEUEHEAD* node = head->next; node != head; node = node->next)
-			{
-				const IKCPSEG* segment = iqueue_entry(node, IKCPSEG, node);
-				allocatedBytes += sizeof(IKCPSEG) + static_cast<uint64>(segment->len);
-			}
-		}
-	}
-	return allocatedBytes;
+	return networkInterface().kcpDynamicAllocatedBytes();
 }
 
 //-------------------------------------------------------------------------------------

@@ -341,6 +341,9 @@ struct IKCPCB
 	 * stream 计数直接量化被省去的 segment 分配，不在 ikcp_send 外增加开销。 */
 	IUINT64 snd_queue_bytes;
 	IUINT64 snd_buf_bytes;
+	/* Total bytes currently owned by IKCPSEG allocations across all four queues.
+	 * 四条队列当前持有的全部 IKCPSEG 分配字节。 */
+	IUINT64 allocated_segment_bytes;
 	IUINT64 stream_coalesces;
 	IUINT64 stream_coalesced_bytes;
 	/* Flush diagnostics distinguish list traversal from useful segment and datagram output.

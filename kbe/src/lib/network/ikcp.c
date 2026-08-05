@@ -194,12 +194,19 @@ void ikcp_allocator(void* (*new_malloc)(size_t), void (*new_free)(void*))
 // allocate a new kcp segment
 static IKCPSEG* ikcp_segment_new(ikcpcb *kcp, int size)
 {
-	return (IKCPSEG*)ikcp_malloc(sizeof(IKCPSEG) + size);
+	IKCPSEG *seg = (IKCPSEG*)ikcp_malloc(sizeof(IKCPSEG) + size);
+	if (seg != NULL) {
+		kcp->allocated_segment_bytes += (IUINT64)(sizeof(IKCPSEG) + size);
+	}
+	return seg;
 }
 
 // delete a segment
 static void ikcp_segment_delete(ikcpcb *kcp, IKCPSEG *seg)
 {
+	const IUINT64 allocated = (IUINT64)(sizeof(IKCPSEG) + seg->len);
+	assert(kcp->allocated_segment_bytes >= allocated);
+	kcp->allocated_segment_bytes -= allocated;
 	ikcp_free(seg);
 }
 
@@ -301,6 +308,7 @@ ikcpcb* ikcp_create(IUINT32 conv, void *user)
 	kcp->fast_retransmissions = 0;
 	kcp->snd_queue_bytes = 0;
 	kcp->snd_buf_bytes = 0;
+	kcp->allocated_segment_bytes = 0;
 	kcp->stream_coalesces = 0;
 	kcp->stream_coalesced_bytes = 0;
 	kcp->flush_calls = 0;

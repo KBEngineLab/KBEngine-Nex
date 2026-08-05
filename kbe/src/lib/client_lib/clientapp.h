@@ -131,6 +131,7 @@ public:
 
 	Network::EventDispatcher & dispatcher()				{ return dispatcher_; }
 	Network::NetworkInterface & networkInterface()		{ return networkInterface_; }
+	const Network::NetworkInterface & networkInterface() const { return networkInterface_; }
 
 	COMPONENT_ID componentID() const	{ return componentID_; }
 	COMPONENT_TYPE componentType() const	{ return componentType_; }

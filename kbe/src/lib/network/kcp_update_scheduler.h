@@ -53,6 +53,15 @@ public:
 	uint64 dataTotalProcessingMicros() const { return dataTotalProcessingMicros_; }
 	uint64 dataMaxProcessingMicros() const { return dataMaxProcessingMicros_; }
 
+	template<typename Visitor>
+	void forEachScheduledChannel(Visitor visitor) const
+	{
+		queue_.forEachScheduledKey([&visitor](KcpUpdateQueue::Key key)
+		{
+			visitor(*reinterpret_cast<Channel*>(key));
+		});
+	}
+
 private:
 	void handleTimeout(TimerHandle handle, void* pUser) override;
 	void armNextTimer();

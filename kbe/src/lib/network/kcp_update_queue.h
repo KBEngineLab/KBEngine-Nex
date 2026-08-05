@@ -41,6 +41,18 @@ public:
 	std::uint64_t staleDiscardCount() const { return staleDiscardCount_; }
 	std::uint64_t compactionCount() const { return compactionCount_; }
 
+	template<typename Visitor>
+	void forEachScheduledKey(Visitor visitor) const
+	{
+		// active_ is the authoritative set; heap_ may contain stale replacement entries.
+		// active_ 是权威集合；heap_ 可能保留被更早截止时间替换后的陈旧项。
+		for (ActiveEntries::const_iterator iter = active_.begin(); iter != active_.end(); ++iter)
+		{
+			if (iter->second.token != 0)
+				visitor(iter->first);
+		}
+	}
+
 private:
 	struct ActiveEntry
 	{

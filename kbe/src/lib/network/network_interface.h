@@ -251,6 +251,8 @@ public:
 	uint64 kcpSendWindowBlockedChannelCount() const;
 	uint64 kcpAdmissionLimitedChannelCount() const;
 	uint64 kcpRemoteWindowZeroChannelCount() const;
+	uint64 kcpFixedAllocatedBytes() const;
+	uint64 kcpDynamicAllocatedBytes() const;
 	uint64 kcpInputErrorCount() const { return kcpInputErrorCount_; }
 	uint64 kcpInputTooShortCount() const { return kcpInputTooShortCount_; }
 	uint64 kcpInputConversationMismatchCount() const { return kcpInputConversationMismatchCount_; }
@@ -268,6 +270,42 @@ private:
 
 	void closeSocket();
 	uint64 kcpSendtoSampleTotalStamps() const;
+
+	struct KcpWatcherSnapshot
+	{
+		uint64 pendingSegments;
+		uint64 queuedSegments;
+		uint64 unackedSegments;
+		uint64 queuedPayloadBytes;
+		uint64 unackedPayloadBytes;
+		uint64 sendBufferMemoryBytes;
+		uint64 acknowledgedSegments;
+		uint64 timeoutRetransmissions;
+		uint64 fastRetransmissions;
+		uint64 ackSent;
+		uint64 ackReceived;
+		uint64 streamCoalesces;
+		uint64 streamCoalescedBytes;
+		uint64 flushCalls;
+		uint64 flushScannedSegments;
+		uint64 flushDataSegments;
+		uint64 flushEmptyDataCalls;
+		uint64 ackOutputCalls;
+		uint64 ackOutputBytes;
+		uint64 dataOutputCalls;
+		uint64 dataOutputBytes;
+		uint64 sendtoSampleCalls;
+		uint64 sendtoSampleStamps;
+		uint64 sendtoMaxSampleStamps;
+		uint64 maxPendingSegmentsPerChannel;
+		uint64 sendWindowBlockedChannels;
+		uint64 admissionLimitedChannels;
+		uint64 remoteWindowZeroChannels;
+		uint64 fixedAllocatedBytes;
+		uint64 dynamicAllocatedBytes;
+	};
+
+	const KcpWatcherSnapshot& kcpWatcherSnapshot() const;
 	void cleanupChannel(ChannelMap::iterator iter);
 	const Channel* currentRegisteredChannel(ChannelMap::const_iterator iter) const;
 	bool registerChannel(Channel* pChannel, bool replaceExistingAcceptedChannel);
@@ -307,6 +345,13 @@ private:
 	// Tick epoch 让 Channel 在首次收发时懒清零窗口计数，避免为全部连接执行无效写入。
 	// The tick epoch lets a Channel lazily reset window counters on first activity, avoiding writes to every connection.
 	uint64									channelTickEpoch_;
+	// A Watcher directory reads many KCP leaves consecutively. Cache one coherent O(Channel)
+	// snapshot per network Tick so diagnostics cannot multiply into dozens of full scans.
+	// 一个 Watcher 目录会连续读取多个 KCP 叶子；每个网络 Tick 只生成一次一致的 O(Channel)
+	// 快照，避免诊断查询放大为数十次全量扫描。
+	mutable uint64							kcpWatcherSnapshotEpoch_;
+	mutable bool								kcpWatcherSnapshotValid_;
+	mutable KcpWatcherSnapshot				kcpWatcherSnapshot_;
 	uint64									finalizedKcpAckSentCount_;
 	uint64									finalizedKcpAckReceivedCount_;
 	uint64									finalizedKcpTimeoutRetransmissionCount_;

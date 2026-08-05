@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <vector>
 
 namespace
 {
@@ -121,6 +122,34 @@ bool testDueAndOverdueMetrics()
 			"taken deadline was not reported") &&
 		require(queue.dueCount(20) == 1, "taken entry remained in due count");
 }
+
+bool testScheduledIterationUsesAuthoritativeEntries()
+{
+	KBEngine::Network::KcpUpdateQueue queue;
+	queue.schedule(1, 30);
+	queue.schedule(2, 10);
+	queue.schedule(3, 20);
+	queue.schedule(1, 25);
+
+	KBEngine::Network::KcpUpdateQueue::Key taken = 0;
+	if (!require(queue.takeDue(10, taken) && taken == 2, "due entry was not transferred") ||
+		!require(queue.cancel(3), "scheduled entry cancellation failed"))
+	{
+		return false;
+	}
+
+	std::vector<KBEngine::Network::KcpUpdateQueue::Key> visited;
+	queue.forEachScheduledKey([&visited](KBEngine::Network::KcpUpdateQueue::Key key)
+	{
+		visited.push_back(key);
+	});
+
+	// Replacement heap nodes, transferred callbacks and cancelled entries are not active
+	// Channels and must not be counted by a diagnostic snapshot.
+	// 被替换的堆节点、已转交回调的项和已取消项都不是活跃 Channel，诊断快照不得计入。
+	return require(visited.size() == 1 && visited[0] == 1,
+		"scheduled iteration exposed a stale or inactive entry");
+}
 }
 
 int main()
@@ -130,7 +159,8 @@ int main()
 		!testCancellationAndKeyReuse() ||
 		!testBoundedStaleCompaction() ||
 		!testRescheduleAfterTake() ||
-		!testDueAndOverdueMetrics())
+		!testDueAndOverdueMetrics() ||
+		!testScheduledIterationUsesAuthoritativeEntries())
 	{
 		return EXIT_FAILURE;
 	}

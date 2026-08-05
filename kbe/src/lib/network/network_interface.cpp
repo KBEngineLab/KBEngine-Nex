@@ -62,6 +62,9 @@ NetworkInterface::NetworkInterface(Network::EventDispatcher * pDispatcher,
 	channelMap_(),
 	channelMaintenance_(),
 	channelTickEpoch_(0),
+	kcpWatcherSnapshotEpoch_(0),
+	kcpWatcherSnapshotValid_(false),
+	kcpWatcherSnapshot_(),
 	finalizedKcpAckSentCount_(0),
 	finalizedKcpAckReceivedCount_(0),
 	finalizedKcpTimeoutRetransmissionCount_(0),
@@ -212,6 +215,7 @@ void NetworkInterface::cleanupChannel(ChannelMap::iterator iter)
 		pChannel->pNetworkInterface() == this && pChannel->pEndPoint() != NULL &&
 		pChannel->addr() == iter->first;
 	channelMap_.erase(iter);
+	kcpWatcherSnapshotValid_ = false;
 
 	if (!ownsCurrentEntry)
 	{
@@ -560,6 +564,7 @@ bool NetworkInterface::registerChannel(Channel* pChannel, bool replaceExistingAc
 	}
 
 	channelMap_[addr] = ChannelIndexEntry(pChannel, pChannel->sessionEpoch());
+	kcpWatcherSnapshotValid_ = false;
 	pChannel->registeredInNetworkInterface(true);
 	if (pChannel->isDestroyed() || pChannel->condemn() > 0)
 		requestChannelMaintenance(pChannel);
@@ -597,6 +602,7 @@ bool NetworkInterface::deregisterAllChannels()
 	channelMap_.clear();
 	channelMaintenance_.clear();
 	numExtChannels_ = 0;
+	kcpWatcherSnapshotValid_ = false;
 
 	return true;
 }
@@ -625,6 +631,7 @@ bool NetworkInterface::deregisterChannel(Channel* pChannel)
 	//	pChannel->c_str()));
 
 	channelMap_.erase(iter);
+	kcpWatcherSnapshotValid_ = false;
 	pChannel->registeredInNetworkInterface(false);
 
 	if(pChannelDeregisterHandler_)
@@ -851,68 +858,123 @@ uint64 NetworkInterface::recordKcpInputError(int result, size_t packetLength)
 }
 
 //-------------------------------------------------------------------------------------
+const NetworkInterface::KcpWatcherSnapshot& NetworkInterface::kcpWatcherSnapshot() const
+{
+	if (kcpWatcherSnapshotValid_ && kcpWatcherSnapshotEpoch_ == channelTickEpoch_)
+		return kcpWatcherSnapshot_;
+
+	KcpWatcherSnapshot snapshot = {};
+	snapshot.timeoutRetransmissions = finalizedKcpTimeoutRetransmissionCount_;
+	snapshot.fastRetransmissions = finalizedKcpFastRetransmissionCount_;
+	snapshot.ackSent = finalizedKcpAckSentCount_;
+	snapshot.ackReceived = finalizedKcpAckReceivedCount_;
+	snapshot.streamCoalesces = finalizedKcpStreamCoalesceCount_;
+	snapshot.streamCoalescedBytes = finalizedKcpStreamCoalescedBytes_;
+	snapshot.flushCalls = finalizedKcpFlushCallCount_;
+	snapshot.flushScannedSegments = finalizedKcpFlushScannedSegmentCount_;
+	snapshot.flushDataSegments = finalizedKcpFlushDataSegmentCount_;
+	snapshot.flushEmptyDataCalls = finalizedKcpFlushEmptyDataCallCount_;
+	snapshot.ackOutputCalls = finalizedKcpAckOutputCallCount_;
+	snapshot.ackOutputBytes = finalizedKcpAckOutputByteCount_;
+	snapshot.dataOutputCalls = finalizedKcpDataOutputCallCount_;
+	snapshot.dataOutputBytes = finalizedKcpDataOutputByteCount_;
+	snapshot.sendtoSampleCalls = finalizedKcpSendtoSampleCallCount_;
+	snapshot.sendtoSampleStamps = finalizedKcpSendtoSampleStamps_;
+	snapshot.sendtoMaxSampleStamps = finalizedKcpSendtoMaxSampleStamps_;
+
+	kcpUpdateScheduler_.forEachScheduledChannel([&snapshot](const Channel& channel)
+	{
+		const Channel* pChannel = &channel;
+		const ikcpcb* pKcp = pChannel->pKCP();
+		if (pKcp == NULL)
+			return;
+
+		const uint64 queued = static_cast<uint64>(pKcp->nsnd_que);
+		const uint64 unacked = static_cast<uint64>(pKcp->nsnd_buf);
+		const uint64 pending = queued + unacked;
+		snapshot.pendingSegments += pending;
+		snapshot.queuedSegments += queued;
+		snapshot.unackedSegments += unacked;
+		snapshot.queuedPayloadBytes += pKcp->snd_queue_bytes;
+		snapshot.unackedPayloadBytes += pKcp->snd_buf_bytes;
+		snapshot.sendBufferMemoryBytes += pKcp->snd_queue_bytes + pKcp->snd_buf_bytes +
+			pending * static_cast<uint64>(sizeof(IKCPSEG));
+		snapshot.acknowledgedSegments += static_cast<uint64>(pKcp->snd_una);
+		snapshot.maxPendingSegmentsPerChannel = std::max(
+			snapshot.maxPendingSegmentsPerChannel, pending);
+
+		snapshot.timeoutRetransmissions += pKcp->timeout_retransmissions;
+		snapshot.fastRetransmissions += pKcp->fast_retransmissions;
+		snapshot.ackSent += pKcp->ack_sent;
+		snapshot.ackReceived += pKcp->ack_received;
+		snapshot.streamCoalesces += pKcp->stream_coalesces;
+		snapshot.streamCoalescedBytes += pKcp->stream_coalesced_bytes;
+		snapshot.flushCalls += pKcp->flush_calls;
+		snapshot.flushScannedSegments += pKcp->flush_scanned_segments;
+		snapshot.flushDataSegments += pKcp->flush_data_segments;
+		snapshot.flushEmptyDataCalls += pKcp->flush_empty_data_calls;
+		snapshot.ackOutputCalls += pKcp->ack_output_calls;
+		snapshot.ackOutputBytes += pKcp->ack_output_bytes;
+		snapshot.dataOutputCalls += pKcp->data_output_calls;
+		snapshot.dataOutputBytes += pKcp->data_output_bytes;
+		snapshot.sendtoSampleCalls += pKcp->sendto_sample_calls;
+		snapshot.sendtoSampleStamps += pKcp->sendto_sample_stamps;
+		snapshot.sendtoMaxSampleStamps = std::max(
+			snapshot.sendtoMaxSampleStamps, static_cast<uint64>(pKcp->sendto_max_sample_stamps));
+
+		const KcpSendState sendState(pKcp->nsnd_que, pKcp->nsnd_buf,
+			pKcp->snd_wnd, pKcp->rmt_wnd, pKcp->cwnd, pKcp->nocwnd == 0,
+			pKcp->snd_queue_bytes + pKcp->snd_buf_bytes,
+			pChannel->isExternal() ? g_rudp_extWriteQueueMaxBytes : 0);
+		if (sendState.isWindowBlocked())
+			++snapshot.sendWindowBlockedChannels;
+		if (sendState.isAdmissionLimited())
+			++snapshot.admissionLimitedChannels;
+		if (pKcp->rmt_wnd == 0)
+			++snapshot.remoteWindowZeroChannels;
+
+		const IUINT32 protocolOverhead = pKcp->mtu - pKcp->mss;
+		snapshot.fixedAllocatedBytes += sizeof(ikcpcb) +
+			static_cast<uint64>(pKcp->mtu + protocolOverhead) * 3 +
+			static_cast<uint64>(pKcp->ackblock) * 2 * sizeof(IUINT32);
+
+		snapshot.dynamicAllocatedBytes += pKcp->allocated_segment_bytes;
+	});
+
+	kcpWatcherSnapshot_ = snapshot;
+	kcpWatcherSnapshotEpoch_ = channelTickEpoch_;
+	kcpWatcherSnapshotValid_ = true;
+	return kcpWatcherSnapshot_;
+}
+
+//-------------------------------------------------------------------------------------
 uint64 NetworkInterface::kcpPendingSegmentCount() const
 {
-	uint64 pendingSegments = 0;
-	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
-	{
-		const Channel* pChannel = iter->second;
-		if (pChannel != NULL && pChannel->pKCP() != NULL)
-			pendingSegments += static_cast<uint64>(ikcp_waitsnd(pChannel->pKCP()));
-	}
-	return pendingSegments;
+	return kcpWatcherSnapshot().pendingSegments;
 }
 
 //-------------------------------------------------------------------------------------
 uint64 NetworkInterface::kcpQueuedSegmentCount() const
 {
-	uint64 queuedSegments = 0;
-	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
-	{
-		const Channel* pChannel = iter->second;
-		if (pChannel != NULL && pChannel->pKCP() != NULL)
-			queuedSegments += static_cast<uint64>(pChannel->pKCP()->nsnd_que);
-	}
-	return queuedSegments;
+	return kcpWatcherSnapshot().queuedSegments;
 }
 
 //-------------------------------------------------------------------------------------
 uint64 NetworkInterface::kcpUnackedSegmentCount() const
 {
-	uint64 unackedSegments = 0;
-	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
-	{
-		const Channel* pChannel = iter->second;
-		if (pChannel != NULL && pChannel->pKCP() != NULL)
-			unackedSegments += static_cast<uint64>(pChannel->pKCP()->nsnd_buf);
-	}
-	return unackedSegments;
+	return kcpWatcherSnapshot().unackedSegments;
 }
 
 //-------------------------------------------------------------------------------------
 uint64 NetworkInterface::kcpQueuedPayloadBytes() const
 {
-	uint64 bytes = 0;
-	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
-	{
-		const Channel* pChannel = iter->second;
-		if (pChannel != NULL && pChannel->pKCP() != NULL)
-			bytes += static_cast<uint64>(pChannel->pKCP()->snd_queue_bytes);
-	}
-	return bytes;
+	return kcpWatcherSnapshot().queuedPayloadBytes;
 }
 
 //-------------------------------------------------------------------------------------
 uint64 NetworkInterface::kcpUnackedPayloadBytes() const
 {
-	uint64 bytes = 0;
-	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
-	{
-		const Channel* pChannel = iter->second;
-		if (pChannel != NULL && pChannel->pKCP() != NULL)
-			bytes += static_cast<uint64>(pChannel->pKCP()->snd_buf_bytes);
-	}
-	return bytes;
+	return kcpWatcherSnapshot().unackedPayloadBytes;
 }
 
 //-------------------------------------------------------------------------------------
@@ -924,23 +986,7 @@ uint64 NetworkInterface::kcpPendingPayloadBytes() const
 //-------------------------------------------------------------------------------------
 uint64 NetworkInterface::kcpSendBufferMemoryBytes() const
 {
-	uint64 bytes = 0;
-	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
-	{
-		const Channel* pChannel = iter->second;
-		const ikcpcb* pKcp = pChannel != NULL ? pChannel->pKCP() : NULL;
-		if (pKcp != NULL)
-		{
-			// ikcp_segment_new allocates sizeof(IKCPSEG) plus payload for every
-			// queued or unacknowledged send segment. Keep this estimate O(channels).
-			// ikcp_segment_new 为每个排队或待确认发送段分配结构体和 payload；
-			// 使用增量字节计数，使该估算保持 O(Channel)。
-			const uint64 segments = static_cast<uint64>(pKcp->nsnd_que) + pKcp->nsnd_buf;
-			bytes += pKcp->snd_queue_bytes + pKcp->snd_buf_bytes +
-				segments * static_cast<uint64>(sizeof(IKCPSEG));
-		}
-	}
-	return bytes;
+	return kcpWatcherSnapshot().sendBufferMemoryBytes;
 }
 
 //-------------------------------------------------------------------------------------
@@ -953,14 +999,7 @@ uint64 NetworkInterface::kcpAverageQueuedPayloadBytes() const
 //-------------------------------------------------------------------------------------
 uint64 NetworkInterface::kcpAcknowledgedSegmentCount() const
 {
-	uint64 acknowledgedSegments = 0;
-	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
-	{
-		const Channel* pChannel = iter->second;
-		if (pChannel != NULL && pChannel->pKCP() != NULL)
-			acknowledgedSegments += static_cast<uint64>(pChannel->pKCP()->snd_una);
-	}
-	return acknowledgedSegments;
+	return kcpWatcherSnapshot().acknowledgedSegments;
 }
 
 //-------------------------------------------------------------------------------------
@@ -970,38 +1009,31 @@ uint64 NetworkInterface::kcpRetransmissionCount() const
 }
 
 //-------------------------------------------------------------------------------------
-#define KBE_KCP_CUMULATIVE_METRIC(methodName, fieldName, finalizedFieldName) \
+#define KBE_KCP_CUMULATIVE_METRIC(methodName, snapshotField) \
 	uint64 NetworkInterface::methodName() const \
 	{ \
-		uint64 total = finalizedFieldName; \
-		for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter) \
-		{ \
-			const Channel* pChannel = iter->second; \
-			if (pChannel != NULL && pChannel->pKCP() != NULL) \
-				total += static_cast<uint64>(pChannel->pKCP()->fieldName); \
-		} \
-		return total; \
+		return kcpWatcherSnapshot().snapshotField; \
 	}
 
-KBE_KCP_CUMULATIVE_METRIC(kcpTimeoutRetransmissionCount, timeout_retransmissions, finalizedKcpTimeoutRetransmissionCount_)
-KBE_KCP_CUMULATIVE_METRIC(kcpFastRetransmissionCount, fast_retransmissions, finalizedKcpFastRetransmissionCount_)
-KBE_KCP_CUMULATIVE_METRIC(kcpAckSentCount, ack_sent, finalizedKcpAckSentCount_)
-KBE_KCP_CUMULATIVE_METRIC(kcpAckReceivedCount, ack_received, finalizedKcpAckReceivedCount_)
-KBE_KCP_CUMULATIVE_METRIC(kcpStreamCoalesceCount, stream_coalesces, finalizedKcpStreamCoalesceCount_)
-KBE_KCP_CUMULATIVE_METRIC(kcpStreamCoalescedBytes, stream_coalesced_bytes, finalizedKcpStreamCoalescedBytes_)
-KBE_KCP_CUMULATIVE_METRIC(kcpFlushCallCount, flush_calls, finalizedKcpFlushCallCount_)
-KBE_KCP_CUMULATIVE_METRIC(kcpFlushScannedSegmentCount, flush_scanned_segments, finalizedKcpFlushScannedSegmentCount_)
-KBE_KCP_CUMULATIVE_METRIC(kcpFlushDataSegmentCount, flush_data_segments, finalizedKcpFlushDataSegmentCount_)
-KBE_KCP_CUMULATIVE_METRIC(kcpFlushEmptyDataCallCount, flush_empty_data_calls, finalizedKcpFlushEmptyDataCallCount_)
-KBE_KCP_CUMULATIVE_METRIC(kcpAckOutputCallCount, ack_output_calls, finalizedKcpAckOutputCallCount_)
-KBE_KCP_CUMULATIVE_METRIC(kcpAckOutputByteCount, ack_output_bytes, finalizedKcpAckOutputByteCount_)
-KBE_KCP_CUMULATIVE_METRIC(kcpDataOutputCallCount, data_output_calls, finalizedKcpDataOutputCallCount_)
-KBE_KCP_CUMULATIVE_METRIC(kcpDataOutputByteCount, data_output_bytes, finalizedKcpDataOutputByteCount_)
-KBE_KCP_CUMULATIVE_METRIC(kcpSendtoSampleCallCount, sendto_sample_calls, finalizedKcpSendtoSampleCallCount_)
+KBE_KCP_CUMULATIVE_METRIC(kcpTimeoutRetransmissionCount, timeoutRetransmissions)
+KBE_KCP_CUMULATIVE_METRIC(kcpFastRetransmissionCount, fastRetransmissions)
+KBE_KCP_CUMULATIVE_METRIC(kcpAckSentCount, ackSent)
+KBE_KCP_CUMULATIVE_METRIC(kcpAckReceivedCount, ackReceived)
+KBE_KCP_CUMULATIVE_METRIC(kcpStreamCoalesceCount, streamCoalesces)
+KBE_KCP_CUMULATIVE_METRIC(kcpStreamCoalescedBytes, streamCoalescedBytes)
+KBE_KCP_CUMULATIVE_METRIC(kcpFlushCallCount, flushCalls)
+KBE_KCP_CUMULATIVE_METRIC(kcpFlushScannedSegmentCount, flushScannedSegments)
+KBE_KCP_CUMULATIVE_METRIC(kcpFlushDataSegmentCount, flushDataSegments)
+KBE_KCP_CUMULATIVE_METRIC(kcpFlushEmptyDataCallCount, flushEmptyDataCalls)
+KBE_KCP_CUMULATIVE_METRIC(kcpAckOutputCallCount, ackOutputCalls)
+KBE_KCP_CUMULATIVE_METRIC(kcpAckOutputByteCount, ackOutputBytes)
+KBE_KCP_CUMULATIVE_METRIC(kcpDataOutputCallCount, dataOutputCalls)
+KBE_KCP_CUMULATIVE_METRIC(kcpDataOutputByteCount, dataOutputBytes)
+KBE_KCP_CUMULATIVE_METRIC(kcpSendtoSampleCallCount, sendtoSampleCalls)
 
 // Timing stays in native stamps until aggregation, preserving precision without floating-point work on the packet hot path.
 // 计时在聚合前保持原生 stamp，避免在报文热路径执行浮点换算并保留精度。
-KBE_KCP_CUMULATIVE_METRIC(kcpSendtoSampleTotalStamps, sendto_sample_stamps, finalizedKcpSendtoSampleStamps_)
+KBE_KCP_CUMULATIVE_METRIC(kcpSendtoSampleTotalStamps, sendtoSampleStamps)
 
 #undef KBE_KCP_CUMULATIVE_METRIC
 
@@ -1012,13 +1044,7 @@ uint64 NetworkInterface::kcpSendtoSampleTotalMicros() const
 
 uint64 NetworkInterface::kcpSendtoSampleMaxMicros() const
 {
-	uint64 maxStamps = finalizedKcpSendtoMaxSampleStamps_;
-	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
-	{
-		const Channel* pChannel = iter->second;
-		if (pChannel != NULL && pChannel->pKCP() != NULL)
-			maxStamps = std::max<uint64>(maxStamps, pChannel->pKCP()->sendto_max_sample_stamps);
-	}
+	const uint64 maxStamps = kcpWatcherSnapshot().sendtoMaxSampleStamps;
 	return static_cast<uint64>(static_cast<double>(maxStamps) * 1000000.0 / stampsPerSecondD());
 }
 
@@ -1050,69 +1076,48 @@ void NetworkInterface::accumulateFinalizedKcpDiagnostics(uint64 ackSent, uint64 
 	finalizedKcpSendtoSampleCallCount_ += sendtoSampleCalls;
 	finalizedKcpSendtoSampleStamps_ += sendtoSampleStamps;
 	finalizedKcpSendtoMaxSampleStamps_ = std::max(finalizedKcpSendtoMaxSampleStamps_, sendtoMaxSampleStamps);
+	// A closing Channel is archived and removed in the same dispatcher turn. Invalidate a
+	// previously materialized snapshot so the next Watcher leaf cannot retain the old Channel
+	// while also observing its newly archived cumulative counters.
+	// Channel 会在同一 dispatcher 轮次内完成指标归档和移除。使已生成的快照失效，避免
+	// 后续 Watcher 叶子同时保留旧 Channel 并读取其新归档的累计计数。
+	kcpWatcherSnapshotValid_ = false;
 }
 
 //-------------------------------------------------------------------------------------
 uint64 NetworkInterface::kcpMaxPendingSegmentsPerChannel() const
 {
-	uint64 maxPendingSegments = 0;
-	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
-	{
-		const Channel* pChannel = iter->second;
-		if (pChannel != NULL && pChannel->pKCP() != NULL)
-		{
-			maxPendingSegments = std::max<uint64>(maxPendingSegments,
-				static_cast<uint64>(ikcp_waitsnd(pChannel->pKCP())));
-		}
-	}
-	return maxPendingSegments;
+	return kcpWatcherSnapshot().maxPendingSegmentsPerChannel;
 }
 
 //-------------------------------------------------------------------------------------
 uint64 NetworkInterface::kcpSendWindowBlockedChannelCount() const
 {
-	uint64 blockedChannels = 0;
-	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
-	{
-		const Channel* pChannel = iter->second;
-		const ikcpcb* pKcp = pChannel != NULL ? pChannel->pKCP() : NULL;
-		if (pKcp != NULL && KcpSendState(pKcp->nsnd_que, pKcp->nsnd_buf,
-			pKcp->snd_wnd, pKcp->rmt_wnd, pKcp->cwnd, pKcp->nocwnd == 0).isWindowBlocked())
-			++blockedChannels;
-	}
-	return blockedChannels;
+	return kcpWatcherSnapshot().sendWindowBlockedChannels;
 }
 
 //-------------------------------------------------------------------------------------
 uint64 NetworkInterface::kcpAdmissionLimitedChannelCount() const
 {
-	uint64 limitedChannels = 0;
-	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
-	{
-		const Channel* pChannel = iter->second;
-		const ikcpcb* pKcp = pChannel != NULL ? pChannel->pKCP() : NULL;
-		if (pKcp != NULL && KcpSendState(pKcp->nsnd_que, pKcp->nsnd_buf,
-			pKcp->snd_wnd, pKcp->rmt_wnd, pKcp->cwnd, pKcp->nocwnd == 0,
-			pKcp->snd_queue_bytes + pKcp->snd_buf_bytes,
-			pChannel->isExternal() ? g_rudp_extWriteQueueMaxBytes : 0).isAdmissionLimited())
-		{
-			++limitedChannels;
-		}
-	}
-	return limitedChannels;
+	return kcpWatcherSnapshot().admissionLimitedChannels;
 }
 
 //-------------------------------------------------------------------------------------
 uint64 NetworkInterface::kcpRemoteWindowZeroChannelCount() const
 {
-	uint64 zeroWindowChannels = 0;
-	for (ChannelMap::const_iterator iter = channelMap_.begin(); iter != channelMap_.end(); ++iter)
-	{
-		const Channel* pChannel = iter->second;
-		if (pChannel != NULL && pChannel->pKCP() != NULL && pChannel->pKCP()->rmt_wnd == 0)
-			++zeroWindowChannels;
-	}
-	return zeroWindowChannels;
+	return kcpWatcherSnapshot().remoteWindowZeroChannels;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 NetworkInterface::kcpFixedAllocatedBytes() const
+{
+	return kcpWatcherSnapshot().fixedAllocatedBytes;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 NetworkInterface::kcpDynamicAllocatedBytes() const
+{
+	return kcpWatcherSnapshot().dynamicAllocatedBytes;
 }
 
 //-------------------------------------------------------------------------------------
