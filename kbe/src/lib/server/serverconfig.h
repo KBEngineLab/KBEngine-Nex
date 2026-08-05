@@ -175,6 +175,8 @@ typedef struct EngineComponentInfo
 		enableRawDatabaseCommandBlacklist = false;
 
 		externalAddress[0] = '\0';
+		externalTcpPorts_min = 0;
+		externalTcpPorts_max = 0;
 		externalUdpPorts_min = -1;
 		externalUdpPorts_max = -1;
 
@@ -234,8 +236,9 @@ typedef struct EngineComponentInfo
 	char internalInterface[MAX_NAME];						// 内部网卡接口名称
 	char externalInterface[MAX_NAME];						// 外部网卡接口名称
 	char externalAddress[MAX_NAME];							// 外部IP地址
-	int32 externalPorts_min;								// 对外socket端口使用指定范围
-	int32 externalPorts_max;
+	// 对外 TCP socket 使用独立端口范围。/ External TCP sockets use an independent port range.
+	int32 externalTcpPorts_min;
+	int32 externalTcpPorts_max;
 	// UDP 使用独立端口范围；-1 表示该组件不创建外部 UDP endpoint。
 	// UDP uses an independent port range; -1 means the component does not create an external UDP endpoint.
 	int32 externalUdpPorts_min;

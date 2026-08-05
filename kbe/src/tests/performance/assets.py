@@ -86,15 +86,17 @@ def create_config_overlay(
         baseapp = root.find("./baseapp")
         if baseapp is None:
             baseapp = ET.SubElement(root, "baseapp")
-        # 旧资产可能仍使用已废弃的 externalTcpPorts_*；写入当前引擎读取的键，
-        # 使 --baseapp-count 在隔离集群中有足够的 TCP 监听端口。
-        # Legacy assets may still use externalTcpPorts_*; write the keys consumed
-        # by the current engine so --baseapp-count has enough isolated TCP ports.
-        port_min = int(baseapp.findtext("externalPorts_min", "20015"))
+        # 压测 overlay 与引擎配置统一使用协议明确的 TCP 字段。
+        # Benchmark overlays use the same protocol-specific TCP keys as the engine.
+        port_min = int(baseapp.findtext("externalTcpPorts_min", "20015"))
         if port_min < 1 or port_min + baseapp_external_port_count - 1 > 65535:
             raise ValueError("BaseApp external TCP port range is invalid")
-        set_xml_value(baseapp, "externalPorts_min", port_min)
-        set_xml_value(baseapp, "externalPorts_max", port_min + baseapp_external_port_count - 1)
+        set_xml_value(baseapp, "externalTcpPorts_min", port_min)
+        set_xml_value(
+            baseapp,
+            "externalTcpPorts_max",
+            port_min + baseapp_external_port_count - 1,
+        )
 
     if (external_receive_messages is not None or external_receive_bytes is not None or
             external_timeout_seconds is not None or reliable_udp_tick_interval_ms is not None or

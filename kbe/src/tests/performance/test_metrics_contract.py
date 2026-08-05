@@ -1131,7 +1131,9 @@ def main() -> int:
         assets.mkdir(parents=True)
         (assets / "kbengine.xml").write_text(
             "<root><bots /><dbmgr><databaseInterfaces><default><numConnections>5</numConnections>"
-            "</default></databaseInterfaces></dbmgr></root>\n",
+            "</default></databaseInterfaces></dbmgr>"
+            "<baseapp><externalTcpPorts_min>21015</externalTcpPorts_min>"
+            "<externalTcpPorts_max>21019</externalTcpPorts_max></baseapp></root>\n",
             encoding="utf-8",
         )
         overlay = create_config_overlay(
@@ -1158,8 +1160,8 @@ def main() -> int:
         assert xml_root.findtext("./channelCommon/reliableUDP/minRTO") == "50"
         assert xml_root.find("./networkInterface/reliableUDP") is None
         assert xml_root.findtext("./dbmgr/databaseInterfaces/default/numConnections") == "32"
-        assert xml_root.findtext("./baseapp/externalPorts_min") == "20015"
-        assert xml_root.findtext("./baseapp/externalPorts_max") == "20024"
+        assert xml_root.findtext("./baseapp/externalTcpPorts_min") == "21015"
+        assert xml_root.findtext("./baseapp/externalTcpPorts_max") == "21024"
         deterministic_run = root / "deterministic-run"
         create_config_overlay(
             assets,

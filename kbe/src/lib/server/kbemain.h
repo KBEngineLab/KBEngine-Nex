@@ -205,6 +205,18 @@ int kbeMainT(int argc, char * argv[], COMPONENT_TYPE componentType,
 		extlisteningUdpPort_min, extlisteningUdpPort_max);
 	
 	DebugHelper::getSingleton().pNetworkInterface(&networkInterface);
+	if (!networkInterface.good())
+	{
+		// Listener bind failures are recoverable startup failures. Return before publishing
+		// invalid component addresses or constructing an application around unusable sockets.
+		// 监听端口绑定失败是可恢复的启动失败；在发布无效组件地址或使用不可用 socket
+		// 构造应用之前直接返回，避免 Debug CRT abort 弹窗。
+		ERROR_MSG(fmt::format("{}({}) network initialization failed; check configured port ranges and port ownership.\n",
+			COMPONENT_NAME_EX(componentType), g_componentID));
+		DebugHelper::getSingleton().finalise();
+		DebugHelper::getSingleton().pNetworkInterface(NULL);
+		return -1;
+	}
 
 	g_kbeSrvConfig.updateInfos(true, componentType, g_componentID, 
 			networkInterface.intaddr(), networkInterface.extaddr());

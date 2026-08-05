@@ -117,12 +117,6 @@ NetworkInterface::NetworkInterface(Network::EventDispatcher * pDispatcher,
 		this->initialize("EXTERNAL", htons(extlisteningPort_min), htons(extlisteningPort_max),
 			extlisteningInterface, &extEndpoint_, pExtListenerReceiver_, extrbuffer, extwbuffer);
 
-		// 如果配置了对外端口范围， 如果范围过小这里extEndpoint_可能没有端口可用了
-		if(extlisteningPort_min != -1)
-		{
-			KBE_ASSERT(extEndpoint_.good() && "Channel::EXTERNAL: no available port, "
-				"please check for kbengine[_defs].xml!\n");
-		}
 	}
 
 	if (extlisteningUdpPort_min != -1)
@@ -133,8 +127,6 @@ NetworkInterface::NetworkInterface(Network::EventDispatcher * pDispatcher,
 			extlisteningInterface, &extUdpEndpoint_, pExtUdpListenerReceiver_, extrbuffer, extwbuffer,
 			PROTOCOL_UDP);
 
-		KBE_ASSERT(extUdpEndpoint_.good() && "Channel::EXTERNAL-UDP: no available UDP port, "
-			"please check for kbengine[_defs].xml!\n");
 	}
 
 	if (intlisteningPort_min != -1)
@@ -145,8 +137,16 @@ NetworkInterface::NetworkInterface(Network::EventDispatcher * pDispatcher,
 			intlisteningInterface, &intEndpoint_, pIntListenerReceiver_, intrbuffer, intwbuffer);
 	}
 
-	KBE_ASSERT(good() && "NetworkInterface::NetworkInterface: no available port, "
-		"please check for kbengine[_defs].xml!\n");
+	if (!good())
+	{
+		// Port exhaustion is a configuration/startup error, not a process invariant.
+		// Debug assertions opened a modal CRT dialog and blocked unattended startup;
+		// kbeMainT checks good() and exits cleanly after this diagnostic.
+		// 端口耗尽属于配置/启动错误，而不是进程不变量。Debug 断言会弹出 CRT
+		// 模态窗口并阻塞无人值守启动；kbeMainT 会检查 good() 并正常退出。
+		ERROR_MSG("NetworkInterface::NetworkInterface: no available listening port, "
+			"please check kbengine[_defs].xml port ranges.\n");
+	}
 
 	pDelayedChannels_->init(this->dispatcher(), this);
 }
