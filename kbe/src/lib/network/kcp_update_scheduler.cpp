@@ -27,7 +27,20 @@ const size_t KCP_MIN_ACK_FLUSHES_PER_WAKEUP = 4;
 const size_t KCP_MAX_UPDATES_PER_WAKEUP = 2048;
 const uint64 KCP_PROCESSING_TIME_BUDGET_MICROS = 2000;
 const uint64 KCP_ACK_PROCESSING_TIME_BUDGET_MICROS = 2000;
+const uint64 KCP_MAX_ADAPTIVE_PROCESSING_TIME_BUDGET_MICROS = 8000;
+const uint64 KCP_ADAPTIVE_EXHAUSTION_STEP = 8;
 const int64 KCP_BACKLOG_RETRY_DELAY_MICROS = 1000;
+
+uint64 adaptiveKcpBudgetMicros(uint64 baseBudgetMicros, uint64 consecutiveExhaustions)
+{
+	// Persistent backlog means the fixed fairness slice is below the arrival rate.
+	// Increase throughput gradually, but retain an 8 ms upper bound for dispatcher fairness.
+	// 持续积压表示固定公平切片低于数据到达速率；逐级提高吞吐，并保留 8ms 上限。
+	const uint64 growthSteps = consecutiveExhaustions / KCP_ADAPTIVE_EXHAUSTION_STEP;
+	const uint64 multiplier = 1 + std::min<uint64>(growthSteps, 3);
+	return std::min<uint64>(baseBudgetMicros * multiplier,
+		KCP_MAX_ADAPTIVE_PROCESSING_TIME_BUDGET_MICROS);
+}
 }
 
 KcpUpdateScheduler::KcpUpdateScheduler(EventDispatcher& dispatcher) :
@@ -199,7 +212,9 @@ void KcpUpdateScheduler::handleTimeout(TimerHandle handle, void*)
 
 	processing_ = true;
 	const uint64 processingStart = timestamp();
-	const uint64 ackBudget = delayToStamps(KCP_ACK_PROCESSING_TIME_BUDGET_MICROS);
+	const uint64 ackBudgetMicros = adaptiveKcpBudgetMicros(
+		KCP_ACK_PROCESSING_TIME_BUDGET_MICROS, consecutiveBudgetExhaustions_);
+	const uint64 ackBudget = delayToStamps(ackBudgetMicros);
 	KcpUpdateQueue::Key key = 0;
 	KcpUpdateQueue::Time dueTime = 0;
 	size_t ackProcessed = 0;
@@ -227,7 +242,9 @@ void KcpUpdateScheduler::handleTimeout(TimerHandle handle, void*)
 	ackMaxProcessingMicros_ = std::max(ackMaxProcessingMicros_, ackProcessingMicros);
 
 	const uint64 dataProcessingStart = timestamp();
-	const uint64 processingBudget = delayToStamps(KCP_PROCESSING_TIME_BUDGET_MICROS);
+	const uint64 processingBudgetMicros = adaptiveKcpBudgetMicros(
+		KCP_PROCESSING_TIME_BUDGET_MICROS, consecutiveBudgetExhaustions_);
+	const uint64 processingBudget = delayToStamps(processingBudgetMicros);
 	const uint64 now = dataProcessingStart;
 	size_t processed = 0;
 	for (; processed < KCP_MAX_UPDATES_PER_WAKEUP; ++processed)

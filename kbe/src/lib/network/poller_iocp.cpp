@@ -317,7 +317,7 @@ bool IocpPoller::armUdpRead(KBESOCKET fd, SocketState& state)
 	if (ret == 0)
 	{
 		trackContext(*pContext);
-		state.pPendingReadContext = pContext;
+		state.pendingReadContexts.insert(pContext);
 		return true;
 	}
 
@@ -325,12 +325,53 @@ bool IocpPoller::armUdpRead(KBESOCKET fd, SocketState& state)
 	if (wsaErr == WSA_IO_PENDING)
 	{
 		trackContext(*pContext);
-		state.pPendingReadContext = pContext;
+		state.pendingReadContexts.insert(pContext);
 		return true;
 	}
 
 	recycleContext(pContext);
 	return false;
+}
+
+//-------------------------------------------------------------------------------------
+uint32 IocpPoller::udpReceiveDepth(const SocketState& state) const
+{
+	// Bots connect each UDP socket to exactly one BaseApp, while a BaseApp listener
+	// remains unconnected and receives all client datagrams. getpeername therefore
+	// gives us a transport-level distinction without coupling network code to component types.
+	// Bots 的 UDP socket 会 connect 到单个 BaseApp，而 BaseApp listener 保持未连接并接收
+	// 所有客户端数据。使用 getpeername 可在网络层区分两者，不依赖具体组件类型。
+	sockaddr_storage peerAddress;
+	int peerAddressLength = sizeof(peerAddress);
+	memset(&peerAddress, 0, sizeof(peerAddress));
+	const bool connected = getpeername(state.socket,
+		reinterpret_cast<sockaddr*>(&peerAddress), &peerAddressLength) == 0;
+	return iocpUdpReceiveDepth(connected);
+}
+
+//-------------------------------------------------------------------------------------
+bool IocpPoller::isReadArmComplete(const SocketState& state) const
+{
+	if (state.kind == SOCKET_KIND_UDP)
+		return state.pendingReadContexts.size() >= udpReceiveDepth(state);
+
+	return state.pPendingReadContext != NULL;
+}
+
+//-------------------------------------------------------------------------------------
+bool IocpPoller::ensureUdpReadsArmed(KBESOCKET fd, SocketState& state)
+{
+	const uint32 targetDepth = udpReceiveDepth(state);
+	while (state.registeredRead && state.pendingReadContexts.size() < targetDepth)
+	{
+		if (!armUdpRead(fd, state))
+			break;
+	}
+
+	// One successfully armed receive is enough to keep the registration valid.
+	// A partial fill is retried through REARM_READ without discarding live operations.
+	// 只要至少一个接收已挂起，注册就是有效的；未补满部分交给 REARM_READ 重试。
+	return !state.pendingReadContexts.empty();
 }
 
 //-------------------------------------------------------------------------------------
@@ -485,13 +526,20 @@ bool IocpPoller::armAccept(KBESOCKET fd, SocketState& state)
 //-------------------------------------------------------------------------------------
 bool IocpPoller::ensureReadArmed(KBESOCKET fd, SocketState& state)
 {
-	// IOCP 本身就是 completion 模型，每个 fd 同时只保留一个读侧 OVERLAPPED。
-	// 这里不使用用户态队列水位暂停 WSARecv/AcceptEx；completion 到达后立即
-	// triggerRead，上层只通过短暂 handoff 队列取走结果。
-	if (!state.registeredRead || state.pPendingReadContext != NULL)
+	// TCP and AcceptEx keep one outstanding read. UDP keeps a bounded receive set so
+	// a completion waiting in the IOCP queue does not leave the socket without a buffer.
+	// TCP/AcceptEx 保持一个 outstanding read；UDP 使用有界接收集合，避免 completion
+	// 尚在 IOCP 队列等待时 socket 已无接收缓冲。
+	if (!state.registeredRead)
 	{
 		return true;
 	}
+
+	if (state.kind == SOCKET_KIND_UDP)
+		return ensureUdpReadsArmed(fd, state);
+
+	if (state.pPendingReadContext != NULL)
+		return true;
 
 	SocketKind detectedKind = SOCKET_KIND_UNKNOWN;
 	if (!tryDetermineSocketKind(state.socket, detectedKind))
@@ -534,7 +582,7 @@ bool IocpPoller::ensureReadArmed(KBESOCKET fd, SocketState& state)
 	case SOCKET_KIND_TCP:
 		return armTcpRead(fd, state);
 	case SOCKET_KIND_UDP:
-		return armUdpRead(fd, state);
+		return ensureUdpReadsArmed(fd, state);
 	case SOCKET_KIND_LISTENER:
 		return armAccept(fd, state);
 	default:
@@ -562,11 +610,12 @@ void IocpPoller::processRearmRequests()
 		}
 
 		SocketState& state = *iter->second;
-		if ((flags & REARM_READ) != 0 && state.registeredRead && state.pPendingReadContext == NULL)
+		if ((flags & REARM_READ) != 0 && state.registeredRead && !isReadArmComplete(state))
 		{
-			const bool armed = ensureReadArmed(fd, state) && state.pPendingReadContext != NULL;
-			recordRearmAttempt(!armed);
-			if (!armed && state.registeredRead)
+			const bool armed = ensureReadArmed(fd, state);
+			const bool complete = armed && isReadArmComplete(state);
+			recordRearmAttempt(!complete);
+			if (!complete && state.registeredRead)
 			{
 				requestRearm(fd, REARM_READ);
 			}
@@ -636,7 +685,7 @@ bool IocpPoller::doRegisterForRead(KBESOCKET fd)
 		iter->second->registeredRead = false;
 		cleanupStateIfUnused(fd);
 	}
-	else if (iter->second->pPendingReadContext == NULL)
+	else if (!hasPendingReadContext(fd) || !isReadArmComplete(*iter->second))
 	{
 		// connect/listen 前的 1.x 注册会被延迟；只登记该 fd，而不是依赖全表轮询发现它。
 		// A 1.x registration before connect/listen is deferred; enqueue this fd instead of rediscovering it through a full-table poll.
@@ -676,6 +725,13 @@ bool IocpPoller::doDeregisterForRead(KBESOCKET fd)
 		CancelIoEx(reinterpret_cast<HANDLE>(state.socket), &pContext->overlapped);
 		state.pPendingReadContext = NULL;
 	}
+
+	for (void* pendingContext : state.pendingReadContexts)
+	{
+		IocpContext* pContext = reinterpret_cast<IocpContext*>(pendingContext);
+		CancelIoEx(reinterpret_cast<HANDLE>(state.socket), &pContext->overlapped);
+	}
+	state.pendingReadContexts.clear();
 
 	if (state.pPendingWriteContext != NULL)
 	{
@@ -824,7 +880,8 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 	const bool hasState = (iter != socketStates_.end());
 	SocketState* pState = hasState ? iter->second.get() : NULL;
 	void** ppCurrentContext = NULL;
-	if (pState != NULL)
+	const bool isUdpReadContext = pContext->operation == OP_UDP_RECV;
+	if (pState != NULL && !isUdpReadContext)
 	{
 		ppCurrentContext = (pContext->operation == OP_TCP_SEND || pContext->operation == OP_UDP_SEND) ?
 			&pState->pPendingWriteContext : &pState->pPendingReadContext;
@@ -836,13 +893,17 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 		completionKey == static_cast<ULONG_PTR>(fd) &&
 		pState->socket == pContext->socket &&
 		pState->generation == pContext->generation &&
-		ppCurrentContext != NULL &&
-		*ppCurrentContext == pContext);
+		(isUdpReadContext ?
+			pState->pendingReadContexts.find(pContext) != pState->pendingReadContexts.end() :
+			(ppCurrentContext != NULL && *ppCurrentContext == pContext)));
 	const bool isUdpPortUnreachable = (pContext->kind == SOCKET_KIND_UDP && errorCode == ERROR_PORT_UNREACHABLE);
 
 	if (isCurrentContext)
 	{
-		*ppCurrentContext = NULL;
+		if (isUdpReadContext)
+			pState->pendingReadContexts.erase(pContext);
+		else
+			*ppCurrentContext = NULL;
 	}
 
 	// 取消 IO 是正常注销路径，不算网络错误。
@@ -969,6 +1030,20 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 			pContext->data.resize(static_cast<size_t>(bytesTransferred));
 			if (pushUdpReceivedData(fd, pContext->data, pContext->udpAddr, 0))
 			{
+				// BaseApp KCP clients share one UDP listener. Packet dispatch can synchronously
+				// execute decryption, Python and Entity handlers for hundreds of milliseconds;
+				// leaving no WSARecvFrom posted during that work turns the kernel socket buffer
+				// into the only receive queue and causes avoidable loss. Post the next receive
+				// after transferring ownership but before dispatching the current datagram.
+				// BaseApp 的 KCP 客户端共用一个 UDP listener。当前包分发可能同步执行解密、
+				// Python 与 Entity handler 数百毫秒；若期间没有挂起 WSARecvFrom，内核 socket
+				// 缓冲就成为唯一接收队列并产生可避免的丢包。数据所有权转移后、分发当前包前，
+				// 立即挂入下一次接收。主线程仍按 completion 顺序串行解析，不引入并发 handler。
+				if (pState->registeredRead &&
+					(!ensureUdpReadsArmed(fd, *pState) || !isReadArmComplete(*pState)))
+				{
+					requestRearm(fd, REARM_READ);
+				}
 				this->triggerRead(fd);
 			}
 		}
@@ -1044,11 +1119,11 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 	if (currentIter != socketStates_.end())
 	{
 		SocketState& currentState = *currentIter->second;
-		if (currentState.registeredRead && currentState.pPendingReadContext == NULL)
+		if (currentState.registeredRead && !isReadArmComplete(currentState))
 		{
 			// completion 回调可能销毁 channel 或重新注册 fd。
 			// 因此重挂 read 前必须重新查当前 state，而不是继续使用旧指针。
-			if (!ensureReadArmed(fd, currentState) || currentState.pPendingReadContext == NULL)
+			if (!ensureReadArmed(fd, currentState) || !isReadArmComplete(currentState))
 			{
 				requestRearm(fd, REARM_READ);
 			}
@@ -1106,9 +1181,10 @@ int IocpPoller::processPendingEvents(double maxWait)
 		// 如果一次 tick 无限制 drain IOCP，断线或启动 burst 会把 timer、
 		// app 心跳和其他 channel 处理饿住。预算到达后保留剩余 completion
 		// 在下一轮 tick 继续取，IOCP 队列本身保证完成事件不会丢。
-		const uint64 completionProcessingBudget =
-			COMPLETION_MAX_PROCESSING_TIME_MS > 0 ?
-			(uint64(COMPLETION_MAX_PROCESSING_TIME_MS) * stampsPerSecond() / 1000) : 0;
+		const uint32 completionProcessingBudgetMs =
+			completionProcessingTimeBudgetMs(completionConsecutiveBudgetExhaustions_);
+		const uint64 completionProcessingBudget = completionProcessingBudgetMs > 0 ?
+			(uint64(completionProcessingBudgetMs) * stampsPerSecond() / 1000) : 0;
 
 		++readyCount;
 		handleCompletion(completionKey, overlapped, bytesTransferred, ok == TRUE, errorCode);
@@ -1153,7 +1229,7 @@ int IocpPoller::processPendingEvents(double maxWait)
 				WARNING_MSG(fmt::format("IocpPoller::processPendingEvents: completion processing took too long, count={}, countBudget={}, timeBudget={}, maxCount={}, maxTimeMS={}, elapsedMS={}\n",
 					readyCount, countBudgetExhausted, timeBudgetExceeded,
 					COMPLETION_MAX_COMPLETIONS_PER_TICK,
-					COMPLETION_MAX_PROCESSING_TIME_MS,
+					completionProcessingBudgetMs,
 					completionProcessingElapsed * 1000 / stampsPerSecond()));
 			}
 		}

@@ -22,6 +22,7 @@ from performance.report import build_summary, load_events, validate_event
 from performance.run import (
     _repository_root,
     collect_readiness_failure_snapshot,
+    drain_watcher_windows,
     expand_bots_watcher_targets,
     expand_component_watcher_targets,
     load_scenario,
@@ -496,41 +497,41 @@ def assert_python_latency_scenario() -> None:
     assert gameplay["readiness"]["root/bots/performance/clientsDestroyed"] == 0
     assert gameplay["readiness"]["root/bots/performance/networkErrors"] == 0
     assert "BASEAPPMGR_TYPE=@baseappmgr:root/allocation" in gameplay["watcher_targets"]
-    assert gameplay["watcher_intervals"]["BASEAPPMGR_TYPE:root/allocation"] == 5.0
+    assert gameplay["watcher_intervals"]["BASEAPPMGR_TYPE:root/allocation"] == 10.0
     assert "CELLAPPMGR_TYPE=@cellappmgr:root/allocation" in gameplay["watcher_targets"]
-    assert gameplay["watcher_intervals"]["CELLAPPMGR_TYPE:root/allocation"] == 5.0
+    assert gameplay["watcher_intervals"]["CELLAPPMGR_TYPE:root/allocation"] == 10.0
     assert "MACHINE_TYPE=@machine:root/discovery" in gameplay["watcher_targets"]
-    assert gameplay["watcher_intervals"]["MACHINE_TYPE:root/discovery"] == 5.0
+    assert gameplay["watcher_intervals"]["MACHINE_TYPE:root/discovery"] == 10.0
     assert "BASEAPP_TYPE=@baseapp:root/network/clientVolatileBackpressure" in gameplay["watcher_targets"]
-    assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/clientVolatileBackpressure"] == 5.0
+    assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/clientVolatileBackpressure"] == 30.0
     assert "BASEAPP_TYPE=@baseapp:root/network/clientInput" in gameplay["watcher_targets"]
-    assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/clientInput"] == 5.0
+    assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/clientInput"] == 30.0
     assert "BASEAPP_TYPE=@baseapp:root/network/messageProcessing" in gameplay["watcher_targets"]
-    assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/messageProcessing"] == 5.0
+    assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/messageProcessing"] == 30.0
     assert "BASEAPP_TYPE=@baseapp:root/network/kcp/receive" in gameplay["watcher_targets"]
-    assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/kcp/receive"] == 5.0
+    assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/kcp/receive"] == 30.0
     assert "BASEAPP_TYPE=@baseapp:root/scriptStages" in gameplay["watcher_targets"]
-    assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/scriptStages"] == 5.0
+    assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/scriptStages"] == 30.0
     assert "CELLAPP_TYPE=@cellapp:root/network/messageProcessing" in gameplay["watcher_targets"]
-    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/network/messageProcessing"] == 5.0
+    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/network/messageProcessing"] == 30.0
     assert "CELLAPP_TYPE=@cellapp:root/network/kcp/receive" in gameplay["watcher_targets"]
-    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/network/kcp/receive"] == 5.0
+    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/network/kcp/receive"] == 30.0
     assert "CELLAPP_TYPE=@cellapp:root/scriptStages" in gameplay["watcher_targets"]
-    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/scriptStages"] == 5.0
+    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/scriptStages"] == 30.0
     assert "CELLAPP_TYPE=@cellapp:root/coordinateSystem" in gameplay["watcher_targets"]
-    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/coordinateSystem"] == 5.0
+    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/coordinateSystem"] == 30.0
     assert "CELLAPP_TYPE=@cellapp:root/witness/backpressure" in gameplay["watcher_targets"]
-    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/witness/backpressure"] == 5.0
+    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/witness/backpressure"] == 30.0
     assert "CELLAPP_TYPE=@cellapp:root/witness/scheduler" in gameplay["watcher_targets"]
     assert "CELLAPP_TYPE=@cellapp:root/witness/messages" in gameplay["watcher_targets"]
     assert "CELLAPP_TYPE=@cellapp:root/witness/queues" in gameplay["watcher_targets"]
-    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/witness/queues"] == 5.0
+    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/witness/queues"] == 30.0
     for component in ("BASEAPP_TYPE", "CELLAPP_TYPE"):
         component_name = component.split("_", 1)[0].lower()
         assert f"{component}=@{component_name}:root/timers" in gameplay["watcher_targets"]
-        assert gameplay["watcher_intervals"][f"{component}:root/timers"] == 5.0
+        assert gameplay["watcher_intervals"][f"{component}:root/timers"] == 30.0
         assert f"{component}=@{component_name}:root/network/receiveWindow" in gameplay["watcher_targets"]
-        assert gameplay["watcher_intervals"][f"{component}:root/network/receiveWindow"] == 5.0
+        assert gameplay["watcher_intervals"][f"{component}:root/network/receiveWindow"] == 30.0
 
     defaults_path = Path(__file__).resolve().parents[3] / "res/server/kbengine_defaults.xml"
     defaults_source = defaults_path.read_text(encoding="utf-8")
@@ -978,12 +979,38 @@ def assert_readiness_target_ownership() -> None:
     ] == 12001
 
 
+def assert_watcher_window_drain_isolation() -> None:
+    targets = [
+        parse_target("BOTS_TYPE=127.0.0.1:20001:root/ok"),
+        parse_target("BOTS_TYPE=127.0.0.1:20002:root/timeout"),
+        parse_target("BOTS_TYPE=127.0.0.1:20003:root/after"),
+    ]
+
+    class DrainCollector:
+        def __init__(self) -> None:
+            self.paths: list[str] = []
+
+        def query(self, target):
+            self.paths.append(target.path)
+            if target.path == "root/timeout":
+                raise TimeoutError("expected timeout")
+            return {}
+
+    collector = DrainCollector()
+    failures = drain_watcher_windows(collector, targets, 2)  # type: ignore[arg-type]
+    assert collector.paths == ["root/ok", "root/timeout", "root/after"]
+    assert len(failures) == 1
+    assert failures[0][0] == targets[1]
+    assert isinstance(failures[0][1], TimeoutError)
+
+
 def main() -> int:
     assert_centralized_discovery_matching()
     assert_partial_workload_start_cleanup()
     assert_windows_command_line_preserves_quoted_executable()
     assert_server_binary_directory_resolution()
     assert_watcher_connection_reuse()
+    assert_watcher_window_drain_isolation()
     assert_watcher_schedule()
     assert_cprofile_window_metrics()
     assert_network_counter_rates()
@@ -1037,6 +1064,26 @@ def main() -> int:
     assert "KCP_BACKLOG_RETRY_DELAY_MICROS = 1000" in scheduler_source
     assert "protocolTickMissCount_" in scheduler_source
     assert "g_rudp_tickInterval > 0 ? g_rudp_tickInterval : 100" in scheduler_source
+    iocp_source = (
+        repository_root / "kbe/src/lib/network/poller_iocp.cpp"
+    ).read_text(encoding="utf-8")
+    udp_receive_start = iocp_source.index(
+        "else if (pContext->operation == OP_UDP_RECV)"
+    )
+    udp_receive_end = iocp_source.index(
+        "else if (pContext->operation == OP_TCP_SEND)", udp_receive_start
+    )
+    udp_receive_source = iocp_source[udp_receive_start:udp_receive_end]
+    assert udp_receive_source.index("ensureUdpReadsArmed(fd, *pState)") < udp_receive_source.index(
+        "this->triggerRead(fd)"
+    )
+    assert "state.pendingReadContexts.insert(pContext)" in iocp_source
+    assert "IOCP_CONNECTED_UDP_RECEIVE_DEPTH = 4" in (
+        repository_root / "kbe/src/lib/network/iocp_udp_receive_depth.h"
+    ).read_text(encoding="utf-8")
+    assert "IOCP_UNCONNECTED_UDP_RECEIVE_DEPTH = 64" in (
+        repository_root / "kbe/src/lib/network/iocp_udp_receive_depth.h"
+    ).read_text(encoding="utf-8")
     ikcp_source = (
         repository_root / "kbe/src/lib/network/ikcp.c"
     ).read_text(encoding="utf-8")

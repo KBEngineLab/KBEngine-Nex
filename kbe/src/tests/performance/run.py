@@ -350,7 +350,17 @@ def main() -> int:
             for log_collector in log_collectors:
                 record_log_samples(recorder, log_collector, "warmup")
             if watcher_collector:
-                drain_watcher_windows(watcher_collector, watcher_targets)
+                for target, error in drain_watcher_windows(
+                    watcher_collector, watcher_targets, args.watcher_concurrency
+                ):
+                    recorder.record(
+                        "watcher",
+                        watcher_instance(target),
+                        "windowDrain.error.count",
+                        1,
+                        "count",
+                        {"kind": "counter", "error": type(error).__name__},
+                    )
             watcher_sample_times: dict[tuple[str, str, int, str], float] = {}
             watcher_stamps_per_second: dict[tuple[str, str, int], float] = {}
             cprofile_previous: dict[tuple[str, str, int, str], tuple[int, float, float, float]] = {}
@@ -1314,12 +1324,27 @@ def wait_for_warmup(
         time.sleep(min(0.25, max(deadline - time.monotonic(), 0.0)))
 
 
-def drain_watcher_windows(watcher_collector: WatcherCollector, watcher_targets: list[WatcherTarget]) -> None:
+def drain_watcher_windows(
+    watcher_collector: WatcherCollector,
+    watcher_targets: list[WatcherTarget],
+    concurrency: int = 1,
+) -> list[tuple[WatcherTarget, Exception]]:
     """Discard readiness/warmup watcher windows before steady-state sampling.
     丢弃 readiness/warmup 阶段累积的窗口指标，避免启动排队污染稳态 P99。
+
+    A control-plane timeout must not abort a healthy workload after readiness.
+    Measurement sampling already isolates queries per target, so preserve the same
+    failure boundary here and expose failures as metrics instead.
+    readiness 已通过后，控制面超时不能终止健康负载。稳态采样本就按目标隔离
+    查询失败，因此窗口清理保持相同边界，并将失败作为指标暴露。
     """
-    for target in watcher_targets:
-        watcher_collector.query(target)
+    return [
+        (target, error)
+        for target, _started, _finished, _values, error in query_watcher_batch(
+            watcher_collector, watcher_targets, concurrency
+        )
+        if error is not None
+    ]
 
 
 def stop_process(process: subprocess.Popen[bytes] | None) -> None:

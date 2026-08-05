@@ -11,6 +11,7 @@
 
 #include <deque>
 #include <memory>
+#include <set>
 
 namespace KBEngine {
 namespace Network
@@ -111,6 +112,10 @@ protected:
 		uint64 generation;
 		// 平台私有 pending context，IOCP 用它保存 OVERLAPPED context 指针。
 		void* pPendingReadContext;
+		// IOCP UDP can keep several WSARecvFrom operations in flight. The set is
+		// also the authoritative lifetime list when a socket is deregistered.
+		// IOCP UDP 可同时挂起多个 WSARecvFrom；注销时以此集合为准取消所有操作。
+		std::set<void*> pendingReadContexts;
 		void* pPendingWriteContext;
 		// TCP 发送队列保存上层已交给 poller、但尚未完成发送的数据。
 		CompletionTcpSendQueue pendingTcpSends;
@@ -214,7 +219,8 @@ protected:
 	// 查询队列 item，避免空错误/断开 completion 绕过 bytes 计数。
 	size_t acceptedSocketCount(KBESOCKET fd) const;
 	size_t tcpReceivedItemCount(KBESOCKET fd) const;
-	size_t udpReceivedItemCount(KBESOCKET fd) const;
+		size_t udpReceivedItemCount(KBESOCKET fd) const;
+		bool hasPendingReadContext(KBESOCKET fd) const;
 
 	// 关闭 accept 队列中尚未被上层接走的 socket。
 	void closeAcceptedSockets(AcceptedSockets& acceptedSockets);

@@ -1,4 +1,5 @@
 #include "network/completion_processing_budget.h"
+#include "network/iocp_udp_receive_depth.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -20,6 +21,34 @@ int main()
 {
 	using namespace KBEngine::Network;
 	const KBEngine::uint64 budget = 2000;
+
+	// 客户端与共享 listener 必须使用不同接收深度：前者控制每连接内存，后者吸收聚合突发。
+	// Client and shared-listener depths differ to bound per-connection memory while absorbing aggregate bursts.
+	if (!require(iocpUdpReceiveDepth(true) == 4,
+		"connected UDP receive depth changed unexpectedly") ||
+		!require(iocpUdpReceiveDepth(false) == 64,
+			"shared UDP listener receive depth changed unexpectedly"))
+	{
+		return EXIT_FAILURE;
+	}
+
+	// 自适应预算必须只在持续积压后增长，并以 8ms 封顶，防止一次网络轮询饿死 Timer。
+	// The adaptive budget grows only after persistent backlog and remains capped at 8 ms.
+	if (!require(completionProcessingTimeBudgetMs(0) == 2,
+		"idle completion budget was not the 2 ms baseline") ||
+		!require(completionProcessingTimeBudgetMs(7) == 2,
+			"completion budget grew before the exhaustion threshold") ||
+		!require(completionProcessingTimeBudgetMs(8) == 4,
+			"completion budget did not grow after persistent exhaustion") ||
+		!require(completionProcessingTimeBudgetMs(16) == 6,
+			"completion budget did not grow progressively") ||
+		!require(completionProcessingTimeBudgetMs(24) == 8,
+			"completion budget did not reach its bounded maximum") ||
+		!require(completionProcessingTimeBudgetMs(1000) == 8,
+			"completion budget exceeded its bounded maximum"))
+	{
+		return EXIT_FAILURE;
+	}
 
 	// 阻塞 poll 已经取出的第一个 completion 必须处理；其回调结束后再决定是否继续 drain。
 	// The first completion returned by the blocking poll must run before deciding whether to continue draining.

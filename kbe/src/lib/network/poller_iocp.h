@@ -5,6 +5,7 @@
 
 #include "poller_completion.h"
 #include "completion_context_pool.h"
+#include "iocp_udp_receive_depth.h"
 
 #if KBE_PLATFORM == PLATFORM_WIN32
 
@@ -103,6 +104,10 @@ private:
 	bool armTcpRead(KBESOCKET fd, SocketState& state);
 	// 投递一次 UDP WSARecvFrom。
 	bool armUdpRead(KBESOCKET fd, SocketState& state);
+	// 补足当前 UDP socket 的有界并发接收深度。
+	bool ensureUdpReadsArmed(KBESOCKET fd, SocketState& state);
+	uint32 udpReceiveDepth(const SocketState& state) const;
+	bool isReadArmComplete(const SocketState& state) const;
 	// 投递一次 TCP WSASend。
 	bool armTcpSend(KBESOCKET fd, SocketState& state);
 	// 投递一次 UDP WSASendTo。

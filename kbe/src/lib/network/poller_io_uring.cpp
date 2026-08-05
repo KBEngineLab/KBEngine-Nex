@@ -1037,9 +1037,10 @@ int IoUringPoller::processPendingEvents(double maxWait)
 
 	int readyCount = 0;
 	const uint64 completionProcessingStart = timestamp();
-	const uint64 completionProcessingBudget =
-		COMPLETION_MAX_PROCESSING_TIME_MS > 0 ?
-		(uint64(COMPLETION_MAX_PROCESSING_TIME_MS) * stampsPerSecond() / 1000) : 0;
+	const uint32 completionProcessingBudgetMs =
+		completionProcessingTimeBudgetMs(completionConsecutiveBudgetExhaustions_);
+	const uint64 completionProcessingBudget = completionProcessingBudgetMs > 0 ?
+		(uint64(completionProcessingBudgetMs) * stampsPerSecond() / 1000) : 0;
 
 	while (shouldProcessAnotherCompletion(static_cast<uint32>(readyCount),
 		timestamp() - completionProcessingStart, completionProcessingBudget))
@@ -1091,7 +1092,7 @@ int IoUringPoller::processPendingEvents(double maxWait)
 		{
 			lastCompletionBudgetWarningTime_ = now;
 			WARNING_MSG(fmt::format("IoUringPoller::processPendingEvents: completion processing took too long, count={}, maxCount={}, maxTimeMS={}, elapsedMS={}\n",
-				readyCount, COMPLETION_MAX_COMPLETIONS_PER_TICK, COMPLETION_MAX_PROCESSING_TIME_MS,
+				readyCount, COMPLETION_MAX_COMPLETIONS_PER_TICK, completionProcessingBudgetMs,
 				completionProcessingElapsed * 1000 / stampsPerSecond()));
 		}
 	}

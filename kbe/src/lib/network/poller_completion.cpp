@@ -40,6 +40,7 @@ CompletionPoller::SocketState::SocketState(KBESOCKET socketArg) :
 	tcpReadTerminated(false),
 	generation(0),
 	pPendingReadContext(NULL),
+	pendingReadContexts(),
 	pPendingWriteContext(NULL),
 	pendingTcpSends(),
 	pendingUdpSends(),
@@ -843,6 +844,7 @@ void CompletionPoller::cleanupStateIfUnused(KBESOCKET fd)
 	SocketState& state = *iter->second;
 	if (state.registeredRead || state.readArmed || state.writeArmed ||
 		state.pPendingReadContext != NULL || state.pPendingWriteContext != NULL ||
+		!state.pendingReadContexts.empty() ||
 		state.pendingTcpReceiveBytes > 0 || state.pendingUdpReceiveBytes > 0 ||
 		tcpReceivedItemCount(fd) > 0 || udpReceivedItemCount(fd) > 0 ||
 		!state.pendingTcpSends.empty() || state.pendingTcpSends.pendingBytes() > 0 ||
@@ -860,6 +862,17 @@ void CompletionPoller::cleanupStateIfUnused(KBESOCKET fd)
 
 	cancelRearm(fd);
 	socketStates_.erase(iter);
+}
+
+//-------------------------------------------------------------------------------------
+bool CompletionPoller::hasPendingReadContext(KBESOCKET fd) const
+{
+	auto iter = socketStates_.find(fd);
+	if (iter == socketStates_.end())
+		return false;
+
+	const SocketState& state = *iter->second;
+	return state.pPendingReadContext != NULL || !state.pendingReadContexts.empty();
 }
 
 }
