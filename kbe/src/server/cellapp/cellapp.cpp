@@ -1499,7 +1499,10 @@ void Cellapp::_onCreateCellEntityFromBaseapp(std::string& entityType, ENTITY_ID 
 	// base部分在向这个space创建entity
 	if(pCreateToEntity == NULL)
 	{
-		ERROR_MSG("Cellapp::_onCreateCellEntityFromBaseapp: not fount spaceEntity. may have been destroyed!\n");
+		// Space destruction may race an already accepted BaseApp create request. The
+		// explicit failure reply completes the protocol, so this is a controlled lifecycle race.
+		// Space 销毁可能与已经接收的 BaseApp 创建请求并发；显式失败回包会闭合协议，因此属于受控生命周期竞态。
+		WARNING_MSG("Cellapp::_onCreateCellEntityFromBaseapp: target space entity was destroyed before creation.\n");
 
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		pBundle->newMessage(BaseappInterface::onCreateCellFailure);
@@ -2519,7 +2522,7 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 {
 	const size_t teleportHeaderSize = sizeof(ENTITY_ID) * 2 + sizeof(SPACE_ID) +
 		sizeof(ENTITY_SCRIPT_UID) + sizeof(Position3D) + sizeof(Direction3D) +
-		sizeof(COMPONENT_ID);
+		sizeof(COMPONENT_ID) * 2;
 	if (s.length() < teleportHeaderSize)
 	{
 		WARNING_MSG("Cellapp::reqTeleportToCellApp: rejected incomplete fixed header.\n");
@@ -2548,6 +2551,7 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 	s >> pos.x >> pos.y >> pos.z;
 	s >> dir.dir.x >> dir.dir.y >> dir.dir.z;
 
+	s >> entityBaseappID;
 	COMPONENT_ID ghostCell;
 	s >> ghostCell;
 	if (ghostCell == 0 || ghostCell != sourceInfos->cid)
@@ -2573,7 +2577,7 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 		(*pBundle).append(&s);
 		pChannel->send(pBundle);
 
-		ERROR_MSG(fmt::format("Cellapp::reqTeleportToCellApp: not found refEntity({}), spaceID({}), reqTeleportEntity({})!\n",
+		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellApp: refEntity({}) was destroyed before migration, spaceID({}), reqTeleportEntity({}).\n",
 			nearbyMBRefID, spaceID, teleportEntityID));
 
 		s.done();
@@ -2593,7 +2597,7 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 		(*pBundle).append(&s);
 		pChannel->send(pBundle);
 
-		ERROR_MSG(fmt::format("Cellapp::reqTeleportToCellApp: not found space({}),  reqTeleportEntity({})!\n", spaceID, teleportEntityID));
+		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellApp: target space({}) was destroyed before migration, reqTeleportEntity({}).\n", spaceID, teleportEntityID));
 		s.done();
 		return;
 	}
@@ -2618,7 +2622,7 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 		(*pBundle).append(&s);
 		pChannel->send(pBundle);
 
-		ERROR_MSG(fmt::format("Cellapp::reqTeleportToCellApp: create reqTeleportEntity({}) error!\n", teleportEntityID));
+		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellApp: create reqTeleportEntity({}) failed during migration.\n", teleportEntityID));
 		scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_DESERIALIZE_CREATE,
 			scriptStageDurationNanos(deserializeCreateStart), true, "reqTeleportToCellApp");
 		s.done();
@@ -2770,7 +2774,7 @@ void Cellapp::reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s
 	Entity* entity = Cellapp::getSingleton().findEntity(teleportEntityID);
 	if(entity == NULL)
 	{
-		ERROR_MSG(fmt::format("Cellapp::reqTeleportToCellAppCB: not found reqTeleportEntity({}), lose entity!\n", 
+		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellAppCB: source entity({}) was destroyed before the failure callback; treating it as a late lifecycle race.\n",
 			teleportEntityID));
 
 		s.done();
@@ -2783,13 +2787,17 @@ void Cellapp::reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s
 	Direction3D dir;
 	ENTITY_SCRIPT_UID entityType;
 	SPACE_ID lastSpaceID = 0;
-	COMPONENT_ID cid;
+	COMPONENT_ID sourceBaseappID = 0;
+	COMPONENT_ID sourceCellappIDFromPayload = 0;
 
 	s >> teleportEntityID >> nearbyMBRefID >> lastSpaceID;
 	s >> entityType;
 	s >> pos.x >> pos.y >> pos.z;
 	s >> dir.dir.x >> dir.dir.y >> dir.dir.z;
-	s >> cid;
+	// The failure callback appends the original request verbatim. Consume both
+	// ownership fields added to the fixed header before restoring the entity stream.
+	// 失败回调会原样附加请求；恢复实体流前必须同时跳过固定头中的 BaseApp 和 CellApp 所有者字段。
+	s >> sourceBaseappID >> sourceCellappIDFromPayload;
 
 	Py_INCREF(entity);
 	entity->changeToReal(0, s);
@@ -2825,7 +2833,7 @@ void Cellapp::reqTeleportToCellAppOver(Network::Channel* pChannel, MemoryStream&
 	Entity* entity = Cellapp::getSingleton().findEntity(teleportEntityID);
 	if(entity == NULL)
 	{
-		ERROR_MSG(fmt::format("Cellapp::reqTeleportToCellAppOver: not found reqTeleportEntity({}), lose entity!\n", 
+		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellAppOver: entity({}) was destroyed before the late migration confirmation.\n",
 			teleportEntityID));
 
 		s.done();

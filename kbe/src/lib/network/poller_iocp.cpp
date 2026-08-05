@@ -107,7 +107,11 @@ IocpPoller::IocpPoller() :
 	outstandingContexts_(),
 	contextPool_(COMPLETION_CONTEXT_CACHE_LIMIT),
 	completionPort_(CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0)),
-	lastCompletionBudgetWarningTime_(0)
+	lastCompletionBudgetWarningTime_(0),
+	pendingCompletions_(),
+	completionDequeueCallCount_(0),
+	completionDequeuedCount_(0),
+	completionMaxDequeuedBatchCount_(0)
 {
 	if (completionPort_ == NULL)
 	{
@@ -135,6 +139,10 @@ uint64 IocpPoller::contextOutstandingBytes() const
 	return static_cast<uint64>(bytes);
 }
 uint64 IocpPoller::contextCachedBytes() const { return static_cast<uint64>(contextPool_.cachedBytes()); }
+uint64 IocpPoller::completionDequeueCallCount() const { return completionDequeueCallCount_; }
+uint64 IocpPoller::completionDequeuedCount() const { return completionDequeuedCount_; }
+uint64 IocpPoller::completionMaxDequeuedBatchCount() const { return completionMaxDequeuedBatchCount_; }
+uint64 IocpPoller::completionPendingLocalCount() const { return static_cast<uint64>(pendingCompletions_.size()); }
 
 //-------------------------------------------------------------------------------------
 IocpPoller::~IocpPoller()
@@ -823,7 +831,15 @@ void IocpPoller::releaseContext(IocpContext& context)
 //-------------------------------------------------------------------------------------
 void IocpPoller::cancelAndDrainContexts()
 {
-	if (completionPort_ == NULL || outstandingContexts_.empty())
+	if (completionPort_ == NULL)
+		return;
+
+	// GetQueuedCompletionStatusEx may already have removed these completions from
+	// the kernel queue. They are safe to release during shutdown and must not be
+	// left outside outstandingContexts_. / 批量 API 已从内核队列取出的完成项在
+	// 关停时已经安全可释放，不能遗留在 outstandingContexts_ 之外。
+	releasePendingCompletions();
+	if (outstandingContexts_.empty())
 		return;
 
 	// CancelIoEx 只发起取消；OVERLAPPED 仍由内核持有，必须等对应完成包出队后才能释放。
@@ -856,6 +872,51 @@ void IocpPoller::cancelAndDrainContexts()
 		ERROR_MSG(fmt::format("IocpPoller::cancelAndDrainContexts: {} contexts did not complete within {} ms; preserving their OVERLAPPED storage.\n",
 			outstandingContexts_.size(), IOCP_SHUTDOWN_DRAIN_TIMEOUT_MS));
 	}
+}
+
+//-------------------------------------------------------------------------------------
+void IocpPoller::releasePendingCompletions()
+{
+	while (!pendingCompletions_.empty())
+	{
+		const PendingCompletion pending = pendingCompletions_.front();
+		pendingCompletions_.pop_front();
+		OutstandingContexts::iterator iter = outstandingContexts_.find(pending.overlapped);
+		if (iter != outstandingContexts_.end())
+			releaseContext(*iter->second);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+DWORD IocpPoller::dequeueCompletions(DWORD timeoutMs)
+{
+	static const ULONG IOCP_DEQUEUE_BATCH_SIZE = 128;
+	OVERLAPPED_ENTRY entries[IOCP_DEQUEUE_BATCH_SIZE];
+	ULONG removed = 0;
+	memset(entries, 0, sizeof(entries));
+	++completionDequeueCallCount_;
+	const BOOL ok = GetQueuedCompletionStatusEx(completionPort_, entries,
+		IOCP_DEQUEUE_BATCH_SIZE, &removed, timeoutMs, FALSE);
+	if (!ok)
+		return GetLastError();
+
+	completionDequeuedCount_ += removed;
+	completionMaxDequeuedBatchCount_ = std::max<uint64>(completionMaxDequeuedBatchCount_, removed);
+	for (ULONG index = 0; index < removed; ++index)
+	{
+		PendingCompletion pending;
+		pending.completionKey = entries[index].lpCompletionKey;
+		pending.overlapped = entries[index].lpOverlapped;
+		pending.bytesTransferred = entries[index].dwNumberOfBytesTransferred;
+		pending.success = entries[index].Internal == 0;
+		// Internal is an NTSTATUS, not a Winsock error. handleCompletion will
+		// normalize it with WSAGetOverlappedResult before classifying the event.
+		// Internal 是 NTSTATUS，不是 Winsock 错误；后续统一由
+		// WSAGetOverlappedResult 转换，避免把取消误判成业务错误。
+		pending.errorCode = pending.success ? 0 : static_cast<DWORD>(entries[index].Internal);
+		pendingCompletions_.push_back(pending);
+	}
+	return ERROR_SUCCESS;
 }
 
 //-------------------------------------------------------------------------------------
@@ -896,7 +957,23 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 		(isUdpReadContext ?
 			pState->pendingReadContexts.find(pContext) != pState->pendingReadContexts.end() :
 			(ppCurrentContext != NULL && *ppCurrentContext == pContext)));
-	const bool isUdpPortUnreachable = (pContext->kind == SOCKET_KIND_UDP && errorCode == ERROR_PORT_UNREACHABLE);
+	// Both GQCS and GQCSEx can expose a non-Winsock completion status. Normalize
+	// before classifying cancellation, disconnect, or UDP port-unreachable paths.
+	// GQCS/GQCSEx 都可能给出非 Winsock 状态；必须先规范化，再判断取消、断线和 UDP 端口不可达。
+	int socketErrorCode = static_cast<int>(errorCode);
+	if (!success)
+	{
+		DWORD transferred = bytesTransferred;
+		DWORD flags = pContext->flags;
+		if (!WSAGetOverlappedResult(pContext->socket, &pContext->overlapped, &transferred, FALSE, &flags))
+		{
+			const int overlappedError = WSAGetLastError();
+			if (overlappedError != 0)
+				socketErrorCode = overlappedError;
+		}
+	}
+	const bool isUdpPortUnreachable = (pContext->kind == SOCKET_KIND_UDP &&
+		socketErrorCode == ERROR_PORT_UNREACHABLE);
 
 	if (isCurrentContext)
 	{
@@ -909,7 +986,7 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 	// 取消 IO 是正常注销路径，不算网络错误。
 	// 这里仍然必须释放 context，因为 Windows 会为被取消的 OVERLAPPED
 	// 投递一个完成包回来。
-	if (!success && errorCode == ERROR_OPERATION_ABORTED)
+	if (!success && socketErrorCode == ERROR_OPERATION_ABORTED)
 	{
 		releaseContext(*pContext);
 
@@ -927,25 +1004,6 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 		// 这是 IOCP 下避免“旧连接事件打到新连接”的核心保护。
 		releaseContext(*pContext);
 		return;
-	}
-
-	// GetQueuedCompletionStatus 返回 Win32 系统错误，例如断线是 ERROR_NETNAME_DELETED(64)；
-	// 旧网络层按 Winsock 错误分类，因此必须从 OVERLAPPED 结果取得 WSAECONNRESET 等规范错误。
-	// GetQueuedCompletionStatus returns Win32 errors such as ERROR_NETNAME_DELETED(64) for disconnects;
-	// the legacy network layer classifies Winsock errors, so retrieve canonical values such as WSAECONNRESET from the OVERLAPPED result.
-	int socketErrorCode = static_cast<int>(errorCode);
-	if (!success)
-	{
-		DWORD transferred = bytesTransferred;
-		DWORD flags = pContext->flags;
-		if (!WSAGetOverlappedResult(pContext->socket, &pContext->overlapped, &transferred, FALSE, &flags))
-		{
-			const int overlappedError = WSAGetLastError();
-			if (overlappedError != 0)
-			{
-				socketErrorCode = overlappedError;
-			}
-		}
 	}
 
 	if (pContext->operation == OP_ACCEPT)
@@ -1155,13 +1213,13 @@ int IocpPoller::processPendingEvents(double maxWait)
 	uint64 startTime = timestamp();
 #endif
 
-	KBEConcurrency::onStartMainThreadIdling();
-	DWORD bytesTransferred = 0;
-	ULONG_PTR completionKey = 0;
-	LPOVERLAPPED overlapped = NULL;
-	BOOL ok = GetQueuedCompletionStatus(completionPort_, &bytesTransferred, &completionKey, &overlapped, timeoutMs);
-	DWORD errorCode = ok ? 0 : GetLastError();
-	KBEConcurrency::onEndMainThreadIdling();
+	DWORD dequeueError = ERROR_SUCCESS;
+	if (pendingCompletions_.empty())
+	{
+		KBEConcurrency::onStartMainThreadIdling();
+		dequeueError = dequeueCompletions(timeoutMs);
+		KBEConcurrency::onEndMainThreadIdling();
+	}
 
 #if ENABLE_WATCHERS
 	g_iocpIdleProfile.stop();
@@ -1172,8 +1230,7 @@ int IocpPoller::processPendingEvents(double maxWait)
 
 	int readyCount = 0;
 	bool completionTimeBudgetExhausted = false;
-
-	if (overlapped != NULL)
+	if (!pendingCompletions_.empty())
 	{
 		const uint64 completionProcessingStart = timestamp();
 		// completionBudget 是主线程公平性保护：
@@ -1186,25 +1243,29 @@ int IocpPoller::processPendingEvents(double maxWait)
 		const uint64 completionProcessingBudget = completionProcessingBudgetMs > 0 ?
 			(uint64(completionProcessingBudgetMs) * stampsPerSecond() / 1000) : 0;
 
-		++readyCount;
-		handleCompletion(completionKey, overlapped, bytesTransferred, ok == TRUE, errorCode);
-
-		while (shouldProcessAnotherCompletion(static_cast<uint32>(readyCount),
-			timestamp() - completionProcessingStart, completionProcessingBudget))
+		while (!pendingCompletions_.empty() &&
+			(readyCount == 0 || shouldProcessAnotherCompletion(static_cast<uint32>(readyCount),
+				timestamp() - completionProcessingStart, completionProcessingBudget)))
 		{
-			bytesTransferred = 0;
-			completionKey = 0;
-			overlapped = NULL;
-			ok = GetQueuedCompletionStatus(completionPort_, &bytesTransferred, &completionKey, &overlapped, 0);
-			errorCode = ok ? 0 : GetLastError();
-
-			if (overlapped == NULL)
-			{
-				break;
-			}
-
+			const PendingCompletion pending = pendingCompletions_.front();
+			pendingCompletions_.pop_front();
 			++readyCount;
-			handleCompletion(completionKey, overlapped, bytesTransferred, ok == TRUE, errorCode);
+			handleCompletion(pending.completionKey, pending.overlapped, pending.bytesTransferred,
+				pending.success, pending.errorCode);
+
+			// The first kernel batch may have been fully consumed. Refill only while
+			// the current tick still has budget; a zero-timeout dequeue never blocks.
+			// 首批内核完成项可能已消费完；仅在本 tick 仍有预算时补批次，零超时不会阻塞。
+			if (pendingCompletions_.empty() && shouldProcessAnotherCompletion(static_cast<uint32>(readyCount),
+				timestamp() - completionProcessingStart, completionProcessingBudget))
+			{
+				const DWORD refillError = dequeueCompletions(0);
+				if (refillError != ERROR_SUCCESS && refillError != WAIT_TIMEOUT)
+				{
+					dequeueError = refillError;
+					break;
+				}
+			}
 		}
 
 		const uint64 completionProcessingElapsed = timestamp() - completionProcessingStart;
@@ -1234,10 +1295,10 @@ int IocpPoller::processPendingEvents(double maxWait)
 			}
 		}
 	}
-	else if (!ok && errorCode != WAIT_TIMEOUT)
+	if (dequeueError != ERROR_SUCCESS && dequeueError != WAIT_TIMEOUT)
 	{
 		WARNING_MSG(fmt::format("IocpPoller::processPendingEvents: GetQueuedCompletionStatus failed: {}\n",
-			kbe_strerror(errorCode)));
+			kbe_strerror(dequeueError)));
 	}
 
 	recordCompletionBatch(static_cast<uint32>(readyCount),

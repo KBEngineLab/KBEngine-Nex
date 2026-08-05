@@ -261,6 +261,10 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/poller/completionConsecutiveBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::pollerCompletionConsecutiveBudgetExhaustions);
 	WATCH_OBJECT("network/poller/completionMaxConsecutiveBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::pollerCompletionMaxConsecutiveBudgetExhaustions);
 	WATCH_OBJECT("network/poller/completionTimeBudgetExhaustions", &networkInterface_, &Network::NetworkInterface::pollerCompletionTimeBudgetExhaustionCount);
+	WATCH_OBJECT("network/poller/completionDequeueCalls", &networkInterface_, &Network::NetworkInterface::pollerCompletionDequeueCallCount);
+	WATCH_OBJECT("network/poller/completionDequeued", &networkInterface_, &Network::NetworkInterface::pollerCompletionDequeuedCount);
+	WATCH_OBJECT("network/poller/completionMaxDequeuedBatch", &networkInterface_, &Network::NetworkInterface::pollerCompletionMaxDequeuedBatchCount);
+	WATCH_OBJECT("network/poller/completionPendingLocal", &networkInterface_, &Network::NetworkInterface::pollerCompletionPendingLocalCount);
 	WATCH_OBJECT("network/poller/discardedPacketsAfterClose", &networkInterface_, &Network::NetworkInterface::discardedPacketsAfterCloseCount);
 
 	// Message categories are classified once when handlers are installed. Watcher reads

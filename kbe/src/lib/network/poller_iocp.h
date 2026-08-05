@@ -39,6 +39,10 @@ public:
 	uint64 contextPeakOutstandingCount() const override;
 	uint64 contextOutstandingBytes() const override;
 	uint64 contextCachedBytes() const override;
+	uint64 completionDequeueCallCount() const override;
+	uint64 completionDequeuedCount() const override;
+	uint64 completionMaxDequeuedBatchCount() const override;
+	uint64 completionPendingLocalCount() const override;
 
 protected:
 	// 将 fd 绑定到 IOCP 并投递读侧 completion。
@@ -129,6 +133,18 @@ private:
 	// 析构前取消并排空所有 outstanding IO，防止内核访问已释放的 OVERLAPPED。
 	// Cancel and drain all outstanding IO before destruction so the kernel cannot access freed OVERLAPPED memory.
 	void cancelAndDrainContexts();
+	// 从内核一次批量取出 completion；用户态队列保留预算用尽后的尾项。
+	// Dequeue a bounded batch from the kernel and retain the tail when the processing budget yields.
+	struct PendingCompletion
+	{
+		ULONG_PTR completionKey;
+		LPOVERLAPPED overlapped;
+		DWORD bytesTransferred;
+		bool success;
+		DWORD errorCode;
+	};
+	DWORD dequeueCompletions(DWORD timeoutMs);
+	void releasePendingCompletions();
 	// 处理一个 IOCP 返回的 OVERLAPPED 完成结果。
 	void handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapped, DWORD bytesTransferred, bool success, DWORD errorCode);
 
@@ -137,6 +153,10 @@ private:
 	CompletionContextPool<IocpContext> contextPool_;
 	HANDLE completionPort_;
 	uint64 lastCompletionBudgetWarningTime_;
+	std::deque<PendingCompletion> pendingCompletions_;
+	uint64 completionDequeueCallCount_;
+	uint64 completionDequeuedCount_;
+	uint64 completionMaxDequeuedBatchCount_;
 };
 
 }

@@ -175,6 +175,10 @@ public:
 	uint64 pollerCompletionConsecutiveBudgetExhaustions() const;
 	uint64 pollerCompletionMaxConsecutiveBudgetExhaustions() const;
 	uint64 pollerCompletionTimeBudgetExhaustionCount() const;
+	uint64 pollerCompletionDequeueCallCount() const;
+	uint64 pollerCompletionDequeuedCount() const;
+	uint64 pollerCompletionMaxDequeuedBatchCount() const;
+	uint64 pollerCompletionPendingLocalCount() const;
 	uint64 discardedPacketsAfterCloseCount() const { return discardedPacketsAfterCloseCount_; }
 	uint64 receiveWindowOverflowBurstCount() const { return receiveWindowOverflowBurstCount_; }
 	uint64 receiveWindowCriticalBurstCount() const { return receiveWindowCriticalBurstCount_; }

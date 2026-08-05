@@ -3898,6 +3898,10 @@ void Entity::onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, D
 	(*pBundle) << pScriptModule()->getUType();
 	(*pBundle) << pos.x << pos.y << pos.z;
 	(*pBundle) << dir.roll() << dir.pitch() << dir.yaw();
+	// Carry the BaseApp owner in the fixed migration header so early target-side
+	// failures can always release BaseApp's migration buffer. / 将 BaseApp 所有者
+	// 放入迁移固定头，确保目标端早期失败也能释放 BaseApp 的迁移缓冲。
+	(*pBundle) << (baseEntityCall() != NULL ? baseEntityCall()->componentID() : COMPONENT_ID(0));
 	(*pBundle) << g_componentID;
 
 	MemoryStream* s = MemoryStream::createPoolObject(OBJECTPOOL_POINT);

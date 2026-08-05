@@ -142,6 +142,12 @@ public:
 	virtual uint64 completionConsecutiveBudgetExhaustions() const;
 	virtual uint64 completionMaxConsecutiveBudgetExhaustions() const;
 	virtual uint64 completionTimeBudgetExhaustionCount() const;
+	// completion 后端从内核批量取出的系统调用和本地待处理尾项。
+	// Count dequeue syscalls and completions carried in user space after a budget yield.
+	virtual uint64 completionDequeueCallCount() const;
+	virtual uint64 completionDequeuedCount() const;
+	virtual uint64 completionMaxDequeuedBatchCount() const;
+	virtual uint64 completionPendingLocalCount() const;
 
 	void clearSpareTime()		{spareTime_ = 0;}
 	uint64 spareTime() const	{return spareTime_;}
