@@ -5,6 +5,7 @@
 
 #include "event_poller.h"
 #include "completion_rearm_queue.h"
+#include "completion_processing_budget.h"
 #include "completion_tcp_send_queue.h"
 #include "completion_udp_send_budget.h"
 
@@ -14,15 +15,6 @@
 namespace KBEngine {
 namespace Network
 {
-
-// Completion processing is bounded per tick so a burst cannot starve timers and application work.
-// 每个 tick 限制 completion 处理量，避免网络突发饿死定时器和应用逻辑。
-static const uint32 COMPLETION_MIN_COMPLETIONS_PER_TICK = 256;
-static const uint32 COMPLETION_MAX_COMPLETIONS_PER_TICK = 1024;
-
-// Drain at least the fairness minimum, then stop at the time or hard-count bound.
-// 至少处理公平性下限，随后在时间预算或硬数量上限处停止。
-static const uint32 COMPLETION_MAX_PROCESSING_TIME_MS = 2;
 
 class CompletionPoller : public EventPoller
 {

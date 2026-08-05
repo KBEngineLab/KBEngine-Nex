@@ -149,13 +149,17 @@
 			
 			<receive>
 				<messages>
-					<critical>	24			</critical>
+					<!-- 外部消息在 KCP/AOI 突发时会集中于同一服务 Tick 到达；该阈值只控制告警与断开，
+						不会预分配消息队列。保持有界但避免正常 MMO 扇出触发日志放大。
+						External KCP/AOI messages may arrive in one server tick. These limits only govern
+						warnings and condemnation and do not preallocate a per-channel message queue. -->
+					<critical>	192			</critical>
 					<internal>	65535		</internal>
-					<external>	32			</external>
+					<external>	256			</external>
 				</messages>
 				<bytes>
 					<internal>	0			</internal>
-					<external>	2048		</external>
+					<external>	65535		</external>
 				</bytes>
 			</receive>
 		</windowOverflow>

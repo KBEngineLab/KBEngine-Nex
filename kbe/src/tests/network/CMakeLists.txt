@@ -12,6 +12,14 @@ add_executable(kbe_test_network_completion_context_pool
     completion_context_pool.cpp
 )
 
+add_executable(kbe_test_network_completion_processing_budget
+    completion_processing_budget.cpp
+)
+
+add_executable(kbe_test_network_kcp_receive_budget
+    kcp_receive_budget.cpp
+)
+
 add_executable(kbe_test_network_completion_udp_send_queue
     completion_udp_send_queue.cpp
 	${CMAKE_SOURCE_DIR}/lib/network/completion_udp_send_budget.cpp
@@ -47,6 +55,8 @@ set(_kbe_network_test_targets
     kbe_test_network_completion_rearm
     kbe_test_network_completion_send_queue
     kbe_test_network_completion_context_pool
+    kbe_test_network_completion_processing_budget
+	 kbe_test_network_kcp_receive_budget
     kbe_test_network_completion_udp_send_queue
     kbe_test_network_kcp_update_queue
     kbe_test_network_kcp_send_state
@@ -62,6 +72,10 @@ target_include_directories(kbe_test_network_completion_send_queue SYSTEM PRIVATE
 set_target_properties(kbe_test_network_completion_send_queue PROPERTIES FOLDER "Tests/Network")
 target_include_directories(kbe_test_network_completion_context_pool SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/lib)
 set_target_properties(kbe_test_network_completion_context_pool PROPERTIES FOLDER "Tests/Network")
+target_include_directories(kbe_test_network_completion_processing_budget SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/lib)
+set_target_properties(kbe_test_network_completion_processing_budget PROPERTIES FOLDER "Tests/Network")
+target_include_directories(kbe_test_network_kcp_receive_budget SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/lib)
+set_target_properties(kbe_test_network_kcp_receive_budget PROPERTIES FOLDER "Tests/Network")
 target_include_directories(kbe_test_network_completion_udp_send_queue SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/lib)
 set_target_properties(kbe_test_network_completion_udp_send_queue PROPERTIES FOLDER "Tests/Network")
 target_include_directories(kbe_test_network_kcp_update_queue SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/lib)
@@ -81,6 +95,8 @@ if(MSVC)
     target_compile_options(kbe_test_network_completion_rearm PRIVATE /W4 /WX /utf-8)
     target_compile_options(kbe_test_network_completion_send_queue PRIVATE /W4 /WX /utf-8)
     target_compile_options(kbe_test_network_completion_context_pool PRIVATE /W4 /WX /utf-8)
+    target_compile_options(kbe_test_network_completion_processing_budget PRIVATE /W4 /WX /utf-8)
+	 target_compile_options(kbe_test_network_kcp_receive_budget PRIVATE /W4 /WX /utf-8)
     target_compile_options(kbe_test_network_completion_udp_send_queue PRIVATE /W4 /WX /utf-8)
     target_compile_options(kbe_test_network_kcp_update_queue PRIVATE /W4 /WX /utf-8)
     target_compile_options(kbe_test_network_kcp_send_state PRIVATE /W4 /WX /utf-8)
@@ -100,6 +116,12 @@ else()
     target_compile_options(kbe_test_network_completion_context_pool PRIVATE
         -Wall -Wextra -Wpedantic -Werror
     )
+    target_compile_options(kbe_test_network_completion_processing_budget PRIVATE
+        -Wall -Wextra -Wpedantic -Werror
+    )
+	 target_compile_options(kbe_test_network_kcp_receive_budget PRIVATE
+		-Wall -Wextra -Wpedantic -Werror
+	 )
     target_compile_options(kbe_test_network_completion_udp_send_queue PRIVATE
         -Wall -Wextra -Wpedantic -Werror
     )
@@ -156,6 +178,18 @@ set_tests_properties(network.kcp_send_state PROPERTIES
 	PASS_REGULAR_EXPRESSION "KCP_SEND_STATE_TEST_PASS"
 )
 
+add_test(NAME network.completion_processing_budget COMMAND kbe_test_network_completion_processing_budget)
+set_tests_properties(network.completion_processing_budget PROPERTIES
+    LABELS "network;cxx;unit;portable;performance"
+    PASS_REGULAR_EXPRESSION "COMPLETION_PROCESSING_BUDGET_TEST_PASS"
+)
+
+add_test(NAME network.kcp_receive_budget COMMAND kbe_test_network_kcp_receive_budget)
+set_tests_properties(network.kcp_receive_budget PROPERTIES
+	LABELS "network;cxx;unit;portable;performance;kcp"
+	PASS_REGULAR_EXPRESSION "KCP_RECEIVE_BUDGET_TEST_PASS"
+)
+
 add_test(NAME network.kcp_protocol_metrics COMMAND kbe_test_network_kcp_protocol_metrics)
 set_tests_properties(network.kcp_protocol_metrics PROPERTIES
 	LABELS "network;cxx;unit;portable;performance;kcp"
@@ -178,6 +212,8 @@ add_custom_target(kbe_network_tests DEPENDS
     kbe_test_network_completion_rearm
     kbe_test_network_completion_send_queue
     kbe_test_network_completion_context_pool
+    kbe_test_network_completion_processing_budget
+	 kbe_test_network_kcp_receive_budget
     kbe_test_network_completion_udp_send_queue
     kbe_test_network_kcp_update_queue
     kbe_test_network_kcp_send_state

@@ -274,6 +274,7 @@ private:
 	void synchronizeViewEntityMetrics();
 	void initializeEntityRefLifecycle(EntityRef* pEntityRef);
 	void queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue = false);
+	void releaseVolatileProducerIfDelivered(EntityRef* pEntityRef);
 	bool needsVolatileUpdate(Entity* pEntity);
 	bool isStructuralUpdate(const EntityRef* pEntityRef) const;
 	bool processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pEntityRef);

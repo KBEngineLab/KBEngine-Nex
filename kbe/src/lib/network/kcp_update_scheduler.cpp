@@ -22,7 +22,7 @@ namespace
 // this small floor still returns control to the BaseApp dispatcher promptly.
 // 单通道输出和 payload 已受限；ACK 与数据队列使用四通道下限摊薄 Windows 粗粒度
 // timer 成本，并在该小批次后检查时间预算，及时归还 BaseApp dispatcher。
-const size_t KCP_MIN_UPDATES_PER_WAKEUP = 4;
+const size_t KCP_MIN_UPDATES_PER_WAKEUP = 1;
 const size_t KCP_MIN_ACK_FLUSHES_PER_WAKEUP = 4;
 const size_t KCP_MAX_UPDATES_PER_WAKEUP = 2048;
 const uint64 KCP_PROCESSING_TIME_BUDGET_MICROS = 2000;

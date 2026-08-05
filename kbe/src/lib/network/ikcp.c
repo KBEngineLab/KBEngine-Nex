@@ -286,6 +286,7 @@ ikcpcb* ikcp_create(IUINT32 conv, void *user)
 	iqueue_init(&kcp->rcv_queue);
 	iqueue_init(&kcp->snd_buf);
 	iqueue_init(&kcp->rcv_buf);
+	kcp->flush_cursor = &kcp->snd_buf;
 	kcp->nrcv_buf = 0;
 	kcp->nsnd_buf = 0;
 	kcp->nrcv_que = 0;
@@ -615,6 +616,18 @@ static void ikcp_shrink_buf(ikcpcb *kcp)
 	}
 }
 
+static void ikcp_advance_flush_cursor_on_remove(ikcpcb *kcp,
+	struct IQUEUEHEAD *node)
+{
+	/* ACK and UNA processing may delete the exact node at which a bounded flush
+	 * intends to resume. Advance before unlinking so the cursor never dangles.
+	 * ACK/UNA 可能删除有界 flush 准备续扫的节点；必须在摘链前推进游标，
+	 * 防止下一轮访问已释放内存。 */
+	if (kcp->flush_cursor == node) {
+		kcp->flush_cursor = node->next;
+	}
+}
+
 static void ikcp_parse_ack(ikcpcb *kcp, IUINT32 sn)
 {
 	struct IQUEUEHEAD *p, *next;
@@ -626,6 +639,7 @@ static void ikcp_parse_ack(ikcpcb *kcp, IUINT32 sn)
 		IKCPSEG *seg = iqueue_entry(p, IKCPSEG, node);
 		next = p->next;
 		if (sn == seg->sn) {
+			ikcp_advance_flush_cursor_on_remove(kcp, p);
 			iqueue_del(p);
 			kcp->snd_buf_bytes -= (IUINT64)seg->len;
 			ikcp_segment_delete(kcp, seg);
@@ -645,6 +659,7 @@ static void ikcp_parse_una(ikcpcb *kcp, IUINT32 una)
 		IKCPSEG *seg = iqueue_entry(p, IKCPSEG, node);
 		next = p->next;
 		if (_itimediff(una, seg->sn) > 0) {
+			ikcp_advance_flush_cursor_on_remove(kcp, p);
 			iqueue_del(p);
 			kcp->snd_buf_bytes -= (IUINT64)seg->len;
 			ikcp_segment_delete(kcp, seg);
@@ -1110,6 +1125,12 @@ void ikcp_flush(ikcpcb *kcp)
 
 		iqueue_del(&newseg->node);
 		iqueue_add_tail(&newseg->node, &kcp->snd_buf);
+		if (kcp->flush_cursor == &kcp->snd_buf) {
+			/* A completed scan leaves the cursor at the sentinel. Resume directly at
+			 * the first newly admitted segment instead of rescanning the old buffer.
+			 * 完整扫描后游标位于哨兵；新段准入时直接指向第一个新段，避免重扫旧缓冲。 */
+			kcp->flush_cursor = &newseg->node;
+		}
 		kcp->nsnd_que--;
 		kcp->nsnd_buf++;
 		kcp->snd_queue_bytes -= (IUINT64)newseg->len;
@@ -1132,8 +1153,13 @@ void ikcp_flush(ikcpcb *kcp)
 	resent = (kcp->fastresend > 0)? (IUINT32)kcp->fastresend : 0xffffffff;
 	rtomin = (kcp->nodelay == 0)? (kcp->rx_rto >> 3) : 0;
 
-	// flush data segments
-	for (p = kcp->snd_buf.next; p != &kcp->snd_buf; p = p->next) {
+	// Continue at the first segment not classified by the previous bounded pass.
+	// 从上一次有界遍历尚未分类的首个 segment 继续。
+	p = kcp->flush_cursor;
+	if (p == &kcp->snd_buf) {
+		p = kcp->snd_buf.next;
+	}
+	for (; p != &kcp->snd_buf; p = p->next) {
 		IKCPSEG *segment = iqueue_entry(p, IKCPSEG, node);
 		int send_reason = 0;
 		kcp->flush_scanned_segments++;
@@ -1153,6 +1179,7 @@ void ikcp_flush(ikcpcb *kcp)
 			 * follow-up so one channel cannot monopolize the global scheduler.
 			 * ACK 与探测已优先发送；逾期数据在有界后续批次继续，避免单通道独占全局调度器。 */
 			kcp->flush_limited = 1;
+			kcp->flush_cursor = p;
 			break;
 		}
 
@@ -1210,6 +1237,12 @@ void ikcp_flush(ikcpcb *kcp)
 			data_sent++;
 			kcp->flush_data_segments++;
 		}
+	}
+	if (p == &kcp->snd_buf) {
+		/* Reaching the sentinel completes this pass. A later protocol tick starts
+		 * from the head so retransmission deadlines remain fully observable.
+		 * 到达哨兵表示本轮完整结束；后续协议 Tick 从头开始，确保重传到期仍被完整检查。 */
+		kcp->flush_cursor = &kcp->snd_buf;
 	}
 	if (data_sent == 0) {
 		kcp->flush_empty_data_calls++;

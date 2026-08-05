@@ -1041,10 +1041,8 @@ int IoUringPoller::processPendingEvents(double maxWait)
 		COMPLETION_MAX_PROCESSING_TIME_MS > 0 ?
 		(uint64(COMPLETION_MAX_PROCESSING_TIME_MS) * stampsPerSecond() / 1000) : 0;
 
-	while (readyCount < static_cast<int>(COMPLETION_MAX_COMPLETIONS_PER_TICK) &&
-		(readyCount < static_cast<int>(COMPLETION_MIN_COMPLETIONS_PER_TICK) ||
-			completionProcessingBudget == 0 ||
-			timestamp() - completionProcessingStart < completionProcessingBudget))
+	while (shouldProcessAnotherCompletion(static_cast<uint32>(readyCount),
+		timestamp() - completionProcessingStart, completionProcessingBudget))
 	{
 		const unsigned head = loadRelaxed(ring_.cqHead);
 		if (head == loadAcquire(ring_.cqTail))
@@ -1100,8 +1098,8 @@ int IoUringPoller::processPendingEvents(double maxWait)
 
 	recordCompletionBatch(static_cast<uint32>(readyCount),
 		readyCount >= static_cast<int>(COMPLETION_MAX_COMPLETIONS_PER_TICK),
-		readyCount >= static_cast<int>(COMPLETION_MIN_COMPLETIONS_PER_TICK) &&
-			completionProcessingBudget > 0 && completionProcessingElapsed >= completionProcessingBudget);
+		completionTimeBudgetExhausted(static_cast<uint32>(readyCount),
+			completionProcessingElapsed, completionProcessingBudget));
 
 	return readyCount;
 }

@@ -44,6 +44,7 @@ public:
 	virtual bool processRecv(bool expectingPacket);
 
 	virtual Reason processPacket(Channel* pChannel, Packet * pPacket);
+	Reason drainReassembledPackets(Channel* pChannel);
 
 	virtual ProtocolSubType protocolSubType() const {
 		return SUB_PROTOCOL_KCP;

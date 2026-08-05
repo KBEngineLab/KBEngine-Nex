@@ -508,10 +508,14 @@ def assert_python_latency_scenario() -> None:
     assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/clientInput"] == 5.0
     assert "BASEAPP_TYPE=@baseapp:root/network/messageProcessing" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/messageProcessing"] == 5.0
+    assert "BASEAPP_TYPE=@baseapp:root/network/kcp/receive" in gameplay["watcher_targets"]
+    assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/kcp/receive"] == 5.0
     assert "BASEAPP_TYPE=@baseapp:root/scriptStages" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/scriptStages"] == 5.0
     assert "CELLAPP_TYPE=@cellapp:root/network/messageProcessing" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/network/messageProcessing"] == 5.0
+    assert "CELLAPP_TYPE=@cellapp:root/network/kcp/receive" in gameplay["watcher_targets"]
+    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/network/kcp/receive"] == 5.0
     assert "CELLAPP_TYPE=@cellapp:root/scriptStages" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/scriptStages"] == 5.0
     assert "CELLAPP_TYPE=@cellapp:root/coordinateSystem" in gameplay["watcher_targets"]
@@ -977,18 +981,21 @@ def main() -> int:
     scheduler_source = (
         repository_root / "kbe/src/lib/network/kcp_update_scheduler.cpp"
     ).read_text(encoding="utf-8")
-    assert "KCP_MIN_UPDATES_PER_WAKEUP = 4" in scheduler_source
+    assert "KCP_MIN_UPDATES_PER_WAKEUP = 1" in scheduler_source
     assert "KCP_MIN_ACK_FLUSHES_PER_WAKEUP = 4" in scheduler_source
     assert "KCP_MAX_UPDATES_PER_WAKEUP = 2048" in scheduler_source
     assert "KCP_BACKLOG_RETRY_DELAY_MICROS = 1000" in scheduler_source
     assert "protocolTickMissCount_" in scheduler_source
     assert "g_rudp_tickInterval > 0 ? g_rudp_tickInterval : 100" in scheduler_source
-    assert 'WATCH_OBJECT("network/kcp/configuredExternalFlushSegmentsBudget"' in (
-        repository_root / "kbe/src/lib/server/serverapp.cpp"
+    ikcp_source = (
+        repository_root / "kbe/src/lib/network/ikcp.c"
     ).read_text(encoding="utf-8")
+    assert "ikcp_advance_flush_cursor_on_remove" in ikcp_source
+    assert "kcp->flush_cursor = p" in ikcp_source
     serverapp_source = (
         repository_root / "kbe/src/lib/server/serverapp.cpp"
     ).read_text(encoding="utf-8")
+    assert 'WATCH_OBJECT("network/kcp/configuredExternalFlushSegmentsBudget"' in serverapp_source
     for watcher in (
         "pendingPayloadBytes",
         "queuedPayloadBytes",

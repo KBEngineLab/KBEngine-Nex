@@ -319,6 +319,12 @@ struct IKCPCB
 	struct IQUEUEHEAD rcv_queue;
 	struct IQUEUEHEAD snd_buf;
 	struct IQUEUEHEAD rcv_buf;
+	/* Continue a fairness-limited flush where the previous pass stopped. Without
+	 * this cursor, every continuation rescans old unacknowledged segments from
+	 * the list head before it can reach new or overdue work near the tail.
+	 * 公平限流后的 flush 从上次停止处继续；否则每次续传都会从链表头重复扫描
+	 * 尚未确认的旧段，才能到达尾部新增或逾期的数据。 */
+	struct IQUEUEHEAD *flush_cursor;
 	IUINT32 *acklist;
 	IUINT32 ackcount;
 	IUINT32 ackblock;

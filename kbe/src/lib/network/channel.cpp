@@ -537,6 +537,18 @@ void Channel::updateKcp()
 	if (!pKCP_ || isDestroyed())
 		return;
 
+	// A previous UDP completion may have yielded with complete application packets still queued.
+	// Continue through the fair KCP scheduler instead of waiting for another datagram to arrive.
+	// 上一个 UDP completion 可能按预算让出，但 KCP 中仍有完整应用包；通过公平调度器续处理，
+	// 不能依赖下一份数据报到达，否则安静连接的尾包会永久滞留。
+	if (ikcp_peeksize(pKCP_) >= 0 && pPacketReceiver_ &&
+		protocolSubtype_ == SUB_PROTOCOL_KCP)
+	{
+		static_cast<KCPPacketReceiver*>(pPacketReceiver_)->drainReassembledPackets(this);
+		if (isDestroyed() || condemn() > 0)
+			return;
+	}
+
 	const IUINT32 current = static_cast<IUINT32>(kbe_clock());
 	ikcp_update(pKCP_, current);
 	if (isKcpIdle(*pKCP_))
@@ -546,6 +558,12 @@ void Channel::updateKcp()
 		// re-enqueue it before entering KCP state.
 		if (pNetworkInterface_ != NULL)
 			pNetworkInterface_->kcpUpdateScheduler_.cancel(*this);
+		return;
+	}
+
+	if (ikcp_peeksize(pKCP_) >= 0)
+	{
+		scheduleKcpUpdate(1);
 		return;
 	}
 
@@ -1070,9 +1088,13 @@ void Channel::addReceiveWindow(Packet* pPacket)
 	prepareTickCounters();
 
 	++lastTickBufferedReceives_;
+	pNetworkInterface_->recordReceiveWindowActivity(lastTickBufferedReceives_, lastTickBytesReceived_);
 
 	if(Network::g_receiveWindowMessagesOverflowCritical > 0 && lastTickBufferedReceives_ > Network::g_receiveWindowMessagesOverflowCritical)
 	{
+		if (lastTickBufferedReceives_ == Network::g_receiveWindowMessagesOverflowCritical + 1)
+			pNetworkInterface_->recordReceiveWindowCriticalBurst();
+
 		if(this->isExternal())
 		{
 			if(Network::g_extReceiveWindowMessagesOverflow > 0 && 
@@ -1095,22 +1117,10 @@ void Channel::addReceiveWindow(Packet* pPacket)
 						receiveWindowMessagesOverflowState_.consecutiveTicks));
 					this->condemn("Channel::addReceiveWindow: receive window has overflowed!");
 				}
-				else if (decision == RECEIVE_WINDOW_OVERFLOW_DEFER &&
-					!receiveWindowMessagesOverflowWarningActive_)
-				{
-					receiveWindowMessagesOverflowWarningActive_ = true;
-					WARNING_MSG(fmt::format("Channel::addReceiveWindow[{:p}]: authenticated external channel({}), transient receive burst deferred({} > {}).\n",
-						(void*)this, this->c_str(), lastTickBufferedReceives_, Network::g_extReceiveWindowMessagesOverflow));
-				}
-			}
-			else
-			{
-				if (!receiveWindowMessagesOverflowWarningActive_)
-				{
-					receiveWindowMessagesOverflowWarningActive_ = true;
-					WARNING_MSG(fmt::format("Channel::addReceiveWindow[{:p}]: external channel({}), receive window has overflowed({} > {}).\n",
-						(void*)this, this->c_str(), lastTickBufferedReceives_, Network::g_receiveWindowMessagesOverflowCritical));
-				}
+				// Authenticated transient bursts are visible through aggregate Watchers. Logging one line
+				// per Channel turns normal AOI fan-out into synchronous IO amplification under load.
+				// 已认证连接的瞬时突发由聚合 Watcher 观测；逐 Channel 写日志会把正常 AOI 扇出
+				// 放大成同步 IO，因此只有真正关闭连接时才保留错误日志。
 			}
 		}
 		else

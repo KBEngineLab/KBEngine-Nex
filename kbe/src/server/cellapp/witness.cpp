@@ -881,6 +881,23 @@ void Witness::queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue)
 }
 
 //-------------------------------------------------------------------------------------
+void Witness::releaseVolatileProducerIfDelivered(EntityRef* pEntityRef)
+{
+	// processEntityRefUpdate 可能立即把持续移动的关系重新排入 volatile 队列，结构提升也可能
+	// 已经在优先队列等待。只有两个队列都不再负责交付该实体最新位姿时，才允许 Entity 的
+	// 下一次坐标变化重新扫描观察者；否则每个 Tick 都会产生 O(观察者数) 的无效 dedupe 扫描。
+	// processEntityRefUpdate may immediately requeue a continuously moving relation, while a structural
+	// promotion may already be waiting in the priority queue. Release the Entity producer only when neither
+	// queue still owns delivery of its latest pose, avoiding an O(observer count) dedupe scan every tick.
+	if (!pEntityRef || pEntityRef->volatileQueued() || pEntityRef->structuralQueued())
+		return;
+
+	Entity* pEntity = pEntityRef->pEntity();
+	if (pEntity)
+		pEntity->onWitnessVolatileDequeued();
+}
+
+//-------------------------------------------------------------------------------------
 void Witness::setVolatileUpdatesEnabled(bool enabled)
 {
 	if (volatileUpdatesEnabled_ == enabled)
@@ -1071,6 +1088,7 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 			g_witnessLoadMetrics.beginLeaveProcessing();
 		const uint64 processingStarted = sampleProcessing ? timestamp() : 0;
 		const bool retained = processEntityRefUpdate(pSendBundle, pEntityRef);
+		releaseVolatileProducerIfDelivered(pEntityRef);
 		if (sampleProcessing)
 		{
 			const uint64 durationNanos = static_cast<uint64>(
@@ -1128,8 +1146,6 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 		}
 
 		EntityRef* pEntityRef = iter->second;
-		if (pEntityRef->volatileQueued() && pEntityRef->pEntity())
-			pEntityRef->pEntity()->onWitnessVolatileDequeued();
 		pEntityRef->volatileQueued(false);
 		if (isStructuralUpdate(pEntityRef))
 		{
@@ -1139,6 +1155,7 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 			// is skipped once instead of entering the dequeue/requeue amplification path.
 			if (!pEntityRef->structuralQueued())
 				queueEntityRefVolatile(pEntityRef, true);
+			releaseVolatileProducerIfDelivered(pEntityRef);
 			g_witnessLoadMetrics.recordPromotedVolatileSkip();
 			continue;
 		}
@@ -1160,6 +1177,7 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 		// While the outer entity-forward message is open, packetsLength() reflects packet boundaries; currMsgLength() is the continuously growing encoded byte count.
 		const size_t beforeBytes = static_cast<size_t>(pSendBundle->currMsgLength());
 		const bool retained = processEntityRefUpdate(pSendBundle, pEntityRef);
+		releaseVolatileProducerIfDelivered(pEntityRef);
 		const size_t afterBytes = static_cast<size_t>(pSendBundle->currMsgLength());
 		const uint64 encodedBytes = afterBytes > beforeBytes ? static_cast<uint64>(afterBytes - beforeBytes) : 0;
 		g_witnessLoadMetrics.recordVolatileUpdate(encodedBytes);

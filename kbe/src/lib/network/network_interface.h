@@ -177,8 +177,16 @@ public:
 	uint64 pollerCompletionTimeBudgetExhaustionCount() const;
 	uint64 discardedPacketsAfterCloseCount() const { return discardedPacketsAfterCloseCount_; }
 	uint64 receiveWindowOverflowBurstCount() const { return receiveWindowOverflowBurstCount_; }
+	uint64 receiveWindowCriticalBurstCount() const { return receiveWindowCriticalBurstCount_; }
 	uint64 receiveWindowOverflowDeferredCount() const { return receiveWindowOverflowDeferredCount_; }
 	uint64 receiveWindowOverflowCondemnedCount() const { return receiveWindowOverflowCondemnedCount_; }
+	uint64 receiveWindowMaxMessagesPerTick() const { return receiveWindowMaxMessagesPerTick_; }
+	uint64 receiveWindowMaxBytesPerTick() const { return receiveWindowMaxBytesPerTick_; }
+	uint64 kcpReceiveDrainCallCount() const { return kcpReceiveDrainCallCount_; }
+	uint64 kcpReceiveDrainedPacketCount() const { return kcpReceiveDrainedPacketCount_; }
+	uint64 kcpReceiveBudgetYieldCount() const { return kcpReceiveBudgetYieldCount_; }
+	uint64 kcpReceivePendingSegmentsPeak() const { return kcpReceivePendingSegmentsPeak_; }
+	void recordKcpReceiveDrain(uint32 processedPackets, uint32 pendingSegments, bool budgetYield);
 	uint64 channelIndexMismatchCount() const { return channelIndexMismatchCount_; }
 	uint64 kcpScheduledChannelCount() const;
 	uint64 kcpSchedulerHeapEntryCount() const;
@@ -281,6 +289,12 @@ private:
 		if (condemned)
 			++receiveWindowOverflowCondemnedCount_;
 	}
+	void recordReceiveWindowActivity(uint32 messages, uint32 bytes)
+	{
+		receiveWindowMaxMessagesPerTick_ = std::max<uint64>(receiveWindowMaxMessagesPerTick_, messages);
+		receiveWindowMaxBytesPerTick_ = std::max<uint64>(receiveWindowMaxBytesPerTick_, bytes);
+	}
+	void recordReceiveWindowCriticalBurst() { ++receiveWindowCriticalBurstCount_; }
 	uint64 channelTickEpoch() const { return channelTickEpoch_; }
 
 private:
@@ -312,8 +326,15 @@ private:
 	uint64									finalizedKcpSendtoMaxSampleStamps_;
 	uint64									discardedPacketsAfterCloseCount_;
 	uint64									receiveWindowOverflowBurstCount_;
+	uint64									receiveWindowCriticalBurstCount_;
 	uint64									receiveWindowOverflowDeferredCount_;
 	uint64									receiveWindowOverflowCondemnedCount_;
+	uint64									receiveWindowMaxMessagesPerTick_;
+	uint64									receiveWindowMaxBytesPerTick_;
+	uint64									kcpReceiveDrainCallCount_;
+	uint64									kcpReceiveDrainedPacketCount_;
+	uint64									kcpReceiveBudgetYieldCount_;
+	uint64									kcpReceivePendingSegmentsPeak_;
 	uint64									channelIndexMismatchCount_;
 	uint64									kcpInputErrorCount_;
 	uint64									kcpInputTooShortCount_;

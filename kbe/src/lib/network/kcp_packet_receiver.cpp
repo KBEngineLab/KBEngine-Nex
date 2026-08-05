@@ -31,6 +31,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/network_interface.h"
 #include "network/event_poller.h"
 #include "network/error_reporter.h"
+#include "network/kcp_receive_budget.h"
+#include "common/timestamp.h"
 #include <limits>
 
 namespace KBEngine {
@@ -165,11 +167,30 @@ Reason KCPPacketReceiver::processPacket(Channel* pChannel, Packet * pPacket)
 
 		RECLAIM_PACKET(pPacket->isTCPPacket(), pPacket);
 
-		while (true)
+		return drainReassembledPackets(pChannel);
+	}
+	else
+	{
+		return PacketReceiver::processPacket(pChannel, pPacket);
+	}
+
+	return REASON_SUCCESS;
+}
+
+//-------------------------------------------------------------------------------------
+Reason KCPPacketReceiver::drainReassembledPackets(Channel* pChannel)
+	{
+	const uint64 processingStart = timestamp();
+	const uint64 processingBudget = static_cast<uint64>(
+		static_cast<double>(KCP_RECEIVE_PROCESSING_BUDGET_MICROS) * stampsPerSecondD() / 1000000.0);
+	uint32 processedPackets = 0;
+
+	while (shouldDrainAnotherKcpPacket(processedPackets,
+		timestamp() - processingStart, processingBudget))
 		{
 			const int messageSize = ikcp_peeksize(pChannel->pKCP());
 			if (messageSize < 0)
-				return REASON_SUCCESS;
+				break;
 
 			Packet* pRcvdUDPPacket = UDPPacket::createPoolObject(OBJECTPOOL_POINT);
 			// KCP 会重组跨数据报消息，完整消息可能大于单个 UDP MTU，必须按 peeksize 扩容后再读取。
@@ -196,6 +217,7 @@ Reason KCPPacketReceiver::processPacket(Channel* pChannel, Packet * pPacket)
 				pRcvdUDPPacket->wpos(bytes_recvd);
 
 				Reason r = PacketReceiver::processPacket(pChannel, pRcvdUDPPacket);
+				++processedPackets;
 				if (r != REASON_SUCCESS)
 				{
 					RECLAIM_PACKET(pRcvdUDPPacket->isTCPPacket(), pRcvdUDPPacket);
@@ -203,11 +225,13 @@ Reason KCPPacketReceiver::processPacket(Channel* pChannel, Packet * pPacket)
 				}
 			}
 		}
-	}
-	else
-	{
-		return PacketReceiver::processPacket(pChannel, pPacket);
-	}
+
+	const uint32 pendingSegments = pChannel->pKCP()->nrcv_que;
+	const bool hasCompletePacket = ikcp_peeksize(pChannel->pKCP()) >= 0;
+	const bool budgetYield = hasCompletePacket && processedPackets > 0;
+	pChannel->networkInterface().recordKcpReceiveDrain(processedPackets, pendingSegments, budgetYield);
+	if (hasCompletePacket)
+		pChannel->scheduleKcpUpdate(1);
 
 	return REASON_SUCCESS;
 }

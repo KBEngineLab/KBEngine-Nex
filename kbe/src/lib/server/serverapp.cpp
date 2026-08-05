@@ -216,8 +216,15 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/channels/pendingMaintenance", &networkInterface_, &Network::NetworkInterface::pendingChannelMaintenanceCount);
 	WATCH_OBJECT("network/channels/indexMismatches", &networkInterface_, &Network::NetworkInterface::channelIndexMismatchCount);
 	WATCH_OBJECT("network/receiveWindow/overflowBursts", &networkInterface_, &Network::NetworkInterface::receiveWindowOverflowBurstCount);
+	WATCH_OBJECT("network/receiveWindow/criticalBursts", &networkInterface_, &Network::NetworkInterface::receiveWindowCriticalBurstCount);
 	WATCH_OBJECT("network/receiveWindow/deferredBursts", &networkInterface_, &Network::NetworkInterface::receiveWindowOverflowDeferredCount);
 	WATCH_OBJECT("network/receiveWindow/condemnedChannels", &networkInterface_, &Network::NetworkInterface::receiveWindowOverflowCondemnedCount);
+	WATCH_OBJECT("network/receiveWindow/maxMessagesPerTick", &networkInterface_, &Network::NetworkInterface::receiveWindowMaxMessagesPerTick);
+	WATCH_OBJECT("network/receiveWindow/maxBytesPerTick", &networkInterface_, &Network::NetworkInterface::receiveWindowMaxBytesPerTick);
+	WATCH_OBJECT("network/kcp/receive/drainCalls", &networkInterface_, &Network::NetworkInterface::kcpReceiveDrainCallCount);
+	WATCH_OBJECT("network/kcp/receive/drainedPackets", &networkInterface_, &Network::NetworkInterface::kcpReceiveDrainedPacketCount);
+	WATCH_OBJECT("network/kcp/receive/budgetYields", &networkInterface_, &Network::NetworkInterface::kcpReceiveBudgetYieldCount);
+	WATCH_OBJECT("network/kcp/receive/pendingSegmentsPeak", &networkInterface_, &Network::NetworkInterface::kcpReceivePendingSegmentsPeak);
 	// completion 重投递队列应只包含暂时失败项；持续非零或 retry 快速增长表示 SQ/驱动资源或 socket 生命周期异常。
 	// The completion rearm queue should contain only transient failures; sustained backlog or rapidly growing retries signals SQ/driver pressure or a socket lifecycle fault.
 	WATCH_OBJECT("network/poller/pendingRearms", &networkInterface_, &Network::NetworkInterface::pendingPollerRearms);

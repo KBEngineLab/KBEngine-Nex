@@ -81,8 +81,15 @@ NetworkInterface::NetworkInterface(Network::EventDispatcher * pDispatcher,
 	finalizedKcpSendtoMaxSampleStamps_(0),
 	discardedPacketsAfterCloseCount_(0),
 	receiveWindowOverflowBurstCount_(0),
+	receiveWindowCriticalBurstCount_(0),
 	receiveWindowOverflowDeferredCount_(0),
 	receiveWindowOverflowCondemnedCount_(0),
+	receiveWindowMaxMessagesPerTick_(0),
+	receiveWindowMaxBytesPerTick_(0),
+	kcpReceiveDrainCallCount_(0),
+	kcpReceiveDrainedPacketCount_(0),
+	kcpReceiveBudgetYieldCount_(0),
+	kcpReceivePendingSegmentsPeak_(0),
 	channelIndexMismatchCount_(0),
 	kcpInputErrorCount_(0),
 	kcpInputTooShortCount_(0),
@@ -229,6 +236,16 @@ void NetworkInterface::cleanupChannel(ChannelMap::iterator iter)
 		pChannel->destroy();
 
 	Network::Channel::reclaimPoolObject(pChannel);
+}
+
+//-------------------------------------------------------------------------------------
+void NetworkInterface::recordKcpReceiveDrain(uint32 processedPackets, uint32 pendingSegments, bool budgetYield)
+{
+	++kcpReceiveDrainCallCount_;
+	kcpReceiveDrainedPacketCount_ += processedPackets;
+	if (budgetYield)
+		++kcpReceiveBudgetYieldCount_;
+	kcpReceivePendingSegmentsPeak_ = std::max<uint64>(kcpReceivePendingSegmentsPeak_, pendingSegments);
 }
 
 //-------------------------------------------------------------------------------------

@@ -24,6 +24,36 @@ int captureDatagram(const char* buffer, int length, ikcpcb*, void* user)
 	return 0;
 }
 
+void encode16(std::vector<char>& datagram, std::size_t offset, IUINT16 value)
+{
+	datagram[offset] = static_cast<char>(value & 0xff);
+	datagram[offset + 1] = static_cast<char>((value >> 8) & 0xff);
+}
+
+void encode32(std::vector<char>& datagram, std::size_t offset, IUINT32 value)
+{
+	datagram[offset] = static_cast<char>(value & 0xff);
+	datagram[offset + 1] = static_cast<char>((value >> 8) & 0xff);
+	datagram[offset + 2] = static_cast<char>((value >> 16) & 0xff);
+	datagram[offset + 3] = static_cast<char>((value >> 24) & 0xff);
+}
+
+std::vector<char> makeAckDatagram(IUINT32 conversation, IUINT32 sequence)
+{
+	// KCP's fixed 24-byte wire header and command constants are private to ikcp.c.
+	// KCP 固定的 24 字节线协议头与命令常量仅在 ikcp.c 内部可见。
+	std::vector<char> datagram(24, 0);
+	encode32(datagram, 0, conversation);
+	datagram[4] = 82;
+	datagram[5] = 0;
+	encode16(datagram, 6, 128);
+	encode32(datagram, 8, 0);
+	encode32(datagram, 12, sequence);
+	encode32(datagram, 16, 0);
+	encode32(datagram, 20, 0);
+	return datagram;
+}
+
 bool testAckCounters()
 {
 	Datagrams outboundA;
@@ -240,6 +270,95 @@ bool testTimeoutRetransmissionBudget()
 	return ok;
 }
 
+bool testBoundedFlushResumesWithoutHeadRescan()
+{
+	Datagrams outbound;
+	ikcpcb* kcp = ikcp_create(13, &outbound);
+	if (!require(kcp != NULL, "KCP cursor allocation failed"))
+		return false;
+
+	kcp->output = captureDatagram;
+	ikcp_nodelay(kcp, 1, 10, 2, 1);
+	ikcp_wndsize(kcp, 128, 128);
+	bool ok = require(ikcp_setflushlimit(kcp, 2) == 0, "cursor flush limit was rejected");
+	const char payload[] = "cursor";
+	for (int index = 0; index < 6; ++index)
+		ok = require(ikcp_send(kcp, payload, static_cast<int>(sizeof(payload))) == 0,
+			"cursor payload enqueue failed") && ok;
+
+	/* Three bounded passes emit all six initial segments and finish at the list
+	 * sentinel. Their retransmission deadlines are then moved out of the way so
+	 * the next pass has exactly one useful tail segment.
+	 * 三次有界 flush 发完六段并到达链表哨兵；随后推迟旧段的重传时间，
+	 * 使下一轮只有一个尾部新段需要发送。 */
+	ikcp_update(kcp, 0);
+	ikcp_update(kcp, 1);
+	ikcp_update(kcp, 2);
+	for (struct IQUEUEHEAD* node = kcp->snd_buf.next;
+		node != &kcp->snd_buf; node = node->next)
+	{
+		IKCPSEG* segment = iqueue_entry(node, IKCPSEG, node);
+		segment->resendts = 1000;
+		segment->fastack = 0;
+	}
+
+	ok = require(ikcp_send(kcp, payload, static_cast<int>(sizeof(payload))) == 0,
+		"tail cursor payload enqueue failed") && ok;
+	const IUINT64 scannedBefore = kcp->flush_scanned_segments;
+	ikcp_update(kcp, 12);
+	const IUINT64 scannedDelta = kcp->flush_scanned_segments - scannedBefore;
+	ok = require(scannedDelta == 1,
+		"tail admission rescanned old unacknowledged segments") && ok;
+
+	ikcp_release(kcp);
+	return ok;
+}
+
+bool testAckAdvancesBoundedFlushCursor()
+{
+	Datagrams outbound;
+	ikcpcb* kcp = ikcp_create(14, &outbound);
+	if (!require(kcp != NULL, "KCP ACK cursor allocation failed"))
+		return false;
+
+	kcp->output = captureDatagram;
+	ikcp_nodelay(kcp, 1, 10, 2, 1);
+	const char payload[] = "ack-cursor";
+	bool ok = true;
+	for (int index = 0; index < 3; ++index)
+		ok = require(ikcp_send(kcp, payload, static_cast<int>(sizeof(payload))) == 0,
+			"ACK cursor payload enqueue failed") && ok;
+	ikcp_update(kcp, 0);
+
+	/* Force all three segments into the fast-retransmit path. The budget stops at
+	 * sequence 2; acknowledging that exact node verifies deletion advances the
+	 * persistent cursor before freeing memory.
+	 * 强制三段进入快速重传；预算会停在序号 2，随后 ACK 正好删除游标节点，
+	 * 用于验证释放内存前会先推进持久游标。 */
+	for (struct IQUEUEHEAD* node = kcp->snd_buf.next;
+		node != &kcp->snd_buf; node = node->next)
+	{
+		IKCPSEG* segment = iqueue_entry(node, IKCPSEG, node);
+		segment->fastack = 2;
+	}
+	ok = require(ikcp_setflushlimit(kcp, 2) == 0, "ACK cursor flush limit was rejected") && ok;
+	ikcp_update(kcp, 10);
+	ok = require(kcp->flush_limited == 1 &&
+		kcp->flush_cursor != &kcp->snd_buf,
+		"bounded flush did not retain a resume cursor") && ok;
+
+	const std::vector<char> acknowledgement = makeAckDatagram(14, 2);
+	ok = require(ikcp_input(kcp, acknowledgement.data(),
+		static_cast<long>(acknowledgement.size())) == 0,
+		"KCP rejected cursor acknowledgement") && ok;
+	ok = require(kcp->flush_cursor == &kcp->snd_buf && kcp->nsnd_buf == 2,
+		"ACK left the bounded flush cursor dangling") && ok;
+	ikcp_update(kcp, 11);
+
+	ikcp_release(kcp);
+	return ok;
+}
+
 bool testThresholdHysteresis()
 {
 	using KBEngine::Network::ThresholdHysteresis;
@@ -262,6 +381,7 @@ int main()
 {
 	if (!testAckCounters() || !testRetransmissionCounters() || !testFlushSegmentBudget() ||
 		!testStreamCoalescingAndPayloadAccounting() || !testTimeoutRetransmissionBudget() ||
+		!testBoundedFlushResumesWithoutHeadRescan() || !testAckAdvancesBoundedFlushCursor() ||
 		!testThresholdHysteresis())
 		return EXIT_FAILURE;
 
