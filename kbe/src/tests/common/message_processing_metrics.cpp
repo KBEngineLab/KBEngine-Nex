@@ -3,6 +3,11 @@
 #include <cstdlib>
 #include <iostream>
 
+namespace KBEngine
+{
+bool g_performanceProbesEnabled = false;
+}
+
 namespace
 {
 bool require(bool condition, const char* message)
@@ -29,6 +34,7 @@ bool testClassification()
 
 bool testDeterministicSampling()
 {
+	KBEngine::g_performanceProbesEnabled = true;
 	KBEngine::Network::MessageProcessingCategoryStats stats(4);
 	bool sampled[8] = {};
 	for (std::size_t i = 0; i < 8; ++i)
@@ -55,6 +61,15 @@ bool testDeterministicSampling()
 		require(stats.sampleRate() == 4, "sample rate drifted");
 }
 
+bool testDisabledSampling()
+{
+	KBEngine::g_performanceProbesEnabled = false;
+	KBEngine::Network::MessageProcessingCategoryStats stats(1);
+	return require(!stats.beginCall(), "disabled probe unexpectedly sampled a call") &&
+		require(stats.calls() == 0 && stats.sampledCalls() == 0,
+			"disabled probe changed diagnostic counters");
+}
+
 bool testCategoryRates()
 {
 	KBEngine::Network::MessageProcessingMetrics metrics;
@@ -73,7 +88,7 @@ bool testCategoryRates()
 
 int main()
 {
-	if (!testClassification() || !testDeterministicSampling() || !testCategoryRates())
+	if (!testClassification() || !testDisabledSampling() || !testDeterministicSampling() || !testCategoryRates())
 		return EXIT_FAILURE;
 
 	std::cout << "MESSAGE_PROCESSING_METRICS_TEST_PASS" << std::endl;

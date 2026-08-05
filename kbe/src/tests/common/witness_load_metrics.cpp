@@ -3,6 +3,11 @@
 #include <cstdlib>
 #include <iostream>
 
+namespace KBEngine
+{
+bool g_performanceProbesEnabled = false;
+}
+
 namespace
 {
 bool require(bool condition, const char* message)
@@ -14,6 +19,7 @@ bool require(bool condition, const char* message)
 
 bool testIncrementalViewAccounting()
 {
+	KBEngine::g_performanceProbesEnabled = true;
 	KBEngine::WitnessLoadMetrics metrics;
 	std::size_t firstWitness = 0;
 	std::size_t secondWitness = 0;
@@ -103,6 +109,21 @@ bool testFullScanWorkAccounting()
 		require(metrics.fullScanEntities() == 7, "full scan work was not accumulated");
 }
 
+bool testDisabledMetrics()
+{
+	KBEngine::g_performanceProbesEnabled = false;
+	KBEngine::WitnessLoadMetrics metrics;
+	std::size_t trackedCount = 0;
+	metrics.synchronizeViewCount(trackedCount, 5);
+	metrics.recordDirtyEnqueued(1, false);
+	metrics.recordDirtyDequeued();
+	metrics.recordEnter(100);
+	return require(trackedCount == 5, "disabled metrics did not preserve Witness lifecycle state") &&
+		require(metrics.viewEntities() == 0 && metrics.dirtyEnqueued() == 0 && metrics.enterUpdates() == 0,
+			"disabled Witness metrics changed diagnostic counters") &&
+		require(!metrics.beginEnterProcessing(), "disabled Witness timing unexpectedly sampled an event");
+}
+
 bool testVolatileBackpressureAccounting()
 {
 	KBEngine::WitnessLoadMetrics metrics;
@@ -165,7 +186,7 @@ bool testStructuralProcessingSampling()
 
 int main()
 {
-	if (!testIncrementalViewAccounting() || !testQueueAttribution() || !testFullScanWorkAccounting() ||
+	if (!testDisabledMetrics() || !testIncrementalViewAccounting() || !testQueueAttribution() || !testFullScanWorkAccounting() ||
 		!testVolatileBackpressureAccounting() || !testStructuralProcessingSampling())
 		return EXIT_FAILURE;
 

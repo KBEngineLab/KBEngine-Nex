@@ -1,6 +1,8 @@
 #ifndef KBE_WITNESS_LOAD_METRICS_H
 #define KBE_WITNESS_LOAD_METRICS_H
 
+#include "common/performance_probes.h"
+
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -24,6 +26,9 @@ public:
 
 	bool beginCall()
 	{
+		if (!g_performanceProbesEnabled)
+			return false;
+
 		++calls_;
 		// 首次事件始终采样，使低频 Enter/Leave 在短窗口内仍可观测。
 		// Always sample the first event so rare Enter/Leave work remains visible in short windows.
@@ -32,6 +37,9 @@ public:
 
 	void recordSample(std::uint64_t durationNanos)
 	{
+		if (!g_performanceProbesEnabled)
+			return;
+
 		++sampledCalls_;
 		sampledTotalNanos_ += durationNanos;
 		if (durationNanos > sampledMaxNanos_)
@@ -69,6 +77,14 @@ class WitnessLoadMetrics
 public:
 	void synchronizeViewCount(std::size_t& trackedCount, std::size_t currentCount)
 	{
+		if (!g_performanceProbesEnabled)
+		{
+			// trackedCount 属于 Witness 生命周期状态，即使关闭统计也必须保持同步，避免析构或未来扩展开关时出现错误增量。
+			// trackedCount belongs to Witness lifecycle state and must stay synchronized even when metrics are disabled.
+			trackedCount = currentCount;
+			return;
+		}
+
 		// 每个 Witness 保存上次已计入的数量，因此增量更新全局值不需要在 Watcher 查询时扫描所有对象。
 		// Each Witness retains its last-accounted count, allowing the global value to update incrementally without scanning every object on Watcher reads.
 		if (currentCount >= trackedCount)
@@ -89,12 +105,18 @@ public:
 
 	void recordFullScan(std::size_t scannedEntities)
 	{
+		if (!g_performanceProbesEnabled)
+			return;
+
 		++fullScans_;
 		fullScanEntities_ += static_cast<std::uint64_t>(scannedEntities);
 	}
 
 	void recordDirtyEnqueued(std::size_t queueDepth, bool requeue, bool structural = false, bool promotion = false)
 	{
+		if (!g_performanceProbesEnabled)
+			return;
+
 		++dirtyQueued_;
 		++dirtyEnqueued_;
 		if (structural)
@@ -118,39 +140,47 @@ public:
 
 	void recordDirtyDequeued(std::size_t count = 1, bool structural = false)
 	{
+		if (!g_performanceProbesEnabled)
+			return;
+
 		assert(dirtyQueued_ >= count);
 		dirtyQueued_ -= static_cast<std::uint64_t>(count);
 		std::uint64_t& queueDepth = structural ? structuralQueued_ : volatileQueued_;
 		assert(queueDepth >= count);
 		queueDepth -= static_cast<std::uint64_t>(count);
 	}
-	void recordQueueDeduplicated() { ++queueDeduplicated_; }
-	void recordProducerCoalesced() { ++producerCoalesced_; }
-	void recordPromotedVolatileSkip() { ++promotedVolatileSkips_; }
-	void recordCancelledPendingLeave() { ++cancelledPendingLeaves_; }
+	void recordQueueDeduplicated() { if (g_performanceProbesEnabled) ++queueDeduplicated_; }
+	void recordProducerCoalesced() { if (g_performanceProbesEnabled) ++producerCoalesced_; }
+	void recordPromotedVolatileSkip() { if (g_performanceProbesEnabled) ++promotedVolatileSkips_; }
+	void recordCancelledPendingLeave() { if (g_performanceProbesEnabled) ++cancelledPendingLeaves_; }
 
-	void recordDirtyProcessed() { ++dirtyProcessed_; }
-	void recordStaleDiscard() { ++staleDiscards_; }
-	void recordStateSkip() { ++stateSkips_; }
-	void recordVolatileBytes(std::uint64_t bytes) { volatileBytesSent_ += bytes; }
-	void recordVolatileBudgetDeferred() { ++volatileBudgetDeferred_; }
-	void recordVolatileBudgetExhaustion() { ++volatileBudgetExhaustions_; }
-	void recordSendBytes(std::uint64_t bytes) { sendBytes_ += bytes; }
-	void recordSendBudgetExhaustion() { ++sendBudgetExhaustions_; }
-	void recordStructuralProcessed() { ++structuralProcessed_; }
+	void recordDirtyProcessed() { if (g_performanceProbesEnabled) ++dirtyProcessed_; }
+	void recordStaleDiscard() { if (g_performanceProbesEnabled) ++staleDiscards_; }
+	void recordStateSkip() { if (g_performanceProbesEnabled) ++stateSkips_; }
+	void recordVolatileBytes(std::uint64_t bytes) { if (g_performanceProbesEnabled) volatileBytesSent_ += bytes; }
+	void recordVolatileBudgetDeferred() { if (g_performanceProbesEnabled) ++volatileBudgetDeferred_; }
+	void recordVolatileBudgetExhaustion() { if (g_performanceProbesEnabled) ++volatileBudgetExhaustions_; }
+	void recordSendBytes(std::uint64_t bytes) { if (g_performanceProbesEnabled) sendBytes_ += bytes; }
+	void recordSendBudgetExhaustion() { if (g_performanceProbesEnabled) ++sendBudgetExhaustions_; }
+	void recordStructuralProcessed() { if (g_performanceProbesEnabled) ++structuralProcessed_; }
 	void recordGlobalAdmission(bool admitted)
 	{
+		if (!g_performanceProbesEnabled)
+			return;
 		admitted ? ++globalAdmitted_ : ++globalDeferred_;
 	}
-	void recordEnter(std::uint64_t bytes) { ++enterUpdates_; enterBytes_ += bytes; }
-	void recordLeave(std::uint64_t bytes) { ++leaveUpdates_; leaveBytes_ += bytes; }
+	void recordEnter(std::uint64_t bytes) { if (g_performanceProbesEnabled) { ++enterUpdates_; enterBytes_ += bytes; } }
+	void recordLeave(std::uint64_t bytes) { if (g_performanceProbesEnabled) { ++leaveUpdates_; leaveBytes_ += bytes; } }
 	bool beginEnterProcessing() { return enterProcessing_.beginCall(); }
 	bool beginLeaveProcessing() { return leaveProcessing_.beginCall(); }
 	void recordEnterProcessing(std::uint64_t durationNanos) { enterProcessing_.recordSample(durationNanos); }
 	void recordLeaveProcessing(std::uint64_t durationNanos) { leaveProcessing_.recordSample(durationNanos); }
-	void recordVolatileUpdate(std::uint64_t bytes) { ++volatileUpdates_; volatileUpdateBytes_ += bytes; }
+	void recordVolatileUpdate(std::uint64_t bytes) { if (g_performanceProbesEnabled) { ++volatileUpdates_; volatileUpdateBytes_ += bytes; } }
 	void recordVolatileSuppression(bool suppressed)
 	{
+		if (!g_performanceProbesEnabled)
+			return;
+
 		if (suppressed)
 		{
 			++activeSuppressed_;
@@ -163,11 +193,14 @@ public:
 			++resumeTransitions_;
 		}
 	}
-	void recordSuppressedUpdateSkip() { ++suppressedUpdateSkips_; }
-	void recordSuppressedVolatileRefresh() { ++suppressedVolatileRefreshes_; }
-	void recordStructuralWhileSuppressed() { ++structuralWhileSuppressed_; }
+	void recordSuppressedUpdateSkip() { if (g_performanceProbesEnabled) ++suppressedUpdateSkips_; }
+	void recordSuppressedVolatileRefresh() { if (g_performanceProbesEnabled) ++suppressedVolatileRefreshes_; }
+	void recordStructuralWhileSuppressed() { if (g_performanceProbesEnabled) ++structuralWhileSuppressed_; }
 	void recordBundle(std::size_t bytes)
 	{
+		if (!g_performanceProbesEnabled)
+			return;
+
 		++bundlesSent_;
 		if (bytes > maxBundleBytes_)
 			maxBundleBytes_ = static_cast<std::uint64_t>(bytes);

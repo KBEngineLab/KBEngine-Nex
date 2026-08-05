@@ -5,6 +5,7 @@
   "bots": 50,
   "connect_rate_per_second": 10,
   "warmup_seconds": 5,
+  "performance_probes_enabled": true,
   "external_receive_messages": 1024,
   "external_receive_bytes": 1048576,
   "readiness": {

@@ -59,6 +59,9 @@ public:
 
 	bool beginCall()
 	{
+		if (!g_performanceProbesEnabled)
+			return false;
+
 		++calls_;
 		return calls_ == 1 || calls_ % sampleRate_ == 0;
 	}

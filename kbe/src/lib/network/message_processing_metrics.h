@@ -1,6 +1,8 @@
 #ifndef KBE_NETWORK_MESSAGE_PROCESSING_METRICS_H
 #define KBE_NETWORK_MESSAGE_PROCESSING_METRICS_H
 
+#include "common/performance_probes.h"
+
 #include <array>
 #include <cassert>
 #include <cstddef>
@@ -40,6 +42,9 @@ public:
 
 	bool beginCall()
 	{
+		if (!g_performanceProbesEnabled)
+			return false;
+
 		++calls_;
 		// Always sample the first call so rare categories remain observable.
 		// 首次调用始终采样，确保低频类别不会在整个测量窗口内保持空白。

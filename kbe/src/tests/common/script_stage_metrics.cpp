@@ -4,6 +4,11 @@
 #include <iostream>
 #include <string>
 
+namespace KBEngine
+{
+bool g_performanceProbesEnabled = false;
+}
+
 namespace
 {
 bool require(bool condition, const char* message)
@@ -15,6 +20,7 @@ bool require(bool condition, const char* message)
 
 bool testSamplingAndStages()
 {
+	KBEngine::g_performanceProbesEnabled = true;
 	KBEngine::ScriptStageMetrics metrics;
 	bool sampled[8] = {};
 	for (std::size_t i = 0; i < 8; ++i)
@@ -35,6 +41,17 @@ bool testSamplingAndStages()
 		require(stats.maxNanos() == 2500000, "stage maximum drifted") &&
 		require(stats.slowOver1ms() == 1, "slow sample count drifted") &&
 		require(metrics.slow(0).name == "Avatar.eighth", "slow handler name drifted");
+}
+
+bool testDisabledMetrics()
+{
+	KBEngine::g_performanceProbesEnabled = false;
+	KBEngine::ScriptStageMetrics metrics;
+	metrics.record(KBEngine::SCRIPT_STAGE_PYTHON_CALL, 2000000, true, "Avatar.move");
+	return require(!metrics.beginRpcCall(), "disabled script probe unexpectedly sampled an RPC") &&
+		require(metrics.rpcCalls() == 0 &&
+			metrics.stats(KBEngine::SCRIPT_STAGE_PYTHON_CALL).calls() == 0,
+			"disabled script probe changed diagnostic counters");
 }
 
 bool testBoundedSlowTop()
@@ -121,7 +138,7 @@ bool testMigrationSubstageNames()
 
 int main()
 {
-	if (!testSamplingAndStages() || !testBoundedSlowTop() || !testSameHandlerKeepsMaximum() ||
+	if (!testDisabledMetrics() || !testSamplingAndStages() || !testBoundedSlowTop() || !testSameHandlerKeepsMaximum() ||
 		!testMigrationSubstageNames())
 		return EXIT_FAILURE;
 

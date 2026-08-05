@@ -1,6 +1,8 @@
 #ifndef KBE_SERVER_SCRIPT_STAGE_METRICS_H
 #define KBE_SERVER_SCRIPT_STAGE_METRICS_H
 
+#include "common/performance_probes.h"
+
 #include <array>
 #include <cassert>
 #include <cstddef>
@@ -108,6 +110,9 @@ public:
 
 	bool beginRpcCall()
 	{
+		if (!g_performanceProbesEnabled)
+			return false;
+
 		++rpcCalls_;
 		// 首次调用必须可观测；之后确定性采样，避免随机数和每次时钟读取进入 RPC 热路径。
 		// The first call remains observable; deterministic sampling avoids RNG and per-call clocks on the RPC hot path.
@@ -117,6 +122,9 @@ public:
 	void record(ScriptStage stage, std::uint64_t durationNanos, bool sampled,
 		const char* handlerName = NULL)
 	{
+		if (!g_performanceProbesEnabled)
+			return;
+
 		assert(stage >= 0 && stage < SCRIPT_STAGE_COUNT);
 		stats(stage).record(durationNanos, sampled);
 		if (sampled && durationNanos >= 1000000 && handlerName != NULL)

@@ -16,6 +16,7 @@
   "reliable_udp_min_rto_ms": 50,
   "runtime_log_level": "warn",
   "server_runtime_log_level": "warn",
+  "performance_probes_enabled": true,
   "cluster_environment": {
     "KBE_PERF_PROFILE_LATENCY_WINDOW_SECONDS": "180"
   },

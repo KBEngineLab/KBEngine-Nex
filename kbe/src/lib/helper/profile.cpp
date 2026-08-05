@@ -130,9 +130,8 @@ ProfileVal::ProfileVal(std::string name, ProfileGroup * pGroup, bool collectLate
 	count_(0),
 	inProgress_(0),
 	initWatcher_(false),
-	pLatencyWindow_(collectLatency ? new ProfileLatencyWindow(
-		ProfileLatencyWindow::DEFAULT_CAPACITY,
-		profileLatencyMaxAgeStamps()) : NULL)
+	collectLatencyRequested_(collectLatency),
+	pLatencyWindow_(NULL)
 {
 	if (pProfileGroup_ == NULL)
 	{
@@ -163,6 +162,15 @@ bool ProfileVal::initializeWatcher()
 		return false;
 
 	initWatcher_ = true;
+
+	// 静态 ProfileVal 早于配置加载构造，延迟到 Watcher 初始化后才能遵守生产开关并避免无用的大窗口分配。
+	// Static ProfileVal instances predate configuration loading, so defer allocation until Watcher initialization can honor the production switch.
+	if (collectLatencyRequested_ && g_performanceProbesEnabled && pLatencyWindow_ == NULL)
+	{
+		pLatencyWindow_ = new ProfileLatencyWindow(
+			ProfileLatencyWindow::DEFAULT_CAPACITY,
+			profileLatencyMaxAgeStamps());
+	}
 
 	char buf[MAX_BUF];
 	kbe_snprintf(buf, MAX_BUF, "cprofiles/%s/%s/lastTime", pProfileGroup_->name(), name_.c_str());

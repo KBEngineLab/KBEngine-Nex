@@ -59,6 +59,7 @@ static void loadRawDatabaseCommandBlacklist(XML* xml, TiXmlNode* rootNode, const
 ServerConfig::ServerConfig():
 	gameUpdateHertz_(10),
 	asyncioRepeatOffset_(0.f),
+	performanceProbesEnabled_(false),
 	tick_max_buffered_logs_(4096),
 	tick_max_sync_logs_(32),
 	channelCommon_(),
@@ -105,6 +106,20 @@ bool ServerConfig::loadConfig(std::string fileName)
 	{
 		// root节点下没有子节点了
 		return true;
+	}
+
+	rootNode = xml->getRootNode("performanceProbes");
+	if (rootNode != NULL)
+	{
+		TiXmlNode* childnode = xml->enterNode(rootNode, "enabled");
+		if (childnode != NULL)
+		{
+			performanceProbesEnabled_ = strutil::toLower(strutil::kbe_trim(
+				xml->getValStr(childnode))) == "true";
+			// 全局只读快路径避免网络、AOI 和脚本库反向依赖 ServerConfig。
+			// A process-wide read-mostly switch avoids reverse dependencies from network, AOI and script libraries to ServerConfig.
+			g_performanceProbesEnabled = performanceProbesEnabled_;
+		}
 	}
 
 	std::string email_service_config;

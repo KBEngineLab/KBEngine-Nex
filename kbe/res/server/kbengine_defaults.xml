@@ -8,6 +8,13 @@
 		(Main-thread asyncio scheduling interval in seconds; 0 disables experimental async support)
 	-->
 	<asyncioRepeatOffset> 0 </asyncioRepeatOffset>
+
+	<!-- 性能探针会增加高频计数、时钟读取和百分位窗口内存，生产环境默认关闭。
+		Performance probes add hot-path counters, clock reads and percentile-window memory, so production defaults to disabled.
+	-->
+	<performanceProbes>
+		<enabled> false </enabled>
+	</performanceProbes>
 	
 	<!-- 每秒发送到客户端的带宽限制(bit) 
 		(The data sent to the client, the second bandwidth limit (bit))

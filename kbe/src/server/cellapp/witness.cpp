@@ -545,7 +545,7 @@ void Witness::resetViewEntities()
 //-------------------------------------------------------------------------------------
 void Witness::onEnterSpace(Space* pSpace, bool recordMigrationStages)
 {
-	const uint64 networkNotifyStart = recordMigrationStages ? timestamp() : 0;
+	const uint64 networkNotifyStart = recordMigrationStages ? scriptStageStartStamps() : 0;
 	Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pEntity_->id(), (*pSendBundle));
 
@@ -576,7 +576,7 @@ void Witness::onEnterSpace(Space* pSpace, bool recordMigrationStages)
 			scriptStageDurationNanos(networkNotifyStart), true, "reqTeleportToCellApp");
 	}
 
-	const uint64 viewTriggerInstallStart = recordMigrationStages ? timestamp() : 0;
+	const uint64 viewTriggerInstallStart = recordMigrationStages ? scriptStageStartStamps() : 0;
 	installViewTrigger();
 	if (recordMigrationStages)
 	{

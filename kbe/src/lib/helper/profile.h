@@ -215,6 +215,7 @@ public:
 	int				inProgress_;
 
 	bool			initWatcher_;
+	bool			collectLatencyRequested_;
 	ProfileLatencyWindow*	pLatencyWindow_;
 	ProfileWarningLimiter	warningLimiter_;
 

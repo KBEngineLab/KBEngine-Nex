@@ -237,6 +237,7 @@ def main() -> int:
             int(scenario["bots_account_suffix_start"]) if "bots_account_suffix_start" in scenario else None,
             int(scenario["database_connections"]) if "database_connections" in scenario else None,
             baseapp_count,
+            bool(scenario.get("performance_probes_enabled", False)),
         )
         environment = build_environment(_repository_root(), args.assets_root, output, fixture_root)
         environment.update(scenario_environment(scenario))

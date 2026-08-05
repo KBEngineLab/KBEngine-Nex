@@ -24,6 +24,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "common/kbeversion.h"
 #include "common/kbemalloc.h"
 #include "common/stringconv.h"
+#include "common/performance_probes.h"
 #include "fmt/format.h"
 
 namespace KBEngine{

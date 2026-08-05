@@ -409,7 +409,7 @@ void Space::addEntityAndEnterWorld(Entity* pEntity, bool isRestore, bool recordM
 	// Only target-Cell migration opts into timing; ordinary entity entry does not read the clock.
 	addEntity(pEntity, recordMigrationStages);
 
-	const uint64 coordinateInstallStart = recordMigrationStages ? timestamp() : 0;
+	const uint64 coordinateInstallStart = recordMigrationStages ? scriptStageStartStamps() : 0;
 	addEntityToNode(pEntity);
 	if (recordMigrationStages)
 	{
@@ -417,7 +417,7 @@ void Space::addEntityAndEnterWorld(Entity* pEntity, bool isRestore, bool recordM
 			scriptStageDurationNanos(coordinateInstallStart), true, "reqTeleportToCellApp");
 	}
 
-	const uint64 witnessEnterWorldStart = recordMigrationStages ? timestamp() : 0;
+	const uint64 witnessEnterWorldStart = recordMigrationStages ? scriptStageStartStamps() : 0;
 	onEnterWorld(pEntity, recordMigrationStages);
 	if (recordMigrationStages)
 	{
@@ -429,7 +429,7 @@ void Space::addEntityAndEnterWorld(Entity* pEntity, bool isRestore, bool recordM
 //-------------------------------------------------------------------------------------
 void Space::addEntity(Entity* pEntity, bool recordMigrationStages)
 {
-	const uint64 spaceRegisterStart = recordMigrationStages ? timestamp() : 0;
+	const uint64 spaceRegisterStart = recordMigrationStages ? scriptStageStartStamps() : 0;
 	pEntity->spaceID(this->id_);
 	pEntity->spaceEntityIdx(entities_.size());
 	entities_.push_back(pEntity);
@@ -439,7 +439,7 @@ void Space::addEntity(Entity* pEntity, bool recordMigrationStages)
 			scriptStageDurationNanos(spaceRegisterStart), true, "reqTeleportToCellApp");
 	}
 
-	const uint64 enterSpaceCallbackStart = recordMigrationStages ? timestamp() : 0;
+	const uint64 enterSpaceCallbackStart = recordMigrationStages ? scriptStageStartStamps() : 0;
 	pEntity->onEnterSpace(this);
 	if (recordMigrationStages)
 	{
@@ -495,7 +495,7 @@ void Space::_onEnterWorld(Entity* pEntity, bool recordMigrationStages)
 
 	if(pEntity->hasWitness())
 	{
-		const uint64 spaceDataStart = recordMigrationStages ? timestamp() : 0;
+		const uint64 spaceDataStart = recordMigrationStages ? scriptStageStartStamps() : 0;
 		_addSpaceDatasToEntityClient(pEntity);
 		if (recordMigrationStages)
 		{

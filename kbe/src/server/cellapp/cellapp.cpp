@@ -2600,9 +2600,9 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 
 	// 目标 Cell 的反序列化/创建阶段从实体构造开始，到进入新 Space 为止；回调单独计量。
 	// Target-Cell deserialize/create timing starts at construction and stops on entering the new Space; callbacks are measured separately.
-	const uint64 deserializeCreateStart = timestamp();
+	const uint64 deserializeCreateStart = scriptStageStartStamps();
 	// 创建entity
-	const uint64 entityConstructStart = timestamp();
+	const uint64 entityConstructStart = scriptStageStartStamps();
 	Entity* e = createEntity(EntityDef::findScriptModule(entityType)->getName(), NULL, false, teleportEntityID, false);
 	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_ENTITY_CONSTRUCT,
 		scriptStageDurationNanos(entityConstructStart), true, "reqTeleportToCellApp");
@@ -2626,7 +2626,7 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 	}
 
 	Py_INCREF(e);
-	const uint64 streamRestoreStart = timestamp();
+	const uint64 streamRestoreStart = scriptStageStartStamps();
 	e->createFromStream(s);
 	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_STREAM_RESTORE,
 		scriptStageDurationNanos(streamRestoreStart), true, "reqTeleportToCellApp");
@@ -2670,7 +2670,7 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 	}
 
 	// 进入新的space中
-	const uint64 spaceAoiStart = timestamp();
+	const uint64 spaceAoiStart = scriptStageStartStamps();
 	space->addEntityAndEnterWorld(e, false, true);
 	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_SPACE_AOI,
 		scriptStageDurationNanos(spaceAoiStart), true, "reqTeleportToCellApp");
@@ -2726,7 +2726,7 @@ void Cellapp::reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s
 		s.done();
 		return;
 	}
-	const uint64 callbackStart = timestamp();
+	const uint64 callbackStart = scriptStageStartStamps();
 
 	// 正常情况下， 应该传送结果返回时传送前的实体应该在当前cell上， 如果到其他cellapp上了， 说明在此期间被迁移走了
 	// 此时被迁移很可能会有问题

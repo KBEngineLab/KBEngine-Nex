@@ -1247,6 +1247,7 @@ def main() -> int:
             server_runtime_log_level="info",
             database_connections=32,
             baseapp_external_port_count=10,
+            performance_probes_enabled=True,
         )
         xml_root = ET.parse(overlay).getroot()
         assert xml_root.findtext("./bots/defaultAddBots/totalCount") == "500"
@@ -1260,6 +1261,7 @@ def main() -> int:
         assert xml_root.findtext("./dbmgr/databaseInterfaces/default/numConnections") == "32"
         assert xml_root.findtext("./baseapp/externalTcpPorts_min") == "21015"
         assert xml_root.findtext("./baseapp/externalTcpPorts_max") == "21024"
+        assert xml_root.findtext("./performanceProbes/enabled") == "true"
         deterministic_run = root / "deterministic-run"
         create_config_overlay(
             assets,
@@ -1271,6 +1273,7 @@ def main() -> int:
             deterministic_run / "config-overlay/res/server/kbengine.xml"
         ).getroot()
         assert deterministic_root.findtext("./bots/account_infos/account_name_suffix_inc") == "1"
+        assert deterministic_root.findtext("./performanceProbes/enabled") == "false"
         bots_log_config = (
             root / "run/config-overlay/res/server/log4cxx_properties/bots.properties"
         ).read_text(encoding="utf-8")

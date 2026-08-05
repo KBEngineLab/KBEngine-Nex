@@ -7,8 +7,16 @@
 namespace KBEngine
 {
 
+inline uint64 scriptStageStartStamps()
+{
+	return g_performanceProbesEnabled ? timestamp() : 0;
+}
+
 inline uint64 scriptStageDurationNanos(uint64 startStamps)
 {
+	if (!g_performanceProbesEnabled)
+		return 0;
+
 	return static_cast<uint64>(
 		(static_cast<double>(timestamp() - startStamps) * 1000000000.0) / stampsPerSecondD());
 }

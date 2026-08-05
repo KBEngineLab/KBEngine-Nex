@@ -36,6 +36,7 @@ def create_config_overlay(
     bots_account_suffix_start: int | None = None,
     database_connections: int | None = None,
     baseapp_external_port_count: int | None = None,
+    performance_probes_enabled: bool = False,
 ) -> Path:
     """Write only the per-run XML override; source assets remain read-only.
     只写入本次运行的 XML 覆盖文件，源资产保持只读。
@@ -51,6 +52,13 @@ def create_config_overlay(
 
     tree = ET.parse(find_server_config(assets_root))
     root = tree.getroot()
+    performance_probes = root.find("./performanceProbes")
+    if performance_probes is None:
+        performance_probes = ET.SubElement(root, "performanceProbes")
+    # 性能场景必须显式声明是否承担探针成本，避免普通启动意外继承压测配置。
+    # Performance scenarios declare probe cost explicitly so ordinary launches never inherit benchmark instrumentation accidentally.
+    set_xml_value(performance_probes, "enabled", str(performance_probes_enabled).lower())
+
     bots_node = root.find("./bots")
     if bots_node is None:
         bots_node = ET.SubElement(root, "bots")

@@ -3888,7 +3888,7 @@ void Entity::teleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Dir
 //-------------------------------------------------------------------------------------
 void Entity::onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Direction3D& dir)
 {
-	const uint64 serializeStart = timestamp();
+	const uint64 serializeStart = scriptStageStartStamps();
 	// 我们需要将entity打包发往目的cellapp
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(CellappInterface::reqTeleportToCellApp);
@@ -3928,7 +3928,7 @@ void Entity::onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, D
 	// 如果未能正确传输过去则可以从当前cell继续恢复entity.
 	// Cellapp::getSingleton().destroyEntity(id(), false);
 
-	const uint64 forwardStart = timestamp();
+	const uint64 forwardStart = scriptStageStartStamps();
 	nearbyMBRef->sendCall(pBundle);
 	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_FORWARD,
 		scriptStageDurationNanos(forwardStart), true, scriptName());
@@ -4088,7 +4088,7 @@ void Entity::teleport(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& di
 bool Entity::onTeleport()
 {
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
-	const uint64 callbackStart = timestamp();
+	const uint64 callbackStart = scriptStageStartStamps();
 
 	bool allowed = true;
 
@@ -4182,7 +4182,7 @@ bool Entity::onTeleport()
 //-------------------------------------------------------------------------------------
 void Entity::onTeleportFailure()
 {
-	const uint64 callbackStart = timestamp();
+	const uint64 callbackStart = scriptStageStartStamps();
 	// 失败回调本身是正常控制流；各拒绝点负责记录可操作的具体原因，避免重复 ERROR 放大日志和质量指标。
 	// The failure callback itself is normal control flow; rejection sites log actionable causes so this notification must not duplicate them as an ERROR.
 	DEBUG_MSG(fmt::format("{}::onTeleportFailure(): entityID={}\n",
@@ -4198,9 +4198,9 @@ void Entity::onTeleportFailure()
 //-------------------------------------------------------------------------------------
 void Entity::onTeleportSuccess(PyObject* nearbyEntity, SPACE_ID lastSpaceID)
 {
-	const uint64 callbackStart = timestamp();
-	const uint64 callbackSetupStart = timestamp();
-	const uint64 baseNotifyStart = timestamp();
+	const uint64 callbackStart = scriptStageStartStamps();
+	const uint64 callbackSetupStart = scriptStageStartStamps();
+	const uint64 baseNotifyStart = scriptStageStartStamps();
 	EntityCall* mb = this->baseEntityCall();
 	if(mb)
 	{
