@@ -828,6 +828,21 @@ def assert_bots_dev_and_manager_watcher_source_contract() -> None:
     assert 'std::string(argv[index]) == "--reuse-existing-accounts"' in bots_main
     assert 'WATCH_OBJECT("bots/devMode", g_botsDevMode)' in bots_source
     assert 'WATCH_OBJECT("bots/reuseAccounts", g_botsReuseAccounts)' in bots_source
+    assert "processClientTickBatch();" in bots_source
+    assert "dispatcher().addTask(this)" in bots_source
+    assert "dispatcher().cancelTask(this)" in bots_source
+    assert "TIMEOUT_CLIENT_BATCH" not in bots_source
+    assert "pEventPoller_->processPendingEvents" not in bots_source
+    for watcher_path in (
+        "clientTickBatchSize",
+        "clientTickBudgetMicros",
+        "clientTickBatches",
+        "clientTickMaxBatchMicros",
+        "clientTickBudgetExhaustions",
+        "clientTickCompletedRounds",
+        "clientTickOverdueGameTicks",
+    ):
+        assert f'WATCH_OBJECT("bots/performance/{watcher_path}"' in bots_source
     network_index = bots_source.index("DebugHelper::getSingleton().pNetworkInterface(&networkInterface())")
     logger_index = bots_source.index("Components::getSingleton().findLogger(true)")
     assert network_index < logger_index

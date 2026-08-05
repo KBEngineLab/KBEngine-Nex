@@ -97,7 +97,6 @@ reqCreateAndLoginTotalCount_(g_kbeSrvConfig.getBots().defaultAddBots_totalCount)
 reqCreateAndLoginTickCount_(g_kbeSrvConfig.getBots().defaultAddBots_tickCount),
 reqCreateAndLoginTickTime_(g_kbeSrvConfig.getBots().defaultAddBots_tickTime),
 pCreateAndLoginHandler_(NULL),
-pEventPoller_(Network::EventPoller::create()),
 pTelnetServer_(NULL),
 pActiveReportHandler_(NULL),
 totalKcpHandshakeSuccesses_(0),
@@ -110,6 +109,14 @@ totalDetachedEntities_(0),
 totalClearedEntityGarbages_(0),
 lastBotsTickMicros_(0),
 maxBotsTickMicros_(0),
+clientTickBatches_(0),
+clientTickMaxBatchMicros_(0),
+clientTickBudgetExhaustions_(0),
+clientTickCompletedRounds_(0),
+clientTickOverdueGameTicks_(0),
+clientTickIter_(clients_.end()),
+clientTickStartStamps_(0),
+clientTickActive_(false),
 pythonLatencyEnabled_(false),
 pythonLatencySuccesses_(0),
 pythonLatencyTimeouts_(0),
@@ -148,7 +155,6 @@ Bots::~Bots()
 
 	SAFE_RELEASE(pActiveReportHandler_);
 	Components::getSingleton().finalise();
-	SAFE_RELEASE(pEventPoller_);
 }
 
 //-------------------------------------------------------------------------------------
@@ -238,6 +244,13 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/clearedEntityGarbages", this, &Bots::totalClearedEntityGarbages);
 	WATCH_OBJECT("bots/performance/tickLastMicros", this, &Bots::lastBotsTickMicros);
 	WATCH_OBJECT("bots/performance/tickMaxMicros", this, &Bots::maxBotsTickMicros);
+	WATCH_OBJECT("bots/performance/clientTickBatchSize", this, &Bots::clientTickBatchSize);
+	WATCH_OBJECT("bots/performance/clientTickBudgetMicros", this, &Bots::clientTickBudgetMicros);
+	WATCH_OBJECT("bots/performance/clientTickBatches", this, &Bots::clientTickBatches);
+	WATCH_OBJECT("bots/performance/clientTickMaxBatchMicros", this, &Bots::clientTickMaxBatchMicros);
+	WATCH_OBJECT("bots/performance/clientTickBudgetExhaustions", this, &Bots::clientTickBudgetExhaustions);
+	WATCH_OBJECT("bots/performance/clientTickCompletedRounds", this, &Bots::clientTickCompletedRounds);
+	WATCH_OBJECT("bots/performance/clientTickOverdueGameTicks", this, &Bots::clientTickOverdueGameTicks);
 	// 复用网络层无锁累计计数；压测控制器在进程外计算速率，热路径不增加统计开销。
 	// Reuse lock-free network totals; the controller derives rates out of process with no hot-path cost.
 	WATCH_OBJECT("bots/performance/numPacketsSent", Network::g_numPacketsSent);
@@ -355,6 +368,12 @@ bool Bots::initializeBegin()
 
 	gameTimer_ = this->dispatcher().addTimer(1000000 / g_kbeSrvConfig.gameUpdateHertz(), this,
 							reinterpret_cast<void *>(TIMEOUT_GAME_TICK));
+	// 常驻 Task 每个 dispatcher 周期只运行一个有界批次。与高频 Timer 相比，它不会在
+	// IOCP 拥塞时因 Timer 迟到而丢失吞吐，同时每批之后仍必然推进系统 Timer 和网络轮询。
+	// A persistent task runs one bounded batch per dispatcher cycle. Unlike a high-frequency
+	// timer it does not lose throughput when IOCP delays timers, while timers and network IO
+	// still receive an execution opportunity after every batch.
+	this->dispatcher().addTask(this);
 
 	// Bots 不继承 EntityApp/PythonApp，必须在自身生命周期显式安装 asyncio dispatcher timer。
 	// Bots does not inherit EntityApp or PythonApp, so it must install the asyncio dispatcher timer in its own lifecycle.
@@ -410,6 +429,9 @@ bool Bots::initializeEnd()
 //-------------------------------------------------------------------------------------
 void Bots::finalise()
 {
+	clientTickActive_ = false;
+	this->dispatcher().cancelTask(this);
+
 	// 结束通知脚本
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 
 										const_cast<char*>("onFinish"),
@@ -585,39 +607,80 @@ void Bots::onChannelTimeOut(Network::Channel* pChannel)
 //-------------------------------------------------------------------------------------
 void Bots::handleGameTick()
 {
-	const uint64 botsTickStart = timestamp();
 	// time_t t = ::time(NULL);
 	// static int kbeTime = 0;
 	// DEBUG_MSG(fmt::format("Bots::handleGameTick[{}]:{}\n", t, ++kbeTime));
 
 	ClientApp::handleGameTick();
 
-	pEventPoller_->processPendingEvents(0.0);
-
+	// 上一轮尚未完成时不重置游标；这保留公平顺序并显式暴露容量不足，
+	// 而不是反复从 map 头部开始导致尾部客户端永久饥饿。
+	// Keep the cursor when the previous round is incomplete so tail clients cannot starve.
+	if (!clientTickActive_)
 	{
-		AUTO_SCOPED_PROFILE("updateBots");
+		clientTickIter_ = clients_.begin();
+		clientTickStartStamps_ = timestamp();
+		clientTickActive_ = clientTickIter_ != clients_.end();
+	}
+	else
+	{
+		++clientTickOverdueGameTicks_;
+	}
+}
 
-		CLIENTS::iterator iter = clients().begin();
-		for(;iter != clients().end();)
+//-------------------------------------------------------------------------------------
+bool Bots::process()
+{
+	processClientTickBatch();
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
+void Bots::processClientTickBatch()
+{
+	if (!clientTickActive_)
+		return;
+
+	AUTO_SCOPED_PROFILE("updateBotsBatch");
+	const uint64 batchStart = timestamp();
+	uint32 processed = 0;
+	const uint64 budgetStamps = static_cast<uint64>(
+		static_cast<double>(clientTickBudgetMicros()) * stampsPerSecondD() / 1000000.0);
+	while (clientTickIter_ != clients_.end() && processed < clientTickBatchSize())
+	{
+		CLIENTS::iterator current = clientTickIter_++;
+		Network::Channel* pChannel = current->first;
+		ClientObject* pClientObject = current->second;
+		if (pClientObject->isDestroyed())
 		{
-			Network::Channel* pChannel = iter->first;
-			ClientObject* pClientObject = iter->second;
-			++iter;
+			delClient(pChannel);
+			continue;
+		}
 
-			if(pClientObject->isDestroyed())
-			{
-				delClient(pChannel);
-				continue;
-			}
-
-			pClientObject->gameTick();
+		pClientObject->gameTick();
+		++processed;
+		if (timestamp() - batchStart >= budgetStamps)
+		{
+			++clientTickBudgetExhaustions_;
+			break;
 		}
 	}
 
-	const uint64 elapsedStamps = timestamp() - botsTickStart;
-	lastBotsTickMicros_ = static_cast<uint64>(
-		static_cast<double>(elapsedStamps) * 1000000.0 / static_cast<double>(stampsPerSecond()));
-	maxBotsTickMicros_ = KBE_MAX(maxBotsTickMicros_, lastBotsTickMicros_);
+	const uint64 batchElapsed = timestamp() - batchStart;
+	const uint64 batchMicros = static_cast<uint64>(
+		static_cast<double>(batchElapsed) * 1000000.0 / static_cast<double>(stampsPerSecond()));
+	clientTickMaxBatchMicros_ = KBE_MAX(clientTickMaxBatchMicros_, batchMicros);
+	++clientTickBatches_;
+
+	if (clientTickIter_ == clients_.end())
+	{
+		clientTickActive_ = false;
+		++clientTickCompletedRounds_;
+		const uint64 elapsedStamps = timestamp() - clientTickStartStamps_;
+		lastBotsTickMicros_ = static_cast<uint64>(
+			static_cast<double>(elapsedStamps) * 1000000.0 / static_cast<double>(stampsPerSecond()));
+		maxBotsTickMicros_ = KBE_MAX(maxBotsTickMicros_, lastBotsTickMicros_);
+	}
 }
 
 //-------------------------------------------------------------------------------------

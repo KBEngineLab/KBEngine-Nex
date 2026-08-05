@@ -60,7 +60,7 @@ class PyBots;
 class TelnetServer;
 class BotsActiveReportHandler;
 
-class Bots  : public ClientApp
+class Bots  : public ClientApp, public Task
 {
 public:
 	Bots(Network::EventDispatcher& dispatcher, 
@@ -86,6 +86,8 @@ public:
 	virtual void handleTimeout(TimerHandle, void * pUser);
 	virtual void onChannelTimeOut(Network::Channel* pChannel);
 	virtual void handleGameTick();
+	virtual bool process();
+	void processClientTickBatch();
 
 	static Bots& getSingleton(){ 
 		return *static_cast<Bots*>(ClientApp::getSingletonPtr()); 
@@ -194,6 +196,13 @@ public:
 	uint64 totalClearedEntityGarbages() const { return totalClearedEntityGarbages_; }
 	uint64 lastBotsTickMicros() const { return lastBotsTickMicros_; }
 	uint64 maxBotsTickMicros() const { return maxBotsTickMicros_; }
+	uint32 clientTickBatchSize() const { return 64; }
+	uint32 clientTickBudgetMicros() const { return 8000; }
+	uint64 clientTickBatches() const { return clientTickBatches_; }
+	uint64 clientTickMaxBatchMicros() const { return clientTickMaxBatchMicros_; }
+	uint64 clientTickBudgetExhaustions() const { return clientTickBudgetExhaustions_; }
+	uint64 clientTickCompletedRounds() const { return clientTickCompletedRounds_; }
+	uint64 clientTickOverdueGameTicks() const { return clientTickOverdueGameTicks_; }
 	void onKcpHandshakeSucceeded() { ++totalKcpHandshakeSuccesses_; }
 	void onKcpHandshakeInvalidPacket() { ++totalKcpHandshakeInvalidPackets_; }
 	void onTcpConnected() { ++totalTcpConnections_; }
@@ -255,8 +264,6 @@ public:
 		@二进制附带数据:二进制额外数据: uint32长度 + bytearray
 	*/
 	virtual void onCreateAccountResult(Network::Channel * pChannel, MemoryStream& s);
-
-	Network::EventPoller* pEventPoller(){ return pEventPoller_; }
 
 	/** 网络接口
 	   登录失败回调
@@ -470,8 +477,6 @@ protected:
 	// 处理创建与登录的handler
 	CreateAndLoginHandler*									pCreateAndLoginHandler_;
 
-	Network::EventPoller*									pEventPoller_;
-
 	TelnetServer*											pTelnetServer_;
 
 	// 独立心跳发送器使 Bots 保持 ClientApp 职责边界，不把服务端组件生命周期逻辑混入机器人客户端循环。
@@ -490,6 +495,14 @@ protected:
 	uint64											totalClearedEntityGarbages_;
 	uint64											lastBotsTickMicros_;
 	uint64											maxBotsTickMicros_;
+	uint64											clientTickBatches_;
+	uint64											clientTickMaxBatchMicros_;
+	uint64											clientTickBudgetExhaustions_;
+	uint64											clientTickCompletedRounds_;
+	uint64											clientTickOverdueGameTicks_;
+	CLIENTS::iterator								clientTickIter_;
+	uint64											clientTickStartStamps_;
+	bool											clientTickActive_;
 
 	enum PythonLatencyOperation
 	{
