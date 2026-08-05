@@ -39,6 +39,7 @@ CMD_ID_queryWatcher = {
 	Define.INTERFACES_TYPE : 41007,
 	Define.LOGGER_TYPE     : 41008,
 	Define.BOTS_TYPE       : 41009,
+	Define.MACHINE_TYPE    : 41010,
 }
 
 class Watcher(ServerApp.ServerApp):
@@ -118,7 +119,10 @@ class Watcher(ServerApp.ServerApp):
 				elif wtype == WATCHER_VALUE_TYPE_COMPONENT_TYPE:
 					val = streamReader.readInt32()
 				else:
-					assert False, "not support!"
+					raise ValueError(
+						"unsupported watcher value type %d for %s (path=%s, id=%d)"
+						% (wtype, name, path, id)
+					)
 
 				#_w = { "fullpath" : fullpath, "id" : id, "val" : val }
 

@@ -102,6 +102,7 @@ public:
 	bool initializeBegin();
 	bool inInitialize();
 	bool initializeEnd();
+	bool initializeWatcher();
 	void finalise();
 	bool initNetwork();
 
@@ -173,6 +174,15 @@ protected:
 	// Track recently completed cluster queries so duplicate broadcasts reuse cached data without blocking the event thread again.
 	typedef std::tuple<uint32, int32, uint16> QueryRequestKey;
 	std::map<QueryRequestKey, TimeStamp> recentQueryRequests_;
+
+	// 组件发现只在 Machine 主线程更新，Watcher 读取无需锁和采样扫描。
+	// Discovery is updated only on Machine's main thread, so Watcher reads need no lock or sampling scan.
+	uint64 discoveryRequestCount_;
+	uint64 discoveryHitCount_;
+	uint64 discoveryMissCount_;
+	uint64 discoveryReplyCount_;
+	uint64 discoveryHandlerTotalMicros_;
+	uint64 discoveryHandlerMaxMicros_;
 };
 
 }

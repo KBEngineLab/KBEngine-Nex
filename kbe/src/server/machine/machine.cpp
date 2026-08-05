@@ -59,7 +59,13 @@ Machine::Machine(Network::EventDispatcher& dispatcher,
 	pEPPacketReceiver_(NULL),
 	pEBPacketReceiver_(NULL),
 	pEPLocalPacketReceiver_(NULL),
-	localuids_()
+	localuids_(),
+	discoveryRequestCount_(0),
+	discoveryHitCount_(0),
+	discoveryMissCount_(0),
+	discoveryReplyCount_(0),
+	discoveryHandlerTotalMicros_(0),
+	discoveryHandlerMaxMicros_(0)
 {
 	SystemInfo::getSingleton().getCPUPer();
 	KBEngine::Network::MessageHandlers::pMainMessageHandlers = &MachineInterface::messageHandlers;
@@ -192,7 +198,12 @@ void Machine::onFindInterfaceAddr(Network::Channel* pChannel, int32 uid, std::st
 			return;
 	}
 
-	INFO_MSG(fmt::format("Machine::onFindInterfaceAddr[{0}]: uid:{1}, username:{2}, "
+	const uint64 handlerStart = timestamp();
+	++discoveryRequestCount_;
+
+	// 启动风暴会产生大量重复发现请求；逐请求 INFO 会放大 Machine 的串行日志 IO。
+	// Startup bursts generate many duplicate discoveries; per-request INFO amplifies Machine's serialized log IO.
+	DEBUG_MSG(fmt::format("Machine::onFindInterfaceAddr[{0}]: uid:{1}, username:{2}, "
 			"componentType:{3}, componentID:{7}, find:{4}, finderaddr:{5}, finderRecvPort:{6}.\n",
 		pChannel->c_str(), uid, username.c_str(), 
 		COMPONENT_NAME_EX((COMPONENT_TYPE)componentType),
@@ -260,6 +271,7 @@ void Machine::onFindInterfaceAddr(Network::Channel* pChannel, int32 uid, std::st
 
 	if(!found)
 	{
+		++discoveryMissCount_;
 		// 如果是控制台， 且uid不是一致的则无需返回找不到消息
 		// 控制台可能广播到其他组去了
 		if(tComponentType == CONSOLE_TYPE)
@@ -276,6 +288,10 @@ void Machine::onFindInterfaceAddr(Network::Channel* pChannel, int32 uid, std::st
 		MachineInterface::onBroadcastInterfaceArgs25::staticAddToBundle((*pBundle), KBEngine::getUserUID(),
 			"", UNKNOWN_COMPONENT_TYPE, 0, componentID, -1, -1, -1, 0, 0, 0, 0, "", 0, 0.f, 0.f, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 	}
+	else
+	{
+		++discoveryHitCount_;
+	}
 
 	if(finderAddr != 0 && finderRecvPort != 0)
 	{
@@ -286,6 +302,12 @@ void Machine::onFindInterfaceAddr(Network::Channel* pChannel, int32 uid, std::st
 	{
 		pChannel->send(pBundle);
 	}
+
+	++discoveryReplyCount_;
+	const uint64 handlerMicros = static_cast<uint64>(
+		static_cast<double>(timestamp() - handlerStart) * 1000000.0 / stampsPerSecondD());
+	discoveryHandlerTotalMicros_ += handlerMicros;
+	discoveryHandlerMaxMicros_ = std::max(discoveryHandlerMaxMicros_, handlerMicros);
 }
 
 //-------------------------------------------------------------------------------------
@@ -840,9 +862,13 @@ bool Machine::run()
 	while(!this->dispatcher().hasBreakProcessing())
 	{
 		threadPool_.onMainThreadTick();
-		this->dispatcher().processOnce(false);
+		// IOCP/readiness pollers sleep until IO or the next timer and wake immediately
+		// for discovery traffic. This preserves idle CPU without imposing 100 ms latency
+		// on every startup request.
+		// IOCP/readiness poller 会等待 IO 或下一个 Timer，并在发现请求到达时立即唤醒；
+		// 既保持空闲低 CPU，也不再给每个启动请求附加 100ms 延迟。
+		this->dispatcher().processOnce(true);
 		networkInterface().processChannels(&MachineInterface::messageHandlers);
-		KBEngine::sleep(100);
 	};
 
 	return ret;
@@ -874,6 +900,18 @@ bool Machine::initializeEnd()
 {
 	pActiveTimerHandle_->cancel(); // machine不需要与其他组件保持活动状态关系
 	return true;
+}
+
+//-------------------------------------------------------------------------------------
+bool Machine::initializeWatcher()
+{
+	WATCH_OBJECT("discovery/requests", discoveryRequestCount_);
+	WATCH_OBJECT("discovery/hits", discoveryHitCount_);
+	WATCH_OBJECT("discovery/misses", discoveryMissCount_);
+	WATCH_OBJECT("discovery/replies", discoveryReplyCount_);
+	WATCH_OBJECT("discovery/handlerTotalMicros", discoveryHandlerTotalMicros_);
+	WATCH_OBJECT("discovery/handlerMaxMicros", discoveryHandlerMaxMicros_);
+	return ServerApp::initializeWatcher();
 }
 
 //-------------------------------------------------------------------------------------

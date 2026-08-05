@@ -443,6 +443,11 @@
 		<id>41009</id>
 		<descr>watcher数据查询</descr>
 	</Bots::queryWatcher>
+
+	<Machine::queryWatcher>
+		<id>41010</id>
+		<descr>watcher数据查询</descr>
+	</Machine::queryWatcher>
 	
 	<Baseappmgr::queryAppsLoads>
 		<id>50001</id>

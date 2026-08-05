@@ -502,6 +502,8 @@ def assert_python_latency_scenario() -> None:
     assert gameplay["watcher_intervals"]["BASEAPPMGR_TYPE:root/allocation"] == 5.0
     assert "CELLAPPMGR_TYPE=@cellappmgr:root/allocation" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["CELLAPPMGR_TYPE:root/allocation"] == 5.0
+    assert "MACHINE_TYPE=@machine:root/discovery" in gameplay["watcher_targets"]
+    assert gameplay["watcher_intervals"]["MACHINE_TYPE:root/discovery"] == 5.0
     assert "BASEAPP_TYPE=@baseapp:root/network/clientVolatileBackpressure" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["BASEAPP_TYPE:root/network/clientVolatileBackpressure"] == 5.0
     assert "BASEAPP_TYPE=@baseapp:root/network/clientInput" in gameplay["watcher_targets"]
@@ -548,9 +550,32 @@ def assert_python_latency_scenario() -> None:
     profile_inline = (Path(__file__).resolve().parents[2] / "lib/helper/profile.inl").read_text(encoding="utf-8")
     entity_app_source = (Path(__file__).resolve().parents[2] / "lib/server/entity_app.h").read_text(encoding="utf-8")
     server_app_source = (Path(__file__).resolve().parents[2] / "lib/server/serverapp.cpp").read_text(encoding="utf-8")
+    machine_source = (Path(__file__).resolve().parents[2] / "server/machine/machine.cpp").read_text(encoding="utf-8")
+    machine_interface_source = (
+        Path(__file__).resolve().parents[2] / "server/machine/machine_interface.h"
+    ).read_text(encoding="utf-8")
+    watcher_tool_source = (
+        Path(__file__).resolve().parents[3] / "tools/server/pycommon/Watcher.py"
+    ).read_text(encoding="utf-8")
+    fixed_messages_source = (
+        Path(__file__).resolve().parents[3] / "res/server/messages_fixed_defaults.xml"
+    ).read_text(encoding="utf-8")
     assert 'WATCH_OBJECT("timers/system/skippedIntervals"' in server_app_source
     assert 'WATCH_OBJECT("timers/script/budgetExhaustions"' in server_app_source
     assert 'WATCH_OBJECT("network/receiveWindow/condemnedChannels"' in server_app_source
+    machine_run_source = machine_source.split("bool Machine::run()", 1)[1].split(
+        "void Machine::handleTimeout", 1
+    )[0]
+    assert "processOnce(true)" in machine_run_source
+    assert "sleep(100)" not in machine_run_source
+    assert 'WATCH_OBJECT("discovery/requests"' in machine_source
+    assert 'WATCH_OBJECT("discovery/handlerMaxMicros"' in machine_source
+    assert 'WATCH_OBJECT("discovery/requests", discoveryRequestCount_)' in machine_source
+    assert 'WATCH_OBJECT("discovery/handlerMaxMicros", discoveryHandlerMaxMicros_)' in machine_source
+    assert 'WATCH_OBJECT("discovery/requests", &discoveryRequestCount_)' not in machine_source
+    assert "MACHINE_MESSAGE_DECLARE_STREAM(queryWatcher" in machine_interface_source
+    assert "Define.MACHINE_TYPE    : 41010" in watcher_tool_source
+    assert "<Machine::queryWatcher>" in fixed_messages_source
     assert 'WATCH_OBJECT("network/clientVolatileBackpressure/activeClients"' in baseapp_source
     assert 'WATCH_OBJECT("network/clientInput/staleNoCellDrops"' in baseapp_source
     assert "++staleClientInputNoCellDrops_;" in baseapp_source

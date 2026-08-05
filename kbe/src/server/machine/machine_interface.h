@@ -121,6 +121,10 @@ NETWORK_INTERFACE_DECLARE_BEGIN(MachineInterface)
 	// 请求强制杀死当前app
 	MACHINE_MESSAGE_DECLARE_STREAM(reqKillServer,					NETWORK_VARIABLE_MESSAGE)
 
+	// 请求查询 Watcher 数据，与其他 ServerApp 组件共用内部控制面协议。
+	// Query Watcher data through the same internal control-plane protocol as other ServerApp components.
+	MACHINE_MESSAGE_DECLARE_STREAM(queryWatcher,					NETWORK_VARIABLE_MESSAGE)
+
 NETWORK_INTERFACE_DECLARE_END()
 
 #ifdef DEFINE_IN_INTERFACE
