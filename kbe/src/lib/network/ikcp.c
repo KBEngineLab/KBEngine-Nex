@@ -1343,6 +1343,22 @@ IUINT32 ikcp_check(const ikcpcb *kcp, IUINT32 current)
 	IINT32 tm_flush = 0x7fffffff;
 	IINT32 tm_packet = 0x7fffffff;
 	IUINT32 minimal = 0;
+	const IUINT32 fastresend = kcp->fastresend > 0 ? (IUINT32)kcp->fastresend : 0xffffffff;
+	/*
+	 * ACKs, probes and newly queued data are explicitly scheduled by the
+	 * channel.  For a connection that only has in-flight data, the next useful
+	 * wakeup is its earliest retransmission or fast-retransmit deadline; the
+	 * periodic ts_flush tick would otherwise rescan the whole snd_buf every
+	 * 10ms.  This preserves retransmission and probe timing while removing a
+	 * large O(Channel * snd_buf / tick) idle cost at high connection density.
+	 *
+	 * ACK、探测和新发送数据都会由 Channel 显式唤醒。仅有飞行中数据的连接，
+	 * 下一次有意义的唤醒是最早重传或快速重传截止时间；继续按 ts_flush 每
+	 * 10ms 扫描整个 snd_buf 会在高连接密度下产生 O(Channel * snd_buf / tick)
+	 * 的无效开销。这里不改变重传/探测时序，只消除无效周期扫描。
+	 */
+	const int needsFlushClock = kcp->nsnd_que > 0 || kcp->ackcount > 0 ||
+		kcp->probe != 0 || kcp->rmt_wnd == 0;
 	struct IQUEUEHEAD *p;
 
 	if (kcp->updated == 0) {
@@ -1354,16 +1370,17 @@ IUINT32 ikcp_check(const ikcpcb *kcp, IUINT32 current)
 		ts_flush = current;
 	}
 
-	if (_itimediff(current, ts_flush) >= 0) {
+	if (needsFlushClock && _itimediff(current, ts_flush) >= 0) {
 		return current;
 	}
 
-	tm_flush = _itimediff(ts_flush, current);
+	if (needsFlushClock)
+		tm_flush = _itimediff(ts_flush, current);
 	if (kcp->flush_limited) {
 		/* Overdue segments intentionally remain after a bounded flush. Honor the
 		 * continuation deadline instead of busy-rescheduling before it can run.
 		 * 有界 flush 后会刻意保留逾期段；应遵守续传时刻，避免可执行前空转调度。 */
-		return current + (IUINT32)tm_flush;
+		return current + (IUINT32)_itimediff(ts_flush, current);
 	}
 
 	for (p = kcp->snd_buf.next; p != &kcp->snd_buf; p = p->next) {
@@ -1372,11 +1389,16 @@ IUINT32 ikcp_check(const ikcpcb *kcp, IUINT32 current)
 		if (diff <= 0) {
 			return current;
 		}
+		if (seg->fastack >= fastresend) {
+			return current;
+		}
 		if (diff < tm_packet) tm_packet = diff;
 	}
 
 	minimal = (IUINT32)(tm_packet < tm_flush ? tm_packet : tm_flush);
-	if (minimal >= kcp->interval) minimal = kcp->interval;
+	if (minimal == 0x7fffffff)
+		minimal = kcp->interval;
+	if (needsFlushClock && minimal >= kcp->interval) minimal = kcp->interval;
 
 	return current + minimal;
 }

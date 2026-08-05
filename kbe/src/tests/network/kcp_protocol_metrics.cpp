@@ -137,6 +137,29 @@ bool testRetransmissionCounters()
 	return ok;
 }
 
+bool testInflightCheckSkipsUnproductiveFlushTick()
+{
+	Datagrams outbound;
+	ikcpcb* kcp = ikcp_create(15, &outbound);
+	if (!require(kcp != NULL, "KCP check allocation failed"))
+		return false;
+	kcp->output = captureDatagram;
+	ikcp_nodelay(kcp, 1, 10, 2, 1);
+	const char payload[] = "check";
+	ikcp_send(kcp, payload, static_cast<int>(sizeof(payload)));
+	ikcp_update(kcp, 0);
+	IKCPSEG* segment = iqueue_entry(kcp->snd_buf.next, IKCPSEG, node);
+	segment->resendts = 50;
+	kcp->ts_flush = 10;
+	bool ok = require(ikcp_check(kcp, 10) == 50,
+		"in-flight KCP check still woke on an unproductive flush tick");
+	segment->fastack = 2;
+	ok = require(ikcp_check(kcp, 10) == 10,
+		"fast retransmit deadline was not prioritized") && ok;
+	ikcp_release(kcp);
+	return ok;
+}
+
 bool testFlushSegmentBudget()
 {
 	Datagrams outbound;
@@ -383,7 +406,8 @@ bool testThresholdHysteresis()
 
 int main()
 {
-	if (!testAckCounters() || !testRetransmissionCounters() || !testFlushSegmentBudget() ||
+	if (!testAckCounters() || !testRetransmissionCounters() ||
+		!testInflightCheckSkipsUnproductiveFlushTick() || !testFlushSegmentBudget() ||
 		!testStreamCoalescingAndPayloadAccounting() || !testTimeoutRetransmissionBudget() ||
 		!testBoundedFlushResumesWithoutHeadRescan() || !testAckAdvancesBoundedFlushCursor() ||
 		!testThresholdHysteresis())

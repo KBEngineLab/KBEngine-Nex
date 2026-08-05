@@ -221,18 +221,15 @@ def assert_watcher_connection_reuse() -> None:
         assert watcher.connect_count == 1 and watcher.clear_count == 2
         collector.close()
         assert watcher.close_count == 1
-        FakeWatcher.fail_next = True
         reconnecting = WatcherCollector(Path("."), timeout_seconds=0.1)
         try:
-            try:
-                reconnecting.query(target)
-            except OSError:
-                pass
-            else:
-                raise AssertionError("failed Watcher query must propagate")
+            assert reconnecting.query(target)["clients"] == 1
+            FakeWatcher.fail_next = True
             assert reconnecting.query(target)["clients"] == 1
             assert len(FakeWatcher.instances) == 4
             assert FakeWatcher.instances[2].close_count == 1
+            retry_stats = reconnecting.last_query_stats(target)
+            assert retry_stats is not None and not retry_stats.connection_reused
         finally:
             reconnecting.close()
     finally:
@@ -1015,6 +1012,7 @@ def main() -> int:
     ikcp_source = (
         repository_root / "kbe/src/lib/network/ikcp.c"
     ).read_text(encoding="utf-8")
+    assert "const int needsFlushClock" in ikcp_source
     assert "ikcp_advance_flush_cursor_on_remove" in ikcp_source
     assert "kcp->flush_cursor = p" in ikcp_source
     serverapp_source = (

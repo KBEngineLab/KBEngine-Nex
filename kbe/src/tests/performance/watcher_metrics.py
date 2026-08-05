@@ -498,34 +498,44 @@ class WatcherCollector:
         """
         key = (target.component_type, target.host, target.port, target.path)
         watcher, connection_reused = self._get_watcher(target)
-        try:
-            if hasattr(watcher, "clearWatchData"):
-                watcher.clearWatchData()
-            watcher.requireQueryWatcher(target.path)
-            effective_timeout = self.timeout_seconds
-            if timeout_seconds is not None:
-                effective_timeout = min(effective_timeout, max(float(timeout_seconds), 0.01))
-            deadline = time.monotonic() + effective_timeout
-            while time.monotonic() < deadline and not watcher.watchData:
-                watcher.processOne(min(0.25, max(deadline - time.monotonic(), 0.01)))
-            if not watcher.watchData:
-                raise TimeoutError(f"watcher query timed out: {target.path}")
-            values = flatten_values(watcher.watchData[0].get("values", {}))
-            self._last_stats[key] = WatcherQueryStats(
-                len(values),
-                estimate_response_bytes(watcher.watchData[0]),
-                connection_reused,
-            )
-            return values
-        except Exception:
-            # A broken socket must not poison later samples; the next query reconnects.
-            # 失效连接立即淘汰，下一次查询自动重连，避免错误状态持续污染采样。
-            self._watchers.pop(key, None)
+        effective_timeout = self.timeout_seconds
+        if timeout_seconds is not None:
+            effective_timeout = min(effective_timeout, max(float(timeout_seconds), 0.01))
+        deadline = time.monotonic() + effective_timeout
+
+        # Machine may close an idle control socket between sparse samples. Retry
+        # only a previously reused connection and only once, within the caller's
+        # original deadline, so a stale socket cannot abort an otherwise valid run.
+        # Machine 可能在稀疏采样间关闭空闲控制连接；仅对复用连接在调用方原始
+        # 截止时间内透明重连一次，既恢复采样又避免无限重试掩盖真实故障。
+        for attempt in range(2):
             try:
-                watcher.close()
-            except (AttributeError, OSError):
-                pass
-            raise
+                if hasattr(watcher, "clearWatchData"):
+                    watcher.clearWatchData()
+                watcher.requireQueryWatcher(target.path)
+                while time.monotonic() < deadline and not watcher.watchData:
+                    watcher.processOne(min(0.25, max(deadline - time.monotonic(), 0.01)))
+                if not watcher.watchData:
+                    raise TimeoutError(f"watcher query timed out: {target.path}")
+                values = flatten_values(watcher.watchData[0].get("values", {}))
+                self._last_stats[key] = WatcherQueryStats(
+                    len(values),
+                    estimate_response_bytes(watcher.watchData[0]),
+                    connection_reused,
+                )
+                return values
+            except Exception:
+                self._watchers.pop(key, None)
+                try:
+                    watcher.close()
+                except (AttributeError, OSError):
+                    pass
+                if attempt == 0 and connection_reused and time.monotonic() < deadline:
+                    watcher, connection_reused = self._get_watcher(target)
+                    continue
+                raise
+
+        raise RuntimeError("unreachable Watcher retry state")
 
     def last_query_stats(self, target: WatcherTarget) -> WatcherQueryStats | None:
         """Return metadata for the last successful target query.
