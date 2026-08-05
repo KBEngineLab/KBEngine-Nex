@@ -739,6 +739,7 @@ def assert_gameplay_stress_scenario() -> None:
     assert scenario["workload_cid_start"] == 10000
     assert "fixture" not in scenario
     assert "server_readiness" not in scenario
+    assert scenario["performance_probes_enabled"] is True
     targets = expand_component_watcher_targets(
         [parse_target(value) for value in scenario["watcher_targets"]],
         scenario["watcher_component_ids"],
@@ -772,6 +773,20 @@ def assert_gameplay_stress_scenario() -> None:
     assert cpu_sustainable["external_timeout_seconds"] == 120
     assert cpu_sustainable["reliable_udp_tick_interval_ms"] == 250
     assert cpu_sustainable["reliable_udp_min_rto_ms"] == 50
+
+    probes_off = load_scenario(scenario_path.with_name("gameplay_4000_probes_off.json"))
+    probes_on = load_scenario(scenario_path.with_name("gameplay_4000_probes_on.json"))
+    assert probes_off["bots"] == probes_on["bots"] == 4000
+    assert probes_off["workload_processes"] == probes_on["workload_processes"] == 8
+    assert probes_off["duration_seconds"] == probes_on["duration_seconds"] == 60
+    assert probes_off["performance_probes_enabled"] is False
+    assert probes_on["performance_probes_enabled"] is True
+    # A/B 场景只能改变名称和探针开关，避免拓扑或采样口径漂移污染结果。
+    # A/B scenarios may differ only by name and probe switch so topology or sampling drift cannot contaminate results.
+    for probe_scenario in (probes_off, probes_on):
+        probe_scenario.pop("name")
+        probe_scenario.pop("performance_probes_enabled")
+    assert probes_off == probes_on
 
 
 def assert_parameterized_topology_and_manager_readiness() -> None:
