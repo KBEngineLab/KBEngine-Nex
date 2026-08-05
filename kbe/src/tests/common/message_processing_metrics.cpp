@@ -41,14 +41,16 @@ bool testDeterministicSampling()
 		return false;
 	}
 
-	stats.recordSample(500000);
-	stats.recordSample(1500000);
+	stats.recordSample(500000, 41, "Client::fastMessage");
+	stats.recordSample(1500000, 42, "Client::slowMessage");
 	stats.recordSample(1000000);
 	return require(stats.calls() == 8, "call count drifted") &&
 		require(stats.sampledCalls() == 3, "sample count drifted") &&
 		require(stats.sampledTotalNanos() == 3000000, "sample duration total drifted") &&
 		require(stats.sampledAverageNanos() == 1000000, "sample duration average drifted") &&
 		require(stats.sampledMaxNanos() == 1500000, "sample duration maximum drifted") &&
+		require(stats.slowestHandlerID() == 42, "slowest handler ID drifted") &&
+		require(stats.slowestHandlerName() == "Client::slowMessage", "slowest handler name drifted") &&
 		require(stats.slowSamplesOver1ms() == 2, "slow sample count drifted") &&
 		require(stats.sampleRate() == 4, "sample rate drifted");
 }

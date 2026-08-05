@@ -59,6 +59,14 @@ namespace
 uint64 g_witnessActiveCount = 0;
 WitnessLoadMetrics g_witnessLoadMetrics;
 WitnessUpdateScheduler g_witnessUpdateScheduler;
+
+// A congested client still needs a small rotating stream of latest positions. A lower
+// byte ceiling plus a relation-count cap prevents one dirty burst from monopolizing a
+// Tick while preserving motion liveness without rebuilding stale intermediate states.
+// 拥塞客户端仍需轮转接收少量最新位置；较低字节上限配合关系条数上限，防止单次dirty洪峰
+// 独占Tick，并且只发送最新状态、不重建陈旧中间轨迹，从而兼顾移动活性与带宽。
+const size_t SUPPRESSED_VOLATILE_MAX_UPDATES_PER_TICK = 8;
+const uint32 SUPPRESSED_VOLATILE_MAX_BYTES_PER_TICK = 256;
 }
 
 //-------------------------------------------------------------------------------------
@@ -1031,16 +1039,23 @@ void Witness::removeViewEntityRef(EntityRef* pEntityRef)
 //-------------------------------------------------------------------------------------
 void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 {
-	if (!volatileUpdatesEnabled_ && structuralDirtyQueue_.size() == 0)
+	const bool volatileSuppressed = !volatileUpdatesEnabled_;
+	if (volatileSuppressed && structuralDirtyQueue_.size() == 0 && volatileDirtyQueue_.size() == 0)
 	{
-		// 没有结构事件时保持 volatile 队列静止，避免拥塞期间扫描任何普通位姿项。
-		// Keep the volatile queue stationary when no structural event exists, avoiding all normal-position scans while congested.
+		// No queued work means there is nothing useful to refresh while congested.
+		// 拥塞时若两个队列均为空，则没有值得发送的保活状态。
 		g_witnessLoadMetrics.recordSuppressedUpdateSkip();
 		return;
 	}
 
 	const EngineComponentInfo& config = g_kbeSrvConfig.getCellApp();
-	WitnessVolatileBudget volatileBudget(config.witness_volatile_bytes_per_tick);
+	uint32 volatileByteLimit = config.witness_volatile_bytes_per_tick;
+	if (volatileSuppressed &&
+		(volatileByteLimit == 0 || volatileByteLimit > SUPPRESSED_VOLATILE_MAX_BYTES_PER_TICK))
+	{
+		volatileByteLimit = SUPPRESSED_VOLATILE_MAX_BYTES_PER_TICK;
+	}
+	WitnessVolatileBudget volatileBudget(volatileByteLimit);
 	WitnessVolatileBudget sendBudget(witnessEffectiveByteLimit(
 		config.witness_total_bytes_per_tick,
 		config.witness_global_bytes_per_tick,
@@ -1115,14 +1130,10 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 			removeViewEntityRef(pEntityRef);
 	}
 
-	if (!volatileUpdatesEnabled_)
-	{
-		g_witnessLoadMetrics.recordVolatileBytes(volatileBudget.bytesSent());
-		g_witnessLoadMetrics.recordSendBytes(sendBudget.bytesSent());
-		return;
-	}
-
-	const size_t batchSize = volatileDirtyQueue_.batchSize();
+	const size_t queuedBatchSize = volatileDirtyQueue_.batchSize();
+	const size_t batchSize = volatileSuppressed
+		? KBE_MIN(queuedBatchSize, SUPPRESSED_VOLATILE_MAX_UPDATES_PER_TICK)
+		: queuedBatchSize;
 	for (size_t i = 0; i < batchSize; ++i)
 	{
 		// 总预算采用软上限：上一条完整消息达到上限后停止，绝不拆断协议消息。
@@ -1181,6 +1192,8 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 		const size_t afterBytes = static_cast<size_t>(pSendBundle->currMsgLength());
 		const uint64 encodedBytes = afterBytes > beforeBytes ? static_cast<uint64>(afterBytes - beforeBytes) : 0;
 		g_witnessLoadMetrics.recordVolatileUpdate(encodedBytes);
+		if (volatileSuppressed)
+			g_witnessLoadMetrics.recordSuppressedVolatileRefresh();
 		sendBudget.recordBundleGrowth(beforeBytes, afterBytes);
 		volatileBudget.recordBundleGrowth(beforeBytes, afterBytes);
 		g_witnessLoadMetrics.recordDirtyProcessed();
@@ -1364,6 +1377,12 @@ uint64 Witness::resumeTransitionCount()
 uint64 Witness::suppressedUpdateSkipCount()
 {
 	return g_witnessLoadMetrics.suppressedUpdateSkips();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::suppressedVolatileRefreshCount()
+{
+	return g_witnessLoadMetrics.suppressedVolatileRefreshes();
 }
 
 //-------------------------------------------------------------------------------------

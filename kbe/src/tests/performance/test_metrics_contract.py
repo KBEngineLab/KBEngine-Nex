@@ -823,6 +823,7 @@ def assert_bots_dev_and_manager_watcher_source_contract() -> None:
     source_root = _repository_root() / "kbe/src"
     bots_main = (source_root / "server/tools/bots/main.cpp").read_text(encoding="utf-8")
     bots_source = (source_root / "server/tools/bots/bots.cpp").read_text(encoding="utf-8")
+    cellapp_source = (source_root / "server/cellapp/cellapp.cpp").read_text(encoding="utf-8")
     components_source = (source_root / "lib/server/components.cpp").read_text(encoding="utf-8")
     assert 'std::string(argv[index]) == "--dev"' in bots_main
     assert 'std::string(argv[index]) == "--reuse-existing-accounts"' in bots_main
@@ -841,6 +842,18 @@ def assert_bots_dev_and_manager_watcher_source_contract() -> None:
         "clientTickBudgetExhaustions",
         "clientTickCompletedRounds",
         "clientTickOverdueGameTicks",
+    ):
+        assert f'WATCH_OBJECT("bots/performance/{watcher_path}"' in bots_source
+    assert 'std::string("bots/performance/messageProcessing_")' in bots_source
+    assert "clientTimerSampledMaxNanos" in bots_source
+    assert "clientMovementSyncSampledMaxNanos" in bots_source
+    assert "SlowestHandlerName" in bots_source
+    assert "suppressedVolatileRefreshes" in cellapp_source
+    for watcher_path in (
+        "kcpReceiveDrainCalls",
+        "kcpReceiveDrainedPackets",
+        "kcpReceiveBudgetYields",
+        "kcpReceivePendingSegmentsPeak",
     ):
         assert f'WATCH_OBJECT("bots/performance/{watcher_path}"' in bots_source
     network_index = bots_source.index("DebugHelper::getSingleton().pNetworkInterface(&networkInterface())")

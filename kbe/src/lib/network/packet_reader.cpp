@@ -32,6 +32,8 @@ public:
 	explicit ScopedMessageProcessingSample(KBEngine::Network::MessageHandler& handler) :
 		metrics_(KBEngine::Network::MessageHandlers::processingMetrics()),
 		category_(handler.processingCategory),
+		handlerID_(handler.msgID),
+		handlerName_(handler.name),
 		sampled_(metrics_.beginCall(category_)),
 		started_(sampled_ ? KBEngine::timestamp() : 0)
 	{
@@ -45,12 +47,14 @@ public:
 		const std::uint64_t elapsed = KBEngine::timestamp() - started_;
 		const std::uint64_t nanos = static_cast<std::uint64_t>(
 			static_cast<double>(elapsed) * 1000000000.0 / KBEngine::stampsPerSecondD());
-		metrics_.recordSample(category_, nanos);
+		metrics_.recordSample(category_, nanos, handlerID_, handlerName_);
 	}
 
 private:
 	KBEngine::Network::MessageProcessingMetrics& metrics_;
 	KBEngine::Network::MessageProcessingCategory category_;
+	KBEngine::Network::MessageID handlerID_;
+	const std::string& handlerName_;
 	bool sampled_;
 	std::uint64_t started_;
 };

@@ -164,6 +164,7 @@ public:
 		}
 	}
 	void recordSuppressedUpdateSkip() { ++suppressedUpdateSkips_; }
+	void recordSuppressedVolatileRefresh() { ++suppressedVolatileRefreshes_; }
 	void recordStructuralWhileSuppressed() { ++structuralWhileSuppressed_; }
 	void recordBundle(std::size_t bytes)
 	{
@@ -212,6 +213,7 @@ public:
 	std::uint64_t suppressionTransitions() const { return suppressionTransitions_; }
 	std::uint64_t resumeTransitions() const { return resumeTransitions_; }
 	std::uint64_t suppressedUpdateSkips() const { return suppressedUpdateSkips_; }
+	std::uint64_t suppressedVolatileRefreshes() const { return suppressedVolatileRefreshes_; }
 	std::uint64_t structuralWhileSuppressed() const { return structuralWhileSuppressed_; }
 	std::uint64_t bundlesSent() const { return bundlesSent_; }
 	std::uint64_t maxBundleBytes() const { return maxBundleBytes_; }
@@ -257,6 +259,7 @@ private:
 	std::uint64_t suppressionTransitions_ = 0;
 	std::uint64_t resumeTransitions_ = 0;
 	std::uint64_t suppressedUpdateSkips_ = 0;
+	std::uint64_t suppressedVolatileRefreshes_ = 0;
 	std::uint64_t structuralWhileSuppressed_ = 0;
 	std::uint64_t bundlesSent_ = 0;
 	std::uint64_t maxBundleBytes_ = 0;

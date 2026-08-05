@@ -108,10 +108,12 @@ bool testVolatileBackpressureAccounting()
 	KBEngine::WitnessLoadMetrics metrics;
 	metrics.recordVolatileSuppression(true);
 	metrics.recordSuppressedUpdateSkip();
+	metrics.recordSuppressedVolatileRefresh();
 	metrics.recordStructuralWhileSuppressed();
 	if (!require(metrics.activeSuppressed() == 1, "active suppression count was not maintained") ||
 		!require(metrics.suppressionTransitions() == 1, "suppression transition was not attributed") ||
 		!require(metrics.suppressedUpdateSkips() == 1, "suppressed update skip was not attributed") ||
+		!require(metrics.suppressedVolatileRefreshes() == 1, "suppressed volatile refresh was not attributed") ||
 		!require(metrics.structuralWhileSuppressed() == 1, "structural bypass was not attributed"))
 	{
 		return false;

@@ -196,7 +196,10 @@ public:
 	uint64 totalClearedEntityGarbages() const { return totalClearedEntityGarbages_; }
 	uint64 lastBotsTickMicros() const { return lastBotsTickMicros_; }
 	uint64 maxBotsTickMicros() const { return maxBotsTickMicros_; }
-	uint32 clientTickBatchSize() const { return 64; }
+	// The time budget is the primary fairness boundary. A wider count ceiling lets cheap
+	// clients use the remaining slice instead of waiting for another IOCP/KCP loop.
+	// 时间预算是主要公平边界；放宽数量上限可让低开销客户端利用剩余切片，避免再等一轮IOCP/KCP。
+	uint32 clientTickBatchSize() const { return 256; }
 	uint32 clientTickBudgetMicros() const { return 8000; }
 	uint64 clientTickBatches() const { return clientTickBatches_; }
 	uint64 clientTickMaxBatchMicros() const { return clientTickMaxBatchMicros_; }

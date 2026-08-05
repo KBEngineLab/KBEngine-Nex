@@ -57,6 +57,21 @@ SCRIPT_INIT(ClientObjectBase, 0, 0, 0, 0, 0)
 
 static int32 g_appID = 1;
 
+ClientTickStageMetrics& clientTickTimerMetrics()
+{
+	// Timer processing executes Python movement callbacks, so sample more frequently than
+	// the mostly arithmetic movement-sync stage while keeping timestamp reads bounded.
+	// Timer阶段会执行Python移动回调，因此比纯算术为主的位移同步阶段更密集采样。
+	static ClientTickStageMetrics metrics(16);
+	return metrics;
+}
+
+ClientTickStageMetrics& clientTickMovementSyncMetrics()
+{
+	static ClientTickStageMetrics metrics(64);
+	return metrics;
+}
+
 //-------------------------------------------------------------------------------------
 ClientObjectBase::ClientObjectBase(Network::NetworkInterface& ninterface, PyTypeObject* pyType):
 ScriptObject(pyType != NULL ? pyType : getScriptType(), false),
@@ -231,7 +246,16 @@ void ClientObjectBase::onServerClosed()
 //-------------------------------------------------------------------------------------
 void ClientObjectBase::tickSend()
 {
+	ClientTickStageMetrics& timerMetrics = clientTickTimerMetrics();
+	const bool sampleTimers = g_componentType == BOTS_TYPE && timerMetrics.beginCall();
+	const uint64 timerStarted = sampleTimers ? timestamp() : 0;
 	handleTimers();
+	if (sampleTimers)
+	{
+		const uint64 elapsed = timestamp() - timerStarted;
+		timerMetrics.recordSample(static_cast<uint64>(
+			static_cast<double>(elapsed) * 1000000000.0 / stampsPerSecondD()));
+	}
 
 	if(!pServerChannel_ || !pServerChannel_->pEndPoint())
 		return;
@@ -261,7 +285,16 @@ void ClientObjectBase::tickSend()
 		pServerChannel_->send(pBundle);
 	}
 
+	ClientTickStageMetrics& movementMetrics = clientTickMovementSyncMetrics();
+	const bool sampleMovement = g_componentType == BOTS_TYPE && movementMetrics.beginCall();
+	const uint64 movementStarted = sampleMovement ? timestamp() : 0;
 	updatePlayerToServer();
+	if (sampleMovement)
+	{
+		const uint64 elapsed = timestamp() - movementStarted;
+		movementMetrics.recordSample(static_cast<uint64>(
+			static_cast<double>(elapsed) * 1000000000.0 / stampsPerSecondD()));
+	}
 }
 
 //-------------------------------------------------------------------------------------	

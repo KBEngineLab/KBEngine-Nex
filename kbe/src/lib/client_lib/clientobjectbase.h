@@ -43,6 +43,58 @@ class Entity;
 
 class EntityCall;
 
+/**
+ * Low-overhead sampled timing for Bots client-side Tick stages.
+ * Bots客户端Tick阶段的低开销采样计时，用于区分脚本Timer饥饿与网络发送拥塞。
+ */
+class ClientTickStageMetrics
+{
+public:
+	explicit ClientTickStageMetrics(uint32 sampleRate) :
+		calls_(0), sampledCalls_(0), sampledTotalNanos_(0), sampledMaxNanos_(0),
+		slowSamplesOver1ms_(0), sampleRate_(sampleRate)
+	{
+		KBE_ASSERT(sampleRate_ > 0);
+	}
+
+	bool beginCall()
+	{
+		++calls_;
+		return calls_ == 1 || calls_ % sampleRate_ == 0;
+	}
+
+	void recordSample(uint64 durationNanos)
+	{
+		++sampledCalls_;
+		sampledTotalNanos_ += durationNanos;
+		sampledMaxNanos_ = KBE_MAX(sampledMaxNanos_, durationNanos);
+		if (durationNanos >= 1000000)
+			++slowSamplesOver1ms_;
+	}
+
+	uint64 calls() const { return calls_; }
+	uint64 sampledCalls() const { return sampledCalls_; }
+	uint64 sampledTotalNanos() const { return sampledTotalNanos_; }
+	uint64 sampledMaxNanos() const { return sampledMaxNanos_; }
+	uint64 slowSamplesOver1ms() const { return slowSamplesOver1ms_; }
+	uint32 sampleRate() const { return sampleRate_; }
+	uint64 sampledAverageNanos() const
+	{
+		return sampledCalls_ == 0 ? 0 : sampledTotalNanos_ / sampledCalls_;
+	}
+
+private:
+	uint64 calls_;
+	uint64 sampledCalls_;
+	uint64 sampledTotalNanos_;
+	uint64 sampledMaxNanos_;
+	uint64 slowSamplesOver1ms_;
+	uint32 sampleRate_;
+};
+
+ClientTickStageMetrics& clientTickTimerMetrics();
+ClientTickStageMetrics& clientTickMovementSyncMetrics();
+
 namespace Network
 {
 class Channel;

@@ -31,7 +31,9 @@ public:
 		sampledTotalNanos_(0),
 		sampledMaxNanos_(0),
 		slowSamplesOver1ms_(0),
-		sampleRate_(sampleRate)
+		sampleRate_(sampleRate),
+		slowestHandlerID_(0),
+		slowestHandlerName_()
 	{
 		assert(sampleRate_ > 0);
 	}
@@ -44,14 +46,26 @@ public:
 		return calls_ == 1 || calls_ % sampleRate_ == 0;
 	}
 
-	void recordSample(std::uint64_t durationNanos)
+	void recordSample(std::uint64_t durationNanos, std::uint16_t handlerID,
+		const std::string& handlerName)
 	{
 		++sampledCalls_;
 		sampledTotalNanos_ += durationNanos;
 		if (durationNanos > sampledMaxNanos_)
+		{
 			sampledMaxNanos_ = durationNanos;
+			slowestHandlerID_ = handlerID;
+			// Only a new maximum copies the name, keeping the sampled hot path allocation-free.
+			// 仅刷新历史最大值时复制名称，确保采样热路径不会持续分配字符串。
+			slowestHandlerName_ = handlerName;
+		}
 		if (durationNanos >= 1000000)
 			++slowSamplesOver1ms_;
+	}
+
+	void recordSample(std::uint64_t durationNanos)
+	{
+		recordSample(durationNanos, 0, std::string());
 	}
 
 	std::uint64_t calls() const { return calls_; }
@@ -60,6 +74,8 @@ public:
 	std::uint64_t sampledMaxNanos() const { return sampledMaxNanos_; }
 	std::uint64_t slowSamplesOver1ms() const { return slowSamplesOver1ms_; }
 	std::uint32_t sampleRate() const { return sampleRate_; }
+	std::uint16_t slowestHandlerID() const { return slowestHandlerID_; }
+	const std::string& slowestHandlerName() const { return slowestHandlerName_; }
 	std::uint64_t sampledAverageNanos() const
 	{
 		return sampledCalls_ == 0 ? 0 : sampledTotalNanos_ / sampledCalls_;
@@ -72,6 +88,8 @@ private:
 	std::uint64_t sampledMaxNanos_;
 	std::uint64_t slowSamplesOver1ms_;
 	std::uint32_t sampleRate_;
+	std::uint16_t slowestHandlerID_;
+	std::string slowestHandlerName_;
 };
 
 /**
@@ -128,6 +146,12 @@ public:
 	void recordSample(MessageProcessingCategory category, std::uint64_t durationNanos)
 	{
 		stats(category).recordSample(durationNanos);
+	}
+
+	void recordSample(MessageProcessingCategory category, std::uint64_t durationNanos,
+		std::uint16_t handlerID, const std::string& handlerName)
+	{
+		stats(category).recordSample(durationNanos, handlerID, handlerName);
 	}
 
 	MessageProcessingCategoryStats& stats(MessageProcessingCategory category)

@@ -254,6 +254,7 @@ public:
 	static uint64 suppressionTransitionCount();
 	static uint64 resumeTransitionCount();
 	static uint64 suppressedUpdateSkipCount();
+	static uint64 suppressedVolatileRefreshCount();
 	static uint64 structuralWhileSuppressedCount();
 	static uint64 bundlesSentCount();
 	static uint64 maxBundleBytes();

@@ -379,6 +379,7 @@ bool Cellapp::initializeWatcher()
 	WATCH_OBJECT("network/clientInput/staleEntityDrops", this, &Cellapp::staleClientInputEntityDrops);
 	WATCH_OBJECT("network/clientInput/staleControlledEntityDrops", this, &Cellapp::staleControlledClientInputEntityDrops);
 	WATCH_OBJECT("witness/backpressure/suppressedUpdateSkips", &Witness::suppressedUpdateSkipCount);
+	WATCH_OBJECT("witness/backpressure/suppressedVolatileRefreshes", &Witness::suppressedVolatileRefreshCount);
 	WATCH_OBJECT("witness/backpressure/structuralWhileSuppressed", &Witness::structuralWhileSuppressedCount);
 	WATCH_OBJECT("witness/bundlesSent", &Witness::bundlesSentCount);
 	WATCH_OBJECT("witness/maxBundleBytes", &Witness::maxBundleBytes);

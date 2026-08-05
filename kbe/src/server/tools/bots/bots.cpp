@@ -251,6 +251,20 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/clientTickBudgetExhaustions", this, &Bots::clientTickBudgetExhaustions);
 	WATCH_OBJECT("bots/performance/clientTickCompletedRounds", this, &Bots::clientTickCompletedRounds);
 	WATCH_OBJECT("bots/performance/clientTickOverdueGameTicks", this, &Bots::clientTickOverdueGameTicks);
+	ClientTickStageMetrics& timerMetrics = clientTickTimerMetrics();
+	WATCH_OBJECT("bots/performance/clientTimerCalls", &timerMetrics, &ClientTickStageMetrics::calls);
+	WATCH_OBJECT("bots/performance/clientTimerSampledCalls", &timerMetrics, &ClientTickStageMetrics::sampledCalls);
+	WATCH_OBJECT("bots/performance/clientTimerSampleRate", &timerMetrics, &ClientTickStageMetrics::sampleRate);
+	WATCH_OBJECT("bots/performance/clientTimerSampledAverageNanos", &timerMetrics, &ClientTickStageMetrics::sampledAverageNanos);
+	WATCH_OBJECT("bots/performance/clientTimerSampledMaxNanos", &timerMetrics, &ClientTickStageMetrics::sampledMaxNanos);
+	WATCH_OBJECT("bots/performance/clientTimerSlowSamplesOver1ms", &timerMetrics, &ClientTickStageMetrics::slowSamplesOver1ms);
+	ClientTickStageMetrics& movementMetrics = clientTickMovementSyncMetrics();
+	WATCH_OBJECT("bots/performance/clientMovementSyncCalls", &movementMetrics, &ClientTickStageMetrics::calls);
+	WATCH_OBJECT("bots/performance/clientMovementSyncSampledCalls", &movementMetrics, &ClientTickStageMetrics::sampledCalls);
+	WATCH_OBJECT("bots/performance/clientMovementSyncSampleRate", &movementMetrics, &ClientTickStageMetrics::sampleRate);
+	WATCH_OBJECT("bots/performance/clientMovementSyncSampledAverageNanos", &movementMetrics, &ClientTickStageMetrics::sampledAverageNanos);
+	WATCH_OBJECT("bots/performance/clientMovementSyncSampledMaxNanos", &movementMetrics, &ClientTickStageMetrics::sampledMaxNanos);
+	WATCH_OBJECT("bots/performance/clientMovementSyncSlowSamplesOver1ms", &movementMetrics, &ClientTickStageMetrics::slowSamplesOver1ms);
 	// 复用网络层无锁累计计数；压测控制器在进程外计算速率，热路径不增加统计开销。
 	// Reuse lock-free network totals; the controller derives rates out of process with no hot-path cost.
 	WATCH_OBJECT("bots/performance/numPacketsSent", Network::g_numPacketsSent);
@@ -275,6 +289,31 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/discardedPacketsAfterClose", &networkInterface(), &Network::NetworkInterface::discardedPacketsAfterCloseCount);
 	WATCH_OBJECT("bots/performance/contextsOutstandingBytes", &networkInterface(), &Network::NetworkInterface::pollerContextsOutstandingBytes);
 	WATCH_OBJECT("bots/performance/contextsCachedBytes", &networkInterface(), &Network::NetworkInterface::pollerContextsCachedBytes);
+	// Bots 与服务端共用消息处理分类计数。只注册现有采样统计，Watcher 查询不会扫描
+	// ClientObject 或 Channel，可直接定位单个 KCP 重组包中的应用 handler 长尾。
+	// Bots shares the server message-category counters. Registering the existing samples
+	// does not scan ClientObjects or Channels and exposes handler latency inside KCP packets.
+	Network::MessageProcessingMetrics& messageMetrics = Network::MessageHandlers::processingMetrics();
+	for (int categoryValue = 0;
+		categoryValue < Network::MESSAGE_PROCESSING_CATEGORY_COUNT; ++categoryValue)
+	{
+		const Network::MessageProcessingCategory category =
+			static_cast<Network::MessageProcessingCategory>(categoryValue);
+		Network::MessageProcessingCategoryStats* pStats = &messageMetrics.stats(category);
+		// Bots performance 由 runner 读取单层目录，分类名必须保持为直属叶子。
+		// The runner reads one Bots performance directory level, so categories stay flat leaves.
+		const std::string prefix = std::string("bots/performance/messageProcessing_") +
+			Network::MessageProcessingMetrics::categoryName(category);
+		WATCH_OBJECT(prefix + "Calls", pStats, &Network::MessageProcessingCategoryStats::calls);
+		WATCH_OBJECT(prefix + "SampledCalls", pStats, &Network::MessageProcessingCategoryStats::sampledCalls);
+		WATCH_OBJECT(prefix + "SampleRate", pStats, &Network::MessageProcessingCategoryStats::sampleRate);
+		WATCH_OBJECT(prefix + "SampledTotalNanos", pStats, &Network::MessageProcessingCategoryStats::sampledTotalNanos);
+		WATCH_OBJECT(prefix + "SampledAverageNanos", pStats, &Network::MessageProcessingCategoryStats::sampledAverageNanos);
+		WATCH_OBJECT(prefix + "SampledMaxNanos", pStats, &Network::MessageProcessingCategoryStats::sampledMaxNanos);
+		WATCH_OBJECT(prefix + "SlowSamplesOver1ms", pStats, &Network::MessageProcessingCategoryStats::slowSamplesOver1ms);
+		WATCH_OBJECT(prefix + "SlowestHandlerID", pStats, &Network::MessageProcessingCategoryStats::slowestHandlerID);
+		WATCH_OBJECT(prefix + "SlowestHandlerName", pStats, &Network::MessageProcessingCategoryStats::slowestHandlerName);
+	}
 	// KCP 调度与队列指标用于区分空闲定时维护开销和真实业务流量，避免仅凭进程 CPU 猜测热点。
 	// KCP scheduler and queue metrics distinguish idle maintenance cost from real traffic instead of inferring hotspots from process CPU alone.
 	WATCH_OBJECT("bots/performance/kcpScheduledChannels", &networkInterface(), &Network::NetworkInterface::kcpScheduledChannelCount);
@@ -311,6 +350,10 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/kcpInputTruncatedSegments", &networkInterface(), &Network::NetworkInterface::kcpInputTruncatedSegmentCount);
 	WATCH_OBJECT("bots/performance/kcpInputInvalidCommands", &networkInterface(), &Network::NetworkInterface::kcpInputInvalidCommandCount);
 	WATCH_OBJECT("bots/performance/kcpInputOtherErrors", &networkInterface(), &Network::NetworkInterface::kcpInputOtherErrorCount);
+	WATCH_OBJECT("bots/performance/kcpReceiveDrainCalls", &networkInterface(), &Network::NetworkInterface::kcpReceiveDrainCallCount);
+	WATCH_OBJECT("bots/performance/kcpReceiveDrainedPackets", &networkInterface(), &Network::NetworkInterface::kcpReceiveDrainedPacketCount);
+	WATCH_OBJECT("bots/performance/kcpReceiveBudgetYields", &networkInterface(), &Network::NetworkInterface::kcpReceiveBudgetYieldCount);
+	WATCH_OBJECT("bots/performance/kcpReceivePendingSegmentsPeak", &networkInterface(), &Network::NetworkInterface::kcpReceivePendingSegmentsPeak);
 	WATCH_OBJECT("bots/performance/kcpFixedAllocatedBytes", this, &Bots::kcpFixedAllocatedBytes);
 	WATCH_OBJECT("bots/performance/kcpDynamicAllocatedBytes", this, &Bots::kcpDynamicAllocatedBytes);
 	WATCH_OBJECT("bots/performance/clientEntities", this, &Bots::numClientEntities);
