@@ -38,6 +38,14 @@ typedef std::vector<EntityPtr> SPACE_ENTITIES;
 class Space
 {
 public:
+	enum VIEWER_BOUNDS_SOURCE
+	{
+		VIEWER_BOUNDS_DEFAULT = 0,
+		VIEWER_BOUNDS_EXPLICIT = 1,
+		VIEWER_BOUNDS_NAVIGATION = 2,
+		VIEWER_BOUNDS_OBSERVED_ENTITIES = 3
+	};
+
 	Space(SPACE_ID spaceID, const std::string& scriptModuleName);
 	~Space();
 
@@ -92,6 +100,9 @@ public:
 	bool addSpaceGeometryMapping(std::string respath, bool shouldLoadOnServer, const std::map< int, std::string >& params);
 	static PyObject* __py_GetSpaceGeometryMapping(PyObject* self, PyObject* args);
 	const std::string& getGeometryPath();
+	const std::string& getScriptModuleName() const { return scriptModuleName_; }
+	bool getViewerBounds(float& minimumX, float& minimumZ, float& maximumX, float& maximumZ,
+		VIEWER_BOUNDS_SOURCE& source) const;
 	void setGeometryPath(const std::string& path);
 	void onLoadedSpaceGeometryMapping(const std::string& resPath, uint64 loadGeneration, NavigationHandlePtr pNavHandle);
 	void onAllSpaceGeometryLoaded();
@@ -153,6 +164,12 @@ protected:
 	// The generation rejects late asynchronous results after path changes; the loading flag prevents duplicates and lets movement wait.
 	uint64						geometryLoadGeneration_;
 	bool						isGeometryLoading_;
+
+	bool					hasNavigationBounds_;
+	float					navigationMinimumX_;
+	float					navigationMinimumZ_;
+	float					navigationMaximumX_;
+	float					navigationMaximumZ_;
 
 	// spaceData, 只能存储字符串资源， 这样能比较好的兼容客户端。
 	// 开发者可以将其他类型转换成字符串进行传输

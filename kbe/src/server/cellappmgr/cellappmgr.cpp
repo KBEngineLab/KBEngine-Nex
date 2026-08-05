@@ -866,6 +866,58 @@ void Cellappmgr::queryAppsLoads(Network::Channel* pChannel, MemoryStream& s)
 //-------------------------------------------------------------------------------------
 void Cellappmgr::querySpaces(Network::Channel* pChannel, MemoryStream& s)
 {
+	const uint32 viewerV2Magic = 0x3253584E;
+	if (s.length() >= sizeof(uint32) + sizeof(uint16))
+	{
+		const size_t initialReadPosition = s.rpos();
+		uint32 magic = 0;
+		uint16 version = 0;
+		s >> magic >> version;
+		if (magic == viewerV2Magic)
+		{
+			if (version != 2)
+			{
+				WARNING_MSG(fmt::format("Cellappmgr::querySpaces: unsupported viewer version {}.\n", version));
+				return;
+			}
+
+			Network::Bundle* v2Bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+			ConsoleInterface::ConsoleQuerySpacesHandler v2Handler;
+			(*v2Bundle).newMessage(v2Handler);
+			(*v2Bundle) << g_componentType << g_componentID << (int32)0;
+			(*v2Bundle) << viewerV2Magic << (uint16)2 << (uint8)1;
+
+			uint32 spaceCount = 0;
+			for (std::map< COMPONENT_ID, Cellapp >::iterator cellIter = cellapps_.begin();
+				cellIter != cellapps_.end(); ++cellIter)
+			{
+				spaceCount += (uint32)cellIter->second.spaces().size();
+			}
+			(*v2Bundle) << spaceCount;
+
+			for (std::map< COMPONENT_ID, Cellapp >::iterator cellIter = cellapps_.begin();
+				cellIter != cellapps_.end(); ++cellIter)
+			{
+				std::map<SPACE_ID, Space>& spaces = cellIter->second.spaces().spaces();
+				for (std::map<SPACE_ID, Space>::iterator spaceIter = spaces.begin();
+					spaceIter != spaces.end(); ++spaceIter)
+				{
+					Space& space = spaceIter->second;
+					(*v2Bundle) << (uint64)cellIter->first << (uint32)space.id();
+					(*v2Bundle) << space.getGeomappingPath() << space.getScriptModuleName();
+					(*v2Bundle) << (uint32)0;
+					(*v2Bundle) << -50.f << -50.f << 50.f << 50.f << (uint8)0;
+					(*v2Bundle) << (int64)0;
+				}
+			}
+
+			pChannel->send(v2Bundle);
+			return;
+		}
+
+		s.rpos(initialReadPosition);
+	}
+
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	ConsoleInterface::ConsoleQuerySpacesHandler msgHandler;
 	(*pBundle).newMessage(msgHandler);

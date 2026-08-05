@@ -29,6 +29,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/network_stats.h"
 #include "server/script_stage_timing.h"
 
+#include <sstream>
+
 #include "../../server/baseappmgr/baseappmgr_interface.h"
 #include "../../server/cellappmgr/cellappmgr_interface.h"
 #include "../../server/baseapp/baseapp_interface.h"
@@ -48,6 +50,11 @@ coordinateSystem_(),
 pNavHandle_(),
 geometryLoadGeneration_(0),
 isGeometryLoading_(false),
+hasNavigationBounds_(false),
+navigationMinimumX_(0.f),
+navigationMinimumZ_(0.f),
+navigationMaximumX_(0.f),
+navigationMaximumZ_(0.f),
 state_(STATE_NORMAL),
 destroyTime_(0)
 {
@@ -283,6 +290,7 @@ bool Space::addSpaceGeometryMapping(std::string respath, bool shouldLoadOnServer
 	++geometryLoadGeneration_;
 	isGeometryLoading_ = false;
 	pNavHandle_.clear();
+	hasNavigationBounds_ = false;
 	setGeometryPath(respath);
 
 	if(shouldLoadOnServer)
@@ -335,6 +343,8 @@ void Space::onLoadedSpaceGeometryMapping(const std::string& resPath, uint64 load
 	KBE_ASSERT(isGeometryLoadCurrent(resPath, loadGeneration));
 	isGeometryLoading_ = false;
 	pNavHandle_ = pNavHandle;
+	hasNavigationBounds_ = pNavHandle_ && pNavHandle_->getBounds(
+		navigationMinimumX_, navigationMinimumZ_, navigationMaximumX_, navigationMaximumZ_);
 	INFO_MSG(fmt::format("KBEngine::onLoadedSpaceGeometryMapping: spaceID={}, respath={}!\n",
 			id(), getGeometryPath()));
 
@@ -651,6 +661,81 @@ void Space::setGeometryPath(const std::string& path)
 const std::string& Space::getGeometryPath()
 { 
 	return getSpaceData("_mapping"); 
+}
+
+//-------------------------------------------------------------------------------------
+bool Space::getViewerBounds(float& minimumX, float& minimumZ, float& maximumX, float& maximumZ,
+	VIEWER_BOUNDS_SOURCE& source) const
+{
+	// Scripts may provide exact bounds through KBEngine.setSpaceData(spaceID, "_viewer_bounds", "minX,minZ,maxX,maxZ").
+	// 脚本可通过该保留 SpaceData 键提供精确范围，避免无 NavMesh 场景被误标为地图边界。
+	SPACE_DATA::const_iterator explicitIter = datas_.find("_viewer_bounds");
+	if (explicitIter != datas_.end())
+	{
+		std::string normalized = explicitIter->second;
+		std::replace(normalized.begin(), normalized.end(), ',', ' ');
+		std::istringstream parser(normalized);
+		if ((parser >> minimumX >> minimumZ >> maximumX >> maximumZ) &&
+			maximumX > minimumX && maximumZ > minimumZ)
+		{
+			source = VIEWER_BOUNDS_EXPLICIT;
+			return true;
+		}
+	}
+
+	if (hasNavigationBounds_)
+	{
+		minimumX = navigationMinimumX_;
+		minimumZ = navigationMinimumZ_;
+		maximumX = navigationMaximumX_;
+		maximumZ = navigationMaximumZ_;
+		source = VIEWER_BOUNDS_NAVIGATION;
+		return true;
+	}
+
+	bool foundEntity = false;
+	for (SPACE_ENTITIES::const_iterator iter = entities_.begin(); iter != entities_.end(); ++iter)
+	{
+		Entity* entity = iter->get();
+		if (entity == NULL || !std::isfinite(entity->position().x) || !std::isfinite(entity->position().z))
+			continue;
+
+		if (!foundEntity)
+		{
+			minimumX = maximumX = entity->position().x;
+			minimumZ = maximumZ = entity->position().z;
+			foundEntity = true;
+		}
+		else
+		{
+			minimumX = std::min(minimumX, entity->position().x);
+			minimumZ = std::min(minimumZ, entity->position().z);
+			maximumX = std::max(maximumX, entity->position().x);
+			maximumZ = std::max(maximumZ, entity->position().z);
+		}
+	}
+
+	if (foundEntity)
+	{
+		const float minimumExtent = 10.f;
+		const float width = std::max(minimumExtent, maximumX - minimumX);
+		const float height = std::max(minimumExtent, maximumZ - minimumZ);
+		const float centerX = (minimumX + maximumX) * 0.5f;
+		const float centerZ = (minimumZ + maximumZ) * 0.5f;
+		const float halfWidth = width * 0.55f;
+		const float halfHeight = height * 0.55f;
+		minimumX = centerX - halfWidth;
+		maximumX = centerX + halfWidth;
+		minimumZ = centerZ - halfHeight;
+		maximumZ = centerZ + halfHeight;
+		source = VIEWER_BOUNDS_OBSERVED_ENTITIES;
+		return true;
+	}
+
+	minimumX = minimumZ = -50.f;
+	maximumX = maximumZ = 50.f;
+	source = VIEWER_BOUNDS_DEFAULT;
+	return true;
 }
 
 //-------------------------------------------------------------------------------------

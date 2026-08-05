@@ -544,4 +544,26 @@
 		<arg>INT32</arg>   <!-- COMPONENT_TYPE -->
 		<arg>UINT64</arg> <!-- COMPONENT_ID -->
 	</Bots::onAppActiveTick>
+
+	<!-- Standalone KBEngine Nex GUIConsole control-plane messages. -->
+	<Baseapp::startProfile><id>55200</id></Baseapp::startProfile>
+	<Cellapp::startProfile><id>55201</id></Cellapp::startProfile>
+	<Baseappmgr::startProfile><id>55202</id></Baseappmgr::startProfile>
+	<Cellappmgr::startProfile><id>55203</id></Cellappmgr::startProfile>
+	<Dbmgr::startProfile><id>55204</id></Dbmgr::startProfile>
+	<Loginapp::startProfile><id>55205</id></Loginapp::startProfile>
+	<Logger::startProfile><id>55206</id></Logger::startProfile>
+	<Bots::startProfile><id>55207</id></Bots::startProfile>
+	<Interfaces::startProfile><id>55208</id></Interfaces::startProfile>
+
+	<Baseapp::lookApp><id>55300</id></Baseapp::lookApp>
+	<Cellapp::lookApp><id>55301</id></Cellapp::lookApp>
+	<Baseappmgr::lookApp><id>55302</id></Baseappmgr::lookApp>
+	<Cellappmgr::lookApp><id>55303</id></Cellappmgr::lookApp>
+	<Dbmgr::lookApp><id>55304</id></Dbmgr::lookApp>
+	<Loginapp::lookApp><id>55305</id></Loginapp::lookApp>
+	<Logger::lookApp><id>55306</id></Logger::lookApp>
+	<Bots::lookApp><id>55307</id></Bots::lookApp>
+	<Interfaces::lookApp><id>55308</id></Interfaces::lookApp>
+	<Machine::lookApp><id>55309</id></Machine::lookApp>
 </root>

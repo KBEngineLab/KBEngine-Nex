@@ -68,6 +68,13 @@ public:
 
 	virtual int raycast(int layer, const Position3D& start, const Position3D& end, std::vector<Position3D>& hitPointVec) = 0;
 
+	// Viewer bounds are optional because non-mesh navigation implementations may not expose a finite map extent.
+	// Viewer 边界是可选能力，非网格导航实现不需要伪造有限地图范围。
+	virtual bool getBounds(float& minimumX, float& minimumZ, float& maximumX, float& maximumZ) const
+	{
+		return false;
+	}
+
 	std::string resPath;
 };
 

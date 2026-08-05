@@ -64,11 +64,18 @@ public:
 	virtual void timeout();
 	virtual void sendStream(MemoryStream* s, int type);
 
-	void updateViewer(const Network::Address& addr, SPACE_ID spaceID, CELL_ID cellID);
+	void updateViewer(const Network::Address& addr, SPACE_ID spaceID, CELL_ID cellID,
+		bool isV2 = false, uint16 sampleIntervalMs = 100);
 
 	const Network::Address& addr() const {
 		return addr_;
 	}
+
+	uint64 lastSampleDurationStamps() const { return lastSampleDurationStamps_; }
+	uint32 lastUpdateCount() const { return lastUpdateCount_; }
+	uint32 lastPayloadBytes() const { return lastPayloadBytes_; }
+	uint32 lastPendingCount() const { return lastPendingCount_; }
+	uint64 budgetLimitedCount() const { return budgetLimitedCount_; }
 
 protected:
 	// 改变了查看space的cell
@@ -90,6 +97,16 @@ protected:
 
 	// 更新序列号， 所有实体都更新完毕则序列号+1， 在某些时候量比较大的情况每次迭代一部分实体更新
 	int lastUpdateVersion_;
+	bool isV2_;
+	uint16 sampleIntervalMs_;
+	uint16 elapsedMs_;
+	uint64 snapshotId_;
+	uint64 sequence_;
+	uint64 lastSampleDurationStamps_;
+	uint32 lastUpdateCount_;
+	uint32 lastPayloadBytes_;
+	uint32 lastPendingCount_;
+	uint64 budgetLimitedCount_;
 };
 
 class SpaceViewers : public TimerHandler
@@ -105,7 +122,8 @@ public:
 	bool addTimer();
 	void finalise();
 
-	void updateSpaceViewer(const Network::Address& addr, SPACE_ID spaceID, CELL_ID cellID, bool del);
+	void updateSpaceViewer(const Network::Address& addr, SPACE_ID spaceID, CELL_ID cellID, bool del,
+		bool isV2 = false, uint16 sampleIntervalMs = 100);
 
 protected:
 	virtual void handleTimeout(TimerHandle handle, void * arg);

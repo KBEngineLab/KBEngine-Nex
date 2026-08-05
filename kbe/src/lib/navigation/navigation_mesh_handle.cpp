@@ -422,6 +422,45 @@ int NavMeshHandle::raycast(int layer, const Position3D& start, const Position3D&
 }
 
 //-------------------------------------------------------------------------------------
+bool NavMeshHandle::getBounds(float& minimumX, float& minimumZ, float& maximumX, float& maximumZ) const
+{
+	bool found = false;
+	for (std::map<int, NavmeshLayer>::const_iterator layerIter = navmeshLayer.begin();
+		layerIter != navmeshLayer.end(); ++layerIter)
+	{
+		const dtNavMesh* navmesh = layerIter->second.pNavmesh;
+		if (navmesh == NULL)
+			continue;
+
+		for (int tileIndex = 0; tileIndex < navmesh->getMaxTiles(); ++tileIndex)
+		{
+			const dtMeshTile* tile = navmesh->getTile(tileIndex);
+			if (tile == NULL || tile->header == NULL)
+				continue;
+
+			const dtMeshHeader* header = tile->header;
+			if (!found)
+			{
+				minimumX = header->bmin[0];
+				minimumZ = header->bmin[2];
+				maximumX = header->bmax[0];
+				maximumZ = header->bmax[2];
+				found = true;
+			}
+			else
+			{
+				minimumX = std::min(minimumX, header->bmin[0]);
+				minimumZ = std::min(minimumZ, header->bmin[2]);
+				maximumX = std::max(maximumX, header->bmax[0]);
+				maximumZ = std::max(maximumZ, header->bmax[2]);
+			}
+		}
+	}
+
+	return found && maximumX > minimumX && maximumZ > minimumZ;
+}
+
+//-------------------------------------------------------------------------------------
 dtPolyRef NavMeshHandle::findNearestPoly(int layer, const Position3D& position, Position3D* nearestPoint)
 {
 	std::map<int, NavmeshLayer>::iterator iter = navmeshLayer.find(layer);

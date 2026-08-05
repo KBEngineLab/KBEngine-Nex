@@ -97,6 +97,7 @@ public:
 	bool getPolyHeight(int layer, dtPolyRef polygon, const Position3D& position, float& height);
 
 	virtual NavigationHandle::NAV_TYPE type() const{ return NAV_MESH; }
+	virtual bool getBounds(float& minimumX, float& minimumZ, float& maximumX, float& maximumZ) const;
 
 	static NavigationHandle* create(std::string resPath, const std::map< int, std::string >& params);
 	static bool _create(int layer, const std::string& resPath, const std::string& res, NavMeshHandle* pNavMeshHandle);

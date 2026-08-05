@@ -2997,6 +2997,36 @@ PyObject* Cellapp::__py_setFlags(PyObject* self, PyObject* args)
 //-------------------------------------------------------------------------------------
 void Cellapp::setSpaceViewer(Network::Channel* pChannel, MemoryStream& s)
 {
+	const uint32 viewerV2Magic = 0x3253584E;
+	if (s.length() >= sizeof(uint32) + sizeof(uint16) + sizeof(uint8) + sizeof(SPACE_ID) + sizeof(uint16))
+	{
+		const size_t initialReadPosition = s.rpos();
+		uint32 magic = 0;
+		s >> magic;
+		if (magic == viewerV2Magic)
+		{
+			uint16 version = 0;
+			uint8 enabled = 0;
+			SPACE_ID spaceID = 0;
+			uint16 sampleIntervalMs = 0;
+			s >> version >> enabled >> spaceID >> sampleIntervalMs;
+			if (version != 2 ||
+				(sampleIntervalMs != 100 && sampleIntervalMs != 250 &&
+				 sampleIntervalMs != 500 && sampleIntervalMs != 1000))
+			{
+				WARNING_MSG(fmt::format("Cellapp::setSpaceViewer: invalid V2 request(version={}, interval={}).\n",
+					version, sampleIntervalMs));
+				return;
+			}
+
+			spaceViewers_.updateSpaceViewer(
+				pChannel->addr(), spaceID, 0, enabled == 0, true, sampleIntervalMs);
+			return;
+		}
+
+		s.rpos(initialReadPosition);
+	}
+
 	bool del = false;
 	s >> del;
 

@@ -34,6 +34,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "helper/profile.h"
 #include "server/serverconfig.h"
 
+#include <ctime>
+
 namespace KBEngine { 
 
 //-------------------------------------------------------------------------------------
@@ -71,7 +73,8 @@ void SpaceViewers::finalise()
 }
 
 //-------------------------------------------------------------------------------------
-void SpaceViewers::updateSpaceViewer(const Network::Address& addr, SPACE_ID spaceID, CELL_ID cellID, bool del)
+void SpaceViewers::updateSpaceViewer(const Network::Address& addr, SPACE_ID spaceID, CELL_ID cellID, bool del,
+	bool isV2, uint16 sampleIntervalMs)
 {
 	if (del)
 	{
@@ -80,7 +83,7 @@ void SpaceViewers::updateSpaceViewer(const Network::Address& addr, SPACE_ID spac
 	}
 
 	SpaceViewer& viewer = spaceViews_[addr];
-	viewer.updateViewer(addr, spaceID, cellID);
+	viewer.updateViewer(addr, spaceID, cellID, isV2, sampleIntervalMs);
 
 	addTimer();
 }
@@ -118,7 +121,17 @@ spaceID_(0),
 cellID_(0),
 viewedEntities(),
 updateType_(0),
-lastUpdateVersion_(0)
+lastUpdateVersion_(0),
+isV2_(false),
+sampleIntervalMs_(100),
+elapsedMs_(0),
+snapshotId_(0),
+sequence_(0),
+lastSampleDurationStamps_(0),
+lastUpdateCount_(0),
+lastPayloadBytes_(0),
+lastPendingCount_(0),
+budgetLimitedCount_(0)
 {
 }
 
@@ -132,12 +145,18 @@ void SpaceViewer::resetViewer()
 {
 	viewedEntities.clear();
 	lastUpdateVersion_ = 0;
+	sequence_ = 0;
+	++snapshotId_;
 }
 
 //-------------------------------------------------------------------------------------
-void SpaceViewer::updateViewer(const Network::Address& addr, SPACE_ID spaceID, CELL_ID cellID)
+void SpaceViewer::updateViewer(const Network::Address& addr, SPACE_ID spaceID, CELL_ID cellID,
+	bool isV2, uint16 sampleIntervalMs)
 {
 	addr_ = addr;
+	isV2_ = isV2;
+	sampleIntervalMs_ = sampleIntervalMs;
+	elapsedMs_ = 0;
 
 	bool chagnedSpace = spaceID_ != spaceID;
 
@@ -165,6 +184,14 @@ void SpaceViewer::onChangedSpaceOrCell()
 //-------------------------------------------------------------------------------------
 void SpaceViewer::timeout()
 {
+	if (isV2_)
+	{
+		elapsedMs_ = uint16(elapsedMs_ + 100);
+		if (elapsedMs_ < sampleIntervalMs_)
+			return;
+		elapsedMs_ = 0;
+	}
+
 	switch (updateType_)
 	{
 	case 0: // 初始化
@@ -195,7 +222,7 @@ void SpaceViewer::sendStream(MemoryStream* s, int type)
 	(*pBundle) << g_componentType;
 	(*pBundle) << g_componentID;
 	(*pBundle) << type;
-	(*pBundle).append(s);
+	(*pBundle).append(s->data() + s->rpos(), static_cast<int>(s->length()));
 	pChannel->send(pBundle);
 }
 
@@ -203,6 +230,30 @@ void SpaceViewer::sendStream(MemoryStream* s, int type)
 void SpaceViewer::initClient()
 {
 	MemoryStream s;
+	Space* space = Spaces::findSpace(spaceID_);
+
+	if (isV2_)
+	{
+		if (space == NULL || !space->isGood())
+			return;
+
+		const uint32 viewerV2Magic = 0x3253584E;
+		const uint16 viewerV2Version = 2;
+		const uint8 metadataMessage = 2;
+		float minimumX = -50.f;
+		float minimumZ = -50.f;
+		float maximumX = 50.f;
+		float maximumZ = 50.f;
+		Space::VIEWER_BOUNDS_SOURCE boundsSource = Space::VIEWER_BOUNDS_DEFAULT;
+		space->getViewerBounds(minimumX, minimumZ, maximumX, maximumZ, boundsSource);
+
+		s << viewerV2Magic << viewerV2Version << metadataMessage;
+		s << (uint64)g_componentID << (uint32)space->id();
+		s << space->getGeometryPath() << space->getScriptModuleName();
+		s << (uint32)space->entities().size();
+		s << minimumX << minimumZ << maximumX << maximumZ << (uint8)boundsSource;
+		s << (int64)(std::time(NULL) * 1000LL);
+	}
 
 	// 先下发脚本ID对应脚本模块的名称，便于降低后面实体同步量，实体只同步id过去
 	const EntityDef::SCRIPT_MODULES& scriptModules = EntityDef::getScriptModules();
@@ -226,6 +277,7 @@ void SpaceViewer::initClient()
 //-------------------------------------------------------------------------------------
 void SpaceViewer::updateClient()
 {
+	const uint64 sampleStartedAt = timestamp();
 	if (spaceID_ == 0)
 		return;
 
@@ -235,16 +287,24 @@ void SpaceViewer::updateClient()
 		return;
 	}
 
-	// 最多每次更新500个实体
+	// 单轮预算限制 Tick 与网络峰值；完整快照可跨多轮发送，并由完成标记显式收口。
+	// The per-round budget bounds Tick and network spikes; completion is explicit when a snapshot spans rounds.
 	const int MAX_UPDATE_COUNT = 100;
+	const uint32 MAX_UPDATE_BYTES = 64 * 1024;
 	int updateCount = 0;
 
 	// 获取本次与上次结果的差值，将差值放入stream中更新到客户端
 	// 差值包括新增的实体，以及已经有的实体的位置变化
-	MemoryStream s;
-
-	Entities<Entity>* pEntities = Cellapp::getSingleton().pEntities();
-	Entities<Entity>::ENTITYS_MAP& entitiesMap = pEntities->getEntities();
+	MemoryStream deltas;
+	std::map<ENTITY_ID, Entity*> currentEntities;
+	const SPACE_ENTITIES& spaceEntities = space->entities();
+	for (SPACE_ENTITIES::const_iterator entityIter = spaceEntities.begin();
+		entityIter != spaceEntities.end(); ++entityIter)
+	{
+		Entity* entity = (*entityIter).get();
+		if (entity != NULL)
+			currentEntities[entity->id()] = entity;
+	}
 
 	// 先检查已经监视的实体，对于版本号较低的优先更新
 	if (updateCount < MAX_UPDATE_COUNT)
@@ -252,7 +312,7 @@ void SpaceViewer::updateClient()
 		std::map< ENTITY_ID, ViewEntity >::iterator viewerIter = viewedEntities.begin();
 		for (; viewerIter != viewedEntities.end(); )
 		{
-			if (updateCount >= MAX_UPDATE_COUNT)
+			if (updateCount >= MAX_UPDATE_COUNT || deltas.length() >= MAX_UPDATE_BYTES)
 				break;
 
 			ViewEntity& viewEntity = viewerIter->second;
@@ -262,36 +322,22 @@ void SpaceViewer::updateClient()
 				continue;
 			}
 
-			Entities<Entity>::ENTITYS_MAP::iterator iter = entitiesMap.find(viewerIter->first);
+			std::map<ENTITY_ID, Entity*>::iterator iter = currentEntities.find(viewerIter->first);
 
 			// 找不到实体， 说明已经销毁或者跑到其他进程了
 			// 如果在其他进程， 其他进程会将其更新到客户端
-			if (iter == entitiesMap.end())
+			if (iter == currentEntities.end())
 			{
-				s << viewerIter->first;
-				s << false; // true为更新， false为销毁
+				deltas << viewerIter->first;
+				deltas << false; // true为更新， false为销毁
 
 				// 将其从viewedEntities删除
 				viewedEntities.erase(viewerIter++);
+				++updateCount;
 			}
 			else
 			{
-				Entity* pEntity = static_cast<Entity*>(iter->second.get());
-				if (pEntity->spaceID() != spaceID_)
-				{
-					// 将其从viewedEntities删除
-					viewedEntities.erase(viewerIter++);
-					continue;
-				}
-
-				/*
-				if (pEntity->cellID() != cellID_)
-				{
-					// 将其从viewedEntities删除
-					viewedEntities.erase(viewerIter++);
-					continue;
-				}
-				*/
+				Entity* pEntity = iter->second;
 
 				// 有新增的实体或者已经观察到的实体，检查位置变化
 				// 如果没有变化则pass
@@ -307,11 +353,11 @@ void SpaceViewer::updateClient()
 				viewEntity.direction = pEntity->direction();
 				++viewEntity.updateVersion;
 
-				s << viewEntity.entityID;
-				s << true; // true为更新， false为销毁
-				s << pEntity->pScriptModule()->getUType();
-				s << viewEntity.position.x << viewEntity.position.y << viewEntity.position.z;
-				s << viewEntity.direction.roll() << viewEntity.direction.pitch() << viewEntity.direction.yaw();
+				deltas << viewEntity.entityID;
+				deltas << true; // true为更新， false为销毁
+				deltas << pEntity->pScriptModule()->getUType();
+				deltas << viewEntity.position.x << viewEntity.position.y << viewEntity.position.z;
+				deltas << viewEntity.direction.roll() << viewEntity.direction.pitch() << viewEntity.direction.yaw();
 
 				++updateCount;
 				++viewerIter;
@@ -322,21 +368,14 @@ void SpaceViewer::updateClient()
 	// 再检查是否有新增的实体
 	if (updateCount < MAX_UPDATE_COUNT)
 	{
-		Entities<Entity>::ENTITYS_MAP::iterator iter = entitiesMap.begin();
-
-		for (; iter != entitiesMap.end(); ++iter)
+		for (SPACE_ENTITIES::const_iterator iter = spaceEntities.begin(); iter != spaceEntities.end(); ++iter)
 		{
-			if (updateCount >= MAX_UPDATE_COUNT)
+			if (updateCount >= MAX_UPDATE_COUNT || deltas.length() >= MAX_UPDATE_BYTES)
 				break;
 
-			Entity* pEntity = static_cast<Entity*>(iter->second.get());
-			if (pEntity->spaceID() != spaceID_)
+			Entity* pEntity = (*iter).get();
+			if (pEntity == NULL)
 				continue;
-
-			/*
-			if (pEntity->cellID() != cellID_)
-				continue;
-			*/
 
 			std::map< ENTITY_ID, ViewEntity >::iterator findIter = viewedEntities.find(pEntity->id());
 			ViewEntity& viewEntity = viewedEntities[pEntity->id()];
@@ -351,18 +390,50 @@ void SpaceViewer::updateClient()
 
 			++updateCount;
 
-			s << viewEntity.entityID;
-			s << true; // true为更新， false为销毁
-			s << pEntity->pScriptModule()->getUType();
-			s << viewEntity.position.x << viewEntity.position.y << viewEntity.position.z;
-			s << viewEntity.direction.roll() << viewEntity.direction.pitch() << viewEntity.direction.yaw();
+			deltas << viewEntity.entityID;
+			deltas << true; // true为更新， false为销毁
+			deltas << pEntity->pScriptModule()->getUType();
+			deltas << viewEntity.position.x << viewEntity.position.y << viewEntity.position.z;
+			deltas << viewEntity.direction.roll() << viewEntity.direction.pitch() << viewEntity.direction.yaw();
 		}
 	}
 
-	sendStream(&s, updateType_);
+	MemoryStream output;
+	const bool snapshotComplete = updateCount < MAX_UPDATE_COUNT && deltas.length() < MAX_UPDATE_BYTES;
+	if (isV2_)
+	{
+		const uint32 viewerV2Magic = 0x3253584E;
+		const uint16 viewerV2Version = 2;
+		const uint8 snapshotMessage = 3;
+		uint8 flags = 0;
+		if (lastUpdateVersion_ == 0)
+			flags |= 0x01;
+		if (snapshotComplete)
+			flags |= 0x02;
+
+		output << viewerV2Magic << viewerV2Version << snapshotMessage;
+		output << snapshotId_ << ++sequence_ << flags;
+		output << (int64)(std::time(NULL) * 1000LL);
+		output << (uint32)spaceID_ << (uint32)spaceEntities.size() << (uint32)updateCount;
+		output.append(deltas.data() + deltas.rpos(), deltas.length());
+	}
+	else
+	{
+		output.append(deltas.data() + deltas.rpos(), deltas.length());
+	}
+
+	lastUpdateCount_ = (uint32)updateCount;
+	lastPayloadBytes_ = (uint32)output.length();
+	lastPendingCount_ = (uint32)(spaceEntities.size() > viewedEntities.size()
+		? spaceEntities.size() - viewedEntities.size() : 0);
+	if (updateCount >= MAX_UPDATE_COUNT || deltas.length() >= MAX_UPDATE_BYTES)
+		++budgetLimitedCount_;
+	lastSampleDurationStamps_ = timestamp() - sampleStartedAt;
+
+	sendStream(&output, updateType_);
 
 	// 如果全部更新完毕，更换版本号
-	if (updateCount < MAX_UPDATE_COUNT)
+	if (snapshotComplete)
 		++lastUpdateVersion_;
 }
 
