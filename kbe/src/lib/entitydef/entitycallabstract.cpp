@@ -38,6 +38,24 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{
 
+namespace
+{
+uint64 g_staleLocalEntityCallResolutionCount = 0;
+uint64 g_staleLocalEntityCallSendAttemptCount = 0;
+uint64 g_invalidRemoteEntityCallSendAttemptCount = 0;
+uint64 g_lastStaleLocalEntityCallWarningTime = 0;
+const uint64 STALE_ENTITYCALL_WARNING_INTERVAL = 10 * stampsPerSecond();
+}
+
+void recordStaleLocalEntityCallResolution()
+{
+	++g_staleLocalEntityCallResolutionCount;
+}
+
+uint64 staleLocalEntityCallResolutionCount() { return g_staleLocalEntityCallResolutionCount; }
+uint64 staleLocalEntityCallSendAttemptCount() { return g_staleLocalEntityCallSendAttemptCount; }
+uint64 invalidRemoteEntityCallSendAttemptCount() { return g_invalidRemoteEntityCallSendAttemptCount; }
+
 
 SCRIPT_METHOD_DECLARE_BEGIN(EntityCallAbstract)
 SCRIPT_METHOD_DECLARE("__reduce_ex__",				reduce_ex__,			METH_VARARGS,		0)
@@ -151,8 +169,25 @@ bool EntityCallAbstract::sendCall(Network::Bundle* pBundle)
 	}
 	else
 	{
-		ERROR_MSG(fmt::format("EntityCallAbstract::sendCall: invalid channel({}), entityID({})!\n",
-			addr_.c_str(), id_));
+		if (componentID_ == g_componentID && componentID_ > 0)
+		{
+			++g_staleLocalEntityCallSendAttemptCount;
+			const uint64 now = timestamp();
+			if (g_lastStaleLocalEntityCallWarningTime == 0 ||
+				now - g_lastStaleLocalEntityCallWarningTime >= STALE_ENTITYCALL_WARNING_INTERVAL)
+			{
+				g_lastStaleLocalEntityCallWarningTime = now;
+				WARNING_MSG(fmt::format(
+					"EntityCallAbstract::sendCall: stale local EntityCall, entityID={}, componentID={}, totalAttempts={}.\n",
+					id_, componentID_, g_staleLocalEntityCallSendAttemptCount));
+			}
+		}
+		else
+		{
+			++g_invalidRemoteEntityCallSendAttemptCount;
+			ERROR_MSG(fmt::format("EntityCallAbstract::sendCall: invalid channel({}), entityID({}), componentID({})!\n",
+				addr_.c_str(), id_, componentID_));
+		}
 	}
 
 	Network::Bundle::reclaimPoolObject(pBundle);

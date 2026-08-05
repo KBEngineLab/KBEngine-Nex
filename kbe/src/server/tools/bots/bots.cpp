@@ -315,6 +315,9 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/completionDequeued", &networkInterface(), &Network::NetworkInterface::pollerCompletionDequeuedCount);
 	WATCH_OBJECT("bots/performance/completionMaxDequeuedBatch", &networkInterface(), &Network::NetworkInterface::pollerCompletionMaxDequeuedBatchCount);
 	WATCH_OBJECT("bots/performance/completionPendingLocal", &networkInterface(), &Network::NetworkInterface::pollerCompletionPendingLocalCount);
+	WATCH_OBJECT("bots/performance/tcpSendSubmissions", &networkInterface(), &Network::NetworkInterface::pollerTcpSendSubmissions);
+	WATCH_OBJECT("bots/performance/tcpSendSubmittedBytes", &networkInterface(), &Network::NetworkInterface::pollerTcpSendSubmittedBytes);
+	WATCH_OBJECT("bots/performance/tcpSendMaxSubmissionBytes", &networkInterface(), &Network::NetworkInterface::pollerTcpSendMaxSubmissionBytes);
 	WATCH_OBJECT("bots/performance/discardedPacketsAfterClose", &networkInterface(), &Network::NetworkInterface::discardedPacketsAfterCloseCount);
 	WATCH_OBJECT("bots/performance/contextsOutstandingBytes", &networkInterface(), &Network::NetworkInterface::pollerContextsOutstandingBytes);
 	WATCH_OBJECT("bots/performance/contextsCachedBytes", &networkInterface(), &Network::NetworkInterface::pollerContextsCachedBytes);

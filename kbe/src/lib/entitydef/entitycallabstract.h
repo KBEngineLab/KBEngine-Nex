@@ -29,6 +29,13 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 	
 namespace KBEngine{
 
+// Stale local EntityCalls are lifecycle diagnostics rather than transport failures.
+// 本地 EntityCall 指向已销毁实体属于生命周期诊断，不应与远端网络故障混为一谈。
+void recordStaleLocalEntityCallResolution();
+uint64 staleLocalEntityCallResolutionCount();
+uint64 staleLocalEntityCallSendAttemptCount();
+uint64 invalidRemoteEntityCallSendAttemptCount();
+
 class ScriptDefModule;
 class RemoteEntityMethod;
 class MethodDescription;

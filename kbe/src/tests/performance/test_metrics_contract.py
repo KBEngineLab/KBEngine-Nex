@@ -862,6 +862,10 @@ def assert_bots_dev_and_manager_watcher_source_contract() -> None:
     source_root = _repository_root() / "kbe/src"
     bots_main = (source_root / "server/tools/bots/main.cpp").read_text(encoding="utf-8")
     bots_source = (source_root / "server/tools/bots/bots.cpp").read_text(encoding="utf-8")
+    serverapp_source = (source_root / "lib/server/serverapp.cpp").read_text(encoding="utf-8")
+    entity_app_source = (source_root / "lib/server/entity_app.h").read_text(encoding="utf-8")
+    iocp_source = (source_root / "lib/network/poller_iocp.cpp").read_text(encoding="utf-8")
+    entity_call_source = (source_root / "lib/entitydef/entitycallabstract.cpp").read_text(encoding="utf-8")
     cellapp_source = (source_root / "server/cellapp/cellapp.cpp").read_text(encoding="utf-8")
     components_source = (source_root / "lib/server/components.cpp").read_text(encoding="utf-8")
     assert 'std::string(argv[index]) == "--dev"' in bots_main
@@ -899,6 +903,19 @@ def assert_bots_dev_and_manager_watcher_source_contract() -> None:
     logger_index = bots_source.index("Components::getSingleton().findLogger(true)")
     assert network_index < logger_index
     assert "g_componentType == BOTS_TYPE && !allowBots" in components_source
+    # TCP batching must defer by one dispatcher round, while UDP/KCP keeps immediate submission.
+    # TCP 合批只延迟一个调度轮次；UDP/KCP 仍保持立即投递，避免协议 ACK 延迟。
+    tcp_queue = iocp_source[iocp_source.index("bool IocpPoller::queueTcpSend"):iocp_source.index("bool IocpPoller::queueUdpSend")]
+    udp_queue = iocp_source[iocp_source.index("bool IocpPoller::queueUdpSend"):iocp_source.index("bool IocpPoller::ensureAssociated")]
+    assert "requestRearm(fd, REARM_WRITE);" in tcp_queue
+    assert "armTcpSend(fd, state)" not in tcp_queue
+    assert "armUdpSend(fd, state)" in udp_queue
+    for watcher_path in ("tcpSendSubmissions", "tcpSendSubmittedBytes", "tcpSendMaxSubmissionBytes"):
+        assert f'WATCH_OBJECT("bots/performance/{watcher_path}"' in bots_source
+        assert f'WATCH_OBJECT("network/poller/{watcher_path}"' in serverapp_source
+    assert "stale local EntityCall" in entity_call_source
+    for watcher_path in ("staleLocalResolutions", "staleLocalSendAttempts", "invalidRemoteSendAttempts"):
+        assert f'WATCH_OBJECT("entityCalls/{watcher_path}"' in entity_app_source
 
     for relative_path, manager_name in (
         ("server/baseappmgr/baseappmgr.cpp", "Baseappmgr"),

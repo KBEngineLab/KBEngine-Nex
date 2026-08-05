@@ -124,6 +124,9 @@ public:
 	virtual uint64 tcpSendOwnershipTransferCount() const;
 	virtual uint64 tcpSendBatchCopyCount() const;
 	virtual uint64 tcpSendBatchCopiedBytes() const;
+	virtual uint64 tcpSendSubmissionCount() const;
+	virtual uint64 tcpSendSubmittedBytes() const;
+	virtual uint64 tcpSendMaxSubmissionBytes() const;
 	virtual uint64 tcpSendBacklogBytes() const;
 	virtual uint64 tcpSendBacklogPeakBytes() const;
 	virtual uint64 tcpSendBackpressureCount() const;

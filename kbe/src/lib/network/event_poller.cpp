@@ -261,6 +261,9 @@ uint64 EventPoller::contextCachedBytes() const { return 0; }
 uint64 EventPoller::tcpSendOwnershipTransferCount() const { return 0; }
 uint64 EventPoller::tcpSendBatchCopyCount() const { return 0; }
 uint64 EventPoller::tcpSendBatchCopiedBytes() const { return 0; }
+uint64 EventPoller::tcpSendSubmissionCount() const { return 0; }
+uint64 EventPoller::tcpSendSubmittedBytes() const { return 0; }
+uint64 EventPoller::tcpSendMaxSubmissionBytes() const { return 0; }
 uint64 EventPoller::tcpSendBacklogBytes() const { return 0; }
 uint64 EventPoller::tcpSendBacklogPeakBytes() const { return 0; }
 uint64 EventPoller::tcpSendBackpressureCount() const { return 0; }

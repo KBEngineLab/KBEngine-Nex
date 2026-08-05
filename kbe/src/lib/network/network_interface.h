@@ -157,6 +157,9 @@ public:
 	uint64 pollerTcpSendOwnershipTransfers() const;
 	uint64 pollerTcpSendBatchCopies() const;
 	uint64 pollerTcpSendBatchCopiedBytes() const;
+	uint64 pollerTcpSendSubmissions() const;
+	uint64 pollerTcpSendSubmittedBytes() const;
+	uint64 pollerTcpSendMaxSubmissionBytes() const;
 	uint64 pollerTcpSendBacklogBytes() const;
 	uint64 pollerTcpSendBacklogPeakBytes() const;
 	uint64 pollerTcpSendBackpressureCount() const;

@@ -111,7 +111,10 @@ IocpPoller::IocpPoller() :
 	pendingCompletions_(),
 	completionDequeueCallCount_(0),
 	completionDequeuedCount_(0),
-	completionMaxDequeuedBatchCount_(0)
+	completionMaxDequeuedBatchCount_(0),
+	tcpSendSubmissionCount_(0),
+	tcpSendSubmittedBytes_(0),
+	tcpSendMaxSubmissionBytes_(0)
 {
 	if (completionPort_ == NULL)
 	{
@@ -143,6 +146,9 @@ uint64 IocpPoller::completionDequeueCallCount() const { return completionDequeue
 uint64 IocpPoller::completionDequeuedCount() const { return completionDequeuedCount_; }
 uint64 IocpPoller::completionMaxDequeuedBatchCount() const { return completionMaxDequeuedBatchCount_; }
 uint64 IocpPoller::completionPendingLocalCount() const { return static_cast<uint64>(pendingCompletions_.size()); }
+uint64 IocpPoller::tcpSendSubmissionCount() const { return tcpSendSubmissionCount_; }
+uint64 IocpPoller::tcpSendSubmittedBytes() const { return tcpSendSubmittedBytes_; }
+uint64 IocpPoller::tcpSendMaxSubmissionBytes() const { return tcpSendMaxSubmissionBytes_; }
 
 //-------------------------------------------------------------------------------------
 IocpPoller::~IocpPoller()
@@ -201,12 +207,11 @@ bool IocpPoller::queueTcpSend(KBESOCKET fd, const void* data, int len)
 		return false;
 	}
 
-	// Once the shared queue accepts bytes, ownership has moved to the poller even if the first WSASend attempt fails.
-	// 共享队列接受字节后，数据所有权已经转移给 poller，即使首次 WSASend 投递失败也由后端继续重试。
-	if (!armTcpSend(fd, state))
-	{
-		requestRearm(fd, REARM_WRITE);
-	}
+	// Defer only until the next dispatcher round. Rearm deduplicates by fd, allowing
+	// all small writes produced by the current callback to enter the 64 KiB batch.
+	// 仅延迟到下一 dispatcher 轮次；rearm 按 fd 去重，使当前回调产生的小包先进入
+	// 64 KiB 合批队列，避免每个逻辑消息各自触发一次 WSASend/completion。
+	requestRearm(fd, REARM_WRITE);
 	return true;
 }
 
@@ -412,18 +417,14 @@ bool IocpPoller::armTcpSend(KBESOCKET fd, SocketState& state)
 
 	DWORD bytes = 0;
 	int ret = WSASend(state.socket, &pContext->buffer, 1, &bytes, 0, &pContext->overlapped, NULL);
-	if (ret == 0)
+	const int wsaErr = (ret == 0) ? ERROR_SUCCESS : WSAGetLastError();
+	if (ret == 0 || wsaErr == WSA_IO_PENDING)
 	{
 		trackContext(*pContext);
 		state.pPendingWriteContext = pContext;
-		return true;
-	}
-
-	int wsaErr = WSAGetLastError();
-	if (wsaErr == WSA_IO_PENDING)
-	{
-		trackContext(*pContext);
-		state.pPendingWriteContext = pContext;
+		++tcpSendSubmissionCount_;
+		tcpSendSubmittedBytes_ += static_cast<uint64>(pContext->tcpSendData.size());
+		tcpSendMaxSubmissionBytes_ = std::max<uint64>(tcpSendMaxSubmissionBytes_, pContext->tcpSendData.size());
 		return true;
 	}
 

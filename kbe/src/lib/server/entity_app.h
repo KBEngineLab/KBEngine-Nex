@@ -348,6 +348,13 @@ bool EntityApp<E>::initializeWatcher()
 	WATCH_OBJECT("tick/warningLogs", this, &EntityApp<E>::tickWarningLogCount);
 	WATCH_OBJECT("tick/suppressedWarnings", this, &EntityApp<E>::suppressedTickWarningCount);
 	WATCH_OBJECT("tick/slowMaxMicros", this, &EntityApp<E>::slowTickMaxMicros);
+	// EntityCall diagnostics belong only to BaseApp/CellApp. Registering them in
+	// ServerApp would force non-entity tools to link the full EntityCall runtime.
+	// EntityCall 指标仅属于 BaseApp/CellApp；放入 ServerApp 会迫使非实体进程
+	// 链接完整 EntityCall 运行时并破坏静态库边界。
+	WATCH_OBJECT("entityCalls/staleLocalResolutions", &KBEngine::staleLocalEntityCallResolutionCount);
+	WATCH_OBJECT("entityCalls/staleLocalSendAttempts", &KBEngine::staleLocalEntityCallSendAttemptCount);
+	WATCH_OBJECT("entityCalls/invalidRemoteSendAttempts", &KBEngine::invalidRemoteEntityCallSendAttemptCount);
 	return ServerApp::initializeWatcher();
 }
 
@@ -708,7 +715,11 @@ PyObject* EntityApp<E>::tryGetEntityByEntityCall(COMPONENT_ID componentID, ENTIT
 	
 	E* entity = pEntities_->find(eid);
 	if(entity == NULL){
-		ERROR_MSG(fmt::format("EntityApp::tryGetEntityByEntityCall: can't found entity:{}.\n", eid));
+		// Unpickling must retain the EntityCall because ENTITYCALL values are not nullable.
+		// Record the stale lifecycle edge here; sendCall reports a rate-limited warning if used.
+		// ENTITYCALL 值不可为空，因此反序列化仍需保留代理；这里只记录生命周期陈旧引用，
+		// 真正使用时由 sendCall 输出限频告警。
+		recordStaleLocalEntityCallResolution();
 		return NULL;
 	}
 

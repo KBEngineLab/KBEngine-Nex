@@ -27,7 +27,8 @@ public:
 	// 等待并处理一批 IOCP completion。
 	int processPendingEvents(double maxWait) override;
 
-	// IOCP 入队后立即尝试投递 WSASend，保留发送失败的同步反馈语义。
+	// IOCP 入队后在下一 dispatcher 轮次投递，同轮小包可合并为一次 WSASend。
+	// Submit on the next dispatcher round so small writes produced in one callback can share a WSASend.
 	bool queueTcpSend(KBESOCKET fd, const void* data, int len) override;
 
 	// IOCP 入队后立即尝试投递 WSASendTo，避免 UDP/KCP 发送只滞留在队列里。
@@ -43,6 +44,9 @@ public:
 	uint64 completionDequeuedCount() const override;
 	uint64 completionMaxDequeuedBatchCount() const override;
 	uint64 completionPendingLocalCount() const override;
+	uint64 tcpSendSubmissionCount() const override;
+	uint64 tcpSendSubmittedBytes() const override;
+	uint64 tcpSendMaxSubmissionBytes() const override;
 
 protected:
 	// 将 fd 绑定到 IOCP 并投递读侧 completion。
@@ -157,6 +161,9 @@ private:
 	uint64 completionDequeueCallCount_;
 	uint64 completionDequeuedCount_;
 	uint64 completionMaxDequeuedBatchCount_;
+	uint64 tcpSendSubmissionCount_;
+	uint64 tcpSendSubmittedBytes_;
+	uint64 tcpSendMaxSubmissionBytes_;
 };
 
 }

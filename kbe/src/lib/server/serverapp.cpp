@@ -241,6 +241,9 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/poller/tcpSendOwnershipTransfers", &networkInterface_, &Network::NetworkInterface::pollerTcpSendOwnershipTransfers);
 	WATCH_OBJECT("network/poller/tcpSendBatchCopies", &networkInterface_, &Network::NetworkInterface::pollerTcpSendBatchCopies);
 	WATCH_OBJECT("network/poller/tcpSendBatchCopiedBytes", &networkInterface_, &Network::NetworkInterface::pollerTcpSendBatchCopiedBytes);
+	WATCH_OBJECT("network/poller/tcpSendSubmissions", &networkInterface_, &Network::NetworkInterface::pollerTcpSendSubmissions);
+	WATCH_OBJECT("network/poller/tcpSendSubmittedBytes", &networkInterface_, &Network::NetworkInterface::pollerTcpSendSubmittedBytes);
+	WATCH_OBJECT("network/poller/tcpSendMaxSubmissionBytes", &networkInterface_, &Network::NetworkInterface::pollerTcpSendMaxSubmissionBytes);
 	WATCH_OBJECT("network/poller/tcpSendBacklogBytes", &networkInterface_, &Network::NetworkInterface::pollerTcpSendBacklogBytes);
 	WATCH_OBJECT("network/poller/tcpSendBacklogPeakBytes", &networkInterface_, &Network::NetworkInterface::pollerTcpSendBacklogPeakBytes);
 	WATCH_OBJECT("network/poller/tcpSendBackpressure", &networkInterface_, &Network::NetworkInterface::pollerTcpSendBackpressureCount);
@@ -266,7 +269,6 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/poller/completionMaxDequeuedBatch", &networkInterface_, &Network::NetworkInterface::pollerCompletionMaxDequeuedBatchCount);
 	WATCH_OBJECT("network/poller/completionPendingLocal", &networkInterface_, &Network::NetworkInterface::pollerCompletionPendingLocalCount);
 	WATCH_OBJECT("network/poller/discardedPacketsAfterClose", &networkInterface_, &Network::NetworkInterface::discardedPacketsAfterCloseCount);
-
 	// Message categories are classified once when handlers are installed. Watcher reads
 	// process-local counters directly, so collection does not scan handlers or channels.
 	// 消息类别仅在安装 handler 时判定一次；Watcher 直接读取进程内累计值，采集时不扫描 handler 或 Channel。
