@@ -60,6 +60,24 @@ Bots 默认只写自身滚动日志且不连接 Logger。只有需要 IDE/PyChar
 `--bots-dev`，或直接启动 `bots.exe` 时添加 `--dev`。开发模式会额外产生序列化、网络、Logger CPU
 和集中磁盘 IO，因此发布正式性能数据时必须关闭。
 
+Bots always use TCP for the LoginApp authentication exchange. The BaseApp gameplay connection can
+be selected independently with `--bots-transport kcp|tcp`. Use `--bots-no-tcp-fallback` for a pure
+protocol benchmark; otherwise a failed KCP setup may fall back to TCP according to the XML setting.
+The runner writes the effective transport into the isolated `kbengine.xml`, passes the same choice to
+every Bots process, and changes readiness to require either all KCP or all TCP clients with zero clients
+on the other transport.
+Bots 与 LoginApp 的认证链路始终使用 TCP。登录成功后的 BaseApp 游戏连接可通过
+`--bots-transport kcp|tcp` 独立选择；纯协议压测必须增加 `--bots-no-tcp-fallback`，否则 KCP
+建立失败时可能按 XML 配置回退 TCP。运行器会把有效协议写入隔离 `kbengine.xml`、传给全部 Bots
+进程，并动态要求全部客户端进入目标协议且另一协议客户端数为零。
+
+Direct Bots launches may override the XML without editing assets:
+直接启动 Bots 时也可覆盖 XML：
+
+```powershell
+bots.exe --bots-transport=tcp --bots-allow-tcp-fallback=false
+```
+
 The runner writes `raw.jsonl`, `summary.json`, and `report.md` below the repository-root
 `kbe/src/out/performance-runs/`, regardless of the caller's current directory. Pass
 `--output-root` to override it explicitly.

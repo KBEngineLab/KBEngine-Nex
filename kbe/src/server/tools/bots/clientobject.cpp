@@ -344,11 +344,13 @@ bool ClientObject::initLoginBaseapp()
 	clearStates();
 	connectedBaseapp_ = false;
 
+	if (botsUseTcpTransport())
+		return connectBaseappTcp();
+
 	if (udp_port_ > 0 && startKcpHandshake())
 		return true;
 
-	clearStates();
-	return connectBaseappTcp();
+	return handleKcpFailure("unable to start KCP transport");
 }
 
 //-------------------------------------------------------------------------------------
@@ -468,7 +470,7 @@ void ClientObject::processKcpHandshake()
 	Network::EndPoint* pEndpoint = pServerChannel_ != NULL ? pServerChannel_->pEndPoint() : NULL;
 	if (pEndpoint == NULL)
 	{
-		fallbackToBaseappTcp("UDP endpoint disappeared during handshake");
+		handleKcpFailure("UDP endpoint disappeared during handshake");
 		return;
 	}
 
@@ -482,7 +484,7 @@ void ClientObject::processKcpHandshake()
 			if (isTransientSocketError(errorCode))
 				break;
 
-			fallbackToBaseappTcp("UDP receive failed during KCP handshake");
+			handleKcpFailure("UDP receive failed during KCP handshake");
 			return;
 		}
 
@@ -499,7 +501,7 @@ void ClientObject::processKcpHandshake()
 
 		if (!completeKcpHandshake(channelID))
 		{
-			fallbackToBaseappTcp("failed to activate KCP transport");
+			handleKcpFailure("failed to activate KCP transport");
 		}
 		return;
 	}
@@ -507,14 +509,14 @@ void ClientObject::processKcpHandshake()
 	const uint64 now = timestamp();
 	if (now - kcpHandshakeStartTime_ >= kcpHandshakeTimeoutStamps())
 	{
-		fallbackToBaseappTcp("KCP handshake timed out");
+		handleKcpFailure("KCP handshake timed out");
 		return;
 	}
 
 	if (kcpHelloSentTime_ == 0 || now - kcpHelloSentTime_ >= KCP_HELLO_RETRY_INTERVAL)
 	{
 		if (!sendKcpHello())
-			fallbackToBaseappTcp("failed to retry KCP hello");
+			handleKcpFailure("failed to retry KCP hello");
 	}
 }
 
@@ -590,7 +592,21 @@ bool ClientObject::completeKcpHandshake(uint32 channelID)
 }
 
 //-------------------------------------------------------------------------------------
-void ClientObject::fallbackToBaseappTcp(const char* reason)
+bool ClientObject::handleKcpFailure(const char* reason)
+{
+	Bots::getSingleton().onTransportFailure();
+	if (botsAllowTcpFallback())
+		return fallbackToBaseappTcp(reason);
+
+	ERROR_MSG(fmt::format(
+		"ClientObject::handleKcpFailure: strict KCP transport failed, name={}, reason={}\n",
+		name_, reason));
+	onNetworkError(std::string("strict KCP transport failure: ") + reason);
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
+bool ClientObject::fallbackToBaseappTcp(const char* reason)
 {
 	const double elapsedSeconds = kcpHandshakeStartTime_ == 0 ? 0.0 :
 		static_cast<double>(timestamp() - kcpHandshakeStartTime_) / static_cast<double>(stampsPerSecond());
@@ -604,6 +620,8 @@ void ClientObject::fallbackToBaseappTcp(const char* reason)
 
 	if (!connectBaseappTcp())
 		state_ = C_STATE_LOGIN_BASEAPP_CREATE;
+
+	return state_ != C_STATE_LOGIN_BASEAPP_CREATE;
 }
 
 //-------------------------------------------------------------------------------------

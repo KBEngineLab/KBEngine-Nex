@@ -133,7 +133,8 @@ protected:
 	bool sendKcpHello();
 	bool retryKcpTransportSetup(const char* operation, int errorCode);
 	void sendBaseappActiveTick(bool force);
-	void fallbackToBaseappTcp(const char* reason);
+	bool fallbackToBaseappTcp(const char* reason);
+	bool handleKcpFailure(const char* reason);
 	void deregisterReceiverEndPoint(Network::PacketReceiver* pPacketReceiver);
 
 	C_ERROR error_;

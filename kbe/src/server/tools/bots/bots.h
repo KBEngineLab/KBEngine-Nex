@@ -54,6 +54,13 @@ namespace KBEngine{
 
 extern bool g_botsDevMode;
 extern bool g_botsReuseAccounts;
+// 命令行覆盖使用三态值，-1 表示沿用 XML，避免默认参数无意覆盖项目配置。
+// Command-line overrides use tri-state values; -1 preserves XML instead of silently replacing project configuration.
+extern int8 g_botsTransportOverride;
+extern int8 g_botsAllowTcpFallbackOverride;
+
+bool botsUseTcpTransport();
+bool botsAllowTcpFallback();
 
 class ClientObject;
 class PyBots;
@@ -190,6 +197,9 @@ public:
 	uint64 totalKcpHandshakeInvalidPackets() const { return totalKcpHandshakeInvalidPackets_; }
 	uint64 totalTcpConnections() const { return totalTcpConnections_; }
 	uint64 totalTcpFallbacks() const { return totalTcpFallbacks_; }
+	uint64 totalTransportFailures() const { return totalTransportFailures_; }
+	std::string configuredTransport() const;
+	bool configuredAllowTcpFallback() const { return botsAllowTcpFallback(); }
 	uint64 totalNetworkErrors() const { return totalNetworkErrors_; }
 	uint64 totalRemovedClients() const { return totalRemovedClients_; }
 	uint64 totalDetachedEntities() const { return totalDetachedEntities_; }
@@ -210,6 +220,7 @@ public:
 	void onKcpHandshakeInvalidPacket() { ++totalKcpHandshakeInvalidPackets_; }
 	void onTcpConnected() { ++totalTcpConnections_; }
 	void onTcpFallback() { ++totalTcpFallbacks_; }
+	void onTransportFailure() { ++totalTransportFailures_; }
 	void onClientNetworkError() { ++totalNetworkErrors_; }
 
 	uint32 reqCreateAndLoginTotalCount(){ return reqCreateAndLoginTotalCount_; }
@@ -492,6 +503,7 @@ protected:
 	uint64											totalKcpHandshakeInvalidPackets_;
 	uint64											totalTcpConnections_;
 	uint64											totalTcpFallbacks_;
+	uint64											totalTransportFailures_;
 	uint64											totalNetworkErrors_;
 	uint64											totalRemovedClients_;
 	uint64											totalDetachedEntities_;

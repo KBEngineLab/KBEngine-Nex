@@ -39,6 +39,29 @@ class WorkloadReadinessError(RuntimeError):
         self.observed = dict(observed or {})
 
 
+def configure_transport_readiness(scenario: dict[str, object], transport: str) -> dict[str, object]:
+    """Bind protocol-specific readiness to the selected BaseApp transport.
+    将协议就绪条件绑定到选定的 BaseApp 传输，阻止 TCP/KCP 样本混入同一轮报告。
+    """
+    configured = dict(scenario)
+    readiness_value = configured.get("readiness")
+    if not isinstance(readiness_value, dict):
+        return configured
+
+    readiness = dict(readiness_value)
+    kcp_metric = "root/bots/performance/clientsKcp"
+    tcp_metric = "root/bots/performance/clientsTcp"
+    # 只有声明了协议指标的场景才扩展此契约，避免给不采集 Bots Watcher 的通用场景增加隐式依赖。
+    # Extend only scenarios that already declare protocol readiness so generic workloads do not gain a hidden Bots dependency.
+    if kcp_metric not in readiness and tcp_metric not in readiness:
+        return configured
+
+    readiness[kcp_metric] = "$bots" if transport == "kcp" else 0
+    readiness[tcp_metric] = "$bots" if transport == "tcp" else 0
+    configured["readiness"] = readiness
+    return configured
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run an isolated KBE performance scenario")
     parser.add_argument("--scenario", required=True, type=Path)
@@ -66,6 +89,16 @@ def parse_args() -> argparse.Namespace:
                         help="Enable Bots Logger forwarding for IDE development")
     parser.add_argument("--reuse-existing-accounts", action="store_true",
                         help="Skip account creation and authenticate pre-provisioned deterministic Bots accounts")
+    parser.add_argument("--bots-transport", choices=("kcp", "tcp"),
+                        help="BaseApp gameplay transport; LoginApp remains TCP")
+    fallback_group = parser.add_mutually_exclusive_group()
+    fallback_group.add_argument("--bots-allow-tcp-fallback", dest="bots_allow_tcp_fallback",
+                                action="store_true",
+                                help="Allow configured KCP clients to fall back to TCP")
+    fallback_group.add_argument("--bots-no-tcp-fallback", dest="bots_allow_tcp_fallback",
+                                action="store_false",
+                                help="Fail KCP clients instead of mixing TCP fallback into the run")
+    parser.set_defaults(bots_allow_tcp_fallback=None)
     parser.add_argument("--tools-root", type=Path, help="kbe/tools/server root for Watcher queries")
     parser.add_argument("--watcher-target", action="append", default=[], metavar="TYPE=HOST:PORT:PATH|TYPE=@COMPONENT:PATH")
     parser.add_argument("--watcher-timeout", type=float,
@@ -109,6 +142,15 @@ def main() -> int:
         args.start_cluster,
     )
     scenario = load_scenario(args.scenario)
+    bots_transport = str(args.bots_transport or scenario.get("bots_transport", "kcp")).lower()
+    if bots_transport not in {"kcp", "tcp"}:
+        raise ValueError("bots_transport must be 'kcp' or 'tcp'")
+    bots_allow_tcp_fallback = bool(
+        args.bots_allow_tcp_fallback
+        if args.bots_allow_tcp_fallback is not None
+        else scenario.get("bots_allow_tcp_fallback", True)
+    )
+    scenario = configure_transport_readiness(scenario, bots_transport)
     args.watcher_timeout = float(
         args.watcher_timeout
         if args.watcher_timeout is not None
@@ -161,9 +203,13 @@ def main() -> int:
                 scenario.get("reuse_existing_accounts", False)
             )
             reuse_argument = " --reuse-existing-accounts" if reuse_accounts else ""
+            transport_arguments = (
+                f" --bots-transport={bots_transport}"
+                f" --bots-allow-tcp-fallback={str(bots_allow_tcp_fallback).lower()}"
+            )
             args.command = (
                 f'"{args.server_binary_dir / "bots.exe"}" '
-                f"--cid={{cid}} --gus={{gus}} --hide=1{dev_argument}{reuse_argument}"
+                f"--cid={{cid}} --gus={{gus}} --hide=1{dev_argument}{reuse_argument}{transport_arguments}"
             )
         scenario = dict(scenario)
         scenario["watcher_component_ids"] = generated_component_ids
@@ -174,6 +220,10 @@ def main() -> int:
             args.command = f"{args.command} --dev"
         if args.reuse_existing_accounts:
             args.command = f"{args.command} --reuse-existing-accounts"
+        args.command = (
+            f"{args.command} --bots-transport={bots_transport}"
+            f" --bots-allow-tcp-fallback={str(bots_allow_tcp_fallback).lower()}"
+        )
 
     bots_per_process = partition_workload_bots(configured_bots, workload_process_count)
     interval = max(float(args.sample_interval), 0.1)
@@ -238,6 +288,8 @@ def main() -> int:
             int(scenario["database_connections"]) if "database_connections" in scenario else None,
             baseapp_count,
             bool(scenario.get("performance_probes_enabled", False)),
+            bots_transport,
+            bots_allow_tcp_fallback,
         )
         environment = build_environment(_repository_root(), args.assets_root, output, fixture_root)
         environment.update(scenario_environment(scenario))
@@ -249,6 +301,8 @@ def main() -> int:
         scenario_metadata["effective_workload_cids"] = list(
             range(workload_cid_start, workload_cid_start + workload_process_count)
         )
+        scenario_metadata["effective_bots_transport"] = bots_transport
+        scenario_metadata["effective_bots_allow_tcp_fallback"] = bots_allow_tcp_fallback
         write_scenario_metadata(output, scenario_metadata, configured_bots)
     elif args.command and configured_bots > 0:
         raise ValueError("--assets-root is required when starting a scenario with Bots")

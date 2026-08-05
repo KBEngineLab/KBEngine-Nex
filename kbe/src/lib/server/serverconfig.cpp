@@ -1666,6 +1666,38 @@ bool ServerConfig::loadConfig(std::string fileName)
 			_botsInfo.forceInternalLogin = (xml->getValStr(node) == "true");
 		}
 
+		node = xml->enterNode(rootNode, "transport");
+		if (node != NULL)
+		{
+			const std::string transport = strutil::toLower(strutil::kbe_trim(xml->getValStr(node)));
+			if (transport == "kcp" || transport == "tcp")
+			{
+				_botsInfo.bots_transport = transport;
+			}
+			else
+			{
+				ERROR_MSG(fmt::format(
+					"ServerConfig::loadConfig: bots/transport '{}' is invalid; expected 'kcp' or 'tcp', keeping '{}'.\n",
+					transport, _botsInfo.bots_transport));
+			}
+		}
+
+		node = xml->enterNode(rootNode, "allowTcpFallback");
+		if (node != NULL)
+		{
+			const std::string value = strutil::toLower(strutil::kbe_trim(xml->getValStr(node)));
+			if (value == "true" || value == "false")
+			{
+				_botsInfo.bots_allow_tcp_fallback = value == "true";
+			}
+			else
+			{
+				ERROR_MSG(fmt::format(
+					"ServerConfig::loadConfig: bots/allowTcpFallback '{}' is invalid; expected 'true' or 'false'.\n",
+					value));
+			}
+		}
+
 		node = xml->enterNode(rootNode, "telnet_service");
 		if(node != NULL)
 		{

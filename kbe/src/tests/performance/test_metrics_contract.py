@@ -22,6 +22,7 @@ from performance.report import build_summary, load_events, validate_event
 from performance.run import (
     _repository_root,
     collect_readiness_failure_snapshot,
+    configure_transport_readiness,
     drain_watcher_windows,
     expand_bots_watcher_targets,
     expand_component_watcher_targets,
@@ -50,6 +51,28 @@ def load_cluster_controller_module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def assert_transport_contract() -> None:
+    kcp = configure_transport_readiness(
+        {"readiness": {
+            "root/bots/performance/clientsKcp": "$bots",
+            "root/bots/performance/clientsPlay": "$bots",
+        }},
+        "kcp",
+    )
+    assert kcp["readiness"]["root/bots/performance/clientsKcp"] == "$bots"
+    assert kcp["readiness"]["root/bots/performance/clientsTcp"] == 0
+
+    tcp = configure_transport_readiness(
+        {"readiness": {"root/bots/performance/clientsKcp": "$bots"}},
+        "tcp",
+    )
+    assert tcp["readiness"]["root/bots/performance/clientsKcp"] == 0
+    assert tcp["readiness"]["root/bots/performance/clientsTcp"] == "$bots"
+
+    untouched = configure_transport_readiness({"readiness": {"root/witness/active": "$bots"}}, "tcp")
+    assert untouched == {"readiness": {"root/witness/active": "$bots"}}
 
 
 def assert_centralized_discovery_matching() -> None:
@@ -1020,6 +1043,7 @@ def assert_watcher_window_drain_isolation() -> None:
 
 
 def main() -> int:
+    assert_transport_contract()
     assert_centralized_discovery_matching()
     assert_partial_workload_start_cleanup()
     assert_windows_command_line_preserves_quoted_executable()
@@ -1263,9 +1287,13 @@ def main() -> int:
             database_connections=32,
             baseapp_external_port_count=10,
             performance_probes_enabled=True,
+            bots_transport="tcp",
+            bots_allow_tcp_fallback=False,
         )
         xml_root = ET.parse(overlay).getroot()
         assert xml_root.findtext("./bots/defaultAddBots/totalCount") == "500"
+        assert xml_root.findtext("./bots/transport") == "tcp"
+        assert xml_root.findtext("./bots/allowTcpFallback") == "false"
         assert xml_root.findtext("./channelCommon/windowOverflow/receive/messages/external") == "1024"
         assert xml_root.findtext("./channelCommon/windowOverflow/receive/messages/critical") == "1024"
         assert xml_root.findtext("./channelCommon/windowOverflow/receive/bytes/external") == "1048576"
@@ -1289,6 +1317,8 @@ def main() -> int:
         ).getroot()
         assert deterministic_root.findtext("./bots/account_infos/account_name_suffix_inc") == "1"
         assert deterministic_root.findtext("./performanceProbes/enabled") == "false"
+        assert deterministic_root.findtext("./bots/transport") == "kcp"
+        assert deterministic_root.findtext("./bots/allowTcpFallback") == "true"
         bots_log_config = (
             root / "run/config-overlay/res/server/log4cxx_properties/bots.properties"
         ).read_text(encoding="utf-8")

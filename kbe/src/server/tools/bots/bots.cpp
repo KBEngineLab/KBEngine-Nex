@@ -84,6 +84,24 @@ uint64 pythonLatencyWindowNanoseconds()
 
 bool g_botsDevMode = false;
 bool g_botsReuseAccounts = false;
+int8 g_botsTransportOverride = -1;
+int8 g_botsAllowTcpFallbackOverride = -1;
+
+bool botsUseTcpTransport()
+{
+	if (g_botsTransportOverride >= 0)
+		return g_botsTransportOverride == 1;
+
+	return g_kbeSrvConfig.getBots().bots_transport == "tcp";
+}
+
+bool botsAllowTcpFallback()
+{
+	if (g_botsAllowTcpFallbackOverride >= 0)
+		return g_botsAllowTcpFallbackOverride == 1;
+
+	return g_kbeSrvConfig.getBots().bots_allow_tcp_fallback;
+}
 
 //-------------------------------------------------------------------------------------
 Bots::Bots(Network::EventDispatcher& dispatcher, 
@@ -103,6 +121,7 @@ totalKcpHandshakeSuccesses_(0),
 totalKcpHandshakeInvalidPackets_(0),
 totalTcpConnections_(0),
 totalTcpFallbacks_(0),
+totalTransportFailures_(0),
 totalNetworkErrors_(0),
 totalRemovedClients_(0),
 totalDetachedEntities_(0),
@@ -187,6 +206,8 @@ bool Bots::initializeWatcher()
 {
 	WATCH_OBJECT("bots/devMode", g_botsDevMode);
 	WATCH_OBJECT("bots/reuseAccounts", g_botsReuseAccounts);
+	WATCH_OBJECT("bots/transport/configured", this, &Bots::configuredTransport);
+	WATCH_OBJECT("bots/transport/allowTcpFallback", this, &Bots::configuredAllowTcpFallback);
 	WATCH_OBJECT("bots/clients/total", this, &Bots::numClients);
 	WATCH_OBJECT("bots/clients/kcp", this, &Bots::numKcpClients);
 	WATCH_OBJECT("bots/clients/tcp", this, &Bots::numTcpClients);
@@ -196,6 +217,7 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/totals/kcpHandshakeInvalidPackets", this, &Bots::totalKcpHandshakeInvalidPackets);
 	WATCH_OBJECT("bots/totals/tcpConnections", this, &Bots::totalTcpConnections);
 	WATCH_OBJECT("bots/totals/tcpFallbacks", this, &Bots::totalTcpFallbacks);
+	WATCH_OBJECT("bots/totals/transportFailures", this, &Bots::totalTransportFailures);
 	WATCH_OBJECT("bots/totals/networkErrors", this, &Bots::totalNetworkErrors);
 	WATCH_OBJECT("bots/totals/removedClients", this, &Bots::totalRemovedClients);
 	WATCH_OBJECT("bots/totals/detachedEntities", this, &Bots::totalDetachedEntities);
@@ -224,6 +246,8 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/clientsTotal", this, &Bots::numClients);
 	WATCH_OBJECT("bots/performance/clientsKcp", this, &Bots::numKcpClients);
 	WATCH_OBJECT("bots/performance/clientsTcp", this, &Bots::numTcpClients);
+	WATCH_OBJECT("bots/performance/configuredTransport", this, &Bots::configuredTransport);
+	WATCH_OBJECT("bots/performance/allowTcpFallback", this, &Bots::configuredAllowTcpFallback);
 	WATCH_OBJECT("bots/performance/clientsDestroyed", this, &Bots::numDestroyedClients);
 	// 状态分布直接定位登录流水线积压阶段；Watcher 每五秒查询一次，单次线性扫描不进入游戏 Tick 热路径。
 	// State distribution identifies login-pipeline backlog directly; the five-second Watcher query keeps this linear scan off the game-tick hot path.
@@ -238,6 +262,7 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/kcpHandshakeSuccesses", this, &Bots::totalKcpHandshakeSuccesses);
 	WATCH_OBJECT("bots/performance/kcpHandshakeInvalidPackets", this, &Bots::totalKcpHandshakeInvalidPackets);
 	WATCH_OBJECT("bots/performance/tcpFallbacks", this, &Bots::totalTcpFallbacks);
+	WATCH_OBJECT("bots/performance/transportFailures", this, &Bots::totalTransportFailures);
 	WATCH_OBJECT("bots/performance/networkErrors", this, &Bots::totalNetworkErrors);
 	WATCH_OBJECT("bots/performance/removedClients", this, &Bots::totalRemovedClients);
 	WATCH_OBJECT("bots/performance/detachedEntities", this, &Bots::totalDetachedEntities);
@@ -733,6 +758,12 @@ uint32 Bots::numKcpClients() const
 	for (CLIENTS::const_iterator iter = clients_.begin(); iter != clients_.end(); ++iter)
 		count += iter->second->isKcpTransport() ? 1 : 0;
 	return count;
+}
+
+//-------------------------------------------------------------------------------------
+std::string Bots::configuredTransport() const
+{
+	return botsUseTcpTransport() ? "tcp" : "kcp";
 }
 
 //-------------------------------------------------------------------------------------

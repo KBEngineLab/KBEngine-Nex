@@ -182,6 +182,8 @@ typedef struct EngineComponentInfo
 
 		isOnInitCallPropertysSetMethods = true;
 		forceInternalLogin = false;
+		bots_transport = "kcp";
+		bots_allow_tcp_fallback = true;
 		witness_volatile_bytes_per_tick = 512;
 		witness_total_bytes_per_tick = 2048;
 		witness_global_bytes_per_tick = 1048576;
@@ -275,7 +277,13 @@ typedef struct EngineComponentInfo
 	uint32 defaultAddBots_tickCount;						// 默认启动进程后自动添加这么多个bots 每次添加数量
 
 	bool forceInternalLogin;								// 对应baseapp的externalAddress的解决方案，当externalAddress强制下发公网IP提供登陆时，
-															// 如果局域网内部使用机器人测试也走公网IP和流量可能会不合适，此时可以设置为true，登陆时强制直接使用内网环境
+													// 如果局域网内部使用机器人测试也走公网IP和流量可能会不合适，此时可以设置为true，登陆时强制直接使用内网环境
+	// Bots 的 LoginApp 链路始终使用 TCP；这里只选择登录成功后的 BaseApp 游戏传输。
+	// Bots always use TCP for LoginApp; this selects only the BaseApp gameplay transport after login.
+	std::string bots_transport;
+	// KCP 建立失败是否允许降级到 TCP；正式纯协议压测应关闭，避免样本混杂。
+	// Whether failed KCP setup may fall back to TCP; pure protocol benchmarks disable it to avoid mixed samples.
+	bool bots_allow_tcp_fallback;
 
 	std::string bots_account_name_prefix;					// 机器人账号名称的前缀
 	uint32 bots_account_name_suffix_inc;					// 机器人账号名称的后缀递增, 0使用随机数递增， 否则按照baseNum填写的数递增

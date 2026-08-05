@@ -37,6 +37,8 @@ def create_config_overlay(
     database_connections: int | None = None,
     baseapp_external_port_count: int | None = None,
     performance_probes_enabled: bool = False,
+    bots_transport: str = "kcp",
+    bots_allow_tcp_fallback: bool = True,
 ) -> Path:
     """Write only the per-run XML override; source assets remain read-only.
     只写入本次运行的 XML 覆盖文件，源资产保持只读。
@@ -62,6 +64,12 @@ def create_config_overlay(
     bots_node = root.find("./bots")
     if bots_node is None:
         bots_node = ET.SubElement(root, "bots")
+    if bots_transport not in {"kcp", "tcp"}:
+        raise ValueError("Bots transport must be 'kcp' or 'tcp'")
+    # 协议属于本轮实验契约，必须写入隔离 overlay，不能依赖业务资产中的隐式默认值。
+    # Transport is part of the run contract and must be explicit in the isolated overlay instead of inheriting asset defaults.
+    set_xml_value(bots_node, "transport", bots_transport)
+    set_xml_value(bots_node, "allowTcpFallback", str(bots_allow_tcp_fallback).lower())
     default_add = bots_node.find("defaultAddBots")
     if default_add is None:
         default_add = ET.SubElement(bots_node, "defaultAddBots")

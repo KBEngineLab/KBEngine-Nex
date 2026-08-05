@@ -949,6 +949,14 @@
 			If the use of robot within the LAN test also take the public network IP and traffic may be inappropriate, can be set to true, 
 			when landing forced to use the internal network environment. -->
 		<forceInternalLogin> false </forceInternalLogin>
+
+		<!-- LoginApp 始终使用 TCP；该选项只切换登录成功后的 BaseApp 游戏连接。
+			LoginApp always uses TCP; this option switches only the BaseApp gameplay connection. -->
+		<transport> kcp </transport>
+
+		<!-- KCP 建立失败时是否允许回退 TCP。纯 KCP 压测应设为 false，避免协议样本混杂。
+			Whether failed KCP setup may fall back to TCP. Set false for pure KCP benchmarks. -->
+		<allowTcpFallback> true </allowTcpFallback>
 		
 		<!-- loginapp地址 
 			（loginapp address)
