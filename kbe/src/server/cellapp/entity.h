@@ -423,8 +423,9 @@ public:
 	void delWitnessed(Entity* entity);
 	void onDelWitnessed();
 
-	/** 某个观察关系已消费待发送位姿，允许下一次变化重新通知所有观察者。 */
-	/** Allows the next change to notify all observers after one relation consumes its pending pose. */
+	/** 某个观察关系加入或完成待发送位姿时维护聚合计数。 */
+	/** Maintains the aggregate count while observer relations queue or complete pose delivery. */
+	void onWitnessVolatileQueued();
 	void onWitnessVolatileDequeued();
 
 	/**
@@ -713,7 +714,7 @@ protected:
 	WITNESS_IDS										witnesses_;
 	size_t													witnesses_count_;
 
-	bool											witnessesVolatileBroadcastPending_;
+	uint32											witnessesVolatilePendingCount_;
 
 	// 观察者对象
 	Witness*												pWitness_;

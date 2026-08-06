@@ -515,7 +515,14 @@ void Witness::_onLeaveView(EntityRef* pEntityRef)
 	pEntityRef->flags(((pEntityRef->flags() | ENTITYREF_FLAG_LEAVE_CLIENT_PENDING) & ~(ENTITYREF_FLAG_ENTER_CLIENT_PENDING)));
 
 	if(pEntityRef->pEntity())
+	{
+		if (pEntityRef->producerPending())
+		{
+			pEntityRef->pEntity()->onWitnessVolatileDequeued();
+			pEntityRef->producerPending(false);
+		}
 		pEntityRef->pEntity()->delWitnessed(pEntity_);
+	}
 
 	pEntityRef->pEntity(NULL);
 	queueEntityRefVolatile(pEntityRef);
@@ -821,8 +828,12 @@ void Witness::clearVolatileDirtyQueue()
 	VIEW_ENTITIES::iterator iter = viewEntities_.begin();
 	for (; iter != viewEntities_.end(); ++iter)
 	{
-		if ((*iter)->volatileQueued() && (*iter)->pEntity())
-			(*iter)->pEntity()->onWitnessVolatileDequeued();
+		if ((*iter)->producerPending())
+		{
+			if ((*iter)->pEntity())
+				(*iter)->pEntity()->onWitnessVolatileDequeued();
+			(*iter)->producerPending(false);
+		}
 		(*iter)->volatileQueued(false);
 		(*iter)->structuralQueued(false);
 	}
@@ -853,17 +864,18 @@ void Witness::initializeEntityRefLifecycle(EntityRef* pEntityRef)
 	pEntityRef->generation(nextEntityRefGeneration_++);
 	pEntityRef->volatileQueued(false);
 	pEntityRef->structuralQueued(false);
+	pEntityRef->producerPending(false);
 }
 
 //-------------------------------------------------------------------------------------
-void Witness::queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue)
+bool Witness::queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue)
 {
 	// 结构消息必须绕过 volatile 背压，因此使用独立优先队列；generation + 双 queued 标记
 	// 允许结构事件提升已经排队的 volatile 项，而不需要在线性容器中搜索和删除旧条目。
 	// Structural messages must bypass volatile backpressure, so they use a dedicated priority queue.
 	// Generation plus two queued flags promotes an already queued volatile item without searching a linear container.
 	if (!pEntityRef || pEntityRef->flags() == ENTITYREF_FLAG_UNKONWN)
-		return;
+		return false;
 
 	if (isStructuralUpdate(pEntityRef))
 	{
@@ -878,7 +890,7 @@ void Witness::queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue)
 		{
 			g_witnessLoadMetrics.recordQueueDeduplicated();
 		}
-		return;
+		return pEntityRef->structuralQueued();
 	}
 
 	if (volatileDirtyQueue_.enqueue(
@@ -891,6 +903,7 @@ void Witness::queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue)
 	{
 		g_witnessLoadMetrics.recordQueueDeduplicated();
 	}
+	return pEntityRef->volatileQueued();
 }
 
 //-------------------------------------------------------------------------------------
@@ -961,8 +974,12 @@ void Witness::releaseVolatileProducerIfDelivered(EntityRef* pEntityRef)
 		return;
 
 	Entity* pEntity = pEntityRef->pEntity();
-	if (pEntity)
-		pEntity->onWitnessVolatileDequeued();
+	if (pEntityRef->producerPending())
+	{
+		pEntityRef->producerPending(false);
+		if (pEntity)
+			pEntity->onWitnessVolatileDequeued();
+	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -979,8 +996,17 @@ void Witness::setVolatileUpdatesEnabled(bool enabled)
 void Witness::markViewEntityVolatileDirty(ENTITY_ID entityID)
 {
 	VIEW_ENTITIES_MAP::iterator iter = viewEntities_map_.find(entityID);
-	if (iter != viewEntities_map_.end())
-		queueEntityRefVolatile(iter->second);
+	if (iter == viewEntities_map_.end())
+		return;
+
+	EntityRef* pEntityRef = iter->second;
+	const bool wasQueued = pEntityRef->volatileQueued() || pEntityRef->structuralQueued();
+	if (queueEntityRefVolatile(pEntityRef) && !wasQueued && !pEntityRef->producerPending())
+	{
+		pEntityRef->producerPending(true);
+		if (pEntityRef->pEntity())
+			pEntityRef->pEntity()->onWitnessVolatileQueued();
+	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -1080,9 +1106,11 @@ bool Witness::processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pE
 //-------------------------------------------------------------------------------------
 void Witness::removeViewEntityRef(EntityRef* pEntityRef)
 {
-	if (pEntityRef->volatileQueued() && pEntityRef->pEntity())
+	if (pEntityRef->producerPending())
 	{
-		pEntityRef->pEntity()->onWitnessVolatileDequeued();
+		if (pEntityRef->pEntity())
+			pEntityRef->pEntity()->onWitnessVolatileDequeued();
+		pEntityRef->producerPending(false);
 		pEntityRef->volatileQueued(false);
 	}
 

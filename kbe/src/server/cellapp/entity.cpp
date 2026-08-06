@@ -137,7 +137,7 @@ topSpeed_(-0.1f),
 topSpeedY_(-0.1f),
 witnesses_(),
 witnesses_count_(0),
-witnessesVolatileBroadcastPending_(false),
+witnessesVolatilePendingCount_(0),
 pWitness_(NULL),
 allClients_(new AllClients(pScriptModule, id, false)),
 otherClients_(new AllClients(pScriptModule, id, true)),
@@ -1614,9 +1614,6 @@ void Entity::addWitnessed(Entity* entity)
 
 	witnesses_.push_back(entity->id());
 	++witnesses_count_;
-	// 关系集合变化后保守地允许一次重新广播，避免新观察者错过最新位姿。
-	// Conservatively allow one rebroadcast after relation changes so a new observer cannot miss the latest pose.
-	witnessesVolatileBroadcastPending_ = false;
 
 	/*
 	int8 detailLevel = pScriptModule_->getDetailLevel().getLevelByRange(range);
@@ -1669,7 +1666,6 @@ void Entity::delWitnessed(Entity* entity)
 	// Preserve observer iteration and migration order; shifting contiguous 32-bit IDs suits infrequent leaves and frequent broadcasts.
 	witnesses_.erase(observer);
 	--witnesses_count_;
-	witnessesVolatileBroadcastPending_ = false;
 
 	if (controlledBy_ != NULL && entity->id() == controlledBy_->id())
 	{
@@ -1692,9 +1688,16 @@ void Entity::delWitnessed(Entity* entity)
 }
 
 //-------------------------------------------------------------------------------------
+void Entity::onWitnessVolatileQueued()
+{
+	++witnessesVolatilePendingCount_;
+}
+
+//-------------------------------------------------------------------------------------
 void Entity::onWitnessVolatileDequeued()
 {
-	witnessesVolatileBroadcastPending_ = false;
+	if (witnessesVolatilePendingCount_ > 0)
+		--witnessesVolatilePendingCount_;
 }
 
 //-------------------------------------------------------------------------------------
@@ -2259,7 +2262,7 @@ void Entity::markWitnessesVolatileDataDirty()
 {
 	// 队列条目在消费时读取实体当前坐标，因此所有观察关系仍在排队时，重复变化只需保留最新值。
 	// Queue entries read the entity's current pose when consumed, so repeated changes coalesce while every observer relation remains queued.
-	if (witnessesVolatileBroadcastPending_)
+	if (witnessesVolatilePendingCount_ > 0)
 	{
 		Witness::recordProducerCoalesced();
 		return;
@@ -2275,8 +2278,6 @@ void Entity::markWitnessesVolatileDataDirty()
 			pWitnessEntity->pWitness()->markViewEntityVolatileDirty(id());
 	}
 
-	if (witnesses_count_ > 0)
-		witnessesVolatileBroadcastPending_ = true;
 }
 
 //-------------------------------------------------------------------------------------

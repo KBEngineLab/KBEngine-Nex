@@ -280,7 +280,7 @@ private:
 	void clearVolatileDirtyQueue();
 	void synchronizeViewEntityMetrics();
 	void initializeEntityRefLifecycle(EntityRef* pEntityRef);
-	void queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue = false);
+	bool queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue = false);
 	void scheduleEntityRefVolatile(EntityRef* pEntityRef);
 	void activateDueVolatileUpdates();
 	uint32 volatileUpdateIntervalTicks(Entity* pEntity) const;

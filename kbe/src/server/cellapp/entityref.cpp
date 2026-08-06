@@ -32,7 +32,8 @@ pEntity_(pEntity),
 flags_(ENTITYREF_FLAG_UNKONWN),
 generation_(0),
 volatileQueued_(false),
-structuralQueued_(false)
+structuralQueued_(false),
+producerPending_(false)
 {
 	id_ = pEntity->id();
 }
@@ -45,7 +46,8 @@ pEntity_(NULL),
 flags_(ENTITYREF_FLAG_UNKONWN),
 generation_(0),
 volatileQueued_(false),
-structuralQueued_(false)
+structuralQueued_(false),
+producerPending_(false)
 {
 }
 
@@ -98,6 +100,7 @@ void EntityRef::onReclaimObject()
 	generation_ = 0;
 	volatileQueued_ = false;
 	structuralQueued_ = false;
+	producerPending_ = false;
 }
 
 //-------------------------------------------------------------------------------------

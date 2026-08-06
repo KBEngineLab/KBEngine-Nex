@@ -57,7 +57,8 @@ public:
 		size_t bytes = sizeof(id_)
 			+ sizeof(aliasID_) + sizeof(pEntity_)
 			+ sizeof(flags_) + sizeof(generation_)
-			+ sizeof(volatileQueued_) + sizeof(structuralQueued_);
+			+ sizeof(volatileQueued_) + sizeof(structuralQueued_)
+			+ sizeof(producerPending_);
 
 		return bytes;
 	}
@@ -82,6 +83,8 @@ public:
 	bool structuralQueued() const { return structuralQueued_; }
 	bool& structuralQueuedRef() { return structuralQueued_; }
 	void structuralQueued(bool value) { structuralQueued_ = value; }
+	bool producerPending() const { return producerPending_; }
+	void producerPending(bool value) { producerPending_ = value; }
 
 	void addToStream(KBEngine::MemoryStream& s);
 	void createFromStream(KBEngine::MemoryStream& s);
@@ -94,6 +97,7 @@ private:
 	uint64 generation_;
 	bool volatileQueued_;
 	bool structuralQueued_;
+	bool producerPending_;
 };
 
 }
