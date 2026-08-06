@@ -1,4 +1,5 @@
 #include "server/cellapp/witness_load_metrics.h"
+#include "server/cellapp/space_load_snapshot.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -115,6 +116,28 @@ bool testFullScanWorkAccounting()
 		require(metrics.fullScanEntities() == 7, "full scan work was not accumulated");
 }
 
+bool testSpaceLoadSnapshotAggregation()
+{
+	KBEngine::SpaceLoadSnapshot snapshot;
+	snapshot.observe(101, 12, 7, 3, 42);
+	snapshot.observe(202, 25, 4, 1, 80);
+	snapshot.observe(303, 25, 9, 5, 60);
+
+	return require(snapshot.spaceCount == 3, "space count was not accumulated") &&
+		require(snapshot.totalEntities == 62, "space entity count was not accumulated") &&
+		require(snapshot.totalWitnesses == 20, "space Witness count was not accumulated") &&
+		require(snapshot.totalPendingWitnesses == 9, "pending Witness count was not accumulated") &&
+		require(snapshot.totalAoiRelations == 182, "AOI relation count was not accumulated") &&
+		require(snapshot.maxEntities == 25 && snapshot.maxEntitiesSpaceID == 202,
+			"entity hotspot or stable tie handling drifted") &&
+		require(snapshot.maxWitnesses == 9 && snapshot.maxWitnessesSpaceID == 303,
+			"Witness hotspot was not retained") &&
+		require(snapshot.maxPendingWitnesses == 5 && snapshot.maxPendingWitnessesSpaceID == 303,
+			"pending Witness hotspot was not retained") &&
+		require(snapshot.maxAoiRelations == 80 && snapshot.maxAoiRelationsSpaceID == 202,
+			"AOI relation hotspot was not retained");
+}
+
 bool testDisabledMetrics()
 {
 	KBEngine::g_performanceProbesEnabled = false;
@@ -193,7 +216,7 @@ bool testStructuralProcessingSampling()
 int main()
 {
 	if (!testDisabledMetrics() || !testIncrementalViewAccounting() || !testQueueAttribution() || !testFullScanWorkAccounting() ||
-		!testVolatileBackpressureAccounting() || !testStructuralProcessingSampling())
+		!testSpaceLoadSnapshotAggregation() || !testVolatileBackpressureAccounting() || !testStructuralProcessingSampling())
 		return EXIT_FAILURE;
 
 	std::cout << "WITNESS_LOAD_METRICS_TEST_PASS" << std::endl;

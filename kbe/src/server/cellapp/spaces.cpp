@@ -22,6 +22,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "profile.h"
 #include "cellapp.h"
 #include "entity.h"
+#include "witness.h"
+#include "common/performance_probes.h"
 namespace KBEngine{	
 
 Spaces::SPACES& Spaces::spaces()
@@ -195,6 +197,80 @@ void Spaces::update()
 		}
 	}
 }
+
+//-------------------------------------------------------------------------------------
+const SpaceLoadSnapshot& Spaces::loadSnapshot()
+{
+	static const SpaceLoadSnapshot emptySnapshot;
+	static SpaceLoadSnapshot snapshot;
+	static GAME_TIME sampledTick = 0;
+	static bool hasSnapshot = false;
+
+	// Watcher sampling is intentionally pull-based and disabled with the other
+	// performance probes. All spaces are scanned at most once per game Tick.
+	// Watcher 采样按需触发，并随性能探针一同关闭；同一游戏 Tick 最多扫描一次全部 Space。
+	if (!g_performanceProbesEnabled)
+		return emptySnapshot;
+
+	if (hasSnapshot && sampledTick == g_kbetime)
+		return snapshot;
+
+	snapshot = SpaceLoadSnapshot();
+	snapshot.sampledTick = g_kbetime;
+
+	const SPACES& registeredSpaces = spaces();
+	for (SPACES::const_iterator spaceIter = registeredSpaces.begin();
+		spaceIter != registeredSpaces.end(); ++spaceIter)
+	{
+		const Space* pSpace = spaceIter->second.get();
+		if (pSpace == NULL)
+			continue;
+
+		const SPACE_ENTITIES& spaceEntities = pSpace->entities();
+		uint64 witnesses = 0;
+		uint64 pendingWitnesses = 0;
+		uint64 aoiRelations = 0;
+
+		for (SPACE_ENTITIES::const_iterator entityIter = spaceEntities.begin();
+			entityIter != spaceEntities.end(); ++entityIter)
+		{
+			Entity* pEntity = entityIter->get();
+			if (pEntity == NULL || pEntity->isDestroyed() || !pEntity->hasWitness())
+				continue;
+
+			Witness* pWitness = pEntity->pWitness();
+			if (pWitness == NULL)
+				continue;
+
+			++witnesses;
+			if (pWitness->schedulerPending())
+				++pendingWitnesses;
+			aoiRelations += static_cast<uint64>(pWitness->viewEntities().size());
+		}
+
+		snapshot.observe(pSpace->id(), static_cast<uint64>(spaceEntities.size()),
+			witnesses, pendingWitnesses, aoiRelations);
+	}
+
+	sampledTick = g_kbetime;
+	hasSnapshot = true;
+	return snapshot;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Spaces::snapshotSpaceCount() { return loadSnapshot().spaceCount; }
+uint64 Spaces::snapshotTotalEntities() { return loadSnapshot().totalEntities; }
+uint64 Spaces::snapshotTotalWitnesses() { return loadSnapshot().totalWitnesses; }
+uint64 Spaces::snapshotTotalPendingWitnesses() { return loadSnapshot().totalPendingWitnesses; }
+uint64 Spaces::snapshotTotalAoiRelations() { return loadSnapshot().totalAoiRelations; }
+uint64 Spaces::snapshotMaxEntities() { return loadSnapshot().maxEntities; }
+uint64 Spaces::snapshotMaxWitnesses() { return loadSnapshot().maxWitnesses; }
+uint64 Spaces::snapshotMaxPendingWitnesses() { return loadSnapshot().maxPendingWitnesses; }
+uint64 Spaces::snapshotMaxAoiRelations() { return loadSnapshot().maxAoiRelations; }
+uint64 Spaces::snapshotMaxEntitiesSpaceID() { return loadSnapshot().maxEntitiesSpaceID; }
+uint64 Spaces::snapshotMaxWitnessesSpaceID() { return loadSnapshot().maxWitnessesSpaceID; }
+uint64 Spaces::snapshotMaxPendingWitnessesSpaceID() { return loadSnapshot().maxPendingWitnessesSpaceID; }
+uint64 Spaces::snapshotMaxAoiRelationsSpaceID() { return loadSnapshot().maxAoiRelationsSpaceID; }
 
 //-------------------------------------------------------------------------------------
 }

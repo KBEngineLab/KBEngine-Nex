@@ -21,6 +21,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "cellapp.h"
 #include "space.h"
+#include "spaces.h"
 #include "space_entity.h"
 #include "profile.h"
 #include "witness.h"
@@ -321,6 +322,19 @@ bool Cellapp::initializeWatcher()
 
 	WATCH_OBJECT("load", this, &Cellapp::_getLoad);
 	WATCH_OBJECT("spaceSize", this, &Cellapp::spaceSize);
+	WATCH_OBJECT("spaces/count", &Spaces::snapshotSpaceCount);
+	WATCH_OBJECT("spaces/entities/total", &Spaces::snapshotTotalEntities);
+	WATCH_OBJECT("spaces/entities/max", &Spaces::snapshotMaxEntities);
+	WATCH_OBJECT("spaces/entities/hottestSpaceID", &Spaces::snapshotMaxEntitiesSpaceID);
+	WATCH_OBJECT("spaces/witnesses/total", &Spaces::snapshotTotalWitnesses);
+	WATCH_OBJECT("spaces/witnesses/max", &Spaces::snapshotMaxWitnesses);
+	WATCH_OBJECT("spaces/witnesses/hottestSpaceID", &Spaces::snapshotMaxWitnessesSpaceID);
+	WATCH_OBJECT("spaces/pendingWitnesses/total", &Spaces::snapshotTotalPendingWitnesses);
+	WATCH_OBJECT("spaces/pendingWitnesses/max", &Spaces::snapshotMaxPendingWitnesses);
+	WATCH_OBJECT("spaces/pendingWitnesses/hottestSpaceID", &Spaces::snapshotMaxPendingWitnessesSpaceID);
+	WATCH_OBJECT("spaces/aoiRelations/total", &Spaces::snapshotTotalAoiRelations);
+	WATCH_OBJECT("spaces/aoiRelations/max", &Spaces::snapshotMaxAoiRelations);
+	WATCH_OBJECT("spaces/aoiRelations/hottestSpaceID", &Spaces::snapshotMaxAoiRelationsSpaceID);
 	WATCH_OBJECT("stats/runningTime", &runningTime);
 	WATCH_OBJECT("witness/active", &Witness::activeCount);
 	WATCH_OBJECT("witness/dirtyQueued", &Witness::dirtyQueuedCount);

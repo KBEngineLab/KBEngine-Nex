@@ -26,6 +26,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "common/singleton.h"
 #include "updatable.h"
 #include "space.h"
+#include "space_load_snapshot.h"
 
 namespace KBEngine{
 
@@ -68,9 +69,23 @@ public:
 	static void update();
 
 	static size_t size(){ return spaces().size(); }
+	static uint64 snapshotSpaceCount();
+	static uint64 snapshotTotalEntities();
+	static uint64 snapshotTotalWitnesses();
+	static uint64 snapshotTotalPendingWitnesses();
+	static uint64 snapshotTotalAoiRelations();
+	static uint64 snapshotMaxEntities();
+	static uint64 snapshotMaxWitnesses();
+	static uint64 snapshotMaxPendingWitnesses();
+	static uint64 snapshotMaxAoiRelations();
+	static uint64 snapshotMaxEntitiesSpaceID();
+	static uint64 snapshotMaxWitnessesSpaceID();
+	static uint64 snapshotMaxPendingWitnessesSpaceID();
+	static uint64 snapshotMaxAoiRelationsSpaceID();
 
 protected:
 	static SPACES& spaces();
+	static const SpaceLoadSnapshot& loadSnapshot();
 };
 
 }

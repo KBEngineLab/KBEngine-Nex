@@ -200,6 +200,7 @@ public:
 	/** Marks a visible entity's volatile data for synchronization in the next update batch. */
 	void markViewEntityVolatileDirty(ENTITY_ID entityID);
 	void setVolatileUpdatesEnabled(bool enabled);
+	bool schedulerPending() const { return schedulerPending_; }
 
 	static uint64 activeCount();
 	static uint64 dirtyQueuedCount();
