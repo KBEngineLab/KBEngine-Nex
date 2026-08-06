@@ -981,7 +981,10 @@ void Witness::setSchedulerPending(bool pending)
 		return;
 	schedulerPending_ = pending;
 	if (pending)
+	{
 		++g_witnessPendingCount;
+		g_witnessLoadMetrics.recordPendingArrival();
+	}
 	else
 	{
 		KBE_ASSERT(g_witnessPendingCount > 0);
@@ -1471,8 +1474,10 @@ void Witness::beginUpdateTick()
 }
 
 uint64 Witness::globalPendingCount() { return g_witnessPendingCount; }
+uint64 Witness::globalPendingSnapshot() { return g_witnessUpdateScheduler.pendingSnapshot(); }
 uint64 Witness::globalPendingAdmittedCount() { return g_witnessLoadMetrics.pendingAdmitted(); }
 uint64 Witness::globalPendingDeferredCount() { return g_witnessLoadMetrics.pendingDeferred(); }
+uint64 Witness::globalPendingArrivalCount() { return g_witnessLoadMetrics.pendingArrivals(); }
 
 //-------------------------------------------------------------------------------------
 uint64 Witness::globalAdmittedCount() { return g_witnessLoadMetrics.globalAdmitted(); }

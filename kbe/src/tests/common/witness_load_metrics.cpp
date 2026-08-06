@@ -63,6 +63,7 @@ bool testQueueAttribution()
 	metrics.recordGlobalAdmission(false);
 	metrics.recordPendingAdmission(true);
 	metrics.recordPendingAdmission(false);
+	metrics.recordPendingArrival();
 	metrics.recordEnter(120);
 	metrics.recordLeave(7);
 	metrics.recordVolatileUpdate(19);
@@ -93,6 +94,7 @@ bool testQueueAttribution()
 			"global scheduler attribution drifted") &&
 		require(metrics.pendingAdmitted() == 1 && metrics.pendingDeferred() == 1,
 			"pending scheduler attribution drifted") &&
+		require(metrics.pendingArrivals() == 1, "pending arrival attribution drifted") &&
 		require(metrics.enterUpdates() == 1 && metrics.enterBytes() == 120,
 			"enter work attribution drifted") &&
 		require(metrics.leaveUpdates() == 1 && metrics.leaveBytes() == 7,

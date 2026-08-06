@@ -231,8 +231,10 @@ public:
 	static uint64 cancelledPendingLeaveCount();
 	static void beginUpdateTick();
 	static uint64 globalPendingCount();
+	static uint64 globalPendingSnapshot();
 	static uint64 globalPendingAdmittedCount();
 	static uint64 globalPendingDeferredCount();
+	static uint64 globalPendingArrivalCount();
 	static uint64 globalAdmittedCount();
 	static uint64 globalDeferredCount();
 	static uint64 globalUpdateLimit();

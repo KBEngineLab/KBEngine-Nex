@@ -89,6 +89,7 @@ public:
 	}
 
 	std::uint64_t admissionCount() const { return admissionCount_; }
+	std::uint64_t pendingSnapshot() const { return pendingCount_; }
 	std::uint64_t nextStart() const { return nextStart_; }
 
 private:
