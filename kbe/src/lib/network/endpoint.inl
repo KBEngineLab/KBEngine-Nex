@@ -85,7 +85,9 @@ INLINE EndPoint::~EndPoint()
 
 uint32 EndPoint::getRTT()
 {
-#if KBE_PLATFORM != PLATFORM_WIN32
+// tcp_info/TCP_INFO 为 Linux 专有；macOS 上直接返回 0。
+// tcp_info/TCP_INFO are Linux-only; macOS simply returns 0.
+#if defined(__linux__)
 	struct tcp_info tcpinfo;
 	socklen_t len = sizeof(tcpinfo);
 
@@ -146,7 +148,7 @@ INLINE int EndPoint::setnodelay(bool nodelay)
 
 INLINE int EndPoint::setnonblocking(bool nonblocking)
 {
-#if KBE_PLATFORM == PLATFORM_UNIX
+#if KBE_PLATFORM != PLATFORM_WIN32
 	int val = nonblocking ? O_NONBLOCK : 0;
 	return ::fcntl(socket_, F_SETFL, val);
 #else
@@ -157,12 +159,14 @@ INLINE int EndPoint::setnonblocking(bool nonblocking)
 
 INLINE int EndPoint::setbroadcast(bool broadcast)
 {
-#if KBE_PLATFORM == PLATFORM_UNIX
+#if KBE_PLATFORM != PLATFORM_WIN32
 	int val;
 	if (broadcast)
 	{
 		val = 2;
-		::setsockopt(socket_, SOL_IP, IP_MULTICAST_TTL, &val, sizeof(int));
+		// macOS 没有 SOL_IP 常量，使用 IPPROTO_IP（两者在 Linux 上等价）。
+		// macOS has no SOL_IP constant; IPPROTO_IP is used (equivalent on Linux).
+		::setsockopt(socket_, IPPROTO_IP, IP_MULTICAST_TTL, &val, sizeof(int));
 	}
 #else
 	bool val;
@@ -173,7 +177,7 @@ INLINE int EndPoint::setbroadcast(bool broadcast)
 
 INLINE int EndPoint::setreuseaddr(bool reuseaddr)
 {
-#if KBE_PLATFORM == PLATFORM_UNIX
+#if KBE_PLATFORM != PLATFORM_WIN32
 	int val;
 #else
 	bool val;
@@ -193,7 +197,7 @@ INLINE int EndPoint::setlinger(uint16 onoff, uint16 linger)
 
 INLINE int EndPoint::setkeepalive(bool keepalive)
 {
-#if KBE_PLATFORM == PLATFORM_UNIX
+#if KBE_PLATFORM != PLATFORM_WIN32
 	int val;
 #else
 	bool val;
@@ -215,28 +219,40 @@ INLINE int EndPoint::bind(u_int16_t networkPort, u_int32_t networkAddr)
 
 INLINE int EndPoint::joinMulticastGroup(u_int32_t networkAddr)
 {
-#if KBE_PLATFORM == PLATFORM_UNIX
+#if defined(__linux__)
 	struct ip_mreqn req;
 	req.imr_multiaddr.s_addr = networkAddr;
 	req.imr_address.s_addr = INADDR_ANY;
 	req.imr_ifindex = 0;
-	return ::setsockopt(socket_, SOL_IP, IP_ADD_MEMBERSHIP, &req, sizeof(req));
+#elif KBE_PLATFORM != PLATFORM_WIN32
+	// macOS/BSD 没有 ip_mreqn，使用标准 ip_mreq。
+	// macOS/BSD lack ip_mreqn; use the standard ip_mreq instead.
+	struct ip_mreq req;
+	req.imr_multiaddr.s_addr = networkAddr;
+	req.imr_interface.s_addr = INADDR_ANY;
 #else
 	return -1;
 #endif
+	return ::setsockopt(socket_, IPPROTO_IP, IP_ADD_MEMBERSHIP, &req, sizeof(req));
 }
 
 INLINE int EndPoint::quitMulticastGroup(u_int32_t networkAddr)
 {
-#if KBE_PLATFORM == PLATFORM_UNIX
+#if defined(__linux__)
 	struct ip_mreqn req;
 	req.imr_multiaddr.s_addr = networkAddr;
 	req.imr_address.s_addr = INADDR_ANY;
 	req.imr_ifindex = 0;
-	return ::setsockopt(socket_, SOL_IP, IP_DROP_MEMBERSHIP,&req, sizeof(req));
+#elif KBE_PLATFORM != PLATFORM_WIN32
+	// macOS/BSD 没有 ip_mreqn，使用标准 ip_mreq。
+	// macOS/BSD lack ip_mreqn; use the standard ip_mreq instead.
+	struct ip_mreq req;
+	req.imr_multiaddr.s_addr = networkAddr;
+	req.imr_interface.s_addr = INADDR_ANY;
 #else
 	return -1;
 #endif
+	return ::setsockopt(socket_, IPPROTO_IP, IP_DROP_MEMBERSHIP, &req, sizeof(req));
 }
 
 INLINE int EndPoint::close()
@@ -264,7 +280,7 @@ INLINE int EndPoint::close()
 		return 0;
 	}
 
-#if KBE_PLATFORM == PLATFORM_UNIX
+#if KBE_PLATFORM != PLATFORM_WIN32
 	int ret = ::close(socket_);
 #else
 	int ret = ::closesocket(socket_);
@@ -444,7 +460,7 @@ INLINE EndPoint * EndPoint::accept(u_int16_t * networkPort, u_int32_t * networkA
 	socklen_t		sinLen = sizeof(sin);
 	KBESOCKET ret = static_cast<KBESOCKET>(::accept(socket_, (sockaddr*)&sin, &sinLen));
 
-#if KBE_PLATFORM == PLATFORM_UNIX
+#if KBE_PLATFORM != PLATFORM_WIN32
 	if (ret < 0) return NULL;
 #else
 	if (ret == INVALID_SOCKET) return NULL;
@@ -491,7 +507,7 @@ INLINE int EndPoint::recv(void * gramData, size_t gramSize)
 	return ::recv(socket_, (char*)gramData, nativeSize, 0);
 }
 
-#if KBE_PLATFORM == PLATFORM_UNIX
+#if KBE_PLATFORM != PLATFORM_WIN32
 INLINE int EndPoint::getInterfaceFlags(const char * name, int & flags)
 {
 	struct ifreq	request;
@@ -538,7 +554,18 @@ INLINE int EndPoint::getInterfaceNetmask(const char * name,
 		return -1;
 	}
 
+#if defined(__linux__)
 	netmask = ((sockaddr_in&)request.ifr_netmask).sin_addr.s_addr;
+#else
+	// macOS/BSD 的 ifreq 没有 ifr_netmask 成员，SIOCGIFNETMASK 通过 ifr_addr 返回结果。
+	// macOS/BSD ifreq has no ifr_netmask member; SIOCGIFNETMASK returns the value through ifr_addr.
+	if (request.ifr_addr.sa_family != AF_INET)
+	{
+		return -1;
+	}
+
+	netmask = ((sockaddr_in&)request.ifr_addr).sin_addr.s_addr;
+#endif
 
 	return 0;
 }

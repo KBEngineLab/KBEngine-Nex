@@ -40,7 +40,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include <cstdlib>
 #endif
 
-#if KBE_PLATFORM == PLATFORM_UNIX
+#if KBE_PLATFORM != PLATFORM_WIN32
 #include <unistd.h>
 #include <syslog.h>
 #else
@@ -85,7 +85,7 @@ bool createDirectoryIfMissing(const std::string& path)
 	if (path.empty())
 		return true;
 
-#if KBE_PLATFORM == PLATFORM_UNIX
+#if KBE_PLATFORM != PLATFORM_WIN32
 	if (::mkdir(path.c_str(), 0755) == 0)
 #else
 	if (::_mkdir(path.c_str()) == 0)

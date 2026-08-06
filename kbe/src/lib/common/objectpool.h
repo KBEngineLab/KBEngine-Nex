@@ -97,7 +97,9 @@ public:
 	{
 	}
 
-	ObjectPool(std::string name, unsigned int preAssignVal, size_t max):
+	// preAssignVal 为历史预留参数，当前实现不预分配对象。
+	// preAssignVal is a legacy reserved parameter; the current implementation does not pre-allocate objects.
+	ObjectPool(std::string name, unsigned int /* preAssignVal */, size_t max):
 		objects_(),
 		max_((max == 0 ? 1 : max)),
 		isDestroyed_(false),
@@ -173,6 +175,10 @@ public:
 	*/
 	T* createObject(const std::string& logPoint)
 	{
+		// logPoint 仅在启用分配点跟踪时使用；未启用时抑制未使用参数警告。
+		// logPoint is used only when allocation-point tracking is enabled; silence the unused-parameter warning otherwise.
+		(void)logPoint;
+
 		pMutex_->lockMutex();
 
 		while(true)

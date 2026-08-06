@@ -174,8 +174,10 @@ bool IDComponentQuerier::receive(Network::MessageArgs* recvArgs, sockaddr_in* ps
 	fd_set fds;
 
 	int icount = 1;
-	tv.tv_sec = 0;
-	tv.tv_usec = timeout;
+	// BSD/macOS 的 select 要求 tv_usec < 1000000，超出返回 EINVAL；拆分后全平台一致。
+	// BSD/macOS select requires tv_usec < 1000000 and returns EINVAL otherwise; splitting works everywhere.
+	tv.tv_sec = timeout / 1000000;
+	tv.tv_usec = timeout % 1000000;
 
 	if (!pCurrPacket())
 		newPacket();

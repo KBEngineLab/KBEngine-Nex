@@ -86,6 +86,21 @@ add_library(KBE::PythonRuntime ALIAS kbe_python_runtime)
 target_include_directories(kbe_python_runtime INTERFACE "${KBE_PYTHON_INCLUDE_DIR}")
 target_link_libraries(kbe_python_runtime INTERFACE "${KBE_PYTHON_LIBRARY}")
 
+# libpython 的 _localemodule 引用 libintl_*（gettext）；macOS 不自带 libintl，需链接 vcpkg 提供的静态库。
+# libpython's _localemodule references libintl_* (gettext); macOS ships no libintl, so the vcpkg static library is linked.
+if(APPLE)
+    find_library(KBE_PYTHON_INTL_LIBRARY
+        NAMES intl
+        PATHS "${KBE_PYTHON_ROOT}/lib"
+        NO_DEFAULT_PATH
+    )
+    if(KBE_PYTHON_INTL_LIBRARY)
+        target_link_libraries(kbe_python_runtime INTERFACE "${KBE_PYTHON_INTL_LIBRARY}")
+    else()
+        message(WARNING "libintl.a not found under ${KBE_PYTHON_ROOT}/lib; python locale module may fail to link")
+    endif()
+endif()
+
 if(CMAKE_DL_LIBS)
     target_link_libraries(kbe_python_runtime INTERFACE "${CMAKE_DL_LIBS}")
 endif()

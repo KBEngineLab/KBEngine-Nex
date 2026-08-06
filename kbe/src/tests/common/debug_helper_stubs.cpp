@@ -16,6 +16,14 @@ void DebugHelper::error_msg(const std::string&)
 {
 }
 
+void DebugHelper::info_msg(const std::string&)
+{
+}
+
+void DebugHelper::warning_msg(const std::string&)
+{
+}
+
 // 测试目标不链接完整日志运行时，但断言失败仍必须立即终止，不能静默继续。
 // Test targets do not link the full logging runtime, but a failed assertion
 // must still terminate immediately rather than allowing corrupted state onward.

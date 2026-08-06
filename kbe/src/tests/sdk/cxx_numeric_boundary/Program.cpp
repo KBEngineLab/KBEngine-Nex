@@ -49,7 +49,7 @@ void verifyUint32Boundaries()
 	require(KBEngine::checkedUint32(0, "test uint32") == 0, "uint32 lower boundary changed.");
 	require(KBEngine::checkedUint32(maximum, "test uint32") == std::numeric_limits<uint32>::max(),
 		"uint32 upper boundary changed.");
-	requireThrows<std::length_error>([maximum]() { KBEngine::checkedUint32(maximum + 1, "test uint32"); },
+	requireThrows<std::length_error>([]() { KBEngine::checkedUint32(maximum + 1, "test uint32"); },
 		"An overflowing uint32 length was accepted.");
 }
 

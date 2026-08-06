@@ -797,8 +797,18 @@ bool Machine::initNetwork()
 	
 #if KBE_PLATFORM == PLATFORM_WIN32
 	u_int32_t baddr = htonl(INADDR_ANY);
+#elif defined(__APPLE__)
+	// macOS/BSD 不允许 bind 广播地址（EADDRNOTAVAIL），改绑 INADDR_ANY；
+	// 需 SO_REUSEADDR 才能与 ep_ 绑定的接口 IP 共用同一端口。
+	// macOS/BSD refuse to bind a broadcast address (EADDRNOTAVAIL); bind INADDR_ANY
+	// instead, with SO_REUSEADDR so the interface-IP bind on ep_ can share the port.
+	u_int32_t baddr = htonl(INADDR_ANY);
 #else
 	u_int32_t baddr = Network::BROADCAST;
+#endif
+
+#if defined(__APPLE__)
+	epBroadcast_.setreuseaddr(true);
 #endif
 
 	if (!epBroadcast_.good() ||
@@ -828,6 +838,10 @@ bool Machine::initNetwork()
 		}
 
 	}
+
+#if defined(__APPLE__)
+	epLocal_.setreuseaddr(true);
+#endif
 
 	if (!epLocal_.good() ||
 		epLocal_.bind(htons(KBE_MACHINE_BROADCAST_SEND_PORT), Network::LOCALHOST) == -1)

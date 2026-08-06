@@ -189,7 +189,9 @@ void SpaceViewer::updateClient()
 
 			Cells& cells = space.cells();
 			std::map<CELL_ID, Cell>& allCells = cells.cells();
-			s << allCells.size();
+			// LP64 下 size_t 同时可转 uint32/uint64，需显式转型消歧。
+			// On LP64, size_t converts to both uint32 and uint64; cast explicitly to disambiguate.
+			s << static_cast<uint32>(allCells.size());
 
 			std::map<CELL_ID, Cell>::iterator iter3 = allCells.begin();
 			for (; iter3 != allCells.end(); ++iter3)

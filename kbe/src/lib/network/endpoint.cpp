@@ -41,6 +41,12 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <arpa/inet.h>
+#include <ifaddrs.h>
+#if defined(__APPLE__)
+// sockaddr_dl/LLADDR 用于 macOS 下通过 AF_LINK 匹配 MAC 地址。
+// sockaddr_dl/LLADDR are used to match MAC addresses over AF_LINK on macOS.
+#include <net/if_dl.h>
+#endif
 #endif
 
 namespace KBEngine { 
@@ -368,6 +374,31 @@ bool EndPoint::getInterfaces(std::map< u_int32_t, std::string > &interfaces)
 
 	return count > 0;
 #else
+#if defined(__APPLE__)
+	// macOS 的 SIOCGIFCONF 条目按实际 sockaddr 长度排列，不能按 sizeof(ifreq) 步进，
+	// 否则会把接口名 ASCII 误读成地址；改用 getifaddrs 枚举 IPv4 接口。
+	// macOS SIOCGIFCONF entries are laid out by actual sockaddr length, so stepping
+	// by sizeof(ifreq) misreads interface names as addresses; enumerate IPv4
+	// interfaces with getifaddrs instead.
+	struct ifaddrs * ifaddr = NULL;
+	bool found = false;
+	if (getifaddrs(&ifaddr) == 0)
+	{
+		for (struct ifaddrs * ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+		{
+			if (ifa->ifa_addr == NULL || ifa->ifa_addr->sa_family != AF_INET)
+				continue;
+
+			struct sockaddr_in * sin = (struct sockaddr_in*)ifa->ifa_addr;
+			interfaces[sin->sin_addr.s_addr] = ifa->ifa_name;
+			found = true;
+		}
+
+		freeifaddrs(ifaddr);
+	}
+
+	return found;
+#else
 	struct ifconf ifc;
 	char          buf[1024];
 
@@ -391,6 +422,7 @@ bool EndPoint::getInterfaces(std::map< u_int32_t, std::string > &interfaces)
 	}
 
 	return true;
+#endif // defined(__APPLE__)
 #endif
 }
 
@@ -462,7 +494,31 @@ int EndPoint::getInterfaceAddressByName(const char * name, u_int32_t & address)
     }
 
 #else
-	
+
+#if defined(__APPLE__)
+	// macOS 的 SIOCGIFCONF 条目按实际 sockaddr 长度排列，不能按 sizeof(ifreq) 步进遍历，
+	// 否则 ifr_name 全部错位；改为直接对目标接口名调用 SIOCGIFADDR。
+	// macOS SIOCGIFCONF entries are laid out by their actual sockaddr length, so
+	// stepping by sizeof(ifreq) misaligns every ifr_name; query the named interface
+	// directly with SIOCGIFADDR instead.
+	struct ifreq request;
+	memset(&request, 0, sizeof(request));
+	strncpy(request.ifr_name, name, IFNAMSIZ - 1);
+
+	int fd = ::socket(AF_INET, SOCK_DGRAM, 0);
+	if (fd < 0)
+	{
+		return -1;
+	}
+
+	if (ioctl(fd, SIOCGIFADDR, &request) == 0 &&
+		request.ifr_addr.sa_family == AF_INET)
+	{
+		ret = Address::string2ip((const char *)inet_ntoa(((struct sockaddr_in *)&(request.ifr_addr))->sin_addr), address);
+	}
+
+	::close(fd);
+#else
 	int fd;
 	int interfaceNum = 0;
 	struct ifreq buf[16];
@@ -495,6 +551,7 @@ int EndPoint::getInterfaceAddressByName(const char * name, u_int32_t & address)
 	}
 
 	::close(fd);
+#endif // defined(__APPLE__)
 
 #endif
 
@@ -569,6 +626,46 @@ int EndPoint::getInterfaceAddressByMAC(const char * mac, u_int32_t & address)
 
 #else
 
+#if defined(__APPLE__)
+	// macOS 没有 SIOCGIFHWADDR/ifr_hwaddr，改用 getifaddrs + AF_LINK 匹配 MAC 并反查 IPv4 地址。
+	// macOS lacks SIOCGIFHWADDR/ifr_hwaddr; match the MAC via getifaddrs + AF_LINK and resolve its IPv4 address.
+	struct ifaddrs * ifaddr = NULL;
+	if (getifaddrs(&ifaddr) == 0)
+	{
+		for (struct ifaddrs * ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+		{
+			if (ifa->ifa_addr == NULL || ifa->ifa_addr->sa_family != AF_LINK)
+				continue;
+
+			struct sockaddr_dl * sdl = (struct sockaddr_dl*)ifa->ifa_addr;
+			if (sdl->sdl_alen != 6)
+				continue;
+
+			if (memcmp((unsigned char*)LLADDR(sdl), macAddress, 6) != 0)
+				continue;
+
+			// 找到匹配接口后，在其名下查找 IPv4 地址。
+			// Once the interface matches, look up its IPv4 address under the same name.
+			const char * ifname = ifa->ifa_name;
+			for (struct ifaddrs * ifa2 = ifaddr; ifa2 != NULL; ifa2 = ifa2->ifa_next)
+			{
+				if (ifa2->ifa_addr == NULL || ifa2->ifa_addr->sa_family != AF_INET)
+					continue;
+
+				if (strcmp(ifa2->ifa_name, ifname) != 0)
+					continue;
+
+				struct sockaddr_in * sin = (struct sockaddr_in*)ifa2->ifa_addr;
+				ret = Address::string2ip((const char*)inet_ntoa(sin->sin_addr), address);
+				break;
+			}
+
+			break;
+		}
+
+		freeifaddrs(ifaddr);
+	}
+#else
 	int fd;
 	int interfaceNum = 0;
 	struct ifreq buf[16];
@@ -608,6 +705,7 @@ int EndPoint::getInterfaceAddressByMAC(const char * mac, u_int32_t & address)
 	}
 
 	::close(fd);
+#endif // defined(__APPLE__)
 
 #endif
 
@@ -617,7 +715,9 @@ int EndPoint::getInterfaceAddressByMAC(const char * mac, u_int32_t & address)
 //-------------------------------------------------------------------------------------
 int EndPoint::findDefaultInterface(char * name, int buffsize)
 {
-#if KBE_PLATFORM != PLATFORM_UNIX
+// macOS/BSD 与 Linux 一样支持 if_nameindex 枚举，仅 Windows 需要硬编码回退名。
+// macOS/BSD, like Linux, support if_nameindex enumeration; only Windows needs a hard-coded fallback name.
+#if KBE_PLATFORM == PLATFORM_WIN32
 	strcpy(name, "eth0");
 	return 0;
 #else
@@ -680,7 +780,11 @@ int EndPoint::getDefaultInterfaceAddress(u_int32_t & address)
 		struct hostent * host = gethostbyname(hostname);
 		if(host)
 		{
-			if(host->h_addr_list[0] < host->h_name)
+			// 原实现对不同对象的指针做 < 比较（未定义行为，macOS 上恒为假），
+			// 这里改为显式判空。
+			// The old code compared pointers of different objects with < (undefined
+			// behavior, always false on macOS); an explicit null check is used instead.
+			if(host->h_addr_list[0] != NULL)
 			{
 				address = ((struct in_addr*)(host->h_addr_list[0]))->s_addr;
 				ret = 0;

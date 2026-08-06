@@ -142,9 +142,10 @@ struct KBString : public KBStringBase
     }
 
     // ---- 转 std::string ----
-    operator std::string() const {
-        return *this; // 本来就是 UTF-8 string
-    }
+    // 派生类到基类本就隐式可转换，此转换运算符永远不会被使用，删除以避免
+    // clang -Wclass-conversion（KBString 直接继承 std::string）。
+    // A derived-to-base conversion is already implicit, so this operator would
+    // never be used; removed to satisfy clang -Wclass-conversion (KBString inherits std::string).
 
     // ---- AppendInt ----
     void AppendInt(int value)

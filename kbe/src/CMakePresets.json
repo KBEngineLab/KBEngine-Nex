@@ -172,6 +172,150 @@
       "targets": ["kbe_tests"]
     },
     {
+      "name": "linux-ninja-debug",
+      "configurePreset": "linux-ninja",
+      "configuration": "Debug",
+      "targets": ["kbe_core_dependencies"]
+    },
+    {
+      "name": "linux-ninja-release",
+      "configurePreset": "linux-ninja",
+      "configuration": "Release",
+      "targets": ["kbe_core_dependencies"]
+    },
+    {
+      "name": "linux-ninja-libraries-debug",
+      "configurePreset": "linux-ninja",
+      "configuration": "Debug",
+      "targets": ["kbe_libraries"]
+    },
+    {
+      "name": "linux-ninja-libraries-release",
+      "configurePreset": "linux-ninja",
+      "configuration": "Release",
+      "targets": ["kbe_libraries"]
+    },
+    {
+      "name": "linux-ninja-kbcmd-debug",
+      "configurePreset": "linux-ninja",
+      "configuration": "Debug",
+      "targets": ["kbcmd"]
+    },
+    {
+      "name": "linux-ninja-kbcmd-release",
+      "configurePreset": "linux-ninja",
+      "configuration": "Release",
+      "targets": ["kbcmd"]
+    },
+    {
+      "name": "linux-ninja-servers-debug",
+      "configurePreset": "linux-ninja",
+      "configuration": "Debug",
+      "targets": ["kbe_servers"]
+    },
+    {
+      "name": "linux-ninja-servers-release",
+      "configurePreset": "linux-ninja",
+      "configuration": "Release",
+      "targets": ["kbe_servers"]
+    },
+    {
+      "name": "linux-ninja-runtime-debug",
+      "configurePreset": "linux-ninja",
+      "configuration": "Debug",
+      "targets": ["kbe_runtime"]
+    },
+    {
+      "name": "linux-ninja-runtime-release",
+      "configurePreset": "linux-ninja",
+      "configuration": "Release",
+      "targets": ["kbe_runtime"]
+    },
+    {
+      "name": "linux-ninja-tests-debug",
+      "configurePreset": "linux-ninja",
+      "configuration": "Debug",
+      "targets": ["kbe_tests"]
+    },
+    {
+      "name": "linux-ninja-tests-release",
+      "configurePreset": "linux-ninja",
+      "configuration": "Release",
+      "targets": ["kbe_tests"]
+    },
+    {
+      "name": "macos-ninja-debug",
+      "configurePreset": "macos-ninja",
+      "configuration": "Debug",
+      "targets": ["kbe_core_dependencies"]
+    },
+    {
+      "name": "macos-ninja-release",
+      "configurePreset": "macos-ninja",
+      "configuration": "Release",
+      "targets": ["kbe_core_dependencies"]
+    },
+    {
+      "name": "macos-ninja-libraries-debug",
+      "configurePreset": "macos-ninja",
+      "configuration": "Debug",
+      "targets": ["kbe_libraries"]
+    },
+    {
+      "name": "macos-ninja-libraries-release",
+      "configurePreset": "macos-ninja",
+      "configuration": "Release",
+      "targets": ["kbe_libraries"]
+    },
+    {
+      "name": "macos-ninja-kbcmd-debug",
+      "configurePreset": "macos-ninja",
+      "configuration": "Debug",
+      "targets": ["kbcmd"]
+    },
+    {
+      "name": "macos-ninja-kbcmd-release",
+      "configurePreset": "macos-ninja",
+      "configuration": "Release",
+      "targets": ["kbcmd"]
+    },
+    {
+      "name": "macos-ninja-servers-debug",
+      "configurePreset": "macos-ninja",
+      "configuration": "Debug",
+      "targets": ["kbe_servers"]
+    },
+    {
+      "name": "macos-ninja-servers-release",
+      "configurePreset": "macos-ninja",
+      "configuration": "Release",
+      "targets": ["kbe_servers"]
+    },
+    {
+      "name": "macos-ninja-runtime-debug",
+      "configurePreset": "macos-ninja",
+      "configuration": "Debug",
+      "targets": ["kbe_runtime"]
+    },
+    {
+      "name": "macos-ninja-runtime-release",
+      "configurePreset": "macos-ninja",
+      "configuration": "Release",
+      "targets": ["kbe_runtime"]
+    },
+    {
+      "name": "macos-ninja-tests-debug",
+      "configurePreset": "macos-ninja",
+      "configuration": "Debug",
+      "targets": ["kbe_tests"]
+    },
+    {
+      "name": "macos-ninja-tests-release",
+      "configurePreset": "macos-ninja",
+      "configuration": "Release",
+      "targets": ["kbe_tests"]
+    },
+    {
       "name": "linux-tests-debug",
       "configurePreset": "linux-ninja",
       "configuration": "Debug",

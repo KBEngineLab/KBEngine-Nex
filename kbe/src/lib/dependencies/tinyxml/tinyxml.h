@@ -39,7 +39,9 @@ distribution.
 #include <assert.h>
 
 // Help out windows:
-#if defined( _DEBUG ) && !defined( DEBUG )
+// 仅 Windows 定义 DEBUG：空宏会破坏 macOS SDK 头文件（Debugging.h 使用 #if DEBUG）。
+// Define DEBUG on Windows only: an empty macro breaks macOS SDK headers (Debugging.h uses #if DEBUG).
+#if defined( _DEBUG ) && !defined( DEBUG ) && defined( _WIN32 )
 #define DEBUG
 #endif
 

@@ -148,12 +148,18 @@ class SafeRefCountable
 public:
 	inline void incRef(void) const
 	{
+#if defined(__x86_64__) || defined(__i386__)
 		__asm__ volatile (
 			"lock addl $1, %0"
 			:						// no output
 			: "m"	(this->refCount_) 	// input: this->count_
 			: "memory" 				// clobbers memory
 		);
+#else
+		// ARM（含 Apple Silicon）使用编译器内建原子操作替代 x86 lock 指令。
+		// ARM (including Apple Silicon) uses compiler built-in atomics instead of the x86 lock prefix.
+		__atomic_fetch_add(&refCount_, 1, __ATOMIC_SEQ_CST);
+#endif
 	}
 
 	inline void decRef(void) const
@@ -200,6 +206,7 @@ private:
 	inline int intDecRef() const
 	{
 		int ret;
+#if defined(__x86_64__) || defined(__i386__)
 		__asm__ volatile (
 			"mov $-1, %0  \n\t"
 			"lock xadd %0, %1"
@@ -207,6 +214,11 @@ private:
 			: "m"	(this->refCount_)		// input (memory)
 			: "memory"
 		);
+#else
+		// ARM（含 Apple Silicon）使用编译器内建原子操作替代 x86 lock xadd。
+		// ARM (including Apple Silicon) uses compiler built-in atomics instead of the x86 lock xadd.
+		ret = __atomic_fetch_add(&refCount_, -1, __ATOMIC_SEQ_CST);
+#endif
 		return ret;
 	}
 };

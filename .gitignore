@@ -88,6 +88,19 @@ venv/
 /kbe/bin/server/*.ipdb
 /kbe/bin/server/*.log
 /kbe/bin/server/CrashDumps/
+# macOS/Linux 服务端产物为无扩展名可执行文件；排除所有已知组件名。
+# macOS/Linux server products are extensionless executables; ignore the known component names.
+/kbe/bin/server/machine
+/kbe/bin/server/baseappmgr
+/kbe/bin/server/cellappmgr
+/kbe/bin/server/dbmgr
+/kbe/bin/server/loginapp
+/kbe/bin/server/baseapp
+/kbe/bin/server/cellapp
+/kbe/bin/server/bots
+/kbe/bin/server/logger
+/kbe/bin/server/interfaces
+/kbe/bin/server/kbcmd
 /kbe/src/libs/*.lib
 /kbe/tools/server/guiconsole/*.lib
 /kbe/tools/server/guiconsole/*.dll

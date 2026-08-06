@@ -19,6 +19,10 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "crashhandler.h"
+
+// crash handler 依赖 Windows SEH/dbghelp，非 Windows 平台不提供实现。
+// The crash handler depends on Windows SEH/dbghelp and is not implemented on non-Windows platforms.
+#if KBE_PLATFORM == PLATFORM_WIN32
 namespace KBEngine{ namespace exception {
 static wchar_t _g_fileName[512] = {0};
 
@@ -168,3 +172,4 @@ BOOL CALLBACK dumpCallback(
 //-------------------------------------------------------------------------------------
 }
 }
+#endif // KBE_PLATFORM == PLATFORM_WIN32

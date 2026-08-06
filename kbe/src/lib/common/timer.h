@@ -68,7 +68,7 @@ public:
 	virtual void handleTimeout(TimerHandle handle, void * pUser) = 0;
 
 protected:
-	virtual void onRelease( TimerHandle handle, void * pUser ) {
+	virtual void onRelease( TimerHandle /* handle */, void * /* pUser */ ) {
 	}
 
 private:

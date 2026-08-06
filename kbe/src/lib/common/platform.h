@@ -82,14 +82,18 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include <netinet/tcp.h> 
 #include <netinet/ip.h>
 #include <arpa/inet.h>
-#include <linux/types.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <sys/resource.h> 
+// linux 专有头文件在 macOS/BSD 上不存在，必须按平台隔离。
+// Linux-only headers do not exist on macOS/BSD and must stay platform-gated.
+#if defined(__linux__)
+#include <linux/types.h>
 #include <linux/errqueue.h>
+#endif
 #endif
 
 #include <signal.h>
@@ -163,8 +167,20 @@ namespace KBEngine
 #  pragma error "FATAL ERROR: Unknown compiler."
 #endif
 
+// UNIX 家族（Linux/BSD/macOS）统称：网络错误处理等共用 errno 路径。
+// UNIX family (Linux/BSD/macOS): network error handling shares the errno path.
 #if KBE_PLATFORM == PLATFORM_UNIX || KBE_PLATFORM == PLATFORM_APPLE
-#ifdef HAVE_DARWIN
+#define KBE_PLATFORM_UNIX_FAMILY 1
+#else
+// 非 UNIX 平台（含 Windows）显式定义 0，避免未来 #ifdef 用法产生歧义。
+// Non-UNIX platforms (including Windows) define 0 explicitly so future #ifdef usage cannot misbehave.
+#define KBE_PLATFORM_UNIX_FAMILY 0
+#endif
+
+#if KBE_PLATFORM == PLATFORM_UNIX || KBE_PLATFORM == PLATFORM_APPLE
+// __APPLE__ 兜底：即使 CMake 未传递 HAVE_DARWIN，AppleClang 也会定义 __APPLE__。
+// __APPLE__ is a fallback: AppleClang always defines it even if HAVE_DARWIN is not passed.
+#if defined(HAVE_DARWIN) || defined(__APPLE__)
 #define KBE_PLATFORM_TEXT "MacOSX"
 #define UNIX_FLAVOUR UNIX_FLAVOUR_OSX
 #else
@@ -613,6 +629,11 @@ inline const char * getUsername()
 	}
 
 	return username;
+#elif defined(__APPLE__)
+	// macOS 的 libc 不提供 cuserid()，改用 getpwuid 读取登录名。
+	// macOS libc does not provide cuserid(); read the login name via getpwuid instead.
+	struct passwd * pw = getpwuid(getuid());
+	return (pw && pw->pw_name) ? pw->pw_name : "";
 #else
 	char * pUsername = cuserid(NULL);
 	return pUsername ? pUsername : "";
@@ -661,7 +682,9 @@ inline uint32 getSystemTimeDiff(uint32 oldTime, uint32 newTime)
 /* get system time */
 inline void kbe_timeofday(long* sec, long* usec)
 {
-#if defined(__unix)
+// AppleClang 不预定义 __unix，必须显式包含 __APPLE__ 才能走 POSIX 分支。
+// AppleClang does not predefine __unix, so __APPLE__ must be included explicitly to take the POSIX path.
+#if defined(__unix) || defined(__APPLE__)
 	struct timeval time;
 	gettimeofday(&time, NULL);
 	if (sec) *sec = time.tv_sec;

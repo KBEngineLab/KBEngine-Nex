@@ -39,6 +39,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 	
 namespace KBEngine{ namespace exception {
+#if KBE_PLATFORM == PLATFORM_WIN32
 /** 安装 */
 void installCrashHandler(int svnVer, const char* dumpType);
 
@@ -69,6 +70,7 @@ BOOL CALLBACK dumpCallback(
 	#define THREAD_TRY_EXECUTION 
 	#define THREAD_HANDLE_CRASH 
 #endif
+#endif // KBE_PLATFORM == PLATFORM_WIN32
 
 }
 }

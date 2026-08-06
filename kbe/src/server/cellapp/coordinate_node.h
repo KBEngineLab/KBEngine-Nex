@@ -139,7 +139,7 @@ public:
 	/**
 		父节点删除
 	*/
-	virtual void onParentRemove(CoordinateNode* pParentNode) {
+	virtual void onParentRemove(CoordinateNode* /* pParentNode */) {
 	}
 
 	/**
@@ -152,7 +152,9 @@ public:
 	void descr(const std::string& str) { descr_ = str; }
 	virtual const char* descr() { return descr_.c_str(); }
 #else
-	void descr(const std::string& str){}
+	// Release 下 descr_ 不存在，参数刻意忽略（保持签名一致）。
+	// In Release builds descr_ does not exist; the parameter is intentionally ignored (signature kept identical).
+	void descr(const std::string& /* str */){}
 	virtual const char* descr(){ return ""; }
 #endif
 

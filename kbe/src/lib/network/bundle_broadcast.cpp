@@ -187,8 +187,11 @@ bool BundleBroadcast::receive(MessageArgs* recvArgs, sockaddr_in* psin, int32 ti
 	fd_set fds;
 	
 	int icount = 1;
-	tv.tv_sec = 0;
-	tv.tv_usec = timeout;
+	// BSD/macOS 的 select 要求 tv_usec < 1000000，超出返回 EINVAL（Linux 虽会内部规范化，但拆分后全平台一致）。
+	// BSD/macOS select requires tv_usec < 1000000 and returns EINVAL otherwise;
+	// Linux normalizes internally, but splitting the timeout works on every platform.
+	tv.tv_sec = timeout / 1000000;
+	tv.tv_usec = timeout % 1000000;
 	
 	if(!pCurrPacket())
 		newPacket();

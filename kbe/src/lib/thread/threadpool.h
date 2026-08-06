@@ -43,7 +43,11 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <fcntl.h>
+// epoll 为 Linux 专有；macOS/BSD 线程池使用 pthread 条件变量，无需此头文件。
+// epoll is Linux-only; the macOS/BSD thread pool uses pthread condition variables and does not need it.
+#if defined(__linux__)
 #include <sys/epoll.h>
+#endif
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <pthread.h>	

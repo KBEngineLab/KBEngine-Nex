@@ -73,7 +73,9 @@ public:
 		THREAD_MUTEX_INIT(mutex_);
 	}
 
-	ThreadMutex(const ThreadMutex& v)
+	// 拷贝构造只复制 mutex 状态是危险的，这里刻意不拷贝源对象内容。
+	// Copying the source mutex state here would be dangerous; the source object is intentionally ignored.
+	ThreadMutex(const ThreadMutex& /* v */)
 	{
 		// 这里不允许拷贝构造mutex_，这是非常危险的
 		// 会造成多次THREAD_MUTEX_DELETE

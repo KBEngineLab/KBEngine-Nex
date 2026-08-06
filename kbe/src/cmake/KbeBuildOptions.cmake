@@ -20,6 +20,7 @@ target_compile_definitions(kbe_build_options INTERFACE
     USE_OPENSSL
     CODE_INLINE
     $<$<PLATFORM_ID:Windows>:WIN32>
+    $<$<PLATFORM_ID:Darwin>:HAVE_DARWIN>
     $<$<CONFIG:Debug>:_DEBUG>
     $<$<NOT:$<CONFIG:Debug>>:NDEBUG>
 )

@@ -1643,7 +1643,7 @@ std::string EntityTableItemMysqlBase::columnTypeWithComment(DBInterface* pdbi,
 
 	const std::string description = pPropertyDescription_->getDescriptionStr();
 	std::vector<char> escapedDescription(description.size() * 2 + 1, '\0');
-	const unsigned long escapedLength = mysql_real_escape_string(
+	const unsigned long escapedLength = KBEngine::mysql_real_escape_string(
 		static_cast<DBInterfaceMysql*>(pdbi)->mysql(), &escapedDescription[0],
 		description.c_str(), static_cast<unsigned long>(description.size()));
 
@@ -1886,7 +1886,7 @@ void EntityTableItemMysql_STRING::getWriteSqlItem(DBInterface* pdbi,
 	char* tbuf = new char[val.size() * 2 + 1];
 	memset(tbuf, 0, val.size() * 2 + 1);
 
-	mysql_real_escape_string(static_cast<DBInterfaceMysql*>(pdbi)->mysql(), 
+	KBEngine::mysql_real_escape_string(static_cast<DBInterfaceMysql*>(pdbi)->mysql(), 
 		tbuf, val.c_str(), val.size());
 
 	pSotvs->extraDatas += tbuf;
@@ -1956,7 +1956,7 @@ void EntityTableItemMysql_UNICODE::getWriteSqlItem(DBInterface* pdbi, MemoryStre
 	char* tbuf = new char[val.size() * 2 + 1];
 	memset(tbuf, 0, val.size() * 2 + 1);
 
-	mysql_real_escape_string(static_cast<DBInterfaceMysql*>(pdbi)->mysql(), 
+	KBEngine::mysql_real_escape_string(static_cast<DBInterfaceMysql*>(pdbi)->mysql(), 
 		tbuf, val.c_str(), val.size());
 	
 	pSotvs->extraDatas = "\"";
@@ -2009,7 +2009,7 @@ void EntityTableItemMysql_BLOB::getWriteSqlItem(DBInterface* pdbi, MemoryStream*
 	char* tbuf = new char[val.size() * 2 + 1];
 	memset(tbuf, 0, val.size() * 2 + 1);
 
-	mysql_real_escape_string(static_cast<DBInterfaceMysql*>(pdbi)->mysql(), 
+	KBEngine::mysql_real_escape_string(static_cast<DBInterfaceMysql*>(pdbi)->mysql(), 
 		tbuf, val.data(), val.size());
 
 	pSotvs->extraDatas = "\"";
@@ -2062,7 +2062,7 @@ void EntityTableItemMysql_PYTHON::getWriteSqlItem(DBInterface* pdbi, MemoryStrea
 	char* tbuf = new char[val.size() * 2 + 1];
 	memset(tbuf, 0, val.size() * 2 + 1);
 
-	mysql_real_escape_string(static_cast<DBInterfaceMysql*>(pdbi)->mysql(), 
+	KBEngine::mysql_real_escape_string(static_cast<DBInterfaceMysql*>(pdbi)->mysql(), 
 		tbuf, val.c_str(), val.size());
 
 	pSotvs->extraDatas = "\"";

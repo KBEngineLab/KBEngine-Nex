@@ -252,7 +252,7 @@ Network::Reason TelnetHandler::checkLastErrors()
 	int err;
 	Network::Reason reason;
 
-#if KBE_PLATFORM == PLATFORM_UNIX
+#if KBE_PLATFORM != PLATFORM_WIN32
 	err = errno;
 
 	switch (err)

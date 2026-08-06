@@ -130,17 +130,19 @@ void CoordinateNode::debugZ()
 }
 
 //-------------------------------------------------------------------------------------
-void CoordinateNode::onNodePassX(CoordinateNode* pNode, bool isfront)
+// 空实现为默认行为：子类按需覆写，参数刻意未使用。
+// Empty implementations are the default behavior; subclasses override as needed, parameters are intentionally unused.
+void CoordinateNode::onNodePassX(CoordinateNode* /* pNode */, bool /* isfront */)
 {
 }
 
 //-------------------------------------------------------------------------------------
-void CoordinateNode::onNodePassY(CoordinateNode* pNode, bool isfront)
+void CoordinateNode::onNodePassY(CoordinateNode* /* pNode */, bool /* isfront */)
 {
 }
 
 //-------------------------------------------------------------------------------------
-void CoordinateNode::onNodePassZ(CoordinateNode* pNode, bool isfront)
+void CoordinateNode::onNodePassZ(CoordinateNode* /* pNode */, bool /* isfront */)
 {
 }
 

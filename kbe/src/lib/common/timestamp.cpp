@@ -23,7 +23,11 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{
 
+// rdtsc 仅 x86/x86_64 可用；Apple Silicon 等 ARM 平台没有该指令，回退到 clock 计时。
+// rdtsc exists only on x86/x86_64; ARM platforms such as Apple Silicon fall back to clock timing.
+#if defined(__x86_64__) || defined(__i386__)
 #define KBE_USE_RDTSC
+#endif
 
 #ifdef KBE_USE_RDTSC
 	KBETimingMethod g_timingMethod = RDTSC_TIMING_METHOD;
@@ -53,12 +57,13 @@ const char* getTimingMethodName()
 	}
 }
 
-#if KBE_PLATFORM == PLATFORM_UNIX
+#if KBE_PLATFORM == PLATFORM_UNIX || KBE_PLATFORM == PLATFORM_APPLE
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
 
-#ifdef KBE_USE_RDTSC
+// 始终定义该函数：非 x86 平台上 timestamp() 会回退到 gettimeofday，结果依然自洽。
+// Always defined: on non-x86 platforms timestamp() falls back to gettimeofday, so the result stays consistent.
 static uint64 calcStampsPerSecond_rdtsc()
 {
 	struct timeval	tvBefore,	tvSleep = {0, 500000},	tvAfter;
@@ -85,7 +90,8 @@ static uint64 calcStampsPerSecond_rdtsc()
 
 	return (stampDelta * 1000000ULL) / microDelta;
 }
-#else
+
+#ifndef KBE_USE_RDTSC
 static uint64 calcStampsPerSecond_gettime()
 {
 	return 1000000000ULL;

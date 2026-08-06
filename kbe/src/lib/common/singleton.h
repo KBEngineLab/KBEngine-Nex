@@ -42,7 +42,12 @@ template <typename T>
 class Singleton
 {
 protected:
-	static T* singleton_;
+	// C++17 inline 静态成员：定义位于头文件，任何翻译单元都能看到定义，
+	// 避免 clang -Wundefined-var-template（测试单元以 -Werror 编译时尤为关键）。
+	// C++17 inline static member: the definition lives in the header so every
+	// translation unit sees it, avoiding clang -Wundefined-var-template (critical
+	// for test units compiled with -Werror).
+	inline static T* singleton_ = nullptr;
 
 public:
 	Singleton(void)
@@ -63,8 +68,10 @@ public:
 	static T* getSingletonPtr(void){ return singleton_; }
 };
 
-#define KBE_SINGLETON_INIT( TYPE )							\
-template <>	 TYPE * Singleton< TYPE >::singleton_ = 0;	\
-	
+// 历史宏保留以兼容旧源码；C++17 inline 静态成员已提供头文件内定义，无需再显式特化。
+// Legacy macro kept for source compatibility; the C++17 inline static member is
+// already defined in the header, so no explicit specialization is needed.
+#define KBE_SINGLETON_INIT( TYPE )
+
 }
 #endif // KBE_SINGLETON_H

@@ -37,6 +37,12 @@ extern "C"
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <arpa/inet.h>
+#include <ifaddrs.h>
+#if defined(__APPLE__)
+// sockaddr_dl/LLADDR 用于 macOS 下通过 AF_LINK 读取 MAC 地址。
+// sockaddr_dl/LLADDR are used to read MAC addresses over AF_LINK on macOS.
+#include <net/if_dl.h>
+#endif
 #endif
 
 namespace KBEngine
@@ -479,6 +485,35 @@ std::vector< std::string > SystemInfo::getMacAddresses()
 
 #else
 
+#if defined(__APPLE__)
+	// macOS 没有 SIOCGIFHWADDR/ifr_hwaddr，改用 getifaddrs + AF_LINK 枚举 MAC 地址。
+	// macOS lacks SIOCGIFHWADDR/ifr_hwaddr; enumerate MAC addresses via getifaddrs + AF_LINK instead.
+	struct ifaddrs * ifaddr = NULL;
+	if (getifaddrs(&ifaddr) == 0)
+	{
+		for (struct ifaddrs * ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+		{
+			if (ifa->ifa_addr == NULL || ifa->ifa_addr->sa_family != AF_LINK)
+				continue;
+
+			struct sockaddr_dl * sdl = (struct sockaddr_dl*)ifa->ifa_addr;
+			if (sdl->sdl_alen != 6)
+				continue;
+
+			unsigned char * macBytes = (unsigned char*)LLADDR(sdl);
+			char MAC[19];
+			memset(&MAC[0], 0, sizeof(MAC));
+
+			sprintf(MAC, "%02x:%02x:%02x:%02x:%02x:%02x",
+				macBytes[0], macBytes[1], macBytes[2],
+				macBytes[3], macBytes[4], macBytes[5]);
+
+			mac_addresses.push_back(MAC);
+		}
+
+		freeifaddrs(ifaddr);
+	}
+#else
 	int fd;
 	int interfaceNum = 0;
 	struct ifreq buf[16];
@@ -521,6 +556,7 @@ std::vector< std::string > SystemInfo::getMacAddresses()
 	}
 
 	::close(fd);
+#endif // defined(__APPLE__)
 
 #endif
 
