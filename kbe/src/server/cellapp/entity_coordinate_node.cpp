@@ -400,22 +400,23 @@ void EntityCoordinateNode::clearDelWatcherNodes()
 
 	if (delWatcherNodeNum_ > 0)
 	{
-		WATCHER_NODES::iterator iter = watcherNodes_.begin();
-		for (; iter != watcherNodes_.end();)
+		// 批量 Leave 时不能逐项 erase：每次 erase 都会搬移后续指针，
+		// 使一次清理退化为 O(n^2)。使用读写游标一次压紧，保持原有顺序。
+		// Batch Leave must not erase one element at a time: each erase shifts the
+		// remaining pointers and turns cleanup into O(n^2). Compact once in linear
+		// time while preserving the established watcher order.
+		WATCHER_NODES::size_type writeIndex = 0;
+		for (WATCHER_NODES::size_type readIndex = 0; readIndex < watcherNodes_.size(); ++readIndex)
 		{
-			if (!(*iter))
-			{
-				iter = watcherNodes_.erase(iter);
-				--delWatcherNodeNum_;
+			CoordinateNode* pNode = watcherNodes_[readIndex];
+			if (!pNode)
+				continue;
 
-				if (delWatcherNodeNum_ <= 0)
-					return;
-			}
-			else
-			{
-				++iter;
-			}
+			watcherNodes_[writeIndex++] = pNode;
 		}
+
+		watcherNodes_.resize(writeIndex);
+		delWatcherNodeNum_ = 0;
 	}
 }
 
