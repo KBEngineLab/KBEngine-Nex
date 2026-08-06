@@ -25,6 +25,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "helper/debug_helper.h"
 #include "common/common.h"
 #include "updatable.h"	
+#include <vector>
 // #define NDEBUG
 // windows include	
 #if KBE_PLATFORM == PLATFORM_WIN32	
@@ -48,7 +49,9 @@ public:
 	void update();
 
 private:
-	std::vector< std::map<uint32, Updatable*> > objects_;
+	// Updatable 以单调 removeIdx 保持优先级内顺序；连续槽位避免每 Tick 遍历红黑树节点。
+	// Monotonic removeIdx preserves per-priority order while contiguous slots avoid tree-node pointer chasing each tick.
+	std::vector< std::vector<Updatable*> > objects_;
 };
 
 }

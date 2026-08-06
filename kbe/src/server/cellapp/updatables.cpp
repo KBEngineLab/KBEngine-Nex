@@ -48,23 +48,18 @@ bool Updatables::add(Updatable* updatable)
 	// 由于没有大量优先级需求，因此这里固定优先级数组
 	if (objects_.size() == 0)
 	{
-		objects_.push_back(std::map<uint32, Updatable*>());
-		objects_.push_back(std::map<uint32, Updatable*>());
+		objects_.push_back(std::vector<Updatable*>());
+		objects_.push_back(std::vector<Updatable*>());
 	}
 
 	KBE_ASSERT(updatable->updatePriority() < objects_.size());
 
-	static uint32 idx = 1;
-	std::map<uint32, Updatable*>& pools = objects_[updatable->updatePriority()];
+	std::vector<Updatable*>& pools = objects_[updatable->updatePriority()];
 
-	// 防止重复
-	while (pools.find(idx) != pools.end())
-		++idx;
-
-	pools[idx] = updatable;
-
-	// 记录存储位置
-	updatable->removeIdx = idx++;
+	// 删除只留下空槽；新对象始终追加，保持旧 map 的注册顺序，避免同 Tick 重排更新顺序。
+	// Removal leaves a hole; new objects always append so registration order and same-tick ordering stay stable.
+	pools.push_back(updatable);
+	updatable->removeIdx = static_cast<int>(pools.size() - 1);
 
 	return true;
 }
@@ -72,8 +67,15 @@ bool Updatables::add(Updatable* updatable)
 //-------------------------------------------------------------------------------------
 bool Updatables::remove(Updatable* updatable)
 {
-	std::map<uint32, Updatable*>& pools = objects_[updatable->updatePriority()];
-	pools.erase(updatable->removeIdx);
+	if (updatable->removeIdx < 0 || updatable->updatePriority() >= objects_.size())
+		return false;
+
+	std::vector<Updatable*>& pools = objects_[updatable->updatePriority()];
+	const size_t index = static_cast<size_t>(updatable->removeIdx);
+	if (index >= pools.size() || pools[index] != updatable)
+		return false;
+
+	pools[index] = NULL;
 	updatable->removeIdx = -1;
 	return true;
 }
@@ -83,21 +85,15 @@ void Updatables::update()
 {
 	SCOPED_PROFILE(UPDATABLES_PROFILE);
 
-	std::vector< std::map<uint32, Updatable*> >::iterator fpIter = objects_.begin();
+	std::vector< std::vector<Updatable*> >::iterator fpIter = objects_.begin();
 	for (; fpIter != objects_.end(); ++fpIter)
 	{
-		std::map<uint32, Updatable*>& pools = (*fpIter);
-		std::map<uint32, Updatable*>::iterator iter = pools.begin();
-		for (; iter != pools.end();)
+		std::vector<Updatable*>& pools = (*fpIter);
+		for (size_t index = 0; index < pools.size(); ++index)
 		{
-			if (!iter->second->update())
-			{
-				pools.erase(iter++);
-			}
-			else
-			{
-				++iter;
-			}
+			Updatable* updatable = pools[index];
+			if (updatable != NULL && !updatable->update() && pools[index] == updatable)
+				remove(updatable);
 		}
 	}
 }
