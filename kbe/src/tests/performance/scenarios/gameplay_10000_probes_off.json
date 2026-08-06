@@ -1,0 +1,8 @@
+{
+  "extends": "gameplay_10000.json",
+  "name": "gameplay-10000-probes-off",
+  "performance_probes_enabled": false
+  ,"readiness": {
+    "root/witness/active": {"min": 9500}
+  }
+}

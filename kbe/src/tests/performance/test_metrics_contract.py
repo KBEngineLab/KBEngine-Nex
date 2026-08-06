@@ -551,6 +551,11 @@ def assert_python_latency_scenario() -> None:
     assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/witness/queues"] == 30.0
     assert "CELLAPP_TYPE=@cellapp:root/witness/lod" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/witness/lod"] == 30.0
+
+    probes_off = load_scenario(gameplay_path.with_name("gameplay_10000_probes_off.json"))
+    assert probes_off["bots"] == 10000
+    assert probes_off["duration_seconds"] == 300
+    assert probes_off["performance_probes_enabled"] is False
     for component in ("BASEAPP_TYPE", "CELLAPP_TYPE"):
         component_name = component.split("_", 1)[0].lower()
         assert f"{component}=@{component_name}:root/timers" in gameplay["watcher_targets"]
@@ -1482,6 +1487,18 @@ def main() -> int:
             workload_processes=2,
         )
         assert distributed["quality"]["status"] == "PASS"
+
+        distributed_min_path = root / "distributed-readiness-min.jsonl"
+        with JsonlRecorder(distributed_min_path, "test-run", "contract") as recorder:
+            recorder.record_sample("watcher", "CELLAPP_TYPE", "root/witness/active", 900, "count")
+            recorder.record_sample("watcher", "CELLAPP_TYPE", "root/witness/active", 1100, "count")
+        distributed_min = build_summary(
+            load_events(distributed_min_path),
+            readiness={"root/witness/active": {"min": 9500}},
+            configured_bots=10000,
+            workload_processes=10,
+        )
+        assert not any("readiness metric dropped" in item for item in distributed_min["quality"]["blockers"])
     windows_cpu_profiler = (
         repository_root / "kbe/src/tests/performance/windows_cpu_profile.ps1"
     ).read_text(encoding="utf-8")

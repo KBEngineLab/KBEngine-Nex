@@ -190,10 +190,15 @@ def evaluate_quality(
             # histogram no longer retains synchronized instance identity, so a single
             # CellApp's zero cannot be treated as an aggregate drop.
             if (
-                expected == "$bots"
-                and name.startswith("watcher.")
+                name.startswith("watcher.")
                 and not name.startswith("watcher.BOTS_TYPE.")
+                and (expected == "$bots" or (isinstance(expected, dict) and set(expected) == {"min"}))
             ):
+                # Server-side readiness is aggregated across component instances by the
+                # controller. The steady-state samples retain per-instance values, so a
+                # global minimum must not be applied to each CellApp/BaseApp separately.
+                # 服务端 readiness 由控制器跨进程聚合；稳态样本保留进程局部值，
+                # 因此全局下限不能再次套用到每个 CellApp/BaseApp。
                 continue
             # readiness.workload.root/... 是控制器写入的多进程总和；带 bots#CID 的样本才是进程局部值。
             # readiness.workload.root/... is the controller aggregate; samples containing bots#CID remain process-local.
