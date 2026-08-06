@@ -105,12 +105,14 @@ private:
 	CoordinateNode* first_y_coordinateNode_;
 	CoordinateNode* first_z_coordinateNode_;
 
-	std::list<CoordinateNode*> dels_;
+	// 延迟删除队列只在 CellApp 主线程访问，连续存储可避免每个节点的 list 堆分配。
+	// Deferred-delete queues are single-threaded; contiguous storage avoids one heap node per entry.
+	std::vector<CoordinateNode*> dels_;
 	size_t dels_count_;
 
 	int updating_;
 
-	std::list<CoordinateNode*> releases_;
+	std::vector<CoordinateNode*> releases_;
 };
 
 }

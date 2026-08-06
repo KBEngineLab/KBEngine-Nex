@@ -236,7 +236,7 @@ bool CoordinateSystem::remove(CoordinateNode* pNode)
 	// 除非实现了标记的计数器，这里强制所有的行为都放入dels_， 由releaseNodes在space中进行调用统一释放
 	if(true /*pNode->hasFlags(COORDINATE_NODE_FLAG_PENDING)*/)
 	{
-		std::list<CoordinateNode*>::iterator iter = std::find(dels_.begin(), dels_.end(), pNode);
+	std::vector<CoordinateNode*>::iterator iter = std::find(dels_.begin(), dels_.end(), pNode);
 		if(iter == dels_.end())
 		{
 			dels_.push_back(pNode);
@@ -257,7 +257,7 @@ void CoordinateSystem::removeDelNodes()
 	if(dels_count_ == 0)
 		return;
 
-	std::list<CoordinateNode*>::iterator iter = dels_.begin();
+	std::vector<CoordinateNode*>::iterator iter = dels_.begin();
 	for(; iter != dels_.end(); ++iter)
 	{
 		removeReal((*iter));
@@ -272,7 +272,7 @@ void CoordinateSystem::releaseNodes()
 {
 	removeDelNodes();
 
-	std::list<CoordinateNode*>::iterator iter = releases_.begin();
+	std::vector<CoordinateNode*>::iterator iter = releases_.begin();
 	for (; iter != releases_.end(); ++iter)
 	{
 		delete (*iter);
