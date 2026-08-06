@@ -366,6 +366,21 @@ void EntityCoordinateNode::update()
 	// 而导致次数update被调用，在某种情况下会出现问题
 	// 例如：// A->B, B-A（此时old_*是B）, A->B（此时old_*是B，而xx等目的地就是B）,此时update中会误判为没有移动。
 	// https://github.com/kbengine/kbengine/issues/407
+	//
+	// CoordinateNode::update() 可能通过观察关系回调递归触发本节点。递归入口
+	// 已经看到同一组坐标时，不需要再次扫描全部 watcher；否则一个移动会把 AOI
+	// 扇出重复放大。位置真正变化时仍保留原有排序和回调流程。
+	//
+	// CoordinateNode::update() can recursively re-enter this node through an AOI
+	// callback. When the recursive entry sees the same coordinates, scanning every
+	// watcher again only amplifies fan-out. Real movement keeps the original ordering
+	// and callback flow unchanged.
+	const float currentX = x();
+	const float currentY = y();
+	const float currentZ = z();
+	if (currentX == old_xx() && currentY == old_yy() && currentZ == old_zz())
+		return;
+
 	old_xx(x());
 	old_yy(y());
 	old_zz(z());
