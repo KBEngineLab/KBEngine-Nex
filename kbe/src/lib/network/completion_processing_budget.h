@@ -17,18 +17,18 @@ namespace Network
 static const uint32 COMPLETION_MIN_COMPLETIONS_PER_TICK = 1;
 static const uint32 COMPLETION_MAX_COMPLETIONS_PER_TICK = 1024;
 static const uint32 COMPLETION_MAX_PROCESSING_TIME_MS = 2;
-static const uint32 COMPLETION_MAX_ADAPTIVE_PROCESSING_TIME_MS = 16;
+static const uint32 COMPLETION_MAX_ADAPTIVE_PROCESSING_TIME_MS = 8;
 static const uint64 COMPLETION_ADAPTIVE_EXHAUSTION_STEP = 8;
 
 inline uint32 completionProcessingTimeBudgetMs(uint64 consecutiveBudgetExhaustions)
 {
 	// A permanently non-empty completion queue needs more throughput than the 2 ms
 	// fairness slice can provide. Grow only after repeated exhaustion and keep the
-	// slice bounded so timers and game ticks still run at least once per 16 ms of IO.
+	// slice bounded so timers and game ticks still run at least once per 8 ms of IO.
 	// completion 队列持续非空时，2ms 公平切片可能不足以追上到达速率。
-	// 仅在连续耗尽后逐级扩容，并以 16ms 封顶，确保 Timer 与游戏 Tick 仍能及时运行。
+	// 仅在连续耗尽后逐级扩容，并以 8ms 封顶，确保 Timer 与游戏 Tick 仍能及时运行。
 	const uint64 growthSteps = consecutiveBudgetExhaustions / COMPLETION_ADAPTIVE_EXHAUSTION_STEP;
-	const uint64 multiplier = 1 + (growthSteps > 7 ? 7 : growthSteps);
+	const uint64 multiplier = 1 + (growthSteps > 3 ? 3 : growthSteps);
 	const uint64 budgetMs = static_cast<uint64>(COMPLETION_MAX_PROCESSING_TIME_MS) * multiplier;
 	return static_cast<uint32>(budgetMs > COMPLETION_MAX_ADAPTIVE_PROCESSING_TIME_MS ?
 		COMPLETION_MAX_ADAPTIVE_PROCESSING_TIME_MS : budgetMs);

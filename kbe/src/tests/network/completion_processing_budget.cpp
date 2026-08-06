@@ -32,8 +32,8 @@ int main()
 		return EXIT_FAILURE;
 	}
 
-	// 自适应预算必须只在持续积压后增长，并以 16ms 封顶，防止一次网络轮询饿死 Timer。
-	// The adaptive budget grows only after persistent backlog and remains capped at 16 ms.
+	// 自适应预算必须只在持续积压后增长，并以 8ms 封顶，防止一次网络轮询饿死 Timer。
+	// The adaptive budget grows only after persistent backlog and remains capped at 8 ms.
 	if (!require(completionProcessingTimeBudgetMs(0) == 2,
 		"idle completion budget was not the 2 ms baseline") ||
 		!require(completionProcessingTimeBudgetMs(7) == 2,
@@ -43,10 +43,8 @@ int main()
 		!require(completionProcessingTimeBudgetMs(16) == 6,
 			"completion budget did not grow progressively") ||
 		!require(completionProcessingTimeBudgetMs(24) == 8,
-			"completion budget did not reach the 8 ms intermediate level") ||
-		!require(completionProcessingTimeBudgetMs(56) == 16,
 			"completion budget did not reach its bounded maximum") ||
-		!require(completionProcessingTimeBudgetMs(1000) == 16,
+		!require(completionProcessingTimeBudgetMs(1000) == 8,
 			"completion budget exceeded its bounded maximum"))
 	{
 		return EXIT_FAILURE;
