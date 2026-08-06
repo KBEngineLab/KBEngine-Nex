@@ -92,8 +92,10 @@ void Updatables::update()
 		for (size_t index = 0; index < pools.size(); ++index)
 		{
 			Updatable* updatable = pools[index];
+			// update() 可能在处理器内部 delete this；返回后只能比较槽位并清空，不能再次访问对象。
+			// update() may delete this inside the handler; after return only inspect the slot and never dereference the object.
 			if (updatable != NULL && !updatable->update() && pools[index] == updatable)
-				remove(updatable);
+				pools[index] = NULL;
 		}
 	}
 }
