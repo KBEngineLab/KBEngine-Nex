@@ -1555,9 +1555,12 @@ bool Witness::update()
 {
 	SCOPED_PROFILE(CLIENT_UPDATE_PROFILE);
 
-	const bool globallyAdmitted = g_witnessUpdateScheduler.admit(
-		schedulerPending_ || fullScanRequired_);
-	const bool hasPendingWork = schedulerPending_ || fullScanRequired_;
+	// schedulerPending_ already includes a non-empty full scan. An empty Witness may keep
+	// fullScanRequired_ set for future AOI entries, but must not consume a pending slot.
+	// schedulerPending_ 已包含非空全量扫描；空视野保留 fullScanRequired_ 仅供后续 AOI 进入使用，
+	// 不能因此占用 pending 准入槽位。
+	const bool hasPendingWork = schedulerPending_;
+	const bool globallyAdmitted = g_witnessUpdateScheduler.admit(hasPendingWork);
 	g_witnessLoadMetrics.recordGlobalAdmission(globallyAdmitted);
 	if (hasPendingWork)
 		g_witnessLoadMetrics.recordPendingAdmission(globallyAdmitted);
