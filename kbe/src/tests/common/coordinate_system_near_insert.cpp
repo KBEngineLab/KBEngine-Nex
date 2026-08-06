@@ -28,7 +28,21 @@ public:
 		targetZ_ = z;
 	}
 
-	void onNodePassX(KBEngine::CoordinateNode*, bool) override { ++passCount_; }
+	void retargetOnFirstXPass(float x)
+	{
+		retargetOnFirstXPass_ = true;
+		retargetX_ = x;
+	}
+
+	void onNodePassX(KBEngine::CoordinateNode*, bool) override
+	{
+		++passCount_;
+		if (retargetOnFirstXPass_)
+		{
+			retargetOnFirstXPass_ = false;
+			targetX_ = retargetX_;
+		}
+	}
 	void onNodePassY(KBEngine::CoordinateNode*, bool) override { ++passCount_; }
 	void onNodePassZ(KBEngine::CoordinateNode*, bool) override { ++passCount_; }
 
@@ -39,6 +53,8 @@ private:
 	float targetY_;
 	float targetZ_;
 	std::size_t passCount_;
+	bool retargetOnFirstXPass_ = false;
+	float retargetX_ = 0.0f;
 };
 
 bool require(bool condition, const char* message)
@@ -204,6 +220,30 @@ bool testVisibleEqualCorrectionNotifiesOnce()
 			"visible equal-coordinate correction did not suppress both duplicate callbacks") &&
 		require(isSortedX(system), "visible equal-coordinate correction broke X ordering");
 }
+
+bool testCallbackRetargetsCurrentMovement()
+{
+	KBEngine::CoordinateSystem::hasY = false;
+	KBEngine::CoordinateSystem system;
+	TestNode* moving = new TestNode(0.0f, 0.0f, 10.0f);
+	system.insert(moving);
+	system.insert(new TestNode(1.0f, 0.0f, 10.0f));
+	system.insert(new TestNode(2.0f, 0.0f, 10.0f));
+	system.insert(new TestNode(3.0f, 0.0f, 10.0f));
+
+	// 穿越回调允许业务再次修改目标坐标。热路径可以在一次穿越内复用坐标，
+	// 但下一次穿越前必须刷新，否则会越过回调指定的新目标。
+	// A pass callback may retarget the moving node. The hot path may reuse the
+	// coordinate for one crossing, but must refresh it before the next crossing.
+	moving->target(4.0f, 0.0f, 10.0f);
+	moving->retargetOnFirstXPass(1.0f);
+	moving->update();
+
+	return require(moving->x() == 1.0f,
+		"coordinate update ignored a callback retarget") &&
+		require(isSortedX(system),
+		"callback retarget broke coordinate ordering");
+}
 }
 
 int main()
@@ -211,7 +251,8 @@ int main()
 	if (!testNearInsertSkipsUnrelatedPrefix(false) ||
 		!testNearInsertSkipsUnrelatedPrefix(true) ||
 		!testNearInsertRejectsUnsafeNodes() ||
-		!testVisibleEqualCorrectionNotifiesOnce())
+		!testVisibleEqualCorrectionNotifiesOnce() ||
+		!testCallbackRetargetsCurrentMovement())
 	{
 		return EXIT_FAILURE;
 	}

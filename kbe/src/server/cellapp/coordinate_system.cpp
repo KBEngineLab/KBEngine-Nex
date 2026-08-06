@@ -389,7 +389,8 @@ void CoordinateSystem::moveNodeX(CoordinateNode* pNode, float px, CoordinateNode
 {
 	if (pCurrNode != NULL)
 	{
-		pNode->x(pCurrNode->x());
+		const float currentX = pCurrNode->x();
+		pNode->x(currentX);
 
 #ifdef DEBUG_COORDINATE_SYSTEM
 		DEBUG_MSG(fmt::format("CoordinateSystem::update start: [{}X] ({}), pCurrNode=>({})\n",
@@ -398,7 +399,7 @@ void CoordinateSystem::moveNodeX(CoordinateNode* pNode, float px, CoordinateNode
 
 		if (pNode->pPrevX() == pCurrNode)
 		{
-			KBE_ASSERT(pCurrNode->x() >= px);
+			KBE_ASSERT(currentX >= px);
 
 			CoordinateNode* pPreNode = pCurrNode->pPrevX();
 			pCurrNode->pPrevX(pNode);
@@ -424,7 +425,7 @@ void CoordinateSystem::moveNodeX(CoordinateNode* pNode, float px, CoordinateNode
 		}
 		else
 		{
-			KBE_ASSERT(pCurrNode->x() <= px);
+			KBE_ASSERT(currentX <= px);
 
 			CoordinateNode* pNextNode = pCurrNode->pNextX();
 			if (pNextNode != pNode)
@@ -491,7 +492,8 @@ void CoordinateSystem::moveNodeY(CoordinateNode* pNode, float py, CoordinateNode
 {
 	if (pCurrNode != NULL)
 	{
-		pNode->y(pCurrNode->y());
+		const float currentY = pCurrNode->y();
+		pNode->y(currentY);
 
 #ifdef DEBUG_COORDINATE_SYSTEM
 		DEBUG_MSG(fmt::format("CoordinateSystem::update start: [{}Y] ({}), pCurrNode=>({})\n",
@@ -500,7 +502,7 @@ void CoordinateSystem::moveNodeY(CoordinateNode* pNode, float py, CoordinateNode
 
 		if (pNode->pPrevY() == pCurrNode)
 		{
-			KBE_ASSERT(pCurrNode->y() >= py);
+			KBE_ASSERT(currentY >= py);
 
 			CoordinateNode* pPreNode = pCurrNode->pPrevY();
 			pCurrNode->pPrevY(pNode);
@@ -526,7 +528,7 @@ void CoordinateSystem::moveNodeY(CoordinateNode* pNode, float py, CoordinateNode
 		}
 		else
 		{
-			KBE_ASSERT(pCurrNode->y() <= py);
+			KBE_ASSERT(currentY <= py);
 
 			CoordinateNode* pNextNode = pCurrNode->pNextY();
 			if (pNextNode != pNode)
@@ -593,7 +595,8 @@ void CoordinateSystem::moveNodeZ(CoordinateNode* pNode, float pz, CoordinateNode
 {
 	if (pCurrNode != NULL)
 	{
-		pNode->z(pCurrNode->z());
+		const float currentZ = pCurrNode->z();
+		pNode->z(currentZ);
 
 #ifdef DEBUG_COORDINATE_SYSTEM
 		DEBUG_MSG(fmt::format("CoordinateSystem::update start: [{}Z] ({}), pCurrNode=>({})\n",
@@ -602,7 +605,7 @@ void CoordinateSystem::moveNodeZ(CoordinateNode* pNode, float pz, CoordinateNode
 
 		if (pNode->pPrevZ() == pCurrNode)
 		{
-			KBE_ASSERT(pCurrNode->z() >= pz);
+			KBE_ASSERT(currentZ >= pz);
 
 			CoordinateNode* pPreNode = pCurrNode->pPrevZ();
 			pCurrNode->pPrevZ(pNode);
@@ -628,7 +631,7 @@ void CoordinateSystem::moveNodeZ(CoordinateNode* pNode, float pz, CoordinateNode
 		}
 		else
 		{
-			KBE_ASSERT(pCurrNode->z() <= pz);
+			KBE_ASSERT(currentZ <= pz);
 
 			CoordinateNode* pNextNode = pCurrNode->pNextZ();
 			if (pNextNode != pNode)
@@ -699,35 +702,56 @@ void CoordinateSystem::update(CoordinateNode* pNode)
 
 	++updating_;
 
-	if (pNode->xx() != pNode->old_xx())
+	const float initialTargetX = pNode->xx();
+	if (initialTargetX != pNode->old_xx())
 	{
 		CoordinateNode* pEqualCorrectionEnd = NULL;
 		CoordinateNode* pCurrNode = pNode->pPrevX();
-		while (pCurrNode && pCurrNode != pNode && pCurrNode->x() > pNode->xx())
+		while (pCurrNode && pCurrNode != pNode)
 		{
-			moveNodeX(pNode, pNode->xx(), pCurrNode);
+			// AOI callbacks may retarget the moving node. Snapshot once for this
+			// crossing, then refresh on the next iteration to preserve that behavior.
+			// AOI 回调可能再次修改目标坐标；单次穿越只读取一次，下一轮重新读取，
+			// 在减少虚函数调用的同时保留动态重定向语义。
+			const float targetX = pNode->xx();
+			if (pCurrNode->x() <= targetX)
+				break;
+
+			moveNodeX(pNode, targetX, pCurrNode);
 			pCurrNode = pNode->pPrevX();
 		}
-		while (pCurrNode && pCurrNode != pNode && pCurrNode->x() == pNode->xx() &&
+		while (pCurrNode && pCurrNode != pNode &&
 			!pCurrNode->hasFlags(COORDINATE_NODE_FLAG_NEGATIVE_BOUNDARY))
 		{
+			const float targetX = pNode->xx();
+			if (pCurrNode->x() != targetX)
+				break;
+
 			if (!pEqualCorrectionEnd)
 				pEqualCorrectionEnd = pCurrNode;
-			moveNodeX(pNode, pNode->xx(), pCurrNode);
+			moveNodeX(pNode, targetX, pCurrNode);
 			pCurrNode = pNode->pPrevX();
 		}
 
 		pCurrNode = pNode->pNextX();
-		while (pCurrNode && pCurrNode != pNode && pCurrNode->x() < pNode->xx())
+		while (pCurrNode && pCurrNode != pNode)
 		{
-			moveNodeX(pNode, pNode->xx(), pCurrNode);
+			const float targetX = pNode->xx();
+			if (pCurrNode->x() >= targetX)
+				break;
+
+			moveNodeX(pNode, targetX, pCurrNode);
 			pCurrNode = pNode->pNextX();
 		}
-		while (pCurrNode && pCurrNode != pNode && pCurrNode->x() == pNode->xx() &&
+		while (pCurrNode && pCurrNode != pNode &&
 			!pCurrNode->hasFlags(COORDINATE_NODE_FLAG_POSITIVE_BOUNDARY))
 		{
+			const float targetX = pNode->xx();
+			if (pCurrNode->x() != targetX)
+				break;
+
 			const bool isEqualCorrection = pEqualCorrectionEnd != NULL;
-			moveNodeX(pNode, pNode->xx(), pCurrNode, !isEqualCorrection);
+			moveNodeX(pNode, targetX, pCurrNode, !isEqualCorrection);
 			if (pCurrNode == pEqualCorrectionEnd)
 				pEqualCorrectionEnd = NULL;
 			pCurrNode = pNode->pNextX();
@@ -736,72 +760,109 @@ void CoordinateSystem::update(CoordinateNode* pNode)
 		pNode->x(pNode->xx());
 	}
 
-	if (CoordinateSystem::hasY && pNode->yy() != pNode->old_yy())
+	if (CoordinateSystem::hasY)
 	{
-		CoordinateNode* pEqualCorrectionEnd = NULL;
-		CoordinateNode* pCurrNode = pNode->pPrevY();
-		while (pCurrNode && pCurrNode != pNode && pCurrNode->y() > pNode->yy())
+		const float initialTargetY = pNode->yy();
+		if (initialTargetY != pNode->old_yy())
 		{
-			moveNodeY(pNode, pNode->yy(), pCurrNode);
-			pCurrNode = pNode->pPrevY();
-		}
-		while (pCurrNode && pCurrNode != pNode && pCurrNode->y() == pNode->yy() &&
-			!pCurrNode->hasFlags(COORDINATE_NODE_FLAG_NEGATIVE_BOUNDARY))
-		{
-			if (!pEqualCorrectionEnd)
-				pEqualCorrectionEnd = pCurrNode;
-			moveNodeY(pNode, pNode->yy(), pCurrNode);
-			pCurrNode = pNode->pPrevY();
-		}
+			CoordinateNode* pEqualCorrectionEnd = NULL;
+			CoordinateNode* pCurrNode = pNode->pPrevY();
+			while (pCurrNode && pCurrNode != pNode)
+			{
+				const float targetY = pNode->yy();
+				if (pCurrNode->y() <= targetY)
+					break;
 
-		pCurrNode = pNode->pNextY();
-		while (pCurrNode && pCurrNode != pNode && pCurrNode->y() < pNode->yy())
-		{
-			moveNodeY(pNode, pNode->yy(), pCurrNode);
-			pCurrNode = pNode->pNextY();
-		}
-		while (pCurrNode && pCurrNode != pNode && pCurrNode->y() == pNode->yy() &&
-			!pCurrNode->hasFlags(COORDINATE_NODE_FLAG_POSITIVE_BOUNDARY))
-		{
-			const bool isEqualCorrection = pEqualCorrectionEnd != NULL;
-			moveNodeY(pNode, pNode->yy(), pCurrNode, !isEqualCorrection);
-			if (pCurrNode == pEqualCorrectionEnd)
-				pEqualCorrectionEnd = NULL;
-			pCurrNode = pNode->pNextY();
-		}
+				moveNodeY(pNode, targetY, pCurrNode);
+				pCurrNode = pNode->pPrevY();
+			}
+			while (pCurrNode && pCurrNode != pNode &&
+				!pCurrNode->hasFlags(COORDINATE_NODE_FLAG_NEGATIVE_BOUNDARY))
+			{
+				const float targetY = pNode->yy();
+				if (pCurrNode->y() != targetY)
+					break;
 
-		pNode->y(pNode->yy());
+				if (!pEqualCorrectionEnd)
+					pEqualCorrectionEnd = pCurrNode;
+				moveNodeY(pNode, targetY, pCurrNode);
+				pCurrNode = pNode->pPrevY();
+			}
+
+			pCurrNode = pNode->pNextY();
+			while (pCurrNode && pCurrNode != pNode)
+			{
+				const float targetY = pNode->yy();
+				if (pCurrNode->y() >= targetY)
+					break;
+
+				moveNodeY(pNode, targetY, pCurrNode);
+				pCurrNode = pNode->pNextY();
+			}
+			while (pCurrNode && pCurrNode != pNode &&
+				!pCurrNode->hasFlags(COORDINATE_NODE_FLAG_POSITIVE_BOUNDARY))
+			{
+				const float targetY = pNode->yy();
+				if (pCurrNode->y() != targetY)
+					break;
+
+				const bool isEqualCorrection = pEqualCorrectionEnd != NULL;
+				moveNodeY(pNode, targetY, pCurrNode, !isEqualCorrection);
+				if (pCurrNode == pEqualCorrectionEnd)
+					pEqualCorrectionEnd = NULL;
+				pCurrNode = pNode->pNextY();
+			}
+
+			pNode->y(pNode->yy());
+		}
 	}
 
-	if (pNode->zz() != pNode->old_zz())
+	const float initialTargetZ = pNode->zz();
+	if (initialTargetZ != pNode->old_zz())
 	{
 		CoordinateNode* pEqualCorrectionEnd = NULL;
 		CoordinateNode* pCurrNode = pNode->pPrevZ();
-		while (pCurrNode && pCurrNode != pNode && pCurrNode->z() > pNode->zz())
+		while (pCurrNode && pCurrNode != pNode)
 		{
-			moveNodeZ(pNode, pNode->zz(), pCurrNode);
+			const float targetZ = pNode->zz();
+			if (pCurrNode->z() <= targetZ)
+				break;
+
+			moveNodeZ(pNode, targetZ, pCurrNode);
 			pCurrNode = pNode->pPrevZ();
 		}
-		while (pCurrNode && pCurrNode != pNode && pCurrNode->z() == pNode->zz() &&
+		while (pCurrNode && pCurrNode != pNode &&
 			!pCurrNode->hasFlags(COORDINATE_NODE_FLAG_NEGATIVE_BOUNDARY))
 		{
+			const float targetZ = pNode->zz();
+			if (pCurrNode->z() != targetZ)
+				break;
+
 			if (!pEqualCorrectionEnd)
 				pEqualCorrectionEnd = pCurrNode;
-			moveNodeZ(pNode, pNode->zz(), pCurrNode);
+			moveNodeZ(pNode, targetZ, pCurrNode);
 			pCurrNode = pNode->pPrevZ();
 		}
 
 		pCurrNode = pNode->pNextZ();
-		while (pCurrNode && pCurrNode != pNode && pCurrNode->z() < pNode->zz())
+		while (pCurrNode && pCurrNode != pNode)
 		{
-			moveNodeZ(pNode, pNode->zz(), pCurrNode);
+			const float targetZ = pNode->zz();
+			if (pCurrNode->z() >= targetZ)
+				break;
+
+			moveNodeZ(pNode, targetZ, pCurrNode);
 			pCurrNode = pNode->pNextZ();
 		}
-		while (pCurrNode && pCurrNode != pNode && pCurrNode->z() == pNode->zz() &&
+		while (pCurrNode && pCurrNode != pNode &&
 			!pCurrNode->hasFlags(COORDINATE_NODE_FLAG_POSITIVE_BOUNDARY))
 		{
+			const float targetZ = pNode->zz();
+			if (pCurrNode->z() != targetZ)
+				break;
+
 			const bool isEqualCorrection = pEqualCorrectionEnd != NULL;
-			moveNodeZ(pNode, pNode->zz(), pCurrNode, !isEqualCorrection);
+			moveNodeZ(pNode, targetZ, pCurrNode, !isEqualCorrection);
 			if (pCurrNode == pEqualCorrectionEnd)
 				pEqualCorrectionEnd = NULL;
 			pCurrNode = pNode->pNextZ();
