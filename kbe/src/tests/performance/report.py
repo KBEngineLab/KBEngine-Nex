@@ -45,6 +45,7 @@ def build_summary(
     counters: Counter[str] = Counter()
     operation_counters: dict[str, Counter[str]] = defaultdict(Counter)
     phase_counters: dict[str, Counter[str]] = defaultdict(Counter)
+    request_scopes: dict[str, Counter[str]] = defaultdict(Counter)
     gauges: dict[str, float] = {}
     labels: dict[str, str] = {}
     metadata: dict[str, str] = {}
@@ -62,6 +63,9 @@ def build_summary(
             labels[f"{event['component']}.{event['instance']}.{metric}"] = str(event["value"])
         elif metric.startswith("log.") or tags.get("kind") == "counter":
             counters[metric] += int(float(event["value"]))
+            if metric in ("request.success.count", "request.error.count", "request.timeout.count"):
+                scope = "control_plane" if str(event["component"]).lower() == "watcher" else "workload"
+                request_scopes[scope][metric] += int(float(event["value"]))
             if operation != "default":
                 operation_counters[operation][metric] += int(float(event["value"]))
             phase = tags.get("phase")
@@ -98,6 +102,16 @@ def build_summary(
             "failures": failures,
             "success_rate_percent": (success / total_requests * 100.0) if total_requests else 0.0,
         },
+        "request_scopes": {
+            scope: {
+                "success": values.get("request.success.count", 0),
+                "failures": values.get("request.error.count", 0) + values.get("request.timeout.count", 0),
+                "total": values.get("request.success.count", 0)
+                + values.get("request.error.count", 0)
+                + values.get("request.timeout.count", 0),
+            }
+            for scope, values in sorted(request_scopes.items())
+        },
     }
     summary["quality"] = evaluate_quality(
         summary,
@@ -122,9 +136,21 @@ def evaluate_quality(
     blockers: list[str] = []
     slow: list[str] = []
     request_result = summary.get("requests", {})
+    workload_requests = summary.get("request_scopes", {}).get("workload", {})
     minimum_success = float(thresholds.get("success_rate_min_percent", 99.0))
-    if request_result.get("total", 0) and request_result.get("success_rate_percent", 0.0) < minimum_success:
+    workload_total = int(workload_requests.get("total", 0))
+    workload_success_rate = (
+        float(workload_requests.get("success", 0)) / workload_total * 100.0
+        if workload_total else None
+    )
+    if workload_total and workload_success_rate < minimum_success:
         blockers.append(f"request success rate below {minimum_success:.3f}%")
+    elif not workload_total and request_result.get("total", 0):
+        # A watcher-only run has no business request stream; do not treat control-plane
+        # polling failures as client traffic loss. Keep the failures in request_scopes.
+        # 只有控制面请求的压测没有业务请求流，不应把 Watcher 失败当成客户端丢包；
+        # 具体失败仍保留在 request_scopes 中供报告和发布数据使用。
+        pass
     phase_counters = summary.get("phase_counters", {})
     # 只有日志计数按测量窗口裁剪；进程退出、请求失败和协议计数没有阶段标签，
     # 必须保留全局值，否则测量阶段存在日志记录时会把真正的失败静默掉。
@@ -169,6 +195,9 @@ def evaluate_quality(
     log_errors = int(quality_counters.get("log.error.count", 0))
     if log_errors > max_log_errors:
         blockers.append(f"log errors={log_errors} > {max_log_errors}")
+    control_plane_failures = int(summary.get("request_scopes", {}).get("control_plane", {}).get("failures", 0))
+    if control_plane_failures > 0:
+        slow.append(f"Watcher control-plane request failures={control_plane_failures}")
     for metric in ("log.resource_unavailable.count", "log.abnormal_exit.count"):
         value = int(quality_counters.get(metric, 0))
         if value > 0:

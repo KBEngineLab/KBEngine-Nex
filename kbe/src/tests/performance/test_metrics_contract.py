@@ -1407,6 +1407,7 @@ def main() -> int:
         assert not any(item.startswith("log errors=") for item in log_only_summary["quality"]["blockers"])
         assert summary["requests"]["success"] == 4
         assert summary["requests"]["failures"] == 1
+        assert summary["request_scopes"]["workload"]["total"] == 5
         assert summary["counters"]["request.slow.count"] == 1
         assert summary["quality"]["status"] == "BLOCKER"
         recorder_path = root / "samples.jsonl"
