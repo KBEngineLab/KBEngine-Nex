@@ -230,6 +230,7 @@ public:
 	static uint64 promotedVolatileSkipCount();
 	static uint64 cancelledPendingLeaveCount();
 	static void beginUpdateTick();
+	static uint64 globalPendingCount();
 	static uint64 globalAdmittedCount();
 	static uint64 globalDeferredCount();
 	static uint64 globalUpdateLimit();
@@ -283,6 +284,8 @@ private:
 	bool queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue = false);
 	void scheduleEntityRefVolatile(EntityRef* pEntityRef);
 	void activateDueVolatileUpdates();
+	void setSchedulerPending(bool pending);
+	void refreshSchedulerPending();
 	uint32 volatileUpdateIntervalTicks(Entity* pEntity) const;
 	void releaseVolatileProducerIfDelivered(EntityRef* pEntityRef);
 	bool needsVolatileUpdate(Entity* pEntity);
@@ -317,6 +320,7 @@ private:
 	WitnessDelayedQueue						delayedVolatileQueue_;
 	WitnessDirtyQueue						structuralDirtyQueue_;
 	bool									volatileUpdatesEnabled_;
+	bool									schedulerPending_;
 };
 
 }

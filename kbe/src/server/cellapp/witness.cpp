@@ -58,6 +58,7 @@ namespace KBEngine{
 namespace
 {
 uint64 g_witnessActiveCount = 0;
+uint64 g_witnessPendingCount = 0;
 WitnessLoadMetrics g_witnessLoadMetrics;
 WitnessUpdateScheduler g_witnessUpdateScheduler;
 
@@ -87,7 +88,8 @@ nextEntityRefGeneration_(1),
 volatileDirtyQueue_(),
 delayedVolatileQueue_(),
 structuralDirtyQueue_(),
-volatileUpdatesEnabled_(true)
+volatileUpdatesEnabled_(true),
+schedulerPending_(false)
 {
 	updatableName = "Witness";
 }
@@ -157,6 +159,7 @@ void Witness::createFromStream(KBEngine::MemoryStream& s)
 	lastBaseDir_.yaw(-FLT_MAX);
 	Cellapp::getSingleton().addUpdatable(this);
 	++g_witnessActiveCount;
+	refreshSchedulerPending();
 }
 
 //-------------------------------------------------------------------------------------
@@ -181,6 +184,7 @@ void Witness::attach(Entity* pEntity)
 	}
 
 	Cellapp::getSingleton().addUpdatable(this);
+	refreshSchedulerPending();
 
 	onAttach(pEntity);
 }
@@ -277,6 +281,7 @@ void Witness::clear(Entity* pEntity)
 	clearVolatileDirtyQueue();
 	fullScanRequired_ = true;
 	KBE_ASSERT(g_witnessActiveCount > 0);
+	setSchedulerPending(false);
 	--g_witnessActiveCount;
 
 	Cellapp::getSingleton().removeUpdatable(this);
@@ -319,6 +324,7 @@ Witness::SmartPoolObjectPtr Witness::createSmartPoolObj(const std::string& logPo
 //-------------------------------------------------------------------------------------
 void Witness::onReclaimObject()
 {
+	setSchedulerPending(false);
 	setVolatileUpdatesEnabled(true);
 	synchronizeViewEntityMetrics();
 	clearVolatileDirtyQueue();
@@ -801,6 +807,7 @@ void Witness::updateEntitiesAliasID(int removedAliasID)
 void Witness::requireFullScan()
 {
 	fullScanRequired_ = true;
+	refreshSchedulerPending();
 }
 
 //-------------------------------------------------------------------------------------
@@ -845,6 +852,7 @@ void Witness::clearVolatileDirtyQueue()
 	volatileDirtyQueue_.clear();
 	delayedVolatileQueue_.clear();
 	structuralDirtyQueue_.clear();
+	refreshSchedulerPending();
 }
 
 //-------------------------------------------------------------------------------------
@@ -876,6 +884,7 @@ bool Witness::queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue)
 	// Generation plus two queued flags promotes an already queued volatile item without searching a linear container.
 	if (!pEntityRef || pEntityRef->flags() == ENTITYREF_FLAG_UNKONWN)
 		return false;
+	setSchedulerPending(true);
 
 	if (isStructuralUpdate(pEntityRef))
 	{
@@ -959,6 +968,31 @@ void Witness::activateDueVolatileUpdates()
 	// Buckets transfer ownership in O(1) per relation. Generation validation remains in the normal active path.
 	// 时间轮按关系 O(1) 转移所有权，generation 校验仍由统一的活跃队列路径完成。
 	delayedVolatileQueue_.activateDue(g_kbetime, volatileDirtyQueue_);
+	if (volatileDirtyQueue_.size() > 0)
+		setSchedulerPending(true);
+}
+
+// Immediate queues and a required full scan are the only work eligible for the
+// global admission window. Delayed LOD entries intentionally remain outside it.
+// 即时队列或待执行全量扫描才占用全局准入窗口，延迟 LOD 条目不占用该窗口。
+void Witness::setSchedulerPending(bool pending)
+{
+	if (schedulerPending_ == pending)
+		return;
+	schedulerPending_ = pending;
+	if (pending)
+		++g_witnessPendingCount;
+	else
+	{
+		KBE_ASSERT(g_witnessPendingCount > 0);
+		--g_witnessPendingCount;
+	}
+}
+
+void Witness::refreshSchedulerPending()
+{
+	setSchedulerPending((fullScanRequired_ && !viewEntities_.empty()) || volatileDirtyQueue_.size() > 0 ||
+		structuralDirtyQueue_.size() > 0);
 }
 
 //-------------------------------------------------------------------------------------
@@ -1140,6 +1174,7 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 		// No queued work means there is nothing useful to refresh while congested.
 		// 拥塞时若两个队列均为空，则没有值得发送的保活状态。
 		g_witnessLoadMetrics.recordSuppressedUpdateSkip();
+		refreshSchedulerPending();
 		return;
 	}
 
@@ -1431,8 +1466,11 @@ uint64 Witness::cancelledPendingLeaveCount() { return g_witnessLoadMetrics.cance
 void Witness::beginUpdateTick()
 {
 	g_witnessUpdateScheduler.beginTick(
-		g_witnessActiveCount, g_kbeSrvConfig.getCellApp().witness_global_updates_per_tick);
+		g_witnessActiveCount, g_kbeSrvConfig.getCellApp().witness_global_updates_per_tick,
+		g_witnessPendingCount);
 }
+
+uint64 Witness::globalPendingCount() { return g_witnessPendingCount; }
 
 //-------------------------------------------------------------------------------------
 uint64 Witness::globalAdmittedCount() { return g_witnessLoadMetrics.globalAdmitted(); }
@@ -1515,7 +1553,8 @@ bool Witness::update()
 {
 	SCOPED_PROFILE(CLIENT_UPDATE_PROFILE);
 
-	const bool globallyAdmitted = g_witnessUpdateScheduler.admit();
+	const bool globallyAdmitted = g_witnessUpdateScheduler.admit(
+		schedulerPending_ || fullScanRequired_);
 	g_witnessLoadMetrics.recordGlobalAdmission(globallyAdmitted);
 	if (!globallyAdmitted)
 		return true;
@@ -1563,6 +1602,7 @@ bool Witness::update()
 			addBaseDataToStream(pSendBundle);
 
 		processVolatileDirtyQueue(pSendBundle);
+		refreshSchedulerPending();
 
 		size_t pSendBundleMessageLength = pSendBundle->currMsgLength();
 		if (pSendBundleMessageLength > 8/*NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN产生的基础包大小*/)

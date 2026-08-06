@@ -83,6 +83,53 @@ bool testRotatingGlobalAdmission()
 		require(scheduler.nextStart() == 0, "admission cursor did not wrap");
 }
 
+bool testPendingAdmissionPrefersWorkAndRotates()
+{
+	KBEngine::WitnessUpdateScheduler scheduler;
+	scheduler.beginTick(6, 2, 3);
+	bool admitted[6] = {};
+	const bool pending[6] = { false, false, true, false, true, true };
+	for (std::size_t index = 0; index < 6; ++index)
+		admitted[index] = scheduler.admit(pending[index]);
+	if (!require(!admitted[0] && !admitted[1] && admitted[2] && !admitted[3] &&
+		admitted[4] && !admitted[5], "pending admission did not reserve its rotating window"))
+		return false;
+
+	scheduler.beginTick(6, 2, 3);
+	for (std::size_t index = 0; index < 6; ++index)
+		admitted[index] = scheduler.admit(pending[index]);
+	return require(admitted[5] && admitted[2],
+		"pending admission did not rotate across ticks") &&
+		require(scheduler.admissionCount() == 2, "pending admission changed the global limit");
+}
+
+bool testPendingBelowLimitFillsRemainingSlots()
+{
+	KBEngine::WitnessUpdateScheduler scheduler;
+	scheduler.beginTick(5, 4, 1);
+	bool admitted[5] = {};
+	const bool pending[5] = { false, false, false, true, false };
+	for (std::size_t index = 0; index < 5; ++index)
+		admitted[index] = scheduler.admit(pending[index]);
+	return require(admitted[0] && admitted[1] && admitted[2] && admitted[3],
+		"non-pending work did not fill slots left by a small pending set") &&
+		require(!admitted[4], "admission exceeded the configured limit");
+}
+
+bool testUnlimitedAdmissionIgnoresPendingPartition()
+{
+	KBEngine::WitnessUpdateScheduler scheduler;
+	scheduler.beginTick(4, 0, 2);
+	const bool pending[4] = { false, true, false, true };
+	for (std::size_t index = 0; index < 4; ++index)
+	{
+		if (!require(scheduler.admit(pending[index]),
+			"unlimited admission rejected an active Witness"))
+			return false;
+	}
+	return require(!scheduler.admit(false), "unlimited admission exceeded the active Witness count");
+}
+
 bool testVolatileDistanceSemantics()
 {
 	using KBEngine::witnessVolatileWithinDistance;
@@ -175,6 +222,8 @@ int main()
 {
 	if (!testBoundedBudgetAllowsOneCompleteUpdate() || !testUnlimitedAndShrinkingBundle() ||
 		!testAdaptiveTotalBudget() || !testRotatingGlobalAdmission() ||
+		!testPendingAdmissionPrefersWorkAndRotates() || !testPendingBelowLimitFillsRemainingSlots() ||
+		!testUnlimitedAdmissionIgnoresPendingPartition() ||
 		!testVolatileDistanceSemantics() || !testDenseViewTemporalLod() ||
 		!testDelayedQueueOrdersDueEntriesAndKeepsOwnership() || !testDirtyQueueTrimsOnlyWhenEmpty())
 		return EXIT_FAILURE;
