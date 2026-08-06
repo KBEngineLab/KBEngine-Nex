@@ -61,6 +61,8 @@ bool testQueueAttribution()
 	metrics.recordStructuralProcessed();
 	metrics.recordGlobalAdmission(true);
 	metrics.recordGlobalAdmission(false);
+	metrics.recordPendingAdmission(true);
+	metrics.recordPendingAdmission(false);
 	metrics.recordEnter(120);
 	metrics.recordLeave(7);
 	metrics.recordVolatileUpdate(19);
@@ -89,6 +91,8 @@ bool testQueueAttribution()
 		require(metrics.structuralProcessed() == 1, "structural work was not attributed") &&
 		require(metrics.globalAdmitted() == 1 && metrics.globalDeferred() == 1,
 			"global scheduler attribution drifted") &&
+		require(metrics.pendingAdmitted() == 1 && metrics.pendingDeferred() == 1,
+			"pending scheduler attribution drifted") &&
 		require(metrics.enterUpdates() == 1 && metrics.enterBytes() == 120,
 			"enter work attribution drifted") &&
 		require(metrics.leaveUpdates() == 1 && metrics.leaveBytes() == 7,

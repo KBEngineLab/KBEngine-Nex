@@ -353,6 +353,8 @@ bool Cellapp::initializeWatcher()
 	WATCH_OBJECT("witness/scheduler/admitted", &Witness::globalAdmittedCount);
 	WATCH_OBJECT("witness/scheduler/deferred", &Witness::globalDeferredCount);
 	WATCH_OBJECT("witness/scheduler/pending", &Witness::globalPendingCount);
+	WATCH_OBJECT("witness/scheduler/pendingAdmitted", &Witness::globalPendingAdmittedCount);
+	WATCH_OBJECT("witness/scheduler/pendingDeferred", &Witness::globalPendingDeferredCount);
 	WATCH_OBJECT("witness/messages/enterCount", &Witness::enterUpdateCount);
 	WATCH_OBJECT("witness/messages/enterBytes", &Witness::enterBytesCount);
 	WATCH_OBJECT("witness/messages/leaveCount", &Witness::leaveUpdateCount);

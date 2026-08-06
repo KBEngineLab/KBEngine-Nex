@@ -1471,6 +1471,8 @@ void Witness::beginUpdateTick()
 }
 
 uint64 Witness::globalPendingCount() { return g_witnessPendingCount; }
+uint64 Witness::globalPendingAdmittedCount() { return g_witnessLoadMetrics.pendingAdmitted(); }
+uint64 Witness::globalPendingDeferredCount() { return g_witnessLoadMetrics.pendingDeferred(); }
 
 //-------------------------------------------------------------------------------------
 uint64 Witness::globalAdmittedCount() { return g_witnessLoadMetrics.globalAdmitted(); }
@@ -1555,7 +1557,10 @@ bool Witness::update()
 
 	const bool globallyAdmitted = g_witnessUpdateScheduler.admit(
 		schedulerPending_ || fullScanRequired_);
+	const bool hasPendingWork = schedulerPending_ || fullScanRequired_;
 	g_witnessLoadMetrics.recordGlobalAdmission(globallyAdmitted);
+	if (hasPendingWork)
+		g_witnessLoadMetrics.recordPendingAdmission(globallyAdmitted);
 	if (!globallyAdmitted)
 		return true;
 

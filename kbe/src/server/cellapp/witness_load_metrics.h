@@ -169,6 +169,12 @@ public:
 			return;
 		admitted ? ++globalAdmitted_ : ++globalDeferred_;
 	}
+	void recordPendingAdmission(bool admitted)
+	{
+		if (!g_performanceProbesEnabled)
+			return;
+		admitted ? ++pendingAdmitted_ : ++pendingDeferred_;
+	}
 	void recordEnter(std::uint64_t bytes) { if (g_performanceProbesEnabled) { ++enterUpdates_; enterBytes_ += bytes; } }
 	void recordLeave(std::uint64_t bytes) { if (g_performanceProbesEnabled) { ++leaveUpdates_; leaveBytes_ += bytes; } }
 	bool beginEnterProcessing() { return enterProcessing_.beginCall(); }
@@ -252,6 +258,8 @@ public:
 	std::uint64_t structuralProcessed() const { return structuralProcessed_; }
 	std::uint64_t globalAdmitted() const { return globalAdmitted_; }
 	std::uint64_t globalDeferred() const { return globalDeferred_; }
+	std::uint64_t pendingAdmitted() const { return pendingAdmitted_; }
+	std::uint64_t pendingDeferred() const { return pendingDeferred_; }
 	std::uint64_t enterUpdates() const { return enterUpdates_; }
 	std::uint64_t enterBytes() const { return enterBytes_; }
 	std::uint64_t leaveUpdates() const { return leaveUpdates_; }
@@ -303,6 +311,8 @@ private:
 	std::uint64_t structuralProcessed_ = 0;
 	std::uint64_t globalAdmitted_ = 0;
 	std::uint64_t globalDeferred_ = 0;
+	std::uint64_t pendingAdmitted_ = 0;
+	std::uint64_t pendingDeferred_ = 0;
 	std::uint64_t enterUpdates_ = 0;
 	std::uint64_t enterBytes_ = 0;
 	std::uint64_t leaveUpdates_ = 0;
