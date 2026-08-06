@@ -483,8 +483,23 @@ bool Dbmgr::initializeEnd()
 
 	Components::getSingleton().extraData4(pTelnetServer_->port());
 	
-	if (!ret || !initInterfacesHandler() || !initDB())
+	if (!ret)
+	{
+		ERROR_MSG("Dbmgr::initializeEnd: TelnetServer::start failed.\n");
 		return false;
+	}
+
+	if (!initInterfacesHandler())
+	{
+		ERROR_MSG("Dbmgr::initializeEnd: initInterfacesHandler failed.\n");
+		return false;
+	}
+
+	if (!initDB())
+	{
+		ERROR_MSG("Dbmgr::initializeEnd: initDB failed.\n");
+		return false;
+	}
 
 	// ready 回调可能立即执行数据库操作，因此只能在所有数据库接口成功初始化后公开服务状态。
 	// The ready callback may issue database operations immediately, so service readiness is exposed only after every database interface initializes successfully.
