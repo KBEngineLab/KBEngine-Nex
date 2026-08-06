@@ -1131,6 +1131,10 @@ def main() -> int:
     assert "KCP_BACKLOG_RETRY_DELAY_MICROS = 1000" in scheduler_source
     assert "protocolTickMissCount_" in scheduler_source
     assert "g_rudp_tickInterval > 0 ? g_rudp_tickInterval : 100" in scheduler_source
+    adaptive_scheduler_source = (
+        repository_root / "kbe/src/lib/network/kcp_adaptive_scheduling.h"
+    ).read_text(encoding="utf-8")
+    assert "KCP_MAX_ADAPTIVE_PROCESSING_TIME_BUDGET_MICROS = 8000" in adaptive_scheduler_source
     iocp_source = (
         repository_root / "kbe/src/lib/network/poller_iocp.cpp"
     ).read_text(encoding="utf-8")

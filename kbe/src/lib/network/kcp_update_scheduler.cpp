@@ -4,6 +4,7 @@
 
 #include "channel.h"
 #include "event_dispatcher.h"
+#include "kcp_adaptive_scheduling.h"
 
 #include <algorithm>
 #include <cmath>
@@ -16,31 +17,17 @@ namespace
 {
 // 积压时单个 ikcp_update 可能因大量重传而从微秒级放大到毫秒级；小批量后即检查时间预算，
 // 避免“至少 256 次”把一次 2ms 调度轮次放大成数百毫秒并继续制造超时重传。
+// 数据队列保持单通道下限，慢回调后立即归还 dispatcher，避免挤占内部 TCP 消费；
+// ACK 队列使用固定四通道下限摊薄 Windows 粗粒度 timer 成本。
 // A backlogged ikcp_update can grow from microseconds to milliseconds due to retransmissions.
-// Per-channel output and payload are bounded. A four-channel floor amortizes the
-// coarse Windows timer quantum for both ACK and data queues; the time check after
-// this small floor still returns control to the BaseApp dispatcher promptly.
-// 单通道输出和 payload 已受限；ACK 与数据队列使用四通道下限摊薄 Windows 粗粒度
-// timer 成本，并在该小批次后检查时间预算，及时归还 BaseApp dispatcher。
+// The data queue keeps a one-channel floor so a slow callback yields promptly and cannot
+// starve internal TCP consumption; the ACK queue uses a fixed four-channel floor.
 const size_t KCP_MIN_UPDATES_PER_WAKEUP = 1;
 const size_t KCP_MIN_ACK_FLUSHES_PER_WAKEUP = 4;
 const size_t KCP_MAX_UPDATES_PER_WAKEUP = 2048;
 const uint64 KCP_PROCESSING_TIME_BUDGET_MICROS = 2000;
 const uint64 KCP_ACK_PROCESSING_TIME_BUDGET_MICROS = 2000;
-const uint64 KCP_MAX_ADAPTIVE_PROCESSING_TIME_BUDGET_MICROS = 8000;
-const uint64 KCP_ADAPTIVE_EXHAUSTION_STEP = 8;
 const int64 KCP_BACKLOG_RETRY_DELAY_MICROS = 1000;
-
-uint64 adaptiveKcpBudgetMicros(uint64 baseBudgetMicros, uint64 consecutiveExhaustions)
-{
-	// Persistent backlog means the fixed fairness slice is below the arrival rate.
-	// Increase throughput gradually, but retain an 8 ms upper bound for dispatcher fairness.
-	// 持续积压表示固定公平切片低于数据到达速率；逐级提高吞吐，并保留 8ms 上限。
-	const uint64 growthSteps = consecutiveExhaustions / KCP_ADAPTIVE_EXHAUSTION_STEP;
-	const uint64 multiplier = 1 + std::min<uint64>(growthSteps, 3);
-	return std::min<uint64>(baseBudgetMicros * multiplier,
-		KCP_MAX_ADAPTIVE_PROCESSING_TIME_BUDGET_MICROS);
-}
 }
 
 KcpUpdateScheduler::KcpUpdateScheduler(EventDispatcher& dispatcher) :

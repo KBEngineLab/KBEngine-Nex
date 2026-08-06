@@ -32,6 +32,10 @@ add_executable(kbe_test_network_kcp_update_queue
 
 add_executable(kbe_test_network_kcp_send_state kcp_send_state.cpp)
 
+add_executable(kbe_test_network_kcp_adaptive_scheduling
+    kcp_adaptive_scheduling.cpp
+)
+
 add_executable(kbe_test_network_kcp_protocol_metrics
     kcp_protocol_metrics.cpp
     ${CMAKE_SOURCE_DIR}/lib/network/ikcp.c
@@ -60,6 +64,7 @@ set(_kbe_network_test_targets
     kbe_test_network_completion_udp_send_queue
     kbe_test_network_kcp_update_queue
     kbe_test_network_kcp_send_state
+    kbe_test_network_kcp_adaptive_scheduling
     kbe_test_network_kcp_protocol_metrics
     kbe_test_network_udp_send_backpressure
 	 kbe_test_network_channel_index_identity
@@ -82,6 +87,8 @@ target_include_directories(kbe_test_network_kcp_update_queue SYSTEM PRIVATE ${CM
 set_target_properties(kbe_test_network_kcp_update_queue PROPERTIES FOLDER "Tests/Network")
 target_include_directories(kbe_test_network_kcp_send_state SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/lib)
 set_target_properties(kbe_test_network_kcp_send_state PROPERTIES FOLDER "Tests/Network")
+target_include_directories(kbe_test_network_kcp_adaptive_scheduling SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/lib)
+set_target_properties(kbe_test_network_kcp_adaptive_scheduling PROPERTIES FOLDER "Tests/Network")
 target_include_directories(kbe_test_network_kcp_protocol_metrics SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/lib)
 set_target_properties(kbe_test_network_kcp_protocol_metrics PROPERTIES FOLDER "Tests/Network")
 target_include_directories(kbe_test_network_udp_send_backpressure SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/lib)
@@ -100,6 +107,7 @@ if(MSVC)
     target_compile_options(kbe_test_network_completion_udp_send_queue PRIVATE /W4 /WX /utf-8)
     target_compile_options(kbe_test_network_kcp_update_queue PRIVATE /W4 /WX /utf-8)
     target_compile_options(kbe_test_network_kcp_send_state PRIVATE /W4 /WX /utf-8)
+    target_compile_options(kbe_test_network_kcp_adaptive_scheduling PRIVATE /W4 /WX /utf-8)
     target_compile_options(kbe_test_network_kcp_protocol_metrics PRIVATE
         $<$<COMPILE_LANGUAGE:CXX>:/W4;/WX;/utf-8>
         $<$<COMPILE_LANGUAGE:C>:/W3;/utf-8>
@@ -129,6 +137,9 @@ else()
         -Wall -Wextra -Wpedantic -Werror
     )
     target_compile_options(kbe_test_network_kcp_send_state PRIVATE
+        -Wall -Wextra -Wpedantic -Werror
+    )
+    target_compile_options(kbe_test_network_kcp_adaptive_scheduling PRIVATE
         -Wall -Wextra -Wpedantic -Werror
     )
     target_compile_options(kbe_test_network_kcp_protocol_metrics PRIVATE
@@ -178,6 +189,12 @@ set_tests_properties(network.kcp_send_state PROPERTIES
 	PASS_REGULAR_EXPRESSION "KCP_SEND_STATE_TEST_PASS"
 )
 
+add_test(NAME network.kcp_adaptive_scheduling COMMAND kbe_test_network_kcp_adaptive_scheduling)
+set_tests_properties(network.kcp_adaptive_scheduling PROPERTIES
+	LABELS "network;cxx;unit;portable;performance;kcp"
+	PASS_REGULAR_EXPRESSION "KCP_ADAPTIVE_SCHEDULING_TEST_PASS"
+)
+
 add_test(NAME network.completion_processing_budget COMMAND kbe_test_network_completion_processing_budget)
 set_tests_properties(network.completion_processing_budget PROPERTIES
     LABELS "network;cxx;unit;portable;performance"
@@ -217,6 +234,7 @@ add_custom_target(kbe_network_tests DEPENDS
     kbe_test_network_completion_udp_send_queue
     kbe_test_network_kcp_update_queue
     kbe_test_network_kcp_send_state
+    kbe_test_network_kcp_adaptive_scheduling
     kbe_test_network_kcp_protocol_metrics
     kbe_test_network_udp_send_backpressure
 	 kbe_test_network_channel_index_identity
