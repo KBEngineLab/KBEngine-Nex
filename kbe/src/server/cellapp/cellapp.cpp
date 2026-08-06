@@ -368,6 +368,11 @@ bool Cellapp::initializeWatcher()
 	WATCH_OBJECT("witness/messages/leaveProcessingSlowSamplesOver1ms", &Witness::leaveProcessingSlowSamplesOver1ms);
 	WATCH_OBJECT("witness/messages/volatileCount", &Witness::volatileUpdateCount);
 	WATCH_OBJECT("witness/messages/volatileBytes", &Witness::volatileUpdateBytesCount);
+	WATCH_OBJECT("witness/lod/nearUpdates", &Witness::lodNearUpdateCount);
+	WATCH_OBJECT("witness/lod/mediumUpdates", &Witness::lodMediumUpdateCount);
+	WATCH_OBJECT("witness/lod/farUpdates", &Witness::lodFarUpdateCount);
+	WATCH_OBJECT("witness/lod/deferredRelations", &Witness::lodDeferredRelationCount);
+	WATCH_OBJECT("witness/lod/distanceFilteredFields", &Witness::lodDistanceFilteredFieldCount);
 	WATCH_OBJECT("coordinateSystem/equalCorrectionMoves",
 		&CoordinateSystem::equalCoordinateCorrectionMoves);
 	WATCH_OBJECT("coordinateSystem/equalCorrectionCallbacksSuppressed",

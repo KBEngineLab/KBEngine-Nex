@@ -549,6 +549,8 @@ def assert_python_latency_scenario() -> None:
     assert "CELLAPP_TYPE=@cellapp:root/witness/messages" in gameplay["watcher_targets"]
     assert "CELLAPP_TYPE=@cellapp:root/witness/queues" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/witness/queues"] == 30.0
+    assert "CELLAPP_TYPE=@cellapp:root/witness/lod" in gameplay["watcher_targets"]
+    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/witness/lod"] == 30.0
     for component in ("BASEAPP_TYPE", "CELLAPP_TYPE"):
         component_name = component.split("_", 1)[0].lower()
         assert f"{component}=@{component_name}:root/timers" in gameplay["watcher_targets"]
@@ -561,6 +563,8 @@ def assert_python_latency_scenario() -> None:
     assert "<witness_total_bytes_per_tick> 2048 </witness_total_bytes_per_tick>" in defaults_source
     assert "<witness_global_bytes_per_tick> 1048576 </witness_global_bytes_per_tick>" in defaults_source
     assert "<witness_global_updates_per_tick> 1024 </witness_global_updates_per_tick>" in defaults_source
+    assert "<minimumViewEntities> 32 </minimumViewEntities>" in defaults_source
+    assert "<farIntervalTicks> 4 </farIntervalTicks>" in defaults_source
     assert "<highSegments> 128 </highSegments>" in defaults_source
     assert "<lowSegments> 32 </lowSegments>" in defaults_source
     assert "<spaceAllocationMaxSkew> 2 </spaceAllocationMaxSkew>" in defaults_source
@@ -610,6 +614,8 @@ def assert_python_latency_scenario() -> None:
     assert 'prefix + "SampledMaxNanos"' in server_app_source
     assert 'categoryName(category) + "/"' not in server_app_source
     assert 'WATCH_OBJECT("witness/queues/cancelledPendingLeaves"' in cellapp_source
+    assert 'WATCH_OBJECT("witness/lod/deferredRelations"' in cellapp_source
+    assert 'WATCH_OBJECT("witness/lod/distanceFilteredFields"' in cellapp_source
     assert 'WATCH_OBJECT("scriptStages/rpcCalls"' in baseapp_source
     assert 'WATCH_OBJECT("scriptStages/rpcCalls"' in cellapp_source
     assert '&pSlow->' not in baseapp_source

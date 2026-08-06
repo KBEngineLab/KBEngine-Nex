@@ -798,6 +798,35 @@ bool ServerConfig::loadConfig(std::string fileName)
 				_cellAppInfo.witness_global_updates_per_tick = xml->getValInt(childnode);
 			}
 
+			childnode = xml->enterNode(node, "witness_volatile_lod");
+			if (childnode)
+			{
+				TiXmlNode* lodNode = xml->enterNode(childnode, "enable");
+				if (lodNode)
+					_cellAppInfo.witness_volatile_lod_enabled = (xml->getValStr(lodNode) == "true");
+
+				lodNode = xml->enterNode(childnode, "minimumViewEntities");
+				if (lodNode)
+					_cellAppInfo.witness_volatile_lod_minimum_view_entities = KBE_MAX(1, xml->getValInt(lodNode));
+
+				lodNode = xml->enterNode(childnode, "nearDistance");
+				if (lodNode)
+					_cellAppInfo.witness_volatile_lod_near_distance = KBE_MAX(0.f, float(xml->getValFloat(lodNode)));
+
+				lodNode = xml->enterNode(childnode, "mediumDistance");
+				if (lodNode)
+					_cellAppInfo.witness_volatile_lod_medium_distance = KBE_MAX(
+						_cellAppInfo.witness_volatile_lod_near_distance, float(xml->getValFloat(lodNode)));
+
+				lodNode = xml->enterNode(childnode, "mediumIntervalTicks");
+				if (lodNode)
+					_cellAppInfo.witness_volatile_lod_medium_interval_ticks = KBE_MIN(64, KBE_MAX(1, xml->getValInt(lodNode)));
+
+				lodNode = xml->enterNode(childnode, "farIntervalTicks");
+				if (lodNode)
+					_cellAppInfo.witness_volatile_lod_far_interval_ticks = KBE_MIN(64, KBE_MAX(1, xml->getValInt(lodNode)));
+			}
+
 			childnode = xml->enterNode(node, "entity_posdir_updates");
 			if (childnode)
 			{

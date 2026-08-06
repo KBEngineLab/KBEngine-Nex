@@ -67,6 +67,7 @@
     "CELLAPP_TYPE=@cellapp:root/witness/scheduler",
     "CELLAPP_TYPE=@cellapp:root/witness/messages",
     "CELLAPP_TYPE=@cellapp:root/witness/queues",
+	"CELLAPP_TYPE=@cellapp:root/witness/lod",
     "CELLAPP_TYPE=@cellapp:root/witness/backpressure"
   ],
   "watcher_intervals": {
@@ -111,6 +112,7 @@
     "CELLAPP_TYPE:root/witness/scheduler": 30.0,
     "CELLAPP_TYPE:root/witness/messages": 30.0,
     "CELLAPP_TYPE:root/witness/queues": 30.0,
+	"CELLAPP_TYPE:root/witness/lod": 30.0,
     "CELLAPP_TYPE:root/witness/backpressure": 30.0
   },
   "readiness": {

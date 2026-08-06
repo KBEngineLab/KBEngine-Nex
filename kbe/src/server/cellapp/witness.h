@@ -25,6 +25,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "updatable.h"
 #include "entityref.h"
 #include "witness_dirty_queue.h"
+#include "witness_delayed_queue.h"
 #include "witness_load_metrics.h"
 #include "helper/debug_helper.h"
 #include "common/common.h"
@@ -250,6 +251,11 @@ public:
 	static uint64 leaveProcessingSlowSamplesOver1ms();
 	static uint64 volatileUpdateCount();
 	static uint64 volatileUpdateBytesCount();
+	static uint64 lodNearUpdateCount();
+	static uint64 lodMediumUpdateCount();
+	static uint64 lodFarUpdateCount();
+	static uint64 lodDeferredRelationCount();
+	static uint64 lodDistanceFilteredFieldCount();
 	static uint64 activeSuppressedCount();
 	static uint64 suppressionTransitionCount();
 	static uint64 resumeTransitionCount();
@@ -275,6 +281,9 @@ private:
 	void synchronizeViewEntityMetrics();
 	void initializeEntityRefLifecycle(EntityRef* pEntityRef);
 	void queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue = false);
+	void scheduleEntityRefVolatile(EntityRef* pEntityRef);
+	void activateDueVolatileUpdates();
+	uint32 volatileUpdateIntervalTicks(Entity* pEntity) const;
 	void releaseVolatileProducerIfDelivered(EntityRef* pEntityRef);
 	bool needsVolatileUpdate(Entity* pEntity);
 	bool isStructuralUpdate(const EntityRef* pEntityRef) const;
@@ -301,9 +310,11 @@ private:
 
 	uint16									clientViewSize_;
 	bool									fullScanRequired_;
+	bool									volatileQueueCompactionPending_;
 	size_t								trackedViewEntityCount_;
 	uint64									nextEntityRefGeneration_;
 	WitnessDirtyQueue						volatileDirtyQueue_;
+	WitnessDelayedQueue						delayedVolatileQueue_;
 	WitnessDirtyQueue						structuralDirtyQueue_;
 	bool									volatileUpdatesEnabled_;
 };

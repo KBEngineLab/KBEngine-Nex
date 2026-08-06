@@ -188,6 +188,12 @@ typedef struct EngineComponentInfo
 		witness_total_bytes_per_tick = 2048;
 		witness_global_bytes_per_tick = 1048576;
 		witness_global_updates_per_tick = 1024;
+		witness_volatile_lod_enabled = true;
+		witness_volatile_lod_minimum_view_entities = 32;
+		witness_volatile_lod_near_distance = 20.f;
+		witness_volatile_lod_medium_distance = 50.f;
+		witness_volatile_lod_medium_interval_ticks = 2;
+		witness_volatile_lod_far_interval_ticks = 4;
 		cellappmgr_space_assignment_max_skew = 2;
 	}
 
@@ -226,6 +232,14 @@ typedef struct EngineComponentInfo
 	// 每 Tick 允许执行 AOI 序列化的 Witness 数；窗口会轮转，零表示不限制。
 	// Witnesses admitted for AOI serialization per tick; the window rotates and zero is unlimited.
 	uint32 witness_global_updates_per_tick;
+	// 高密度 AOI 仅降低位置/方向刷新频率，结构消息始终实时发送。
+	// Dense AOI reduces only position/direction refresh frequency; structural messages remain immediate.
+	bool witness_volatile_lod_enabled;
+	uint32 witness_volatile_lod_minimum_view_entities;
+	float witness_volatile_lod_near_distance;
+	float witness_volatile_lod_medium_distance;
+	uint32 witness_volatile_lod_medium_interval_ticks;
+	uint32 witness_volatile_lod_far_interval_ticks;
 	// 自动分配的新 Space 在 CellApp 间允许的最大数量差；零关闭硬约束。
 	// Maximum automatic Space-count skew between CellApps; zero disables the hard bound.
 	uint32 cellappmgr_space_assignment_max_skew;

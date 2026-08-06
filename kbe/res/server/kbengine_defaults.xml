@@ -627,6 +627,20 @@
 				across ticks to prevent registration-order starvation; deferred positions coalesce to latest. 0 is unlimited.
 			-->
 			<witness_global_updates_per_tick> 1024 </witness_global_updates_per_tick>
+
+			<!-- 高密度同屏时按距离降低位置/方向刷新频率。Enter/Leave、属性和方法消息不受影响；
+				实体ID用于稳定错峰，避免所有远端关系在同一Tick集中编码。关闭后恢复每Tick刷新。
+				Reduce position/direction refresh frequency by distance in dense views. Enter/Leave, properties
+				and methods remain immediate. Stable entity-ID phasing avoids synchronized encoding bursts.
+			-->
+			<witness_volatile_lod>
+				<enable> true </enable>
+				<minimumViewEntities> 32 </minimumViewEntities>
+				<nearDistance> 20 </nearDistance>
+				<mediumDistance> 50 </mediumDistance>
+				<mediumIntervalTicks> 2 </mediumIntervalTicks>
+				<farIntervalTicks> 4 </farIntervalTicks>
+			</witness_volatile_lod>
 						
 			<!-- 实体位置更新方式，
 				0：直接同步高精度浮点数据，View范围无限制。 

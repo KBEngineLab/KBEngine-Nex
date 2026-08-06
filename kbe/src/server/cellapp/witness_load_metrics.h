@@ -176,6 +176,24 @@ public:
 	void recordEnterProcessing(std::uint64_t durationNanos) { enterProcessing_.recordSample(durationNanos); }
 	void recordLeaveProcessing(std::uint64_t durationNanos) { leaveProcessing_.recordSample(durationNanos); }
 	void recordVolatileUpdate(std::uint64_t bytes) { if (g_performanceProbesEnabled) { ++volatileUpdates_; volatileUpdateBytes_ += bytes; } }
+	void recordLodScheduled(std::uint32_t intervalTicks)
+	{
+		if (!g_performanceProbesEnabled)
+			return;
+
+		++lodDeferredRelations_;
+		if (intervalTicks <= 1)
+			++lodNearUpdates_;
+		else if (intervalTicks == 2)
+			++lodMediumUpdates_;
+		else
+			++lodFarUpdates_;
+	}
+	void recordDistanceFilteredFields(std::uint32_t count)
+	{
+		if (g_performanceProbesEnabled)
+			lodDistanceFilteredFields_ += count;
+	}
 	void recordVolatileSuppression(bool suppressed)
 	{
 		if (!g_performanceProbesEnabled)
@@ -242,6 +260,11 @@ public:
 	const WitnessProcessingStats& leaveProcessing() const { return leaveProcessing_; }
 	std::uint64_t volatileUpdates() const { return volatileUpdates_; }
 	std::uint64_t volatileUpdateBytes() const { return volatileUpdateBytes_; }
+	std::uint64_t lodNearUpdates() const { return lodNearUpdates_; }
+	std::uint64_t lodMediumUpdates() const { return lodMediumUpdates_; }
+	std::uint64_t lodFarUpdates() const { return lodFarUpdates_; }
+	std::uint64_t lodDeferredRelations() const { return lodDeferredRelations_; }
+	std::uint64_t lodDistanceFilteredFields() const { return lodDistanceFilteredFields_; }
 	std::uint64_t activeSuppressed() const { return activeSuppressed_; }
 	std::uint64_t suppressionTransitions() const { return suppressionTransitions_; }
 	std::uint64_t resumeTransitions() const { return resumeTransitions_; }
@@ -288,6 +311,11 @@ private:
 	WitnessProcessingStats leaveProcessing_;
 	std::uint64_t volatileUpdates_ = 0;
 	std::uint64_t volatileUpdateBytes_ = 0;
+	std::uint64_t lodNearUpdates_ = 0;
+	std::uint64_t lodMediumUpdates_ = 0;
+	std::uint64_t lodFarUpdates_ = 0;
+	std::uint64_t lodDeferredRelations_ = 0;
+	std::uint64_t lodDistanceFilteredFields_ = 0;
 	std::uint64_t activeSuppressed_ = 0;
 	std::uint64_t suppressionTransitions_ = 0;
 	std::uint64_t resumeTransitions_ = 0;

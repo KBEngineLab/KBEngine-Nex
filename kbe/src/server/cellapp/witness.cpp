@@ -21,6 +21,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "witness.h"
 #include "witness_volatile_budget.h"
 #include "witness_update_scheduler.h"
+#include "witness_volatile_lod.h"
 #include "entity.h"	
 #include "profile.h"
 #include "cellapp.h"
@@ -80,9 +81,11 @@ viewEntities_(),
 viewEntities_map_(),
 clientViewSize_(0),
 fullScanRequired_(true),
+volatileQueueCompactionPending_(false),
 trackedViewEntityCount_(0),
 nextEntityRefGeneration_(1),
 volatileDirtyQueue_(),
+delayedVolatileQueue_(),
 structuralDirtyQueue_(),
 volatileUpdatesEnabled_(true)
 {
@@ -808,6 +811,7 @@ void Witness::prepareFullScanQueue()
 	}
 
 	fullScanRequired_ = false;
+	volatileQueueCompactionPending_ = true;
 	g_witnessLoadMetrics.recordFullScan(scannedEntities);
 }
 
@@ -823,11 +827,12 @@ void Witness::clearVolatileDirtyQueue()
 		(*iter)->structuralQueued(false);
 	}
 
-	const size_t volatileQueuedCount = volatileDirtyQueue_.size();
+	const size_t volatileQueuedCount = volatileDirtyQueue_.size() + delayedVolatileQueue_.size();
 	const size_t structuralQueuedCount = structuralDirtyQueue_.size();
 	g_witnessLoadMetrics.recordDirtyDequeued(volatileQueuedCount, false);
 	g_witnessLoadMetrics.recordDirtyDequeued(structuralQueuedCount, true);
 	volatileDirtyQueue_.clear();
+	delayedVolatileQueue_.clear();
 	structuralDirtyQueue_.clear();
 }
 
@@ -886,6 +891,61 @@ void Witness::queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue)
 	{
 		g_witnessLoadMetrics.recordQueueDeduplicated();
 	}
+}
+
+//-------------------------------------------------------------------------------------
+uint32 Witness::volatileUpdateIntervalTicks(Entity* pOtherEntity) const
+{
+	if (!pEntity_ || !pOtherEntity)
+		return 1;
+
+	const EngineComponentInfo& config = g_kbeSrvConfig.getCellApp();
+	const Position3D& observerPosition = pEntity_->position();
+	const Position3D& targetPosition = pOtherEntity->position();
+	const float deltaX = targetPosition.x - observerPosition.x;
+	const float deltaZ = targetPosition.z - observerPosition.z;
+	const float distanceSquared = deltaX * deltaX + deltaZ * deltaZ;
+	const WitnessVolatileLodConfig lodConfig = {
+		config.witness_volatile_lod_enabled,
+		config.witness_volatile_lod_minimum_view_entities,
+		config.witness_volatile_lod_near_distance,
+		config.witness_volatile_lod_medium_distance,
+		config.witness_volatile_lod_medium_interval_ticks,
+		config.witness_volatile_lod_far_interval_ticks
+	};
+	return witnessVolatileIntervalTicks(lodConfig, viewEntities_.size(), distanceSquared);
+}
+
+//-------------------------------------------------------------------------------------
+void Witness::scheduleEntityRefVolatile(EntityRef* pEntityRef)
+{
+	if (!pEntityRef || !pEntityRef->pEntity() || isStructuralUpdate(pEntityRef))
+		return;
+
+	const uint32 intervalTicks = volatileUpdateIntervalTicks(pEntityRef->pEntity());
+	const uint32 phaseKey = witnessVolatilePhaseKey(pEntity_->id(), pEntityRef->id());
+	const uint64 dueTick = witnessNextVolatileTick(g_kbetime, intervalTicks, phaseKey);
+	const EngineComponentInfo& config = g_kbeSrvConfig.getCellApp();
+	const uint32 maximumIntervalTicks = KBE_MAX(
+		config.witness_volatile_lod_medium_interval_ticks,
+		config.witness_volatile_lod_far_interval_ticks);
+	if (delayedVolatileQueue_.schedule(
+		pEntityRef->id(), pEntityRef->generation(), g_kbetime, dueTick,
+		maximumIntervalTicks, pEntityRef->volatileQueuedRef()))
+	{
+		g_witnessLoadMetrics.recordDirtyEnqueued(
+			volatileDirtyQueue_.size() + delayedVolatileQueue_.size() + structuralDirtyQueue_.size(),
+			true, false, false);
+		g_witnessLoadMetrics.recordLodScheduled(intervalTicks);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Witness::activateDueVolatileUpdates()
+{
+	// Buckets transfer ownership in O(1) per relation. Generation validation remains in the normal active path.
+	// 时间轮按关系 O(1) 转移所有权，generation 校验仍由统一的活跃队列路径完成。
+	delayedVolatileQueue_.activateDue(g_kbetime, volatileDirtyQueue_);
 }
 
 //-------------------------------------------------------------------------------------
@@ -974,7 +1034,7 @@ bool Witness::processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pE
 		++clientViewSize_;
 
 		if (needsVolatileUpdate(pOtherEntity))
-			queueEntityRefVolatile(pEntityRef, true);
+			scheduleEntityRefVolatile(pEntityRef);
 
 		return true;
 	}
@@ -1012,7 +1072,7 @@ bool Witness::processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pE
 	const uint32 flags = getEntityVolatileDataUpdateFlags(pOtherEntity);
 	addUpdateToStream(pSendBundle, flags, pEntityRef);
 	if (flags != UPDATE_FLAG_NULL)
-		queueEntityRefVolatile(pEntityRef, true);
+		scheduleEntityRefVolatile(pEntityRef);
 
 	return true;
 }
@@ -1020,6 +1080,12 @@ bool Witness::processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pE
 //-------------------------------------------------------------------------------------
 void Witness::removeViewEntityRef(EntityRef* pEntityRef)
 {
+	if (pEntityRef->volatileQueued() && pEntityRef->pEntity())
+	{
+		pEntityRef->pEntity()->onWitnessVolatileDequeued();
+		pEntityRef->volatileQueued(false);
+	}
+
 	const int removedAliasID = pEntityRef->aliasID();
 	viewEntities_map_.erase(pEntityRef->id());
 	for (VIEW_ENTITIES::iterator iter = viewEntities_.begin(); iter != viewEntities_.end(); ++iter)
@@ -1039,6 +1105,7 @@ void Witness::removeViewEntityRef(EntityRef* pEntityRef)
 //-------------------------------------------------------------------------------------
 void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 {
+	activateDueVolatileUpdates();
 	const bool volatileSuppressed = !volatileUpdatesEnabled_;
 	if (volatileSuppressed && structuralDirtyQueue_.size() == 0 && volatileDirtyQueue_.size() == 0)
 	{
@@ -1203,6 +1270,13 @@ void Witness::processVolatileDirtyQueue(Network::Bundle* pSendBundle)
 
 	g_witnessLoadMetrics.recordVolatileBytes(volatileBudget.bytesSent());
 	g_witnessLoadMetrics.recordSendBytes(sendBudget.bytesSent());
+	if (volatileQueueCompactionPending_ && volatileDirtyQueue_.size() == 0)
+	{
+		// One-time post-full-scan compaction avoids allocator churn during steady movement.
+		// 全量扫描后仅收缩一次，避免稳态移动期间反复触发分配器抖动。
+		volatileDirtyQueue_.trimEmpty(32);
+		volatileQueueCompactionPending_ = false;
+	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -1354,6 +1428,11 @@ uint64 Witness::leaveProcessingMaxNanos() { return g_witnessLoadMetrics.leavePro
 uint64 Witness::leaveProcessingSlowSamplesOver1ms() { return g_witnessLoadMetrics.leaveProcessing().slowSamplesOver1ms(); }
 uint64 Witness::volatileUpdateCount() { return g_witnessLoadMetrics.volatileUpdates(); }
 uint64 Witness::volatileUpdateBytesCount() { return g_witnessLoadMetrics.volatileUpdateBytes(); }
+uint64 Witness::lodNearUpdateCount() { return g_witnessLoadMetrics.lodNearUpdates(); }
+uint64 Witness::lodMediumUpdateCount() { return g_witnessLoadMetrics.lodMediumUpdates(); }
+uint64 Witness::lodFarUpdateCount() { return g_witnessLoadMetrics.lodFarUpdates(); }
+uint64 Witness::lodDeferredRelationCount() { return g_witnessLoadMetrics.lodDeferredRelations(); }
+uint64 Witness::lodDistanceFilteredFieldCount() { return g_witnessLoadMetrics.lodDistanceFilteredFields(); }
 
 //-------------------------------------------------------------------------------------
 uint64 Witness::activeSuppressedCount()
@@ -2183,9 +2262,25 @@ uint32 Witness::getEntityVolatileDataUpdateFlags(Entity* otherEntity)
 	if (!pVolatileInfo)
 		pVolatileInfo = otherEntity->pScriptModule()->getPVolatileInfo();
 
+	const Position3D& observerPosition = pEntity_->position();
+	const Position3D& targetPosition = otherEntity->position();
+	const float deltaX = targetPosition.x - observerPosition.x;
+	const float deltaZ = targetPosition.z - observerPosition.z;
+	const float distanceSquared = deltaX * deltaX + deltaZ * deltaZ;
+	const bool updatePosition = witnessVolatileWithinDistance(pVolatileInfo->position(), distanceSquared);
+	const bool updateYaw = witnessVolatileWithinDistance(pVolatileInfo->yaw(), distanceSquared);
+	const bool updatePitch = witnessVolatileWithinDistance(pVolatileInfo->pitch(), distanceSquared);
+	const bool updateRoll = witnessVolatileWithinDistance(pVolatileInfo->roll(), distanceSquared);
+	uint32 distanceFilteredFields = 0;
+	distanceFilteredFields += pVolatileInfo->position() > 0.f && !updatePosition ? 1 : 0;
+	distanceFilteredFields += pVolatileInfo->yaw() > 0.f && !updateYaw ? 1 : 0;
+	distanceFilteredFields += pVolatileInfo->pitch() > 0.f && !updatePitch ? 1 : 0;
+	distanceFilteredFields += pVolatileInfo->roll() > 0.f && !updateRoll ? 1 : 0;
+	g_witnessLoadMetrics.recordDistanceFilteredFields(distanceFilteredFields);
+
 	static uint16 entity_posdir_additional_updates = g_kbeSrvConfig.getCellApp().entity_posdir_additional_updates;
 	
-	if ((pVolatileInfo->position() > 0.f) && (entity_posdir_additional_updates == 0 || g_kbetime - otherEntity->posChangedTime() < entity_posdir_additional_updates))
+	if (updatePosition && (entity_posdir_additional_updates == 0 || g_kbetime - otherEntity->posChangedTime() < entity_posdir_additional_updates))
 	{
 		if (!otherEntity->isOnGround() || !pVolatileInfo->optimized())
 		{
@@ -2199,11 +2294,11 @@ uint32 Witness::getEntityVolatileDataUpdateFlags(Entity* otherEntity)
 
 	if((entity_posdir_additional_updates == 0) || (g_kbetime - otherEntity->dirChangedTime() < entity_posdir_additional_updates))
 	{
-		if (pVolatileInfo->yaw() > 0.f)
+		if (updateYaw)
 		{
-			if (pVolatileInfo->roll() > 0.f)
+			if (updateRoll)
 			{
-				if (pVolatileInfo->pitch() > 0.f)
+				if (updatePitch)
 				{
 					flags |= UPDATE_FLAG_YAW_PITCH_ROLL;
 				}
@@ -2212,7 +2307,7 @@ uint32 Witness::getEntityVolatileDataUpdateFlags(Entity* otherEntity)
 					flags |= UPDATE_FLAG_YAW_ROLL;
 				}
 			}
-			else if (pVolatileInfo->pitch() > 0.f)
+			else if (updatePitch)
 			{
 				flags |= UPDATE_FLAG_YAW_PITCH;
 			}
@@ -2221,9 +2316,9 @@ uint32 Witness::getEntityVolatileDataUpdateFlags(Entity* otherEntity)
 				flags |= UPDATE_FLAG_YAW;
 			}
 		}
-		else if (pVolatileInfo->roll() > 0.f)
+		else if (updateRoll)
 		{
-			if (pVolatileInfo->pitch() > 0.f)
+			if (updatePitch)
 			{
 				flags |= UPDATE_FLAG_PITCH_ROLL;
 			}
@@ -2232,7 +2327,7 @@ uint32 Witness::getEntityVolatileDataUpdateFlags(Entity* otherEntity)
 				flags |= UPDATE_FLAG_ROLL;
 			}
 		}
-		else if (pVolatileInfo->pitch() > 0.f)
+		else if (updatePitch)
 		{
 			flags |= UPDATE_FLAG_PITCH; 
 		}

@@ -30,6 +30,16 @@ public:
 		return true;
 	}
 
+	void enqueueOwned(std::uint32_t entityID, std::uint64_t generation)
+	{
+		// Ownership is transferred from the delayed queue, so the EntityRef queued flag intentionally stays true.
+		// 所有权从延迟队列转移而来，因此 EntityRef 的 queued 标记应继续保持 true。
+		ensureCapacity();
+		const std::size_t tail = (head_ + count_) % entries_.size();
+		entries_[tail] = Entry{ entityID, generation };
+		++count_;
+	}
+
 	bool pop(Entry& entry)
 	{
 		if (count_ == 0)
@@ -59,6 +69,19 @@ public:
 	{
 		head_ = 0;
 		count_ = 0;
+	}
+
+	void trimEmpty(std::size_t retainedCapacity)
+	{
+		if (count_ != 0 || entries_.size() <= retainedCapacity)
+			return;
+
+		// Full-scan bursts should not pin their peak ring capacity for the entire Witness lifetime.
+		// 全量扫描洪峰不应让环形队列在整个 Witness 生命周期内永久保留峰值容量。
+		std::vector<Entry> compact;
+		compact.resize(retainedCapacity);
+		entries_.swap(compact);
+		head_ = 0;
 	}
 
 private:

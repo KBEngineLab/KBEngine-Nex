@@ -1,7 +1,10 @@
 #include "server/cellapp/witness_volatile_budget.h"
 #include "server/cellapp/witness_update_scheduler.h"
+#include "server/cellapp/witness_delayed_queue.h"
+#include "server/cellapp/witness_volatile_lod.h"
 
 #include <cstdlib>
+#include <limits>
 #include <iostream>
 
 namespace
@@ -79,12 +82,101 @@ bool testRotatingGlobalAdmission()
 		"rotating admission did not reach the tail") &&
 		require(scheduler.nextStart() == 0, "admission cursor did not wrap");
 }
+
+bool testVolatileDistanceSemantics()
+{
+	using KBEngine::witnessVolatileWithinDistance;
+	return require(!witnessVolatileWithinDistance(0.f, 0.f), "NEVER volatile field was enabled") &&
+		require(witnessVolatileWithinDistance(std::numeric_limits<float>::max(), 1.0e20f),
+			"ALWAYS volatile field was distance limited") &&
+		require(witnessVolatileWithinDistance(20.f, 400.f), "distance boundary was excluded") &&
+		require(!witnessVolatileWithinDistance(20.f, 400.01f), "field exceeded its configured distance");
+}
+
+bool testDenseViewTemporalLod()
+{
+	const KBEngine::WitnessVolatileLodConfig config = { true, 32, 20.f, 50.f, 2, 4 };
+	using KBEngine::witnessNextVolatileTick;
+	using KBEngine::witnessVolatilePhaseKey;
+	using KBEngine::witnessVolatileIntervalTicks;
+	return require(witnessVolatileIntervalTicks(config, 31, 10000.f) == 1,
+		"small view unexpectedly enabled temporal LOD") &&
+		require(witnessVolatileIntervalTicks(config, 100, 400.f) == 1,
+			"near relation lost full tick rate") &&
+		require(witnessVolatileIntervalTicks(config, 100, 1600.f) == 2,
+			"medium relation used the wrong interval") &&
+		require(witnessVolatileIntervalTicks(config, 100, 10000.f) == 4,
+			"far relation used the wrong interval") &&
+		require(witnessNextVolatileTick(100, 4, 2) == 102,
+			"stable phase did not select the expected future tick") &&
+		require(witnessNextVolatileTick(102, 4, 2) == 106,
+			"stable phase did not preserve cadence") &&
+		require(witnessVolatilePhaseKey(1, 100) != witnessVolatilePhaseKey(2, 100),
+			"relation phasing synchronized all observers of the same target");
+}
+
+bool testDelayedQueueOrdersDueEntriesAndKeepsOwnership()
+{
+	KBEngine::WitnessDelayedQueue queue;
+	KBEngine::WitnessDirtyQueue activeQueue;
+	bool firstQueued = false;
+	bool secondQueued = false;
+	if (!require(queue.schedule(1, 10, 3, 8, 5, firstQueued), "first delayed relation was rejected") ||
+		!require(queue.schedule(2, 20, 3, 4, 5, secondQueued), "second delayed relation was rejected") ||
+		!require(firstQueued && secondQueued, "delayed queue did not retain relation ownership"))
+	{
+		return false;
+	}
+
+	KBEngine::WitnessDirtyQueue::Entry entry = {};
+	queue.activateDue(3, activeQueue);
+	if (!require(activeQueue.size() == 0, "future relation was released early"))
+		return false;
+	queue.activateDue(4, activeQueue);
+	if (!require(activeQueue.pop(entry) && entry.entityID == 2 && entry.generation == 20,
+			"delayed queue did not release the earliest due relation") &&
+		!require(queue.size() == 1, "delayed queue lost the later relation"))
+	{
+		return false;
+	}
+	queue.activateDue(7, activeQueue);
+	if (!require(activeQueue.size() == 0, "later relation was released early"))
+		return false;
+	queue.activateDue(8, activeQueue);
+	return require(activeQueue.pop(entry) && entry.entityID == 1 && queue.size() == 0,
+		"delayed queue did not drain in due order");
+}
+
+bool testDirtyQueueTrimsOnlyWhenEmpty()
+{
+	KBEngine::WitnessDirtyQueue queue;
+	bool queued = false;
+	for (std::uint32_t entityID = 1; entityID <= 128; ++entityID)
+	{
+		queued = false;
+		queue.enqueue(entityID, entityID, queued);
+	}
+	queue.trimEmpty(8);
+	if (!require(queue.size() == 128, "non-empty dirty queue was trimmed"))
+		return false;
+
+	KBEngine::WitnessDirtyQueue::Entry entry = {};
+	while (queue.pop(entry))
+	{
+	}
+	queue.trimEmpty(8);
+	queued = false;
+	return require(queue.enqueue(999, 999, queued) && queue.size() == 1,
+		"trimmed dirty queue could not be reused");
+}
 }
 
 int main()
 {
 	if (!testBoundedBudgetAllowsOneCompleteUpdate() || !testUnlimitedAndShrinkingBundle() ||
-		!testAdaptiveTotalBudget() || !testRotatingGlobalAdmission())
+		!testAdaptiveTotalBudget() || !testRotatingGlobalAdmission() ||
+		!testVolatileDistanceSemantics() || !testDenseViewTemporalLod() ||
+		!testDelayedQueueOrdersDueEntriesAndKeepsOwnership() || !testDirtyQueueTrimsOnlyWhenEmpty())
 		return EXIT_FAILURE;
 
 	std::cout << "WITNESS_VOLATILE_BUDGET_TEST_PASS" << std::endl;
