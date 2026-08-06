@@ -291,7 +291,9 @@ bool NavigateHandler::updateDetour()
 		return true;
 	}
 
-	KBEVec3Normalize(&movement, &movement);
+	// movementLength 已计算，直接复用倒数，避免再次计算平方根。
+	// Reuse movementLength instead of normalizing with a second square root.
+	movement *= 1.f / movementLength;
 	float stepDistance = std::min(velocity_, movementLength);
 	if (maxMoveDistance_ > 0.f)
 		stepDistance = std::min(stepDistance, maxMoveDistance_);

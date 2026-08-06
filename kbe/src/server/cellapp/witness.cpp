@@ -1621,7 +1621,7 @@ void Witness::addBaseDataToStream(Network::Bundle* pSendBundle)
 		const Direction3D& bdir = baseDir();
 		Vector3 changeDir = bdir.dir - lastBaseDir_.dir;
 
-		if (KBEVec3Length(&changeDir) > 0.0004f)
+		if (KBEVec3LengthSq(&changeDir) > 0.0004f * 0.0004f)
 		{
 			ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onUpdateBaseDir, onUpdateBaseDir);
 			(*pSendBundle) << bdir.yaw() << bdir.pitch() << bdir.roll();
@@ -1633,7 +1633,7 @@ void Witness::addBaseDataToStream(Network::Bundle* pSendBundle)
 	const Position3D& bpos = basePos();
 	Vector3 movement = bpos - lastBasePos_;
 
-	if(KBEVec3Length(&movement) < 0.0004f)
+	if(KBEVec3LengthSq(&movement) < 0.0004f * 0.0004f)
 		return;
 
 	if (fabs(lastBasePos_.y - bpos.y) > 0.0004f)

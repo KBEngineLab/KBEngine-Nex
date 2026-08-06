@@ -2849,7 +2849,7 @@ bool Entity::navigatePathPoints( std::vector<Position3D>& outPaths, const Positi
 	while(iter != outPaths.end())
 	{
 		Vector3 movement = (*iter) - position_;
-		if(KBEVec3Length(&movement) <= 0.00001f)
+		if(KBEVec3LengthSq(&movement) <= 0.00001f * 0.00001f)
 		{
 			iter++;
 			continue;
