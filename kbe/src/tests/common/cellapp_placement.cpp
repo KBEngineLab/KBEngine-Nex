@@ -35,6 +35,16 @@ bool testPendingReservationsAffectNextDecision()
 		"pending Space reservation did not raise placement pressure");
 }
 
+bool testWitnessPendingPressureAvoidsHotCell()
+{
+	const double hot = KBEngine::cellappPlacementScore(0.20f, 10, 60, 6, 1200, 1600, 1.0);
+	const double cool = KBEngine::cellappPlacementScore(0.20f, 10, 60, 6, 800, 1600, 1.0);
+	return require(cool < hot, "Witness pending pressure did not avoid the hotter CellApp") &&
+		require(std::abs(KBEngine::cellappPlacementScore(0.20f, 10, 60, 6, 1200, 1600, 0.0) -
+			KBEngine::cellappPlacementScore(0.20f, 10, 60, 6)) < 0.000001,
+			"zero Witness pressure weight did not preserve the existing score");
+}
+
 bool testConfiguredSkewBoundsCandidates()
 {
 	using KBEngine::cellappPlacementWithinSkew;
@@ -50,7 +60,8 @@ bool testConfiguredSkewBoundsCandidates()
 int main()
 {
 	if (!testInitialPlacementUsesLiveLoad() || !testSpacePressureCorrectsSkew() ||
-		!testPendingReservationsAffectNextDecision() || !testConfiguredSkewBoundsCandidates())
+		!testPendingReservationsAffectNextDecision() || !testWitnessPendingPressureAvoidsHotCell() ||
+		!testConfiguredSkewBoundsCandidates())
 	{
 		return EXIT_FAILURE;
 	}

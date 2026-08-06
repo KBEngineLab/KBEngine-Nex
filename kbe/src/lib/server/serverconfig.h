@@ -195,6 +195,7 @@ typedef struct EngineComponentInfo
 		witness_volatile_lod_medium_interval_ticks = 2;
 		witness_volatile_lod_far_interval_ticks = 4;
 		cellappmgr_space_assignment_max_skew = 2;
+		cellappmgr_witness_pending_pressure_weight = 1.f;
 	}
 
 	~EngineComponentInfo()
@@ -243,6 +244,9 @@ typedef struct EngineComponentInfo
 	// 自动分配的新 Space 在 CellApp 间允许的最大数量差；零关闭硬约束。
 	// Maximum automatic Space-count skew between CellApps; zero disables the hard bound.
 	uint32 cellappmgr_space_assignment_max_skew;
+	// 新 Space 分配时，CellApp Witness pending/active 比例的评分权重；零关闭。
+	// Placement weight for the CellApp Witness pending/active ratio; zero disables it.
+	float cellappmgr_witness_pending_pressure_weight;
 	uint16 entity_posdir_updates_type;						// 实体位置更新方式，0：非优化高精度同步, 1:优化同步, 2:智能选择模式
 	uint16 entity_posdir_updates_smart_threshold;			// 实体位置更新智能模式下的同屏人数阈值
 

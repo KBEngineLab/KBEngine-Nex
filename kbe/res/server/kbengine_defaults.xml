@@ -843,6 +843,11 @@
 			Live CPU load and entity count still choose within the candidate set; 0 disables the hard bound.
 		-->
 		<spaceAllocationMaxSkew> 2 </spaceAllocationMaxSkew>
+
+		<!-- 新 Space 分配时 Witness pending/active 比例的评分权重，0 表示关闭。
+			Placement score weight for the Witness pending/active ratio; 0 disables it.
+		-->
+		<witnessPendingPressureWeight> 1.0 </witnessPendingPressureWeight>
 	</cellappmgr>
 	
 	<baseappmgr>

@@ -1541,6 +1541,11 @@ bool ServerConfig::loadConfig(std::string fileName)
 		node = xml->enterNode(rootNode, "spaceAllocationMaxSkew");
 		if (node != NULL)
 			_cellAppMgrInfo.cellappmgr_space_assignment_max_skew = xml->getValInt(node);
+
+		node = xml->enterNode(rootNode, "witnessPendingPressureWeight");
+		if (node != NULL)
+			_cellAppMgrInfo.cellappmgr_witness_pending_pressure_weight =
+				std::max(0.f, static_cast<float>(xml->getValFloat(node)));
 	}
 	
 	rootNode = xml->getRootNode("baseappmgr");

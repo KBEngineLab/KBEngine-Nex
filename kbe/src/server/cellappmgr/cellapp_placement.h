@@ -2,6 +2,7 @@
 #define KBE_CELLAPPMGR_CELLAPP_PLACEMENT_H
 
 #include <cstddef>
+#include <cstdint>
 
 namespace KBEngine
 {
@@ -13,15 +14,20 @@ namespace KBEngine
  * assignedSpaces must include confirmed and pending Spaces so asynchronous bursts cannot target one CellApp repeatedly.
  */
 inline double cellappPlacementScore(
-	float load, std::size_t assignedSpaces, std::size_t totalAssignedSpaces, std::size_t appCount)
+	float load, std::size_t assignedSpaces, std::size_t totalAssignedSpaces, std::size_t appCount,
+	std::uint64_t pendingWitnesses = 0, std::uint64_t activeWitnesses = 0,
+	double witnessPendingWeight = 0.0)
 {
+	const double witnessPendingPressure = activeWitnesses == 0 ? 0.0 :
+		static_cast<double>(pendingWitnesses) / static_cast<double>(activeWitnesses);
 	if (totalAssignedSpaces == 0 || appCount == 0)
-		return static_cast<double>(load);
+		return static_cast<double>(load) + witnessPendingPressure * witnessPendingWeight;
 
 	const double relativeSpacePressure =
 		static_cast<double>(assignedSpaces) * static_cast<double>(appCount) /
 		static_cast<double>(totalAssignedSpaces);
-	return static_cast<double>(load) + relativeSpacePressure;
+	return static_cast<double>(load) + relativeSpacePressure +
+		witnessPendingPressure * witnessPendingWeight;
 }
 
 inline bool cellappPlacementWithinSkew(

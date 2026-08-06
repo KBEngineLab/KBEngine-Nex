@@ -24,6 +24,8 @@ namespace KBEngine{
 //-------------------------------------------------------------------------------------
 Cellapp::Cellapp():
 numEntities_(0),
+activeWitnesses_(0),
+pendingWitnesses_(0),
 load_(0.f),
 isDestroyed_(false),
 watchers_(),

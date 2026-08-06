@@ -739,8 +739,9 @@ void Cellapp::onUpdateLoad()
 	{
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(CellappmgrInterface::updateCellapp);
-		CellappmgrInterface::updateCellappArgs4::staticAddToBundle((*pBundle), 
-			componentID_, (ENTITY_ID)pEntities_->getEntities().size(), getLoad(), flags_);
+		CellappmgrInterface::updateCellappArgs6::staticAddToBundle((*pBundle),
+			componentID_, (ENTITY_ID)pEntities_->getEntities().size(), getLoad(), flags_,
+			Witness::activeCount(), Witness::globalPendingSnapshot());
 
 		pChannel->send(pBundle);
 	}

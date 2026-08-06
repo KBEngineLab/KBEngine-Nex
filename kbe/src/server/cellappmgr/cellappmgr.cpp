@@ -241,6 +241,11 @@ bool Cellappmgr::initializeWatcher()
 	WATCH_OBJECT("allocation/pendingSpaces", this, &Cellappmgr::pendingSpaceCount);
 	WATCH_OBJECT("allocation/minAssignedSpaces", this, &Cellappmgr::minAssignedSpaceCount);
 	WATCH_OBJECT("allocation/maxAssignedSpaces", this, &Cellappmgr::maxAssignedSpaceCount);
+	WATCH_OBJECT("allocation/minPendingWitnesses", this, &Cellappmgr::minPendingWitnessCount);
+	WATCH_OBJECT("allocation/maxPendingWitnesses", this, &Cellappmgr::maxPendingWitnessCount);
+	WATCH_OBJECT("allocation/minActiveWitnesses", this, &Cellappmgr::minActiveWitnessCount);
+	WATCH_OBJECT("allocation/maxActiveWitnesses", this, &Cellappmgr::maxActiveWitnessCount);
+	WATCH_OBJECT("allocation/witnessPendingPressureWeight", this, &Cellappmgr::witnessPendingPressureWeight);
 	return ServerApp::initializeWatcher();
 }
 
@@ -450,7 +455,9 @@ COMPONENT_ID Cellappmgr::findFreeCellapp(void)
 				continue;
 			}
 			const double score = cellappPlacementScore(
-				iter->second.load(), assignedSpaces, totalAssignedSpaces, appCount);
+				iter->second.load(), assignedSpaces, totalAssignedSpaces, appCount,
+				iter->second.pendingWitnesses(), iter->second.activeWitnesses(),
+				g_serverConfig.getCellAppMgr().cellappmgr_witness_pending_pressure_weight);
 			const bool equalScore = std::abs(score - bestScore) <= 0.000001;
 			if (score < bestScore ||
 				(equalScore && assignedSpaces < bestAssignedSpaces) ||
@@ -546,6 +553,54 @@ uint64 Cellappmgr::maxAssignedSpaceCount() const
 	for (std::map<COMPONENT_ID, Cellapp>::const_iterator iter = cellapps_.begin(); iter != cellapps_.end(); ++iter)
 		count = std::max<uint64>(count, static_cast<uint64>(iter->second.assignedSpaces()));
 	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Cellappmgr::minPendingWitnessCount() const
+{
+	if (cellapps_.empty())
+		return 0;
+
+	uint64 count = std::numeric_limits<uint64>::max();
+	for (std::map<COMPONENT_ID, Cellapp>::const_iterator iter = cellapps_.begin(); iter != cellapps_.end(); ++iter)
+		count = std::min(count, iter->second.pendingWitnesses());
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Cellappmgr::maxPendingWitnessCount() const
+{
+	uint64 count = 0;
+	for (std::map<COMPONENT_ID, Cellapp>::const_iterator iter = cellapps_.begin(); iter != cellapps_.end(); ++iter)
+		count = std::max(count, iter->second.pendingWitnesses());
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Cellappmgr::minActiveWitnessCount() const
+{
+	if (cellapps_.empty())
+		return 0;
+
+	uint64 count = std::numeric_limits<uint64>::max();
+	for (std::map<COMPONENT_ID, Cellapp>::const_iterator iter = cellapps_.begin(); iter != cellapps_.end(); ++iter)
+		count = std::min(count, iter->second.activeWitnesses());
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Cellappmgr::maxActiveWitnessCount() const
+{
+	uint64 count = 0;
+	for (std::map<COMPONENT_ID, Cellapp>::const_iterator iter = cellapps_.begin(); iter != cellapps_.end(); ++iter)
+		count = std::max(count, iter->second.activeWitnesses());
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+float Cellappmgr::witnessPendingPressureWeight() const
+{
+	return g_serverConfig.getCellAppMgr().cellappmgr_witness_pending_pressure_weight;
 }
 
 //-------------------------------------------------------------------------------------
@@ -738,8 +793,8 @@ void Cellappmgr::reqRestoreSpaceInCell(Network::Channel* pChannel, MemoryStream&
 }
 
 //-------------------------------------------------------------------------------------
-void Cellappmgr::updateCellapp(Network::Channel* pChannel, COMPONENT_ID componentID, 
-	ENTITY_ID numEntities, float load, uint32 flags)
+void Cellappmgr::updateCellapp(Network::Channel* pChannel, COMPONENT_ID componentID,
+	ENTITY_ID numEntities, float load, uint32 flags, uint64 activeWitnesses, uint64 pendingWitnesses)
 {
 	Components& components = Components::getSingleton();
 	Components::ComponentInfos* sourceInfos =
@@ -747,7 +802,8 @@ void Cellappmgr::updateCellapp(Network::Channel* pChannel, COMPONENT_ID componen
 	std::map<COMPONENT_ID, Cellapp>::iterator cellappIter = cellapps_.find(componentID);
 	if (pChannel == NULL || pChannel->isExternal() ||
 		!Security::isBoundComponentSource(componentID, sourceInfos, pChannel) ||
-		cellappIter == cellapps_.end() || !Security::isValidComponentMetric(load))
+		cellappIter == cellapps_.end() || !Security::isValidComponentMetric(load) ||
+		pendingWitnesses > activeWitnesses)
 	{
 		WARNING_MSG(fmt::format("Cellappmgr::updateCellapp: rejected componentID({}), load({})!\n",
 			componentID, load));
@@ -759,6 +815,8 @@ void Cellappmgr::updateCellapp(Network::Channel* pChannel, COMPONENT_ID componen
 	cellapp.load(load);
 	cellapp.numEntities(numEntities);
 	cellapp.flags(flags);
+	cellapp.activeWitnesses(activeWitnesses);
+	cellapp.pendingWitnesses(pendingWitnesses);
 
 	sourceInfos->appFlags = flags;
 	

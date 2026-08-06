@@ -86,11 +86,13 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappmgrInterface)
 	CELLAPPMGR_MESSAGE_DECLARE_STREAM(queryWatcher,							NETWORK_VARIABLE_MESSAGE)
 
 	// 更新cellapp信息。
-	CELLAPPMGR_MESSAGE_DECLARE_ARGS4(updateCellapp,							NETWORK_FIXED_MESSAGE,
+	CELLAPPMGR_MESSAGE_DECLARE_ARGS6(updateCellapp,							NETWORK_FIXED_MESSAGE,
 									COMPONENT_ID,							componentID,
 									ENTITY_ID,								numEntities,
 									float,									load,
-									uint32,									flags)
+									uint32,									flags,
+									uint64,									activeWitnesses,
+									uint64,									pendingWitnesses)
 
 	// 开始profile
 	CELLAPPMGR_MESSAGE_DECLARE_STREAM(startProfile,							NETWORK_VARIABLE_MESSAGE)

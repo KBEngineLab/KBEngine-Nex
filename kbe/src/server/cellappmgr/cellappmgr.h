@@ -93,7 +93,8 @@ public:
 	/** 网络接口
 		更新cellapp情况。
 	*/
-	void updateCellapp(Network::Channel* pChannel, COMPONENT_ID componentID, ENTITY_ID numEntities, float load, uint32 flags);
+	void updateCellapp(Network::Channel* pChannel, COMPONENT_ID componentID, ENTITY_ID numEntities,
+		float load, uint32 flags, uint64 activeWitnesses, uint64 pendingWitnesses);
 
 	/** 网络接口
 		cellapp同步自己的初始化信息
@@ -119,6 +120,11 @@ public:
 	uint64 pendingSpaceCount() const;
 	uint64 minAssignedSpaceCount() const;
 	uint64 maxAssignedSpaceCount() const;
+	uint64 minPendingWitnessCount() const;
+	uint64 maxPendingWitnessCount() const;
+	uint64 minActiveWitnessCount() const;
+	uint64 maxActiveWitnessCount() const;
+	float witnessPendingPressureWeight() const;
 
 	/* 以groupOrderID为排序基准，
 	   増加一个cellapp component id到cellapp_cids_列表中

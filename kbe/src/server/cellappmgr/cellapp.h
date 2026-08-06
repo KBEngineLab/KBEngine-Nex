@@ -49,6 +49,10 @@ public:
 	ENTITY_ID numEntities() const { return numEntities_; }
 	void numEntities(ENTITY_ID num) { numEntities_ = num; }
 	void incNumEntities() { ++numEntities_; }
+	uint64 activeWitnesses() const { return activeWitnesses_; }
+	void activeWitnesses(uint64 value) { activeWitnesses_ = value; }
+	uint64 pendingWitnesses() const { return pendingWitnesses_; }
+	void pendingWitnesses(uint64 value) { pendingWitnesses_ = value; }
 
 	std::size_t pendingSpaceCreations() const { return pendingSpaceCreations_.size(); }
 	void reserveSpaceCreation(SPACE_ID spaceID) { pendingSpaceCreations_.insert(spaceID); }
@@ -69,6 +73,8 @@ public:
 
 protected:
 	ENTITY_ID numEntities_;
+	uint64 activeWitnesses_;
+	uint64 pendingWitnesses_;
 
 	float load_;
 
