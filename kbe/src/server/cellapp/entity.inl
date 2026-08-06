@@ -68,7 +68,9 @@ INLINE void Entity::position(const Position3D& pos)
 { 
 	Vector3 movement = pos - position_;
 
-	if(KBEVec3Length(&movement) < 0.0004f)
+	// 这里只判断阈值，不需要计算平方根；位置热路径会被每个移动实体每 Tick 调用。
+	// This is only a threshold test, so avoid a square root on every moving entity every tick.
+	if(KBEVec3LengthSq(&movement) < 0.0004f * 0.0004f)
 		return;
 		
 	position_ = pos; 

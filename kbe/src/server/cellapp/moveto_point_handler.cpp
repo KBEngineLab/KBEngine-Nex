@@ -143,11 +143,11 @@ bool MoveToPointHandler::update()
 
 		if (distance_ > 0.0f)
 		{
-			// 单位化向量
-			KBEVec3Normalize(&movement, &movement); 
-				
 			if(dist_len > distance_)
 			{
+				// dist_len 已在上方计算，复用其倒数，避免 Normalize 再做一次平方根。
+				// Reuse the distance already computed above so Normalize does not take a second square root.
+				movement *= 1.f / dist_len;
 				movement *= distance_;
 				currpos = dstPos - movement;
 			}
@@ -164,8 +164,10 @@ bool MoveToPointHandler::update()
 	}
 	else
 	{
-		// 单位化向量
-		KBEVec3Normalize(&movement, &movement); 
+		// 该分支仅在目标距离大于步长时进入，因此 dist_len 正常情况下非零。
+		// Guard zero-speed/zero-distance inputs as well, avoiding undefined normalization.
+		if (dist_len > 0.f)
+			movement *= 1.f / dist_len;
 
 		// 移动位置
 		movement *= velocity_;
