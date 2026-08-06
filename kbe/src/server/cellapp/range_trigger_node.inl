@@ -24,51 +24,61 @@ namespace KBEngine{
 //-------------------------------------------------------------------------------------
 INLINE bool RangeTriggerNode::isInXRange(CoordinateNode * pNode)
 {
-	float originX = pRangeTrigger_->origin()->xx();
+	const float originX = pRangeTrigger_->origin()->xx();
+	const float nodeX = pNode->xx();
+	const float radius = fabs(range_xz_);
 
-	const float lowerBound = originX - fabs(range_xz_);
-	const float upperBound = originX + fabs(range_xz_);
-	return (pNode->xx() >= lowerBound) && (pNode->xx() <= upperBound);
+	const float lowerBound = originX - radius;
+	const float upperBound = originX + radius;
+	return (nodeX >= lowerBound) && (nodeX <= upperBound);
 }
 
 //-------------------------------------------------------------------------------------
 INLINE bool RangeTriggerNode::isInYRange(CoordinateNode * pNode)
 {
-	float originY = pRangeTrigger_->origin()->yy();
+	const float originY = pRangeTrigger_->origin()->yy();
+	const float nodeY = pNode->yy();
+	const float radius = fabs(range_y_);
 
-	const float lowerBound = originY - fabs(range_y_);
-	const float upperBound = originY + fabs(range_y_);
-	return (pNode->yy() >= lowerBound) && (pNode->yy() <= upperBound);
+	const float lowerBound = originY - radius;
+	const float upperBound = originY + radius;
+	return (nodeY >= lowerBound) && (nodeY <= upperBound);
 }
 
 //-------------------------------------------------------------------------------------
 INLINE bool RangeTriggerNode::isInZRange(CoordinateNode * pNode)
 {
-	float originZ = pRangeTrigger_->origin()->zz();
+	const float originZ = pRangeTrigger_->origin()->zz();
+	const float nodeZ = pNode->zz();
+	const float radius = fabs(range_xz_);
 
-	const float lowerBound = originZ - fabs(range_xz_);
-	const float upperBound = originZ + fabs(range_xz_);
-	return (pNode->zz() >= lowerBound) && (pNode->zz() <= upperBound);
+	const float lowerBound = originZ - radius;
+	const float upperBound = originZ + radius;
+	return (nodeZ >= lowerBound) && (nodeZ <= upperBound);
 }
 
 //-------------------------------------------------------------------------------------
 INLINE bool RangeTriggerNode::wasInXRange(CoordinateNode * pNode)
 {
-	float originX = old_xx() - old_range_xz_;
+	const float originX = old_xx() - old_range_xz_;
+	const float nodeX = pNode->old_xx();
+	const float radius = fabs(old_range_xz_);
 
-	const float lowerBound = originX - fabs(old_range_xz_);
-	const float upperBound = originX + fabs(old_range_xz_);
-	return (pNode->old_xx() >= lowerBound) && (pNode->old_xx() <= upperBound);
+	const float lowerBound = originX - radius;
+	const float upperBound = originX + radius;
+	return (nodeX >= lowerBound) && (nodeX <= upperBound);
 }
 
 //-------------------------------------------------------------------------------------
 INLINE bool RangeTriggerNode::wasInZRange(CoordinateNode * pNode)
 {
-	float originZ = old_zz() - old_range_xz_;
+	const float originZ = old_zz() - old_range_xz_;
+	const float nodeZ = pNode->old_zz();
+	const float radius = fabs(old_range_xz_);
 
-	const float lowerBound = originZ - fabs(old_range_xz_);
-	const float upperBound = originZ + fabs(old_range_xz_);
-	return (pNode->old_zz() >= lowerBound) && (pNode->old_zz() <= upperBound);
+	const float lowerBound = originZ - radius;
+	const float upperBound = originZ + radius;
+	return (nodeZ >= lowerBound) && (nodeZ <= upperBound);
 }
 
 //-------------------------------------------------------------------------------------

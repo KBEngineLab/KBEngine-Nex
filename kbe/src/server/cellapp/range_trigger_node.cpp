@@ -64,6 +64,21 @@ RangeTriggerNode::~RangeTriggerNode()
 }
 
 //-------------------------------------------------------------------------------------
+bool RangeTriggerNode::wasInYRange(CoordinateNode* pNode)
+{
+	if (!CoordinateSystem::hasY)
+		return true;
+
+	const float originY = old_yy() - old_range_y_;
+	const float nodeY = pNode->old_yy();
+	const float radius = fabs(old_range_y_);
+
+	const float lowerBound = originY - radius;
+	const float upperBound = originY + radius;
+	return (nodeY >= lowerBound) && (nodeY <= upperBound);
+}
+
+//-------------------------------------------------------------------------------------
 void RangeTriggerNode::onTriggerUninstall()
 {
 	if (pRangeTrigger_->origin())
@@ -88,19 +103,6 @@ void RangeTriggerNode::onParentRemove(CoordinateNode* pParentNode)
 	// 既然自己都要删除了，通知pRangeTrigger_卸载
 	if (pRangeTrigger_)
 		pRangeTrigger_->uninstall();
-}
-
-//-------------------------------------------------------------------------------------
-bool RangeTriggerNode::wasInYRange(CoordinateNode * pNode)
-{
-	if (!CoordinateSystem::hasY)
-		return true;
-
-	float originY = old_yy() - old_range_y_;
-
-	const float lowerBound = originY - fabs(old_range_y_);
-	const float upperBound = originY + fabs(old_range_y_);
-	return (pNode->old_yy() >= lowerBound) && (pNode->old_yy() <= upperBound);
 }
 
 //-------------------------------------------------------------------------------------
