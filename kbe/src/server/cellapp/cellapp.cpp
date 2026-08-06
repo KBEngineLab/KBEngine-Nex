@@ -379,6 +379,9 @@ bool Cellapp::initializeWatcher()
 		&CoordinateSystem::equalCoordinateCorrectionMoves);
 	WATCH_OBJECT("coordinateSystem/equalCorrectionCallbacksSuppressed",
 		&CoordinateSystem::equalCoordinateCallbacksSuppressed);
+	WATCH_OBJECT("coordinateSystem/releasedNodes", &CoordinateSystem::releasedNodes);
+	WATCH_OBJECT("coordinateSystem/releaseBatches", &CoordinateSystem::releaseBatches);
+	WATCH_OBJECT("coordinateSystem/maxReleaseBatch", &CoordinateSystem::maxReleaseBatch);
 	WATCH_OBJECT("witness/backpressure/activeSuppressed", &Witness::activeSuppressedCount);
 	WATCH_OBJECT("witness/backpressure/suppressionTransitions", &Witness::suppressionTransitionCount);
 	WATCH_OBJECT("witness/backpressure/resumeTransitions", &Witness::resumeTransitionCount);

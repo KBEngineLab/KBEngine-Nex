@@ -26,6 +26,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CODE_INLINE
 #include "coordinate_system.inl"
 #endif
+#include "common/performance_probes.h"
 
 namespace KBEngine{	
 
@@ -35,6 +36,9 @@ namespace
 {
 uint64 g_equalCoordinateCorrectionMoves = 0;
 uint64 g_equalCoordinateCallbacksSuppressed = 0;
+uint64 g_releasedNodes = 0;
+uint64 g_releaseBatches = 0;
+uint64 g_maxReleaseBatch = 0;
 
 // 等坐标纠正只恢复既有链表排序；首次穿越已经发布过关系变化，因此纠正阶段
 // 再次通知只会重复 AOI/Python 工作。计数仅发生在该稀有分支，不污染普通移动热路径。
@@ -49,7 +53,12 @@ void recordEqualCoordinateCorrection(CoordinateNode* pNode, CoordinateNode* pCur
 		(pNode->hasFlags(COORDINATE_NODE_FLAG_HIDE_OR_REMOVED) ? 0 : 1) +
 		(pCurrNode->hasFlags(COORDINATE_NODE_FLAG_HIDE_OR_REMOVED) ? 0 : 1);
 }
+
 }
+
+uint64 CoordinateSystem::releasedNodes() { return g_releasedNodes; }
+uint64 CoordinateSystem::releaseBatches() { return g_releaseBatches; }
+uint64 CoordinateSystem::maxReleaseBatch() { return g_maxReleaseBatch; }
 
 //-------------------------------------------------------------------------------------
 CoordinateSystem::CoordinateSystem():
@@ -271,6 +280,14 @@ void CoordinateSystem::removeDelNodes()
 void CoordinateSystem::releaseNodes()
 {
 	removeDelNodes();
+	const size_t releaseCount = releases_.size();
+	if (g_performanceProbesEnabled && releaseCount > 0)
+	{
+		g_releasedNodes += static_cast<uint64>(releaseCount);
+		++g_releaseBatches;
+		if (releaseCount > g_maxReleaseBatch)
+			g_maxReleaseBatch = static_cast<uint64>(releaseCount);
+	}
 
 	std::vector<CoordinateNode*>::iterator iter = releases_.begin();
 	for (; iter != releases_.end(); ++iter)

@@ -76,6 +76,9 @@ public:
 
 	static uint64 equalCoordinateCorrectionMoves();
 	static uint64 equalCoordinateCallbacksSuppressed();
+	static uint64 releasedNodes();
+	static uint64 releaseBatches();
+	static uint64 maxReleaseBatch();
 
 	INLINE CoordinateNode * pFirstXNode() const;
 	INLINE CoordinateNode * pFirstYNode() const;
