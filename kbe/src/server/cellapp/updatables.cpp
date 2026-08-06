@@ -20,6 +20,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "updatables.h"	
 #include "helper/profile.h"	
+#include "profile.h"
 
 namespace KBEngine{	
 
@@ -80,7 +81,7 @@ bool Updatables::remove(Updatable* updatable)
 //-------------------------------------------------------------------------------------
 void Updatables::update()
 {
-	AUTO_SCOPED_PROFILE("callUpdates");
+	SCOPED_PROFILE(UPDATABLES_PROFILE);
 
 	std::vector< std::map<uint32, Updatable*> >::iterator fpIter = objects_.begin();
 	for (; fpIter != objects_.end(); ++fpIter)

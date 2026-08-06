@@ -26,6 +26,8 @@ ProfileVal ONMOVE_PROFILE("onMove");
 ProfileVal ON_NAVIGATE_PROFILE("onNavigate");
 ProfileVal CLIENT_UPDATE_PROFILE("clientUpdate", NULL, true);
 ProfileVal ONTIMER_PROFILE("onTimer", NULL, true);
+ProfileVal UPDATABLES_PROFILE("callUpdates", NULL, true);
+ProfileVal SPACES_UPDATE_PROFILE("spacesUpdate", NULL, true);
 
 EventHistoryStats g_privateClientEventHistoryStats("PrivateClientEvents");
 EventHistoryStats g_publicClientEventHistoryStats("PublicClientEvents");

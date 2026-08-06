@@ -33,6 +33,8 @@ extern ProfileVal ONMOVE_PROFILE;
 extern ProfileVal ONNAVIGATE_PROFILE;
 extern ProfileVal CLIENT_UPDATE_PROFILE;
 extern ProfileVal ONTIMER_PROFILE;
+extern ProfileVal UPDATABLES_PROFILE;
+extern ProfileVal SPACES_UPDATE_PROFILE;
 
 extern EventHistoryStats g_privateClientEventHistoryStats;
 extern EventHistoryStats g_publicClientEventHistoryStats;

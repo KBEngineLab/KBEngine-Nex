@@ -19,6 +19,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "spaces.h"
+#include "profile.h"
 #include "cellapp.h"
 #include "entity.h"
 namespace KBEngine{	
@@ -175,6 +176,7 @@ PyObject* Spaces::__py_EntitiesForSpace(PyObject* /*self*/, PyObject* args)
 //-------------------------------------------------------------------------------------
 void Spaces::update()
 {
+	SCOPED_PROFILE(SPACES_UPDATE_PROFILE);
 	SPACES& registeredSpaces = Spaces::spaces();
 	SPACES::iterator iter = registeredSpaces.begin();
 

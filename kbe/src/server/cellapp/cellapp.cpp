@@ -292,6 +292,8 @@ bool Cellapp::initializeWatcher()
 	SCRIPTCALL_PROFILE.initializeWatcher();
 	ONTIMER_PROFILE.initializeWatcher();
 	CLIENT_UPDATE_PROFILE.initializeWatcher();
+	UPDATABLES_PROFILE.initializeWatcher();
+	SPACES_UPDATE_PROFILE.initializeWatcher();
 
 	ScriptStageMetrics& scriptMetrics = scriptStageMetrics();
 	WATCH_OBJECT("scriptStages/rpcCalls", &scriptMetrics, &ScriptStageMetrics::rpcCalls);
