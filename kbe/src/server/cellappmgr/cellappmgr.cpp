@@ -933,9 +933,14 @@ void Cellappmgr::querySpaces(Network::Channel* pChannel, MemoryStream& s)
 		s >> magic >> version;
 		if (magic == viewerV2Magic)
 		{
-			if (version != 2)
+			if (version != 3)
 			{
 				WARNING_MSG(fmt::format("Cellappmgr::querySpaces: unsupported viewer version {}.\n", version));
+				return;
+			}
+
+			if (!validateGuiConsoleAdminToken(pChannel, s, "querySpaces"))
+			{
 				return;
 			}
 
@@ -943,7 +948,7 @@ void Cellappmgr::querySpaces(Network::Channel* pChannel, MemoryStream& s)
 			ConsoleInterface::ConsoleQuerySpacesHandler v2Handler;
 			(*v2Bundle).newMessage(v2Handler);
 			(*v2Bundle) << g_componentType << g_componentID << (int32)0;
-			(*v2Bundle) << viewerV2Magic << (uint16)2 << (uint8)1;
+			(*v2Bundle) << viewerV2Magic << (uint16)3 << (uint8)1;
 
 			uint32 spaceCount = 0;
 			for (std::map< COMPONENT_ID, Cellapp >::iterator cellIter = cellapps_.begin();

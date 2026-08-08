@@ -92,12 +92,17 @@ void PyProfileHandler::sendStream(MemoryStream* s)
 
 //-------------------------------------------------------------------------------------
 PyTickProfileHandler::PyTickProfileHandler(Network::NetworkInterface & networkInterface, uint32 timinglen,
-	std::string name, const Network::Address& addr) :
-	ProfileHandler(networkInterface, timinglen, name, addr)
+std::string name, const Network::Address& addr) :
+	ProfileHandler(networkInterface, timinglen, name, addr),
+	stopped_(false),
+	nextProcessStamp_(timestamp()),
+	processIntervalStamps_(std::max<uint64>(
+		stampsPerSecond() / std::max<uint64>(1, static_cast<uint64>(g_kbeSrvConfig.gameUpdateHertz())),
+		uint64(1)))
 {
 	DEBUG_MSG(fmt::format("PyTickProfileHandler::PyTickProfileHandler(), name = {}, timinglen = {}\n", name_, timinglen));
 	networkInterface_.dispatcher().addTask(this);
-	script::PyProfile::start(name_);
+	script::PyProfile::start(name_, false);
 }
 
 //-------------------------------------------------------------------------------------
@@ -111,19 +116,40 @@ PyTickProfileHandler::~PyTickProfileHandler()
 //-------------------------------------------------------------------------------------
 void PyTickProfileHandler::timeout()
 {
-	script::PyProfile::stop(name_);
+	if(stopped_)
+		return;
+
+	stopped_ = true;
+	script::PyProfile::stop(name_, false);
 }
 
 //-------------------------------------------------------------------------------------
 bool PyTickProfileHandler::process()
 {
+	if(stopped_)
+		return false;
+
+	uint64 now = timestamp();
+	if (now < nextProcessStamp_)
+	{
+		return true;
+	}
+	nextProcessStamp_ = now + processIntervalStamps_;
+
 	MemoryStream s;
-	script::PyProfile::stop(name_);
-	script::PyProfile::addToStream(name_, &s);
+	script::PyProfile::stop(name_, false);
+	size_t payloadSize = script::PyProfile::addToStream(name_, &s);
 	script::PyProfile::remove(name_);
-	script::PyProfile::start(name_);
+	script::PyProfile::start(name_, false);
+
+	if (payloadSize == 0)
+	{
+		WARNING_MSG(fmt::format("PyTickProfileHandler::process: empty profile payload for {}.\n", name_));
+		return !stopped_;
+	}
+
 	sendStream(&s);
-	return true;
+	return !stopped_;
 }
 
 //-------------------------------------------------------------------------------------
@@ -134,6 +160,7 @@ void PyTickProfileHandler::sendStream(MemoryStream* s)
 	{
 		WARNING_MSG(fmt::format("PyTickProfileHandler::sendStream: not found {} addr({})\n",
 			name_, addr_.c_str()));
+		networkInterface_.dispatcher().cancelTask(this);
 		timeout();
 		return;
 	}

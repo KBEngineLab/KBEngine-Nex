@@ -43,10 +43,15 @@ public:
 	PyTickProfileHandler(Network::NetworkInterface & networkInterface, uint32 timinglen,
 		std::string name, const Network::Address& addr);
 	virtual ~PyTickProfileHandler();
-
+	
 	virtual void timeout();
 	virtual bool process();
 	virtual void sendStream(MemoryStream* s);
+
+protected:
+	bool stopped_;
+	uint64 nextProcessStamp_;
+	uint64 processIntervalStamps_;
 };
 
 

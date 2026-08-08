@@ -46,6 +46,87 @@ namespace KBEngine{
 ServerConfig g_serverConfig;
 KBE_SINGLETON_INIT(Machine);
 
+namespace
+{
+bool isLoopbackAddress(uint32 ip)
+{
+	return ip == Network::LOCALHOST;
+}
+
+void sendLifecycleReply(Network::Channel* pChannel, uint16 finderRecvPort, bool success, const char* operationName)
+{
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	(*pBundle) << success;
+
+	if (finderRecvPort != 0)
+	{
+		Network::EndPoint ep;
+		ep.socket(SOCK_DGRAM);
+
+		if (!ep.good())
+		{
+			ERROR_MSG(fmt::format("Machine::{}: Failed to create socket.\n", operationName));
+			Network::Bundle::reclaimPoolObject(pBundle);
+			return;
+		}
+
+		// finderRecvPort is already encoded in network byte order by the client.
+		// finderRecvPort 已由客户端按网络字节序编码，不能再次 htons。
+		ep.sendto(pBundle, finderRecvPort, pChannel->addr().ip);
+		Network::Bundle::reclaimPoolObject(pBundle);
+		return;
+	}
+
+	pChannel->send(pBundle);
+}
+
+bool isMachineLocalAddress(const Network::NetworkInterface& networkInterface, uint32 broadcastAddr, uint32 ip)
+{
+	return networkInterface.intaddr().ip == ip ||
+		networkInterface.extaddr().ip == ip ||
+		(broadcastAddr != 0 && broadcastAddr == ip);
+}
+
+bool canReturnLocalComponent(const Network::NetworkInterface& networkInterface,
+	uint32 broadcastAddr, const Components::ComponentInfos* info, uint32 requesterAddr)
+{
+	if(isMachineLocalAddress(networkInterface, broadcastAddr, info->pIntAddr->ip))
+		return true;
+
+	// Some single-machine deployments bind server components to 127.0.0.1 while
+	// Machine listens on a physical interface for broadcast discovery. The confirmed
+	// broadcast interface is part of Machine's local identity even when the main TCP
+	// endpoint stays on loopback, so local consoles using that interface can still
+	// inspect loopback-bound components without exposing them to remote machines.
+	// 部分单机部署会让服务组件绑定 127.0.0.1，而 Machine 使用物理网卡处理广播发现。
+	// 已确认的广播网卡也是 Machine 的本机身份；本机控制台经该网卡访问时仍可查看
+	// loopback 组件，但远端机器不会拿到不可达的 loopback 地址。
+	if(isLoopbackAddress(info->pIntAddr->ip))
+	{
+		return requesterAddr == 0 ||
+			isLoopbackAddress(requesterAddr) ||
+			isMachineLocalAddress(networkInterface, broadcastAddr, requesterAddr);
+	}
+
+	return false;
+}
+
+bool canAcceptLocalBroadcast(const Network::NetworkInterface& networkInterface,
+	uint32 broadcastAddr, uint32 componentIntAddr, uint32 packetAddr)
+{
+	if(isMachineLocalAddress(networkInterface, broadcastAddr, componentIntAddr))
+		return true;
+
+	// Components can bind internally to loopback while their UDP discovery packet
+	// reaches Machine through the physical broadcast interface. Accept that only
+	// when the packet itself is from this host, preserving the multi-machine guard.
+	// 组件内部地址可能绑定 loopback，但 UDP 发现包经物理广播网卡抵达 Machine。
+	// 只有包本身来自本机时才接受，继续保留多机部署的隔离边界。
+	return isLoopbackAddress(componentIntAddr) &&
+		(isLoopbackAddress(packetAddr) || isMachineLocalAddress(networkInterface, broadcastAddr, packetAddr));
+}
+}
+
 //-------------------------------------------------------------------------------------
 Machine::Machine(Network::EventDispatcher& dispatcher, 
 				 Network::NetworkInterface& ninterface, 
@@ -131,8 +212,7 @@ void Machine::onBroadcastInterface(Network::Channel* pChannel, int32 uid, std::s
 	}
 
 	// 只记录本机启动的进程
-	if(this->networkInterface().intaddr().ip == intaddr ||
-				this->networkInterface().extaddr().ip == intaddr)
+	if(canAcceptLocalBroadcast(this->networkInterface(), broadcastAddr_, intaddr, pChannel->addr().ip))
 	{
 		pinfos = Components::getSingleton().findComponent((COMPONENT_TYPE)componentType, uid, componentID);
 		if(pinfos)
@@ -243,8 +323,7 @@ void Machine::onFindInterfaceAddr(Network::Channel* pChannel, int32 uid, std::st
 
 		if(usable)
 		{
-			if(this->networkInterface().intaddr().ip == pinfos->pIntAddr->ip ||
-				this->networkInterface().extaddr().ip == pinfos->pIntAddr->ip)
+			if(canReturnLocalComponent(this->networkInterface(), broadcastAddr_, pinfos, finderAddr))
 			{
 				found = true;
 
@@ -391,8 +470,7 @@ void Machine::queryComponentID(Network::Channel* pChannel, COMPONENT_TYPE compon
 		return;
 	}
 
-	if (this->networkInterface().intaddr().ip == ip ||
-		this->networkInterface().extaddr().ip == ip)
+	if (isMachineLocalAddress(this->networkInterface(), broadcastAddr_, ip))
 	{
 		COMPONENT_ID cid1 = (COMPONENT_ID)uid * COMPONENT_ID_MULTIPLE;
 		COMPONENT_ID cid2 = (COMPONENT_ID)macMD5 * 10000;
@@ -482,6 +560,19 @@ void Machine::queryComponentID(Network::Channel* pChannel, COMPONENT_TYPE compon
 
 		INFO_MSG(fmt::format("Machine::queryComponentID[{}], set componentID success: component:{}({}) uid:{} pidMD5:{}.\n",
 			pChannel->c_str(), COMPONENT_NAME_EX(componentType), cid, uid, pidMD5));
+	}
+	else
+	{
+		WARNING_MSG(fmt::format(
+			"Machine::queryComponentID[{}]: reject non-local component request, machineInt={}, machineExt={}, broadcast={}. component:{}({}) uid:{} pid:{}.\n",
+			pChannel->c_str(),
+			this->networkInterface().intaddr().c_str(),
+			this->networkInterface().extaddr().c_str(),
+			inet_ntoa((struct in_addr&)broadcastAddr_),
+			COMPONENT_NAME_EX(componentType),
+			componentID,
+			uid,
+			pid));
 	}
 }
 
@@ -637,8 +728,7 @@ void Machine::onQueryAllInterfaceInfos(Network::Channel* pChannel, int32 uid, st
 
 			const Components::ComponentInfos* pinfos = &(*iter);
 			
-			bool islocal = this->networkInterface().intaddr().ip == pinfos->pIntAddr->ip ||
-					this->networkInterface().extaddr().ip == pinfos->pIntAddr->ip;
+			bool islocal = canReturnLocalComponent(this->networkInterface(), broadcastAddr_, pinfos, pChannel->addr().ip);
 
 			// 首个请求刷新进程和运行时数据；重复包使用刚完成的缓存，避免每个组件最多两次 300ms 同步等待。
 			// The first request refreshes process and runtime data; duplicates use the just-completed cache to avoid up to two 300 ms synchronous waits per component.
@@ -730,6 +820,26 @@ bool Machine::findBroadcastInterface()
 				iter->second.c_str()));
 
 			broadcastAddr_ = sin.sin_addr.s_addr;
+			return true;
+		}
+	}
+
+	// macOS may not loop a limited broadcast back to the sending process even
+	// though the interface is healthy. The network layer has already resolved a
+	// usable default interface, so use it only when the broadcast probe times out.
+	// macOS 即使网卡正常也可能不把受限广播回送给发送进程。网络层此前已经解析出
+	// 可用的默认接口，因此仅在广播探测超时时使用该结果，避免 Machine 随机启动失败。
+	u_int32_t defaultAddress = 0;
+	if (bhandler.epListen().getDefaultInterfaceAddress(defaultAddress) == 0)
+	{
+		std::map<u_int32_t, std::string>::const_iterator defaultIter = interfaces.find(defaultAddress);
+		if (defaultIter != interfaces.end() && defaultAddress != Network::LOCALHOST)
+		{
+			INFO_MSG(fmt::format(
+				"Machine::findBroadcastInterface: Broadcast probe timed out; using default interface {} ({}).\n",
+				inet_ntoa((struct in_addr&)defaultAddress), defaultIter->second.c_str()));
+
+			broadcastAddr_ = defaultAddress;
 			return true;
 		}
 	}
@@ -965,6 +1075,13 @@ void Machine::startserver(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 		s >> KBE_BIN_PATH;
 	}
 
+	if (!validateGuiConsoleAdminToken(pChannel, s, "startserver"))
+	{
+		Network::Bundle::reclaimPoolObject(pBundle);
+		sendLifecycleReply(pChannel, finderRecvPort, false, "startserver");
+		return;
+	}
+
 	INFO_MSG(fmt::format("Machine::startserver: uid={}, [{}], addr={}, cid={}, gus={}, KBE_ROOT={}, KBE_RES_PATH={}, KBE_BIN_PATH={}\n", 
 		uid, COMPONENT_NAME_EX(componentType), pChannel->c_str(), cid, gus, KBE_ROOT, KBE_RES_PATH, KBE_BIN_PATH));
 	
@@ -996,7 +1113,12 @@ void Machine::startserver(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 			return;
 		}
 	
-		ep.sendto(pBundle, htons(finderRecvPort), pChannel->addr().ip);
+		// finderRecvPort is already encoded in network byte order by the client.
+		// Applying htons() again sends the acknowledgement to a different port on
+		// little-endian hosts, making UDP lifecycle starts appear to time out.
+		// finderRecvPort 已由客户端按网络字节序编码；再次 htons() 会在小端平台把
+		// 回执发往错误端口，从而使 UDP 启动操作表现为超时。
+		ep.sendto(pBundle, finderRecvPort, pChannel->addr().ip);
 		Network::Bundle::reclaimPoolObject(pBundle);
 	}
 	else
@@ -1024,6 +1146,12 @@ void Machine::stopserver(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 	if(s.length() > 0)
 	{
 		s >> finderRecvPort;
+	}
+
+	if (!validateGuiConsoleAdminToken(pChannel, s, "stopserver"))
+	{
+		sendLifecycleReply(pChannel, finderRecvPort, false, "stopserver");
+		return;
 	}
 
 	INFO_MSG(fmt::format("Machine::stopserver: request uid={}, componentType={}, componentID={},  addr={}\n", 
@@ -1117,7 +1245,14 @@ void Machine::stopserver(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 			recvpacket.resize(255);
 
 			fd_set	fds;
-			struct timeval tv = { 0, 1000000 }; // 1000ms
+			struct timeval tv;
+			// macOS/BSD requires tv_usec to be smaller than 1000000; using
+			// {0, 1000000} makes select() fail with EINVAL immediately and closes
+			// this short-lived control socket before the target app can ACK.
+			// macOS/BSD 要求 tv_usec 小于 1000000；{0, 1000000} 会让 select()
+			// 立刻 EINVAL，短连接控制包还没等到目标 ACK 就被关闭。
+			tv.tv_sec = 1;
+			tv.tv_usec = 0;
 
 			FD_ZERO( &fds );
 			FD_SET(ep1, &fds);
@@ -1134,15 +1269,17 @@ void Machine::stopserver(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 					(*iter).cid, COMPONENT_NAME[componentType], (cinfos->pIntAddr != NULL ? 
 					cinfos->pIntAddr->c_str() : "unknown")));
 
+				success = false;
 				iter++;
 				continue;
 			}
 			else if(selgot == -1)
 			{
-				WARNING_MSG(fmt::format("--> stop {}({}), addr={}, recv_len == -1!\n", 
+				WARNING_MSG(fmt::format("--> stop {}({}), addr={}, select failed: {}.\n",
 					(*iter).cid, COMPONENT_NAME[componentType], (cinfos->pIntAddr != NULL ? 
-					cinfos->pIntAddr->c_str() : "unknown")));
+					cinfos->pIntAddr->c_str() : "unknown"), kbe_strerror()));
 
+				success = false;
 				iter++;
 				continue;
 			}
@@ -1218,6 +1355,12 @@ void Machine::killserver(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 	if (s.length() > 0)
 	{
 		s >> finderRecvPort;
+	}
+
+	if (!validateGuiConsoleAdminToken(pChannel, s, "killserver"))
+	{
+		sendLifecycleReply(pChannel, finderRecvPort, false, "killserver");
+		return;
 	}
 
 	INFO_MSG(fmt::format("Machine::killserver: request uid={}, componentType={}, componentID={},  addr={}\n",

@@ -643,6 +643,11 @@ int KqueuePoller::flushPendingSends(KBESOCKET fd, SocketState& state)
 
 	if (state.pendingTcpSends.empty() && state.pendingUdpSends.empty())
 	{
+		// kqueue 的 EVFILT_WRITE 是 level-triggered readiness。
+		// kqueue EVFILT_WRITE is level-triggered readiness.
+		// 队列清空后如果继续保留写 filter，可写 socket 会持续唤醒主循环造成空转。
+		// Once the send queues are empty, keeping the write filter armed spins the loop.
+		doRegister(fd, false, false);
 		state.writeArmed = false;
 		if (this->findForWrite(fd) != NULL)
 		{

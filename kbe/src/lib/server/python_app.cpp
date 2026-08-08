@@ -715,13 +715,26 @@ PyObject* PythonApp::__py_listPathRes(PyObject* self, PyObject* args)
 void PythonApp::startProfile_(Network::Channel* pChannel, std::string profileName, 
 	int8 profileType, uint32 timelen)
 {
-	if(pChannel->isExternal())
+	if(pChannel == NULL || pChannel->isExternal())
 		return;
 	
 	switch(profileType)
 	{
 	case 0:	// pyprofile
 		new PyProfileHandler(this->networkInterface(), timelen, profileName, pChannel->addr());
+		return;
+	case 4: // pytickprofile
+		if(g_componentType != BASEAPP_TYPE && g_componentType != CELLAPP_TYPE)
+		{
+			WARNING_MSG(fmt::format("PythonApp::startProfile_: pytickprofile is unsupported on componentType={}.\n",
+				g_componentType));
+			return;
+		}
+
+		// WebConsole/Telnet already expose Python tick profiling. GUIConsole uses the same
+		// handler so operators can inspect per-tick Python hotspots without a separate shell.
+		// WebConsole/Telnet 已经提供逐 Tick Python 采样，这里复用同一处理器开放给 GUIConsole。
+		new PyTickProfileHandler(this->networkInterface(), timelen, profileName, pChannel->addr());
 		return;
 	default:
 		break;
@@ -738,6 +751,10 @@ void PythonApp::onExecScriptCommand(Network::Channel* pChannel, KBEngine::Memory
 	
 	std::string cmd;
 	s.readBlob(cmd);
+	if (!validateGuiConsoleAdminToken(pChannel, s, "onExecScriptCommand"))
+	{
+		return;
+	}
 
 	PyObject* pycmd = PyUnicode_DecodeUTF8(cmd.data(), cmd.size(), NULL);
 	if(pycmd == NULL)

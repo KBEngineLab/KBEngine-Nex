@@ -29,6 +29,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/udp_packet.h"
 #include "network/tcp_packet.h"
 #include "network/bundle_broadcast.h"
+#include "network/common.h"
 #include "network/network_interface.h"
 #include "client_lib/client_interface.h"
 #include "server/serverconfig.h"
@@ -754,7 +755,8 @@ Components::ComponentInfos* Components::findLocalComponent(uint32 pid)
 bool Components::isLocalComponent(const Components::ComponentInfos* info)
 {
 	return _pNetworkInterface->intaddr().ip == info->pIntAddr->ip ||
-			_pNetworkInterface->extaddr().ip == info->pIntAddr->ip;
+			_pNetworkInterface->extaddr().ip == info->pIntAddr->ip ||
+			info->pIntAddr->ip == Network::LOCALHOST;
 }
 
 //-------------------------------------------------------------------------------------		
@@ -1118,9 +1120,12 @@ bool Components::findLogger(bool allowBots)
 	
 	int i = 0;
 
-	// Logger 与其他组件同时启动时可增加查找次数；当前保持一次以延续既有启动策略。
-	// More attempts can help when Logger starts concurrently; keep one attempt to preserve the existing startup policy.
-	while(i++ < 1)
+	// Logger can publish its Machine identity a few hundred milliseconds after the
+	// first game component asks for it. Retry in a bounded startup window so a
+	// tiny launch-order race does not permanently disable centralized logging.
+	// Logger 可能比首个游戏组件的查询晚几百毫秒才向 Machine 发布身份。这里使用
+	// 有界启动窗口重试，避免微小启动顺序抖动导致集中日志永久不可用。
+	while(i++ < 5)
 	{
 		// 临时发现 socket 使用系统分配端口，避免并发组件争用固定随机端口池。
 		// Temporary discovery sockets use OS-assigned ports to avoid contention in the fixed random-port range.
@@ -1247,6 +1252,8 @@ RESTART_RECV:
 		{
 			// 接受数据超时了
 		}
+
+		KBEngine::sleep(200);
 	}
 
 	return false;
@@ -1691,10 +1698,19 @@ bool Components::process()
 			
 		if(timestamp() - lastTime > uint64(stampsPerSecond()))
 		{
+			// Machine may still be initializing when an early component performs its
+			// first identity broadcast. Rebroadcast while discovery is incomplete so
+			// late Machine startup can learn about this component without requiring a
+			// manual restart.
+			// 早启动组件首次身份广播时，Machine 可能还在初始化。发现未完成期间补发身份广播，
+			// 让后启动的 Machine 能重新记录该组件，避免必须手动重启。
+			broadcastSelf();
+
 			if(!findComponents())
 			{
-				if(state_ != 2)
-					lastTime = timestamp();
+				// 发现后半段可能在等待对端入站 Channel 完成注册；未节流会在主循环中自旋。
+				// The second discovery phase may wait for a peer inbound Channel; throttle it to avoid spinning the main loop.
+				lastTime = timestamp();
 
 				return true;
 			}

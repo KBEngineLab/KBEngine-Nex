@@ -3040,12 +3040,17 @@ void Cellapp::setSpaceViewer(Network::Channel* pChannel, MemoryStream& s)
 			SPACE_ID spaceID = 0;
 			uint16 sampleIntervalMs = 0;
 			s >> version >> enabled >> spaceID >> sampleIntervalMs;
-			if (version != 2 ||
+			if (version != 3 ||
 				(sampleIntervalMs != 100 && sampleIntervalMs != 250 &&
 				 sampleIntervalMs != 500 && sampleIntervalMs != 1000))
 			{
 				WARNING_MSG(fmt::format("Cellapp::setSpaceViewer: invalid V2 request(version={}, interval={}).\n",
 					version, sampleIntervalMs));
+				return;
+			}
+
+			if (!this->validateGuiConsoleAdminToken(pChannel, s, "setSpaceViewer"))
+			{
 				return;
 			}
 

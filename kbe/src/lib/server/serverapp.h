@@ -200,6 +200,12 @@ public:
 	*/
 	void startProfile(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 	virtual void startProfile_(Network::Channel* pChannel, std::string profileName, int8 profileType, uint32 timelen);
+
+	/**
+	 * Validate the shared GUIConsole admin token appended to privileged console requests.
+	 * 校验 GUIConsole 特权请求尾部追加的共享管理 Token。
+	 */
+	bool validateGuiConsoleAdminToken(Network::Channel* pChannel, MemoryStream& s, const char* operationName) const;
 		
 protected:
 	/**

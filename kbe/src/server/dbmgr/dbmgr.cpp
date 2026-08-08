@@ -389,6 +389,14 @@ void Dbmgr::handleMainTick()
 	pyCallbackMgr_.tick();
 	DBUtil::handleMainTick();
 	networkInterface().processChannels(&DbmgrInterface::messageHandlers);
+
+	if (pSyncAppDatasHandler_ != NULL)
+	{
+		// 组件注册消息在 processChannels 中进入，随后立即推进 ready gate，可避免依赖独立 Task 调度造成启动链无声卡住。
+		// Registration messages enter through processChannels; advancing the ready gate here keeps startup ordering explicit.
+		SyncAppDatasHandler* pHandler = pSyncAppDatasHandler_;
+		pHandler->process();
+	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -752,7 +760,7 @@ void Dbmgr::onRegisterNewApp(Network::Channel* pChannel, int32 uid, std::string&
 		startGlobalOrder = globalorderID;
 
 	if(pSyncAppDatasHandler_ == NULL)
-		pSyncAppDatasHandler_ = new SyncAppDatasHandler(this->networkInterface());
+		pSyncAppDatasHandler_ = new SyncAppDatasHandler();
 
 	// 下一步:
 	// 如果是连接到dbmgr则需要等待接收app初始信息

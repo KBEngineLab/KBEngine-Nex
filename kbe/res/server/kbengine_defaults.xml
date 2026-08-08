@@ -15,6 +15,13 @@
 	<performanceProbes>
 		<enabled> false </enabled>
 	</performanceProbes>
+
+	<!-- GUIConsole 管理协议共享 Token；为空会关闭认证，仅建议本机调试临时使用。
+		GUIConsole admin protocol shared token; leave empty only for temporary local debugging.
+	-->
+	<guiConsole>
+		<adminToken> 8be0f32909da7702f7cf2424af6e9422b4881f70bd5991f973424fed24004e5e </adminToken>
+	</guiConsole>
 	
 	<!-- 每秒发送到客户端的带宽限制(bit) 
 		(The data sent to the client, the second bandwidth limit (bit))

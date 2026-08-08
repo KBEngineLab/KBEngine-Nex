@@ -60,6 +60,7 @@ ServerConfig::ServerConfig():
 	gameUpdateHertz_(10),
 	asyncioRepeatOffset_(0.f),
 	performanceProbesEnabled_(false),
+	guiConsoleAdminToken_("8be0f32909da7702f7cf2424af6e9422b4881f70bd5991f973424fed24004e5e"),
 	tick_max_buffered_logs_(4096),
 	tick_max_sync_logs_(32),
 	channelCommon_(),
@@ -119,6 +120,16 @@ bool ServerConfig::loadConfig(std::string fileName)
 			// 全局只读快路径避免网络、AOI 和脚本库反向依赖 ServerConfig。
 			// A process-wide read-mostly switch avoids reverse dependencies from network, AOI and script libraries to ServerConfig.
 			g_performanceProbesEnabled = performanceProbesEnabled_;
+		}
+	}
+
+	rootNode = xml->getRootNode("guiConsole");
+	if (rootNode != NULL)
+	{
+		TiXmlNode* childnode = xml->enterNode(rootNode, "adminToken");
+		if (childnode != NULL)
+		{
+			guiConsoleAdminToken_ = strutil::kbe_trim(xml->getValStr(childnode));
 		}
 	}
 

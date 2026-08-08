@@ -144,7 +144,7 @@ public:
 	virtual void accountBindMail(Network::Channel* pChannel, std::string& username, std::string& scode);
 	virtual void accountNewPassword(Network::Channel* pChannel, ENTITY_ID entityID, std::string& accountName, std::string& password, std::string& newpassword);
 
-	bool reconnect();
+	bool reconnect(bool logConnectionFailure = true);
 
 	virtual bool process();
 

@@ -844,8 +844,17 @@ void Channel::send(Bundle * pBundle)
 
 		pPacketSender_->processSend(this);
 
-		// 如果不能立即发送到系统缓冲区，那么交给poller处理
-		if(bundles_.size() > 0 && condemn() == 0 && !isDestroyed())
+		EventPoller* pPoller = pNetworkInterface_->dispatcher().pPoller();
+		const bool hasCompletionPendingSend = pPoller != NULL && pPoller->supportsCompletion() &&
+			pPoller->hasPendingSend(*pEndPoint_);
+
+		// 完成模型会先把 Bundle 从 Channel 队列转移到 poller 的发送队列。
+		// 即使 bundles_ 已经为空，TCP 字节也可能还没有写入 socket；此时必须保持写 handler，
+		// 否则 kqueue/io_uring/IOCP 的最终发送完成通知无法回到 Channel::onSendCompleted()。
+		// Completion backends move Bundles into the poller send queue before bytes are actually
+		// written to the socket. Keep the write handler while those bytes are pending so the final
+		// completion can drive Channel::onSendCompleted().
+		if((bundles_.size() > 0 || hasCompletionPendingSend) && condemn() == 0 && !isDestroyed())
 		{
 			flags_ |= FLAG_SENDING;
 			pNetworkInterface_->dispatcher().registerWriteFileDescriptor(*pEndPoint_, pPacketSender_);

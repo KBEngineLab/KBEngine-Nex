@@ -46,6 +46,24 @@ namespace script{
 namespace
 {
 
+// 控制台单行需要保留 REPL 回显，例如输入 "a" 时输出 repr(a)；多行块必须按脚本文件编译，
+// 否则 "def ...\n...\nprint(...)" 会被 Py_single_input 当成非法交互输入。
+// Console single-line input must keep REPL echo semantics, while multi-line blocks must be
+// compiled as file input so compound statements followed by more statements are accepted.
+int getConsoleCompileMode(const char* command)
+{
+	if (command == NULL)
+		return Py_single_input;
+
+	std::string text = command;
+	while (!text.empty() && (text.back() == '\n' || text.back() == '\r' || text.back() == ' ' || text.back() == '\t'))
+	{
+		text.pop_back();
+	}
+
+	return text.find('\n') == std::string::npos ? Py_single_input : Py_file_input;
+}
+
 //-------------------------------------------------------------------------------------
 bool isCompatibleVenvRoot(const std::string& rootPath)
 {
@@ -268,7 +286,7 @@ int Script::run_simpleString(const char* command, std::string* retBufferPtr)
 
 		d = PyModule_GetDict(m);
 
-		v = PyRun_String(command, Py_single_input, d, d);
+		v = PyRun_String(command, getConsoleCompileMode(command), d, d);
 		if (v == NULL) 
 		{
 			PyErr_Print();

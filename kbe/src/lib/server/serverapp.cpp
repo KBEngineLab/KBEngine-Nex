@@ -384,6 +384,10 @@ void ServerApp::queryWatcher(Network::Channel* pChannel, MemoryStream& s)
 
 	std::string path;
 	s >> path;
+	if (!validateGuiConsoleAdminToken(pChannel, s, "queryWatcher"))
+	{
+		return;
+	}
 
 	MemoryStream::SmartPoolObjectPtr readStreamPtr = MemoryStream::createSmartPoolObj(OBJECTPOOL_POINT);
 	WatcherPaths::root().readWatchers(path, readStreamPtr.get()->get());
@@ -843,8 +847,39 @@ void ServerApp::startProfile(Network::Channel* pChannel, KBEngine::MemoryStream&
 	uint32 timelen;
 
 	s >> profileName >> profileType >> timelen;
+	if (!validateGuiConsoleAdminToken(pChannel, s, "startProfile"))
+	{
+		return;
+	}
 
 	startProfile_(pChannel, profileName, profileType, timelen);
+}
+
+//-------------------------------------------------------------------------------------
+bool ServerApp::validateGuiConsoleAdminToken(Network::Channel* pChannel, MemoryStream& s, const char* operationName) const
+{
+	const std::string& expectedToken = ServerConfig::getSingleton().guiConsoleAdminToken();
+	if (expectedToken.empty())
+	{
+		return true;
+	}
+
+	std::string actualToken;
+	if (s.length() > 0)
+	{
+		s >> actualToken;
+	}
+
+	if (actualToken == expectedToken)
+	{
+		return true;
+	}
+
+	// 不打印 Token 明文，避免认证失败本身把密钥泄露到 Logger。
+	// Do not log token contents; an auth failure must not leak the shared secret into Logger.
+	WARNING_MSG(fmt::format("ServerApp::validateGuiConsoleAdminToken: reject operation={}, addr={}.\n",
+		operationName, pChannel->c_str()));
+	return false;
 }
 
 //-------------------------------------------------------------------------------------

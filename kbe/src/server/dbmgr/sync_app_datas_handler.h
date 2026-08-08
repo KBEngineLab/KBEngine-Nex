@@ -43,7 +43,7 @@ public:
 		COMPONENT_ORDER startGlobalOrder;
 	};
 
-	SyncAppDatasHandler(Network::NetworkInterface & networkInterface);
+	SyncAppDatasHandler();
 	~SyncAppDatasHandler();
 	
 	bool process();
@@ -51,8 +51,8 @@ public:
 	void pushApp(COMPONENT_ID cid, COMPONENT_ORDER startGroupOrder, COMPONENT_ORDER startGlobalOrder);
 
 private:
-	Network::NetworkInterface &		networkInterface_;
 	uint64							lastRegAppTime_;
+	uint64							lastWaitLogTime_;
 	std::vector<ComponentInitInfo>	apps_;
 
 };

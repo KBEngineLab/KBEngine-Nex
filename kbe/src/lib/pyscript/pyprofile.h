@@ -39,10 +39,10 @@ public:
 	/** 
 		激活与停止某个profile
 	*/
-	static bool start(std::string profile);
-	static bool stop(std::string profile);
+	static bool start(std::string profile, bool logMessage = true);
+	static bool stop(std::string profile, bool logMessage = true);
 	static bool dump(std::string profile, std::string fileName);
-	static void addToStream(std::string profile, MemoryStream* s);
+	static size_t addToStream(std::string profile, MemoryStream* s);
 	static bool remove(std::string profile);
 
 	static void print_stats(const std::string& sort = "time", const std::string& profileName = "kbengine");

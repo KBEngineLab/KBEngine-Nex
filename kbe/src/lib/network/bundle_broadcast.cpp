@@ -259,7 +259,7 @@ bool BundleBroadcast::receive(MessageArgs* recvArgs, sockaddr_in* psin, int32 ti
 				continue;
 			}
 			
-			//DEBUG_MSG(fmt::format("BundleBroadcast::receive: from {}, datalen={}.\n", 
+			//DEBUG_MSG(fmt::format("BundleBroadcast::receive: from {}, datalen={}.\n",
 			//	inet_ntoa((struct in_addr&)psin->sin_addr.s_addr), len));
 
 			pCurrPacket()->wpos(len);
@@ -308,6 +308,12 @@ bool BundleBroadcast::receive(MessageArgs* recvArgs, sockaddr_in* psin, int32 ti
 
 	while (1)
 	{
+		// poll() writes revents for every call, but clearing it explicitly keeps the
+		// receive loop deterministic on BSD/macOS when a socket transitions through
+		// an error state between component-discovery requests.
+		// poll() 每次都会写入 revents；这里仍显式清零，保证 BSD/macOS 上套接字在
+		// 组件发现请求之间进入错误状态时，不会沿用上一次事件造成不可诊断的忙循环。
+		clientfds[0].revents = 0;
 		int nready = poll(clientfds, maxi + 1, timeout / 1000);
 
 		if (nready == -1)
@@ -341,52 +347,65 @@ bool BundleBroadcast::receive(MessageArgs* recvArgs, sockaddr_in* psin, int32 ti
 			icount++;
 			continue;
 		}
-		else
+		else if (clientfds[0].revents & POLLIN)
 		{
-			if (clientfds[0].revents & POLLIN)
+			sockaddr_in	sin;
+			pCurrPacket()->resetPacket();
+
+			if (psin == NULL)
+				psin = &sin;
+
+			pCurrPacket()->data_resize(recvWindowSize_);
+
+			int len = epListen_.recvfrom(pCurrPacket()->data(), recvWindowSize_, *psin);
+			if (len == -1)
 			{
-				sockaddr_in	sin;
-				pCurrPacket()->resetPacket();
-
-				if (psin == NULL)
-					psin = &sin;
-
-				pCurrPacket()->data_resize(recvWindowSize_);
-
-				int len = epListen_.recvfrom(pCurrPacket()->data(), recvWindowSize_, *psin);
-				if (len == -1)
+				if (showerr)
 				{
-					if (showerr)
-					{
-						ERROR_MSG(fmt::format("BundleBroadcast::receive: recvfrom error. {}.\n",
-							kbe_strerror()));
-					}
+					ERROR_MSG(fmt::format("BundleBroadcast::receive: recvfrom error. {}.\n",
+						kbe_strerror()));
+				}
+
+				continue;
+			}
+
+			//DEBUG_MSG(fmt::format("BundleBroadcast::receive: from {}, datalen={}.\n",
+			//	inet_ntoa((struct in_addr&)psin->sin_addr.s_addr), len));
+
+			pCurrPacket()->wpos(len);
+
+			if (recvArgs != NULL)
+			{
+				try
+				{
+					recvArgs->createFromStream(*pCurrPacket());
+				}
+				catch (MemoryStreamException &)
+				{
+					ERROR_MSG(fmt::format("BundleBroadcast::receive: data wrong. size={}, from {}.\n",
+						len, inet_ntoa((struct in_addr&)psin->sin_addr.s_addr)));
 
 					continue;
 				}
-
-				//DEBUG_MSG(fmt::format("BundleBroadcast::receive: from {}, datalen={}.\n", 
-				//	inet_ntoa((struct in_addr&)psin->sin_addr.s_addr), len));
-
-				pCurrPacket()->wpos(len);
-
-				if (recvArgs != NULL)
-				{
-					try
-					{
-						recvArgs->createFromStream(*pCurrPacket());
-					}
-					catch (MemoryStreamException &)
-					{
-						ERROR_MSG(fmt::format("BundleBroadcast::receive: data wrong. size={}, from {}.\n",
-							len, inet_ntoa((struct in_addr&)psin->sin_addr.s_addr)));
-
-						continue;
-					}
-				}
-
-				break;
 			}
+
+			break;
+		}
+		else
+		{
+			// Error-only poll events must terminate this receive attempt. The previous
+			// implementation looped immediately without consuming an event, pinning a
+			// server process at 100% CPU and preventing app discovery from advancing.
+			// 仅包含错误的 poll 事件必须结束本次接收。旧实现不会消费事件却立即重试，
+			// 会让服务进程占满单核并阻止 app 发现状态机继续推进。
+			if (showerr)
+			{
+				ERROR_MSG(fmt::format(
+					"BundleBroadcast::receive: unexpected poll events=0x{:x}, {}.\n",
+					static_cast<unsigned int>(clientfds[0].revents), kbe_strerror()));
+			}
+
+			return false;
 		}
 	}
 

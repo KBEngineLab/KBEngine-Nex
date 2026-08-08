@@ -115,7 +115,22 @@ void UDPPacketSender::onSent(Packet* pPacket)
 //-------------------------------------------------------------------------------------
 bool UDPPacketSender::processSend(Channel* pChannel, int userarg)
 {
-	KBE_ASSERT(pChannel != NULL);
+	bool noticed = pChannel == NULL;
+
+	// Output notification callbacks do not carry a Channel. Resolve it by endpoint
+	// just like TCPPacketSender; if the channel has already gone away, report and
+	// return instead of asserting inside the network thread.
+	// 输出通知回调不会携带 Channel，需和 TCPPacketSender 一样通过 endpoint 找回。
+	// 如果连接已经被销毁，只记录错误并返回，避免网络线程因生命周期竞态断言退出。
+	if(noticed)
+		pChannel = getChannel();
+
+	if (pChannel == NULL)
+	{
+		ERROR_MSG(fmt::format("UDPPacketSender::processSend: channel not found, endpoint={}\n",
+			pEndpoint_ != NULL ? pEndpoint_->addr().c_str() : "null"));
+		return false;
+	}
 
 	if (pChannel->condemn() == Channel::FLAG_CONDEMN_AND_DESTROY)
 	{
@@ -204,6 +219,9 @@ bool UDPPacketSender::processSend(Channel* pChannel, int userarg)
 	}
 
 	bundles.clear();
+
+	if(noticed)
+		pChannel->onSendCompleted();
 
 	return true;
 }

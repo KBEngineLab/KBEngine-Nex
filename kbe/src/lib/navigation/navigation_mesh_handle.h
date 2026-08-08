@@ -29,6 +29,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "recastnavigation/DetourNavMesh.h"
 
 namespace KBEngine{
+class MemoryStream;
 
 struct NavMeshSetHeader
 {
@@ -98,6 +99,7 @@ public:
 
 	virtual NavigationHandle::NAV_TYPE type() const{ return NAV_MESH; }
 	virtual bool getBounds(float& minimumX, float& minimumZ, float& maximumX, float& maximumZ) const;
+	uint32 writeViewerSegments(MemoryStream& stream, uint32 maxSegments) const;
 
 	static NavigationHandle* create(std::string resPath, const std::map< int, std::string >& params);
 	static bool _create(int layer, const std::string& resPath, const std::string& res, NavMeshHandle* pNavMeshHandle);

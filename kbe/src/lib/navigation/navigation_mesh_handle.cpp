@@ -20,6 +20,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "navigation_mesh_handle.h"	
 #include "navigation/navigation.h"
+#include "common/memorystream.h"
 #include "resmgr/resmgr.h"
 #include "thread/threadguard.h"
 #include "math/math.h"
@@ -461,6 +462,52 @@ bool NavMeshHandle::getBounds(float& minimumX, float& minimumZ, float& maximumX,
 }
 
 //-------------------------------------------------------------------------------------
+uint32 NavMeshHandle::writeViewerSegments(MemoryStream& stream, uint32 maxSegments) const
+{
+	MemoryStream segments;
+	uint32 segmentCount = 0;
+	for (std::map<int, NavmeshLayer>::const_iterator layerIter = navmeshLayer.begin();
+		layerIter != navmeshLayer.end() && segmentCount < maxSegments; ++layerIter)
+	{
+		const dtNavMesh* navmesh = layerIter->second.pNavmesh;
+		if (navmesh == NULL)
+			continue;
+
+		for (int tileIndex = 0; tileIndex < navmesh->getMaxTiles() && segmentCount < maxSegments; ++tileIndex)
+		{
+			const dtMeshTile* tile = navmesh->getTile(tileIndex);
+			if (tile == NULL || tile->header == NULL || tile->polys == NULL || tile->verts == NULL)
+				continue;
+
+			for (int polyIndex = 0; polyIndex < tile->header->polyCount && segmentCount < maxSegments; ++polyIndex)
+			{
+				const dtPoly& poly = tile->polys[polyIndex];
+				if (poly.getType() != DT_POLYTYPE_GROUND)
+					continue;
+
+				for (int edgeIndex = 0; edgeIndex < poly.vertCount && segmentCount < maxSegments; ++edgeIndex)
+				{
+					// 只发送没有邻接多边形的外边界，避免把 Detour 内部三角剖分线当成地图轮廓。
+					// Only boundary edges are exported so the viewer shows walkable outlines instead of internal triangulation.
+					if (poly.neis[edgeIndex] != 0)
+						continue;
+
+					const int nextEdgeIndex = (edgeIndex + 1) % poly.vertCount;
+					const float* start = &tile->verts[poly.verts[edgeIndex] * 3];
+					const float* end = &tile->verts[poly.verts[nextEdgeIndex] * 3];
+					segments << start[0] << start[2] << end[0] << end[2];
+					++segmentCount;
+				}
+			}
+		}
+	}
+
+	stream << segmentCount;
+	stream.append(segments.data() + segments.rpos(), segments.length());
+	return segmentCount;
+}
+
+//-------------------------------------------------------------------------------------
 dtPolyRef NavMeshHandle::findNearestPoly(int layer, const Position3D& position, Position3D* nearestPoint)
 {
 	std::map<int, NavmeshLayer>::iterator iter = navmeshLayer.find(layer);
@@ -793,9 +840,28 @@ bool NavMeshHandle::_create(int layer, const std::string& resPath, const std::st
 	fclose(fp);
 	SAFE_RELEASE_ARRAY(data);
 
-	dtNavMeshQuery* pMavmeshQuery = new dtNavMeshQuery();
+	// Detour objects must be allocated and freed through the same allocator family.
+	// dtFreeNavMeshQuery() is used in the destructor, so using new here corrupts
+	// the allocator on shutdown when a cellapp has loaded navmesh data.
+	// Detour 对象必须使用同一组分配/释放接口；析构中使用 dtFreeNavMeshQuery()，
+	// 如果这里用 new，cellapp 关闭释放 navmesh 时会触发 macOS malloc 非法释放。
+	dtNavMeshQuery* pMavmeshQuery = dtAllocNavMeshQuery();
+	if (!pMavmeshQuery)
+	{
+		ERROR_MSG("NavMeshHandle::create: dtAllocNavMeshQuery is failed!\n");
+		dtFreeNavMesh(mesh);
+		return false;
+	}
 
-	pMavmeshQuery->init(mesh, 1024);
+	dtStatus queryStatus = pMavmeshQuery->init(mesh, 1024);
+	if (dtStatusFailed(queryStatus))
+	{
+		ERROR_MSG(fmt::format("NavMeshHandle::create: navmesh query init error({})!\n", queryStatus));
+		dtFreeNavMeshQuery(pMavmeshQuery);
+		dtFreeNavMesh(mesh);
+		return false;
+	}
+
 	pNavMeshHandle->resPath = resPath;
 	pNavMeshHandle->navmeshLayer[layer].pNavmeshQuery = pMavmeshQuery;
 	pNavMeshHandle->navmeshLayer[layer].pNavmesh = mesh;

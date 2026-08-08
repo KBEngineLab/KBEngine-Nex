@@ -117,16 +117,40 @@ bool ScriptStdErr::uninstall(void)
 //-------------------------------------------------------------------------------------
 PyObject* ScriptStdErr::__py_write(PyObject* self, PyObject *args)
 {
-	char* sdata = NULL;
-	Py_ssize_t size = 0;
+	PyObject* pyText = NULL;
+	bool ownsText = false;
 
-	if (!PyArg_ParseTuple(args, "s#", &sdata, &size))
+	if (!PyArg_ParseTuple(args, "O", &pyText))
 	{
 		ERROR_MSG("ScriptStdErr::write: Bad args\n");
 		return NULL;
 	}
+
+	if (!PyUnicode_Check(pyText))
+	{
+		pyText = PyUnicode_FromObject(pyText);
+		ownsText = true;
+		if (!pyText)
+		{
+			ERROR_MSG("ScriptStdErr::write: failed to convert text to unicode\n");
+			return NULL;
+		}
+	}
+
+	Py_ssize_t size = 0;
+	const char* sdata = PyUnicode_AsUTF8AndSize(pyText, &size);
+	if (!sdata)
+	{
+		ERROR_MSG("ScriptStdErr::write: failed to read utf-8 text\n");
+		if (ownsText)
+			Py_DECREF(pyText);
+		return NULL;
+	}
 		
 	static_cast<ScriptStdErr*>(self)->pScriptStdOutErr()->error_msg(sdata, static_cast<uint32>(size));
+
+	if (ownsText)
+		Py_DECREF(pyText);
 	S_Return;
 }
 

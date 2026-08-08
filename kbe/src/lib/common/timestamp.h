@@ -91,12 +91,16 @@ namespace KBEngine {
 	{
 		timespec tv;
 #if defined(__linux__)
-		assert(syscall(__NR_clock_gettime, CLOCK_MONOTONIC, &tv) == 0);
+		const int result = syscall(__NR_clock_gettime, CLOCK_MONOTONIC, &tv);
 #else
 		// macOS/BSD 直接使用 clock_gettime，无需 syscall 包装。
 		// macOS/BSD call clock_gettime directly without a syscall wrapper.
-		assert(clock_gettime(CLOCK_MONOTONIC, &tv) == 0);
+		const int result = clock_gettime(CLOCK_MONOTONIC, &tv);
 #endif
+		// 调用必须在 Release 下也执行；assert 只负责暴露系统调用失败。
+		// The call must execute in Release as well; assert is only for surfacing syscall failures.
+		assert(result == 0);
+		(void)result;
 		return 1000000000ULL * tv.tv_sec + tv.tv_nsec;
 	}
 

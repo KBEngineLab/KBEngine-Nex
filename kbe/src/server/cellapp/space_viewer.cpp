@@ -32,6 +32,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "common/memorystream.h"
 #include "helper/console_helper.h"
 #include "helper/profile.h"
+#include "navigation/navigation_mesh_handle.h"
 #include "server/serverconfig.h"
 
 #include <ctime>
@@ -238,7 +239,7 @@ void SpaceViewer::initClient()
 			return;
 
 		const uint32 viewerV2Magic = 0x3253584E;
-		const uint16 viewerV2Version = 2;
+		const uint16 viewerV2Version = 3;
 		const uint8 metadataMessage = 2;
 		float minimumX = -50.f;
 		float minimumZ = -50.f;
@@ -264,6 +265,20 @@ void SpaceViewer::initClient()
 	{
 		s << moduleIter->get()->getUType();
 		s << moduleIter->get()->getName();
+	}
+
+	if (isV2_)
+	{
+		const uint32 maxViewerSegments = 20000;
+		NavigationHandlePtr pNavHandle = space->pNavHandle();
+		if (pNavHandle && pNavHandle->type() == NavigationHandle::NAV_MESH)
+		{
+			static_cast<NavMeshHandle*>(pNavHandle.get())->writeViewerSegments(s, maxViewerSegments);
+		}
+		else
+		{
+			s << (uint32)0;
+		}
 	}
 
 	sendStream(&s, updateType_);
@@ -403,7 +418,7 @@ void SpaceViewer::updateClient()
 	if (isV2_)
 	{
 		const uint32 viewerV2Magic = 0x3253584E;
-		const uint16 viewerV2Version = 2;
+		const uint16 viewerV2Version = 3;
 		const uint8 snapshotMessage = 3;
 		uint8 flags = 0;
 		if (lastUpdateVersion_ == 0)

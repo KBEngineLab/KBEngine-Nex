@@ -803,7 +803,7 @@ E* EntityApp<E>::findEntity(ENTITY_ID entityID)
 template<class E>
 void EntityApp<E>::onReqAllocEntityID(Network::Channel* pChannel, ENTITY_ID startID, ENTITY_ID endID)
 {
-	if(pChannel->isExternal())
+	if(pChannel == NULL || pChannel->isExternal())
 		return;
 	
 	// INFO_MSG("EntityApp::onReqAllocEntityID: entityID alloc(%d-%d).\n", startID, endID);
@@ -1289,6 +1289,11 @@ void EntityApp<E>::startProfile_(Network::Channel* pChannel, std::string profile
 	case 0:	// pyprofile
 		new PyProfileHandler(this->networkInterface(), timelen, profileName, pChannel->addr());
 		return;
+	case 4: // pytickprofile
+		// Keep GUIConsole aligned with Telnet/WebConsole tick profiling for entity apps.
+		// 与 Telnet/WebConsole 的逐 Tick Python 采样保持一致，便于直接观察实体进程脚本热点。
+		new PyTickProfileHandler(this->networkInterface(), timelen, profileName, pChannel->addr());
+		return;
 	default:
 		break;
 	};
@@ -1398,6 +1403,10 @@ void EntityApp<E>::onExecScriptCommand(Network::Channel* pChannel, KBEngine::Mem
 	
 	std::string cmd;
 	s.readBlob(cmd);
+	if (!this->validateGuiConsoleAdminToken(pChannel, s, "onExecScriptCommand"))
+	{
+		return;
+	}
 
 	PyObject* pycmd = PyUnicode_DecodeUTF8(cmd.data(), cmd.size(), NULL);
 	if(pycmd == NULL)

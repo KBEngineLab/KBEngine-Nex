@@ -520,11 +520,39 @@ bool InterfacesHandler_Interfaces::initialize()
 		pInterfacesChannel->condemn() == 0)
 		return true;
 
-	return reconnect();
+	// start_server launches components concurrently, so Interfaces may still be
+	// binding its fixed port when DBMgr reaches initializeEnd. A bounded wait keeps
+	// startup deterministic without hiding a persistent address or service failure.
+	// start_server 会并发拉起各组件，DBMgr 到达 initializeEnd 时 Interfaces 可能仍在绑定
+	// 固定端口。这里使用有界等待保证启动稳定，同时不会掩盖长期地址或服务故障。
+	static const uint32 MAX_STARTUP_CONNECT_ATTEMPTS = 20;
+	static const uint32 STARTUP_RETRY_DELAY_MS = 250;
+	for (uint32 attempt = 1; attempt <= MAX_STARTUP_CONNECT_ATTEMPTS; ++attempt)
+	{
+		if (reconnect(false))
+		{
+			if (attempt > 1)
+			{
+				INFO_MSG(fmt::format(
+					"InterfacesHandler_Interfaces::initialize: connected to {} on attempt {}.\n",
+					addr_.c_str(), attempt));
+			}
+
+			return true;
+		}
+
+		if (attempt < MAX_STARTUP_CONNECT_ATTEMPTS)
+			KBEngine::sleep(STARTUP_RETRY_DELAY_MS);
+	}
+
+	ERROR_MSG(fmt::format(
+		"InterfacesHandler_Interfaces::initialize: couldn't connect to Interfaces {} after {} attempts.\n",
+		addr_.c_str(), MAX_STARTUP_CONNECT_ATTEMPTS));
+	return false;
 }
 
 //-------------------------------------------------------------------------------------
-bool InterfacesHandler_Interfaces::reconnect()
+bool InterfacesHandler_Interfaces::reconnect(bool logConnectionFailure)
 {
 	if (addr_ == Network::Address::NONE)
 	{
@@ -602,8 +630,11 @@ bool InterfacesHandler_Interfaces::reconnect()
 
 		if(!connected)
 		{
-			ERROR_MSG(fmt::format("InterfacesHandler_Interfaces::reconnect(): couldn't connect to(interfaces server): {}! Check kbengine[_defs].xml->interfaces->host and interfaces.*.log\n", 
-				pInterfacesChannel->pEndPoint()->addr().c_str()));
+			if (logConnectionFailure)
+			{
+				ERROR_MSG(fmt::format("InterfacesHandler_Interfaces::reconnect(): couldn't connect to(interfaces server): {}! Check kbengine[_defs].xml->interfaces->host and interfaces.*.log\n",
+					pInterfacesChannel->pEndPoint()->addr().c_str()));
+			}
 
 			pInterfacesChannel->destroy();
 			Network::Channel::reclaimPoolObject(pInterfacesChannel);
