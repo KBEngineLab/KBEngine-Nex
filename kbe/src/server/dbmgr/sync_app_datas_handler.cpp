@@ -45,9 +45,12 @@ uint64 syncAppDatasNow()
 {
 	// 启动 ready gate 只需要稳定的单调时间，不需要跟随全局 profiling timing method。
 	// The readiness gate needs stable monotonic time, not the global profiling timing method.
-	// 在 macOS 上 timestamp() 可能受运行时 timing method 切换影响而短暂回退，导致 init completed 一直延后。
-	// On macOS timestamp() can move backwards when the runtime timing method changes, which can keep init-completed delayed.
-	return timestamp_gettime();
+	// 使用 C++ 标准 steady_clock 统一纳秒单位，避免平台专用 timestamp_gettime 在 Windows
+	// 不可用，也避免不同平台 timing backend 的单位和回退语义不一致。
+	// Use the standard monotonic clock in nanoseconds on every platform. This avoids the
+	// Unix-only timestamp_gettime symbol and keeps the readiness gate's units consistent.
+	return static_cast<uint64>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+		std::chrono::steady_clock::now().time_since_epoch()).count());
 }
 }
 

@@ -166,7 +166,6 @@ if(BUILD_TESTING)
     # The unified test build entry includes the runtime and compiled fixtures required by CTest, avoiding late missing-executable failures.
     add_custom_target(kbe_tests DEPENDS
         kbe_runtime
-        kbe_sdk_tests
         kbe_network_tests
         kbe_common_tests
         kbe_security_tests

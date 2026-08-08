@@ -23,8 +23,6 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine {
 
-template <> postgresql::EntitySqlStatementMapping* Singleton<postgresql::EntitySqlStatementMapping>::singleton_ = 0;
-
 namespace postgresql {
 
 EntitySqlStatementMapping g_entitySqlStatementMapping;

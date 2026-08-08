@@ -224,16 +224,19 @@ INLINE int EndPoint::joinMulticastGroup(u_int32_t networkAddr)
 	req.imr_multiaddr.s_addr = networkAddr;
 	req.imr_address.s_addr = INADDR_ANY;
 	req.imr_ifindex = 0;
-#elif KBE_PLATFORM != PLATFORM_WIN32
-	// macOS/BSD 没有 ip_mreqn，使用标准 ip_mreq。
-	// macOS/BSD lack ip_mreqn; use the standard ip_mreq instead.
+#else
+	// macOS/BSD/Windows do not use Linux's ip_mreqn; use the portable ip_mreq.
+	// macOS/BSD/Windows 没有 Linux 专用的 ip_mreqn，统一使用可移植的 ip_mreq。
 	struct ip_mreq req;
 	req.imr_multiaddr.s_addr = networkAddr;
 	req.imr_interface.s_addr = INADDR_ANY;
-#else
-	return -1;
 #endif
+#if KBE_PLATFORM == PLATFORM_WIN32
+	return ::setsockopt(socket_, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+		reinterpret_cast<const char*>(&req), static_cast<int>(sizeof(req)));
+#else
 	return ::setsockopt(socket_, IPPROTO_IP, IP_ADD_MEMBERSHIP, &req, sizeof(req));
+#endif
 }
 
 INLINE int EndPoint::quitMulticastGroup(u_int32_t networkAddr)
@@ -243,16 +246,19 @@ INLINE int EndPoint::quitMulticastGroup(u_int32_t networkAddr)
 	req.imr_multiaddr.s_addr = networkAddr;
 	req.imr_address.s_addr = INADDR_ANY;
 	req.imr_ifindex = 0;
-#elif KBE_PLATFORM != PLATFORM_WIN32
-	// macOS/BSD 没有 ip_mreqn，使用标准 ip_mreq。
-	// macOS/BSD lack ip_mreqn; use the standard ip_mreq instead.
+#else
+	// macOS/BSD/Windows do not use Linux's ip_mreqn; use the portable ip_mreq.
+	// macOS/BSD/Windows 没有 Linux 专用的 ip_mreqn，统一使用可移植的 ip_mreq。
 	struct ip_mreq req;
 	req.imr_multiaddr.s_addr = networkAddr;
 	req.imr_interface.s_addr = INADDR_ANY;
-#else
-	return -1;
 #endif
+#if KBE_PLATFORM == PLATFORM_WIN32
+	return ::setsockopt(socket_, IPPROTO_IP, IP_DROP_MEMBERSHIP,
+		reinterpret_cast<const char*>(&req), static_cast<int>(sizeof(req)));
+#else
 	return ::setsockopt(socket_, IPPROTO_IP, IP_DROP_MEMBERSHIP, &req, sizeof(req));
+#endif
 }
 
 INLINE int EndPoint::close()
@@ -573,18 +579,13 @@ INLINE int EndPoint::getInterfaceNetmask(const char * name,
 #else
 INLINE int EndPoint::getInterfaceFlags(const char * name, int & flags)
 {
-	if (!strcmp(name,"eth0"))
-	{
-		flags = IFF_UP | IFF_BROADCAST | IFF_NOTRAILERS |
-			IFF_RUNNING | IFF_MULTICAST;
-		return 0;
-	}
-	else if (!strcmp(name,"lo"))
-	{
-		flags = IFF_UP | IFF_LOOPBACK | IFF_RUNNING;
-		return 0;
-	}
-	return -1;
+	// Windows uses findDefaultInterface's hostname fallback and does not expose
+	// POSIX ifreq flags. Keep this compatibility helper side-effect free.
+	// Windows 使用 findDefaultInterface 的主机名回退，不提供 POSIX ifreq 标志；
+	// 该兼容接口保持无副作用即可。
+	(void)name;
+	flags = 0;
+	return 0;
 }
 
 INLINE int EndPoint::getInterfaceAddress(const char * name, u_int32_t & address)

@@ -59,6 +59,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 //#define FD_SETSIZE 1024
 #ifndef WIN32_LEAN_AND_MEAN 
 #include <winsock2.h>		// 必须在windows.h之前包含， 否则网络模块编译会出错
+#include <ws2tcpip.h>		// IP multicast options and ip_mreq are declared here on MSVC.
 #include <mswsock.h> 
 #define WIN32_LEAN_AND_MEAN
 #endif

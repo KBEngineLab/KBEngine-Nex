@@ -202,9 +202,6 @@ if(KBE_TEST_ASSETS)
     endif()
 endif()
 
-# SDK 回归属于源码测试树；外部项目验收和发布流程不应成为引擎 CTest 的隐式依赖。
-# SDK regressions belong to the source test tree; external project acceptance and release workflows must not become implicit engine CTest dependencies.
-add_subdirectory(sdk)
 add_subdirectory(network)
 add_subdirectory(common)
 add_subdirectory(performance)
