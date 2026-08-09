@@ -45,6 +45,19 @@ function Test-CMakeSupportsVs2026 {
     return $LASTEXITCODE -eq 0 -and ($help -match 'Visual Studio 18 2026')
 }
 
+function Wait-ForKeyPress {
+    if ($env:CI) {
+        return
+    }
+
+    if ([Console]::IsInputRedirected -or [Console]::IsOutputRedirected) {
+        return
+    }
+
+    Write-Host 'Press any key to exit...'
+    [void][Console]::ReadKey($true)
+}
+
 Require-Command git
 Require-Command cmake
 
@@ -74,3 +87,4 @@ try {
 }
 
 Write-Host "[SUCCESS] VS$vsVersion project generated: kbe/src/out/build/windows-vs$vsVersion"
+Wait-ForKeyPress

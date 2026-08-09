@@ -18,6 +18,19 @@ function Require-Command([string]$Name) {
     }
 }
 
+function Wait-ForKeyPress {
+    if ($env:CI) {
+        return
+    }
+
+    if ([Console]::IsInputRedirected -or [Console]::IsOutputRedirected) {
+        return
+    }
+
+    Write-Host 'Press any key to exit...'
+    [void][Console]::ReadKey($true)
+}
+
 Require-Command git
 Require-Command cmake
 
@@ -43,3 +56,4 @@ try {
 }
 
 Write-Host '[SUCCESS] Windows CMake install/build completed'
+Wait-ForKeyPress
