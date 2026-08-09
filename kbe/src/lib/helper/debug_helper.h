@@ -82,7 +82,7 @@ const char KBELOG_TYPE_NAME[][255] = {
 
 inline const char* KBELOG_TYPE_NAME_EX(uint32 CTYPE)
 {									
-	if(CTYPE < 0 || ((CTYPE) & (KBELOG_TYPES)) <= 0)
+	if(((CTYPE) & (KBELOG_TYPES)) == 0)
 	{
 		return " UNKNOWN";
 	}

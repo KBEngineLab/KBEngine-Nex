@@ -214,7 +214,10 @@ int KCPPacketSender::kcp_output(const char *buf, int len, ikcpcb *kcp, Channel* 
 				const uint64 elapsed = timestamp() - sampleStart;
 				++kcp->sendto_sample_calls;
 				kcp->sendto_sample_stamps += elapsed;
-				kcp->sendto_max_sample_stamps = std::max(kcp->sendto_max_sample_stamps, elapsed);
+				// KCP uses IUINT64 while KBEngine::uint64 may be unsigned long on Linux;
+				// make the comparison type explicit so GCC does not reject mixed-width aliases.
+				kcp->sendto_max_sample_stamps = std::max<IUINT64>(
+					kcp->sendto_max_sample_stamps, static_cast<IUINT64>(elapsed));
 			}
 			if (directResult == len)
 			{
@@ -239,7 +242,8 @@ int KCPPacketSender::kcp_output(const char *buf, int len, ikcpcb *kcp, Channel* 
 		const uint64 elapsed = timestamp() - sampleStart;
 		++kcp->sendto_sample_calls;
 		kcp->sendto_sample_stamps += elapsed;
-		kcp->sendto_max_sample_stamps = std::max(kcp->sendto_max_sample_stamps, elapsed);
+		kcp->sendto_max_sample_stamps = std::max<IUINT64>(
+			kcp->sendto_max_sample_stamps, static_cast<IUINT64>(elapsed));
 	}
 
 	bool sentCompleted = retlen == len;

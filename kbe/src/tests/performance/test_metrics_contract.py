@@ -107,8 +107,10 @@ def assert_partial_workload_start_cleanup() -> None:
 
         def poll(self):
             return None
-
         def terminate(self):
+            self.terminated = True
+
+        def send_signal(self, _signal):
             self.terminated = True
 
         def wait(self, timeout=None):
