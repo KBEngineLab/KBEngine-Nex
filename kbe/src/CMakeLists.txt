@@ -103,8 +103,8 @@ add_custom_target(kbe_libraries DEPENDS
     tmxparser
 )
 
-# 聚合目标覆盖全部跨平台服务进程和命令行工具；MFC guiconsole 继续由既有 VS 工程维护。
-# The aggregate target covers every cross-platform server process and command-line tool; the MFC guiconsole remains maintained by the existing VS project.
+# 聚合目标覆盖全部跨平台服务进程和命令行工具。
+# The aggregate target covers every cross-platform server process and command-line tool.
 add_custom_target(kbe_servers DEPENDS
     machine
     baseappmgr
