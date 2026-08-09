@@ -38,7 +38,9 @@ cmake --fresh --preset macos-ninja
 cmake --build "$SOURCE_DIR/out/build/macos-ninja" --config "$CONFIGURATION" \
     --target kbe_runtime kbe_servers kbe_tests --parallel
 
-echo "[SUCCESS] macOS CMake 安装/构建完成，配置：$CONFIGURATION"
+echo "[SUCCESS] Task completed."
+echo "[OUTPUT] CMake build directory: kbe/src/out/build/macos-ninja"
+echo "[OUTPUT] Runtime directory: kbe/bin/server"
 if [ -z "${CI:-}" ] && [ -t 0 ] && [ -t 1 ]; then
     read -n 1 -s -r -p "Press any key to exit..."
     echo

@@ -55,5 +55,7 @@ try {
     Pop-Location
 }
 
-Write-Host '[SUCCESS] Windows CMake install/build completed'
+Write-Host '[SUCCESS] Task completed.'
+Write-Host '[OUTPUT] CMake build directory: kbe/src/out/build/windows-ninja-multi'
+Write-Host '[OUTPUT] Runtime directory: kbe/bin/server'
 Wait-ForKeyPress

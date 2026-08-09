@@ -86,5 +86,6 @@ try {
     Pop-Location
 }
 
-Write-Host "[SUCCESS] VS$vsVersion project generated: kbe/src/out/build/windows-vs$vsVersion"
+Write-Host '[SUCCESS] Task completed.'
+Write-Host "[OUTPUT] Visual Studio project: kbe/src/out/build/windows-vs$vsVersion"
 Wait-ForKeyPress
