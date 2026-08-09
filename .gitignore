@@ -65,19 +65,6 @@ venv/
 /kbe/src/python-runtime/triplets/
 /kbe/src/python-runtime/vcpkg_installed/
 /kbe/src/python-runtime/x64/
-/kbe/src/lib/dependencies/apr/LibR/
-/kbe/src/lib/dependencies/apr/include/apr.h
-/kbe/src/lib/dependencies/apr/include/apr_escape_test_char.h
-/kbe/src/lib/dependencies/apr-util/include/apr_ldap.h
-/kbe/src/lib/dependencies/apr-util/include/apu.h
-/kbe/src/lib/dependencies/apr-util/include/apu_want.h
-/kbe/src/lib/dependencies/apr-util/include/private/apu_config.h
-/kbe/src/lib/dependencies/apr-util/include/private/apu_select_dbm.h
-/kbe/src/lib/python/PCbuild/
-/kbe/src/lib/pythonBuild/pythonBuild
-/kbe/src/lib/pythonBuild/x64/
-/kbe/src/server/init/x64/
-/kbe/src/server/init/KBEMain
 
 # Server and tool build products
 /kbe/bin/server/*.exe
@@ -106,6 +93,9 @@ venv/
 /kbe/tools/server/guiconsole/*.lib
 /kbe/tools/server/guiconsole/*.dll
 /kbe/tools/server/guiconsole/*.log
+/kbe/src/tools/kcp_latency_probe/
+/kbe/tools/kcp_latency_probe/bin/
+/kbe/tools/kcp_latency_probe/obj/
 
 # Python runtime files generated from the source tree
 /kbe/res/scripts/common/lib-dynload/
@@ -151,3 +141,5 @@ kbe_temp_*
 
 # Performance Lab generated runs / 性能实验室生成的运行结果
 /kbe/src/out/performance-runs/
+
+server_assets

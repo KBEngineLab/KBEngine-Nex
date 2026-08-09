@@ -5,7 +5,7 @@ This .NET 8 console tool repeatedly performs KBEngine's real UDP/KCP hello excha
 这个 .NET 8 控制台工具会对一个 BaseApp 外部 UDP 端点重复执行 KBEngine 的真实 UDP/KCP hello 往返。它不依赖业务 Entity 方法，可测量 BaseApp 入口、IOCP 调度、Channel 查找与 hello ACK 发送延迟。
 
 ```powershell
-dotnet run --project .\kbe\src\tools\kcp_latency_probe\KcpLatencyProbe.csproj -c Release -- `
+dotnet run --project .\kbe\tools\kcp_latency_probe\KcpLatencyProbe.csproj -c Release -- `
   --host 172.18.16.1 `
   --port 20015 `
   --duration 60 `
