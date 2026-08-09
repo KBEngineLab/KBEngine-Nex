@@ -283,6 +283,7 @@ set_tests_properties(cellapp.coordinate_system_near_insert PROPERTIES
 
 add_custom_target(kbe_common_tests DEPENDS
 	kbe_test_common_pooling
+	kbe_test_blowfish_compat
 	kbe_test_timer_fairness
 	kbe_test_receive_window_policy
 	kbe_test_profile_latency
