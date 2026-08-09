@@ -64,6 +64,6 @@ export http_proxy=http://172.18.16.1:7897
 ## 可选环境变量
 
 - `KBE_VCPKG_REPOSITORY`：自定义 vcpkg Git 仓库地址。
-- `KBE_VCPKG_REF`：首次克隆后检出的 vcpkg 分支、标签或提交。
+- `KBE_VCPKG_REF`：首次克隆后检出的 vcpkg 分支、标签或提交；不设置时默认跟随最新分支。
 
 脚本不会对已有 vcpkg 工作区执行 `reset --hard` 或自动拉取，避免覆盖本地修改；需要升级时请显式操作 `kbe/vcpkg`。

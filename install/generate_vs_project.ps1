@@ -2,7 +2,7 @@
 param(
     [string]$VisualStudioVersion = '',
     [string]$VcpkgRepository = $(if ($env:KBE_VCPKG_REPOSITORY) { $env:KBE_VCPKG_REPOSITORY } else { 'https://github.com/microsoft/vcpkg.git' }),
-    [string]$VcpkgRef = $(if ($env:KBE_VCPKG_REF) { $env:KBE_VCPKG_REF } else { '2825cdd8fe079a9538032fd78c3102d033195a2c' })
+    [string]$VcpkgRef = $env:KBE_VCPKG_REF
 )
 
 $ErrorActionPreference = 'Stop'

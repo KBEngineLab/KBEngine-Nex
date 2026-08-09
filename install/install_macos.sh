@@ -25,7 +25,9 @@ if [ ! -x "$VCPKG_ROOT/vcpkg" ]; then
     repository="${KBE_VCPKG_REPOSITORY:-https://github.com/microsoft/vcpkg.git}"
     echo "[INFO] 克隆 vcpkg 到 $VCPKG_ROOT"
     git clone "$repository" "$VCPKG_ROOT"
-    git -C "$VCPKG_ROOT" checkout "${KBE_VCPKG_REF:-2825cdd8fe079a9538032fd78c3102d033195a2c}"
+    if [ -n "${KBE_VCPKG_REF:-}" ]; then
+        git -C "$VCPKG_ROOT" checkout "$KBE_VCPKG_REF"
+    fi
     "$VCPKG_ROOT/bootstrap-vcpkg.sh"
 fi
 
