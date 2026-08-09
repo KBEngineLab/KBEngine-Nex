@@ -1,0 +1,45 @@
+[CmdletBinding()]
+param(
+    [ValidateSet('Debug', 'Release')]
+    [string]$Configuration = 'Release',
+    [string]$VcpkgRepository = $(if ($env:KBE_VCPKG_REPOSITORY) { $env:KBE_VCPKG_REPOSITORY } else { 'https://github.com/microsoft/vcpkg.git' }),
+    [string]$VcpkgRef = $(if ($env:KBE_VCPKG_REF) { $env:KBE_VCPKG_REF } else { '2825cdd8fe079a9538032fd78c3102d033195a2c' }),
+    [switch]$SkipBuild
+)
+
+$ErrorActionPreference = 'Stop'
+$InstallRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$SourceRoot = Join-Path $InstallRoot 'kbe/src'
+$VcpkgRoot = Join-Path $InstallRoot 'kbe/vcpkg'
+
+function Require-Command([string]$Name) {
+    if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
+        throw "未找到 $Name。请先安装 Git、CMake 和 Ninja，并在 Developer PowerShell 中运行。"
+    }
+}
+
+Require-Command git
+Require-Command cmake
+
+if (-not (Test-Path (Join-Path $VcpkgRoot 'vcpkg.exe'))) {
+    Write-Host "[INFO] 克隆 vcpkg 到 $VcpkgRoot"
+    git clone $VcpkgRepository $VcpkgRoot
+    if ($VcpkgRef) { git -C $VcpkgRoot checkout $VcpkgRef }
+    & (Join-Path $VcpkgRoot 'bootstrap-vcpkg.bat')
+}
+
+$env:VCPKG_ROOT = $VcpkgRoot
+Write-Host "[INFO] VCPKG_ROOT=$env:VCPKG_ROOT"
+
+Push-Location $SourceRoot
+try {
+    & cmake --fresh --preset windows-ninja
+    if (-not $SkipBuild) {
+        $target = if ($Configuration -eq 'Debug') { 'windows-ninja-debug' } else { 'windows-ninja-release' }
+        & cmake --build --preset $target --target kbe_runtime kbe_servers kbe_tests --parallel
+    }
+} finally {
+    Pop-Location
+}
+
+Write-Host '[SUCCESS] Windows CMake 安装/构建完成'

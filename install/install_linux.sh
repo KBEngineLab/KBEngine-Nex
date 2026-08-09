@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CONFIGURATION="${1:-Release}"
+ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+SOURCE_DIR="$ROOT_DIR/kbe/src"
+VCPKG_ROOT="$ROOT_DIR/kbe/vcpkg"
+export VCPKG_ROOT
+
+require_command() {
+    command -v "$1" >/dev/null 2>&1 || {
+        echo "[ERROR] 未找到 $1，请先安装 Git、CMake、Ninja 和 C++ 编译器。" >&2
+        exit 1
+    }
+}
+
+for tool in git cmake ninja; do require_command "$tool"; done
+if [ "$CONFIGURATION" != "Debug" ] && [ "$CONFIGURATION" != "Release" ]; then
+    echo "[ERROR] 配置必须是 Debug 或 Release。" >&2
+    exit 2
+fi
+
+
+if [ ! -x "$VCPKG_ROOT/vcpkg" ]; then
+    repository="${KBE_VCPKG_REPOSITORY:-https://github.com/microsoft/vcpkg.git}"
+    echo "[INFO] 克隆 vcpkg 到 $VCPKG_ROOT"
+    git clone "$repository" "$VCPKG_ROOT"
+    git -C "$VCPKG_ROOT" checkout "${KBE_VCPKG_REF:-2825cdd8fe079a9538032fd78c3102d033195a2c}"
+    "$VCPKG_ROOT/bootstrap-vcpkg.sh"
+fi
+
+
+
+cd "$SOURCE_DIR"
+cmake --fresh --preset linux-ninja
+cmake --build "$SOURCE_DIR/out/build/linux-ninja" --config "$CONFIGURATION" \
+    --target kbe_runtime kbe_servers kbe_tests --parallel
+
+echo "[SUCCESS] Linux CMake 安装/构建完成，配置：$CONFIGURATION"
