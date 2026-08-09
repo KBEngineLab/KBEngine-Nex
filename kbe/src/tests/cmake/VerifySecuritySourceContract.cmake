@@ -21,7 +21,6 @@ set(_kbe_sensitive_sources
 	"server/dbmgr/interfaces_handler.cpp"
     "lib/db_mysql/kbe_table_mysql.cpp"
     "lib/db_mongodb/kbe_table_mongodb.cpp"
-    "lib/db_redis/kbe_table_redis.cpp"
 )
 
 set(_kbe_sensitive_text "")
@@ -82,6 +81,9 @@ file(READ "${KBE_SOURCE_ROOT}/lib/server/globaldata_server.cpp" _kbe_globaldata_
 file(READ "${KBE_SOURCE_ROOT}/../res/sdk_templates/client/csharp/EncryptionFilter.cs" _kbe_sdk_csharp_encryption)
 file(READ "${KBE_SOURCE_ROOT}/../res/sdk_templates/client/cxx/EncryptionFilter.cpp" _kbe_sdk_cxx_encryption)
 file(READ "${KBE_SOURCE_ROOT}/../res/sdk_templates/client/gdscript/BlowfishFilter.gd" _kbe_sdk_gdscript_encryption)
+file(READ "${KBE_SOURCE_ROOT}/../res/sdk_templates/client/csharp/Blowfish.cs" _kbe_sdk_csharp_blowfish)
+file(READ "${KBE_SOURCE_ROOT}/../res/sdk_templates/client/cxx/blowfish/Blowfish.cpp" _kbe_sdk_cxx_blowfish)
+file(READ "${KBE_SOURCE_ROOT}/../res/sdk_templates/client/gdscript/Blowfish.gd" _kbe_sdk_gdscript_blowfish)
 
 # Generated SDKs must reject malformed Blowfish frames before decrypting or
 # passing bytes to a message reader. 生成 SDK 必须在解密和消息解析前拒绝非法帧。
@@ -106,6 +108,32 @@ foreach(_kbe_sdk_encryption_source IN ITEMS
 			message(FATAL_ERROR "C++ or GDScript SDK Blowfish frame guard is missing: ${_kbe_required}")
 		endif()
 	endforeach()
+endforeach()
+
+# SDK 模板使用平台无关 Blowfish 实现；服务端从 OpenSSL 低级 BF API 迁到 EVP 后，
+# 模板仍必须保留相同的块级算法入口和 KBE 链式 XOR 流程。
+# SDK templates use platform-neutral Blowfish implementations. After the server
+# moves from OpenSSL low-level BF APIs to EVP, templates must still keep the same
+# block-level algorithm entry points and KBE chained-XOR flow.
+foreach(_kbe_required IN ITEMS "encipher" "decipher" "prevBlock")
+	string(FIND "${_kbe_sdk_csharp_blowfish}" "${_kbe_required}" _kbe_required_position)
+	if(_kbe_required_position EQUAL -1)
+		message(FATAL_ERROR "C# SDK Blowfish template contract is missing: ${_kbe_required}")
+	endif()
+endforeach()
+
+foreach(_kbe_required IN ITEMS "EncryptBlock" "DecryptBlock" "prevBlock")
+	string(FIND "${_kbe_sdk_cxx_blowfish}${_kbe_sdk_cxx_encryption}" "${_kbe_required}" _kbe_required_position)
+	if(_kbe_required_position EQUAL -1)
+		message(FATAL_ERROR "C++ SDK Blowfish template contract is missing: ${_kbe_required}")
+	endif()
+endforeach()
+
+foreach(_kbe_required IN ITEMS "_encipherBlock" "_decipherBlock" "prevBlock")
+	string(FIND "${_kbe_sdk_gdscript_blowfish}" "${_kbe_required}" _kbe_required_position)
+	if(_kbe_required_position EQUAL -1)
+		message(FATAL_ERROR "GDScript SDK Blowfish template contract is missing: ${_kbe_required}")
+	endif()
 endforeach()
 
 # Stream handlers carry runtime-sized MemoryStream bodies. Declaring one as a

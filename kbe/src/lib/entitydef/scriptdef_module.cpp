@@ -66,12 +66,12 @@ hasClient_(false),
 pVolatileinfo_(new VolatileInfo()),
 name_(name),
 defSourceFile_(),
-usePropertyDescrAlias_(false),
-useMethodDescrAlias_(false),
 componentDescr_uidmap_(),
 componentDescr_(),
 componentDescrVec_(),
-isComponentModule_(false)
+isComponentModule_(false),
+usePropertyDescrAlias_(false),
+useMethodDescrAlias_(false)
 {
 	EntityDef::md5().append((void*)name.c_str(), (int)name.size());
 }

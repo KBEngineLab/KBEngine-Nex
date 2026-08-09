@@ -33,8 +33,7 @@ namespace KBEngine{
 
 //-------------------------------------------------------------------------------------
 SyncEntityStreamTemplateHandler::SyncEntityStreamTemplateHandler(Network::NetworkInterface & networkInterface):
-Task(),
-networkInterface_(networkInterface)
+Task()
 {
 	networkInterface.dispatcher().addTask(this);
 

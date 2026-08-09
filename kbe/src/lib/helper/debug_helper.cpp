@@ -383,7 +383,6 @@ DebugHelperSyncHandler* g_pDebugHelperSyncHandler = NULL;
 
 //-------------------------------------------------------------------------------------
 DebugHelper::DebugHelper() :
-_logfile(NULL),
 _currFile(),
 _currFuncName(),
 _currLine(0),

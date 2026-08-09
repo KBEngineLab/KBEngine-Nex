@@ -283,19 +283,35 @@ typedef int64													intptr;
 typedef uint64													uintptr;
 
 #ifndef PRI64
+#if KBE_PLATFORM == PLATFORM_APPLE
+#define PRI64													"lld"
+#else
 #define PRI64													"ld"
+#endif
 #endif
 
 #ifndef PRIu64
+#if KBE_PLATFORM == PLATFORM_APPLE
+#define PRIu64													"llu"
+#else
 #define PRIu64													"lu"
+#endif
 #endif
 
 #ifndef PRIx64
+#if KBE_PLATFORM == PLATFORM_APPLE
+#define PRIx64													"llx"
+#else
 #define PRIx64													"lx"
+#endif
 #endif
 
 #ifndef PRIX64
+#if KBE_PLATFORM == PLATFORM_APPLE
+#define PRIX64													"llX"
+#else
 #define PRIX64													"lX"
+#endif
 #endif
 
 #ifndef PRTime

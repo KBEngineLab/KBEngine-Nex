@@ -123,9 +123,7 @@ const int TERMINAL_XTERM						= 3;
 
 //telnet协议
 const unsigned char IAC							= 255;					//数据字节255
-const unsigned char DONT						= 254;					//选项协商，发送方想让接收端去禁止选项
 const unsigned char DO							= 253;					//选项协商,发送方想叫接收端激活选项
-const unsigned char WONT						= 252;					//选项协商,发送方本身想禁止选项
 const unsigned char WILL						= 251;					//选项协商,发送方本身将激活选项
 const unsigned char SB							= 250;					//子选项开始
 const unsigned char SE							= 240;					//子选项结束
@@ -1285,4 +1283,3 @@ void TelnetNetworkProfileHandler::sendStream(MemoryStream* s)
 
 //-------------------------------------------------------------------------------------
 }
-

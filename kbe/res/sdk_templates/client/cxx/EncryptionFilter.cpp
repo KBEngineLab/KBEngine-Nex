@@ -187,7 +187,8 @@ void BlowfishFilter::encrypt(uint8 *buf, uint32 len) {
         uint64_t currentBlock = 0;
         memcpy(&currentBlock, data + i, BLOCK_SIZE);
 
-        // 处理大小端：OpenSSL的BF_ecb_encrypt使用大端字节序
+        // 处理大小端：与服务端 OpenSSL EVP BF-ECB 单块结果保持一致
+        // Byte order is normalized to match the server's OpenSSL EVP BF-ECB block output.
         currentBlock = swapUint64(currentBlock);
 
         if (prevBlock != 0) {

@@ -28,7 +28,6 @@ namespace KBEngine {
 DBExceptionPostgresql::DBExceptionPostgresql(DBInterfacePostgresql* pdbi,
 	const std::string& errStr,
 	const std::string& sqlState) :
-	pdbi_(pdbi),
 	errStr_(errStr),
 	sqlState_(sqlState),
 	connectionLost_(pdbi != NULL && pdbi->pgconn() != NULL && PQstatus(pdbi->pgconn()) == CONNECTION_BAD)

@@ -387,8 +387,8 @@
 				-->
 				<pure> false </pure>
 
-				<!-- 数据库类型 （mysql、redis）
-					（Database type(mysql, redis))
+				<!-- 数据库类型 （mysql、mongodb、postgresql）
+					（Database type(mysql, mongodb, postgresql))
 				-->
 				<type> mysql </type>											<!-- Type: String -->
 

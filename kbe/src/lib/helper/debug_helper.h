@@ -192,7 +192,6 @@ public:
 	bool canLog(int level);
 
 private:
-	FILE* _logfile;
 	std::string _currFile, _currFuncName;
 	uint32 _currLine;
 

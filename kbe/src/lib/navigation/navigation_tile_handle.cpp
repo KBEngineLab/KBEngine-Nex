@@ -95,15 +95,16 @@ int NavTileHandle::findStraightPath(int layer, const Position3D& start, const Po
 	astarsearch.SetStartAndGoalStates(nodeStart, nodeGoal);
 
 	unsigned int SearchState;
+#if DEBUG_LISTS
 	unsigned int SearchSteps = 0;
+#endif
 
 	do
 	{
 		SearchState = astarsearch.SearchStep();
 
-		SearchSteps++;
-
 #if DEBUG_LISTS
+		SearchSteps++;
 
 		DEBUG_MSG(fmt::format("NavTileHandle::findStraightPath: Steps: {}\n", SearchSteps));
 
@@ -147,8 +148,6 @@ int NavTileHandle::findStraightPath(int layer, const Position3D& start, const Po
 		//DEBUG_MSG("NavTileHandle::findStraightPath: Search found goal state\n");
 		MapSearchNode *node = astarsearch.GetSolutionStart();
 
-		int steps = 0;
-
 		//node->PrintNodeInfo();
 		for( ;; )
 		{
@@ -160,7 +159,6 @@ int NavTileHandle::findStraightPath(int layer, const Position3D& start, const Po
 			}
 
 			//node->PrintNodeInfo();
-			steps ++;
 			paths.push_back(Position3D((float)node->x * pTilemap->GetTileWidth(), 0, (float)node->y * pTilemap->GetTileWidth()));
 		};
 
@@ -448,7 +446,7 @@ bool NavTileHandle::MapSearchNode::IsSameState(MapSearchNode &rhs)
 void NavTileHandle::MapSearchNode::PrintNodeInfo()
 {
 	char str[100];
-	sprintf( str, "NavTileHandle::MapSearchNode::printNodeInfo(): Node position : (%d,%d)\n", 
+	kbe_snprintf( str, sizeof(str), "NavTileHandle::MapSearchNode::printNodeInfo(): Node position : (%d,%d)\n",
 		x, y);
 	
 	DEBUG_MSG(str);
@@ -610,4 +608,3 @@ float NavTileHandle::MapSearchNode::GetCost( MapSearchNode &successor )
 
 //-------------------------------------------------------------------------------------
 }
-

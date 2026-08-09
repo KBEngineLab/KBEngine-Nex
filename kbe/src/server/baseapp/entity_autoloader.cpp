@@ -35,13 +35,14 @@ namespace KBEngine{
 
 //-------------------------------------------------------------------------------------
 EntityAutoLoader::EntityAutoLoader(Network::NetworkInterface & networkInterface, InitProgressHandler* pInitProgressHandler):
-networkInterface_(networkInterface),
 pInitProgressHandler_(pInitProgressHandler),
 entityTypes_(),
 start_(0),
 end_(0),
 querying_(false)
 {
+	(void)networkInterface;
+
 	ENGINE_COMPONENT_INFO& dbcfg = g_kbeSrvConfig.getDBMgr();
 
 	std::vector<DBInterfaceInfo>::iterator dbinfo_iter = dbcfg.dbInterfaceInfos.begin();

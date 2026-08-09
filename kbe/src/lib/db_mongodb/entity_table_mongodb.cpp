@@ -1277,9 +1277,10 @@ namespace KBEngine {
 
 					while (!bsonlist.empty())
 					{
-						static_cast<EntityTableMongodb*>(pChildTable_)->addToStream(s, *iter->second.get(), 0, bsonlist.front());
+						bson_t* childDoc = bsonlist.front();
+						static_cast<EntityTableMongodb*>(pChildTable_)->addToStream(s, *iter->second.get(), 0, childDoc);
 
-						bson_destroy(bsonlist.front());
+						bson_destroy(childDoc);
 						bsonlist.pop_front();
 					}
 

@@ -128,7 +128,6 @@ public:
 private:
 	Vector2*			val_;
 	bool				isCopy_;
-	bool				isReadOnly_;
 	static const int 	VECTOR_SIZE;
 } ;
 

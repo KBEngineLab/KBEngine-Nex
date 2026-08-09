@@ -41,8 +41,6 @@ public:
 	
 	bool process();
 private:
-	Network::NetworkInterface & networkInterface_;
-
 };
 
 

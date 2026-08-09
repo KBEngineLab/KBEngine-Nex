@@ -33,9 +33,16 @@ SCRIPT_METHOD_DECLARE("write",				write,				METH_VARARGS,			0)
 SCRIPT_METHOD_DECLARE("flush",				flush,				METH_VARARGS,			0)	
 SCRIPT_METHOD_DECLARE_END()
 
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
+#endif
 SCRIPT_MEMBER_DECLARE_BEGIN(ScriptStdErr)
 SCRIPT_MEMBER_DECLARE("softspace",			softspace_,			T_CHAR,					0,			0)	
 SCRIPT_MEMBER_DECLARE_END()
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 
 SCRIPT_GETSET_DECLARE_BEGIN(ScriptStdErr)
 SCRIPT_GETSET_DECLARE_END()

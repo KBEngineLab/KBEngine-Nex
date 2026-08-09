@@ -27,6 +27,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "resmgr/resmgr.h"
 #include <openssl/bio.h>
 #include <openssl/err.h>
+#include <algorithm>
 #include <new>
 
 #include "network/bundle.h"
@@ -572,7 +573,7 @@ int EndPoint::getInterfaceAddressByMAC(const char * mac, u_int32_t & address)
 	unsigned char macAddress[16] = {0};
 	unsigned char macAddressIdx = 0;
 	char szTemp[2] = {0};
-	char szTempIdx = 0;
+	unsigned char szTempIdx = 0;
 	char* pMac = (char*)mac;
 	while(*pMac && macAddressIdx < sizeof(macAddress))
 	{
@@ -903,25 +904,22 @@ void EndPoint::sendto(Bundle * pBundle, u_int16_t networkPort, u_int32_t network
 }
 
 //-------------------------------------------------------------------------------------
-static long ssl_bio_callback(BIO *bio, int cmd, const char *argp, int argi, long argl, long ret)
+static long ssl_bio_callback(BIO *bio, int cmd, const char *argp, size_t len, int argi, long argl, int ret, size_t *processed)
 {
 	if ((cmd & ~BIO_CB_RETURN) != BIO_CB_READ)
 		return ret;
 
 	Packet* pPacket = (Packet*)BIO_get_callback_arg(bio);
 
-	// 类似recv， argi是buffer，argl是buffer长度，这里判断pPacket大于长度返回指定长度，小于长度则返回读取到的长度
-	if ((int)pPacket->length() < argi)
-		argi = (int)pPacket->length();
+	// 类似recv，len是buffer长度，这里判断pPacket大于长度返回指定长度，小于长度则返回读取到的长度
+	// Similar to recv: len is the buffer length, so clamp the injected packet bytes to the caller buffer.
+	size_t readSize = std::min(pPacket->length(), len);
 
 	// 将我们的buffer填充进去
 	if ((cmd & BIO_CB_RETURN) > 0)
 	{
-		memcpy((void*)argp, pPacket->data() + pPacket->rpos(), argi);
-		pPacket->read_skip(argi);
-#if (OPENSSL_VERSION_NUMBER <  0x10100000)
-		bio->num_read += argi;
-#endif
+		memcpy((void*)argp, pPacket->data() + pPacket->rpos(), readSize);
+		pPacket->read_skip(readSize);
 	}
 	else
 	{
@@ -930,11 +928,14 @@ static long ssl_bio_callback(BIO *bio, int cmd, const char *argp, int argi, long
 
 	if (pPacket->length() == 0)
 	{
-		BIO_set_callback(bio, NULL);
+		BIO_set_callback_ex(bio, NULL);
 		BIO_set_callback_arg(bio, (char*)NULL);
 	}
 
-	return argi;
+	if (processed != NULL)
+		*processed = readSize;
+
+	return static_cast<long>(readSize);
 }
 
 bool EndPoint::setupSSL(int sslVersion, Packet* pPacket, bool useMemoryBIO)
@@ -1072,7 +1073,7 @@ bool EndPoint::setupSSL(int sslVersion, Packet* pPacket, bool useMemoryBIO)
 	SSL_set_fd(sslHandle_, *this);
 #endif
 
-	BIO_set_callback(SSL_get_rbio(sslHandle_), ssl_bio_callback);
+	BIO_set_callback_ex(SSL_get_rbio(sslHandle_), ssl_bio_callback);
 	BIO_set_callback_arg(SSL_get_rbio(sslHandle_), (char*)pPacket);
 
 	while (SSL_accept(sslHandle_) == -1)
@@ -1126,7 +1127,7 @@ bool EndPoint::setupSSL(int sslVersion, Packet* pPacket, bool useMemoryBIO)
 		}
 	}
 
-	BIO_set_callback(SSL_get_rbio(sslHandle_), NULL);
+	BIO_set_callback_ex(SSL_get_rbio(sslHandle_), NULL);
 	BIO_set_callback_arg(SSL_get_rbio(sslHandle_), (char*)NULL);
 	return true;
 }

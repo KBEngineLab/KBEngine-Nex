@@ -509,7 +509,7 @@ bool ClientSDKTypeScript::writeTypes()
 		return false;
 
 
-	return saveFile();
+	return saveFile(true);
 }
 
 
@@ -725,7 +725,7 @@ bool ClientSDKTypeScript::writeEntityCall(ScriptDefModule* pScriptDefModule)
 	if (!writeEntityCallEnd(pScriptDefModule))
 		return false;
 
-	return saveFile();
+	return saveFile(true);
 }
 
 

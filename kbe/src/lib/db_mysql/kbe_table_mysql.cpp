@@ -342,7 +342,7 @@ bool KBEServerLogTableMysql::updateServer(DBInterface * pdbi)
 
 	char* tbuf = new char[MAX_BUF * 3];
 
-	kbe_snprintf(tbuf, MAX_BUF, "%" PRTime, time(NULL));
+	kbe_snprintf(tbuf, MAX_BUF, "%" PRTime, static_cast<int64>(time(NULL)));
 	sqlstr += tbuf;
 	sqlstr += ",";
 
@@ -354,7 +354,7 @@ bool KBEServerLogTableMysql::updateServer(DBInterface * pdbi)
 	sqlstr += tbuf;
 	sqlstr += ") ON DUPLICATE KEY UPDATE heartbeatTime=";
 
-	kbe_snprintf(tbuf, MAX_BUF, "%" PRTime, time(NULL));
+	kbe_snprintf(tbuf, MAX_BUF, "%" PRTime, static_cast<int64>(time(NULL)));
 	sqlstr += tbuf;
 	sqlstr += ",";
 
@@ -814,11 +814,11 @@ bool KBEAccountTableMysql::logAccount(DBInterface * pdbi, ACCOUNT_INFOS& info)
 	sqlstr += tbuf;
 	sqlstr += ",";
 	
-	kbe_snprintf(tbuf, MAX_BUF, "%" PRTime, time(NULL));
+	kbe_snprintf(tbuf, MAX_BUF, "%" PRTime, static_cast<int64>(time(NULL)));
 	sqlstr += tbuf;
 	sqlstr += ",";
 
-	kbe_snprintf(tbuf, MAX_BUF, "%" PRTime, time(NULL));
+	kbe_snprintf(tbuf, MAX_BUF, "%" PRTime, static_cast<int64>(time(NULL)));
 	sqlstr += tbuf;
 	sqlstr += ")";
 
@@ -924,7 +924,7 @@ bool KBEEmailVerificationTableMysql::logAccount(DBInterface * pdbi, int8 type, c
 	sqlstr += tbuf;
 	sqlstr += "\",";
 
-	kbe_snprintf(tbuf, MAX_BUF, "%" PRTime, time(NULL));
+	kbe_snprintf(tbuf, MAX_BUF, "%" PRTime, static_cast<int64>(time(NULL)));
 
 	sqlstr += tbuf;
 	sqlstr += ")";

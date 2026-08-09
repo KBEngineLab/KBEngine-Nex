@@ -328,7 +328,7 @@ func _decipherBlock(xl:int, xr:int)-> Array:
 
 	return [Xl, Xr]
 
-# Encrypt a byte array in place (CBC mode with previous block XOR)
+# Encrypt a byte array in place using KBE's chained previous-plain-block XOR.
 func encipher(data:PackedByteArray, length:int)-> void:
 	if length % 8 != 0:
 		Dbg.ERROR_MSG("Blowfish::encipher: Invalid Length " + str(length))
@@ -338,7 +338,7 @@ func encipher(data:PackedByteArray, length:int)-> void:
 
 	for i:int in range(0, length, 8):
 		if prevBlock != 0:
-			# XOR with previous ciphertext block (CBC mode)
+			# XOR with previous plaintext block to match the server wire format.
 			var oldValue:int = _readUint64(data, i)
 			var ret:int = oldValue ^ prevBlock
 			prevBlock = oldValue
@@ -364,7 +364,7 @@ func encipher(data:PackedByteArray, length:int)-> void:
 		data[i + 6] = (xr >> 8) & 0xFF
 		data[i + 7] = xr & 0xFF
 
-# Decrypt a byte array in place (CBC mode)
+# Decrypt a byte array in place using KBE's chained previous-plain-block XOR.
 func decipher(data:PackedByteArray, startIndex:int, length:int)-> void:
 	if length % 8 != 0:
 		Dbg.ERROR_MSG("Blowfish::decipher: Invalid Length " + str(length))

@@ -43,7 +43,6 @@ public:
 	void onEntityAutoLoadCBFromDBMgr(Network::Channel* pChannel, MemoryStream& s);
 
 private:
-	Network::NetworkInterface & networkInterface_;
 	InitProgressHandler* pInitProgressHandler_;
 
 	std::vector< std::vector<ENTITY_SCRIPT_UID> > entityTypes_;

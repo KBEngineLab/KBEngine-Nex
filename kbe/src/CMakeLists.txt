@@ -67,7 +67,6 @@ add_subdirectory(lib/server)
 add_subdirectory(lib/client_lib)
 add_subdirectory(lib/db_interface)
 add_subdirectory(lib/db_mysql)
-add_subdirectory(lib/db_redis)
 add_subdirectory(lib/db_mongodb)
 add_subdirectory(lib/db_postgresql)
 add_subdirectory(server/machine)
@@ -96,7 +95,6 @@ add_custom_target(kbe_libraries DEPENDS
     client_lib
     db_interface
     db_mysql
-    db_redis
     db_mongodb
     db_postgresql
     navigation
@@ -145,7 +143,7 @@ kbe_set_target_folder("Engine/Runtime"
     client_lib navigation server kbe_build_options kbe_python_runtime
 )
 kbe_set_target_folder("Engine/Database"
-    db_interface db_mysql db_redis db_mongodb db_postgresql
+    db_interface db_mysql db_mongodb db_postgresql
 )
 kbe_set_target_folder("Engine/ThirdParty"
     sigar jwsmtp tmxparser

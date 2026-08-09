@@ -2587,7 +2587,7 @@ void Baseapp::onCreateEntityRemotelyFromDBIDCallback(Network::Channel* pChannel,
 			}
 
 			// baseEntityRef, dbid, wasActive
-			PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID);
+			PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID, callbackSource);
 			if(pyfunc != NULL)
 			{
 				SCOPED_PROFILE(SCRIPTCALL_PROFILE);
@@ -2621,7 +2621,7 @@ void Baseapp::onCreateEntityRemotelyFromDBIDCallback(Network::Channel* pChannel,
 
 		if (callbackID > 0)
 		{
-			PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID);
+			PyObjectPtr pyfunc = pyCallbackMgr_.take(callbackID, callbackSource);
 			if (pyfunc != NULL)
 			{
 			}

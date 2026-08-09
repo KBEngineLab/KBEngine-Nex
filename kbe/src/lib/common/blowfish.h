@@ -22,7 +22,6 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef KBENGINE_BLOWFISH_H
 #define KBENGINE_BLOWFISH_H
 
-#include "openssl/blowfish.h"
 #include <string>
 
 namespace KBEngine { 
@@ -54,15 +53,12 @@ public:
 	int encrypt(const unsigned char * src, unsigned char * dest, int length);
 	int decrypt(const unsigned char * src, unsigned char * dest, int length);
 
-	BF_KEY * pBlowFishKey() { return (BF_KEY*)pBlowFishKey_; }
 protected:
 	bool init();
 
 	Key key_;
 	size_t keySize_;
 	bool isGood_;
-
-	void * pBlowFishKey_;
 };
 
 }

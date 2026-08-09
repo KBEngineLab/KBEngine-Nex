@@ -15,6 +15,8 @@ public:
 	ClientSDKTypeScript();
 	virtual ~ClientSDKTypeScript();
 
+	using ClientSDK::saveFile;
+
 	virtual std::string name() const {
 		return "typescript";
 	}

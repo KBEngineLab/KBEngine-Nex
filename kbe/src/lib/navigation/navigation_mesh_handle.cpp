@@ -987,14 +987,6 @@ void NavMeshHandle::getOverlapPolyPoly2D(const float* polyVertsA, const int nPol
 
 void NavMeshHandle::clockwiseSortPoints(float* verts, const int nVerts)
 {
-	float x = 0.0;
-	float z = 0.0;
-	for (int i = 0; i < nVerts; ++i)
-	{
-		x += verts[i * 3];
-		z += verts[i * 3 + 2];
-	}
-
 	//Put most left point in first position.
 	for (int i = 0; i < nVerts; i++)
 	{

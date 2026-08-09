@@ -160,8 +160,8 @@ bool DBTaskExecuteRawDatabaseCommand::db_thread_process()
 	}
 	catch (std::exception & e)
 	{
-		// 异常恢复由实际数据库后端处理，避免把 PostgreSQL 或 Redis 异常错误转换为 MySQL 类型。
-		// Exception recovery is delegated to the active backend to avoid casting PostgreSQL or Redis failures to MySQL types.
+		// 异常恢复由实际数据库后端处理，避免把 PostgreSQL 异常错误转换为 MySQL 类型。
+		// Exception recovery is delegated to the active backend to avoid casting PostgreSQL failures to MySQL types.
 		if (pdbi_->processException(e))
 		{
 			return true;

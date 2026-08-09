@@ -129,7 +129,6 @@ public:
 private:
 	Vector4*			val_;
 	bool				isCopy_;
-	bool				isReadOnly_;
 	static const int 	VECTOR_SIZE;
 } ;
 

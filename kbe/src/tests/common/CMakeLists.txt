@@ -19,6 +19,29 @@ set_tests_properties(common.pooling PROPERTIES
     PASS_REGULAR_EXPRESSION "COMMON_POOLING_TEST_PASS"
 )
 
+add_executable(kbe_test_blowfish_compat
+	debug_helper_stubs.cpp
+	blowfish_compat.cpp
+)
+target_include_directories(kbe_test_blowfish_compat PRIVATE
+	"${CMAKE_SOURCE_DIR}"
+	"${CMAKE_SOURCE_DIR}/lib"
+)
+target_link_libraries(kbe_test_blowfish_compat PRIVATE common)
+set_target_properties(kbe_test_blowfish_compat PROPERTIES FOLDER "Tests/Common")
+
+if(MSVC)
+	target_compile_options(kbe_test_blowfish_compat PRIVATE /W4 /WX /utf-8)
+else()
+	target_compile_options(kbe_test_blowfish_compat PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
+add_test(NAME common.blowfish_compat COMMAND kbe_test_blowfish_compat)
+set_tests_properties(common.blowfish_compat PROPERTIES
+	LABELS "common;cxx;unit;portable;security"
+	PASS_REGULAR_EXPRESSION "BLOWFISH_COMPAT_TEST_PASS"
+)
+
 add_executable(kbe_test_timer_fairness
 	debug_helper_stubs.cpp
 	timer_fairness.cpp

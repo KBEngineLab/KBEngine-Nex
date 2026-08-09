@@ -13,13 +13,11 @@ kbe_add_server_executable(dbmgr KBE_DBMGR
         update_dblog_handler.cpp
     DEFINITIONS
         USE_KBE_MYSQL
-        USE_KBE_REDIS
         USE_KBE_POSTGRESQL
         USE_KBE_MONGODB
     LIBRARIES
         db_interface
         db_mysql
-        db_redis
         db_mongodb
         db_postgresql
     WINDOWS_LIBRARIES

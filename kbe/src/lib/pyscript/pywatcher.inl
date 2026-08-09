@@ -25,7 +25,7 @@ namespace script{
 template <class T>
 INLINE T PyWatcherObject<T>::getValue()
 {
-	T v;
+	T v = T();
 
 	PyObject* pyObj1 = PyObject_CallFunction(pyCallable_, const_cast<char*>(""));
 	if(!pyObj1)
@@ -46,4 +46,3 @@ INLINE T PyWatcherObject<T>::getValue()
 	
 }
 }
-
