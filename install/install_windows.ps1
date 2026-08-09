@@ -14,7 +14,7 @@ $VcpkgRoot = Join-Path $InstallRoot 'kbe/vcpkg'
 
 function Require-Command([string]$Name) {
     if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
-        throw "未找到 $Name。请先安装 Git、CMake 和 Ninja，并在 Developer PowerShell 中运行。"
+        throw "Command not found: $Name. Please install Git, CMake and Ninja, then run this script from a Developer PowerShell."
     }
 }
 
@@ -22,7 +22,7 @@ Require-Command git
 Require-Command cmake
 
 if (-not (Test-Path (Join-Path $VcpkgRoot 'vcpkg.exe'))) {
-    Write-Host "[INFO] 克隆 vcpkg 到 $VcpkgRoot"
+    Write-Host "[INFO] Cloning vcpkg to $VcpkgRoot"
     git clone $VcpkgRepository $VcpkgRoot
     if ($VcpkgRef) { git -C $VcpkgRoot checkout $VcpkgRef }
     & (Join-Path $VcpkgRoot 'bootstrap-vcpkg.bat')
@@ -42,4 +42,4 @@ try {
     Pop-Location
 }
 
-Write-Host '[SUCCESS] Windows CMake 安装/构建完成'
+Write-Host '[SUCCESS] Windows CMake install/build completed'
