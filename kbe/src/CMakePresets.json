@@ -29,6 +29,15 @@
       "binaryDir": "${sourceDir}/out/build/windows-vs2022"
     },
     {
+      "name": "windows-vs2026",
+      "displayName": "Windows VS 2026 x64",
+      "description": "Requires a CMake version that provides the Visual Studio 18 2026 generator.",
+      "inherits": "windows-common",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/out/build/windows-vs2026"
+    },
+    {
       "name": "windows-ninja",
       "displayName": "Windows Ninja Multi-Config with active MSVC",
       "description": "Run from a Visual Studio developer shell; the active MSVC installation may be VS 2022 or newer.",
@@ -94,8 +103,20 @@
       "targets": ["kbe_core_dependencies"]
     },
     {
+      "name": "windows-vs2026-debug",
+      "configurePreset": "windows-vs2026",
+      "configuration": "Debug",
+      "targets": ["kbe_core_dependencies"]
+    },
+    {
       "name": "windows-vs2022-release",
       "configurePreset": "windows-vs2022",
+      "configuration": "Release",
+      "targets": ["kbe_core_dependencies"]
+    },
+    {
+      "name": "windows-vs2026-release",
+      "configurePreset": "windows-vs2026",
       "configuration": "Release",
       "targets": ["kbe_core_dependencies"]
     },
@@ -106,8 +127,20 @@
       "targets": ["kbe_libraries"]
     },
     {
+      "name": "windows-vs2026-libraries-debug",
+      "configurePreset": "windows-vs2026",
+      "configuration": "Debug",
+      "targets": ["kbe_libraries"]
+    },
+    {
       "name": "windows-vs2022-libraries-release",
       "configurePreset": "windows-vs2022",
+      "configuration": "Release",
+      "targets": ["kbe_libraries"]
+    },
+    {
+      "name": "windows-vs2026-libraries-release",
+      "configurePreset": "windows-vs2026",
       "configuration": "Release",
       "targets": ["kbe_libraries"]
     },
@@ -118,8 +151,20 @@
       "targets": ["kbcmd"]
     },
     {
+      "name": "windows-vs2026-kbcmd-debug",
+      "configurePreset": "windows-vs2026",
+      "configuration": "Debug",
+      "targets": ["kbcmd"]
+    },
+    {
       "name": "windows-vs2022-kbcmd-release",
       "configurePreset": "windows-vs2022",
+      "configuration": "Release",
+      "targets": ["kbcmd"]
+    },
+    {
+      "name": "windows-vs2026-kbcmd-release",
+      "configurePreset": "windows-vs2026",
       "configuration": "Release",
       "targets": ["kbcmd"]
     },
@@ -130,8 +175,20 @@
       "targets": ["kbe_servers"]
     },
     {
+      "name": "windows-vs2026-servers-debug",
+      "configurePreset": "windows-vs2026",
+      "configuration": "Debug",
+      "targets": ["kbe_servers"]
+    },
+    {
       "name": "windows-vs2022-servers-release",
       "configurePreset": "windows-vs2022",
+      "configuration": "Release",
+      "targets": ["kbe_servers"]
+    },
+    {
+      "name": "windows-vs2026-servers-release",
+      "configurePreset": "windows-vs2026",
       "configuration": "Release",
       "targets": ["kbe_servers"]
     },
@@ -142,8 +199,20 @@
       "targets": ["kbe_runtime"]
     },
     {
+      "name": "windows-vs2026-runtime-debug",
+      "configurePreset": "windows-vs2026",
+      "configuration": "Debug",
+      "targets": ["kbe_runtime"]
+    },
+    {
       "name": "windows-vs2022-runtime-release",
       "configurePreset": "windows-vs2022",
+      "configuration": "Release",
+      "targets": ["kbe_runtime"]
+    },
+    {
+      "name": "windows-vs2026-runtime-release",
+      "configurePreset": "windows-vs2026",
       "configuration": "Release",
       "targets": ["kbe_runtime"]
     },
@@ -154,8 +223,20 @@
       "targets": ["kbe_tests"]
     },
     {
+      "name": "windows-vs2026-tests-debug",
+      "configurePreset": "windows-vs2026",
+      "configuration": "Debug",
+      "targets": ["kbe_tests"]
+    },
+    {
       "name": "windows-vs2022-tests-release",
       "configurePreset": "windows-vs2022",
+      "configuration": "Release",
+      "targets": ["kbe_tests"]
+    },
+    {
+      "name": "windows-vs2026-tests-release",
+      "configurePreset": "windows-vs2026",
       "configuration": "Release",
       "targets": ["kbe_tests"]
     },

@@ -30,6 +30,18 @@ install\install_windows.bat Release
 
 工程目录：`kbe/src/out/build/windows-vs2022`。
 
+如果当前脚本选择 VS 2026，就会导出到：
+
+```text
+kbe/src/out/build/windows-vs2026
+```
+
+也可以直接显式指定：
+
+```powershell
+.\install\generate_vs_project.ps1 -VisualStudioVersion 2026
+```
+
 ## Linux / WSL2
 
 ```bash
