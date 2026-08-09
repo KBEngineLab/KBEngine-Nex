@@ -25,7 +25,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/bundle.h"
 #include "network/channel.h"
 #include "network/tcp_packet.h"
-#include "utf8cpp/utf8.h"
+#include <utf8.h>
 #include "network/network_interface.h"
 #include "network/packet_receiver.h"
 
@@ -449,16 +449,7 @@ Reason WebSocketPacketFilter::onClose(Channel * pChannel, Packet* pPacket)
 		bool reasonIsValidUtf8 = true;
 		if (valid && length > 2)
 		{
-			// utf8cpp 旧版内部把迭代器差值传给 int；输入最多 123 字节，局部屏蔽不会隐藏本项目的宽度问题。
-			// Old utf8cpp passes iterator differences to int; input is at most 123 bytes, so local suppression cannot hide project width issues.
-#if KBE_PLATFORM == PLATFORM_WIN32
-#pragma warning(push)
-#pragma warning(disable: 4244)
-#endif
 			reasonIsValidUtf8 = utf8::is_valid(payload + 2, payload + length);
-#if KBE_PLATFORM == PLATFORM_WIN32
-#pragma warning(pop)
-#endif
 		}
 
 		if (!reasonIsValidUtf8)

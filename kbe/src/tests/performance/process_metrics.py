@@ -5,12 +5,11 @@ from __future__ import annotations
 import os
 import time
 import ctypes
-from ctypes import wintypes
 from dataclasses import dataclass
 from pathlib import Path
 
 
-@dataclass(slots=True)
+@dataclass
 class ProcessSample:
     cpu_percent: float
     working_set_bytes: int
@@ -21,6 +20,8 @@ class ProcessSample:
 
 
 if os.name == "nt":
+    from ctypes import wintypes
+
     class _ProcessMemoryCountersEx(ctypes.Structure):
         _fields_ = [
             ("cb", wintypes.DWORD),
@@ -247,11 +248,12 @@ class ProcessGroupCollector:
 
     def sample(self) -> dict[str, ProcessSample]:
         if os.name != "nt":
-            return {
-                name: sample
-                for name, collector in self._collectors.items()
-                if (sample := collector.sample()) is not None
-            }
+            samples: dict[str, ProcessSample] = {}
+            for name, collector in self._collectors.items():
+                sample = collector.sample()
+                if sample is not None:
+                    samples[name] = sample
+            return samples
         if not self._collectors:
             return {}
         pids = {collector.pid for collector in self._collectors.values()}
@@ -265,4 +267,3 @@ class ProcessGroupCollector:
                 continue
             samples[name] = collector._finish(*row)
         return samples
-

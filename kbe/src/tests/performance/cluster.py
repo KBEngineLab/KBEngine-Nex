@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class ClusterProcess:
     name: str
     pid: int

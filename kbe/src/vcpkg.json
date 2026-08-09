@@ -12,6 +12,7 @@
     "openssl",
     "mongo-c-driver",
     "libpq",
+    "utfcpp",
     "recastnavigation",
     "nlohmann-json",
     {
@@ -72,6 +73,10 @@
     {
       "name": "libpq",
       "version": "16.9#3"
+    },
+    {
+      "name": "utfcpp",
+      "version": "4.0.9"
     },
     {
       "name": "nlohmann-json",

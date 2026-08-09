@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class WatcherTarget:
     component_type: str
     host: str
@@ -351,7 +351,7 @@ def _validate_interval(value: Any, name: str) -> float:
     return interval
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class WatcherQueryStats:
     """Metadata about the last response, separate from Watcher values.
     保存最近一次响应的元数据，与业务 Watcher 值分离，避免污染指标树。
@@ -575,4 +575,3 @@ def flatten_values(values: dict[str, Any], prefix: str = "") -> dict[str, Any]:
         else:
             result[name] = value
     return result
-

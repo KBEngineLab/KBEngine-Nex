@@ -16,4 +16,5 @@ add_library(common STATIC
 )
 
 kbe_configure_target(common)
-target_link_libraries(common PUBLIC fmt::fmt OpenSSL::SSL OpenSSL::Crypto)
+find_package(utf8cpp CONFIG REQUIRED)
+target_link_libraries(common PUBLIC fmt::fmt OpenSSL::SSL OpenSSL::Crypto utf8cpp::utf8cpp)
