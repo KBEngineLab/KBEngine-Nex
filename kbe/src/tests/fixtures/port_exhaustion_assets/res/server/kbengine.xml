@@ -1,0 +1,8 @@
+<root>
+	<baseapp>
+		<externalTcpPorts_min>20015</externalTcpPorts_min>
+		<externalTcpPorts_max>20015</externalTcpPorts_max>
+		<externalUdpPorts_min>20015</externalUdpPorts_min>
+		<externalUdpPorts_max>20015</externalUdpPorts_max>
+	</baseapp>
+</root>

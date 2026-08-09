@@ -139,6 +139,10 @@ logs/
 build.log
 kbe_temp_*
 
+# Test runner caches and legacy nested output / 测试运行缓存与历史嵌套输出
+/kbe/src/tests/.pytest_cache/
+/kbe/src/tests/kbe/
+
 # Performance Lab generated runs / 性能实验室生成的运行结果
 /kbe/src/out/performance-runs/
 
