@@ -81,10 +81,10 @@ public:
 	virtual bool initializeBegin();
 	virtual bool inInitialize(){ return true; }
 	virtual bool initializeEnd();
-	virtual void finalise();
+	virtual void finalise() override;
 	virtual bool run();
 	
-	virtual void reset(void);
+	virtual void reset(void) override;
 
 	virtual int processOnce(bool shouldIdle = false);
 
@@ -112,7 +112,7 @@ public:
 
 	const char* name(){return COMPONENT_NAME_EX(componentType_);}
 	
-	virtual void handleTimeout(TimerHandle, void * pUser);
+	virtual void handleTimeout(TimerHandle, void * pUser) override;
 	virtual void handleGameTick();
 
 	void shutDown();
@@ -147,36 +147,36 @@ public:
 	static PyObject* __py_recordPerformanceProbeTimeout(PyObject* self, PyObject* args);
 	static PyObject* __py_recordPerformanceProbeInvalidResponse(PyObject* self, PyObject* args);
 
-	virtual void onServerClosed();
+	virtual void onServerClosed() override;
 
 	/**
 		设置脚本输出类型前缀
 	*/
 	static PyObject* __py_setScriptLogType(PyObject* self, PyObject* args);
 
-	virtual void onChannelTimeOut(Network::Channel * pChannel);
-	virtual void onChannelDeregister(Network::Channel * pChannel);
+	virtual void onChannelTimeOut(Network::Channel * pChannel) override;
+	virtual void onChannelDeregister(Network::Channel * pChannel) override;
 
 	virtual void onHelloCB_(Network::Channel* pChannel, const std::string& verInfo,
 		const std::string& scriptVerInfo, const std::string& protocolMD5, 
-		const std::string& entityDefMD5, COMPONENT_TYPE componentType);
+		const std::string& entityDefMD5, COMPONENT_TYPE componentType) override;
 
 	/** 网络接口
 		和服务端的版本不匹配
 	*/
-	virtual void onVersionNotMatch(Network::Channel* pChannel, MemoryStream& s);
+	virtual void onVersionNotMatch(Network::Channel* pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 		和服务端的脚本层版本不匹配
 	*/
-	virtual void onScriptVersionNotMatch(Network::Channel* pChannel, MemoryStream& s);
+	virtual void onScriptVersionNotMatch(Network::Channel* pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 	   登录成功
 	   @ip: 服务器ip地址
 	   @port: 服务器端口
 	*/
-	virtual void onLoginSuccessfully(Network::Channel * pChannel, MemoryStream& s);
+	virtual void onLoginSuccessfully(Network::Channel * pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 	   登录失败回调
@@ -184,7 +184,7 @@ public:
 									NETWORK_ERR_SRV_OVERLOAD:服务器负载过重, 
 									NETWORK_ERR_NAME_PASSWORD:用户名或者密码不正确
 	*/
-	virtual void onLoginFailed(Network::Channel * pChannel, MemoryStream& s);
+	virtual void onLoginFailed(Network::Channel * pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 	   登录失败回调
@@ -192,20 +192,20 @@ public:
 									NETWORK_ERR_ILLEGAL_LOGIN:非法登录, 
 									NETWORK_ERR_NAME_PASSWORD:用户名或者密码不正确
 	*/
-	virtual void onLoginBaseappFailed(Network::Channel * pChannel, SERVER_ERROR_CODE failedcode);
-	virtual void onReloginBaseappFailed(Network::Channel * pChannel, SERVER_ERROR_CODE failedcode);
+	virtual void onLoginBaseappFailed(Network::Channel * pChannel, SERVER_ERROR_CODE failedcode) override;
+	virtual void onReloginBaseappFailed(Network::Channel * pChannel, SERVER_ERROR_CODE failedcode) override;
 
 	/** 网络接口
 	   重登陆baseapp成功
 	*/
-	virtual void onReloginBaseappSuccessfully(Network::Channel * pChannel, MemoryStream& s);
+	virtual void onReloginBaseappSuccessfully(Network::Channel * pChannel, MemoryStream& s) override;
 
-	virtual void onTargetChanged();
+	virtual void onTargetChanged() override;
 
 	/** 
 		服务端添加了某个space的几何映射
 	*/
-	virtual void onAddSpaceGeometryMapping(SPACE_ID spaceID, std::string& respath);
+	virtual void onAddSpaceGeometryMapping(SPACE_ID spaceID, const std::string& respath) override;
 
 	static PyObject* __py_GetSpaceData(PyObject *self, PyObject* args)
 	{

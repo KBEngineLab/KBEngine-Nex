@@ -60,7 +60,8 @@ struct CallbackSourceContext
 	static CallbackSourceContext component(COMPONENT_TYPE type, COMPONENT_ID cid = 0,
 		uint64 epoch = 0)
 	{
-		return CallbackSourceContext(type < 32 ? (uint32(1) << type) : 0, cid, epoch);
+		const uint32 typeIndex = static_cast<uint32>(type);
+		return CallbackSourceContext(typeIndex < 32 ? (uint32(1) << typeIndex) : 0, cid, epoch);
 	}
 
 	bool matches(const CallbackSourceContext& actual) const

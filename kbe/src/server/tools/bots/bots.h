@@ -77,23 +77,23 @@ public:
 
 	~Bots();
 
-	virtual bool initialize();
+	virtual bool initialize() override;
 	bool initializeWatcher();
-	virtual void finalise();
+	virtual void finalise() override;
 
-	virtual bool initializeBegin();
-	virtual bool initializeEnd();
+	virtual bool initializeBegin() override;
+	virtual bool initializeEnd() override;
 
-	virtual bool installPyModules();
-	virtual void onInstallPyModules() {};
-	virtual bool uninstallPyModules();
-	bool uninstallPyScript();
-	bool installEntityDef();
+	virtual bool installPyModules() override;
+	virtual void onInstallPyModules() override {};
+	virtual bool uninstallPyModules() override;
+	bool uninstallPyScript() override;
+	bool installEntityDef() override;
 
-	virtual void handleTimeout(TimerHandle, void * pUser);
-	virtual void onChannelTimeOut(Network::Channel* pChannel);
-	virtual void handleGameTick();
-	virtual bool process();
+	virtual void handleTimeout(TimerHandle, void * pUser) override;
+	virtual void onChannelTimeOut(Network::Channel* pChannel) override;
+	virtual void handleGameTick() override;
+	virtual bool process() override;
 	void processClientTickBatch();
 
 	static Bots& getSingleton(){ 
@@ -105,18 +105,18 @@ public:
 	*/
 	static PyObject* __py_setScriptLogType(PyObject* self, PyObject* args);
 
-	bool run(void);
+	bool run(void) override;
 
 	/**
 		由entitycall来尝试获取一个channel的实例
 	*/
-	virtual Network::Channel* findChannelByEntityCall(EntityCall& entitycall);
+	virtual Network::Channel* findChannelByEntityCall(EntityCall& entitycall) override;
 
 	/**
 		先按机器人 appID 定位客户端，再在其实体容器内查找 owner。
 		Locate the bot client by app ID before resolving the owner in that client's entity collection.
 	*/
-	virtual PyObject* tryGetEntity(COMPONENT_ID componentID, ENTITY_ID entityID);
+	virtual PyObject* tryGetEntity(COMPONENT_ID componentID, ENTITY_ID entityID) override;
 
 	/** 网络接口
 		某个app请求查看该app
@@ -256,17 +256,17 @@ public:
 
 	virtual void onHelloCB_(Network::Channel* pChannel, const std::string& verInfo,
 		const std::string& scriptVerInfo, const std::string& protocolMD5, 
-		const std::string& entityDefMD5, COMPONENT_TYPE componentType);
+		const std::string& entityDefMD5, COMPONENT_TYPE componentType) override;
 
 	/** 网络接口
 		和服务端的版本不匹配
 	*/
-	virtual void onVersionNotMatch(Network::Channel* pChannel, MemoryStream& s);
+	virtual void onVersionNotMatch(Network::Channel* pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 		和服务端的脚本层版本不匹配
 	*/
-	virtual void onScriptVersionNotMatch(Network::Channel* pChannel, MemoryStream& s);
+	virtual void onScriptVersionNotMatch(Network::Channel* pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 		创建账号成功和失败回调
@@ -277,7 +277,7 @@ public:
 									SERVER_ERROR_CODE failedcode;
 		@二进制附带数据:二进制额外数据: uint32长度 + bytearray
 	*/
-	virtual void onCreateAccountResult(Network::Channel * pChannel, MemoryStream& s);
+	virtual void onCreateAccountResult(Network::Channel * pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 	   登录失败回调
@@ -285,14 +285,14 @@ public:
 									NETWORK_ERR_SRV_OVERLOAD:服务器负载过重, 
 									NETWORK_ERR_NAME_PASSWORD:用户名或者密码不正确
 	*/
-	virtual void onLoginFailed(Network::Channel * pChannel, MemoryStream& s);
+	virtual void onLoginFailed(Network::Channel * pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 	   登录成功
 	   @ip: 服务器ip地址
 	   @port: 服务器端口
 	*/
-	virtual void onLoginSuccessfully(Network::Channel * pChannel, MemoryStream& s);
+	virtual void onLoginSuccessfully(Network::Channel * pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 	   登录失败回调
@@ -300,12 +300,12 @@ public:
 									NETWORK_ERR_ILLEGAL_LOGIN:非法登录, 
 									NETWORK_ERR_NAME_PASSWORD:用户名或者密码不正确
 	*/
-	virtual void onLoginBaseappFailed(Network::Channel * pChannel, SERVER_ERROR_CODE failedcode);
+	virtual void onLoginBaseappFailed(Network::Channel * pChannel, SERVER_ERROR_CODE failedcode) override;
 
 	/** 网络接口
 	   重登陆baseapp成功
 	*/
-	virtual void onReloginBaseappSuccessfully(Network::Channel * pChannel, MemoryStream& s);
+	virtual void onReloginBaseappSuccessfully(Network::Channel * pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 		服务器端已经创建了一个与客户端关联的代理Entity
@@ -313,149 +313,149 @@ public:
 	   @datas: 账号entity的信息
 	*/
 	virtual void onCreatedProxies(Network::Channel * pChannel, uint64 rndUUID, 
-		ENTITY_ID eid, std::string& entityType);
+		ENTITY_ID eid, std::string& entityType) override;
 
 	/** 网络接口
 		服务器上的entity已经进入游戏世界了
 	*/
-	virtual void onEntityEnterWorld(Network::Channel * pChannel, MemoryStream& s);
+	virtual void onEntityEnterWorld(Network::Channel * pChannel, MemoryStream& s) override;
 
 
 	/** 网络接口
 		服务器上的entity已经离开游戏世界了
 	*/
-	virtual void onEntityLeaveWorld(Network::Channel * pChannel, ENTITY_ID eid);
-	virtual void onEntityLeaveWorldOptimized(Network::Channel * pChannel, MemoryStream& s);
+	virtual void onEntityLeaveWorld(Network::Channel * pChannel, ENTITY_ID eid) override;
+	virtual void onEntityLeaveWorldOptimized(Network::Channel * pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 		告诉客户端某个entity销毁了， 此类entity通常是还未onEntityEnterWorld
 	*/
-	virtual void onEntityDestroyed(Network::Channel * pChannel, ENTITY_ID eid);
+	virtual void onEntityDestroyed(Network::Channel * pChannel, ENTITY_ID eid) override;
 
 	/** 网络接口
 		服务器上的entity已经进入space了
 	*/
-	virtual void onEntityEnterSpace(Network::Channel * pChannel, MemoryStream& s);
+	virtual void onEntityEnterSpace(Network::Channel * pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 		服务器上的entity已经离开space了
 	*/
-	virtual void onEntityLeaveSpace(Network::Channel * pChannel, ENTITY_ID eid);
+	virtual void onEntityLeaveSpace(Network::Channel * pChannel, ENTITY_ID eid) override;
 
 	/** 网络接口
 		远程调用entity的方法 
 	*/
-	virtual void onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onRemoteMethodCallOptimized(Network::Channel* pChannel, MemoryStream& s);
+	virtual void onRemoteMethodCall(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onRemoteMethodCallOptimized(Network::Channel* pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 	   被踢出服务器
 	*/
-	virtual void onKicked(Network::Channel * pChannel, SERVER_ERROR_CODE failedcode);
+	virtual void onKicked(Network::Channel * pChannel, SERVER_ERROR_CODE failedcode) override;
 
 	/** 网络接口
 		服务器更新entity属性
 	*/
-	virtual void onUpdatePropertys(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdatePropertysOptimized(Network::Channel* pChannel, MemoryStream& s);
+	virtual void onUpdatePropertys(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdatePropertysOptimized(Network::Channel* pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 		服务器更新avatar基础位置和朝向
 	*/
-	virtual void onUpdateBasePos(Network::Channel* pChannel, float x, float y, float z);
-	virtual void onUpdateBasePosXZ(Network::Channel* pChannel, float x, float z);
-	virtual void onUpdateBaseDir(Network::Channel* pChannel, MemoryStream& s);
+	virtual void onUpdateBasePos(Network::Channel* pChannel, float x, float y, float z) override;
+	virtual void onUpdateBasePosXZ(Network::Channel* pChannel, float x, float z) override;
+	virtual void onUpdateBaseDir(Network::Channel* pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 		服务器强制设置entity的位置与朝向
 	*/
-	virtual void onSetEntityPosAndDir(Network::Channel* pChannel, MemoryStream& s);
+	virtual void onSetEntityPosAndDir(Network::Channel* pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 		服务器更新VolatileData
 	*/
-	virtual void onUpdateData(Network::Channel* pChannel, MemoryStream& s);
+	virtual void onUpdateData(Network::Channel* pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 		非优化高精度同步
 	*/
-	virtual void onUpdateData_ypr(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_yp(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_yr(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_pr(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_y(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_p(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_r(Network::Channel* pChannel, MemoryStream& s);
+	virtual void onUpdateData_ypr(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_yp(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_yr(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_pr(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_y(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_p(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_r(Network::Channel* pChannel, MemoryStream& s) override;
 
-	virtual void onUpdateData_xz(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xz_ypr(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xz_yp(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xz_yr(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xz_pr(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xz_y(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xz_p(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xz_r(Network::Channel* pChannel, MemoryStream& s);
+	virtual void onUpdateData_xz(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xz_ypr(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xz_yp(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xz_yr(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xz_pr(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xz_y(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xz_p(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xz_r(Network::Channel* pChannel, MemoryStream& s) override;
 
-	virtual void onUpdateData_xyz(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xyz_ypr(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xyz_yp(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xyz_yr(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xyz_pr(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xyz_y(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xyz_p(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xyz_r(Network::Channel* pChannel, MemoryStream& s);
+	virtual void onUpdateData_xyz(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xyz_ypr(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xyz_yp(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xyz_yr(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xyz_pr(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xyz_y(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xyz_p(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xyz_r(Network::Channel* pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 		优化的位置同步
 	*/
-	virtual void onUpdateData_ypr_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_yp_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_yr_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_pr_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_y_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_p_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_r_optimized(Network::Channel* pChannel, MemoryStream& s);
+	virtual void onUpdateData_ypr_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_yp_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_yr_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_pr_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_y_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_p_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_r_optimized(Network::Channel* pChannel, MemoryStream& s) override;
 
-	virtual void onUpdateData_xz_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xz_ypr_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xz_yp_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xz_yr_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xz_pr_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xz_y_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xz_p_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xz_r_optimized(Network::Channel* pChannel, MemoryStream& s);
+	virtual void onUpdateData_xz_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xz_ypr_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xz_yp_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xz_yr_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xz_pr_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xz_y_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xz_p_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xz_r_optimized(Network::Channel* pChannel, MemoryStream& s) override;
 
-	virtual void onUpdateData_xyz_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xyz_ypr_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xyz_yp_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xyz_yr_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xyz_pr_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xyz_y_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xyz_p_optimized(Network::Channel* pChannel, MemoryStream& s);
-	virtual void onUpdateData_xyz_r_optimized(Network::Channel* pChannel, MemoryStream& s);
+	virtual void onUpdateData_xyz_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xyz_ypr_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xyz_yp_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xyz_yr_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xyz_pr_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xyz_y_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xyz_p_optimized(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void onUpdateData_xyz_r_optimized(Network::Channel* pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 		download stream开始了 
 	*/
-	virtual void onStreamDataStarted(Network::Channel* pChannel, int16 id, uint32 datasize, std::string& descr);
+	virtual void onStreamDataStarted(Network::Channel* pChannel, int16 id, uint32 datasize, std::string& descr) override;
 
 	/** 网络接口
 		接收到streamData
 	*/
-	virtual void onStreamDataRecv(Network::Channel* pChannel, MemoryStream& s);
+	virtual void onStreamDataRecv(Network::Channel* pChannel, MemoryStream& s) override;
 
 	/** 网络接口
 		download stream完成了 
 	*/
-	virtual void onStreamDataCompleted(Network::Channel* pChannel, int16 id);
+	virtual void onStreamDataCompleted(Network::Channel* pChannel, int16 id) override;
 
 	/** 网络接口
 		space相关操作接口
 		服务端添加了某个space的几何映射
 	*/
-	virtual void initSpaceData(Network::Channel* pChannel, MemoryStream& s);
-	virtual void setSpaceData(Network::Channel* pChannel, SPACE_ID spaceID, const std::string& key, const std::string& value);
-	virtual void delSpaceData(Network::Channel* pChannel, SPACE_ID spaceID, const std::string& key);
+	virtual void initSpaceData(Network::Channel* pChannel, MemoryStream& s) override;
+	virtual void setSpaceData(Network::Channel* pChannel, SPACE_ID spaceID, const std::string& key, const std::string& value) override;
+	virtual void delSpaceData(Network::Channel* pChannel, SPACE_ID spaceID, const std::string& key) override;
 
 	/** 网络接口
 		请求查看watcher
@@ -471,7 +471,7 @@ public:
 	/** 网络接口
 	    服务器告诉客户端：你当前（取消）控制谁的位移同步
 	*/
-	virtual void onControlEntity(Network::Channel* pChannel, int32 entityID, int8 isControlled);
+	virtual void onControlEntity(Network::Channel* pChannel, int32 entityID, int8 isControlled) override;
 
 	/** 网络接口
 		服务器心跳返回

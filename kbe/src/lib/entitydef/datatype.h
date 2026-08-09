@@ -686,6 +686,9 @@ public:
 class FixedArrayType : public DataType
 {
 public:	
+	using DataType::initialize;
+	using DataType::createNewItemFromObj;
+
 	FixedArrayType(DATATYPE_UID did = 0);
 	virtual ~FixedArrayType();	
 	
@@ -723,6 +726,9 @@ protected:
 class FixedDictType : public DataType
 {
 public:
+	using DataType::initialize;
+	using DataType::createNewItemFromObj;
+
 	struct DictItemDataType
 	{
 		DataType* dataType;
@@ -940,4 +946,3 @@ PyObject* IntType<SPECIFY_TYPE>::createFromStream(MemoryStream* mstream)
 #include "datatype.inl"
 #endif
 #endif // KBE_DATA_TYPE_H
-

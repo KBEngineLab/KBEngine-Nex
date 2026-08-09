@@ -21,7 +21,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef KBENGINE_MD5_H
 #define KBENGINE_MD5_H
 
-#include "openssl/md5.h"
+#include "openssl/evp.h"
 #include <cstddef>
 #include <string>
 
@@ -59,7 +59,7 @@ public:
 	bool isFinal() const{ return isFinal_; }
 
 private:
-	MD5_CTX state_;
+	EVP_MD_CTX* state_;
 	unsigned char bytes_[16];
 	bool isFinal_;
 };

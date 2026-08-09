@@ -13,7 +13,7 @@ KBEngine is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Lesser General Public License for more details.
- 
+
 You should have received a copy of the GNU Lesser General Public License
 along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
@@ -22,15 +22,71 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "common.h"
 #include "helper/debug_helper.h"
 
-#include <iostream>
-#include <fstream>
+#include <cstdio>
+#include <cstring>
 #include <openssl/bn.h>
+#include <openssl/decoder.h>
+#include <openssl/encoder.h>
 #include <openssl/err.h>
-#include <openssl/rsa.h>
+#include <openssl/evp.h>
 #include <openssl/pem.h>
+#include <openssl/rsa.h>
 
 namespace KBEngine
 {
+
+namespace
+{
+	EVP_PKEY* loadKeyFromPemFile(const std::string& keyname, int selection)
+	{
+		BIO* bio = BIO_new_file(keyname.c_str(), "rb");
+		if (bio == NULL)
+		{
+			return NULL;
+		}
+
+		EVP_PKEY* key = NULL;
+		OSSL_DECODER_CTX* ctx = OSSL_DECODER_CTX_new_for_pkey(&key, "PEM", NULL, NULL,
+			selection, NULL, NULL);
+		if (ctx == NULL)
+		{
+			BIO_free(bio);
+			return NULL;
+		}
+
+		const int ret = OSSL_DECODER_from_bio(ctx, bio);
+		OSSL_DECODER_CTX_free(ctx);
+		BIO_free(bio);
+		return ret == 1 ? key : NULL;
+	}
+
+	bool writeKeyToPemFile(const std::string& keyname, EVP_PKEY* key, int selection)
+	{
+		BIO* bio = BIO_new_file(keyname.c_str(), "wb");
+		if (bio == NULL)
+		{
+			return false;
+		}
+
+		OSSL_ENCODER_CTX* ctx = OSSL_ENCODER_CTX_new_for_pkey(key, selection, "PEM", NULL, NULL);
+		if (ctx == NULL)
+		{
+			BIO_free(bio);
+			return false;
+		}
+
+		const int ret = OSSL_ENCODER_to_bio(ctx, bio);
+		OSSL_ENCODER_CTX_free(ctx);
+		BIO_free(bio);
+		return ret == 1;
+	}
+
+	const char* errorString()
+	{
+		static thread_local char err[1024];
+		return ERR_error_string(ERR_get_error(), err);
+	}
+}
 
 //-------------------------------------------------------------------------------------
 KBE_RSA::KBE_RSA(const std::string& pubkeyname, const std::string& prikeyname):
@@ -59,13 +115,13 @@ KBE_RSA::~KBE_RSA()
 {
 	if(rsa_public != NULL)
 	{
-		RSA_free(static_cast<RSA*>(rsa_public));
+		EVP_PKEY_free(static_cast<EVP_PKEY*>(rsa_public));
 		rsa_public = NULL;
 	}
 
 	if(rsa_private != NULL)
 	{
-		RSA_free(static_cast<RSA*>(rsa_private));
+		EVP_PKEY_free(static_cast<EVP_PKEY*>(rsa_private));
 		rsa_private = NULL;
 	}
 }
@@ -73,157 +129,87 @@ KBE_RSA::~KBE_RSA()
 //-------------------------------------------------------------------------------------
 bool KBE_RSA::loadPublic(const std::string& keyname)
 {
-    FILE *fp = NULL;
-
-	if(rsa_public == NULL)
+	if(rsa_public != NULL)
 	{
-		fp = fopen(keyname.c_str(), "rb");
-		if (!fp) {
-			return false;
-		}
-		
-		rsa_public = PEM_read_RSAPublicKey(fp, NULL, NULL, NULL);
-		if(NULL == rsa_public)
-		{
-			ERR_load_crypto_strings();
-			char err[1024];
-			char* errret = ERR_error_string(ERR_get_error(), err);
-			ERROR_MSG(fmt::format("KBE_RSA::loadPublic: PEM_read_RSAPublicKey error({} : {})\n",
-				errret, err));
-
-			fclose(fp);
-			return false;
-		}
+		return true;
 	}
-	
-	if(fp)
-		fclose(fp);
-	return rsa_public != NULL;
+
+	rsa_public = loadKeyFromPemFile(keyname, OSSL_KEYMGMT_SELECT_PUBLIC_KEY);
+	if(NULL == rsa_public)
+	{
+		ERROR_MSG(fmt::format("KBE_RSA::loadPublic: loadKeyFromPemFile error({})\n", errorString()));
+		return false;
+	}
+
+	return true;
 }
 
 //-------------------------------------------------------------------------------------
 bool KBE_RSA::loadPrivate(const std::string& keyname)
 {
-    FILE *fp = NULL;
-
-	if(rsa_private == NULL)
+	if(rsa_private != NULL)
 	{
-		fp = fopen(keyname.c_str(), "rb");
-		if (!fp) {
-			return false;
-		}
-		
-		rsa_private = PEM_read_RSAPrivateKey(fp, NULL, NULL, NULL);
-		if(NULL == rsa_private)
-		{
-			ERR_load_crypto_strings();
-			char err[1024];
-			char* errret = ERR_error_string(ERR_get_error(), err);
-			ERROR_MSG(fmt::format("KBE_RSA::loadPrivate: PEM_read_RSAPrivateKey error({} : {})\n",
-				errret, err));
-
-			fclose(fp);
-			return false;
-		}
+		return true;
 	}
 
-	if(fp)
-		fclose(fp);
-	return rsa_private != NULL;
+	rsa_private = loadKeyFromPemFile(keyname, OSSL_KEYMGMT_SELECT_KEYPAIR);
+	if(NULL == rsa_private)
+	{
+		ERROR_MSG(fmt::format("KBE_RSA::loadPrivate: loadKeyFromPemFile error({})\n", errorString()));
+		return false;
+	}
+
+	return true;
 }
 
 //-------------------------------------------------------------------------------------
-bool KBE_RSA::generateKey(const std::string& pubkeyname, 
+bool KBE_RSA::generateKey(const std::string& pubkeyname,
 						  const std::string& prikeyname, int keySize, int e)
 {
 	KBE_ASSERT(rsa_public == NULL && rsa_private == NULL);
-	
-	RSA* rsa = NULL;
-    FILE *fp = NULL;
 
-#if OPENSSL_VERSION_NUMBER < 0x00908000L
-	if ((rsa = RSA_generate_key(keySize, e, NULL, NULL)) == NULL) 
-#else
-    BIGNUM *bne;
-
-    bne = BN_new();
-    if (bne && BN_set_word(bne, e) != 1)
-        rsa = RSA_new();
-
-    bool ret = rsa && RSA_generate_key_ex(rsa, keySize, bne, NULL) != 1;
-
-    if (!ret)
-    {
-        RSA_free(rsa);
-        rsa = NULL;
-    }
-
-    BN_free(bne);
-    
-    if(!ret)
-#endif
+	EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
+	if (ctx == NULL)
 	{
-		ERR_load_crypto_strings();
-		char err[1024];
-		char* errret = ERR_error_string(ERR_get_error(), err);
-		ERROR_MSG(fmt::format("KBE_RSA::generateKey: RSA_generate_key error({} : {})\n",
-			errret, err));
-
 		return false;
 	}
 
-	if (!RSA_check_key(rsa)) 
+	EVP_PKEY* pkey = NULL;
+	BIGNUM* bne = BN_new();
+	if (bne == NULL || BN_set_word(bne, static_cast<BN_ULONG>(e)) != 1 ||
+		EVP_PKEY_keygen_init(ctx) <= 0 ||
+		EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, keySize) <= 0 ||
+		EVP_PKEY_CTX_set1_rsa_keygen_pubexp(ctx, bne) <= 0 ||
+		EVP_PKEY_keygen(ctx, &pkey) <= 0)
 	{
-		ERROR_MSG("KBE_RSA::generateKey: invalid RSA Key.\n");
-		RSA_free(rsa);
+		ERROR_MSG(fmt::format("KBE_RSA::generateKey: EVP_PKEY_keygen error({})\n", errorString()));
+
+		BN_free(bne);
+		EVP_PKEY_CTX_free(ctx);
+		if (pkey != NULL)
+		{
+			EVP_PKEY_free(pkey);
+		}
 		return false;
 	}
 
-	fp = fopen(prikeyname.c_str(), "w");
-	if (!fp) {
-		RSA_free(rsa);
-		return false;
-	}
+	BN_free(bne);
+	EVP_PKEY_CTX_free(ctx);
 
-	if (!PEM_write_RSAPrivateKey(fp, static_cast<RSA*>(rsa), NULL, NULL, 0, 0, NULL)) 
+	if (!writeKeyToPemFile(prikeyname, pkey, OSSL_KEYMGMT_SELECT_KEYPAIR) ||
+		!writeKeyToPemFile(pubkeyname, pkey, OSSL_KEYMGMT_SELECT_PUBLIC_KEY))
 	{
-		ERR_load_crypto_strings();
-		char err[1024];
-		char* errret = ERR_error_string(ERR_get_error(), err);
-		ERROR_MSG(fmt::format("KBE_RSA::generateKey: PEM_write_RSAPrivateKey error({} : {})\n",
-			errret, err));
-
-		fclose(fp);
-		RSA_free(rsa);
+		ERROR_MSG("KBE_RSA::generateKey: write pem file failed.\n");
+		EVP_PKEY_free(pkey);
 		return false;
 	}
 
-	fclose(fp);
-	fp = fopen(pubkeyname.c_str(), "w");
-	if (!fp) {
-		RSA_free(rsa);
-		return false;
-	}
-
-	if (!PEM_write_RSAPublicKey(fp, static_cast<RSA*>(rsa))) 
-	{
-		ERR_load_crypto_strings();
-		char err[1024];
-		char* errret = ERR_error_string(ERR_get_error(), err);
-		ERROR_MSG(fmt::format("KBE_RSA::generateKey: PEM_write_RSAPublicKey error({} : {})\n",
-			errret, err));
-
-		fclose(fp);
-		RSA_free(rsa);
-		return false;
-	}
+	EVP_PKEY_up_ref(pkey);
+	rsa_private = pkey;
+	rsa_public = pkey;
 
 	INFO_MSG(fmt::format("KBE_RSA::generateKey: RSA key generated. keysize({}) bits.\n", keySize));
-
-	RSA_free(rsa);
-	fclose(fp);
-
-	return loadPrivate(prikeyname) && loadPublic(pubkeyname);
+	return true;
 }
 
 //-------------------------------------------------------------------------------------
@@ -234,8 +220,8 @@ std::string KBE_RSA::encrypt(const std::string& instr)
 		return "";
 
 	char strencrypted[1024];
-	memset(strencrypted, 0, 1024);
-	strutil::bytes2string((unsigned char *)encrypted.data(), static_cast<int>(encrypted.size()), (unsigned char *)strencrypted, 1024);
+	memset(strencrypted, 0, sizeof(strencrypted));
+	strutil::bytes2string((unsigned char *)encrypted.data(), static_cast<int>(encrypted.size()), (unsigned char *)strencrypted, sizeof(strencrypted));
 	return strencrypted;
 }
 
@@ -244,33 +230,39 @@ int KBE_RSA::encrypt(const std::string& instr, std::string& outCertifdata)
 {
 	KBE_ASSERT(rsa_public != NULL);
 
-	unsigned char* certifdata =(unsigned char*)calloc(RSA_size(static_cast<RSA*>(rsa_public)) + 1, sizeof(unsigned char));
-
-	if(instr.size() > static_cast<size_t>(std::numeric_limits<int>::max()))
+	EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new(static_cast<EVP_PKEY*>(rsa_public), NULL);
+	if (ctx == NULL)
 	{
-		ERROR_MSG("KBE_RSA::encrypt: input exceeds OpenSSL length limit.\n");
-		free(certifdata);
 		return -1;
 	}
 
-	int certifsize = RSA_public_encrypt(static_cast<int>(instr.size()),
-		(unsigned char*)instr.c_str(), certifdata, static_cast<RSA*>(rsa_public), RSA_PKCS1_OAEP_PADDING);
-
-	if (certifsize < 0)
+	if (EVP_PKEY_encrypt_init(ctx) <= 0 ||
+		EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0)
 	{
-		ERR_load_crypto_strings();
-		char err[1024];
-		char* errret = ERR_error_string(ERR_get_error(), err);
-		ERROR_MSG(fmt::format("KBE_RSA::encrypt: RSA_public_encrypt error({} : {})\n",
-			errret, err));
-
-		free(certifdata);
-		return certifsize;
+		EVP_PKEY_CTX_free(ctx);
+		return -1;
 	}
-	
-	outCertifdata.assign((const char*)certifdata, certifsize);
-	free(certifdata);
-	return certifsize;
+
+	size_t outlen = 0;
+	if (EVP_PKEY_encrypt(ctx, NULL, &outlen,
+		reinterpret_cast<const unsigned char*>(instr.data()), instr.size()) <= 0)
+	{
+		EVP_PKEY_CTX_free(ctx);
+		return -1;
+	}
+
+	outCertifdata.resize(outlen);
+	if (EVP_PKEY_encrypt(ctx, reinterpret_cast<unsigned char*>(&outCertifdata[0]), &outlen,
+		reinterpret_cast<const unsigned char*>(instr.data()), instr.size()) <= 0)
+	{
+		EVP_PKEY_CTX_free(ctx);
+		outCertifdata.clear();
+		return -1;
+	}
+
+	EVP_PKEY_CTX_free(ctx);
+	outCertifdata.resize(outlen);
+	return static_cast<int>(outlen);
 }
 
 //-------------------------------------------------------------------------------------
@@ -282,7 +274,7 @@ void KBE_RSA::hexCertifData(const std::string& inCertifdata)
 		s += fmt::format("{:x}{:x}", ((inCertifdata.data()[i] >> 4) & 0xf),
 			(inCertifdata.data()[i] & 0xf));
 	}
-	
+
 	s += "\n";
 
 	INFO_MSG(s.c_str());
@@ -293,37 +285,49 @@ int KBE_RSA::decrypt(const std::string& inCertifdata, std::string& outstr)
 {
 	KBE_ASSERT(rsa_private != NULL);
 
-	int rsa_len = RSA_size(static_cast<RSA*>(rsa_private));
-	unsigned char* keydata =(unsigned char*)calloc(rsa_len + 1, sizeof(unsigned char));
-
-	int keysize = RSA_private_decrypt(rsa_len,
-		(const unsigned char *)inCertifdata.data(), keydata, static_cast<RSA*>(rsa_private), RSA_PKCS1_OAEP_PADDING);
-
-	if (keysize < 0)
+	EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new(static_cast<EVP_PKEY*>(rsa_private), NULL);
+	if (ctx == NULL)
 	{
-		ERR_load_crypto_strings();
-		char err[1024];
-		char* errret = ERR_error_string(ERR_get_error(), err);
-		ERROR_MSG(fmt::format("KBE_RSA::decrypt: RSA_private_decrypt error({} : {})\n",
-			errret, err));
-
-		free(keydata);
-		return keysize;
+		return -1;
 	}
-	
-	outstr.assign((const char*)keydata, keysize);
-	free(keydata);
-	return keysize;
+
+	if (EVP_PKEY_decrypt_init(ctx) <= 0 ||
+		EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0)
+	{
+		EVP_PKEY_CTX_free(ctx);
+		return -1;
+	}
+
+	size_t outlen = 0;
+	if (EVP_PKEY_decrypt(ctx, NULL, &outlen,
+		reinterpret_cast<const unsigned char*>(inCertifdata.data()), inCertifdata.size()) <= 0)
+	{
+		EVP_PKEY_CTX_free(ctx);
+		return -1;
+	}
+
+	outstr.resize(outlen);
+	if (EVP_PKEY_decrypt(ctx, reinterpret_cast<unsigned char*>(&outstr[0]), &outlen,
+		reinterpret_cast<const unsigned char*>(inCertifdata.data()), inCertifdata.size()) <= 0)
+	{
+		EVP_PKEY_CTX_free(ctx);
+		outstr.clear();
+		return -1;
+	}
+
+	EVP_PKEY_CTX_free(ctx);
+	outstr.resize(outlen);
+	return static_cast<int>(outlen);
 }
 
 //-------------------------------------------------------------------------------------
 std::string KBE_RSA::decrypt(const std::string& instr)
 {
 	unsigned char strencrypted[1024];
-	memset(strencrypted, 0, 1024);
-	strutil::string2bytes((unsigned char *)instr.data(), (unsigned char *)&strencrypted[0], 1024);
+	memset(strencrypted, 0, sizeof(strencrypted));
+	strutil::string2bytes((unsigned char *)instr.data(), (unsigned char *)&strencrypted[0], sizeof(strencrypted));
 	std::string encrypted;
-	encrypted.assign((char*)strencrypted, 1024);
+	encrypted.assign((char*)strencrypted, sizeof(strencrypted));
 
 	std::string out;
 	if(decrypt(encrypted, out) < 0)
@@ -333,4 +337,4 @@ std::string KBE_RSA::decrypt(const std::string& instr)
 }
 
 //-------------------------------------------------------------------------------------
-} 
+}

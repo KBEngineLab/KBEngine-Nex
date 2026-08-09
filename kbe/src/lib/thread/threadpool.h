@@ -26,6 +26,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "common/tasks.h"
 #include "helper/debug_helper.h"
 #include "thread/threadtask.h"
+#include <cstdio>
 // windows include	
 #if KBE_PLATFORM == PLATFORM_WIN32
 #include <windows.h>          // for HANDLE
@@ -211,7 +212,7 @@ REATTEMPT:
 	{
 		char buf[128];
 		lock();
-		sprintf(buf, "%p,%u", currTask_, done_tasks_);
+		std::snprintf(buf, sizeof(buf), "%p,%u", static_cast<void*>(currTask_), done_tasks_);
 		unlock();
 		return buf;
 	}

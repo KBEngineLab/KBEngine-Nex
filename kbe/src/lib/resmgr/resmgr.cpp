@@ -24,6 +24,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 
 #if KBE_PLATFORM != PLATFORM_WIN32
 #include <unistd.h>
@@ -345,7 +346,7 @@ bool Resmgr::listPathRes(std::wstring path, const std::wstring& extendName, std:
 
 		struct stat s;
 		char pathstrtmp[MAX_PATH * 2];
-		sprintf(pathstrtmp, "%s%s", pathstr, filename->d_name);
+		std::snprintf(pathstrtmp, sizeof(pathstrtmp), "%s%s", pathstr, filename->d_name);
 		lstat(pathstrtmp, &s);
 
 		if (S_ISDIR(s.st_mode))

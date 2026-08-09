@@ -33,40 +33,15 @@ namespace KBEngine
 //-------------------------------------------------------------------------------------
 bool KB_SSL::initialize()
 {
-	SSL_load_error_strings();
-	ERR_load_BIO_strings();
-	SSL_library_init();
-	OpenSSL_add_all_algorithms();
+	OPENSSL_init_ssl(0, NULL);
+	OPENSSL_init_crypto(0, NULL);
 	return true;
 }
 
 //-------------------------------------------------------------------------------------
 void KB_SSL::finalise()
 {
-#if (OPENSSL_VERSION_NUMBER >= 0x10002000L) \
-    && (OPENSSL_VERSION_NUMBER < 0x10100000L) \
-    && !defined(SSL_OP_NO_COMPRESSION)
-    ::SSL_COMP_free_compression_methods();
-#endif // (OPENSSL_VERSION_NUMBER >= 0x10002000L)
-
-// after 1.1.0 no need
-#if (OPENSSL_VERSION_NUMBER <  0x10100000)
-// <= 1.0.1f = old api, 1.0.1g+ = new api
-#if (OPENSSL_VERSION_NUMBER <= 0x1000106f) || defined(USE_WOLFSSL)
-        ERR_remove_state(0);
-#else
-#if OPENSSL_VERSION_NUMBER >= 0x1010005f && \
-    !defined(LIBRESSL_VERSION_NUMBER) && \
-    !defined(OPENSSL_IS_BORINGSSL)
-        ERR_remove_thread_state();
-#else
-        ERR_remove_thread_state(NULL);
-#endif
-#endif
-        ERR_free_strings();
-        EVP_cleanup();
-        CRYPTO_cleanup_all_ex_data();
-#endif
+	// OpenSSL 1.1+ manages process-wide cleanup itself.
 }
 
 //-------------------------------------------------------------------------------------

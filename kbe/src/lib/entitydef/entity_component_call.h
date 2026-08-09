@@ -74,7 +74,7 @@ public:
 
 	ScriptDefModule* pComponentScriptDefModule();
 
-	virtual void newCall(Network::Bundle& bundle);
+	virtual void newCall(Network::Bundle& bundle) override;
 
 	static std::vector<EntityComponentCall*> getComponents(const std::string& name, EntityCall* pEntity, ScriptDefModule* pEntityScriptDescrs);
 

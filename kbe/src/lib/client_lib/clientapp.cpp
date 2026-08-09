@@ -847,7 +847,7 @@ void ClientApp::onReloginBaseappSuccessfully(Network::Channel * pChannel, Memory
 }
 
 //-------------------------------------------------------------------------------------	
-void ClientApp::onAddSpaceGeometryMapping(SPACE_ID spaceID, std::string& respath)
+void ClientApp::onAddSpaceGeometryMapping(SPACE_ID spaceID, const std::string& respath)
 {
 }
 

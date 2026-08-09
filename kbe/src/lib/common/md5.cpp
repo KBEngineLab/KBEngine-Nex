@@ -20,6 +20,9 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "md5.h"
 #include "common.h"
+#include "helper/debug_helper.h"
+#include <cstdio>
+#include <cstring>
 
 namespace KBEngine
 {
@@ -27,14 +30,18 @@ namespace KBEngine
 //-------------------------------------------------------------------------------------
 KBE_MD5::KBE_MD5()
 {
-	MD5_Init(&state_);
+	state_ = EVP_MD_CTX_new();
+	KBE_ASSERT(state_ != NULL);
+	EVP_DigestInit_ex(state_, EVP_md5(), NULL);
 	isFinal_ = false;
 }
 
 //-------------------------------------------------------------------------------------
 KBE_MD5::KBE_MD5(const void * data, size_t numBytes)
 {
-	MD5_Init(&state_);
+	state_ = EVP_MD_CTX_new();
+	KBE_ASSERT(state_ != NULL);
+	EVP_DigestInit_ex(state_, EVP_md5(), NULL);
 	isFinal_ = false;
 
 	append(data, numBytes);
@@ -43,12 +50,18 @@ KBE_MD5::KBE_MD5(const void * data, size_t numBytes)
 //-------------------------------------------------------------------------------------
 KBE_MD5::~KBE_MD5()
 {
+	if(state_ != NULL)
+	{
+		EVP_MD_CTX_free(state_);
+		state_ = NULL;
+	}
 }
 
 //-------------------------------------------------------------------------------------
 void KBE_MD5::append(const void * data, size_t numBytes)
 {
-	MD5_Update(&state_, (const unsigned char*)data, numBytes);
+	KBE_ASSERT(state_ != NULL);
+	EVP_DigestUpdate(state_, data, numBytes);
 }
 
 //-------------------------------------------------------------------------------------
@@ -66,8 +79,8 @@ std::string KBE_MD5::getDigestStr()
 	char tmp[3]={'\0'}, md5str[33] = {'\0'};
 	for (int i = 0; i < 16; ++i)
 	{
-		sprintf(tmp,"%2.2X", md[i]);
-		strcat(md5str, tmp);
+		std::snprintf(tmp, sizeof(tmp), "%02X", md[i]);
+		std::strcat(md5str, tmp);
 	}
 
 	return md5str;
@@ -78,7 +91,10 @@ void KBE_MD5::final()
 {
 	if(!isFinal_)
 	{
-		MD5_Final(bytes_, &state_);
+		unsigned int len = 0;
+		KBE_ASSERT(state_ != NULL);
+		EVP_DigestFinal_ex(state_, bytes_, &len);
+		KBE_ASSERT(len == sizeof(bytes_));
 		isFinal_ = true;
 	}
 }
@@ -86,9 +102,18 @@ void KBE_MD5::final()
 //-------------------------------------------------------------------------------------
 void KBE_MD5::clear()
 {
-	memset(this, 0, sizeof(*this));
+	if(state_ == NULL)
+	{
+		state_ = EVP_MD_CTX_new();
+	}
+	else
+	{
+		EVP_MD_CTX_reset(state_);
+	}
 
-	MD5_Init(&state_);
+	KBE_ASSERT(state_ != NULL);
+	EVP_DigestInit_ex(state_, EVP_md5(), NULL);
+	memset(bytes_, 0, sizeof(bytes_));
 	isFinal_ = false;
 }
 

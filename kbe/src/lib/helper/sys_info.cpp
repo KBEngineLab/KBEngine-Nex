@@ -19,6 +19,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "sys_info.h"
+#include <cstdio>
 
 extern "C"
 {
@@ -468,7 +469,7 @@ std::vector< std::string > SystemInfo::getMacAddresses()
 
 			for (UINT i = 0; i < _pIpAdapterInfo->AddressLength; i++)
 			{
-				sprintf(MAC_BUF, "%02x", _pIpAdapterInfo->Address[i]);
+				std::snprintf(MAC_BUF, sizeof(MAC_BUF), "%02x", _pIpAdapterInfo->Address[i]);
 				MAC += MAC_BUF;
 			}
 
@@ -504,7 +505,7 @@ std::vector< std::string > SystemInfo::getMacAddresses()
 			char MAC[19];
 			memset(&MAC[0], 0, sizeof(MAC));
 
-			sprintf(MAC, "%02x:%02x:%02x:%02x:%02x:%02x",
+			std::snprintf(MAC, sizeof(MAC), "%02x:%02x:%02x:%02x:%02x:%02x",
 				macBytes[0], macBytes[1], macBytes[2],
 				macBytes[3], macBytes[4], macBytes[5]);
 
@@ -538,7 +539,7 @@ std::vector< std::string > SystemInfo::getMacAddresses()
 				char MAC[19];
 				memset(&MAC[0], 0, sizeof(MAC));
 
-				sprintf(MAC, "%02x:%02x:%02x:%02x:%02x:%02x",
+				std::snprintf(MAC, sizeof(MAC), "%02x:%02x:%02x:%02x:%02x:%02x",
 					(unsigned char)buf[interfaceNum].ifr_hwaddr.sa_data[0],
 					(unsigned char)buf[interfaceNum].ifr_hwaddr.sa_data[1],
 					(unsigned char)buf[interfaceNum].ifr_hwaddr.sa_data[2],
@@ -565,4 +566,3 @@ std::vector< std::string > SystemInfo::getMacAddresses()
 
 //-------------------------------------------------------------------------------------
 } 
-

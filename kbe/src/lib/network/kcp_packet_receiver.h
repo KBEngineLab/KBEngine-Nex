@@ -41,12 +41,12 @@ public:
 	virtual ~KCPPacketReceiver();
 
 	bool processRecv(UDPPacket* pReceiveWindow) override;
-	virtual bool processRecv(bool expectingPacket);
+	virtual bool processRecv(bool expectingPacket) override;
 
-	virtual Reason processPacket(Channel* pChannel, Packet * pPacket);
+	virtual Reason processPacket(Channel* pChannel, Packet * pPacket) override;
 	Reason drainReassembledPackets(Channel* pChannel);
 
-	virtual ProtocolSubType protocolSubType() const {
+	virtual ProtocolSubType protocolSubType() const override {
 		return SUB_PROTOCOL_KCP;
 	}
 
