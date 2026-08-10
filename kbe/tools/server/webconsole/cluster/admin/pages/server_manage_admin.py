@@ -5,7 +5,7 @@ from django.template.response import TemplateResponse
 from KBESettings.custom_admin_site import custom_admin_site
 from cluster.models import ServerManage
 from webconsole.machines_mgr import machinesmgr
-from webconsole.models import KBEUserExtension
+from webconsole.user_extension import get_kbe_user_context
 
 
 @admin.register(ServerManage, site=custom_admin_site)
@@ -17,9 +17,9 @@ class ServerManageAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None): return False
 
     def changelist_view(self, request, extra_context=None):
-        ext = KBEUserExtension.objects.get(user=request.user)
-        system_user_uid = 0 if ext.system_user_uid is None else int(ext.system_user_uid)
-        system_username = "" if ext.system_username is None else ext.system_username
+        user_context = get_kbe_user_context(request.user)
+        system_user_uid = user_context.system_user_uid
+        system_username = user_context.system_username
 
         interfaces_groups = machinesmgr.queryAllInterfaces(system_user_uid, system_username)
 

@@ -4,7 +4,6 @@ from django.template.response import TemplateResponse
 from KBESettings.custom_admin_site import custom_admin_site
 from cluster.models import ServerMachines
 from webconsole.machines_mgr import machinesmgr
-from webconsole.models import KBEUserExtension
 
 
 @admin.register(ServerMachines, site=custom_admin_site)

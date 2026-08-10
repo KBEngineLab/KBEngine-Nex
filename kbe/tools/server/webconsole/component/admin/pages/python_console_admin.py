@@ -5,7 +5,7 @@ from KBESettings.custom_admin_site import custom_admin_site
 from component.models import PythonConsole
 from pycommon import Define
 from webconsole.machines_mgr import machinesmgr
-from webconsole.models import KBEUserExtension
+from webconsole.user_extension import get_kbe_user_context
 
 
 @admin.register(PythonConsole, site=custom_admin_site)
@@ -23,9 +23,9 @@ class PythonConsoleAdmin(admin.ModelAdmin):
         VALID_CT = {Define.DBMGR_TYPE, Define.LOGINAPP_TYPE, Define.CELLAPP_TYPE, Define.BASEAPP_TYPE,
                     Define.INTERFACES_TYPE, Define.LOGGER_TYPE}
 
-        ext = KBEUserExtension.objects.get(user=request.user)
-        system_user_uid = 0 if ext.system_user_uid is None else int(ext.system_user_uid)
-        system_username = "" if ext.system_username is None else ext.system_username
+        user_context = get_kbe_user_context(request.user)
+        system_user_uid = user_context.system_user_uid
+        system_username = user_context.system_username
 
         interfaces_groups = machinesmgr.queryAllInterfaces(system_user_uid, system_username)
 

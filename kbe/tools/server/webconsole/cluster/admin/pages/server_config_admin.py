@@ -10,7 +10,7 @@ from django.contrib import admin, messages
 
 from pycommon import Define, Machines
 from webconsole.machines_mgr import machinesmgr
-from webconsole.models import KBEUserExtension
+from webconsole.user_extension import get_kbe_user_context
 
 
 #
@@ -46,9 +46,10 @@ def load_servers(modeladmin, request, queryset):
         messages.error(request, "只能选择一条服务器配置执行此操作。")
         return
 
-    ext = KBEUserExtension.objects.get(user=request.user)
-    system_user_uid = 0 if ext.system_user_uid is None else int(ext.system_user_uid)
-    system_username = "" if ext.system_username is None else ext.system_username
+    user_context = get_kbe_user_context(request.user)
+    ext = user_context.extension
+    system_user_uid = user_context.system_user_uid
+    system_username = user_context.system_username
 
     server_config = queryset.first()
 
@@ -65,9 +66,9 @@ def load_servers(modeladmin, request, queryset):
 
 
 
-    kbe_root = "" if ext.kbe_root is None else ext.kbe_root
-    kbe_res_path = "" if ext.kbe_res_path is None else ext.kbe_res_path
-    kbe_bin_path = "" if ext.kbe_bin_path is None else ext.kbe_bin_path
+    kbe_root = user_context.kbe_root
+    kbe_res_path = user_context.kbe_res_path
+    kbe_bin_path = user_context.kbe_bin_path
 
     # if kbe_root == "":
     #     messages.error(request, "请配置KBE_ROOT。")

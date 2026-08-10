@@ -7,7 +7,7 @@ from cluster.models import ServerManage, ServerLog
 from pycommon import Define
 from pycommon.LoggerWatcher import logName2type
 from webconsole.machines_mgr import machinesmgr
-from webconsole.models import KBEUserExtension
+from webconsole.user_extension import get_kbe_user_context
 
 
 @admin.register(ServerLog, site=custom_admin_site)
@@ -19,9 +19,9 @@ class ServerManageAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None): return False
 
     def changelist_view(self, request, extra_context=None):
-        ext = KBEUserExtension.objects.get(user=request.user)
-        system_user_uid = 0 if ext.system_user_uid is None else int(ext.system_user_uid)
-        system_username = "" if ext.system_username is None else ext.system_username
+        user_context = get_kbe_user_context(request.user)
+        system_user_uid = user_context.system_user_uid
+        system_username = user_context.system_username
 
         VALID_CT = {Define.LOGGER_TYPE}
 

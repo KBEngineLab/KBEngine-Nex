@@ -13,7 +13,7 @@ from pycommon import Define, Machines
 
 from utils import kbe_util
 from webconsole.machines_mgr import machinesmgr
-from webconsole.models import KBEUserExtension
+from webconsole.user_extension import get_kbe_user_context
 
 
 # ===================view===============================
@@ -33,9 +33,9 @@ def server_shutdown(request):
         Define.LOGGER_TYPE,
     ]
 
-    ext = KBEUserExtension.objects.get(user=request.user)
-    system_user_uid = 0 if ext.system_user_uid is None else int(ext.system_user_uid)
-    system_username = "" if ext.system_username is None else ext.system_username
+    user_context = get_kbe_user_context(request.user)
+    system_user_uid = user_context.system_user_uid
+    system_username = user_context.system_username
 
     components = Machines.Machines(system_user_uid, system_username)
 
@@ -56,9 +56,9 @@ def server_kill(request, ct, cid):
     ct = int(ct)
     cid = int(cid)
 
-    ext = KBEUserExtension.objects.get(user=request.user)
-    system_user_uid = 0 if ext.system_user_uid is None else int(ext.system_user_uid)
-    system_username = "" if ext.system_username is None else ext.system_username
+    user_context = get_kbe_user_context(request.user)
+    system_user_uid = user_context.system_user_uid
+    system_username = user_context.system_username
 
     components = Machines.Machines(system_user_uid, system_username)
     hosts = kbe_util.get_machines_address()
@@ -78,12 +78,13 @@ def server_run(request):
     运行组件
     """
 
-    ext = KBEUserExtension.objects.get(user=request.user)
-    system_user_uid = 0 if ext.system_user_uid is None else int(ext.system_user_uid)
-    system_username = "" if ext.system_username is None else ext.system_username
-    kbe_root = "" if ext.kbe_root is None else ext.kbe_root
-    kbe_bin_path = "" if ext.kbe_bin_path is None else ext.kbe_bin_path
-    kbe_res_path = "" if ext.kbe_res_path is None else ext.kbe_res_path
+    user_context = get_kbe_user_context(request.user)
+    ext = user_context.extension
+    system_user_uid = user_context.system_user_uid
+    system_username = user_context.system_username
+    kbe_root = user_context.kbe_root
+    kbe_bin_path = user_context.kbe_bin_path
+    kbe_res_path = user_context.kbe_res_path
 
     components = Machines.Machines(system_user_uid, system_username)
     context = {
@@ -126,9 +127,9 @@ def server_stop(request, ct, cid):
     ct = int(ct)
     cid = int(cid)
 
-    ext = KBEUserExtension.objects.get(user=request.user)
-    system_user_uid = 0 if ext.system_user_uid is None else int(ext.system_user_uid)
-    system_username = "" if ext.system_username is None else ext.system_username
+    user_context = get_kbe_user_context(request.user)
+    system_user_uid = user_context.system_user_uid
+    system_username = user_context.system_username
 
     components = Machines.Machines(system_user_uid, system_username)
 
@@ -149,9 +150,9 @@ def server_query(request):
     """
     请求获取组件数据
     """
-    ext = KBEUserExtension.objects.get(user=request.user)
-    system_user_uid = 0 if ext.system_user_uid is None else int(ext.system_user_uid)
-    system_username = "" if ext.system_username is None else ext.system_username
+    user_context = get_kbe_user_context(request.user)
+    system_user_uid = user_context.system_user_uid
+    system_username = user_context.system_username
 
     interfaces_groups = machinesmgr.queryAllInterfaces(system_user_uid, system_username)
 
@@ -191,9 +192,9 @@ def server_one_query(request, ct, cid):
     请求获取一个组件数据
     """
 
-    ext = KBEUserExtension.objects.get(user=request.user)
-    system_user_uid = 0 if ext.system_user_uid is None else int(ext.system_user_uid)
-    system_username = "" if ext.system_username is None else ext.system_username
+    user_context = get_kbe_user_context(request.user)
+    system_user_uid = user_context.system_user_uid
+    system_username = user_context.system_username
 
     ct = int(ct)
     cid = int(cid)
@@ -311,9 +312,9 @@ def server_save_config(request):
         Define.INTERFACES_TYPE,
         Define.LOGGER_TYPE
     }
-    ext = KBEUserExtension.objects.get(user=request.user)
-    system_user_uid = 0 if ext.system_user_uid is None else int(ext.system_user_uid)
-    system_username = "" if ext.system_username is None else ext.system_username
+    user_context = get_kbe_user_context(request.user)
+    system_user_uid = user_context.system_user_uid
+    system_username = user_context.system_username
     interfaces_groups = machinesmgr.queryAllInterfaces(system_user_uid, system_username)
 
     conf = {}
