@@ -2917,21 +2917,32 @@ uint32 Entity::navigate(const Position3D& destination, float velocity, float dis
 		return 0;
 	}
 
-	stopMove();
-
 	velocity = velocity / g_kbeSrvConfig.gameUpdateHertz();
 
+	if (pMoveController_)
+	{
+		// 追敌等高频 navigate 场景优先复用当前控制器，只重定向目标，避免 stop + new 造成一帧移动空窗。
+		// Frequent chase retargeting should reuse the current controller to avoid the one-frame gap caused by stop + new.
+		MoveController* pMoveController = static_cast<MoveController*>(pMoveController_.get());
+		if (pMoveController != NULL && pMoveController->resetNavigate(destination, velocity, distance,
+			faceMovement, maxMoveDistance, paths_ptr, layer, userData, useDetour))
+		{
+			return pMoveController_->id();
+		}
+	}
+
+	stopMove();
+
 	KBEShared_ptr<Controller> p(new MoveController(this, NULL));
-	NavigateHandler* handler = nullptr;
 	
 	if (useDetour)
 	{
-		handler = new NavigateHandler(p, destination, velocity, distance,
+		new NavigateHandler(p, destination, velocity, distance,
 			faceMovement, maxMoveDistance, layer, userData);
 	}
 	else
 	{
-		handler = new NavigateHandler(p, destination, velocity,
+		new NavigateHandler(p, destination, velocity,
 			distance, faceMovement, maxMoveDistance, paths_ptr, userData);
 	}
 
@@ -2939,11 +2950,6 @@ uint32 Entity::navigate(const Position3D& destination, float velocity, float dis
 	KBE_ASSERT(ret);
 
 	pMoveController_ = p;
-	// 立即执行一次移动，避免 Detour 刚创建后的首帧空窗，
-	// 这样可以更早暴露路径是否真的可推进，也能减少高负载下的初始堆积。
-	// Run one update immediately so Detour does not waste its first frame waiting in the queue.
-	if (handler)
-		handler->stepMoveOnceWithoutDelete();
 	return p->id();
 }
 

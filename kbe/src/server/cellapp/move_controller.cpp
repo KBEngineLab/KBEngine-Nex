@@ -81,6 +81,23 @@ void MoveController::createFromStream(KBEngine::MemoryStream& s)
 }
 
 //-------------------------------------------------------------------------------------
+bool MoveController::resetNavigate(const Position3D& destPos, float velocity, float distance, bool faceMovement,
+	float maxMoveDistance, VECTOR_POS3D_PTR paths_ptr, int8 layer, PyObject* userarg, bool useDetour)
+{
+	if (pMoveToPointHandler_ == NULL)
+		return false;
+
+	const MoveToPointHandler::MoveType expectedType = useDetour ?
+		MoveToPointHandler::MOVE_TYPE_NAV_DETOUR : MoveToPointHandler::MOVE_TYPE_NAV;
+	if (pMoveToPointHandler_->type() != expectedType)
+		return false;
+
+	NavigateHandler* pNavigateHandler = static_cast<NavigateHandler*>(pMoveToPointHandler_);
+	return pNavigateHandler->resetNavigate(destPos, velocity, distance, faceMovement,
+		maxMoveDistance, paths_ptr, layer, userarg, useDetour);
+}
+
+//-------------------------------------------------------------------------------------
 void MoveController::destroy()
 {
 	Controller::destroy();

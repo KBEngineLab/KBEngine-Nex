@@ -123,6 +123,48 @@ void NavigateHandler::createFromStream(KBEngine::MemoryStream& s)
 }
 
 //-------------------------------------------------------------------------------------
+bool NavigateHandler::resetNavigate(const Position3D& destPos, float velocity, float distance, bool faceMovement,
+	float maxMoveDistance, VECTOR_POS3D_PTR paths_ptr, int8 layer, PyObject* userarg, bool useDetour)
+{
+	if (isDestroyed_ || useDetour_ != useDetour)
+		return false;
+
+	if (!useDetour_ && (!paths_ptr || paths_ptr->empty()))
+		return false;
+
+	destPos_ = destPos;
+	velocity_ = velocity;
+	distance_ = distance;
+	faceMovement_ = faceMovement;
+	maxMoveDistance_ = maxMoveDistance;
+	layer_ = layer;
+	retryCount_ = 0;
+
+	if (pyuserarg_ != userarg)
+	{
+		Py_INCREF(userarg);
+		Py_DECREF(pyuserarg_);
+		pyuserarg_ = userarg;
+	}
+
+	if (useDetour_)
+	{
+		// 追敌重定向只丢弃路径缓存，不销毁控制器，避免频繁 navigate 造成一帧移动空窗。
+		// Retargeting drops only cached path state, avoiding the one-frame gap caused by destroy-and-create.
+		navHandle_.clear();
+		invalidateDetourPath();
+	}
+	else
+	{
+		paths_ = paths_ptr;
+		destPosIdx_ = 0;
+		destPos_ = (*paths_)[destPosIdx_++];
+	}
+
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
 bool NavigateHandler::requestMoveOver(const Position3D& oldPos)
 {
 	if (useDetour_)
@@ -194,20 +236,18 @@ bool NavigateHandler::requestMoveFailure()
 }
 
 //-------------------------------------------------------------------------------------
-bool NavigateHandler::updateDetour(bool deleteOnFinish)
+bool NavigateHandler::updateDetour()
 {
 	if (isDestroyed_)
 	{
-		if (deleteOnFinish)
-			delete this;
+		delete this;
 		return false;
 	}
 
 	if (!pController_ || !pController_->pEntity())
 	{
 		requestMoveFailure();
-		if (deleteOnFinish)
-			delete this;
+		delete this;
 		return false;
 	}
 
@@ -222,8 +262,7 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 	{
 		requestMoveFailure();
 		Py_DECREF(pEntity);
-		if (deleteOnFinish)
-			delete this;
+		delete this;
 		return false;
 	}
 
@@ -247,8 +286,7 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 	{
 		requestMoveOver(oldPosition);
 		Py_DECREF(pEntity);
-		if (deleteOnFinish)
-			delete this;
+		delete this;
 		return false;
 	}
 
@@ -260,8 +298,7 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 			{
 				requestMoveFailure();
 				Py_DECREF(pEntity);
-				if (deleteOnFinish)
-					delete this;
+				delete this;
 				return false;
 			}
 
@@ -302,8 +339,7 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 		{
 			requestMoveOver(oldPosition);
 			Py_DECREF(pEntity);
-			if (deleteOnFinish)
-				delete this;
+			delete this;
 			return false;
 		}
 
@@ -328,8 +364,7 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 		{
 			requestMoveFailure();
 			Py_DECREF(pEntity);
-			if (deleteOnFinish)
-				delete this;
+			delete this;
 			return false;
 		}
 
@@ -377,8 +412,7 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 			requestMoveOver(oldPosition);
 
 		Py_DECREF(pEntity);
-		if (deleteOnFinish)
-			delete this;
+		delete this;
 		return false;
 	}
 
@@ -390,18 +424,9 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 bool NavigateHandler::update()
 {
 	if (useDetour_)
-		return updateDetour(true);
+		return updateDetour();
 
 	return MoveToPointHandler::update();
-}
-
-//-------------------------------------------------------------------------------------
-bool NavigateHandler::stepMoveOnceWithoutDelete()
-{
-	if (!useDetour_)
-		return MoveToPointHandler::update();
-
-	return updateDetour(false);
 }
 
 //-------------------------------------------------------------------------------------

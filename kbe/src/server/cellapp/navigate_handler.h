@@ -47,14 +47,15 @@ public:
 
 	virtual bool requestMoveOver(const Position3D& oldPos);
 	virtual bool update();
-	bool stepMoveOnceWithoutDelete();
+	bool resetNavigate(const Position3D& destPos, float velocity, float distance, bool faceMovement,
+		float maxMoveDistance, VECTOR_POS3D_PTR paths_ptr, int8 layer, PyObject* userarg, bool useDetour);
 
 	virtual bool isOnGround(){ return true; }
 
 	virtual MoveType type() const { return useDetour_ ? MOVE_TYPE_NAV_DETOUR : MOVE_TYPE_NAV; }
 
 protected:
-	bool updateDetour(bool deleteOnFinish);
+	bool updateDetour();
 	bool buildDetourPath(const Position3D& currentPosition);
 	bool requestMoveFailure();
 	void invalidateDetourPath();
