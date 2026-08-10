@@ -2927,6 +2927,8 @@ uint32 Entity::navigate(const Position3D& destination, float velocity, float dis
 		if (pMoveController != NULL && pMoveController->resetNavigate(destination, velocity, distance,
 			faceMovement, maxMoveDistance, paths_ptr, layer, userData, useDetour))
 		{
+			if (useDetour)
+				pMoveController->stepMoveOnceWithoutDelete();
 			return pMoveController_->id();
 		}
 	}
@@ -2934,6 +2936,7 @@ uint32 Entity::navigate(const Position3D& destination, float velocity, float dis
 	stopMove();
 
 	KBEShared_ptr<Controller> p(new MoveController(this, NULL));
+	MoveController* pMoveController = static_cast<MoveController*>(p.get());
 	
 	if (useDetour)
 	{
@@ -2950,6 +2953,8 @@ uint32 Entity::navigate(const Position3D& destination, float velocity, float dis
 	KBE_ASSERT(ret);
 
 	pMoveController_ = p;
+	if (useDetour)
+		pMoveController->stepMoveOnceWithoutDelete();
 	return p->id();
 }
 

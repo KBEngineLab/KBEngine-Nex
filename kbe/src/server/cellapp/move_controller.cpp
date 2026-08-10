@@ -98,6 +98,18 @@ bool MoveController::resetNavigate(const Position3D& destPos, float velocity, fl
 }
 
 //-------------------------------------------------------------------------------------
+bool MoveController::stepMoveOnceWithoutDelete()
+{
+	if (pMoveToPointHandler_ == NULL)
+		return false;
+
+	if (pMoveToPointHandler_->type() != MoveToPointHandler::MOVE_TYPE_NAV_DETOUR)
+		return false;
+
+	return static_cast<NavigateHandler*>(pMoveToPointHandler_)->stepMoveOnceWithoutDelete();
+}
+
+//-------------------------------------------------------------------------------------
 void MoveController::destroy()
 {
 	Controller::destroy();

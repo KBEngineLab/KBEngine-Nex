@@ -236,18 +236,20 @@ bool NavigateHandler::requestMoveFailure()
 }
 
 //-------------------------------------------------------------------------------------
-bool NavigateHandler::updateDetour()
+bool NavigateHandler::updateDetour(bool deleteOnFinish)
 {
 	if (isDestroyed_)
 	{
-		delete this;
+		if (deleteOnFinish)
+			delete this;
 		return false;
 	}
 
 	if (!pController_ || !pController_->pEntity())
 	{
 		requestMoveFailure();
-		delete this;
+		if (deleteOnFinish)
+			delete this;
 		return false;
 	}
 
@@ -262,7 +264,8 @@ bool NavigateHandler::updateDetour()
 	{
 		requestMoveFailure();
 		Py_DECREF(pEntity);
-		delete this;
+		if (deleteOnFinish)
+			delete this;
 		return false;
 	}
 
@@ -286,7 +289,8 @@ bool NavigateHandler::updateDetour()
 	{
 		requestMoveOver(oldPosition);
 		Py_DECREF(pEntity);
-		delete this;
+		if (deleteOnFinish)
+			delete this;
 		return false;
 	}
 
@@ -298,7 +302,8 @@ bool NavigateHandler::updateDetour()
 			{
 				requestMoveFailure();
 				Py_DECREF(pEntity);
-				delete this;
+				if (deleteOnFinish)
+					delete this;
 				return false;
 			}
 
@@ -339,7 +344,8 @@ bool NavigateHandler::updateDetour()
 		{
 			requestMoveOver(oldPosition);
 			Py_DECREF(pEntity);
-			delete this;
+			if (deleteOnFinish)
+				delete this;
 			return false;
 		}
 
@@ -364,7 +370,8 @@ bool NavigateHandler::updateDetour()
 		{
 			requestMoveFailure();
 			Py_DECREF(pEntity);
-			delete this;
+			if (deleteOnFinish)
+				delete this;
 			return false;
 		}
 
@@ -412,7 +419,8 @@ bool NavigateHandler::updateDetour()
 			requestMoveOver(oldPosition);
 
 		Py_DECREF(pEntity);
-		delete this;
+		if (deleteOnFinish)
+			delete this;
 		return false;
 	}
 
@@ -424,9 +432,18 @@ bool NavigateHandler::updateDetour()
 bool NavigateHandler::update()
 {
 	if (useDetour_)
-		return updateDetour();
+		return updateDetour(true);
 
 	return MoveToPointHandler::update();
+}
+
+//-------------------------------------------------------------------------------------
+bool NavigateHandler::stepMoveOnceWithoutDelete()
+{
+	if (!useDetour_)
+		return MoveToPointHandler::update();
+
+	return updateDetour(false);
 }
 
 //-------------------------------------------------------------------------------------
