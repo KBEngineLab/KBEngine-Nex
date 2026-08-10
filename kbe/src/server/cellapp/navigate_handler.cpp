@@ -42,6 +42,7 @@ navHandle_(),
 currentPolygon_(NavMeshHandle::INVALID_NAVMESH_POLYREF),
 straightPath_(),
 straightPathIndex_(0),
+lookAheadDistance_(2.0f),
 retryCount_(0)
 {
 	destPos_ = (*paths_)[destPosIdx_++];
@@ -62,6 +63,7 @@ navHandle_(),
 currentPolygon_(NavMeshHandle::INVALID_NAVMESH_POLYREF),
 straightPath_(),
 straightPathIndex_(0),
+lookAheadDistance_(2.0f),
 retryCount_(0)
 {
 	updatableName = "NavigateHandler";
@@ -78,6 +80,7 @@ navHandle_(),
 currentPolygon_(NavMeshHandle::INVALID_NAVMESH_POLYREF),
 straightPath_(),
 straightPathIndex_(0),
+lookAheadDistance_(2.0f),
 retryCount_(0)
 {
 	updatableName = "NavigateHandler";
@@ -94,6 +97,7 @@ navHandle_(),
 currentPolygon_(NavMeshHandle::INVALID_NAVMESH_POLYREF),
 straightPath_(),
 straightPathIndex_(0),
+lookAheadDistance_(2.0f),
 retryCount_(0)
 {
 	updatableName = "NavigateHandler";
@@ -261,32 +265,42 @@ bool NavigateHandler::updateDetour()
 		}
 	}
 
-	while (straightPathIndex_ < straightPath_.size() &&
-		(straightPath_[straightPathIndex_] - currentPosition).squaredLength() <= 0.0025f)
+	// 与旧版 Detour 行为保持一致：不是每 tick 只追最近拐点，而是向前看一小段。
+	// 这样在拐点很近、实体贴边或 Detour 投影点略有抖动时，不会连续产生“几乎不动”的假失败。
+	// Keep the legacy Detour semantics: look a little ahead instead of chasing only the nearest corner.
+	Position3D moveTarget = currentPosition;
+	float remainingLookAhead = lookAheadDistance_;
+	size_t nextPathIndex = straightPathIndex_;
+	while (nextPathIndex < straightPath_.size() && remainingLookAhead > 0.f)
+	{
+		Vector3 segment = straightPath_[nextPathIndex] - moveTarget;
+		float segmentLength = segment.length();
+		if (segmentLength > remainingLookAhead)
+		{
+			segment *= 1.f / segmentLength;
+			moveTarget += segment * remainingLookAhead;
+			break;
+		}
+
+		moveTarget = straightPath_[nextPathIndex];
+		remainingLookAhead -= segmentLength;
+		++nextPathIndex;
+	}
+
+	straightPathIndex_ = nextPathIndex;
+	Vector3 movement = moveTarget - currentPosition;
+	float movementLength = movement.length();
+	if (movementLength <= 0.05f || velocity_ <= 0.f)
 	{
 		++straightPathIndex_;
-	}
-
-	if (straightPathIndex_ >= straightPath_.size())
-	{
-		invalidateDetourPath();
-		Py_DECREF(pEntity);
-		return true;
-	}
-
-	Vector3 movement = straightPath_[straightPathIndex_] - currentPosition;
-	float movementLength = movement.length();
-	if (movementLength <= 0.00001f || velocity_ <= 0.f)
-	{
-		if (++retryCount_ > 5)
+		if (straightPathIndex_ >= straightPath_.size())
 		{
-			requestMoveFailure();
+			requestMoveOver(oldPosition);
 			Py_DECREF(pEntity);
 			delete this;
 			return false;
 		}
 
-		invalidateDetourPath();
 		Py_DECREF(pEntity);
 		return true;
 	}
@@ -318,17 +332,20 @@ bool NavigateHandler::updateDetour()
 	}
 
 	float groundHeight = nextPosition.y;
-	if (!pNavMesh->getPolyHeight(layer_, currentPolygon_, nextPosition, groundHeight) ||
-		(nextPosition - currentPosition).squaredLength() <= 0.00000001f)
+	if (!pNavMesh->getPolyHeight(layer_, currentPolygon_, nextPosition, groundHeight))
 	{
-		if (++retryCount_ > 5)
-		{
-			requestMoveFailure();
-			Py_DECREF(pEntity);
-			delete this;
-			return false;
-		}
+		// 高度查询失败通常是 polyRef 在边界上暂时失效，旧版只重建路径不触发 onMoveFailure。
+		// Height lookup failures are usually transient boundary polyRef misses, so rebuild instead of failing.
+		invalidateDetourPath();
+		Py_DECREF(pEntity);
+		return true;
+	}
 
+	if ((nextPosition - currentPosition).squaredLength() <= 0.00000001f)
+	{
+		// Detour 返回“成功但未推进”时也只重建路径。把它算作真实失败会让高负载下的临时拥塞
+		// 快速变成脚本层 onMoveFailure，这正是新版相对旧版更容易站桩的主要原因之一。
+		// A successful no-op movement means the corridor needs rebuilding, not that the move controller failed.
 		invalidateDetourPath();
 		Py_DECREF(pEntity);
 		return true;

@@ -2922,22 +2922,27 @@ uint32 Entity::navigate(const Position3D& destination, float velocity, float dis
 	velocity = velocity / g_kbeSrvConfig.gameUpdateHertz();
 
 	KBEShared_ptr<Controller> p(new MoveController(this, NULL));
+	NavigateHandler* handler = nullptr;
 	
 	if (useDetour)
 	{
-		new NavigateHandler(p, destination, velocity, distance,
+		handler = new NavigateHandler(p, destination, velocity, distance,
 			faceMovement, maxMoveDistance, layer, userData);
 	}
 	else
 	{
-		new NavigateHandler(p, destination, velocity,
+		handler = new NavigateHandler(p, destination, velocity,
 			distance, faceMovement, maxMoveDistance, paths_ptr, userData);
 	}
 
 	bool ret = pControllers_->add(p);
 	KBE_ASSERT(ret);
-	
+
 	pMoveController_ = p;
+	// 立即执行一次移动，避免 Detour 刚创建后的首帧空窗，
+	// 这样可以更早暴露路径是否真的可推进，也能减少高负载下的初始堆积。
+	// Run one update immediately so Detour does not waste its first frame waiting in the queue.
+	handler->update();
 	return p->id();
 }
 
