@@ -31,10 +31,12 @@ export namespace DataTypes{
     const TWO_PWR_16_DBL = 1 << 16;
     const TWO_PWR_32_DBL = TWO_PWR_16_DBL * TWO_PWR_16_DBL;
 
-    // 保留 DataTypes 命名空间下的类身份，旧 SDK 调用与直接模块导入共享同一个构造函数。
-    // Preserve class identity under DataTypes so legacy SDK calls and direct module imports share one constructor.
-    export import KB_INT64 = Int64.KB_INT64;
-    export import KB_UINT64 = Int64.KB_UINT64;
+    // 用显式运行时常量保留旧 SDK 的 DataTypes.KB_* 访问方式，避免部分打包器擦除 namespace import alias。
+    // Use explicit runtime constants for legacy DataTypes.KB_* access so bundlers cannot erase namespace import aliases.
+    export type KB_INT64 = Int64.KB_INT64;
+    export const KB_INT64: typeof Int64.KB_INT64 = Int64.KB_INT64;
+    export type KB_UINT64 = Int64.KB_UINT64;
+    export const KB_UINT64: typeof Int64.KB_UINT64 = Int64.KB_UINT64;
     export class NumberUtil {
         static toUInt8(n: number): number {
             return n & 0xFF;

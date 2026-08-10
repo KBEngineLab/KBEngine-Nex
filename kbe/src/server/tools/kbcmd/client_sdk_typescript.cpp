@@ -1351,6 +1351,7 @@ bool ClientSDKTypeScript::writeEntityCallBegin(ScriptDefModule* pScriptDefModule
 
 	sourcefileBody_ += "import { EntityCall } from './KBEngine';\n";
 	sourcefileBody_ += "import { DataTypes } from './DataTypes';\n";
+	sourcefileBody_ += "import { KB_INT64, KB_UINT64 } from './Int64';\n";
 	sourcefileBody_ += "import * as KBETypes from './KBETypes';\n";
 	sourcefileBody_ += "import EntityDef from './EntityDef';\n";
 	//sourcefileBody_ += "import * as KBEngine from './KBEngine';\n";
@@ -1445,12 +1446,10 @@ bool ClientSDKTypeScript::writeEntityCallMethodBegin(ScriptDefModule* pScriptDef
 			
 
 			if (writeName == "Uint64") {
-				//writeName = fmt::format("stream.Write{}(DataTypes.KB_UINT64.fromBigInt(v[i]))", writeName);
-				writeName = fmt::format("this.bundle!.Write{}(DataTypes.KB_UINT64.fromBigInt(arg{}))", writeName, i);
+				writeName = fmt::format("this.bundle!.Write{}(KB_UINT64.fromBigInt(arg{}))", writeName, i);
 			}
 			else if (writeName == "Int64") {
-				//writeName = fmt::format("stream.Write{}(DataTypes.KB_INT64.fromBigInt(v[i]))", writeName);
-				writeName = fmt::format("this.bundle!.Write{}(DataTypes.KB_INT64.fromBigInt(arg{}))", writeName, i);
+				writeName = fmt::format("this.bundle!.Write{}(KB_INT64.fromBigInt(arg{}))", writeName, i);
 			}
 			else {
 				writeName = fmt::format("this.bundle!.Write{}(arg{})", writeName, i);
@@ -1675,10 +1674,10 @@ bool ClientSDKTypeScript::createArrayChildClass(DataType* pRootDataType, DataTyp
 			//writeName = fmt::format("stream.Write{}(v[i])", writeName);
 
 			if (writeName == "Uint64") {
-				writeName = fmt::format("stream.Write{}(DataTypes.KB_UINT64.fromBigInt(v[i]))", writeName);
+				writeName = fmt::format("stream.Write{}(KB_UINT64.fromBigInt(v[i]))", writeName);
 			}
 			else if (writeName == "Int64") {
-				writeName = fmt::format("stream.Write{}(DataTypes.KB_INT64.fromBigInt(v[i]))", writeName);
+				writeName = fmt::format("stream.Write{}(KB_INT64.fromBigInt(v[i]))", writeName);
 			}
 			else {
 				writeName = fmt::format("stream.Write{}(v[i])", writeName);
@@ -1755,10 +1754,10 @@ bool ClientSDKTypeScript::createArrayChildClass(DataType* pRootDataType, DataTyp
 			//writeName = fmt::format("stream.Write{}(v[i])", writeName);
 
 			if (writeName == "Uint64") {
-				writeName = fmt::format("stream.Write{}(DataTypes.KB_UINT64.fromBigInt(v[i]))", writeName);
+				writeName = fmt::format("stream.Write{}(KB_UINT64.fromBigInt(v[i]))", writeName);
 			}
 			else if (writeName == "Int64") {
-				writeName = fmt::format("stream.Write{}(DataTypes.KB_INT64.fromBigInt(v[i]))", writeName);
+				writeName = fmt::format("stream.Write{}(KB_INT64.fromBigInt(v[i]))", writeName);
 			}
 			else {
 				writeName = fmt::format("stream.Write{}(v[i])", writeName);
@@ -1812,10 +1811,10 @@ bool ClientSDKTypeScript::createArrayChildClass(DataType* pRootDataType, DataTyp
 		
 
 		if (writeName == "Uint64") {
-			writeName = fmt::format("stream.Write{}(DataTypes.KB_UINT64.fromBigInt(v[i]))", writeName);
+			writeName = fmt::format("stream.Write{}(KB_UINT64.fromBigInt(v[i]))", writeName);
 		}
 		else if (writeName == "Int64") {
-			writeName = fmt::format("stream.Write{}(DataTypes.KB_INT64.fromBigInt(v[i]))", writeName);
+			writeName = fmt::format("stream.Write{}(KB_INT64.fromBigInt(v[i]))", writeName);
 		}
 		else {
 			writeName = fmt::format("stream.Write{}(v[i])", writeName);
@@ -1963,9 +1962,9 @@ bool ClientSDKTypeScript::writeCustomDataType(const DataType* pDataType)
 					writeName[0] = std::toupper(writeName[0]);
 
 					if (writeName == "Uint64" ) {
-						sourcefileBody_ += fmt::format("\t\tstream.Write{}(DataTypes.KB_UINT64.fromBigInt(v.{}));\n", writeName, keyiter->first);
+						sourcefileBody_ += fmt::format("\t\tstream.Write{}(KB_UINT64.fromBigInt(v.{}));\n", writeName, keyiter->first);
 					}else if ( writeName == "Int64") {
-						sourcefileBody_ += fmt::format("\t\tstream.Write{}(DataTypes.KB_INT64.fromBigInt(v.{}));\n", writeName, keyiter->first);
+						sourcefileBody_ += fmt::format("\t\tstream.Write{}(KB_INT64.fromBigInt(v.{}));\n", writeName, keyiter->first);
 					}
 					else {
 						sourcefileBody_ += fmt::format("\t\tstream.Write{}(v.{});\n", writeName, keyiter->first);
@@ -2073,10 +2072,10 @@ bool ClientSDKTypeScript::writeCustomDataType(const DataType* pDataType)
 				writeName[0] = std::toupper(writeName[0]);
 
 				if (writeName == "Uint64") {
-					writeName = fmt::format("stream.Write{}(DataTypes.KB_UINT64.fromBigInt(v[i]))", writeName);
+					writeName = fmt::format("stream.Write{}(KB_UINT64.fromBigInt(v[i]))", writeName);
 				}
 				else if (writeName == "Int64") {
-					writeName = fmt::format("stream.Write{}(DataTypes.KB_INT64.fromBigInt(v[i]))", writeName);
+					writeName = fmt::format("stream.Write{}(KB_INT64.fromBigInt(v[i]))", writeName);
 				}
 				else {
 					writeName = fmt::format("stream.Write{}(v[i])", writeName);
@@ -2157,10 +2156,10 @@ bool ClientSDKTypeScript::writeCustomDataType(const DataType* pDataType)
 				writeName[0] = std::toupper(writeName[0]);
 
 				if (writeName == "Uint64") {
-					writeName = fmt::format("stream.Write{}(DataTypes.KB_UINT64.fromBigInt(v[i]))", writeName);
+					writeName = fmt::format("stream.Write{}(KB_UINT64.fromBigInt(v[i]))", writeName);
 				}
 				else if (writeName == "Int64") {
-					writeName = fmt::format("stream.Write{}(DataTypes.KB_INT64.fromBigInt(v[i]))", writeName);
+					writeName = fmt::format("stream.Write{}(KB_INT64.fromBigInt(v[i]))", writeName);
 				}
 				else {
 					writeName = fmt::format("stream.Write{}(v[i])", writeName);
@@ -2360,6 +2359,7 @@ bool ClientSDKTypeScript::writeTypesBegin()
 
 import { DataTypes } from "./DataTypes";
 import type { DataTypeWriter } from "./DataTypes";
+import { KB_INT64, KB_UINT64 } from "./Int64";
 import { MemoryStream } from "./MemoryStream";
 import { Vector2, Vector3, Vector4 } from "./KBEMath";
 
