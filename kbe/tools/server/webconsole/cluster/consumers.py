@@ -8,6 +8,7 @@ import json
 
 from pycommon import Define
 from pycommon.LoggerWatcher import LoggerWatcher
+from webconsole.user_extension import get_kbe_user_context
 
 
 class LogWatch(object):
@@ -16,7 +17,7 @@ class LogWatch(object):
     """
 
     def __init__(self, wsInst, extaddr, extport, uid, components_check, logtype, globalOrder, groupOrder, searchDate,
-                 keystr):
+                 keystr, admin_token):
         self.wsInst = wsInst
         self.extaddr = extaddr
         self.extport = extport
@@ -27,6 +28,7 @@ class LogWatch(object):
         self.groupOrder = groupOrder
         self.searchDate = searchDate
         self.keystr = keystr
+        self.admin_token = admin_token
         self.logger = LoggerWatcher()
         self.previous_log = []
 
@@ -38,7 +40,7 @@ class LogWatch(object):
         self.logger.close()
         self.logger.connect(self.extaddr, self.extport)
         self.logger.registerToLoggerForWeb(self.uid, self.components_check, self.logtype, self.globalOrder,
-                                           self.groupOrder, self.searchDate, self.keystr)
+                                           self.groupOrder, self.searchDate, self.keystr, self.admin_token)
 
         def onReceivedLog(logs):
             if self._stop_event.is_set():  # 检查停止
@@ -56,7 +58,7 @@ class LogWatch(object):
         """
         """
         self._stop_event.set()  # 设置停止标记
-        self.logger.deregisterFromLogger()
+        self.logger.deregisterFromLogger(self.admin_token)
         self.logger.close()
 
         if self.wsInst:
@@ -113,10 +115,7 @@ class LogConsumer(AsyncWebsocketConsumer):
         if dbmgr_check == '1': components_check[1] = Define.DBMGR_TYPE
         if loginapp_check == '1': components_check[2] = Define.LOGINAPP_TYPE
         if components_check == components_check2:
-            i = -1
-            for x in components_check:
-                i = i + 1
-                components_check[x] = i
+            components_check = list(range(Define.COMPONENT_END_TYPE))
 
         logtype = int(query_params.get("logtype", [None])[0])
 
@@ -132,9 +131,10 @@ class LogConsumer(AsyncWebsocketConsumer):
         groupOrder = int(groupOrder)
         searchDate = query_params.get("searchDate", [''])[0]
         keystr = query_params.get("keystr", [''])[0]
+        admin_token = get_kbe_user_context(self.scope["user"]).gui_console_admin_token
 
         self.console = LogWatch(self, extaddr, extport, uid, components_check, logtype, globalOrder, groupOrder,
-                           searchDate, keystr)
+                           searchDate, keystr, admin_token)
         self.console.do()
 
 

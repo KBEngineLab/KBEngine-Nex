@@ -1,4 +1,7 @@
 from dataclasses import dataclass
+from pathlib import Path
+import os
+import xml.etree.ElementTree as ET
 
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import PermissionDenied
@@ -14,6 +17,7 @@ class KBEUserExtensionContext:
     kbe_root: str
     kbe_res_path: str
     kbe_bin_path: str
+    gui_console_admin_token: str
 
 
 def get_kbe_user_extension(user: User) -> KBEUserExtension:
@@ -42,7 +46,56 @@ def get_kbe_user_context(user: User) -> KBEUserExtensionContext:
         kbe_root=_safe_str(extension.kbe_root),
         kbe_res_path=_safe_str(extension.kbe_res_path),
         kbe_bin_path=_safe_str(extension.kbe_bin_path),
+        gui_console_admin_token=resolve_gui_console_admin_token(extension),
     )
+
+
+def resolve_gui_console_admin_token(extension: KBEUserExtension) -> str:
+    """Resolve GUIConsole admin token using the same defaults-then-override rule as the server.
+    按服务端一致的 defaults 后 overlay 规则解析 GUIConsole 管理 Token。
+    """
+    roots = _resource_roots(extension)
+    token = _read_first_gui_console_admin_token(
+        roots,
+        ("server/kbengine_defaults.xml", "kbengine_defaults.xml"),
+    )
+    override = _read_first_gui_console_admin_token(
+        roots,
+        ("server/kbengine.xml", "kbengine.xml"),
+    )
+    return token if override is None else override
+
+
+def _resource_roots(extension: KBEUserExtension) -> list[Path]:
+    roots: list[Path] = []
+    res_path = _safe_str(extension.kbe_res_path)
+    if res_path:
+        roots.extend(Path(item) for item in res_path.split(os.pathsep) if item)
+
+    # WebConsole sits under kbe/tools/server/webconsole; this fallback lets log
+    # watching work with the engine default token even before KBE_RES_PATH is filled.
+    # WebConsole 位于 kbe/tools/server/webconsole；该回退允许用户未填写 KBE_RES_PATH 时
+    # 仍能读取引擎默认 token 并订阅日志。
+    engine_res = Path(__file__).resolve().parents[4] / "res"
+    if engine_res not in roots:
+        roots.append(engine_res)
+    return roots
+
+
+def _read_first_gui_console_admin_token(roots: list[Path], names: tuple[str, ...]) -> str | None:
+    for root in roots:
+        for name in names:
+            candidate = root / name
+            if not candidate.is_file():
+                continue
+            try:
+                tree = ET.parse(candidate)
+            except (OSError, ET.ParseError):
+                continue
+            token_node = tree.getroot().find("./guiConsole/adminToken")
+            if token_node is not None:
+                return (token_node.text or "").strip()
+    return None
 
 
 def _safe_str(value: object) -> str:

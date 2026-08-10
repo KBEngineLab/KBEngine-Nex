@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.http import HttpResponse
 from django.template.response import TemplateResponse
+from urllib.parse import urlencode
 
 from KBESettings.custom_admin_site import custom_admin_site
 from cluster.models import ServerManage, ServerLog
@@ -37,8 +38,8 @@ class ServerManageAdmin(admin.ModelAdmin):
         try:
             intaddr = kbeComps[0].intaddr
             intport = kbeComps[0].intport
-            extaddr = kbeComps[0].extaddr
-            extport = kbeComps[0].extport
+            extaddr = kbeComps[0].intaddr
+            extport = kbeComps[0].intport
             # host = kbeComps[0].extaddr
             # port = kbeComps[0].consolePort
             uid = system_user_uid
@@ -65,7 +66,7 @@ class ServerManageAdmin(admin.ModelAdmin):
         loginapp_check = POST.get("loginapp_check")
         pull_state = POST.get("pull_state")
 
-        if pull_state == 0:
+        if pull_state == "0":
             pull_state = 1
 
         if baseapp_check: components_checks[6] = Define.BASEAPP_TYPE
@@ -83,11 +84,11 @@ class ServerManageAdmin(admin.ModelAdmin):
             components_checks[5] = Define.CELLAPP_TYPE
             components_checks[1] = Define.DBMGR_TYPE
             components_checks[2] = Define.LOGINAPP_TYPE
-            baseapp_check = 1
-            baseappmgr_check = 1
-            cellapp_check = 1
-            dbmgr_check = 1
-            loginapp_check = 1
+            baseapp_check = "1"
+            baseappmgr_check = "1"
+            cellapp_check = "1"
+            dbmgr_check = "1"
+            loginapp_check = "1"
 
         # if len(components_checks)<=1:components_checks[].append(Define.COMPONENT_END_TYPE)
 
@@ -147,7 +148,7 @@ class ServerManageAdmin(admin.ModelAdmin):
             logtype |= logName2type["S_WARN"]
             S_WARN_check = 1
         if WARNING:
-            logtype |= logName2type["S_WARN"]
+            logtype |= logName2type["WARNING"]
             WARNING_check = 1
         if logtype == 0x00000000:
             logtype = 0xffffffff
@@ -173,9 +174,22 @@ class ServerManageAdmin(admin.ModelAdmin):
         if searchDate is None: searchDate = ""
         if keystr is None: keystr = ""
 
-        ws_url = "ws://%s/ws/server_manage/?&logtype=%s&extaddr=%s&extport=%s&uid=%s&baseapp_check=%s&baseappmgr_check=%s&cellapp_check=%s&dbmgr_check=%s&loginapp_check=%s&globalOrder=%s&groupOrder=%s&searchDate=%s&keystr=%s" % (
-            request.META["HTTP_HOST"], logtype, extaddr, extport, uid, baseapp_check, baseappmgr_check, cellapp_check,
-            dbmgr_check, loginapp_check, globalOrder, groupOrder, searchDate, keystr)
+        query = urlencode({
+            "logtype": logtype,
+            "extaddr": extaddr,
+            "extport": extport,
+            "uid": uid,
+            "baseapp_check": baseapp_check or "",
+            "baseappmgr_check": baseappmgr_check or "",
+            "cellapp_check": cellapp_check or "",
+            "dbmgr_check": dbmgr_check or "",
+            "loginapp_check": loginapp_check or "",
+            "globalOrder": globalOrder,
+            "groupOrder": groupOrder,
+            "searchDate": searchDate,
+            "keystr": keystr,
+        })
+        ws_url = "ws://%s/ws/server_manage/?%s" % (request.META["HTTP_HOST"], query)
 
 
 

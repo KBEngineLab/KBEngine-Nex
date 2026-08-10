@@ -56,6 +56,20 @@ class LoggerWatcher:
 		self.socket = None
 		self.msgBuffer = "".encode()
 
+	@staticmethod
+	def writeString(stream, value):
+		"""
+		写入KBE协议字符串，末尾包含空终止符。
+		Write a KBE protocol string with the trailing null terminator.
+		"""
+		if value is None:
+			value = ""
+		if isinstance(value, bytes):
+			encoded = value
+		else:
+			encoded = str(value).encode("utf-8")
+		stream.write(struct.pack("=%ss" % (len(encoded) + 1), encoded))
+
 	def connect( self, ip, port ):
 		"""
 		连接到logger
@@ -74,14 +88,15 @@ class LoggerWatcher:
 			self.socket.close()
 			self.socket = None
 
-	def registerToLogger( self, uid):
+	def registerToLogger( self, uid, adminToken = None):
 		"""
 		向logger注册
 		"""
 
 		msg = Define.BytesIO()
 		msg.write( struct.pack("=H", Logger_registerLogWatcher ) ) # command
-		msg.write( struct.pack("=H", struct.calcsize("=iIiiccB" + "i" * Define.COMPONENT_END_TYPE + "BB") ) ) # package len
+		adminToken = "" if adminToken is None else str(adminToken).strip()
+		msg.write( struct.pack("=H", struct.calcsize("=iIiiccB" + "i" * Define.COMPONENT_END_TYPE + "BB") + len(adminToken.encode("utf-8")) + 1) ) # package len
 		msg.write( struct.pack("=i", uid ) )
 		msg.write( struct.pack("=I",0xffffffff) ) # logtypes filter
 		# msg.write( struct.pack("=I",KBELOG_WARNING ) ) # logtypes filter
@@ -89,18 +104,20 @@ class LoggerWatcher:
 		msg.write( struct.pack("=B" ,Define.COMPONENT_END_TYPE) ) # component type filter count
 		msg.write( struct.pack("="+"i" * Define.COMPONENT_END_TYPE, *list(range(Define.COMPONENT_END_TYPE)))) # component type filter
 		msg.write( struct.pack("=BB", 0, 1 ) ) # isfind, first
+		self.writeString(msg, adminToken)
 		self.socket.sendall( msg.getvalue() )
 
-	def registerToLoggerForWeb( self, uid, components_check, logtype, globalOrder, groupOrder, searchDate, keystr ):
+	def registerToLoggerForWeb( self, uid, components_check, logtype, globalOrder, groupOrder, searchDate, keystr, adminToken = None ):
 		"""
 		向logger注册
 		"""
 
 		msg = Define.BytesIO()
+		adminToken = "" if adminToken is None else str(adminToken).strip()
 		d1 = str(len(searchDate.encode()))
 		d2 = str(len(keystr.encode()))
 		msg.write( struct.pack("=H", Logger_registerLogWatcher ) ) # command
-		msg.write( struct.pack("=H", struct.calcsize("=iIiiccB" + "i" * Define.COMPONENT_END_TYPE + "BB") + len(searchDate.encode()) + len(keystr.encode())) ) # package len
+		msg.write( struct.pack("=H", struct.calcsize("=iIiiccB" + "i" * Define.COMPONENT_END_TYPE + "BB") + len(searchDate.encode()) + len(keystr.encode()) + len(adminToken.encode("utf-8")) + 1) ) # package len
 		msg.write( struct.pack("=i", uid ) )
 		msg.write( struct.pack("=I",logtype) ) # logtypes filter
 		# msg.write( struct.pack("=I",KBELOG_WARNING ) ) # logtypes filter
@@ -108,15 +125,18 @@ class LoggerWatcher:
 		msg.write( struct.pack("=B" ,Define.COMPONENT_END_TYPE) ) # component type filter count
 		msg.write( struct.pack("="+"i" * Define.COMPONENT_END_TYPE, *list(list(components_check)))) # component type filter
 		msg.write( struct.pack("=BB", 0, 1 ) ) # isfind, first
+		self.writeString(msg, adminToken)
 		self.socket.sendall( msg.getvalue() )
 
-	def deregisterFromLogger( self ):
+	def deregisterFromLogger( self, adminToken = None ):
 		"""
 		从logger取消注册
 		"""
 		msg = Define.BytesIO()
+		adminToken = "" if adminToken is None else str(adminToken).strip()
 		msg.write( struct.pack("=H", Logger_deregisterLogWatcher ) ) # command
-		msg.write( struct.pack("=H", 0) ) # package len
+		msg.write( struct.pack("=H", len(adminToken.encode("utf-8")) + 1) ) # package len
+		self.writeString(msg, adminToken)
 		self.socket.sendall( msg.getvalue() )
 
 	def sendActiveTick( self ):
