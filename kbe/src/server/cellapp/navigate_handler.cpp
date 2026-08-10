@@ -317,6 +317,7 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 	// Keep the legacy Detour semantics: look a little ahead instead of chasing only the nearest corner.
 	Position3D moveTarget = currentPosition;
 	float remainingLookAhead = lookAheadDistance_;
+	size_t cornerPathIndex = straightPathIndex_;
 	size_t nextPathIndex = straightPathIndex_;
 	while (nextPathIndex < straightPath_.size() && remainingLookAhead > 0.f)
 	{
@@ -378,6 +379,37 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 		invalidateDetourPath();
 		Py_DECREF(pEntity);
 		return true;
+	}
+
+	if ((nextPosition - currentPosition).squaredLength() <= 0.00000001f &&
+		cornerPathIndex < straightPath_.size())
+	{
+		Vector3 cornerMovement = straightPath_[cornerPathIndex] - currentPosition;
+		float cornerMovementLength = cornerMovement.length();
+		if (cornerMovementLength > 0.05f)
+		{
+			// 前视点可能已经越过拐角，直线推进会切到障碍边界上。此时先朝当前拐点移动，
+			// 让实体真正完成转弯，再恢复前视移动，避免在栅栏/墙角处持续投影不动。
+			// The look-ahead target can be past the corner and the straight steering vector may cut into an obstacle.
+			// Fall back to the current corner first so the entity can complete the turn.
+			cornerMovement *= 1.f / cornerMovementLength;
+			float cornerStepDistance = std::min(velocity_, cornerMovementLength);
+			if (maxMoveDistance_ > 0.f)
+				cornerStepDistance = std::min(cornerStepDistance, maxMoveDistance_);
+			cornerMovement *= cornerStepDistance;
+
+			dtPolyRef cornerPolygon = currentPolygon_;
+			Position3D cornerPosition;
+			if (pNavMesh->moveAlongSurface(layer_, cornerPolygon, currentPosition,
+				currentPosition + cornerMovement, cornerPosition) &&
+				(cornerPosition - currentPosition).squaredLength() > 0.00000001f)
+			{
+				currentPolygon_ = cornerPolygon;
+				straightPathIndex_ = cornerPathIndex;
+				nextPosition = cornerPosition;
+				movement = cornerMovement;
+			}
+		}
 	}
 
 	float groundHeight = nextPosition.y;
