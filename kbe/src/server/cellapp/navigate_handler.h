@@ -67,9 +67,10 @@ protected:
 	float maxMoveDistance_;
 	bool useDetour_;
 	NavigationHandlePtr navHandle_;
-	dtPolyRef currentPolygon_;
+	dtPolyRef polyRef_;
 	std::vector<Position3D> straightPath_;
-	size_t straightPathIndex_;
+	int currentPathIndex_;
+	bool pathValid_;
 	// Detour 移动保留一点前视距离，避免每 tick 只追最近拐点导致贴边、极短步长和误判失败。
 	// Detour movement keeps a small look-ahead distance to avoid chasing the nearest corner every tick.
 	float lookAheadDistance_;

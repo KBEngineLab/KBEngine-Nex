@@ -193,6 +193,12 @@ public:
 	INLINE bool isOnGround() const;
 	DECLARE_PY_GET_MOTHOD(pyGetIsOnGround);
 
+	/**
+		是否处于导航移动中
+	*/
+	INLINE void isOnNavigate(bool v);
+	INLINE bool isOnNavigate() const;
+
 	/** 
 		设置entity方向和位置 
 	*/
@@ -698,6 +704,8 @@ protected:
 
 	// 是否在地面上
 	bool													isOnGround_;
+	// 是否处于导航移动中
+	bool													isOnNavigate_;
 
 	// entity x,z轴最高移动速度
 	float													topSpeed_;

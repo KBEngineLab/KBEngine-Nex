@@ -2363,7 +2363,7 @@ uint32 Witness::getEntityVolatileDataUpdateFlags(Entity* otherEntity)
 	
 	if (updatePosition && (entity_posdir_additional_updates == 0 || g_kbetime - otherEntity->posChangedTime() < entity_posdir_additional_updates))
 	{
-		if (!otherEntity->isOnGround() || !pVolatileInfo->optimized())
+		if (!otherEntity->isOnGround() || otherEntity->isOnNavigate() || !pVolatileInfo->optimized())
 		{
 			flags |= UPDATE_FLAG_XYZ; 
 		}

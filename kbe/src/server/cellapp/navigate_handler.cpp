@@ -39,9 +39,10 @@ paths_(paths_ptr),
 maxMoveDistance_(maxMoveDistance),
 useDetour_(false),
 navHandle_(),
-currentPolygon_(NavMeshHandle::INVALID_NAVMESH_POLYREF),
+polyRef_(NavMeshHandle::INVALID_NAVMESH_POLYREF),
 straightPath_(),
-straightPathIndex_(0),
+currentPathIndex_(0),
+pathValid_(false),
 lookAheadDistance_(2.0f),
 retryCount_(0)
 {
@@ -60,9 +61,10 @@ paths_(),
 maxMoveDistance_(maxMoveDistance),
 useDetour_(true),
 navHandle_(),
-currentPolygon_(NavMeshHandle::INVALID_NAVMESH_POLYREF),
+polyRef_(NavMeshHandle::INVALID_NAVMESH_POLYREF),
 straightPath_(),
-straightPathIndex_(0),
+currentPathIndex_(0),
+pathValid_(false),
 lookAheadDistance_(2.0f),
 retryCount_(0)
 {
@@ -77,9 +79,10 @@ paths_(),
 maxMoveDistance_(0.f),
 useDetour_(false),
 navHandle_(),
-currentPolygon_(NavMeshHandle::INVALID_NAVMESH_POLYREF),
+polyRef_(NavMeshHandle::INVALID_NAVMESH_POLYREF),
 straightPath_(),
-straightPathIndex_(0),
+currentPathIndex_(0),
+pathValid_(false),
 lookAheadDistance_(2.0f),
 retryCount_(0)
 {
@@ -94,9 +97,10 @@ paths_(),
 maxMoveDistance_(0.f),
 useDetour_(useDetour),
 navHandle_(),
-currentPolygon_(NavMeshHandle::INVALID_NAVMESH_POLYREF),
+polyRef_(NavMeshHandle::INVALID_NAVMESH_POLYREF),
 straightPath_(),
-straightPathIndex_(0),
+currentPathIndex_(0),
+pathValid_(false),
 lookAheadDistance_(2.0f),
 retryCount_(0)
 {
@@ -126,42 +130,11 @@ void NavigateHandler::createFromStream(KBEngine::MemoryStream& s)
 bool NavigateHandler::resetNavigate(const Position3D& destPos, float velocity, float distance, bool faceMovement,
 	float maxMoveDistance, VECTOR_POS3D_PTR paths_ptr, int8 layer, PyObject* userarg, bool useDetour)
 {
-	if (isDestroyed_ || useDetour_ != useDetour)
-		return false;
-
-	if (!useDetour_ && (!paths_ptr || paths_ptr->empty()))
-		return false;
-
-	destPos_ = destPos;
-	velocity_ = velocity;
-	distance_ = distance;
-	faceMovement_ = faceMovement;
-	maxMoveDistance_ = maxMoveDistance;
-	layer_ = layer;
-	retryCount_ = 0;
-
-	if (pyuserarg_ != userarg)
-	{
-		Py_INCREF(userarg);
-		Py_DECREF(pyuserarg_);
-		pyuserarg_ = userarg;
-	}
-
-	if (useDetour_)
-	{
-		// 追敌重定向只丢弃路径缓存，不销毁控制器，避免频繁 navigate 造成一帧移动空窗。
-		// Retargeting drops only cached path state, avoiding the one-frame gap caused by destroy-and-create.
-		navHandle_.clear();
-		invalidateDetourPath();
-	}
-	else
-	{
-		paths_ = paths_ptr;
-		destPosIdx_ = 0;
-		destPos_ = (*paths_)[destPosIdx_++];
-	}
-
-	return true;
+	// Detour 导航的目标切换必须重新建立 handler，避免复用时把旧 polyRef/path index
+	// 带入新目标，导致拐角处长期停在失效路径状态中。
+	// Detour retargeting must rebuild the handler so stale polyRef/path index state cannot leak
+	// into the next destination and pin an entity at a corner.
+	return false;
 }
 
 //-------------------------------------------------------------------------------------
@@ -181,9 +154,10 @@ bool NavigateHandler::requestMoveOver(const Position3D& oldPos)
 //-------------------------------------------------------------------------------------
 void NavigateHandler::invalidateDetourPath()
 {
-	currentPolygon_ = NavMeshHandle::INVALID_NAVMESH_POLYREF;
+	pathValid_ = false;
+	polyRef_ = NavMeshHandle::INVALID_NAVMESH_POLYREF;
 	straightPath_.clear();
-	straightPathIndex_ = 0;
+	currentPathIndex_ = 0;
 }
 
 //-------------------------------------------------------------------------------------
@@ -207,16 +181,17 @@ bool NavigateHandler::buildDetourPath(const Position3D& currentPosition)
 	if (pNavMesh->findStraightPath(layer_, currentPosition, destPos_, straightPath_) <= 0 || straightPath_.empty())
 		return false;
 
-	currentPolygon_ = pNavMesh->findNearestPoly(layer_, currentPosition, NULL);
-	if (currentPolygon_ == NavMeshHandle::INVALID_NAVMESH_POLYREF)
+	polyRef_ = pNavMesh->findNearestPoly(layer_, currentPosition, NULL);
+	if (polyRef_ == NavMeshHandle::INVALID_NAVMESH_POLYREF)
 		return false;
 
-	straightPathIndex_ = 0;
-	while (straightPathIndex_ < straightPath_.size() &&
-		(straightPath_[straightPathIndex_] - currentPosition).squaredLength() <= 0.0025f)
+	currentPathIndex_ = 0;
+	while (currentPathIndex_ < (int)straightPath_.size() &&
+		(straightPath_[currentPathIndex_] - currentPosition).squaredLength() <= 0.0025f)
 	{
-		++straightPathIndex_;
+		++currentPathIndex_;
 	}
+	pathValid_ = true;
 
 	return true;
 }
@@ -257,6 +232,7 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 	Py_INCREF(pEntity);
 	Position3D currentPosition = pEntity->position();
 	Position3D oldPosition = currentPosition;
+	pEntity->isOnNavigate(true);
 	const float arrivalDistance = std::max(distance_, 0.05f);
 
 	Space* pSpace = Spaces::findSpace(pEntity->spaceID());
@@ -267,16 +243,6 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 		if (deleteOnFinish)
 			delete this;
 		return false;
-	}
-
-	NavigationHandlePtr currentNavHandle = pSpace->pNavHandle();
-	if (navHandle_.get() != currentNavHandle.get())
-	{
-		// Space 更换句柄后必须丢弃旧 polygon 与直线路径，不能在旧网格上继续推进实体。
-		// A Space handle change must discard the old polygon and straight path so the entity cannot continue on the old mesh.
-		navHandle_.clear();
-		invalidateDetourPath();
-		retryCount_ = 0;
 	}
 
 	if (pSpace->isGeometryLoading())
@@ -294,7 +260,17 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 		return false;
 	}
 
-	if (straightPath_.empty() || straightPathIndex_ >= straightPath_.size())
+	NavigationHandlePtr currentNavHandle = pSpace->pNavHandle();
+	if (navHandle_.get() != currentNavHandle.get())
+	{
+		// Space 重载或切换 NavMesh 后，旧 polyRef 不能继续用于 Detour corridor。
+		// After a Space reload or NavMesh switch, stale polyRef must not remain in the corridor.
+		navHandle_.clear();
+		invalidateDetourPath();
+		retryCount_ = 0;
+	}
+
+	if (!pathValid_)
 	{
 		if (!buildDetourPath(currentPosition))
 		{
@@ -310,18 +286,26 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 			Py_DECREF(pEntity);
 			return true;
 		}
+
+		retryCount_ = 0;
 	}
 
-	// 与旧版 Detour 行为保持一致：不是每 tick 只追最近拐点，而是向前看一小段。
-	// 这样在拐点很近、实体贴边或 Detour 投影点略有抖动时，不会连续产生“几乎不动”的假失败。
-	// Keep the legacy Detour semantics: look a little ahead instead of chasing only the nearest corner.
+	if (straightPath_.empty())
+	{
+		requestMoveOver(oldPosition);
+		Py_DECREF(pEntity);
+		if (deleteOnFinish)
+			delete this;
+		return false;
+	}
+
 	Position3D moveTarget = currentPosition;
 	float remainingLookAhead = lookAheadDistance_;
-	size_t cornerPathIndex = straightPathIndex_;
-	size_t nextPathIndex = straightPathIndex_;
-	while (nextPathIndex < straightPath_.size() && remainingLookAhead > 0.f)
+	const int cornerPathIndex = currentPathIndex_;
+	int pathIndex = currentPathIndex_;
+	while (pathIndex < (int)straightPath_.size() && remainingLookAhead > 0.f)
 	{
-		Vector3 segment = straightPath_[nextPathIndex] - moveTarget;
+		Vector3 segment = straightPath_[pathIndex] - moveTarget;
 		float segmentLength = segment.length();
 		if (segmentLength > remainingLookAhead)
 		{
@@ -330,20 +314,20 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 			break;
 		}
 
-		moveTarget = straightPath_[nextPathIndex];
+		moveTarget = straightPath_[pathIndex];
 		remainingLookAhead -= segmentLength;
-		++nextPathIndex;
+		++pathIndex;
 	}
 
-	straightPathIndex_ = nextPathIndex;
+	currentPathIndex_ = pathIndex;
 	Vector3 movement = moveTarget - currentPosition;
 	float movementLength = movement.length();
 	if (movementLength <= 0.05f || velocity_ <= 0.f)
 	{
-		++straightPathIndex_;
-		if (straightPathIndex_ >= straightPath_.size())
+		++currentPathIndex_;
+		if (currentPathIndex_ >= (int)straightPath_.size())
 		{
-			requestMoveOver(oldPosition);
+			requestMoveOver(currentPosition);
 			Py_DECREF(pEntity);
 			if (deleteOnFinish)
 				delete this;
@@ -354,8 +338,6 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 		return true;
 	}
 
-	// movementLength 已计算，直接复用倒数，避免再次计算平方根。
-	// Reuse movementLength instead of normalizing with a second square root.
 	movement *= 1.f / movementLength;
 	float stepDistance = std::min(velocity_, movementLength);
 	if (maxMoveDistance_ > 0.f)
@@ -363,8 +345,15 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 	movement *= stepDistance;
 
 	NavMeshHandle* pNavMesh = static_cast<NavMeshHandle*>(navHandle_.get());
+	if (polyRef_ == NavMeshHandle::INVALID_NAVMESH_POLYREF)
+	{
+		invalidateDetourPath();
+		Py_DECREF(pEntity);
+		return true;
+	}
+
 	Position3D nextPosition;
-	if (!pNavMesh->moveAlongSurface(layer_, currentPolygon_, currentPosition,
+	if (!pNavMesh->moveAlongSurface(layer_, polyRef_, currentPosition,
 		currentPosition + movement, nextPosition))
 	{
 		if (++retryCount_ > 5)
@@ -382,30 +371,30 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 	}
 
 	if ((nextPosition - currentPosition).squaredLength() <= 0.00000001f &&
-		cornerPathIndex < straightPath_.size())
+		cornerPathIndex < (int)straightPath_.size())
 	{
+		// 前视目标可能越过拐角并撞到障碍边界；先尝试当前拐点，
+		// 避免每 tick 重复向同一条被阻挡的前视线投影。
+		// Look-ahead can cross a corner and project to the obstacle boundary;
+		// try the current corner first so subsequent ticks can leave the corner.
 		Vector3 cornerMovement = straightPath_[cornerPathIndex] - currentPosition;
-		float cornerMovementLength = cornerMovement.length();
-		if (cornerMovementLength > 0.05f)
+		const float cornerLength = cornerMovement.length();
+		if (cornerLength > 0.05f)
 		{
-			// 前视点可能已经越过拐角，直线推进会切到障碍边界上。此时先朝当前拐点移动，
-			// 让实体真正完成转弯，再恢复前视移动，避免在栅栏/墙角处持续投影不动。
-			// The look-ahead target can be past the corner and the straight steering vector may cut into an obstacle.
-			// Fall back to the current corner first so the entity can complete the turn.
-			cornerMovement *= 1.f / cornerMovementLength;
-			float cornerStepDistance = std::min(velocity_, cornerMovementLength);
+			cornerMovement *= 1.f / cornerLength;
+			float cornerStepDistance = std::min(velocity_, cornerLength);
 			if (maxMoveDistance_ > 0.f)
 				cornerStepDistance = std::min(cornerStepDistance, maxMoveDistance_);
 			cornerMovement *= cornerStepDistance;
 
-			dtPolyRef cornerPolygon = currentPolygon_;
+			dtPolyRef cornerPolyRef = polyRef_;
 			Position3D cornerPosition;
-			if (pNavMesh->moveAlongSurface(layer_, cornerPolygon, currentPosition,
+			if (pNavMesh->moveAlongSurface(layer_, cornerPolyRef, currentPosition,
 				currentPosition + cornerMovement, cornerPosition) &&
 				(cornerPosition - currentPosition).squaredLength() > 0.00000001f)
 			{
-				currentPolygon_ = cornerPolygon;
-				straightPathIndex_ = cornerPathIndex;
+				polyRef_ = cornerPolyRef;
+				currentPathIndex_ = cornerPathIndex;
 				nextPosition = cornerPosition;
 				movement = cornerMovement;
 			}
@@ -413,24 +402,20 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 	}
 
 	float groundHeight = nextPosition.y;
-	if (!pNavMesh->getPolyHeight(layer_, currentPolygon_, nextPosition, groundHeight))
-	{
-		// 高度查询失败通常是 polyRef 在边界上暂时失效，旧版只重建路径不触发 onMoveFailure。
-		// Height lookup failures are usually transient boundary polyRef misses, so rebuild instead of failing.
-		invalidateDetourPath();
-		Py_DECREF(pEntity);
-		return true;
-	}
+	// 多边形边界上的高度查询可能瞬时失败，但 moveAlongSurface 已经给出了合法的表面位置。
+	// 老版 Nex 会保留 Detour 返回的 Y 并继续提交本 Tick 位移；若在这里重建路径，
+	// 尖锐转角会反复回到同一个 funnel 起点，表现为没有 onMoveFailure 的原地卡顿。
+	// Height lookup can transiently fail on a polygon boundary even though moveAlongSurface
+	// returned a valid surface position. Preserve that Y value so the entity can leave the corner.
+	if (pNavMesh->getPolyHeight(layer_, polyRef_, nextPosition, groundHeight))
+		nextPosition.y = groundHeight;
 
 	if ((nextPosition - currentPosition).squaredLength() <= 0.00000001f)
 	{
-		// 拐角处 Detour 可能返回成功但本 tick 几乎没有推进。此时如果立即重建路径，
-		// straightPathIndex_ 会回到起点，下一 tick 可能再次选择同一段方向并卡在角上。
-		// 先尝试推进到下一个拐点，保留当前路径上下文，让后续 tick 有机会绕过角。
-		// At corners Detour may succeed without moving. Rebuilding immediately resets the path index
-		// and can choose the same blocked segment again, so first keep the corridor and skip a corner.
-		if (straightPathIndex_ + 1 < straightPath_.size())
-			++straightPathIndex_;
+		// Detour may report success without progress exactly at a corner. Keep the
+		// current path context and advance one waypoint before rebuilding.
+		if (currentPathIndex_ + 1 < (int)straightPath_.size())
+			++currentPathIndex_;
 		else
 			invalidateDetourPath();
 
@@ -439,7 +424,6 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 	}
 
 	retryCount_ = 0;
-	nextPosition.y = groundHeight;
 	Direction3D direction = pEntity->direction();
 	if (faceMovement_ && (movement.x != 0.f || movement.z != 0.f))
 		direction.yaw(movement.yaw());
@@ -454,7 +438,7 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 	if (isDestroyed_ || (destPos_ - nextPosition).squaredLength() <= arrivalDistance * arrivalDistance)
 	{
 		if (!isDestroyed_)
-			requestMoveOver(oldPosition);
+			requestMoveOver(nextPosition);
 
 		Py_DECREF(pEntity);
 		if (deleteOnFinish)

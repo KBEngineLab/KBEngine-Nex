@@ -125,7 +125,8 @@ bool MoveToPointHandler::update()
 	
 	Entity* pEntity = pController_->pEntity();
 	Py_INCREF(pEntity);
-
+	pEntity->isOnNavigate(false);
+	
 	const Position3D& dstPos = destPos();
 	Position3D currpos = pEntity->position();
 	Position3D currpos_backup = currpos;

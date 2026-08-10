@@ -133,6 +133,7 @@ posChangedTime_(0),
 dirChangedTime_(0),
 isSpace_(false),
 isOnGround_(false),
+isOnNavigate_(false),
 topSpeed_(-0.1f),
 topSpeedY_(-0.1f),
 witnesses_(),
@@ -2918,20 +2919,6 @@ uint32 Entity::navigate(const Position3D& destination, float velocity, float dis
 	}
 
 	velocity = velocity / g_kbeSrvConfig.gameUpdateHertz();
-
-	if (pMoveController_)
-	{
-		// 追敌等高频 navigate 场景优先复用当前控制器，只重定向目标，避免 stop + new 造成一帧移动空窗。
-		// Frequent chase retargeting should reuse the current controller to avoid the one-frame gap caused by stop + new.
-		MoveController* pMoveController = static_cast<MoveController*>(pMoveController_.get());
-		if (pMoveController != NULL && pMoveController->resetNavigate(destination, velocity, distance,
-			faceMovement, maxMoveDistance, paths_ptr, layer, userData, useDetour))
-		{
-			if (useDetour)
-				pMoveController->stepMoveOnceWithoutDelete();
-			return pMoveController_->id();
-		}
-	}
 
 	stopMove();
 
