@@ -363,9 +363,15 @@ class WatcherQueryStats:
 
 
 class WatcherCollector:
-    def __init__(self, tools_root: Path, timeout_seconds: float = 5.0):
+    def __init__(
+        self,
+        tools_root: Path,
+        timeout_seconds: float = 5.0,
+        admin_token: str | None = None,
+    ):
         self.tools_root = tools_root
         self.timeout_seconds = timeout_seconds
+        self.admin_token = (admin_token or "").strip()
         self._watchers: dict[tuple[str, str, int, str], Any] = {}
         self._last_stats: dict[tuple[str, str, int, str], WatcherQueryStats] = {}
         self._machine_resolver = MachineEndpointResolver(tools_root)
@@ -512,7 +518,7 @@ class WatcherCollector:
             try:
                 if hasattr(watcher, "clearWatchData"):
                     watcher.clearWatchData()
-                watcher.requireQueryWatcher(target.path)
+                watcher.requireQueryWatcher(target.path, self.admin_token)
                 while time.monotonic() < deadline and not watcher.watchData:
                     watcher.processOne(min(0.25, max(deadline - time.monotonic(), 0.01)))
                 if not watcher.watchData:

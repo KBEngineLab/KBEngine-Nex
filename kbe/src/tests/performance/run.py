@@ -11,6 +11,7 @@ import signal
 import subprocess
 import time
 import uuid
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from .assets import (
@@ -60,6 +61,51 @@ def configure_transport_readiness(scenario: dict[str, object], transport: str) -
     readiness[tcp_metric] = "$bots" if transport == "tcp" else 0
     configured["readiness"] = readiness
     return configured
+
+
+def resolve_gui_console_admin_token(environment: dict[str, str] | None) -> str:
+    """Resolve the shared GUIConsole admin token from the active resource path chain.
+    从当前资源路径链解析 GUIConsole 共享管理 Token。
+
+    The engine applies defaults first, then lets the first project kbengine.xml
+    override the node. Mirror that two-stage precedence so performance Watcher
+    queries use the same token that the isolated server cluster already reads.
+    引擎会先应用 defaults，再允许首个业务 kbengine.xml 覆盖节点；这里必须
+    保持同样的两阶段优先级，确保性能 Watcher 查询与隔离集群使用同一份 token。
+    """
+    if not environment:
+        return ""
+    resource_path = environment.get("KBE_RES_PATH", "")
+    if not resource_path:
+        return ""
+
+    roots = [Path(item) for item in resource_path.split(os.pathsep) if item]
+
+    token = _read_first_gui_console_admin_token(
+        roots,
+        ("server/kbengine_defaults.xml", "kbengine_defaults.xml"),
+    )
+    override = _read_first_gui_console_admin_token(
+        roots,
+        ("server/kbengine.xml", "kbengine.xml"),
+    )
+    return token if override is None else override
+
+
+def _read_first_gui_console_admin_token(roots: list[Path], names: tuple[str, ...]) -> str | None:
+    for root in roots:
+        for name in names:
+            candidate = root / name
+            if not candidate.is_file():
+                continue
+            try:
+                tree = ET.parse(candidate)
+            except (OSError, ET.ParseError):
+                continue
+            token_node = tree.getroot().find("./guiConsole/adminToken")
+            if token_node is not None:
+                return (token_node.text or "").strip()
+    return None
 
 
 def parse_args() -> argparse.Namespace:
@@ -326,6 +372,7 @@ def main() -> int:
             owned_processes.update({f"cluster:{item.name}": item.pid for item in cluster.start()})
             if not args.tools_root:
                 raise ValueError("--tools-root is required to verify server onReadyForLogin readiness")
+            admin_token = resolve_gui_console_admin_token(environment)
             wait_for_cluster_ready_for_login(
                 args.tools_root,
                 [cluster.run_root / "server/logs"],
@@ -334,6 +381,7 @@ def main() -> int:
                 args.server_ready_timeout,
                 args.watcher_timeout,
                 cluster,
+                admin_token,
             )
             server_readiness = scenario.get("server_readiness")
             if server_readiness is not None:
@@ -375,7 +423,12 @@ def main() -> int:
     if cluster is not None:
         log_roots.add((cluster.run_root / "server/logs").resolve())
     log_collectors = [IncrementalLogCollector(path) for path in sorted(log_roots)]
-    watcher_collector = WatcherCollector(args.tools_root, args.watcher_timeout) if args.tools_root and watcher_targets else None
+    admin_token = resolve_gui_console_admin_token(environment)
+    watcher_collector = (
+        WatcherCollector(args.tools_root, args.watcher_timeout, admin_token)
+        if args.tools_root and watcher_targets
+        else None
+    )
     events_path = output / "raw.jsonl"
     readiness_failure: WorkloadReadinessError | None = None
     with JsonlRecorder(events_path, run_id, name) as recorder:
@@ -716,6 +769,7 @@ def wait_for_cluster_ready_for_login(
     timeout_seconds: float,
     watcher_timeout_seconds: float,
     cluster: PerformanceCluster | None = None,
+    admin_token: str | None = None,
 ) -> dict[str, dict[str, object]]:
     """Wait for standard BaseApp/CellApp onReadyForLogin aggregation.
     等待标准 BaseApp/CellApp onReadyForLogin 聚合状态。
@@ -726,7 +780,7 @@ def wait_for_cluster_ready_for_login(
         (parse_target("BASEAPPMGR_TYPE=@baseappmgr:root/readiness"), baseapp_count),
         (parse_target("CELLAPPMGR_TYPE=@cellappmgr:root/readiness"), cellapp_count),
     )
-    collector = WatcherCollector(tools_root, max(watcher_timeout_seconds, 0.1))
+    collector = WatcherCollector(tools_root, max(watcher_timeout_seconds, 0.1), admin_token)
     observed: dict[str, dict[str, object]] = {}
     deadline = time.monotonic() + timeout_seconds
     try:

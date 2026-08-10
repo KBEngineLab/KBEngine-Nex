@@ -69,12 +69,14 @@ class Watcher(ServerApp.ServerApp):
 		"""
 		self.watchData = []
 
-	def requireQueryWatcher(self, path):
+	def requireQueryWatcher(self, path, adminToken = None):
 		"""
 		"""
 		CMD_queryWatcher = CMD_ID_queryWatcher[self.componentType]
 		msg = MessageStream.MessageStreamWriter(CMD_queryWatcher)
 		msg.writeString(path)
+		if adminToken is not None and len(str(adminToken).strip()) > 0:
+			msg.writeString(str(adminToken).strip())
 		self.send(msg)
 
 	def onWatcherMsg(self, streamReader):

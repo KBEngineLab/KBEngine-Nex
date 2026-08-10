@@ -8,6 +8,13 @@
   "performance_probes_enabled": true,
   "external_receive_messages": 1024,
   "external_receive_bytes": 1048576,
+  "watcher_targets": [
+    "BOTS_TYPE=@bots:root/bots/performance",
+    "CELLAPP_TYPE=@cellapp:root/witness"
+  ],
+  "watcher_intervals": {
+    "BOTS_TYPE:root/bots/performance": 5.0
+  },
   "readiness": {
     "root/bots/performance/clientsTotal": "$bots",
     "root/bots/performance/clientsKcp": "$bots",

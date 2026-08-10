@@ -210,7 +210,7 @@ def assert_watcher_connection_reuse() -> None:
             self.clear_count += 1
             self.watchData = []
 
-        def requireQueryWatcher(self, path):
+        def requireQueryWatcher(self, path, admin_token=None):
             self.query_count += 1
 
         def processOne(self, timeout):
