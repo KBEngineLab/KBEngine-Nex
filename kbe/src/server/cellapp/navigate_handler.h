@@ -36,7 +36,7 @@ public:
 		PyObject* userarg);
 	NavigateHandler(KBEShared_ptr<Controller>& pController, const Position3D& destPos,
 		float velocity, float distance, bool faceMovement, float maxMoveDistance,
-		int8 layer, PyObject* userarg);
+		int8 layer, VECTOR_POS3D_PTR paths_ptr, PyObject* userarg);
 
 	NavigateHandler();
 	explicit NavigateHandler(bool useDetour);

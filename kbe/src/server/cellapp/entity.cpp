@@ -2841,7 +2841,7 @@ bool Entity::navigatePathPoints( std::vector<Position3D>& outPaths, const Positi
 		return false;
 	}
 
-	if (pNavHandle->findStraightPath(layer, position_, destination, outPaths) < 0)
+	if (pNavHandle->findStraightPath(layer, position_, destination, maxSearchDistance, outPaths) < 0)
 	{
 		return false;
 	}
@@ -2928,7 +2928,7 @@ uint32 Entity::navigate(const Position3D& destination, float velocity, float dis
 	if (useDetour)
 	{
 		new NavigateHandler(p, destination, velocity, distance,
-			faceMovement, maxMoveDistance, layer, userData);
+			faceMovement, maxMoveDistance, layer, paths_ptr, userData);
 	}
 	else
 	{

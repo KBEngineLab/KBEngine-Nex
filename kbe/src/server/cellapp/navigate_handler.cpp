@@ -54,7 +54,7 @@ retryCount_(0)
 //-------------------------------------------------------------------------------------
 NavigateHandler::NavigateHandler(KBEShared_ptr<Controller>& pController, const Position3D& destPos,
 	float velocity, float distance, bool faceMovement, float maxMoveDistance,
-	int8 layer, PyObject* userarg):
+	int8 layer, VECTOR_POS3D_PTR paths_ptr, PyObject* userarg):
 MoveToPointHandler(pController, layer, destPos, velocity, distance, faceMovement, false, userarg),
 destPosIdx_(0),
 paths_(),
@@ -68,6 +68,25 @@ pathValid_(false),
 lookAheadDistance_(2.0f),
 retryCount_(0)
 {
+	// Entity::navigate() already performs the synchronous reachability query. Reuse that
+	// path so the first Detour tick only initializes its corridor polygon instead of searching twice.
+	// Entity::navigate() 已同步完成可达性查询，首次 Tick 直接复用路径，只初始化 corridor 多边形。
+	if (paths_ptr && !paths_ptr->empty() && pController->pEntity())
+	{
+		Space* pSpace = Spaces::findSpace(pController->pEntity()->spaceID());
+		if (pSpace && pSpace->isGood())
+		{
+			navHandle_ = pSpace->pNavHandle();
+			if (navHandle_ && navHandle_->type() == NavigationHandle::NAV_MESH)
+			{
+				straightPath_ = *paths_ptr;
+				NavMeshHandle* pNavMesh = static_cast<NavMeshHandle*>(navHandle_.get());
+				polyRef_ = pNavMesh->findNearestPoly(layer_, pController->pEntity()->position(), NULL);
+				pathValid_ = polyRef_ != NavMeshHandle::INVALID_NAVMESH_POLYREF;
+			}
+		}
+	}
+
 	updatableName = "NavigateHandler";
 }
 

@@ -63,6 +63,14 @@ public:
 
 	virtual int findStraightPath(int layer, const Position3D& start, const Position3D& end, std::vector<Position3D>& paths) = 0;
 
+	// Limits nearest-poly projection for navigation implementations that support a search radius.
+	// 限制支持该能力的导航实现查找最近可行走多边形时的投影范围。
+	virtual int findStraightPath(int layer, const Position3D& start, const Position3D& end,
+		float maxSearchDistance, std::vector<Position3D>& paths)
+	{
+		return findStraightPath(layer, start, end, paths);
+	}
+
 	virtual int findRandomPointAroundCircle(int layer, const Position3D& centerPos,
 		std::vector<Position3D>& points, uint32 max_points, float maxRadius) = 0;
 

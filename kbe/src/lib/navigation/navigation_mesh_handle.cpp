@@ -47,8 +47,8 @@ NavMeshHandle::~NavMeshHandle()
 	std::map<int, NavmeshLayer>::iterator iter = navmeshLayer.begin();
 	for(; iter != navmeshLayer.end(); ++iter)
 	{
-		dtFreeNavMesh(iter->second.pNavmesh);
 		dtFreeNavMeshQuery(iter->second.pNavmeshQuery);
+		dtFreeNavMesh(iter->second.pNavmesh);
 	}
 	
 	DEBUG_MSG(fmt::format("NavMeshHandle::~NavMeshHandle(): ({}) is destroyed!\n", resPath));
@@ -56,6 +56,13 @@ NavMeshHandle::~NavMeshHandle()
 
 //-------------------------------------------------------------------------------------
 int NavMeshHandle::findStraightPath(int layer, const Position3D& start, const Position3D& end, std::vector<Position3D>& paths)
+{
+	return findStraightPath(layer, start, end, 2.f, paths);
+}
+
+//-------------------------------------------------------------------------------------
+int NavMeshHandle::findStraightPath(int layer, const Position3D& start, const Position3D& end,
+	float maxSearchDistance, std::vector<Position3D>& paths)
 {
 	std::map<int, NavmeshLayer>::iterator iter = navmeshLayer.find(layer);
 	if(iter == navmeshLayer.end())
@@ -81,42 +88,55 @@ int NavMeshHandle::findStraightPath(int layer, const Position3D& start, const Po
 	filter.setIncludeFlags(0xffff);
 	filter.setExcludeFlags(0);
 
-	const float extents[3] = {2.f, 4.f, 2.f};
+	// Keep the historical 2m projection radius when callers pass a non-positive value.
+	// 调用方未设置有效距离时保留历史 2 米投影范围，避免改变旧接口行为。
+	const float searchDistance = maxSearchDistance > 0.f ? maxSearchDistance : 2.f;
+	const float extents[3] = {searchDistance, 4.f, searchDistance};
 
 	dtPolyRef startRef = INVALID_NAVMESH_POLYREF;
 	dtPolyRef endRef = INVALID_NAVMESH_POLYREF;
 
-	float startNearestPt[3];
-	float endNearestPt[3];
-	navmeshQuery->findNearestPoly(spos, extents, &filter, &startRef, startNearestPt);
-	navmeshQuery->findNearestPoly(epos, extents, &filter, &endRef, endNearestPt);
+	float startNearestPt[3] = {0.f, 0.f, 0.f};
+	float endNearestPt[3] = {0.f, 0.f, 0.f};
+	const dtStatus startStatus = navmeshQuery->findNearestPoly(spos, extents, &filter, &startRef, startNearestPt);
+	const dtStatus endStatus = navmeshQuery->findNearestPoly(epos, extents, &filter, &endRef, endNearestPt);
 
-	if (!startRef || !endRef)
+	if (dtStatusFailed(startStatus) || dtStatusFailed(endStatus) || !startRef || !endRef)
 	{
 		ERROR_MSG(fmt::format("NavMeshHandle::findStraightPath({2}): Could not find any nearby poly's ({0}, {1})\n", startRef, endRef, resPath));
 		return NAV_ERROR_NEARESTPOLY;
 	}
 
 	dtPolyRef polys[MAX_POLYS];
-	int npolys;
+	int npolys = 0;
 	float straightPath[MAX_POLYS * 3];
 	unsigned char straightPathFlags[MAX_POLYS];
 	dtPolyRef straightPathPolys[MAX_POLYS];
-	int nstraightPath;
+	int nstraightPath = 0;
 	int pos = 0;
 
-	navmeshQuery->findPath(startRef, endRef, startNearestPt, endNearestPt, &filter, polys, &npolys, MAX_POLYS);
-	nstraightPath = 0;
+	const dtStatus pathStatus = navmeshQuery->findPath(startRef, endRef, startNearestPt, endNearestPt,
+		&filter, polys, &npolys, MAX_POLYS);
+	if (dtStatusFailed(pathStatus))
+		return NAV_ERROR;
 
 	if (npolys)
 	{
-		float epos1[3];
-		dtVcopy(epos1, endNearestPt);
-				
+		float pathEnd[3];
+		dtVcopy(pathEnd, endNearestPt);
+
 		if (polys[npolys-1] != endRef)
-			navmeshQuery->closestPointOnPoly(polys[npolys-1], endNearestPt, epos1, 0);
-				
-		navmeshQuery->findStraightPath(startNearestPt, endNearestPt, polys, npolys, straightPath, straightPathFlags, straightPathPolys, &nstraightPath, MAX_POLYS);
+		{
+			const dtStatus closestStatus = navmeshQuery->closestPointOnPoly(
+				polys[npolys - 1], endNearestPt, pathEnd, 0);
+			if (dtStatusFailed(closestStatus))
+				return NAV_ERROR;
+		}
+
+		const dtStatus straightPathStatus = navmeshQuery->findStraightPath(startNearestPt, pathEnd,
+			polys, npolys, straightPath, straightPathFlags, straightPathPolys, &nstraightPath, MAX_POLYS);
+		if (dtStatusFailed(straightPathStatus))
+			return NAV_ERROR;
 
 		Position3D currpos;
 		for(int i = 0; i < nstraightPath * 3; )

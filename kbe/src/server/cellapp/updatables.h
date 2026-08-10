@@ -49,9 +49,12 @@ public:
 	void update();
 
 private:
-	// Updatable 以单调 removeIdx 保持优先级内顺序；连续槽位避免每 Tick 遍历红黑树节点。
-	// Monotonic removeIdx preserves per-priority order while contiguous slots avoid tree-node pointer chasing each tick.
+	// 复用销毁对象留下的槽位，避免长期运行时容器单调增长；更新期间释放的槽位延迟到本 Tick 结束。
+	// Reuse removed slots, while deferring slots released during update until the current tick completes.
 	std::vector< std::vector<Updatable*> > objects_;
+	std::vector< std::vector<int> > freeIndices_;
+	std::vector< std::vector<int> > pendingFreeIndices_;
+	bool updating_;
 };
 
 }
