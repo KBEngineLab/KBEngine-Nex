@@ -392,10 +392,16 @@ bool NavigateHandler::updateDetour(bool deleteOnFinish)
 
 	if ((nextPosition - currentPosition).squaredLength() <= 0.00000001f)
 	{
-		// Detour 返回“成功但未推进”时也只重建路径。把它算作真实失败会让高负载下的临时拥塞
-		// 快速变成脚本层 onMoveFailure，这正是新版相对旧版更容易站桩的主要原因之一。
-		// A successful no-op movement means the corridor needs rebuilding, not that the move controller failed.
-		invalidateDetourPath();
+		// 拐角处 Detour 可能返回成功但本 tick 几乎没有推进。此时如果立即重建路径，
+		// straightPathIndex_ 会回到起点，下一 tick 可能再次选择同一段方向并卡在角上。
+		// 先尝试推进到下一个拐点，保留当前路径上下文，让后续 tick 有机会绕过角。
+		// At corners Detour may succeed without moving. Rebuilding immediately resets the path index
+		// and can choose the same blocked segment again, so first keep the corridor and skip a corner.
+		if (straightPathIndex_ + 1 < straightPath_.size())
+			++straightPathIndex_;
+		else
+			invalidateDetourPath();
+
 		Py_DECREF(pEntity);
 		return true;
 	}
