@@ -47,13 +47,14 @@ public:
 
 	virtual bool requestMoveOver(const Position3D& oldPos);
 	virtual bool update();
+	bool stepMoveOnceWithoutDelete();
 
 	virtual bool isOnGround(){ return true; }
 
 	virtual MoveType type() const { return useDetour_ ? MOVE_TYPE_NAV_DETOUR : MOVE_TYPE_NAV; }
 
 protected:
-	bool updateDetour();
+	bool updateDetour(bool deleteOnFinish);
 	bool buildDetourPath(const Position3D& currentPosition);
 	bool requestMoveFailure();
 	void invalidateDetourPath();

@@ -2942,7 +2942,8 @@ uint32 Entity::navigate(const Position3D& destination, float velocity, float dis
 	// 立即执行一次移动，避免 Detour 刚创建后的首帧空窗，
 	// 这样可以更早暴露路径是否真的可推进，也能减少高负载下的初始堆积。
 	// Run one update immediately so Detour does not waste its first frame waiting in the queue.
-	handler->update();
+	if (handler)
+		handler->stepMoveOnceWithoutDelete();
 	return p->id();
 }
 
