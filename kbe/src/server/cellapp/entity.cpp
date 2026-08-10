@@ -2920,6 +2920,18 @@ uint32 Entity::navigate(const Position3D& destination, float velocity, float dis
 
 	velocity = velocity / g_kbeSrvConfig.gameUpdateHertz();
 
+	if (useDetour && pMoveController_)
+	{
+		// 高频 Detour 重定向复用现有 handler，避免 stopMove() 到下一 Tick 之间出现移动空窗。
+		// Reuse the active Detour handler during frequent retargeting to avoid a movement gap between ticks.
+		MoveController* pCurrentMoveController = static_cast<MoveController*>(pMoveController_.get());
+		if (pCurrentMoveController->resetNavigate(destination, velocity, distance,
+			faceMovement, maxMoveDistance, paths_ptr, layer, userData, true))
+		{
+			return pCurrentMoveController->id();
+		}
+	}
+
 	stopMove();
 
 	KBEShared_ptr<Controller> p(new MoveController(this, NULL));
@@ -2940,8 +2952,6 @@ uint32 Entity::navigate(const Position3D& destination, float velocity, float dis
 	KBE_ASSERT(ret);
 
 	pMoveController_ = p;
-	if (useDetour)
-		pMoveController->stepMoveOnceWithoutDelete();
 	return p->id();
 }
 

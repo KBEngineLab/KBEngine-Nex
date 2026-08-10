@@ -47,7 +47,6 @@ public:
 
 	virtual bool requestMoveOver(const Position3D& oldPos);
 	virtual bool update();
-	bool stepMoveOnceWithoutDelete();
 	bool resetNavigate(const Position3D& destPos, float velocity, float distance, bool faceMovement,
 		float maxMoveDistance, VECTOR_POS3D_PTR paths_ptr, int8 layer, PyObject* userarg, bool useDetour);
 

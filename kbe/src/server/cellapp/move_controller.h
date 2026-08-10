@@ -42,7 +42,6 @@ public:
 	virtual void createFromStream(KBEngine::MemoryStream& s);
 	bool resetNavigate(const Position3D& destPos, float velocity, float distance, bool faceMovement,
 		float maxMoveDistance, VECTOR_POS3D_PTR paths_ptr, int8 layer, PyObject* userarg, bool useDetour);
-	bool stepMoveOnceWithoutDelete();
 
 	float velocity() const {
 		return pMoveToPointHandler_->velocity();

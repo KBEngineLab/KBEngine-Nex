@@ -149,11 +149,50 @@ void NavigateHandler::createFromStream(KBEngine::MemoryStream& s)
 bool NavigateHandler::resetNavigate(const Position3D& destPos, float velocity, float distance, bool faceMovement,
 	float maxMoveDistance, VECTOR_POS3D_PTR paths_ptr, int8 layer, PyObject* userarg, bool useDetour)
 {
-	// Detour 导航的目标切换必须重新建立 handler，避免复用时把旧 polyRef/path index
-	// 带入新目标，导致拐角处长期停在失效路径状态中。
-	// Detour retargeting must rebuild the handler so stale polyRef/path index state cannot leak
-	// into the next destination and pin an entity at a corner.
-	return false;
+	if (isDestroyed_ || !useDetour_ || !useDetour || !paths_ptr || paths_ptr->empty() || !pController_)
+		return false;
+
+	Entity* pEntity = pController_->pEntity();
+	if (!pEntity)
+		return false;
+
+	Space* pSpace = Spaces::findSpace(pEntity->spaceID());
+	if (!pSpace || !pSpace->isGood() || pSpace->isGeometryLoading())
+		return false;
+
+	NavigationHandlePtr currentNavHandle = pSpace->pNavHandle();
+	if (!currentNavHandle || currentNavHandle->type() != NavigationHandle::NAV_MESH)
+		return false;
+
+	destPos_ = destPos;
+	velocity_ = velocity;
+	distance_ = distance;
+	faceMovement_ = faceMovement;
+	maxMoveDistance_ = maxMoveDistance;
+	layer_ = layer;
+
+	if (pyuserarg_ != userarg)
+	{
+		Py_INCREF(userarg);
+		Py_DECREF(pyuserarg_);
+		pyuserarg_ = userarg;
+	}
+
+	navHandle_ = currentNavHandle;
+	straightPath_ = *paths_ptr;
+	currentPathIndex_ = 0;
+	const Position3D currentPosition = pEntity->position();
+	while (currentPathIndex_ < static_cast<int>(straightPath_.size()) &&
+		(straightPath_[currentPathIndex_] - currentPosition).squaredLength() <= 0.0025f)
+	{
+		++currentPathIndex_;
+	}
+
+	polyRef_ = static_cast<NavMeshHandle*>(navHandle_.get())->findNearestPoly(layer_, currentPosition, NULL);
+	pathValid_ = polyRef_ != NavMeshHandle::INVALID_NAVMESH_POLYREF &&
+		currentPathIndex_ < static_cast<int>(straightPath_.size());
+	retryCount_ = 0;
+	return pathValid_;
 }
 
 //-------------------------------------------------------------------------------------
@@ -476,15 +515,6 @@ bool NavigateHandler::update()
 		return updateDetour(true);
 
 	return MoveToPointHandler::update();
-}
-
-//-------------------------------------------------------------------------------------
-bool NavigateHandler::stepMoveOnceWithoutDelete()
-{
-	if (!useDetour_)
-		return MoveToPointHandler::update();
-
-	return updateDetour(false);
 }
 
 //-------------------------------------------------------------------------------------
