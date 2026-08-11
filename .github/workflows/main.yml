@@ -123,6 +123,17 @@ jobs:
           restore-keys: |
             vcpkg-${{ runner.os }}-${{ runner.arch }}-
 
+      - name: Prepare vcpkg cache directories
+        shell: pwsh
+        run: |
+          $binaryCache = Join-Path $env:GITHUB_WORKSPACE ".cache/vcpkg-binaries"
+          foreach ($path in @($env:VCPKG_DOWNLOADS, $binaryCache)) {
+            if (-not $path) {
+              throw "A vcpkg cache path is empty."
+            }
+            New-Item -ItemType Directory -Path $path -Force | Out-Null
+          }
+
       - name: Build on Linux
         if: runner.os == 'Linux'
         shell: sh
