@@ -51,20 +51,30 @@ find_package(EXPAT REQUIRED)
 find_package(log4cxx CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 
-# log4cxx's Unix package config names APR libraries without preserving their vcpkg
-# search directory. PkgConfig imported targets retain the matching include paths,
-# library directories, and transitive flags from the same vcpkg installation.
-# log4cxx 的 Unix 包配置只保留 APR 库名，没有保留 vcpkg 库搜索目录；
-# PkgConfig 导入目标可从同一 vcpkg 安装中完整传播头文件、库目录和传递链接参数。
+# log4cxx 的 Unix 导入目标传递裸 APR 库名，但没有传递 vcpkg 搜索目录。
+# Multi-Config 配置阶段不能使用单配置 PkgConfig 目标，否则 Release 可能混入 Debug APR。
+# log4cxx's Unix target propagates bare APR names without their vcpkg search directory.
+# A configure-time PkgConfig target is unsuitable for Multi-Config builds because Release may select Debug APR.
 add_library(kbe_log4cxx INTERFACE)
 target_link_libraries(kbe_log4cxx INTERFACE log4cxx)
 if(NOT WIN32)
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(KBE_APR REQUIRED IMPORTED_TARGET apr-1)
-    pkg_check_modules(KBE_APRUTIL REQUIRED IMPORTED_TARGET apr-util-1)
-    target_link_libraries(kbe_log4cxx INTERFACE
-        PkgConfig::KBE_APR
-        PkgConfig::KBE_APRUTIL
+    set(_kbe_unix_vcpkg_root "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+    cmake_path(ABSOLUTE_PATH _kbe_unix_vcpkg_root
+        BASE_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        NORMALIZE
+        OUTPUT_VARIABLE _kbe_unix_vcpkg_root
+    )
+    foreach(_kbe_apr_library_dir IN ITEMS
+        "${_kbe_unix_vcpkg_root}/lib"
+        "${_kbe_unix_vcpkg_root}/debug/lib"
+    )
+        if(NOT IS_DIRECTORY "${_kbe_apr_library_dir}")
+            message(FATAL_ERROR "vcpkg APR library directory is missing: ${_kbe_apr_library_dir}")
+        endif()
+    endforeach()
+    target_link_directories(kbe_log4cxx INTERFACE
+        "$<$<CONFIG:Debug>:${_kbe_unix_vcpkg_root}/debug/lib>"
+        "$<$<NOT:$<CONFIG:Debug>>:${_kbe_unix_vcpkg_root}/lib>"
     )
 endif()
 

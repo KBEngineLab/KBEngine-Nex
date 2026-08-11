@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.25)
+
 set(_kbe_python_runtime_files "@KBE_PYTHON_RUNTIME_FILES@")
 set(_kbe_python_stdlib_source "@KBE_PYTHON_STDLIB_SOURCE@")
 set(_kbe_python_extensions_source "@KBE_PYTHON_EXTENSIONS_SOURCE@")

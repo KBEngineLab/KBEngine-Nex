@@ -90,6 +90,15 @@ set_tests_properties(source.custom_cfg_contract PROPERTIES
     LABELS "python;serverconfig;source"
 )
 
+add_test(NAME source.build_portability_contract
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyBuildPortability.cmake"
+)
+set_tests_properties(source.build_portability_contract PROPERTIES
+    LABELS "cmake;linux;macos;source;windows"
+)
+
 set(KBE_TEST_ASSETS "" CACHE PATH "Assets directory used by CMake integration tests")
 option(KBE_TEST_SERVER_CLUSTER "Enable the server cluster integration test" OFF)
 set(KBE_TEST_DATABASE_HOST "127.0.0.1" CACHE STRING "Database host used by CMake integration tests")

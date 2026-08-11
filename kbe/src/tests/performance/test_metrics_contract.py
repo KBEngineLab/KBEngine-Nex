@@ -1066,7 +1066,10 @@ def assert_watcher_window_drain_isolation() -> None:
 
     collector = DrainCollector()
     failures = drain_watcher_windows(collector, targets, 2)  # type: ignore[arg-type]
-    assert collector.paths == ["root/ok", "root/timeout", "root/after"]
+    # ThreadPoolExecutor preserves result order, not worker start order. Verify that
+    # timeout isolation drains every target exactly once without imposing scheduler order.
+    # ThreadPoolExecutor 只保证结果顺序，不保证线程启动顺序；这里只验证全部目标恰好查询一次。
+    assert sorted(collector.paths) == ["root/after", "root/ok", "root/timeout"]
     assert len(failures) == 1
     assert failures[0][0] == targets[1]
     assert isinstance(failures[0][1], TimeoutError)
