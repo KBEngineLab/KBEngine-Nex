@@ -43,7 +43,9 @@ install_system_dependencies() {
     require_command brew
 
     echo "[INFO] 检查 KBEngine 和 vcpkg 所需的宿主工具。"
-    for kbe_system_formula in cmake ninja autoconf automake libtool pkg-config bison flex m4 perl libtirpc; do
+    # vcpkg-make 会通过 aclocal 实际加载 autoconf-archive 宏；仅有 autoconf/automake 不足以构建 jemalloc。
+    # vcpkg-make loads autoconf-archive macros through aclocal; autoconf/automake alone cannot build jemalloc.
+    for kbe_system_formula in cmake ninja autoconf autoconf-archive automake libtool pkg-config bison flex m4 perl libtirpc; do
         install_brew_dependency "$kbe_system_formula"
     done
 }
