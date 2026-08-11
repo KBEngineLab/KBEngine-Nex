@@ -209,27 +209,23 @@
     #endif
 #endif
 
-    #ifdef _DEBUG
-        #pragma comment (linker, "/NODEFAULTLIB:libc.lib")
-        #pragma comment (linker, "/NODEFAULTLIB:libcmt.lib")
-        #pragma comment (linker, "/NODEFAULTLIB:msvcrt.lib")
-        #pragma comment (linker, "/NODEFAULTLIB:libcd.lib")
-        #pragma comment (linker, "/NODEFAULTLIB:msvcrtd.lib")
-    #else
-        #pragma comment(linker, "/NODEFAULTLIB:LIBC.LIB")
-        #pragma comment(linker, "/NODEFAULTLIB:msvcrt.lib")
-        #pragma comment(linker, "/NODEFAULTLIB:libcd.lib")
-        #pragma comment(linker, "/NODEFAULTLIB:libcmtd.lib")
-        #pragma comment(linker, "/NODEFAULTLIB:msvcrtd.lib")
+    // 仅保留旧静态 CRT 构建的默认库筛选；/MD、/MDd 必须让编译器选择 MSVCRT。
+    // Retain the legacy default library filtering only for static CRT builds; /MD and /MDd must keep MSVCRT.
+    #ifndef _DLL
+        #ifdef _DEBUG
+            #pragma comment (linker, "/NODEFAULTLIB:libc.lib")
+            #pragma comment (linker, "/NODEFAULTLIB:libcmt.lib")
+            #pragma comment (linker, "/NODEFAULTLIB:msvcrt.lib")
+            #pragma comment (linker, "/NODEFAULTLIB:libcd.lib")
+            #pragma comment (linker, "/NODEFAULTLIB:msvcrtd.lib")
+        #else
+            #pragma comment(linker, "/NODEFAULTLIB:LIBC.LIB")
+            #pragma comment(linker, "/NODEFAULTLIB:msvcrt.lib")
+            #pragma comment(linker, "/NODEFAULTLIB:libcd.lib")
+            #pragma comment(linker, "/NODEFAULTLIB:libcmtd.lib")
+            #pragma comment(linker, "/NODEFAULTLIB:msvcrtd.lib")
+        #endif
     #endif
-
-    // Now set up external linking
-
-    #ifdef _DEBUG
-        // zlib and SDL were linked against the release MSVCRT; force
-        // the debug version.
-        #pragma comment(linker, "/NODEFAULTLIB:MSVCRT.LIB")
-#	endif
 
 #   ifndef WIN32_LEAN_AND_MEAN
 #       define WIN32_LEAN_AND_MEAN 1

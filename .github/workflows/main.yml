@@ -97,14 +97,9 @@ jobs:
         shell: pwsh
         run: |
           $mainManifest = Get-Content "kbe/src/vcpkg.json" -Raw | ConvertFrom-Json
-          $pythonManifest = Get-Content "kbe/src/python-runtime/vcpkg.json" -Raw | ConvertFrom-Json
           $mainBaseline = $mainManifest.'builtin-baseline'
-          $pythonBaseline = $pythonManifest.'builtin-baseline'
           if (-not $mainBaseline) {
             throw "kbe/src/vcpkg.json does not define builtin-baseline."
-          }
-          if ($mainBaseline -ne $pythonBaseline) {
-            throw "The engine and Python runtime vcpkg baselines must match."
           }
           "KBE_VCPKG_REF=$mainBaseline" >> $env:GITHUB_ENV
 
@@ -114,7 +109,7 @@ jobs:
           path: |
             .cache/vcpkg-binaries
             .cache/vcpkg-downloads
-          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('kbe/src/vcpkg.json', 'kbe/src/python-runtime/vcpkg.json', 'kbe/src/python-runtime/triplets/*.cmake') }}
+          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('kbe/src/vcpkg.json', 'kbe/src/cmake/vcpkg-triplets/*.cmake') }}
           restore-keys: |
             vcpkg-${{ runner.os }}-${{ runner.arch }}-
 
@@ -212,6 +207,20 @@ jobs:
                 echo "[ERROR] Missing runtime dependency for $binary" >&2
                 exit 1
               fi
+              dynamic_tags="$(readelf -d "$binary")"
+              if printf '%s\n' "$dynamic_tags" | grep -Eq 'vcpkg_installed|/home/runner/work'; then
+                echo "[ERROR] Non-relocatable Linux runtime path in $binary" >&2
+                exit 1
+              fi
+              case "$(basename "$binary")" in
+                libpython3*.so*) ;;
+                *)
+                  if ! printf '%s\n' "$dynamic_tags" | grep -E '(RPATH|RUNPATH)' | grep -Fq '$ORIGIN'; then
+                    echo "[ERROR] Missing relocatable \$ORIGIN runtime path in $binary" >&2
+                    exit 1
+                  fi
+                  ;;
+              esac
             fi
           done
 
@@ -240,6 +249,11 @@ jobs:
             [ -f "$library" ] || continue
             base="$(basename "$library")"
             case "$base" in
+              libpython3*.so*)
+                # Python 已由构建部署到可执行文件同目录，不在 server/lib 中保留重复副本。
+                # Python is already deployed beside the executables; do not duplicate it in server/lib.
+                continue
+                ;;
               ld-linux*.so.*|libc.so.*|libm.so.*|libdl.so.*|libpthread.so.*|librt.so.*|libresolv.so.*|linux-vdso*.so.*)
                 continue
                 ;;
@@ -265,8 +279,13 @@ jobs:
           for binary in kbe/bin/server/*; do
             if [ -f "$binary" ] && file "$binary" | grep -q "Mach-O"; then
               echo "::group::otool -L $binary"
-              otool -L "$binary"
+              dependencies="$(otool -L "$binary")"
+              printf '%s\n' "$dependencies"
               echo "::endgroup::"
+              if printf '%s\n' "$dependencies" | grep -Eq 'vcpkg_installed|/Users/runner/work'; then
+                echo "[ERROR] Non-relocatable macOS dependency in $binary" >&2
+                exit 1
+              fi
             fi
           done
 

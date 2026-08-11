@@ -26,9 +26,9 @@ target_compile_definitions(kbe_build_options INTERFACE
 )
 
 if(MSVC)
-    # 与既有 VS 工程保持 /MT、/MTd ABI，并显式使用 UTF-8 源码和执行字符集。
-    # Match the existing VS projects' /MT and /MTd ABI while explicitly using UTF-8 source and execution character sets.
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "MSVC runtime" FORCE)
+    # Python DLL 与原生扩展共享进程级 CRT 状态，因此全部 Windows 目标统一使用 /MD、/MDd。
+    # The Python DLL and native extensions share process-wide CRT state, so every Windows target uses /MD and /MDd.
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL" CACHE STRING "MSVC runtime" FORCE)
     target_compile_definitions(kbe_build_options INTERFACE UNICODE _UNICODE)
     # /FS 让同一目标的并行编译通过 mspdbsrv 串行写 PDB，避免首次完整构建出现 C1041。
     # /FS serializes parallel PDB writes through mspdbsrv, preventing C1041 during the first complete build.

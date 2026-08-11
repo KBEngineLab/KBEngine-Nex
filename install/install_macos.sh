@@ -141,7 +141,7 @@ cmake_meets_minimum_version "$CMAKE_COMMAND" || error "CMake 版本必须不低�
 cd "$SOURCE_DIR"
 "$CMAKE_COMMAND" --fresh --preset macos-ninja
 "$CMAKE_COMMAND" --build "$SOURCE_DIR/out/build/macos-ninja" --config "$CONFIGURATION" \
-    --target kbe_runtime kbe_servers kbe_tests --parallel
+    --target kbe_servers kbe_tests --parallel
 
 echo "[SUCCESS] Task completed."
 echo "[OUTPUT] CMake build directory: kbe/src/out/build/macos-ninja"

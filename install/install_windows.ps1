@@ -70,7 +70,7 @@ try {
     Assert-NativeCommandSucceeded -Description 'CMake configure' -ExitCode $LASTEXITCODE
     if (-not $SkipBuild) {
         $buildPreset = if ($Configuration -eq 'Debug') { 'windows-ninja-tests-debug' } else { 'windows-ninja-tests-release' }
-        & cmake --build --preset $buildPreset --target kbe_runtime kbe_servers kbe_tests --parallel
+        & cmake --build --preset $buildPreset --target kbe_servers kbe_tests --parallel
         Assert-NativeCommandSucceeded -Description 'CMake build' -ExitCode $LASTEXITCODE
     }
 } finally {

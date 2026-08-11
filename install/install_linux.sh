@@ -262,7 +262,7 @@ select_cmake
 cd "$SOURCE_DIR"
 "$CMAKE_COMMAND" --fresh --preset linux-ninja
 "$CMAKE_COMMAND" --build "$SOURCE_DIR/out/build/linux-ninja" --config "$CONFIGURATION" \
-    --target kbe_runtime kbe_servers kbe_tests --parallel
+    --target kbe_servers kbe_tests --parallel
 
 echo "[SUCCESS] Task completed."
 echo "[OUTPUT] CMake build directory: kbe/src/out/build/linux-ninja"

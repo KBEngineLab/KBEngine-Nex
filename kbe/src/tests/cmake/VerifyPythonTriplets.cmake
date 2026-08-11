@@ -1,81 +1,54 @@
-if(NOT DEFINED KBE_CMAKE_ROOT OR NOT EXISTS "${KBE_CMAKE_ROOT}/KbePythonTriplet.cmake")
-    message(FATAL_ERROR "KBE_CMAKE_ROOT must contain KbePythonTriplet.cmake")
+if(NOT DEFINED KBE_TRIPLET_ROOT OR NOT IS_DIRECTORY "${KBE_TRIPLET_ROOT}")
+    message(FATAL_ERROR "KBE_TRIPLET_ROOT must contain the project overlay triplets")
 endif()
 
-include("${KBE_CMAKE_ROOT}/KbePythonTriplet.cmake")
-
-if(KBE_TEST_UNSUPPORTED_UNIVERSAL_CHILD)
-    # 一份动态 Python 不能同时承载 x64 与 arm64 扩展，预期此调用明确失败。
-    # One dynamic Python runtime cannot host both x64 and arm64 extensions, so this call is expected to fail explicitly.
-    kbe_resolve_python_triplet(_kbe_universal_triplet "Darwin" "arm64" "" "arm64;x86_64")
-    message(FATAL_ERROR "Universal macOS Python triplet was unexpectedly accepted: ${_kbe_universal_triplet}")
-endif()
-
-if(KBE_TEST_UNSUPPORTED_UNIVERSAL)
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}"
-            "-DKBE_CMAKE_ROOT=${KBE_CMAKE_ROOT}"
-            -DKBE_TEST_UNSUPPORTED_UNIVERSAL_CHILD=ON
-            -P "${CMAKE_CURRENT_LIST_FILE}"
-        RESULT_VARIABLE _kbe_universal_result
-        OUTPUT_VARIABLE _kbe_universal_stdout
-        ERROR_VARIABLE _kbe_universal_stderr
-    )
-    set(_kbe_universal_output "${_kbe_universal_stdout}\n${_kbe_universal_stderr}")
-    if(_kbe_universal_result EQUAL 0 OR
-       NOT _kbe_universal_output MATCHES "Embedded Python requires one macOS architecture per build")
-        message(FATAL_ERROR
-            "Universal macOS rejection did not fail with the required diagnostic.\n${_kbe_universal_output}"
-        )
-    endif()
-    message(STATUS "Verified that universal macOS Python builds are rejected with an actionable diagnostic")
-    return()
-endif()
-
-function(kbe_assert_python_triplet expected system_name system_processor vs_platform osx_architectures)
-    kbe_resolve_python_triplet(
-        _kbe_actual
-        "${system_name}"
-        "${system_processor}"
-        "${vs_platform}"
-        "${osx_architectures}"
-    )
-    if(NOT _kbe_actual STREQUAL expected)
-        message(FATAL_ERROR
-            "Python triplet mismatch for ${system_name}/${system_processor}/${vs_platform}/${osx_architectures}: "
-            "expected ${expected}, received ${_kbe_actual}"
-        )
-    endif()
-endfunction()
-
-function(kbe_assert_python_release_triplet triplet)
-    set(_kbe_triplet_file "${KBE_CMAKE_ROOT}/../python-runtime/triplets/${triplet}.cmake")
+function(kbe_assert_triplet triplet expected_architecture expected_system expected_osx_architecture)
+    set(_kbe_triplet_file "${KBE_TRIPLET_ROOT}/${triplet}.cmake")
     if(NOT EXISTS "${_kbe_triplet_file}")
-        message(FATAL_ERROR "Python release triplet does not exist: ${_kbe_triplet_file}")
+        message(FATAL_ERROR "Overlay triplet does not exist: ${_kbe_triplet_file}")
     endif()
 
-    # Include the triplet in function scope so its ABI variables cannot leak into another case.
-    # 在函数作用域内加载 triplet，避免其 ABI 变量污染下一个验证用例。
+    # 普通依赖继续静态链接；在函数作用域内加载可防止各用例的 port 状态相互污染。
+    # Ordinary dependencies remain static; function scope prevents one port case from contaminating another.
+    set(PORT fmt)
+    unset(VCPKG_BUILD_TYPE)
     include("${_kbe_triplet_file}")
+    if(NOT VCPKG_LIBRARY_LINKAGE STREQUAL "static")
+        message(FATAL_ERROR "${triplet} must keep non-Python ports static")
+    endif()
+    if(DEFINED VCPKG_BUILD_TYPE)
+        message(FATAL_ERROR "${triplet} must not force a build type for non-Python ports")
+    endif()
+    if(NOT VCPKG_CRT_LINKAGE STREQUAL "dynamic")
+        message(FATAL_ERROR "${triplet} must use the dynamic CRT")
+    endif()
+    if(NOT VCPKG_TARGET_ARCHITECTURE STREQUAL expected_architecture)
+        message(FATAL_ERROR "${triplet} architecture mismatch: ${VCPKG_TARGET_ARCHITECTURE}")
+    endif()
+    if(expected_system AND NOT VCPKG_CMAKE_SYSTEM_NAME STREQUAL expected_system)
+        message(FATAL_ERROR "${triplet} system mismatch: ${VCPKG_CMAKE_SYSTEM_NAME}")
+    endif()
+    if(expected_osx_architecture AND
+       NOT VCPKG_OSX_ARCHITECTURES STREQUAL expected_osx_architecture)
+        message(FATAL_ERROR "${triplet} macOS architecture mismatch: ${VCPKG_OSX_ARCHITECTURES}")
+    endif()
+
+    set(PORT python3)
+    unset(VCPKG_BUILD_TYPE)
+    include("${_kbe_triplet_file}")
+    if(NOT VCPKG_LIBRARY_LINKAGE STREQUAL "dynamic")
+        message(FATAL_ERROR "${triplet} must build python3 dynamically")
+    endif()
     if(NOT VCPKG_BUILD_TYPE STREQUAL "release")
-        message(FATAL_ERROR
-            "Python triplet ${triplet} must set VCPKG_BUILD_TYPE to release, received '${VCPKG_BUILD_TYPE}'"
-        )
+        message(FATAL_ERROR "${triplet} must build python3 as Release only")
     endif()
 endfunction()
 
-kbe_assert_python_triplet("x64-windows-kbe-python-release" "Windows" "AMD64" "x64" "")
-kbe_assert_python_triplet("arm64-windows-kbe-python-release" "Windows" "AMD64" "ARM64" "")
-kbe_assert_python_triplet("x64-linux-kbe-python-release" "Linux" "x86_64" "" "")
-kbe_assert_python_triplet("arm64-linux-kbe-python-release" "Linux" "aarch64" "" "")
-kbe_assert_python_triplet("x64-osx-kbe-python-release" "Darwin" "arm64" "" "x86_64")
-kbe_assert_python_triplet("arm64-osx-kbe-python-release" "Darwin" "x86_64" "" "arm64")
+kbe_assert_triplet("x64-windows-static-md" x64 "" "")
+kbe_assert_triplet("arm64-windows-static-md" arm64 "" "")
+kbe_assert_triplet("x64-linux" x64 Linux "")
+kbe_assert_triplet("arm64-linux" arm64 Linux "")
+kbe_assert_triplet("x64-osx" x64 Darwin x86_64)
+kbe_assert_triplet("arm64-osx" arm64 Darwin arm64)
 
-kbe_assert_python_release_triplet("x64-windows-kbe-python-release")
-kbe_assert_python_release_triplet("arm64-windows-kbe-python-release")
-kbe_assert_python_release_triplet("x64-linux-kbe-python-release")
-kbe_assert_python_release_triplet("arm64-linux-kbe-python-release")
-kbe_assert_python_release_triplet("x64-osx-kbe-python-release")
-kbe_assert_python_release_triplet("arm64-osx-kbe-python-release")
-
-message(STATUS "Verified release-only Python vcpkg triplets for Windows, Linux, and macOS x64/arm64")
+message(STATUS "Verified static dependencies and dynamic Release Python for all overlay triplets")

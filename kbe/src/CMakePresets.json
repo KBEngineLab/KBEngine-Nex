@@ -11,7 +11,9 @@
       "hidden": true,
       "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
       "cacheVariables": {
-        "VCPKG_TARGET_TRIPLET": "x64-windows-static",
+        "VCPKG_TARGET_TRIPLET": "x64-windows-static-md",
+        "VCPKG_HOST_TRIPLET": "x64-windows-static-md",
+        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/cmake/vcpkg-triplets",
         "VCPKG_INSTALLED_DIR": "${sourceDir}/vcpkg_installed",
         "KBE_TEST_ASSETS": "$env{KBE_TEST_ASSETS}",
         "KBE_TEST_SERVER_CLUSTER": "$env{KBE_TEST_SERVER_CLUSTER}",
@@ -57,6 +59,7 @@
       "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
       "cacheVariables": {
         "VCPKG_INSTALLED_DIR": "${sourceDir}/vcpkg_installed",
+        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/cmake/vcpkg-triplets",
         "KBE_TEST_ASSETS": "$env{KBE_TEST_ASSETS}",
         "KBE_TEST_SERVER_CLUSTER": "$env{KBE_TEST_SERVER_CLUSTER}",
         "KBE_TEST_DATABASES": "$env{KBE_TEST_DATABASES}",
@@ -196,25 +199,25 @@
       "name": "windows-vs2022-runtime-debug",
       "configurePreset": "windows-vs2022",
       "configuration": "Debug",
-      "targets": ["kbe_runtime"]
+      "targets": ["kbe_servers"]
     },
     {
       "name": "windows-vs2026-runtime-debug",
       "configurePreset": "windows-vs2026",
       "configuration": "Debug",
-      "targets": ["kbe_runtime"]
+      "targets": ["kbe_servers"]
     },
     {
       "name": "windows-vs2022-runtime-release",
       "configurePreset": "windows-vs2022",
       "configuration": "Release",
-      "targets": ["kbe_runtime"]
+      "targets": ["kbe_servers"]
     },
     {
       "name": "windows-vs2026-runtime-release",
       "configurePreset": "windows-vs2026",
       "configuration": "Release",
-      "targets": ["kbe_runtime"]
+      "targets": ["kbe_servers"]
     },
     {
       "name": "windows-vs2022-tests-debug",
@@ -304,13 +307,13 @@
       "name": "linux-ninja-runtime-debug",
       "configurePreset": "linux-ninja",
       "configuration": "Debug",
-      "targets": ["kbe_runtime"]
+      "targets": ["kbe_servers"]
     },
     {
       "name": "linux-ninja-runtime-release",
       "configurePreset": "linux-ninja",
       "configuration": "Release",
-      "targets": ["kbe_runtime"]
+      "targets": ["kbe_servers"]
     },
     {
       "name": "linux-ninja-tests-debug",
@@ -376,13 +379,13 @@
       "name": "macos-ninja-runtime-debug",
       "configurePreset": "macos-ninja",
       "configuration": "Debug",
-      "targets": ["kbe_runtime"]
+      "targets": ["kbe_servers"]
     },
     {
       "name": "macos-ninja-runtime-release",
       "configurePreset": "macos-ninja",
       "configuration": "Release",
-      "targets": ["kbe_runtime"]
+      "targets": ["kbe_servers"]
     },
     {
       "name": "macos-ninja-tests-debug",

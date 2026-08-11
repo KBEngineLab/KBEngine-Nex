@@ -28,6 +28,9 @@ function(kbe_add_server_executable target_name component_definition)
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different
             "$<TARGET_FILE:${target_name}>"
             "${KBE_SERVER_RUNTIME_DIR}"
+        # 部署脚本不创建额外工程；文件锁会串行化多个服务端并行链接后的 Python 更新。
+        # The script adds no project; its file lock serializes Python updates after parallel server links.
+        COMMAND "${CMAKE_COMMAND}" -P "${KBE_PYTHON_DEPLOY_SCRIPT}"
         VERBATIM
     )
     target_compile_definitions(${target_name} PRIVATE
@@ -63,16 +66,28 @@ function(kbe_add_server_executable target_name component_definition)
             ${CMAKE_DL_LIBS}
         )
 
+        # 服务端发布目录可整体移动：动态 Python 只从可执行文件所在目录解析。
+        # The server runtime can move as a unit because dynamic Python resolves only beside each executable.
+        if(APPLE)
+            set(_kbe_server_origin "@loader_path")
+        else()
+            set(_kbe_server_origin "$ORIGIN")
+        endif()
+        set_target_properties(${target_name} PROPERTIES
+            BUILD_WITH_INSTALL_RPATH TRUE
+            INSTALL_RPATH "${_kbe_server_origin}"
+            INSTALL_RPATH_USE_LINK_PATH FALSE
+        )
+
         if(NOT APPLE)
-            # Linux 服务端保留 Python 的 libutil、时钟运行库和主程序符号导出语义。
-            # Linux servers preserve Python's libutil, the clock runtime library, and main-program symbol export semantics.
+            # Linux 服务端仍显式链接历史代码使用的 libutil 与时钟运行库。
+            # Linux servers continue to link libutil and the clock runtime used by legacy engine code.
             find_library(KBE_UTIL_LIBRARY NAMES util REQUIRED)
             find_library(KBE_RT_LIBRARY NAMES rt REQUIRED)
             target_link_libraries(${target_name} PRIVATE
                 ${KBE_UTIL_LIBRARY}
                 ${KBE_RT_LIBRARY}
             )
-            target_link_options(${target_name} PRIVATE "LINKER:--export-dynamic")
         endif()
     endif()
 endfunction()

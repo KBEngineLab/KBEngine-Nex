@@ -12,16 +12,16 @@ set(_kbe_runtime_executables
     "${KBE_RUNTIME_BIN_DIR}/kbcmd${CMAKE_EXECUTABLE_SUFFIX}"
 )
 list(JOIN _kbe_runtime_executables "|" _kbe_runtime_executables_arg)
+list(JOIN KBE_RUNTIME_PYTHON_FILES "|" _kbe_runtime_python_files_arg)
 
 add_test(NAME runtime.layout
     COMMAND "${CMAKE_COMMAND}"
         "-DKBE_EXECUTABLES=${_kbe_runtime_executables_arg}"
         "-DKBE_PYTHON_STDLIB=${KBE_RUNTIME_PYTHON_STDLIB}"
         "-DKBE_PYTHON_EXTENSION=${KBE_RUNTIME_PYTHON_EXTENSION}"
-        "-DKBE_PYTHON_DLL_DIR=${KBE_RUNTIME_BIN_DIR}"
+        "-DKBE_PYTHON_RUNTIME_FILES=${_kbe_runtime_python_files_arg}"
         "-DKBE_RUNTIME_DIR=${KBE_RUNTIME_BIN_DIR}"
         "-DKBE_LOG4J_CONFIG=${KBE_RUNTIME_BIN_DIR}/log4j.properties"
-        "-DKBE_PYTHON_ABI=${_kbe_python_abi}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyRuntime.cmake"
 )
 set_tests_properties(runtime.layout PROPERTIES LABELS "smoke;runtime")
@@ -36,6 +36,17 @@ set_tests_properties(runtime.kbcmd_getuid PROPERTIES
     ENVIRONMENT "KBE_ROOT=${CMAKE_SOURCE_DIR}/../..;KBE_RES_PATH=${CMAKE_SOURCE_DIR}/../res;KBE_BIN_PATH=${KBE_RUNTIME_BIN_DIR}"
 )
 
+add_test(NAME runtime.relocated_kbcmd
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_EXECUTABLE=${KBE_RUNTIME_BIN_DIR}/kbcmd${CMAKE_EXECUTABLE_SUFFIX}"
+        "-DKBE_PYTHON_RUNTIME_FILES=${_kbe_runtime_python_files_arg}"
+        "-DKBE_RELOCATED_DIR=${CMAKE_CURRENT_BINARY_DIR}/relocated-runtime"
+        "-DKBE_ROOT=${CMAKE_SOURCE_DIR}/../.."
+        "-DKBE_RES_PATH=${CMAKE_SOURCE_DIR}/../res"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyRelocatedRuntime.cmake"
+)
+set_tests_properties(runtime.relocated_kbcmd PROPERTIES LABELS "python;runtime;smoke")
+
 add_test(NAME source.macos_sigar_contract
     COMMAND "${CMAKE_COMMAND}"
         "-DKBE_SIGAR_ROOT=${CMAKE_SOURCE_DIR}/lib/dependencies/sigar"
@@ -45,20 +56,10 @@ set_tests_properties(source.macos_sigar_contract PROPERTIES LABELS "macos;source
 
 add_test(NAME source.python_triplet_matrix
     COMMAND "${CMAKE_COMMAND}"
-        "-DKBE_CMAKE_ROOT=${CMAKE_SOURCE_DIR}/cmake"
+        "-DKBE_TRIPLET_ROOT=${CMAKE_SOURCE_DIR}/cmake/vcpkg-triplets"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyPythonTriplets.cmake"
 )
 set_tests_properties(source.python_triplet_matrix PROPERTIES LABELS "python;source")
-
-add_test(NAME source.python_triplet_rejects_universal
-    COMMAND "${CMAKE_COMMAND}"
-        "-DKBE_CMAKE_ROOT=${CMAKE_SOURCE_DIR}/cmake"
-        -DKBE_TEST_UNSUPPORTED_UNIVERSAL=ON
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyPythonTriplets.cmake"
-)
-set_tests_properties(source.python_triplet_rejects_universal PROPERTIES
-    LABELS "macos;python;source"
-)
 
 add_test(NAME source.watcher_protocol_contract
     COMMAND "${CMAKE_COMMAND}"

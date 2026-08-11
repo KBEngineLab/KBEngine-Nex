@@ -41,6 +41,7 @@ include(KbeBuildOptions)
 include(KbePythonRuntime)
 include(KbeRuntime)
 include(KbeServerTarget)
+kbe_prepare_runtime()
 
 find_package(fmt CONFIG REQUIRED)
 find_package(OpenSSL REQUIRED)
@@ -157,7 +158,7 @@ kbe_set_target_folder("Engine/Core"
     common math thread xml helper resmgr network pyscript entitydef
 )
 kbe_set_target_folder("Engine/Runtime"
-    client_lib navigation server kbe_build_options kbe_log4cxx kbe_python_runtime
+    client_lib navigation server kbe_build_options kbe_log4cxx
 )
 kbe_set_target_folder("Engine/Database"
     db_interface db_mysql db_mongodb db_postgresql
@@ -173,14 +174,13 @@ kbe_set_target_folder("Server/Tools"
 )
 kbe_set_target_folder("Build/Aggregates"
     kbe_core kbe_core_dependencies kbe_libraries kbe_servers
-    kbe_python_stdlib kbe_python_runtime_files kbe_runtime
 )
 
 if(BUILD_TESTING)
     # 统一测试构建入口包含 CTest 所需运行时和编译型 fixture，避免先运行 CTest 才发现测试程序尚未生成。
     # The unified test build entry includes the runtime and compiled fixtures required by CTest, avoiding late missing-executable failures.
     add_custom_target(kbe_tests DEPENDS
-        kbe_runtime
+        kbe_servers
         kbe_network_tests
         kbe_common_tests
         kbe_security_tests

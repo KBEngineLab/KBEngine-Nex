@@ -10,6 +10,10 @@
     "apr-util",
     "curl",
     "openssl",
+    {
+      "name": "python3",
+      "features": ["extensions"]
+    },
     "mongo-c-driver",
     "libpq",
     "utfcpp",
@@ -75,6 +79,11 @@
     {
       "name": "openssl",
       "version": "3.6.3"
+    },
+    {
+      "name": "python3",
+      "version": "3.12.13",
+      "port-version": 1
     },
     {
       "name": "libpq",

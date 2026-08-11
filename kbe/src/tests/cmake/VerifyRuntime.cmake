@@ -1,5 +1,6 @@
 if(NOT DEFINED KBE_EXECUTABLES OR NOT DEFINED KBE_PYTHON_STDLIB OR
-   NOT DEFINED KBE_PYTHON_EXTENSION OR NOT DEFINED KBE_RUNTIME_DIR OR
+   NOT DEFINED KBE_PYTHON_EXTENSION OR NOT DEFINED KBE_PYTHON_RUNTIME_FILES OR
+   NOT DEFINED KBE_RUNTIME_DIR OR
    NOT DEFINED KBE_LOG4J_CONFIG)
     message(FATAL_ERROR "Runtime verification arguments are incomplete")
 endif()
@@ -35,13 +36,12 @@ if(NOT _kbe_python_extensions)
     message(FATAL_ERROR "Python extension probe is missing: ${KBE_PYTHON_EXTENSION}")
 endif()
 
-if(WIN32)
-    foreach(_kbe_python_dll IN ITEMS python3.dll "python${KBE_PYTHON_ABI}.dll")
-        if(NOT EXISTS "${KBE_PYTHON_DLL_DIR}/${_kbe_python_dll}")
-            message(FATAL_ERROR "Python runtime DLL is missing: ${KBE_PYTHON_DLL_DIR}/${_kbe_python_dll}")
-        endif()
-    endforeach()
-endif()
+string(REPLACE "|" ";" _kbe_python_runtime_files "${KBE_PYTHON_RUNTIME_FILES}")
+foreach(_kbe_python_runtime_file IN LISTS _kbe_python_runtime_files)
+    if(NOT EXISTS "${_kbe_python_runtime_file}")
+        message(FATAL_ERROR "Python runtime library is missing: ${_kbe_python_runtime_file}")
+    endif()
+endforeach()
 
 list(LENGTH _kbe_executables _kbe_executable_count)
 message(STATUS "Verified ${_kbe_executable_count} server executables and the embedded Python runtime")

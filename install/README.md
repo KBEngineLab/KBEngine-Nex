@@ -1,6 +1,6 @@
 # 安装与构建
 
-这些脚本统一使用 `kbe/src/CMakePresets.json`，不会再调用旧的 Visual Studio 工程作为构建入口。vcpkg 默认安装到仓库内的 `kbe/vcpkg`，依赖安装目录仍由 CMake manifest 管理，位于 `kbe/src/vcpkg_installed` 和 `kbe/src/python-runtime/vcpkg_installed`。
+这些脚本统一使用 `kbe/src/CMakePresets.json`，不会再调用旧的 Visual Studio 工程作为构建入口。vcpkg 默认安装到仓库内的 `kbe/vcpkg`，包括动态 Python 在内的全部依赖均由主 manifest 管理，统一位于 `kbe/src/vcpkg_installed`。
 
 ## Windows
 

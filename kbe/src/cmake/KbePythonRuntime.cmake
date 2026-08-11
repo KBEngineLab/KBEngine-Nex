@@ -1,131 +1,92 @@
 include_guard(GLOBAL)
-include(KbePythonTriplet)
 
 set(KBE_PYTHON_VERSION "3.12" CACHE STRING "Embedded Python major and minor version")
+string(REPLACE "." "" KBE_PYTHON_ABI "${KBE_PYTHON_VERSION}")
 
-# Python 使用独立的动态 triplet，避免主工程的静态依赖策略改变 CPython ABI 和第三方扩展加载方式。
-# Python uses an independent dynamic triplet so the main project's static dependency policy cannot alter the CPython ABI or extension loading behavior.
-if(NOT KBE_PYTHON_TRIPLET)
-    # macOS 交叉构建必须以目标 architecture 为准，不能沿用 Apple Silicon 主机处理器选择 Python ABI。
-    # macOS cross-builds must use the target architecture instead of selecting the Python ABI from the Apple Silicon host processor.
-    kbe_resolve_python_triplet(
-        _kbe_python_triplet
-        "${CMAKE_SYSTEM_NAME}"
-        "${CMAKE_SYSTEM_PROCESSOR}"
-        "${CMAKE_VS_PLATFORM_NAME}"
-        "${CMAKE_OSX_ARCHITECTURES}"
-    )
-    set(KBE_PYTHON_TRIPLET "${_kbe_python_triplet}" CACHE STRING "vcpkg triplet for the embedded Python runtime")
-endif()
-
-# Python's vcpkg port may build a host interpreter in addition to the target runtime.
-# Resolve an explicit release-only host triplet so native builds do not silently rebuild
-# Python and its dependencies with vcpkg's default Debug/Release host triplet.
-# vcpkg 的 Python port 除目标 runtime 外还可能构建主机解释器；显式选择 release-only
-# host triplet，避免原生构建再次通过默认 host triplet 生成 Debug/Release 双配置依赖。
-if(NOT KBE_PYTHON_HOST_TRIPLET)
-    kbe_resolve_python_triplet(
-        _kbe_python_host_triplet
-        "${CMAKE_HOST_SYSTEM_NAME}"
-        "${CMAKE_HOST_SYSTEM_PROCESSOR}"
-        ""
-        ""
-    )
-    set(KBE_PYTHON_HOST_TRIPLET
-        "${_kbe_python_host_triplet}"
-        CACHE STRING "vcpkg host triplet for building the embedded Python runtime"
+if(NOT VCPKG_INSTALLED_DIR OR NOT VCPKG_TARGET_TRIPLET)
+    message(FATAL_ERROR
+        "Embedded Python must be resolved from the main vcpkg manifest. "
+        "Configure with a preset that defines VCPKG_INSTALLED_DIR and VCPKG_TARGET_TRIPLET."
     )
 endif()
 
-set(KBE_PYTHON_INSTALL_ROOT
-    "${CMAKE_SOURCE_DIR}/python-runtime/vcpkg_installed"
-    CACHE PATH "Independent vcpkg installation root for embedded Python"
-)
-set(KBE_PYTHON_OVERLAY_TRIPLETS
-    "${CMAKE_SOURCE_DIR}/python-runtime/triplets"
-    CACHE PATH "Release-only vcpkg triplets for the embedded Python runtime"
-)
-set(KBE_PYTHON_ROOT "${KBE_PYTHON_INSTALL_ROOT}/${KBE_PYTHON_TRIPLET}")
+# Python 与其余第三方库共享一个安装树；overlay triplet 只对 python3 port 切换为动态 Release。
+# Python shares the main dependency tree; the overlay triplet switches only the python3 port to dynamic Release.
+set(KBE_PYTHON_ROOT "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+cmake_path(ABSOLUTE_PATH KBE_PYTHON_ROOT
+    BASE_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    NORMALIZE
+    OUTPUT_VARIABLE KBE_PYTHON_ROOT)
 set(KBE_PYTHON_INCLUDE_DIR "${KBE_PYTHON_ROOT}/include/python${KBE_PYTHON_VERSION}")
 
 if(WIN32)
-    string(REPLACE "." "" _kbe_python_abi "${KBE_PYTHON_VERSION}")
-    set(KBE_PYTHON_LIBRARY "${KBE_PYTHON_ROOT}/lib/python${_kbe_python_abi}.lib")
+    set(KBE_PYTHON_LIBRARY "${KBE_PYTHON_ROOT}/lib/python${KBE_PYTHON_ABI}.lib")
+    set(KBE_PYTHON_RUNTIME_LIBRARY "${KBE_PYTHON_ROOT}/bin/python${KBE_PYTHON_ABI}.dll")
+    set(KBE_PYTHON_RUNTIME_FILES
+        "${KBE_PYTHON_ROOT}/bin/python3.dll"
+        "${KBE_PYTHON_RUNTIME_LIBRARY}"
+    )
+    set(KBE_PYTHON_STDLIB_SOURCE "${KBE_PYTHON_ROOT}/tools/python3/Lib")
+    set(KBE_PYTHON_EXTENSIONS_SOURCE "${KBE_PYTHON_ROOT}/tools/python3/DLLs")
+    set(KBE_PYTHON_EXTENSION_PROBE "${KBE_PYTHON_EXTENSIONS_SOURCE}/_asyncio.pyd")
+elseif(APPLE)
+    set(KBE_PYTHON_LIBRARY "${KBE_PYTHON_ROOT}/lib/libpython${KBE_PYTHON_VERSION}.dylib")
+    set(KBE_PYTHON_RUNTIME_LIBRARY "${KBE_PYTHON_LIBRARY}")
+    file(GLOB KBE_PYTHON_RUNTIME_FILES CONFIGURE_DEPENDS
+        "${KBE_PYTHON_ROOT}/lib/libpython3*.dylib")
+    set(KBE_PYTHON_STDLIB_SOURCE "${KBE_PYTHON_ROOT}/lib/python${KBE_PYTHON_VERSION}")
+    set(KBE_PYTHON_EXTENSIONS_SOURCE "${KBE_PYTHON_STDLIB_SOURCE}/lib-dynload")
+    file(GLOB _kbe_python_extension_probes
+        "${KBE_PYTHON_EXTENSIONS_SOURCE}/_asyncio*.so")
+    if(_kbe_python_extension_probes)
+        list(GET _kbe_python_extension_probes 0 KBE_PYTHON_EXTENSION_PROBE)
+    endif()
 else()
-    find_library(KBE_PYTHON_LIBRARY
-        NAMES "python${KBE_PYTHON_VERSION}"
-        PATHS "${KBE_PYTHON_ROOT}/lib"
-        NO_DEFAULT_PATH
-    )
-endif()
-
-# 缺失运行时时复用 python-runtime manifest 自动安装；普通增量配置只做文件校验，不重复调用 vcpkg。
-# Reuse the python-runtime manifest for automatic installation when absent; normal incremental configure only validates files and does not invoke vcpkg again.
-if(NOT EXISTS "${KBE_PYTHON_INCLUDE_DIR}/Python.h" OR NOT EXISTS "${KBE_PYTHON_LIBRARY}")
-    if(DEFINED ENV{VCPKG_ROOT})
-        set(_kbe_vcpkg_root "$ENV{VCPKG_ROOT}")
-    elseif(CMAKE_TOOLCHAIN_FILE MATCHES "[/\\\\]scripts[/\\\\]buildsystems[/\\\\]vcpkg\\.cmake$")
-        get_filename_component(_kbe_vcpkg_root "${CMAKE_TOOLCHAIN_FILE}/../../.." ABSOLUTE)
-    endif()
-
-    find_program(_kbe_vcpkg_executable
-        NAMES vcpkg vcpkg.exe
-        HINTS "${_kbe_vcpkg_root}"
-        NO_DEFAULT_PATH
-    )
-    if(NOT _kbe_vcpkg_executable)
-        message(FATAL_ERROR "Embedded Python is missing and vcpkg was not found. Set VCPKG_ROOT.")
-    endif()
-
-    execute_process(
-        COMMAND "${_kbe_vcpkg_executable}"
-            install
-            --triplet "${KBE_PYTHON_TRIPLET}"
-            --host-triplet "${KBE_PYTHON_HOST_TRIPLET}"
-            --overlay-triplets "${KBE_PYTHON_OVERLAY_TRIPLETS}"
-            --x-manifest-root "${CMAKE_SOURCE_DIR}/python-runtime"
-            --x-install-root "${KBE_PYTHON_INSTALL_ROOT}"
-        RESULT_VARIABLE _kbe_python_install_result
-        COMMAND_ECHO STDOUT
-    )
-    if(NOT _kbe_python_install_result EQUAL 0)
-        message(FATAL_ERROR "vcpkg failed to install the embedded Python runtime: ${_kbe_python_install_result}")
-    endif()
-
-    if(NOT WIN32)
-        find_library(KBE_PYTHON_LIBRARY
-            NAMES "python${KBE_PYTHON_VERSION}"
-            PATHS "${KBE_PYTHON_ROOT}/lib"
-            NO_DEFAULT_PATH
-            NO_CACHE
-        )
+    set(KBE_PYTHON_LIBRARY "${KBE_PYTHON_ROOT}/lib/libpython${KBE_PYTHON_VERSION}.so")
+    set(KBE_PYTHON_RUNTIME_LIBRARY "${KBE_PYTHON_LIBRARY}")
+    file(GLOB KBE_PYTHON_RUNTIME_FILES CONFIGURE_DEPENDS
+        "${KBE_PYTHON_ROOT}/lib/libpython3*.so*")
+    set(KBE_PYTHON_STDLIB_SOURCE "${KBE_PYTHON_ROOT}/lib/python${KBE_PYTHON_VERSION}")
+    set(KBE_PYTHON_EXTENSIONS_SOURCE "${KBE_PYTHON_STDLIB_SOURCE}/lib-dynload")
+    file(GLOB _kbe_python_extension_probes
+        "${KBE_PYTHON_EXTENSIONS_SOURCE}/_asyncio*.so")
+    if(_kbe_python_extension_probes)
+        list(GET _kbe_python_extension_probes 0 KBE_PYTHON_EXTENSION_PROBE)
     endif()
 endif()
 
-if(NOT EXISTS "${KBE_PYTHON_INCLUDE_DIR}/Python.h" OR NOT EXISTS "${KBE_PYTHON_LIBRARY}")
-    message(FATAL_ERROR "Embedded Python ${KBE_PYTHON_VERSION} is incomplete under ${KBE_PYTHON_ROOT}")
-endif()
-
-add_library(kbe_python_runtime INTERFACE)
-add_library(KBE::PythonRuntime ALIAS kbe_python_runtime)
-target_include_directories(kbe_python_runtime INTERFACE "${KBE_PYTHON_INCLUDE_DIR}")
-target_link_libraries(kbe_python_runtime INTERFACE "${KBE_PYTHON_LIBRARY}")
-
-# libpython 的 _localemodule 引用 libintl_*（gettext）；macOS 不自带 libintl，需链接 vcpkg 提供的静态库。
-# libpython's _localemodule references libintl_* (gettext); macOS ships no libintl, so the vcpkg static library is linked.
-if(APPLE)
-    find_library(KBE_PYTHON_INTL_LIBRARY
-        NAMES intl
-        PATHS "${KBE_PYTHON_ROOT}/lib"
-        NO_DEFAULT_PATH
-    )
-    if(KBE_PYTHON_INTL_LIBRARY)
-        target_link_libraries(kbe_python_runtime INTERFACE "${KBE_PYTHON_INTL_LIBRARY}")
-    else()
-        message(WARNING "libintl.a not found under ${KBE_PYTHON_ROOT}/lib; python locale module may fail to link")
+foreach(_kbe_python_required_path IN ITEMS
+    "${KBE_PYTHON_INCLUDE_DIR}/Python.h"
+    "${KBE_PYTHON_LIBRARY}"
+    "${KBE_PYTHON_RUNTIME_LIBRARY}"
+    "${KBE_PYTHON_STDLIB_SOURCE}/os.py"
+    "${KBE_PYTHON_EXTENSION_PROBE}"
+)
+    if(NOT EXISTS "${_kbe_python_required_path}")
+        message(FATAL_ERROR
+            "Embedded Python ${KBE_PYTHON_VERSION} is incomplete: ${_kbe_python_required_path}")
     endif()
-endif()
+endforeach()
 
-if(CMAKE_DL_LIBS)
-    target_link_libraries(kbe_python_runtime INTERFACE "${CMAKE_DL_LIBS}")
+if(NOT KBE_PYTHON_RUNTIME_FILES)
+    message(FATAL_ERROR "Python runtime libraries were not found under ${KBE_PYTHON_ROOT}")
+endif()
+list(SORT KBE_PYTHON_RUNTIME_FILES)
+
+# 只暴露一个 imported target，不生成新的 VS/CMake 工程；所有配置都映射到 Release Python。
+# A single imported target adds no IDE project, and every engine configuration maps to Release Python.
+add_library(KBE::PythonRuntime SHARED IMPORTED GLOBAL)
+set_target_properties(KBE::PythonRuntime PROPERTIES
+    IMPORTED_CONFIGURATIONS RELEASE
+    IMPORTED_LOCATION_RELEASE "${KBE_PYTHON_RUNTIME_LIBRARY}"
+    INTERFACE_INCLUDE_DIRECTORIES "${KBE_PYTHON_INCLUDE_DIR}"
+    MAP_IMPORTED_CONFIG_DEBUG Release
+    MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release
+    MAP_IMPORTED_CONFIG_MINSIZEREL Release
+)
+
+if(WIN32)
+    set_target_properties(KBE::PythonRuntime PROPERTIES
+        IMPORTED_IMPLIB_RELEASE "${KBE_PYTHON_LIBRARY}"
+    )
 endif()

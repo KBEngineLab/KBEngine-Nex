@@ -44,12 +44,12 @@ BaseApp/CellApp，并自动选择 Bots 可执行文件；只有覆盖该位置�
 
 Server Debug and Release executables link into configuration-specific CMake directories without a
 `_d` suffix, then deploy to `kbe/bin/server`. Building an individual server target deploys that
-target after linking; building `kbe_servers` or `kbe_runtime` redeploys the complete selected
-configuration even when it was already up to date. The tracked `log4j.properties` in that directory
+target after linking; building `kbe_servers` redeploys the complete selected configuration and
+the shared Python runtime even when it was already up to date. The tracked `log4j.properties` in that directory
 is runtime configuration, not generated output, and must remain in source control.
 服务端 Debug/Release 程序先在 CMake 配置隔离目录中以无 `_d` 名称链接，再部署到
-`kbe/bin/server`。单独编译服务端目标会在链接后部署该程序；编译 `kbe_servers` 或
-`kbe_runtime` 会重新部署完整的当前配置，即使链接产物已经是最新状态。目录中受版本控制的
+`kbe/bin/server`。单独编译服务端目标会在链接后部署该程序；编译 `kbe_servers`
+会重新部署完整的当前配置及共享 Python 运行库，即使链接产物已经是最新状态。目录中受版本控制的
 `log4j.properties` 是运行时配置而非生成物，必须保留。
 
 Bots write their own rotating log by default and do not connect to Logger. Add `--bots-dev` to the

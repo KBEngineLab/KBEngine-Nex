@@ -1,0 +1,124 @@
+set(_kbe_python_runtime_files "@KBE_PYTHON_RUNTIME_FILES@")
+set(_kbe_python_stdlib_source "@KBE_PYTHON_STDLIB_SOURCE@")
+set(_kbe_python_extensions_source "@KBE_PYTHON_EXTENSIONS_SOURCE@")
+set(_kbe_python_scripts_dir "@KBE_PYTHON_SCRIPTS_DIR@")
+set(_kbe_python_extensions_destination "@KBE_PYTHON_EXTENSIONS_DESTINATION@")
+set(_kbe_runtime_dir "@KBE_SERVER_RUNTIME_DIR@")
+set(_kbe_manifest "@KBE_PYTHON_MANIFEST@")
+set(_kbe_python_header "@KBE_PYTHON_INCLUDE_DIR@/Python.h")
+set(_kbe_python_extension_probe "@KBE_PYTHON_EXTENSION_PROBE@")
+set(_kbe_stamp "@KBE_PYTHON_DEPLOY_STAMP@")
+set(_kbe_lock "@KBE_PYTHON_DEPLOY_LOCK@")
+set(_kbe_log4j_source "@KBE_LOG4J_SOURCE@")
+
+cmake_path(GET _kbe_lock PARENT_PATH _kbe_lock_dir)
+file(MAKE_DIRECTORY "${_kbe_lock_dir}" "${_kbe_runtime_dir}")
+file(LOCK "${_kbe_lock}" GUARD PROCESS TIMEOUT 300 RESULT_VARIABLE _kbe_lock_result)
+if(NOT _kbe_lock_result STREQUAL "0")
+    message(FATAL_ERROR "Unable to lock Python runtime deployment: ${_kbe_lock_result}")
+endif()
+
+foreach(_kbe_required_file IN ITEMS
+    "${_kbe_manifest}"
+    "${_kbe_python_header}"
+    "${_kbe_python_stdlib_source}/os.py"
+    "${_kbe_python_extension_probe}"
+)
+    if(NOT EXISTS "${_kbe_required_file}")
+        message(FATAL_ERROR "Python deployment input is missing: ${_kbe_required_file}")
+    endif()
+endforeach()
+
+# 动态库可能在构建后被清理或替换，因此每次都做低成本差异复制。
+# Runtime libraries may be cleaned or replaced after a build, so always perform a cheap copy-if-different pass.
+foreach(_kbe_runtime_file IN LISTS _kbe_python_runtime_files)
+    if(NOT EXISTS "${_kbe_runtime_file}")
+        message(FATAL_ERROR "Python runtime library is missing: ${_kbe_runtime_file}")
+    endif()
+    execute_process(
+        COMMAND "@CMAKE_COMMAND@" -E copy_if_different
+            "${_kbe_runtime_file}" "${_kbe_runtime_dir}"
+        RESULT_VARIABLE _kbe_copy_result
+    )
+    if(NOT _kbe_copy_result EQUAL 0)
+        message(FATAL_ERROR "Failed to deploy Python runtime library: ${_kbe_runtime_file}")
+    endif()
+endforeach()
+
+# 清理切换平台或 Python 版本后残留的 core 文件，避免发布包混入旧静态归档或动态库。
+# Remove stale core files after a platform or Python-version switch so packages cannot retain old archives or libraries.
+set(_kbe_expected_runtime_names)
+foreach(_kbe_runtime_file IN LISTS _kbe_python_runtime_files)
+    cmake_path(GET _kbe_runtime_file FILENAME _kbe_runtime_name)
+    list(APPEND _kbe_expected_runtime_names "${_kbe_runtime_name}")
+endforeach()
+file(GLOB _kbe_existing_python_cores
+    "${_kbe_runtime_dir}/python3*.dll"
+    "${_kbe_runtime_dir}/libpython3*.so*"
+    "${_kbe_runtime_dir}/libpython3*.dylib"
+    "${_kbe_runtime_dir}/libpython3*.a"
+)
+foreach(_kbe_existing_python_core IN LISTS _kbe_existing_python_cores)
+    cmake_path(GET _kbe_existing_python_core FILENAME _kbe_existing_runtime_name)
+    if(NOT _kbe_existing_runtime_name IN_LIST _kbe_expected_runtime_names)
+        file(REMOVE "${_kbe_existing_python_core}")
+    endif()
+endforeach()
+
+cmake_path(NORMAL_PATH _kbe_log4j_source OUTPUT_VARIABLE _kbe_log4j_source_normalized)
+set(_kbe_log4j_destination "${_kbe_runtime_dir}/log4j.properties")
+cmake_path(NORMAL_PATH _kbe_log4j_destination OUTPUT_VARIABLE _kbe_log4j_destination_normalized)
+if(NOT _kbe_log4j_source_normalized STREQUAL _kbe_log4j_destination_normalized)
+    execute_process(
+        COMMAND "@CMAKE_COMMAND@" -E copy_if_different
+            "${_kbe_log4j_source}" "${_kbe_runtime_dir}"
+        RESULT_VARIABLE _kbe_copy_result
+    )
+    if(NOT _kbe_copy_result EQUAL 0)
+        message(FATAL_ERROR "Failed to deploy log4j configuration: ${_kbe_log4j_source}")
+    endif()
+endif()
+
+set(_kbe_fingerprint_input)
+foreach(_kbe_fingerprint_file IN ITEMS
+    "${CMAKE_CURRENT_LIST_FILE}"
+    "${_kbe_manifest}"
+    "${_kbe_python_header}"
+    "${_kbe_python_stdlib_source}/os.py"
+    "${_kbe_python_extension_probe}"
+)
+    file(SHA256 "${_kbe_fingerprint_file}" _kbe_file_hash)
+    string(APPEND _kbe_fingerprint_input
+        "${_kbe_fingerprint_file}=${_kbe_file_hash}\n")
+endforeach()
+string(SHA256 _kbe_fingerprint "${_kbe_fingerprint_input}")
+
+set(_kbe_previous_fingerprint)
+if(EXISTS "${_kbe_stamp}")
+    file(READ "${_kbe_stamp}" _kbe_previous_fingerprint)
+    string(STRIP "${_kbe_previous_fingerprint}" _kbe_previous_fingerprint)
+endif()
+
+if(NOT _kbe_previous_fingerprint STREQUAL _kbe_fingerprint)
+    set(_kbe_stdlib_destination "${_kbe_python_scripts_dir}/Lib")
+    file(REMOVE_RECURSE
+        "${_kbe_stdlib_destination}"
+        "${_kbe_python_extensions_destination}"
+    )
+    file(MAKE_DIRECTORY
+        "${_kbe_stdlib_destination}"
+        "${_kbe_python_extensions_destination}"
+    )
+
+    # Unix 的 lib-dynload 必须位于现有 SCRIPT_PATH 约定的同级目录，避免复制两份扩展模块。
+    # Unix lib-dynload belongs beside Lib per the existing SCRIPT_PATH contract, avoiding duplicate extension copies.
+    file(COPY "${_kbe_python_stdlib_source}/"
+        DESTINATION "${_kbe_stdlib_destination}"
+        PATTERN "lib-dynload" EXCLUDE
+    )
+    file(COPY "${_kbe_python_extensions_source}/"
+        DESTINATION "${_kbe_python_extensions_destination}"
+    )
+    file(WRITE "${_kbe_stamp}" "${_kbe_fingerprint}\n")
+    message(STATUS "Deployed Python standard library and native extensions")
+endif()
