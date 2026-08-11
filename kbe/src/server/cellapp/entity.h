@@ -129,6 +129,13 @@ public:
 	*/
 	void onDefDataChanged(EntityComponent* pEntityComponent, const PropertyDescription* propertyDescription,
 			PyObject* pyData);
+
+	/**
+		将指定详情级别范围内、可广播给其他客户端的当前属性写入更新流。
+		Writes current OTHER_CLIENT property values in the requested detail-level range.
+	*/
+	uint32 addOtherClientDataToStreamByDetailRange(MemoryStream* pStream,
+		DETAIL_TYPE minimumDetailLevel, DETAIL_TYPE maximumDetailLevel);
 	
 	/** 
 		该entity通信通道

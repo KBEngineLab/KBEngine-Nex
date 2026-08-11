@@ -781,7 +781,6 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent,
 		}
 	}
 	
-	const Position3D& basePos = this->position(); 
 	if((flags & ENTITY_BROADCAST_OTHER_CLIENT_FLAGS) > 0)
 	{
 		DETAIL_TYPE propertyDetailLevel = propertyDescription->getDetailLevel();
@@ -803,13 +802,13 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent,
 
 			// 这个可能性是存在的，例如数据来源于createWitnessFromStream()
 			// 又如自己的entity还未在目标客户端上创建
-			if(!pEntity->pWitness()->entityInView(id()))
+			Witness* pTargetWitness = pEntity->pWitness();
+			if(!pTargetWitness->entityInView(id()))
 				continue;
 
-			const Position3D& targetPos = pEntity->position();
-			Position3D lengthPos = targetPos - basePos;
-
-			if(pScriptModule_->getDetailLevel().level[propertyDetailLevel].inLevel(lengthPos.length()))
+			EntityRef* pEntityRef = pTargetWitness->getViewEntityRef(id());
+			if(pEntityRef != NULL && pScriptModule_->getDetailLevel().isVisible(
+				propertyDetailLevel, pEntityRef->detailLevel()))
 			{
 				Network::Bundle* pSendBundle = pChannel->createSendBundle();
 				NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pEntity->id(), (*pSendBundle));
@@ -856,61 +855,6 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent,
 		}
 	}
 
-	/*
-	// 判断这个属性是否还需要广播给其他客户端
-	if((flags & ENTITY_BROADCAST_OTHER_CLIENT_FLAGS) > 0)
-	{
-		int8 detailLevel = propertyDescription->getDetailLevel();
-		for(int8 i=DETAIL_LEVEL_NEAR; i<=detailLevel; ++i)
-		{
-			std::map<ENTITY_ID, Entity*>::iterator iter = witnessEntities_[i].begin();
-			for(; iter != witnessEntities_[i].end(); ++iter)
-			{
-				Entity* entity = iter->second;
-				EntityCall* clientEntityCall = entity->clientEntityCall();
-				if(clientEntityCall != NULL)
-				{
-					Packet* sp = clientEntityCall->newCall(ENTITYCALL_TYPE_UPDATE_PROPERTY);
-					(*sp) << id_;
-					sp->append(mstream->contents(), mstream->size());
-					clientEntityCall->post(sp);
-				}
-			}
-		}
-
-		// 这个属性已经更新过， 将这些信息添加到曾经进入过这个级别的entity， 但现在可能走远了一点， 在他回来重新进入这个detaillevel
-		// 时如果重新将所有的属性都更新到他的客户端可能不合适， 我们记录这个属性的改变， 下次他重新进入我们只需要将所有期间有过改变的
-		// 数据发送到他的客户端更新
-		for(int8 i=detailLevel; i<=DETAIL_LEVEL_FAR; ++i)
-		{
-			std::map<ENTITY_ID, Entity*>::iterator iter = witnessEntities_[i].begin();
-			for(; iter != witnessEntities_[i].end(); ++iter)
-			{
-				Entity* entity = iter->second;
-				EntityCall* clientEntityCall = entity->clientEntityCall();
-				if(clientEntityCall != NULL)
-				{
-					WitnessInfo* witnessInfo = witnessEntityDetailLevelMap_.find(iter->first)->second;
-					if(witnessInfo->detailLevelLog[detailLevel])
-					{
-						std::vector<uint32>& cddlog = witnessInfo->changeDefDataLogs[detailLevel];
-						std::vector<uint32>::iterator fiter = std::find(cddlog.begin(), cddlog.end(), utype);
-						if(fiter == cddlog.end())
-							witnessInfo->changeDefDataLogs[detailLevel].push_back(utype);
-					}
-				}
-
-				// 记录这个事件产生的数据量大小
-				std::string event_name = this->scriptName();
-				event_name += ".";
-				event_name += propertyDescription->getName();
-				
-				g_publicClientEventHistoryStats.add(scriptName(), propertyDescription->getName(), pSendBundle->currMsgLength());
-			}
-		}
-	}
-	*/
-
 	// 判断这个属性是否还需要广播给自己的客户端
 	if((flags & ENTITY_BROADCAST_OWN_CLIENT_FLAGS) > 0 && clientEntityCall_ != NULL && pWitness_)
 	{
@@ -954,6 +898,112 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent,
 	}
 
 	MemoryStream::reclaimPoolObject(mstream);
+}
+
+//-------------------------------------------------------------------------------------
+uint32 Entity::addOtherClientDataToStreamByDetailRange(MemoryStream* pStream,
+	DETAIL_TYPE minimumDetailLevel, DETAIL_TYPE maximumDetailLevel)
+{
+	if(pStream == NULL || minimumDetailLevel > maximumDetailLevel ||
+		maximumDetailLevel >= DETAIL_LEVEL_COUNT)
+	{
+		return 0;
+	}
+
+	const COMPONENT_TYPE previousComponentType = EntityDef::context().currComponentType;
+	const ENTITY_ID previousEntityID = EntityDef::context().currEntityID;
+	EntityDef::context().currComponentType = CLIENT_TYPE;
+	EntityDef::context().currEntityID = id();
+
+	PyObject* pydict = PyObject_GetAttrString(this, "__dict__");
+	if(pydict == NULL)
+	{
+		SCRIPT_ERROR_CHECK();
+		EntityDef::context().currComponentType = previousComponentType;
+		EntityDef::context().currEntityID = previousEntityID;
+		return 0;
+	}
+
+	const bool useAliasID = pScriptModule_->usePropertyDescrAlias();
+	auto writePropertyHeader = [pStream, useAliasID](const PropertyDescription* pParent,
+		const PropertyDescription* pProperty)
+	{
+		if(useAliasID)
+		{
+			(*pStream) << static_cast<uint8>(pParent ? pParent->aliasIDAsUint8() : 0);
+			(*pStream) << pProperty->aliasIDAsUint8();
+		}
+		else
+		{
+			(*pStream) << static_cast<ENTITY_PROPERTY_UID>(pParent ? pParent->getUType() : 0);
+			(*pStream) << pProperty->getUType();
+		}
+	};
+
+	uint32 propertyCount = 0;
+	ScriptDefModule::PROPERTYDESCRIPTION_MAP& propertyDescrs =
+		pScriptModule_->getClientPropertyDescriptions();
+	for(ScriptDefModule::PROPERTYDESCRIPTION_MAP::const_iterator iter = propertyDescrs.begin();
+		iter != propertyDescrs.end(); ++iter)
+	{
+		PropertyDescription* pProperty = iter->second;
+		if((pProperty->getFlags() & ENTITY_BROADCAST_OTHER_CLIENT_FLAGS) == 0)
+			continue;
+
+		PyObject* pyValue = PyDict_GetItemString(pydict, pProperty->getName());
+		if(pyValue == NULL)
+			continue;
+
+		if(pProperty->getDataType()->type() != DATA_TYPE_ENTITY_COMPONENT)
+		{
+			const DETAIL_TYPE detailLevel = pProperty->getDetailLevel();
+			if(detailLevel < minimumDetailLevel || detailLevel > maximumDetailLevel)
+				continue;
+
+			writePropertyHeader(NULL, pProperty);
+			pProperty->getDataType()->addToStream(pStream, pyValue);
+			++propertyCount;
+			continue;
+		}
+
+		// 组件只补发落入新可见等级的子属性，不能整组件重发；否则会把 OWN_CLIENT
+		// 字段和仍处于更近等级的字段一起带给其他客户端。
+		// Components resend only newly visible child properties. Re-serializing the whole
+		// component would also expose OWN_CLIENT and still-nearer fields to other clients.
+		EntityComponentType* pComponentType =
+			static_cast<EntityComponentType*>(pProperty->getDataType());
+		ScriptDefModule* pComponentModule = pComponentType->pScriptDefModule();
+		for(DETAIL_TYPE detailLevel = minimumDetailLevel;
+			detailLevel <= maximumDetailLevel; ++detailLevel)
+		{
+			ScriptDefModule::PROPERTYDESCRIPTION_MAP& childDescrs =
+				pComponentModule->getCellPropertyDescriptionsByDetailLevel(detailLevel);
+			for(ScriptDefModule::PROPERTYDESCRIPTION_MAP::const_iterator childIter = childDescrs.begin();
+				childIter != childDescrs.end(); ++childIter)
+			{
+				PropertyDescription* pChildProperty = childIter->second;
+				if((pChildProperty->getFlags() & ENTITY_BROADCAST_OTHER_CLIENT_FLAGS) == 0)
+					continue;
+
+				PyObject* pyChildValue = PyObject_GetAttrString(pyValue, pChildProperty->getName());
+				if(pyChildValue == NULL)
+				{
+					SCRIPT_ERROR_CHECK();
+					continue;
+				}
+
+				writePropertyHeader(pProperty, pChildProperty);
+				pChildProperty->getDataType()->addToStream(pStream, pyChildValue);
+				Py_DECREF(pyChildValue);
+				++propertyCount;
+			}
+		}
+	}
+
+	Py_DECREF(pydict);
+	EntityDef::context().currComponentType = previousComponentType;
+	EntityDef::context().currEntityID = previousEntityID;
+	return propertyCount;
 }
 
 //-------------------------------------------------------------------------------------
@@ -1616,25 +1666,6 @@ void Entity::addWitnessed(Entity* entity)
 	witnesses_.push_back(entity->id());
 	++witnesses_count_;
 
-	/*
-	int8 detailLevel = pScriptModule_->getDetailLevel().getLevelByRange(range);
-	WitnessInfo* info = new WitnessInfo(detailLevel, entity, range);
-	ENTITY_ID id = entity->id();
-
-	DEBUG_MSG("Entity[%s:%ld]::onWitnessed:%s %ld enter detailLevel %d. range=%f.\n", scriptName(), id_, 
-			entity->scriptName(), id, detailLevel, range);
-
-#ifdef _DEBUG
-	WITNESSENTITY_DETAILLEVEL_MAP::iterator iter = witnessEntityDetailLevelMap_.find(id);
-	if(iter != witnessEntityDetailLevelMap_.end())
-		ERROR_MSG("Entity::onWitnessed: %s %ld is exist.\n", entity->scriptName(), id);
-#endif
-	
-	witnessEntityDetailLevelMap_[id] = info;
-	witnessEntities_[detailLevel][id] = entity;
-	onEntityInitDetailLevel(entity, detailLevel);
-	*/
-
 	if(witnesses_count_ == 1)
 	{
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
@@ -2195,6 +2226,14 @@ void Entity::onPyPositionChanged()
 		Entity::bufferCallback(false);
 	}
 
+	// 脚本直接修改 position 已经即时广播坐标，但详情等级仍需进入统一 Witness 队列，
+	// 才能为靠近的观察者补发此前被过滤的属性。
+	// Direct script position changes already broadcast the pose immediately, but detail-level
+	// transitions still enter the Witness queue so approaching observers receive filtered properties.
+	markWitnessesVolatileDataDirty();
+	if(!this->isDestroyed() && pWitness_)
+		pWitness_->onOwnerPositionChanged();
+
 	updateLastPos();
 }
 
@@ -2214,6 +2253,9 @@ void Entity::onPositionChanged()
 		this->pEntityCoordinateNode()->update();
 		Entity::bufferCallback(false);
 	}
+
+	if(!this->isDestroyed() && pWitness_)
+		pWitness_->onOwnerPositionChanged();
 
 	updateLastPos();
 }

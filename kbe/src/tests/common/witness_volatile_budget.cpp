@@ -2,6 +2,7 @@
 #include "server/cellapp/witness_update_scheduler.h"
 #include "server/cellapp/witness_delayed_queue.h"
 #include "server/cellapp/witness_volatile_lod.h"
+#include "entitydef/detaillevel.h"
 
 #include <cstdlib>
 #include <limits>
@@ -162,6 +163,40 @@ bool testDenseViewTemporalLod()
 			"relation phasing synchronized all observers of the same target");
 }
 
+bool testPropertyDetailLevelHysteresis()
+{
+	KBEngine::DetailLevel detailLevel;
+	detailLevel.level[DETAIL_LEVEL_NEAR].radius = 10.f;
+	detailLevel.level[DETAIL_LEVEL_NEAR].hyst = 2.f;
+	detailLevel.level[DETAIL_LEVEL_MEDIUM].radius = 30.f;
+	detailLevel.level[DETAIL_LEVEL_MEDIUM].hyst = 3.f;
+	detailLevel.level[DETAIL_LEVEL_FAR].radius = 60.f;
+	detailLevel.level[DETAIL_LEVEL_FAR].hyst = 5.f;
+
+	return require(detailLevel.resolveLevel(81.f) == DETAIL_LEVEL_NEAR,
+		"initial near detail level was not selected") &&
+		require(detailLevel.resolveLevel(400.f) == DETAIL_LEVEL_MEDIUM,
+			"initial medium detail level was not selected") &&
+		require(detailLevel.resolveLevel(132.25f, DETAIL_LEVEL_NEAR) == DETAIL_LEVEL_NEAR,
+			"near hysteresis released the relation too early") &&
+		require(detailLevel.resolveLevel(146.41f, DETAIL_LEVEL_NEAR) == DETAIL_LEVEL_MEDIUM,
+			"near hysteresis did not release the relation") &&
+		require(detailLevel.resolveLevel(1024.f, DETAIL_LEVEL_MEDIUM) == DETAIL_LEVEL_MEDIUM,
+			"medium hysteresis released the relation too early") &&
+		require(detailLevel.resolveLevel(1156.f, DETAIL_LEVEL_MEDIUM) == DETAIL_LEVEL_FAR,
+			"medium hysteresis did not advance to far") &&
+		require(detailLevel.resolveLevel(4356.f, DETAIL_LEVEL_FAR) == DETAIL_LEVEL_NONE,
+			"far hysteresis did not release the relation") &&
+		require(detailLevel.resolveLevel(3481.f, DETAIL_LEVEL_NONE) == DETAIL_LEVEL_FAR,
+			"outside relation did not re-enter at the configured far radius") &&
+		require(detailLevel.isVisible(DETAIL_LEVEL_MEDIUM, DETAIL_LEVEL_NEAR),
+			"near relation could not see a medium property") &&
+		require(!detailLevel.isVisible(DETAIL_LEVEL_NEAR, DETAIL_LEVEL_MEDIUM),
+			"medium relation incorrectly saw a near property") &&
+		require(!detailLevel.isVisible(DETAIL_LEVEL_FAR, DETAIL_LEVEL_NONE),
+			"outside relation incorrectly saw a far property");
+}
+
 bool testDelayedQueueOrdersDueEntriesAndKeepsOwnership()
 {
 	KBEngine::WitnessDelayedQueue queue;
@@ -225,6 +260,7 @@ int main()
 		!testPendingAdmissionPrefersWorkAndRotates() || !testPendingBelowLimitFillsRemainingSlots() ||
 		!testUnlimitedAdmissionIgnoresPendingPartition() ||
 		!testVolatileDistanceSemantics() || !testDenseViewTemporalLod() ||
+		!testPropertyDetailLevelHysteresis() ||
 		!testDelayedQueueOrdersDueEntriesAndKeepsOwnership() || !testDirtyQueueTrimsOnlyWhenEmpty())
 		return EXIT_FAILURE;
 

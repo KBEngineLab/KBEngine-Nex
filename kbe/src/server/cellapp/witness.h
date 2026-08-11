@@ -52,29 +52,6 @@ class MemoryStream;
 class ViewTrigger;
 class Space;
 
-/** 观察者信息结构 */
-struct WitnessInfo
-{
-	WitnessInfo(const int8& lv, Entity* e, const float& r):
-	detailLevel(lv),
-	entity(e),
-	range(r)
-	{
-		for(int i=0; i<3; ++i)
-			if(lv == i)
-				detailLevelLog[i] = true;
-			else
-				detailLevelLog[i] = false;
-	}
-	
-	int8 detailLevel;							// 当前所在详情级别
-	Entity* entity;								// 所表达的entity
-	float range;								// 当前与这个entity的距离
-	bool detailLevelLog[3];						// 表示这个entity都进入过该entity的哪些详情级别， 提供属性广播优化用的
-												// 当没有进入过某级别时， 会将所有这个级别的属性更新给他， 否则只更新近段时间曾经改变过的属性
-	std::vector<uint32> changeDefDataLogs[3];	// entity离开了某个详情级别(没有脱离witness)后， 这期间有某个详情级别的属性改变均记录在这里
-};
-
 /**
 	这个模块用来监视我们感兴趣的entity数据， 如：view， 属性更新， 调用entity的方法
 	并将其传输给监视者。
@@ -199,6 +176,7 @@ public:
 	/** 标记可见实体的易变数据需要在下一个更新批次同步。 */
 	/** Marks a visible entity's volatile data for synchronization in the next update batch. */
 	void markViewEntityVolatileDirty(ENTITY_ID entityID);
+	void onOwnerPositionChanged();
 	void setVolatileUpdatesEnabled(bool enabled);
 	bool schedulerPending() const { return schedulerPending_; }
 
@@ -286,6 +264,11 @@ private:
 	void clearVolatileDirtyQueue();
 	void synchronizeViewEntityMetrics();
 	void initializeEntityRefLifecycle(EntityRef* pEntityRef);
+	DETAIL_TYPE resolveEntityRefDetailLevel(EntityRef* pEntityRef) const;
+	uint32 appendEntityRefDetailLevelProperties(Network::Bundle* pSendBundle,
+		EntityRef* pEntityRef, DETAIL_TYPE minimumDetailLevel, DETAIL_TYPE maximumDetailLevel);
+	void updateEntityRefDetailLevel(Network::Bundle* pSendBundle, EntityRef* pEntityRef);
+	void processDetailLevelScan(Network::Bundle* pSendBundle);
 	bool queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue = false);
 	void scheduleEntityRefVolatile(EntityRef* pEntityRef);
 	void activateDueVolatileUpdates();
@@ -318,6 +301,7 @@ private:
 
 	uint16									clientViewSize_;
 	bool									fullScanRequired_;
+	bool									detailLevelScanRequired_;
 	bool									volatileQueueCompactionPending_;
 	size_t								trackedViewEntityCount_;
 	uint64									nextEntityRefGeneration_;

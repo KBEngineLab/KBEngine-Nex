@@ -82,6 +82,7 @@ viewEntities_(),
 viewEntities_map_(),
 clientViewSize_(0),
 fullScanRequired_(true),
+detailLevelScanRequired_(false),
 volatileQueueCompactionPending_(false),
 trackedViewEntityCount_(0),
 nextEntityRefGeneration_(1),
@@ -137,6 +138,7 @@ void Witness::createFromStream(KBEngine::MemoryStream& s)
 {
 	clearVolatileDirtyQueue();
 	fullScanRequired_ = true;
+	detailLevelScanRequired_ = false;
 	s >> viewRadius_ >> viewHysteresisArea_ >> clientViewSize_;
 
 	uint32 size;
@@ -171,6 +173,7 @@ void Witness::attach(Entity* pEntity)
 	pEntity_ = pEntity;
 	clearVolatileDirtyQueue();
 	fullScanRequired_ = true;
+	detailLevelScanRequired_ = false;
 	++g_witnessActiveCount;
 
 	lastBasePos_.z = -FLT_MAX;
@@ -280,6 +283,7 @@ void Witness::clear(Entity* pEntity)
 	synchronizeViewEntityMetrics();
 	clearVolatileDirtyQueue();
 	fullScanRequired_ = true;
+	detailLevelScanRequired_ = false;
 	KBE_ASSERT(g_witnessActiveCount > 0);
 	setSchedulerPending(false);
 	--g_witnessActiveCount;
@@ -329,6 +333,7 @@ void Witness::onReclaimObject()
 	synchronizeViewEntityMetrics();
 	clearVolatileDirtyQueue();
 	fullScanRequired_ = true;
+	detailLevelScanRequired_ = false;
 	nextEntityRefGeneration_ = 1;
 }
 
@@ -873,6 +878,84 @@ void Witness::initializeEntityRefLifecycle(EntityRef* pEntityRef)
 	pEntityRef->volatileQueued(false);
 	pEntityRef->structuralQueued(false);
 	pEntityRef->producerPending(false);
+	pEntityRef->detailLevel(resolveEntityRefDetailLevel(pEntityRef));
+}
+
+//-------------------------------------------------------------------------------------
+DETAIL_TYPE Witness::resolveEntityRefDetailLevel(EntityRef* pEntityRef) const
+{
+	if(pEntity_ == NULL || pEntityRef == NULL || pEntityRef->pEntity() == NULL)
+		return DETAIL_LEVEL_NONE;
+
+	Entity* pOtherEntity = pEntityRef->pEntity();
+	const Position3D& observerPosition = pEntity_->position();
+	const Position3D& targetPosition = pOtherEntity->position();
+	const float deltaX = targetPosition.x - observerPosition.x;
+	const float deltaZ = targetPosition.z - observerPosition.z;
+	const float distanceSquared = deltaX * deltaX + deltaZ * deltaZ;
+	return pOtherEntity->pScriptModule()->getDetailLevel().resolveLevel(
+		distanceSquared, pEntityRef->detailLevel());
+}
+
+//-------------------------------------------------------------------------------------
+uint32 Witness::appendEntityRefDetailLevelProperties(Network::Bundle* pSendBundle,
+	EntityRef* pEntityRef, DETAIL_TYPE minimumDetailLevel, DETAIL_TYPE maximumDetailLevel)
+{
+	if(pSendBundle == NULL || pEntityRef == NULL || pEntityRef->pEntity() == NULL ||
+		minimumDetailLevel > maximumDetailLevel || maximumDetailLevel >= DETAIL_LEVEL_COUNT)
+	{
+		return 0;
+	}
+
+	MemoryStream* pStream = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
+	Entity* pOtherEntity = pEntityRef->pEntity();
+	const uint32 propertyCount = pOtherEntity->addOtherClientDataToStreamByDetailRange(
+		pStream, minimumDetailLevel, maximumDetailLevel);
+	if(propertyCount > 0)
+	{
+		ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onUpdatePropertys, updatePropertys);
+		(*pSendBundle) << pOtherEntity->id();
+		pSendBundle->append(*pStream);
+		ENTITY_MESSAGE_FORWARD_CLIENT_END(pSendBundle, ClientInterface::onUpdatePropertys, updatePropertys);
+	}
+
+	MemoryStream::reclaimPoolObject(pStream);
+	return propertyCount;
+}
+
+//-------------------------------------------------------------------------------------
+void Witness::updateEntityRefDetailLevel(Network::Bundle* pSendBundle, EntityRef* pEntityRef)
+{
+	if(pEntityRef == NULL || pEntityRef->pEntity() == NULL)
+		return;
+
+	const DETAIL_TYPE previousLevel = pEntityRef->detailLevel();
+	const DETAIL_TYPE currentLevel = resolveEntityRefDetailLevel(pEntityRef);
+	if(currentLevel == previousLevel)
+		return;
+
+	pEntityRef->detailLevel(currentLevel);
+	if((pEntityRef->flags() & ENTITYREF_FLAG_NORMAL) == 0 || currentLevel >= previousLevel)
+		return;
+
+	const DETAIL_TYPE maximumDetailLevel = previousLevel > DETAIL_LEVEL_FAR ?
+		DETAIL_LEVEL_FAR : static_cast<DETAIL_TYPE>(previousLevel - 1);
+	appendEntityRefDetailLevelProperties(pSendBundle, pEntityRef, currentLevel, maximumDetailLevel);
+}
+
+//-------------------------------------------------------------------------------------
+void Witness::processDetailLevelScan(Network::Bundle* pSendBundle)
+{
+	if(!detailLevelScanRequired_)
+		return;
+
+	detailLevelScanRequired_ = false;
+	for(VIEW_ENTITIES::iterator iter = viewEntities_.begin(); iter != viewEntities_.end(); ++iter)
+	{
+		EntityRef* pEntityRef = *iter;
+		if((pEntityRef->flags() & ENTITYREF_FLAG_NORMAL) > 0)
+			updateEntityRefDetailLevel(pSendBundle, pEntityRef);
+	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -994,7 +1077,8 @@ void Witness::setSchedulerPending(bool pending)
 
 void Witness::refreshSchedulerPending()
 {
-	setSchedulerPending((fullScanRequired_ && !viewEntities_.empty()) || volatileDirtyQueue_.size() > 0 ||
+	setSchedulerPending((fullScanRequired_ && !viewEntities_.empty()) ||
+		(detailLevelScanRequired_ && !viewEntities_.empty()) || volatileDirtyQueue_.size() > 0 ||
 		structuralDirtyQueue_.size() > 0);
 }
 
@@ -1047,6 +1131,18 @@ void Witness::markViewEntityVolatileDirty(ENTITY_ID entityID)
 }
 
 //-------------------------------------------------------------------------------------
+void Witness::onOwnerPositionChanged()
+{
+	// 观察者一次 Tick 内可能被多个控制器修正坐标，只保留一次关系扫描请求。
+	// Multiple controllers may adjust the observer in one tick; one relationship scan is sufficient.
+	if(viewEntities_.empty() || detailLevelScanRequired_)
+		return;
+
+	detailLevelScanRequired_ = true;
+	setSchedulerPending(true);
+}
+
+//-------------------------------------------------------------------------------------
 bool Witness::needsVolatileUpdate(Entity* pEntity)
 {
 	return getEntityVolatileDataUpdateFlags(pEntity) != UPDATE_FLAG_NULL;
@@ -1090,6 +1186,7 @@ bool Witness::processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pE
 		ENTITY_MESSAGE_FORWARD_CLIENT_END(pSendBundle, ClientInterface::onEntityEnterWorld, entityEnterWorld);
 
 		pEntityRef->flags(ENTITYREF_FLAG_NORMAL);
+		pEntityRef->detailLevel(resolveEntityRefDetailLevel(pEntityRef));
 		// EnterWorld 在客户端按尾插建立别名；这里必须使用发送前的客户端可见数量。
 		// EnterWorld appends to the client alias table, so use the visible count before incrementing it.
 		pEntityRef->aliasID(static_cast<int>(clientViewSize_));
@@ -1132,6 +1229,7 @@ bool Witness::processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pE
 	}
 
 	KBE_ASSERT(pEntityRef->flags() == ENTITYREF_FLAG_NORMAL);
+	updateEntityRefDetailLevel(pSendBundle, pEntityRef);
 	const uint32 flags = getEntityVolatileDataUpdateFlags(pOtherEntity);
 	addUpdateToStream(pSendBundle, flags, pEntityRef);
 	if (flags != UPDATE_FLAG_NULL)
@@ -1614,6 +1712,7 @@ bool Witness::update()
 		if (volatileUpdatesEnabled_)
 			addBaseDataToStream(pSendBundle);
 
+		processDetailLevelScan(pSendBundle);
 		processVolatileDirtyQueue(pSendBundle);
 		refreshSchedulerPending();
 

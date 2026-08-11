@@ -24,6 +24,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "helper/debug_helper.h"
 #include "common/common.h"	
 #include "common/objectpool.h"
+#include "entitydef/common.h"
 
 namespace KBEngine{
 
@@ -58,7 +59,7 @@ public:
 			+ sizeof(aliasID_) + sizeof(pEntity_)
 			+ sizeof(flags_) + sizeof(generation_)
 			+ sizeof(volatileQueued_) + sizeof(structuralQueued_)
-			+ sizeof(producerPending_);
+			+ sizeof(producerPending_) + sizeof(detailLevel_);
 
 		return bytes;
 	}
@@ -85,6 +86,8 @@ public:
 	void structuralQueued(bool value) { structuralQueued_ = value; }
 	bool producerPending() const { return producerPending_; }
 	void producerPending(bool value) { producerPending_ = value; }
+	DETAIL_TYPE detailLevel() const { return detailLevel_; }
+	void detailLevel(DETAIL_TYPE value) { detailLevel_ = value; }
 
 	void addToStream(KBEngine::MemoryStream& s);
 	void createFromStream(KBEngine::MemoryStream& s);
@@ -98,6 +101,7 @@ private:
 	bool volatileQueued_;
 	bool structuralQueued_;
 	bool producerPending_;
+	DETAIL_TYPE detailLevel_;
 };
 
 }

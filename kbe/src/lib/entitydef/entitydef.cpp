@@ -30,6 +30,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "entitydef/volatileinfo.h"
 #include "entitydef/entity_call.h"
 
+#include <cmath>
+
 #ifndef CODE_INLINE
 #include "entitydef.inl"
 #endif
@@ -298,6 +300,32 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 			return false;
 		}
 
+		if(!pScriptModule->getDetailLevel().configured())
+		{
+			const PropertyDescription* pRestrictedProperty = NULL;
+			for(DETAIL_TYPE detailLevel = DETAIL_LEVEL_NEAR;
+				detailLevel < DETAIL_LEVEL_FAR && pRestrictedProperty == NULL; ++detailLevel)
+			{
+				ScriptDefModule::PROPERTYDESCRIPTION_MAP& detailProperties =
+					pScriptModule->getCellPropertyDescriptionsByDetailLevel(detailLevel);
+				for(ScriptDefModule::PROPERTYDESCRIPTION_MAP::const_iterator propertyIter = detailProperties.begin();
+					propertyIter != detailProperties.end(); ++propertyIter)
+				{
+					if((propertyIter->second->getFlags() & ENTITY_BROADCAST_OTHER_CLIENT_FLAGS) > 0)
+					{
+						pRestrictedProperty = propertyIter->second;
+						break;
+					}
+				}
+			}
+
+			if(pRestrictedProperty != NULL)
+			{
+				WARNING_MSG(fmt::format("EntityDef::initialize: entity({}) property({}) uses DetailLevel but has no DetailLevels; all ranges remain unlimited.\n",
+					moduleName, pRestrictedProperty->getName()));
+			}
+		}
+
 		pScriptModule->onLoaded();
 		return true;
 	};
@@ -400,67 +428,64 @@ bool EntityDef::loadDefInfo(const std::string& defFilePath,
 }
 
 //-------------------------------------------------------------------------------------
-bool EntityDef::loadDetailLevelInfo(const std::string& defFilePath, 
-									const std::string& moduleName, 
-									XML* defxml, 
-									TiXmlNode* defNode, 
+bool EntityDef::loadDetailLevelInfo(const std::string& defFilePath,
+									const std::string& moduleName,
+									XML* defxml,
+									TiXmlNode* defNode,
 									ScriptDefModule* pScriptModule)
 {
+	(void)defFilePath;
 	TiXmlNode* detailLevelNode = defxml->enterNode(defNode, "DetailLevels");
 	if(detailLevelNode == NULL)
 		return true;
 
+	DetailLevel::Level configuredLevels[DETAIL_LEVEL_COUNT];
+	const char* levelNames[DETAIL_LEVEL_COUNT] = { "NEAR", "MEDIUM", "FAR" };
+	for(DETAIL_TYPE detailLevel = DETAIL_LEVEL_NEAR; detailLevel < DETAIL_LEVEL_COUNT; ++detailLevel)
+	{
+		TiXmlNode* node = defxml->enterNode(detailLevelNode, levelNames[detailLevel]);
+		if(node == NULL)
+		{
+			ERROR_MSG(fmt::format("EntityDef::loadDetailLevelInfo: entity:{} is missing {} in DetailLevels.\n",
+				moduleName, levelNames[detailLevel]));
+			return false;
+		}
+
+		TiXmlNode* radiusNode = defxml->enterNode(node, "radius");
+		TiXmlNode* hystNode = defxml->enterNode(node, "hyst");
+		if(radiusNode == NULL || hystNode == NULL)
+		{
+			ERROR_MSG(fmt::format("EntityDef::loadDetailLevelInfo: entity:{} {} requires radius and hyst.\n",
+				moduleName, levelNames[detailLevel]));
+			return false;
+		}
+
+		configuredLevels[detailLevel].radius = static_cast<float>(defxml->getValFloat(radiusNode));
+		configuredLevels[detailLevel].hyst = static_cast<float>(defxml->getValFloat(hystNode));
+		if(!std::isfinite(configuredLevels[detailLevel].radius) ||
+			!std::isfinite(configuredLevels[detailLevel].hyst) ||
+			configuredLevels[detailLevel].radius < 0.f || configuredLevels[detailLevel].hyst < 0.f)
+		{
+			ERROR_MSG(fmt::format("EntityDef::loadDetailLevelInfo: entity:{} {} radius and hyst must be finite non-negative values.\n",
+				moduleName, levelNames[detailLevel]));
+			return false;
+		}
+	}
+
+	// radius 使用绝对距离，hyst 只负责向外离开当前等级的滞回。
+	// Radius values are absolute distances; hyst is used only when leaving the current level.
+	if(configuredLevels[DETAIL_LEVEL_NEAR].radius > configuredLevels[DETAIL_LEVEL_MEDIUM].radius ||
+		configuredLevels[DETAIL_LEVEL_MEDIUM].radius > configuredLevels[DETAIL_LEVEL_FAR].radius)
+	{
+		ERROR_MSG(fmt::format("EntityDef::loadDetailLevelInfo: entity:{} DetailLevels radius must satisfy NEAR <= MEDIUM <= FAR.\n",
+			moduleName));
+		return false;
+	}
+
 	DetailLevel& dlInfo = pScriptModule->getDetailLevel();
-	
-	TiXmlNode* node = defxml->enterNode(detailLevelNode, "NEAR");
-	TiXmlNode* radiusNode = defxml->enterNode(node, "radius");
-	TiXmlNode* hystNode = defxml->enterNode(node, "hyst");
-	if(node == NULL || radiusNode == NULL || hystNode == NULL) 
-	{
-		ERROR_MSG(fmt::format("EntityDef::loadDetailLevelInfo: failed to load entity:{} NEAR-DetailLevelInfo.\n",
-			moduleName.c_str()));
-
-		return false;
-	}
-	
-	dlInfo.level[DETAIL_LEVEL_NEAR].radius = (float)defxml->getValFloat(radiusNode);
-	dlInfo.level[DETAIL_LEVEL_NEAR].hyst = (float)defxml->getValFloat(hystNode);
-	
-	node = defxml->enterNode(detailLevelNode, "MEDIUM");
-	radiusNode = defxml->enterNode(node, "radius");
-	hystNode = defxml->enterNode(node, "hyst");
-	if(node == NULL || radiusNode == NULL || hystNode == NULL) 
-	{
-		ERROR_MSG(fmt::format("EntityDef::loadDetailLevelInfo: failed to load entity:{} MEDIUM-DetailLevelInfo.\n",
-			moduleName.c_str()));
-
-		return false;
-	}
-	
-	dlInfo.level[DETAIL_LEVEL_MEDIUM].radius = (float)defxml->getValFloat(radiusNode);
-
-	dlInfo.level[DETAIL_LEVEL_MEDIUM].radius += dlInfo.level[DETAIL_LEVEL_NEAR].radius + 
-												dlInfo.level[DETAIL_LEVEL_NEAR].hyst;
-
-	dlInfo.level[DETAIL_LEVEL_MEDIUM].hyst = (float)defxml->getValFloat(hystNode);
-	
-	node = defxml->enterNode(detailLevelNode, "FAR");
-	radiusNode = defxml->enterNode(node, "radius");
-	hystNode = defxml->enterNode(node, "hyst");
-	if(node == NULL || radiusNode == NULL || hystNode == NULL) 
-	{
-		ERROR_MSG(fmt::format("EntityDef::loadDetailLevelInfo: failed to load entity:{} FAR-DetailLevelInfo.\n", 
-			moduleName.c_str()));
-
-		return false;
-	}
-	
-	dlInfo.level[DETAIL_LEVEL_FAR].radius = (float)defxml->getValFloat(radiusNode);
-
-	dlInfo.level[DETAIL_LEVEL_FAR].radius += dlInfo.level[DETAIL_LEVEL_MEDIUM].radius + 
-													dlInfo.level[DETAIL_LEVEL_MEDIUM].hyst;
-
-	dlInfo.level[DETAIL_LEVEL_FAR].hyst = (float)defxml->getValFloat(hystNode);
+	for(DETAIL_TYPE detailLevel = DETAIL_LEVEL_NEAR; detailLevel < DETAIL_LEVEL_COUNT; ++detailLevel)
+		dlInfo.level[detailLevel] = configuredLevels[detailLevel];
+	dlInfo.configured(true);
 
 	return true;
 

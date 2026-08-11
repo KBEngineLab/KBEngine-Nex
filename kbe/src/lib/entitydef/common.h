@@ -23,6 +23,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #define KBENGINE_DEF_COMMON_H
 
 #include "common/common.h"
+#include "detaillevel.h"
 #if KBE_PLATFORM == PLATFORM_WIN32
 #pragma warning (disable : 4910)
 #pragma warning (disable : 4251)
@@ -84,12 +85,6 @@ const COMPONENT_TYPE ENTITYCALL_COMPONENT_TYPE_MAPPING[] =
 	CELLAPP_TYPE,
 	BASEAPP_TYPE,
 };
-
-/** 属性的lod广播级别范围的定义 */
-typedef uint8 DETAIL_TYPE;
-#define DETAIL_LEVEL_NEAR													0	// lod级别：近						
-#define DETAIL_LEVEL_MEDIUM													1	// lod级别：中
-#define DETAIL_LEVEL_FAR													2	// lod级别：远	
 
 typedef std::map<std::string, EntityDataFlags> ENTITYFLAGMAP;
 extern ENTITYFLAGMAP g_entityFlagMapping;										// entity 的flag字符串映射表

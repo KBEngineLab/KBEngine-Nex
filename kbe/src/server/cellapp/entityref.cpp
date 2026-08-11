@@ -33,7 +33,8 @@ flags_(ENTITYREF_FLAG_UNKONWN),
 generation_(0),
 volatileQueued_(false),
 structuralQueued_(false),
-producerPending_(false)
+producerPending_(false),
+detailLevel_(DETAIL_LEVEL_NONE)
 {
 	id_ = pEntity->id();
 }
@@ -47,7 +48,8 @@ flags_(ENTITYREF_FLAG_UNKONWN),
 generation_(0),
 volatileQueued_(false),
 structuralQueued_(false),
-producerPending_(false)
+producerPending_(false),
+detailLevel_(DETAIL_LEVEL_NONE)
 {
 }
 
@@ -101,6 +103,7 @@ void EntityRef::onReclaimObject()
 	volatileQueued_ = false;
 	structuralQueued_ = false;
 	producerPending_ = false;
+	detailLevel_ = DETAIL_LEVEL_NONE;
 }
 
 //-------------------------------------------------------------------------------------
@@ -119,14 +122,14 @@ void EntityRef::addToStream(KBEngine::MemoryStream& s)
 	if(pEntity_)
 		eid = pEntity_->id();
 
-	s << id_ << aliasID_ << flags_ << eid;
+	s << id_ << aliasID_ << flags_ << eid << detailLevel_;
 }
 
 //-------------------------------------------------------------------------------------
 void EntityRef::createFromStream(KBEngine::MemoryStream& s)
 {
 	ENTITY_ID eid = 0;
-	s >> id_ >> aliasID_ >> flags_ >> eid;
+	s >> id_ >> aliasID_ >> flags_ >> eid >> detailLevel_;
 
 	if(eid > 0)
 	{
