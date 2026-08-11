@@ -1934,6 +1934,60 @@ bool ServerConfig::loadConfig(std::string fileName)
 		}
 	}
 
+	// 自定义配置只接受统一的 param 结构，使 key 不受 XML 标签命名规则限制。
+	// Custom configuration accepts only param elements so keys are independent of XML tag naming rules.
+	rootNode = xml->getRootNode("customCfg");
+	if(rootNode != NULL)
+	{
+		TiXmlNode* childnode = rootNode;
+		while(childnode)
+		{
+			if(childnode->Type() == TiXmlNode::TINYXML_ELEMENT)
+			{
+				TiXmlElement* element = childnode->ToElement();
+				if(element == NULL)
+				{
+					childnode = childnode->NextSibling();
+					continue;
+				}
+
+				if(std::string(element->Value()) != "param")
+				{
+					WARNING_MSG(fmt::format(
+						"ServerConfig::loadConfig: customCfg only supports <param>, ignore <{}>.\n",
+						element->Value()));
+					childnode = childnode->NextSibling();
+					continue;
+				}
+
+				const char* name = element->Attribute("name");
+				if(name == NULL || name[0] == '\0')
+				{
+					WARNING_MSG("ServerConfig::loadConfig: customCfg param missing name, ignored.\n");
+					childnode = childnode->NextSibling();
+					continue;
+				}
+
+				CustomCfgItem item;
+				item.name = name;
+
+				// 缺省类型按 string 处理，避免简单文本配置必须重复声明类型。
+				// Missing types default to string so simple text values need no redundant declaration.
+				const char* type = element->Attribute("type");
+				item.type = (type != NULL && type[0] != '\0') ? type : "string";
+
+				TiXmlNode* textNode = childnode->FirstChild();
+				item.value = textNode != NULL ? xml->getValStr(textNode) : "";
+
+				// loadConfig 先读取 defaults 再读取项目配置，赋值语义自然提供业务覆盖能力。
+				// loadConfig reads defaults before project settings, so assignment provides project overrides.
+				customCfg_[item.name] = item;
+			}
+
+			childnode = childnode->NextSibling();
+		}
+	}
+
 	return true;
 }
 

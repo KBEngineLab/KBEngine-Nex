@@ -149,7 +149,8 @@
 
 - [feat] 新增添加额外配置参数 [@Smile010110](https://github.com/Smile010110) [Pull request #176](https://github.com/KBEngineLab/KBEngine-Nex/pull/176)
   - 在 `kbengine.xml` 根节点下新增 `<customCfg>` 段，支持业务自定义键值配置（int / bool / float / string / dict / list 类型）。
-  - Python 层通过 `KBEngine.getCustomCfg("key", default)` 读取，无需手动解析 XML。
+  - Python 层通过 `KBEngine.getCustomCfg("key"[, default])` 读取；配置存在时只按 XML 的 `type` 转换，不通过 `default` 推断类型。
+  - 配置不存在且未提供 `default` 时返回 `None`；同名参数按默认配置、业务配置的加载顺序覆盖。
   - 示例：
     ```xml
     <customCfg>

@@ -80,6 +80,16 @@ set_tests_properties(source.teleport_state_contract PROPERTIES
     LABELS "cellapp;source;teleport"
 )
 
+add_test(NAME source.custom_cfg_contract
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+        "-DKBE_DEFAULT_CONFIG=${CMAKE_SOURCE_DIR}/../res/server/kbengine_defaults.xml"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyCustomCfg.cmake"
+)
+set_tests_properties(source.custom_cfg_contract PROPERTIES
+    LABELS "python;serverconfig;source"
+)
+
 set(KBE_TEST_ASSETS "" CACHE PATH "Assets directory used by CMake integration tests")
 option(KBE_TEST_SERVER_CLUSTER "Enable the server cluster integration test" OFF)
 set(KBE_TEST_DATABASE_HOST "127.0.0.1" CACHE STRING "Database host used by CMake integration tests")

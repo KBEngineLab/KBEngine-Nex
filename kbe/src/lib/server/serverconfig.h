@@ -340,6 +340,17 @@ typedef struct EngineComponentInfo
 class ServerConfig : public Singleton<ServerConfig>
 {
 public:
+	/**
+		脚本层只读的自定义配置项，保留 XML 声明的类型和值，Python 导出层按需转换。
+		Read-only script configuration that retains the XML type and value for on-demand Python conversion.
+	*/
+	struct CustomCfgItem
+	{
+		std::string name;
+		std::string type;
+		std::string value;
+	};
+
 	ServerConfig();
 	~ServerConfig();
 	
@@ -392,6 +403,7 @@ public:
 	INLINE const char* dbInterfaceIndex2dbInterfaceName(size_t dbInterfaceIndex);
 	bool enableRawDatabaseCommandBlacklist() const;
 	const std::vector<std::string>& rawDatabaseCommandBlacklist(const std::string& dbType) const;
+	INLINE const std::map<std::string, CustomCfgItem>& customCfg(void) const { return customCfg_; }
 
 private:
 	void _updateEmailInfos();
@@ -439,6 +451,10 @@ public:
 	EmailSendInfo emailAtivationInfo_;
 	EmailSendInfo emailResetPasswordInfo_;
 	EmailSendInfo emailBindInfo_;
+
+	// 同名配置按默认配置、业务配置的加载顺序覆盖，查询路径保持 O(log n)。
+	// Duplicate keys follow default/project load order while lookups remain O(log n).
+	std::map<std::string, CustomCfgItem> customCfg_;
 
 };
 

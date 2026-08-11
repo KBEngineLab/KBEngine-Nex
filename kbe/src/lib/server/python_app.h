@@ -18,8 +18,8 @@ You should have received a copy of the GNU Lesser General Public License
 along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef KBE_ENTITY_APP_H
-#define KBE_ENTITY_APP_H
+#ifndef KBE_PYTHON_APP_H
+#define KBE_PYTHON_APP_H
 
 // common include
 #include "pyscript/py_gc.h"
@@ -101,6 +101,12 @@ public:
 	static PyObject* __py_getAppPublish(PyObject* self, PyObject* args);
 
 	/**
+		读取脚本层自定义配置。配置存在时按 XML type 转换；不存在时返回 default 或 None。
+		Reads script configuration using the XML type, returning the optional default or None when absent.
+	*/
+	static PyObject* __py_getCustomCfg(PyObject* self, PyObject* args);
+
+	/**
 		设置脚本输出类型前缀
 	*/
 	static PyObject* __py_setScriptLogType(PyObject* self, PyObject* args);
@@ -158,4 +164,4 @@ protected:
 
 }
 
-#endif // KBE_ENTITY_APP_H
+#endif // KBE_PYTHON_APP_H

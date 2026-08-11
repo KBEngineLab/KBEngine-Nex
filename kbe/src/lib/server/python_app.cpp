@@ -25,6 +25,11 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "server/py_file_descriptor.h"
 #include "server/plugin_runtime.h"
 #include "resmgr/plugins/plugin_manager.h"
+#include <algorithm>
+#include <cerrno>
+#include <cctype>
+#include <cstdlib>
+#include <cstring>
 
 namespace KBEngine{
 
@@ -36,6 +41,177 @@ bool usesPythonAppPluginRuntime(COMPONENT_TYPE componentType)
 {
 	return componentType == DBMGR_TYPE || componentType == LOGINAPP_TYPE ||
 		componentType == INTERFACES_TYPE || componentType == LOGGER_TYPE;
+}
+
+std::string normalizeCustomCfgType(const std::string& type)
+{
+	std::string lowerType = type;
+	std::transform(lowerType.begin(), lowerType.end(), lowerType.begin(), [](unsigned char ch) {
+		return static_cast<char>(std::tolower(ch));
+	});
+	return lowerType;
+}
+
+// bool 显式支持常用可读写法，非法值不会静默退化成 false。
+// Bool accepts common readable forms and never silently converts invalid input to false.
+bool parseCustomCfgBool(const std::string& value, bool& result)
+{
+	std::string lowerValue = normalizeCustomCfgType(value);
+	if(lowerValue == "true" || lowerValue == "1" || lowerValue == "yes")
+	{
+		result = true;
+		return true;
+	}
+
+	if(lowerValue == "false" || lowerValue == "0" || lowerValue == "no")
+	{
+		result = false;
+		return true;
+	}
+
+	return false;
+}
+
+// strtod 配合完整尾部检查，拒绝 "3.5abc" 这类部分成功的配置。
+// strtod plus full-tail validation rejects partially parsed values such as "3.5abc".
+bool parseCustomCfgFloat(const std::string& value, double& result)
+{
+	char* end = NULL;
+	errno = 0;
+	result = std::strtod(value.c_str(), &end);
+	return end != value.c_str() && end != NULL && *end == '\0' && errno != ERANGE;
+}
+
+// dict/list 使用 literal_eval，支持 Python 字面量但不执行任意脚本。
+// Dict/list values use literal_eval to support Python literals without executing arbitrary code.
+PyObject* parseCustomCfgLiteral(const ServerConfig::CustomCfgItem& item, const char* expectedType)
+{
+	PyObject* astModule = PyImport_ImportModule("ast");
+	if(astModule == NULL)
+	{
+		ERROR_MSG("KBEngine::getCustomCfg(): unable to import ast module for customCfg literal parsing.\n");
+		PyErr_PrintEx(0);
+		Py_RETURN_NONE;
+	}
+
+	PyObject* literalEval = PyObject_GetAttrString(astModule, "literal_eval");
+	Py_DECREF(astModule);
+	if(literalEval == NULL)
+	{
+		ERROR_MSG("KBEngine::getCustomCfg(): unable to get ast.literal_eval for customCfg literal parsing.\n");
+		PyErr_PrintEx(0);
+		Py_RETURN_NONE;
+	}
+
+	PyObject* pyValueText = PyUnicode_FromString(item.value.c_str());
+	if(pyValueText == NULL)
+	{
+		ERROR_MSG(fmt::format(
+			"KBEngine::getCustomCfg(): customCfg[{}] unable to build unicode value, value={}.\n",
+			item.name, item.value));
+		Py_DECREF(literalEval);
+		PyErr_PrintEx(0);
+		Py_RETURN_NONE;
+	}
+
+	PyObject* pyValue = PyObject_CallFunctionObjArgs(literalEval, pyValueText, NULL);
+	Py_DECREF(literalEval);
+	Py_DECREF(pyValueText);
+	if(pyValue == NULL)
+	{
+		ERROR_MSG(fmt::format(
+			"KBEngine::getCustomCfg(): customCfg[{}] value parse failed, type={}, value={}.\n",
+			item.name, item.type, item.value));
+		PyErr_PrintEx(0);
+		Py_RETURN_NONE;
+	}
+
+	// 声明类型必须与解析结果一致，避免脚本拿到与配置契约不同的对象。
+	// The parsed object must match the declared type so scripts receive a stable contract.
+	if(strcmp(expectedType, "dict") == 0 && !PyDict_Check(pyValue))
+	{
+		ERROR_MSG(fmt::format(
+			"KBEngine::getCustomCfg(): customCfg[{}] expects dict, value={}.\n",
+			item.name, item.value));
+		Py_DECREF(pyValue);
+		Py_RETURN_NONE;
+	}
+
+	if(strcmp(expectedType, "list") == 0 && !PyList_Check(pyValue))
+	{
+		ERROR_MSG(fmt::format(
+			"KBEngine::getCustomCfg(): customCfg[{}] expects list, value={}.\n",
+			item.name, item.value));
+		Py_DECREF(pyValue);
+		Py_RETURN_NONE;
+	}
+
+	return pyValue;
+}
+
+// default 只处理缺失 key，不参与已有配置的类型推断，保证不同调用方看到相同类型。
+// The default handles missing keys only; declared XML types remain stable across callers.
+PyObject* customCfgItemToPyObject(const ServerConfig::CustomCfgItem& item)
+{
+	std::string type = normalizeCustomCfgType(item.type);
+	if(type == "bool")
+	{
+		bool value = false;
+		if(!parseCustomCfgBool(item.value, value))
+		{
+			ERROR_MSG(fmt::format(
+				"KBEngine::getCustomCfg(): customCfg[{}] bool parse failed, value={}.\n",
+				item.name, item.value));
+			Py_RETURN_NONE;
+		}
+
+		if(value)
+			Py_RETURN_TRUE;
+		Py_RETURN_FALSE;
+	}
+
+	if(type == "int")
+	{
+		char* end = NULL;
+		PyObject* pyValue = PyLong_FromString(const_cast<char*>(item.value.c_str()), &end, 10);
+		if(pyValue == NULL || end == NULL || *end != '\0')
+		{
+			Py_XDECREF(pyValue);
+			PyErr_Clear();
+			ERROR_MSG(fmt::format(
+				"KBEngine::getCustomCfg(): customCfg[{}] int parse failed, value={}.\n",
+				item.name, item.value));
+			Py_RETURN_NONE;
+		}
+		return pyValue;
+	}
+
+	if(type == "float")
+	{
+		double value = 0.0;
+		if(!parseCustomCfgFloat(item.value, value))
+		{
+			ERROR_MSG(fmt::format(
+				"KBEngine::getCustomCfg(): customCfg[{}] float parse failed, value={}.\n",
+				item.name, item.value));
+			Py_RETURN_NONE;
+		}
+		return PyFloat_FromDouble(value);
+	}
+
+	if(type == "string" || type == "str")
+		return PyUnicode_FromString(item.value.c_str());
+
+	if(type == "dict")
+		return parseCustomCfgLiteral(item, "dict");
+
+	if(type == "list")
+		return parseCustomCfgLiteral(item, "list");
+
+	ERROR_MSG(fmt::format(
+		"KBEngine::getCustomCfg(): customCfg[{}] unsupported type={}, value={}.\n",
+		item.name, item.type, item.value));
+	Py_RETURN_NONE;
 }
 
 }
@@ -343,6 +519,10 @@ bool PythonApp::installPyModules()
 	// 向脚本注册app发布状态
 	APPEND_SCRIPT_MODULE_METHOD(module, publish, __py_getAppPublish, METH_VARARGS, 0);
 
+	// 所有直接使用 PythonApp 的服务端组件共享同一套只读配置接口。
+	// Every server component using PythonApp shares the same read-only configuration API.
+	APPEND_SCRIPT_MODULE_METHOD(module, getCustomCfg, __py_getCustomCfg, METH_VARARGS, 0);
+
 	// 注册设置脚本输出类型
 	APPEND_SCRIPT_MODULE_METHOD(module, scriptLogType, __py_setScriptLogType, METH_VARARGS, 0);
 	
@@ -440,6 +620,41 @@ bool PythonApp::uninstallPyModules()
 PyObject* PythonApp::__py_getAppPublish(PyObject* self, PyObject* args)
 {
 	return PyLong_FromLong(g_appPublish);
+}
+
+//-------------------------------------------------------------------------------------
+PyObject* PythonApp::__py_getCustomCfg(PyObject* self, PyObject* args)
+{
+	Py_ssize_t argCount = PyTuple_Size(args);
+	if(argCount != 1 && argCount != 2)
+	{
+		PyErr_Format(PyExc_TypeError,
+			"KBEngine::getCustomCfg(): requires 1 or 2 args (key[, default])!");
+		return NULL;
+	}
+
+	const char* key = NULL;
+	PyObject* pyDefault = NULL;
+	if(!PyArg_ParseTuple(args, "s|O", &key, &pyDefault))
+	{
+		PyErr_Format(PyExc_TypeError, "KBEngine::getCustomCfg(): args error!");
+		return NULL;
+	}
+
+	const std::map<std::string, ServerConfig::CustomCfgItem>& cfg = g_kbeSrvConfig.customCfg();
+	std::map<std::string, ServerConfig::CustomCfgItem>::const_iterator iter = cfg.find(key);
+	if(iter == cfg.end())
+	{
+		if(pyDefault != NULL)
+		{
+			Py_INCREF(pyDefault);
+			return pyDefault;
+		}
+
+		Py_RETURN_NONE;
+	}
+
+	return customCfgItemToPyObject(iter->second);
 }
 
 //-------------------------------------------------------------------------------------

@@ -39,6 +39,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "server/script_timers.h"
 #include "server/plugin_runtime.h"
 #include "server/idallocate.h"
+#include "server/python_app.h"
 #include "server/serverconfig.h"
 #include "server/globaldata_client.h"
 #include "server/globaldata_server.h"
@@ -182,6 +183,12 @@ public:
 		获取apps发布状态, 可在脚本中获取该值
 	*/
 	static PyObject* __py_getAppPublish(PyObject* self, PyObject* args);
+
+	/**
+		转发到 PythonApp 的自定义配置实现，确保 EntityApp 组件使用相同的类型和缺省值语义。
+		Forwards custom configuration reads to PythonApp so EntityApp components keep identical type/default semantics.
+	*/
+	static PyObject* __py_getCustomCfg(PyObject* self, PyObject* args);
 
 	/**
 		设置脚本输出类型前缀
@@ -480,6 +487,10 @@ bool EntityApp<E>::installPyModules()
 	
 	// 向脚本注册app发布状态
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	publish,			__py_getAppPublish,						METH_VARARGS,	0);
+
+	// 获取只读的业务自定义配置
+	// Expose read-only project custom configuration.
+	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	getCustomCfg,		__py_getCustomCfg,					METH_VARARGS,	0);
 
 	// 注册设置脚本输出类型
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	scriptLogType,		__py_setScriptLogType,					METH_VARARGS,	0);
@@ -821,6 +832,12 @@ template<class E>
 PyObject* EntityApp<E>::__py_getAppPublish(PyObject* self, PyObject* args)
 {
 	return PyLong_FromLong(g_appPublish);
+}
+
+template<class E>
+PyObject* EntityApp<E>::__py_getCustomCfg(PyObject* self, PyObject* args)
+{
+	return PythonApp::__py_getCustomCfg(self, args);
 }
 
 template<class E>

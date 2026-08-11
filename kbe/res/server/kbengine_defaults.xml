@@ -1075,4 +1075,25 @@
 		 -->
 		<SOMAXCONN> 511 </SOMAXCONN>
 	</logger>
+
+	<!-- 自定义配置只供服务端 Python 脚本读取，可通过 KBEngine.getCustomCfg("key"[, default]) 获取。
+	     Custom configuration is read-only for server Python scripts through KBEngine.getCustomCfg("key"[, default]).
+
+	     name: 查询键，建议使用 battle.maxPlayers 这样的分组命名。
+	     type: 支持 bool、int、float、string、dict、list，缺省时为 string。
+	     desc: 仅供配置维护者阅读，运行时不会保存。
+	     文本值: dict/list 使用 Python 字面量，由 ast.literal_eval 安全解析。
+
+	     name: Lookup key; grouped names such as battle.maxPlayers are recommended.
+	     type: bool, int, float, string, dict, or list; defaults to string.
+	     desc: Documentation only and is not retained at runtime.
+	     Text: dict/list values use Python literals parsed safely by ast.literal_eval. -->
+	<customCfg>
+		<!-- <param name="battle.maxPlayers" type="int" desc="max players per battle">100</param> -->
+		<!-- <param name="battle.enableRank" type="bool" desc="enable battle rank">true</param> -->
+		<!-- <param name="battle.speedScale" type="float" desc="battle speed scale">1.0</param> -->
+		<!-- <param name="battle.welcome" type="string" desc="welcome text">hello</param> -->
+		<!-- <param name="battle.dropRates" type="dict" desc="drop rate config">{"gold": 1.2, "item": 0.05}</param> -->
+		<!-- <param name="battle.spawnPoints" type="list" desc="spawn point ids">[1, 2, 3]</param> -->
+	</customCfg>
 </root>
