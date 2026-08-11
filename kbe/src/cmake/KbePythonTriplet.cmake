@@ -41,5 +41,9 @@ function(kbe_resolve_python_triplet output_variable system_name system_processor
         message(FATAL_ERROR "Unsupported Python platform: ${system_name}")
     endif()
 
-    set(${output_variable} "${_kbe_python_arch}-${_kbe_python_platform}" PARENT_SCOPE)
+    # Embedded Python is always shipped as a Release runtime, even when KBEngine itself is
+    # built in Debug. A dedicated triplet prevents vcpkg from building unused Debug packages.
+    # 嵌入式 Python 始终以 Release runtime 发布，即使 KBEngine 本身使用 Debug 构建；
+    # 专用 triplet 可避免 vcpkg 编译不会被链接和分发的 Debug 包。
+    set(${output_variable} "${_kbe_python_arch}-${_kbe_python_platform}-kbe-python-release" PARENT_SCOPE)
 endfunction()

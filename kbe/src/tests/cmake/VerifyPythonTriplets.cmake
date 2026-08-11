@@ -48,11 +48,34 @@ function(kbe_assert_python_triplet expected system_name system_processor vs_plat
     endif()
 endfunction()
 
-kbe_assert_python_triplet("x64-windows" "Windows" "AMD64" "x64" "")
-kbe_assert_python_triplet("arm64-windows" "Windows" "AMD64" "ARM64" "")
-kbe_assert_python_triplet("x64-linux" "Linux" "x86_64" "" "")
-kbe_assert_python_triplet("arm64-linux" "Linux" "aarch64" "" "")
-kbe_assert_python_triplet("x64-osx" "Darwin" "arm64" "" "x86_64")
-kbe_assert_python_triplet("arm64-osx" "Darwin" "x86_64" "" "arm64")
+function(kbe_assert_python_release_triplet triplet)
+    set(_kbe_triplet_file "${KBE_CMAKE_ROOT}/../python-runtime/triplets/${triplet}.cmake")
+    if(NOT EXISTS "${_kbe_triplet_file}")
+        message(FATAL_ERROR "Python release triplet does not exist: ${_kbe_triplet_file}")
+    endif()
 
-message(STATUS "Verified Python vcpkg triplet selection for Windows, Linux, and macOS x64/arm64")
+    # Include the triplet in function scope so its ABI variables cannot leak into another case.
+    # 在函数作用域内加载 triplet，避免其 ABI 变量污染下一个验证用例。
+    include("${_kbe_triplet_file}")
+    if(NOT VCPKG_BUILD_TYPE STREQUAL "release")
+        message(FATAL_ERROR
+            "Python triplet ${triplet} must set VCPKG_BUILD_TYPE to release, received '${VCPKG_BUILD_TYPE}'"
+        )
+    endif()
+endfunction()
+
+kbe_assert_python_triplet("x64-windows-kbe-python-release" "Windows" "AMD64" "x64" "")
+kbe_assert_python_triplet("arm64-windows-kbe-python-release" "Windows" "AMD64" "ARM64" "")
+kbe_assert_python_triplet("x64-linux-kbe-python-release" "Linux" "x86_64" "" "")
+kbe_assert_python_triplet("arm64-linux-kbe-python-release" "Linux" "aarch64" "" "")
+kbe_assert_python_triplet("x64-osx-kbe-python-release" "Darwin" "arm64" "" "x86_64")
+kbe_assert_python_triplet("arm64-osx-kbe-python-release" "Darwin" "x86_64" "" "arm64")
+
+kbe_assert_python_release_triplet("x64-windows-kbe-python-release")
+kbe_assert_python_release_triplet("arm64-windows-kbe-python-release")
+kbe_assert_python_release_triplet("x64-linux-kbe-python-release")
+kbe_assert_python_release_triplet("arm64-linux-kbe-python-release")
+kbe_assert_python_release_triplet("x64-osx-kbe-python-release")
+kbe_assert_python_release_triplet("arm64-osx-kbe-python-release")
+
+message(STATUS "Verified release-only Python vcpkg triplets for Windows, Linux, and macOS x64/arm64")

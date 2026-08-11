@@ -18,9 +18,32 @@ if(NOT KBE_PYTHON_TRIPLET)
     set(KBE_PYTHON_TRIPLET "${_kbe_python_triplet}" CACHE STRING "vcpkg triplet for the embedded Python runtime")
 endif()
 
+# Python's vcpkg port may build a host interpreter in addition to the target runtime.
+# Resolve an explicit release-only host triplet so native builds do not silently rebuild
+# Python and its dependencies with vcpkg's default Debug/Release host triplet.
+# vcpkg 的 Python port 除目标 runtime 外还可能构建主机解释器；显式选择 release-only
+# host triplet，避免原生构建再次通过默认 host triplet 生成 Debug/Release 双配置依赖。
+if(NOT KBE_PYTHON_HOST_TRIPLET)
+    kbe_resolve_python_triplet(
+        _kbe_python_host_triplet
+        "${CMAKE_HOST_SYSTEM_NAME}"
+        "${CMAKE_HOST_SYSTEM_PROCESSOR}"
+        ""
+        ""
+    )
+    set(KBE_PYTHON_HOST_TRIPLET
+        "${_kbe_python_host_triplet}"
+        CACHE STRING "vcpkg host triplet for building the embedded Python runtime"
+    )
+endif()
+
 set(KBE_PYTHON_INSTALL_ROOT
     "${CMAKE_SOURCE_DIR}/python-runtime/vcpkg_installed"
     CACHE PATH "Independent vcpkg installation root for embedded Python"
+)
+set(KBE_PYTHON_OVERLAY_TRIPLETS
+    "${CMAKE_SOURCE_DIR}/python-runtime/triplets"
+    CACHE PATH "Release-only vcpkg triplets for the embedded Python runtime"
 )
 set(KBE_PYTHON_ROOT "${KBE_PYTHON_INSTALL_ROOT}/${KBE_PYTHON_TRIPLET}")
 set(KBE_PYTHON_INCLUDE_DIR "${KBE_PYTHON_ROOT}/include/python${KBE_PYTHON_VERSION}")
@@ -58,6 +81,8 @@ if(NOT EXISTS "${KBE_PYTHON_INCLUDE_DIR}/Python.h" OR NOT EXISTS "${KBE_PYTHON_L
         COMMAND "${_kbe_vcpkg_executable}"
             install
             --triplet "${KBE_PYTHON_TRIPLET}"
+            --host-triplet "${KBE_PYTHON_HOST_TRIPLET}"
+            --overlay-triplets "${KBE_PYTHON_OVERLAY_TRIPLETS}"
             --x-manifest-root "${CMAKE_SOURCE_DIR}/python-runtime"
             --x-install-root "${KBE_PYTHON_INSTALL_ROOT}"
         RESULT_VARIABLE _kbe_python_install_result

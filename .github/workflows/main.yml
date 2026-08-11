@@ -114,7 +114,7 @@ jobs:
           path: |
             .cache/vcpkg-binaries
             .cache/vcpkg-downloads
-          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('kbe/src/vcpkg.json', 'kbe/src/python-runtime/vcpkg.json') }}
+          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('kbe/src/vcpkg.json', 'kbe/src/python-runtime/vcpkg.json', 'kbe/src/python-runtime/triplets/*.cmake') }}
           restore-keys: |
             vcpkg-${{ runner.os }}-${{ runner.arch }}-
 

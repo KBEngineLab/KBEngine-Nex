@@ -50,6 +50,23 @@ find_package(EXPAT REQUIRED)
 find_package(log4cxx CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 
+# log4cxx's Unix package config names APR libraries without preserving their vcpkg
+# search directory. PkgConfig imported targets retain the matching include paths,
+# library directories, and transitive flags from the same vcpkg installation.
+# log4cxx 的 Unix 包配置只保留 APR 库名，没有保留 vcpkg 库搜索目录；
+# PkgConfig 导入目标可从同一 vcpkg 安装中完整传播头文件、库目录和传递链接参数。
+add_library(kbe_log4cxx INTERFACE)
+target_link_libraries(kbe_log4cxx INTERFACE log4cxx)
+if(NOT WIN32)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(KBE_APR REQUIRED IMPORTED_TARGET apr-1)
+    pkg_check_modules(KBE_APRUTIL REQUIRED IMPORTED_TARGET apr-util-1)
+    target_link_libraries(kbe_log4cxx INTERFACE
+        PkgConfig::KBE_APR
+        PkgConfig::KBE_APRUTIL
+    )
+endif()
+
 add_subdirectory(lib/common)
 add_subdirectory(lib/math)
 add_subdirectory(lib/thread)
@@ -140,7 +157,7 @@ kbe_set_target_folder("Engine/Core"
     common math thread xml helper resmgr network pyscript entitydef
 )
 kbe_set_target_folder("Engine/Runtime"
-    client_lib navigation server kbe_build_options kbe_python_runtime
+    client_lib navigation server kbe_build_options kbe_log4cxx kbe_python_runtime
 )
 kbe_set_target_folder("Engine/Database"
     db_interface db_mysql db_mongodb db_postgresql

@@ -18,6 +18,21 @@ function Require-Command([string]$Name) {
     }
 }
 
+function Assert-NativeCommandSucceeded {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Description,
+
+        [int]$ExitCode
+    )
+
+    # PowerShell 5 does not promote a native process failure to a terminating error, so
+    # callers capture the exit code immediately or CI may continue with missing artifacts.
+    if ($ExitCode -ne 0) {
+        throw "$Description failed with exit code $ExitCode."
+    }
+}
+
 function Wait-ForKeyPress {
     if ($env:CI) {
         return
@@ -37,8 +52,13 @@ Require-Command cmake
 if (-not (Test-Path (Join-Path $VcpkgRoot 'vcpkg.exe'))) {
     Write-Host "[INFO] Cloning vcpkg to $VcpkgRoot"
     git clone $VcpkgRepository $VcpkgRoot
-    if ($VcpkgRef) { git -C $VcpkgRoot checkout $VcpkgRef }
+    Assert-NativeCommandSucceeded -Description 'git clone vcpkg' -ExitCode $LASTEXITCODE
+    if ($VcpkgRef) {
+        git -C $VcpkgRoot checkout $VcpkgRef
+        Assert-NativeCommandSucceeded -Description 'git checkout vcpkg revision' -ExitCode $LASTEXITCODE
+    }
     & (Join-Path $VcpkgRoot 'bootstrap-vcpkg.bat')
+    Assert-NativeCommandSucceeded -Description 'vcpkg bootstrap' -ExitCode $LASTEXITCODE
 }
 
 $env:VCPKG_ROOT = $VcpkgRoot
@@ -47,9 +67,11 @@ Write-Host "[INFO] VCPKG_ROOT=$env:VCPKG_ROOT"
 Push-Location $SourceRoot
 try {
     & cmake --fresh --preset windows-ninja
+    Assert-NativeCommandSucceeded -Description 'CMake configure' -ExitCode $LASTEXITCODE
     if (-not $SkipBuild) {
-        $target = if ($Configuration -eq 'Debug') { 'windows-ninja-debug' } else { 'windows-ninja-release' }
-        & cmake --build --preset $target --target kbe_runtime kbe_servers kbe_tests --parallel
+        $buildPreset = if ($Configuration -eq 'Debug') { 'windows-ninja-tests-debug' } else { 'windows-ninja-tests-release' }
+        & cmake --build --preset $buildPreset --target kbe_runtime kbe_servers kbe_tests --parallel
+        Assert-NativeCommandSucceeded -Description 'CMake build' -ExitCode $LASTEXITCODE
     }
 } finally {
     Pop-Location

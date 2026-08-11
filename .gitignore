@@ -62,7 +62,8 @@ venv/
 /kbe/src/x64/
 /kbe/vcpkg/
 /kbe/src/vcpkg_installed/
-/kbe/src/python-runtime/triplets/
+/kbe/src/python-runtime/triplets/*
+!/kbe/src/python-runtime/triplets/*-kbe-python-release.cmake
 /kbe/src/python-runtime/vcpkg_installed/
 /kbe/src/python-runtime/x64/
 

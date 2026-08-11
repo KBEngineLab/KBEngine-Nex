@@ -19,4 +19,4 @@ if(WIN32)
 endif()
 
 kbe_configure_target(helper)
-target_link_libraries(helper PUBLIC common thread fmt::fmt log4cxx sigar)
+target_link_libraries(helper PUBLIC common thread fmt::fmt kbe_log4cxx sigar)

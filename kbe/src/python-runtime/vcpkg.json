@@ -1,18 +1,18 @@
 {
   "name": "kbengine-python-runtime",
-  "version": "3.12.9",
+  "version": "3.12.13",
   "dependencies": [
     {
       "name": "python3",
       "features": ["extensions"]
     }
   ],
-  "builtin-baseline": "2825cdd8fe079a9538032fd78c3102d033195a2c",
+  "builtin-baseline": "2f1d605400c8727cc00c15797aba796c88ccd523",
   "overrides": [
     {
       "name": "python3",
-      "version": "3.12.9",
-      "port-version": 9
+      "version": "3.12.13",
+      "port-version": 1
     }
   ]
 }
