@@ -300,7 +300,8 @@ jobs:
             }
           }
           foreach ($file in @(
-            "new_assets.bat", "new_assets.sh", "UPDATE.md", "README.md", "LGPL-LICENSE.txt"
+            "new_assets.bat", "new_assets.sh", "UPDATE.md", "README.md",
+            "GPL-LICENSE.txt", "LGPL-LICENSE.txt"
           )) {
             if (Test-Path $file) {
               Copy-Item $file -Destination $stageDir -Force
