@@ -1,0 +1,367 @@
+name: Build and release
+
+on:
+  push:
+    branches:
+      - "3.x"
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - "3.x"
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "Create or update a GitHub Release after CI passes"
+        required: true
+        default: false
+        type: boolean
+      tag_name:
+        description: "Release tag when publish_release is enabled, for example v2.8.0"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' && github.ref_type != 'tag' }}
+
+env:
+  BUILD_CONFIG: Release
+  CI: "true"
+  VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/.cache/vcpkg-binaries,readwrite"
+  VCPKG_DOWNLOADS: "${{ github.workspace }}/.cache/vcpkg-downloads"
+
+jobs:
+  metadata:
+    name: Resolve build metadata
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      is_release: ${{ steps.release.outputs.is_release }}
+
+    steps:
+      - name: Resolve version and release mode
+        id: release
+        shell: pwsh
+        run: |
+          $manualTag = "${{ inputs.tag_name }}"
+          $isTag = "${{ github.ref_type }}" -eq "tag"
+          $isManual = "${{ github.event_name }}" -eq "workflow_dispatch"
+          $publishManualRelease = "${{ inputs.publish_release }}" -eq "true"
+
+          if ($isTag) {
+            $version = "${{ github.ref_name }}"
+            $isRelease = $true
+          } elseif ($isManual -and $publishManualRelease) {
+            if ($manualTag -notmatch '^v[0-9A-Za-z][0-9A-Za-z._-]*$') {
+              throw "tag_name is required when publish_release is enabled; it must start with v and contain only letters, numbers, dots, underscores, or hyphens."
+            }
+            $version = $manualTag
+            $isRelease = $true
+          } else {
+            $sha = "${{ github.sha }}"
+            $version = "dev-$($sha.Substring(0, 7))"
+            $isRelease = $false
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "is_release=$($isRelease.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: metadata
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            os: windows-2022
+            test_preset: windows-ninja-release
+            archive_ext: zip
+          - platform: linux
+            os: ubuntu-24.04
+            test_preset: linux-release
+            archive_ext: tar.gz
+          - platform: macos
+            os: macos-latest
+            test_preset: macos-release
+            archive_ext: tar.gz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Resolve pinned vcpkg revision
+        shell: pwsh
+        run: |
+          $mainManifest = Get-Content "kbe/src/vcpkg.json" -Raw | ConvertFrom-Json
+          $pythonManifest = Get-Content "kbe/src/python-runtime/vcpkg.json" -Raw | ConvertFrom-Json
+          $mainBaseline = $mainManifest.'builtin-baseline'
+          $pythonBaseline = $pythonManifest.'builtin-baseline'
+          if (-not $mainBaseline) {
+            throw "kbe/src/vcpkg.json does not define builtin-baseline."
+          }
+          if ($mainBaseline -ne $pythonBaseline) {
+            throw "The engine and Python runtime vcpkg baselines must match."
+          }
+          "KBE_VCPKG_REF=$mainBaseline" >> $env:GITHUB_ENV
+
+      - name: Restore vcpkg caches
+        uses: actions/cache@v6
+        with:
+          path: |
+            .cache/vcpkg-binaries
+            .cache/vcpkg-downloads
+          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('kbe/src/vcpkg.json', 'kbe/src/python-runtime/vcpkg.json') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Build on Linux
+        if: runner.os == 'Linux'
+        shell: sh
+        run: sh ./install/install_linux.sh "$BUILD_CONFIG"
+
+      - name: Build on macOS
+        if: runner.os == 'macOS'
+        shell: sh
+        run: sh ./install/install_macos.sh "$BUILD_CONFIG"
+
+      - name: Build on Windows
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          set "VSDEVCMD=%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
+          if not exist "%VSDEVCMD%" set "VSDEVCMD=%ProgramFiles%\Microsoft Visual Studio\2022\Professional\Common7\Tools\VsDevCmd.bat"
+          if not exist "%VSDEVCMD%" set "VSDEVCMD=%ProgramFiles%\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
+          if not exist "%VSDEVCMD%" (
+            echo [ERROR] Visual Studio 2022 with C++ tools was not found.
+            exit /b 1
+          )
+          call "%VSDEVCMD%" -no_logo -arch=x64 -host_arch=x64
+          if errorlevel 1 exit /b %errorlevel%
+          call install\install_windows.bat %BUILD_CONFIG%
+          if errorlevel 1 exit /b %errorlevel%
+
+      - name: Run CTest
+        shell: pwsh
+        run: |
+          Push-Location "kbe/src"
+          try {
+            ctest --preset "${{ matrix.test_preset }}"
+            if ($LASTEXITCODE -ne 0) {
+              throw "CTest failed with exit code $LASTEXITCODE."
+            }
+          } finally {
+            Pop-Location
+          }
+
+      - name: Upload test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-diagnostics-${{ matrix.platform }}
+          path: |
+            kbe/src/out/build/**/Testing/Temporary/
+            kbe/src/out/build/**/Testing/**/*.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Verify server binaries
+        shell: pwsh
+        run: |
+          $suffix = if ("${{ runner.os }}" -eq "Windows") { ".exe" } else { "" }
+          $required = @(
+            "machine", "baseappmgr", "cellappmgr", "dbmgr", "loginapp",
+            "baseapp", "cellapp", "bots", "logger", "interfaces", "kbcmd"
+          )
+          foreach ($name in $required) {
+            $path = Join-Path "kbe/bin/server" "$name$suffix"
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Missing server binary: $path"
+            }
+          }
+          Get-ChildItem -LiteralPath "kbe/bin/server" -File |
+            Sort-Object Name |
+            Select-Object Name, Length
+
+      - name: Audit Linux runtime dependencies
+        if: runner.os == 'Linux'
+        shell: sh
+        run: |
+          set -eu
+          for binary in kbe/bin/server/*; do
+            if [ -f "$binary" ] && file "$binary" | grep -q "ELF"; then
+              echo "::group::ldd $binary"
+              dependencies="$(ldd "$binary")"
+              printf '%s\n' "$dependencies"
+              echo "::endgroup::"
+              if printf '%s\n' "$dependencies" | grep -q "not found"; then
+                echo "[ERROR] Missing runtime dependency for $binary" >&2
+                exit 1
+              fi
+            fi
+          done
+
+      - name: Bundle Linux runtime libraries
+        if: runner.os == 'Linux' && needs.metadata.outputs.is_release == 'true'
+        shell: sh
+        run: |
+          set -eu
+          sudo apt-get update
+          sudo apt-get install -y patchelf
+          lib_dir="kbe/bin/server/lib"
+          mkdir -p "$lib_dir"
+          : > /tmp/kbe-runtime-libs.txt
+
+          for binary in kbe/bin/server/*; do
+            if [ -f "$binary" ] && file "$binary" | grep -q "ELF"; then
+              ldd "$binary" | awk '
+                /=> \// { print $3 }
+                /^[[:space:]]*\// { print $1 }
+              ' >> /tmp/kbe-runtime-libs.txt
+            fi
+          done
+
+          sort -u /tmp/kbe-runtime-libs.txt | while IFS= read -r library; do
+            [ -n "$library" ] || continue
+            [ -f "$library" ] || continue
+            base="$(basename "$library")"
+            case "$base" in
+              ld-linux*.so.*|libc.so.*|libm.so.*|libdl.so.*|libpthread.so.*|librt.so.*|libresolv.so.*|linux-vdso*.so.*)
+                continue
+                ;;
+            esac
+            cp -L "$library" "$lib_dir/"
+          done
+
+          for binary in kbe/bin/server/*; do
+            if [ -f "$binary" ] && file "$binary" | grep -q "ELF"; then
+              patchelf --set-rpath '$ORIGIN/lib:$ORIGIN' "$binary"
+            fi
+          done
+
+          echo "::group::Bundled Linux runtime libraries"
+          find "$lib_dir" -maxdepth 1 -type f -printf '%f\n' | sort
+          echo "::endgroup::"
+
+      - name: Audit macOS runtime dependencies
+        if: runner.os == 'macOS'
+        shell: sh
+        run: |
+          set -eu
+          for binary in kbe/bin/server/*; do
+            if [ -f "$binary" ] && file "$binary" | grep -q "Mach-O"; then
+              echo "::group::otool -L $binary"
+              otool -L "$binary"
+              echo "::endgroup::"
+            fi
+          done
+
+      - name: Package release
+        if: needs.metadata.outputs.is_release == 'true'
+        id: package
+        shell: pwsh
+        run: |
+          $version = "${{ needs.metadata.outputs.version }}"
+          $platform = "${{ matrix.platform }}"
+          if ("${{ runner.os }}" -ne "Windows") {
+            $arch = (& uname -m).Trim()
+            if ($LASTEXITCODE -ne 0 -or -not $arch) {
+              throw "Unable to resolve the runner architecture."
+            }
+            $platform = "$platform-$arch"
+          }
+          $packageName = "KBEngine-Nex-1x-$version-$platform"
+          $stageRoot = Join-Path $PWD "dist"
+          $stageDir = Join-Path $stageRoot $packageName
+          $kbeDir = Join-Path $stageDir "kbe"
+
+          New-Item -ItemType Directory -Force -Path $kbeDir | Out-Null
+          if (Test-Path "docs") {
+            Copy-Item "docs" -Destination $stageDir -Recurse -Force
+          }
+          foreach ($dir in @("bin", "res", "tools")) {
+            $source = Join-Path "kbe" $dir
+            if (Test-Path $source) {
+              Copy-Item $source -Destination $kbeDir -Recurse -Force
+            }
+          }
+          foreach ($file in @(
+            "new_assets.bat", "new_assets.sh", "UPDATE.md", "README.md", "LGPL-LICENSE.txt"
+          )) {
+            if (Test-Path $file) {
+              Copy-Item $file -Destination $stageDir -Force
+            }
+          }
+
+          $archivePath = Join-Path $stageRoot "$packageName.${{ matrix.archive_ext }}"
+          if ("${{ matrix.archive_ext }}" -eq "zip") {
+            Compress-Archive -Path $stageDir -DestinationPath $archivePath -Force
+          } else {
+            tar -czf $archivePath -C $stageRoot $packageName
+            if ($LASTEXITCODE -ne 0) {
+              throw "tar failed with exit code $LASTEXITCODE."
+            }
+          }
+
+          "archive=$archivePath" >> $env:GITHUB_OUTPUT
+          "archive_name=$(Split-Path $archivePath -Leaf)" >> $env:GITHUB_OUTPUT
+
+      - name: Upload release artifact
+        if: needs.metadata.outputs.is_release == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.package.outputs.archive_name }}
+          path: ${{ steps.package.outputs.archive }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish GitHub Release
+    if: needs.metadata.outputs.is_release == 'true'
+    needs:
+      - metadata
+      - build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        shell: sh
+        run: |
+          set -eu
+          cd dist
+          sha256sum KBEngine-Nex-1x-* > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create or update GitHub Release
+        shell: sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -eu
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release upload "$VERSION" dist/* --clobber
+          else
+            gh release create "$VERSION" dist/* \
+              --target "$GITHUB_SHA" \
+              --title "KBEngine Nex 1.x $VERSION" \
+              --notes "Release binaries for Windows, Linux, and macOS."
+          fi
