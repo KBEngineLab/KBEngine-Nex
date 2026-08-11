@@ -395,8 +395,16 @@
 				<!-- 数据库地址 
 					（Database address)
 				-->
-				<host> localhost </host>										<!-- Type: String -->
+				<host> 127.0.0.1 </host>										<!-- Type: String -->
 				<port> 0 </port>												<!-- Type: Integer -->
+
+				<!-- 数据库ID生成方式：Default表示MySQL/PostgreSQL使用数据库自增，MongoDB保持UUID64；UUID64表示统一由引擎生成。 -->
+				<!-- Database ID generation: Default uses database-generated IDs for MySQL/PostgreSQL and UUID64 for MongoDB; UUID64 uses engine-generated IDs everywhere. -->
+				<idType> Default </idType>
+
+				<!-- 新建MySQL自增表的起始ID，仅在Default模式生效；切换已有表需自行迁移数据库结构。 -->
+				<!-- Initial ID for new MySQL auto-increment tables in Default mode; existing schemas require an explicit database migration when switching modes. -->
+				<autoIncrementInit> 1 </autoIncrementInit>
 
 				<!-- 数据库账号验证 
 					（Database auth)

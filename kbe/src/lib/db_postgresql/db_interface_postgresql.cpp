@@ -763,9 +763,8 @@ bool DBInterfacePostgresql::processException(std::exception& e)
 //-------------------------------------------------------------------------------------
 bool DBInterfacePostgresql::isAutoIncrementDBID() const
 {
-	// 1.x 配置没有可切换的 DBID 生成策略，保持既有数据库自增语义，避免不同后端生成不一致的实体标识。
-	// The 1.x configuration has no selectable DBID strategy, so preserve database-generated IDs across all backends.
-	return true;
+	DBInterfaceInfo* pDBInfo = g_kbeSrvConfig.dbInterface(name());
+	return pDBInfo == NULL || pDBInfo->db_idType == DBInterfaceInfo::DBID_TYPE_DEFAULT;
 }
 
 // 转义 SQL 字符串字面量内容。

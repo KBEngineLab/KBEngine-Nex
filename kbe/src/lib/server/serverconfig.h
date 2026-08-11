@@ -119,12 +119,20 @@ struct DBMysqlTLSInfo
 
 struct DBInterfaceInfo
 {
+	enum DBID_TYPE
+	{
+		DBID_TYPE_DEFAULT,
+		DBID_TYPE_UUID64
+	};
+
 	DBInterfaceInfo()
 	{
 		index = 0;
 		isPure = false;
 		db_numConnections = 5;
 		db_passwordEncrypt = true;
+		db_autoIncrementInit = 1;
+		db_idType = DBID_TYPE_DEFAULT;
 
 		memset(name, 0, sizeof(name));
 		memset(db_type, 0, sizeof(db_type));
@@ -153,6 +161,10 @@ struct DBInterfaceInfo
 	bool db_passwordEncrypt;								// db密码是否是加密的
 	char db_name[MAX_NAME];									// 数据库名
 	uint16 db_numConnections;								// 数据库最大连接
+	// 自增起始值使用数值类型保存，避免未经校验的配置文本进入建表 SQL。
+	// Store the initial auto-increment value as a number so unchecked configuration text never reaches schema SQL.
+	uint64 db_autoIncrementInit;
+	DBID_TYPE db_idType;									// 数据库ID类型: Default(数据库生成) / UUID64(引擎生成)
 	std::string db_unicodeString_characterSet;				// 设置数据库字符集
 	std::string db_unicodeString_collation;
 	// MySQL专属TLS配置由MySQL适配层消费，其他数据库接口保持无感知。

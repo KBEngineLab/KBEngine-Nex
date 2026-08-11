@@ -385,10 +385,23 @@ bool EntityTableMysql::syncToDB(DBInterface* pdbi)
 	if(this->isChild())
 		exItems = ", " TABLE_PARENTID_CONST_STR " bigint(20) unsigned NOT NULL, INDEX(" TABLE_PARENTID_CONST_STR ")";
 
-	kbe_snprintf(sql_str, SQL_BUF, "CREATE TABLE IF NOT EXISTS " ENTITY_TABLE_PERFIX "_%s "
-			"(id bigint(20) unsigned AUTO_INCREMENT, PRIMARY KEY idKey (id)%s)"
-		"ENGINE=" MYSQL_ENGINE_TYPE, 
-		tableName(), exItems.c_str());
+	DBInterfaceMysql* mysqlDB = static_cast<DBInterfaceMysql*>(pdbi);
+	if (mysqlDB->isAutoIncrementDBID())
+	{
+		kbe_snprintf(sql_str, SQL_BUF, "CREATE TABLE IF NOT EXISTS " ENTITY_TABLE_PERFIX "_%s "
+				"(id bigint(20) unsigned AUTO_INCREMENT, PRIMARY KEY idKey (id)%s)"
+			"ENGINE=" MYSQL_ENGINE_TYPE " AUTO_INCREMENT=%" PRIu64,
+			tableName(), exItems.c_str(), mysqlDB->autoIncrementInit());
+	}
+	else
+	{
+		// UUID64模式显式写入主键，因此表结构不能依赖AUTO_INCREMENT生成ID。
+		// UUID64 mode writes the primary key explicitly, so the schema must not rely on AUTO_INCREMENT.
+		kbe_snprintf(sql_str, SQL_BUF, "CREATE TABLE IF NOT EXISTS " ENTITY_TABLE_PERFIX "_%s "
+				"(id bigint(20) unsigned NOT NULL, PRIMARY KEY idKey (id)%s)"
+			"ENGINE=" MYSQL_ENGINE_TYPE,
+			tableName(), exItems.c_str());
+	}
 
 	try
 	{

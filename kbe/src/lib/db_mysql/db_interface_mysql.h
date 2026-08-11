@@ -189,6 +189,18 @@ public:
 	bool processException(std::exception & e);
 
 	/**
+		返回当前接口是否由数据库生成实体DBID。
+		Return whether this interface lets the database generate entity DBIDs.
+	*/
+	bool isAutoIncrementDBID() const;
+
+	/**
+		返回新建自增表的起始值。
+		Return the initial value used when creating an auto-increment table.
+	*/
+	uint64 autoIncrementInit() const;
+
+	/**
 		SQL命令最长大小
 	*/
 	static size_t sql_max_allowed_packet(){ return sql_max_allowed_packet_; }

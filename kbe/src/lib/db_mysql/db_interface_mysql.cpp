@@ -907,4 +907,18 @@ bool DBInterfaceMysql::processException(std::exception & e)
 }
 
 //-------------------------------------------------------------------------------------
+bool DBInterfaceMysql::isAutoIncrementDBID() const
+{
+	DBInterfaceInfo* pDBInfo = g_kbeSrvConfig.dbInterface(name());
+	return pDBInfo == NULL || pDBInfo->db_idType == DBInterfaceInfo::DBID_TYPE_DEFAULT;
+}
+
+//-------------------------------------------------------------------------------------
+uint64 DBInterfaceMysql::autoIncrementInit() const
+{
+	DBInterfaceInfo* pDBInfo = g_kbeSrvConfig.dbInterface(name());
+	return pDBInfo == NULL ? 1 : pDBInfo->db_autoIncrementInit;
+}
+
+//-------------------------------------------------------------------------------------
 }

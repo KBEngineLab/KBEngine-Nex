@@ -89,13 +89,20 @@ class SqlStatementInsert : public SqlStatement
 public:
 	SqlStatementInsert(DBInterface* pdbi, std::string tableName, DBID parentDBID, 
 		DBID dbid, mysql::DBContext::DB_ITEM_DATAS& tableItemDatas) :
-	  SqlStatement(pdbi, tableName, parentDBID, dbid, tableItemDatas)
+	  SqlStatement(pdbi, tableName, parentDBID, dbid, tableItemDatas),
+	  sqlstr1_(),
+	  writeDBID_(dbid),
+	  useAutoIncrement_(static_cast<DBInterfaceMysql*>(pdbi)->isAutoIncrementDBID())
 	{
-		// insert into tbl_Account (sm_accountName) values("fdsafsad\0\fdsfasfsa\0fdsafsda");
+		// UUID64模式必须在生成SQL前确定主键，并在执行成功后作为实体DBID回传。
+		// UUID64 mode must choose the key before SQL generation and return the same value as the entity DBID after success.
+		if (!useAutoIncrement_ && writeDBID_ == 0)
+			writeDBID_ = static_cast<DBID>(KBEngine::genUUID64());
+
 		sqlstr_ = "insert into " ENTITY_TABLE_PERFIX "_";
 		sqlstr_ += tableName;
 		sqlstr_ += " (";
-		sqlstr1_ = ")  values(";
+		sqlstr1_ = ") values(";
 		
 		if(parentDBID > 0)
 		{
@@ -108,31 +115,36 @@ public:
 			sqlstr1_ += ",";
 		}
 
+		if (!useAutoIncrement_)
+		{
+			sqlstr_ += TABLE_ID_CONST_STR;
+			sqlstr_ += ",";
+
+			char strdbid[MAX_BUF];
+			kbe_snprintf(strdbid, MAX_BUF, "%" PRDBID, writeDBID_);
+			sqlstr1_ += strdbid;
+			sqlstr1_ += ",";
+		}
+
 		mysql::DBContext::DB_ITEM_DATAS::iterator tableValIter = tableItemDatas.begin();
 		for(; tableValIter != tableItemDatas.end(); ++tableValIter)
 		{
 			KBEShared_ptr<mysql::DBContext::DB_ITEM_DATA> pSotvs = (*tableValIter);
 
-			if(dbid > 0)
-			{
-			}
+			sqlstr_ += pSotvs->sqlkey;
+			if(pSotvs->extraDatas.size() > 0)
+				sqlstr1_ += pSotvs->extraDatas;
 			else
-			{
-				sqlstr_ += pSotvs->sqlkey;
-				if(pSotvs->extraDatas.size() > 0)
-					sqlstr1_ += pSotvs->extraDatas;
-				else
-					sqlstr1_ += pSotvs->sqlval;
+				sqlstr1_ += pSotvs->sqlval;
 
-				sqlstr_ += ",";
-				sqlstr1_ += ",";
-			}
+			sqlstr_ += ",";
+			sqlstr1_ += ",";
 		}
 		
-		if(parentDBID > 0 || sqlstr_.at(sqlstr_.size() - 1) == ',')
+		if(sqlstr_.at(sqlstr_.size() - 1) == ',')
 			sqlstr_.erase(sqlstr_.size() - 1);
 
-		if(parentDBID > 0 || sqlstr1_.at(sqlstr1_.size() - 1) == ',')
+		if(sqlstr1_.at(sqlstr1_.size() - 1) == ',')
 			sqlstr1_.erase(sqlstr1_.size() - 1);
 
 		sqlstr1_ += ")";
@@ -158,12 +170,18 @@ public:
 			return false;
 		}
 
-		dbid_ = static_cast<DBInterfaceMysql*>(pdbi != NULL ? pdbi : pdbi_)->insertID();
+		if (useAutoIncrement_)
+			dbid_ = static_cast<DBInterfaceMysql*>(pdbi != NULL ? pdbi : pdbi_)->insertID();
+		else
+			dbid_ = writeDBID_;
+
 		return ret;
 	}
 
 protected:
 	std::string sqlstr1_;
+	DBID writeDBID_;
+	bool useAutoIncrement_;
 };
 
 class SqlStatementUpdate : public SqlStatement

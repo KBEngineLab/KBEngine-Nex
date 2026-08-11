@@ -79,7 +79,7 @@ public:
 			mysql::DBContext& wbox = *iter1->second.get();
 
 			KBEUnordered_map<std::string, std::vector<DBID> >::iterator iter = 
-				childTableDBIDs.find(context.tableName);
+				childTableDBIDs.find(wbox.tableName);
 
 			if(iter == childTableDBIDs.end())
 			{

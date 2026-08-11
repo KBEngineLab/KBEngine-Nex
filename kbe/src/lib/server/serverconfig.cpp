@@ -26,6 +26,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "common/kbekey.h"
 #include "common/kbeversion.h"
 
+#include <cerrno>
+
 #ifndef CODE_INLINE
 #include "serverconfig.inl"
 #endif
@@ -1217,6 +1219,51 @@ bool ServerConfig::loadConfig(std::string fileName)
 						pDBInfo->db_port = xml->getValInt(node);
 					else
 						missingFields.push_back("port");
+
+					// DBID策略允许在用户配置中覆盖默认值；未知值必须在启动期失败，避免各后端静默采用不同语义。
+					// The DBID policy may override defaults, but unknown values fail at startup so backends never silently diverge.
+					node = xml->enterNode(interfaceNode, "idType");
+					if (node != NULL)
+					{
+						const std::string idType = strutil::kbe_trim(xml->getValStr(node));
+						if (kbe_stricmp(idType.c_str(), "Default") == 0)
+							pDBInfo->db_idType = DBInterfaceInfo::DBID_TYPE_DEFAULT;
+						else if (kbe_stricmp(idType.c_str(), "UUID64") == 0)
+							pDBInfo->db_idType = DBInterfaceInfo::DBID_TYPE_UUID64;
+						else
+						{
+							ERROR_MSG(fmt::format(
+								"ServerConfig::loadConfig: databaseInterface({}) has invalid idType({}), expected Default or UUID64, file={}!\n",
+								name, idType, fileName));
+							return false;
+						}
+					}
+
+					node = xml->enterNode(interfaceNode, "autoIncrementInit");
+					if (node != NULL)
+					{
+						const std::string value = strutil::kbe_trim(xml->getValStr(node));
+						if (value.empty() || value.find_first_not_of("0123456789") != std::string::npos)
+						{
+							ERROR_MSG(fmt::format(
+								"ServerConfig::loadConfig: databaseInterface({}) has invalid autoIncrementInit({}), expected a positive integer, file={}!\n",
+								name, value, fileName));
+							return false;
+						}
+
+						errno = 0;
+						char* end = NULL;
+						const uint64 autoIncrementInit = strtoull(value.c_str(), &end, 10);
+						if (errno == ERANGE || end == NULL || *end != '\0' || autoIncrementInit == 0)
+						{
+							ERROR_MSG(fmt::format(
+								"ServerConfig::loadConfig: databaseInterface({}) has invalid autoIncrementInit({}), expected a positive integer, file={}!\n",
+								name, value, fileName));
+							return false;
+						}
+
+						pDBInfo->db_autoIncrementInit = autoIncrementInit;
+					}
 
 					// replicaSet 是可选的 MongoDB 拓扑配置；指定后驱动会从种子节点发现并切换主节点。
 					// replicaSet is optional MongoDB topology configuration; when set, the driver discovers members and follows primary changes from the seed node.
