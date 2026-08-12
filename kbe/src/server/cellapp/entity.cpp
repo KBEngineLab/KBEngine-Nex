@@ -4654,6 +4654,7 @@ void Entity::addToStream(KBEngine::MemoryStream& s)
 	addControllersToStream(s);
 	addWitnessToStream(s);
 	addTimersToStream(s);
+	EntityEvents::addToStream(this, s);
 
 	pyCallbackMgr_.addToStream(s);
 }
@@ -4717,6 +4718,12 @@ void Entity::createFromStream(KBEngine::MemoryStream& s)
 	createControllersFromStream(s);
 	createWitnessFromStream(s);
 	createTimersFromStream(s);
+	if (!EntityEvents::createFromStream(this, s))
+	{
+		WARNING_MSG(fmt::format(
+			"{}::createFromStream: failed to restore migrated event subscriptions for entity {}.\n",
+			scriptName(), id()));
+	}
 
 	pyCallbackMgr_.createFromStream(s);
 }

@@ -6,6 +6,7 @@ add_library(entitydef STATIC
     entity_component.cpp
     entity_component_call.cpp
     entity_call.cpp
+	entity_events.cpp
     entitydef.cpp
     entitycallabstract.cpp
     fixedarray.cpp

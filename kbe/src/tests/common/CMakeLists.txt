@@ -19,6 +19,36 @@ set_tests_properties(common.pooling PROPERTIES
     PASS_REGULAR_EXPRESSION "COMMON_POOLING_TEST_PASS"
 )
 
+add_executable(kbe_test_cell_event_migration
+	debug_helper_stubs.cpp
+	cell_event_migration.cpp
+	"${CMAKE_SOURCE_DIR}/lib/entitydef/entity_events.cpp"
+)
+target_include_directories(kbe_test_cell_event_migration PRIVATE
+	"${CMAKE_SOURCE_DIR}"
+	"${CMAKE_SOURCE_DIR}/lib"
+)
+target_link_libraries(kbe_test_cell_event_migration PRIVATE common KBE::PythonRuntime)
+set_target_properties(kbe_test_cell_event_migration PROPERTIES FOLDER "Tests/Common")
+
+if(MSVC)
+	target_compile_options(kbe_test_cell_event_migration PRIVATE /W4 /WX /utf-8)
+else()
+	target_compile_options(kbe_test_cell_event_migration PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
+add_test(NAME cellapp.event_migration COMMAND kbe_test_cell_event_migration)
+if(WIN32)
+	set(_kbe_cell_event_python_home "${KBE_PYTHON_ROOT}/tools/python3")
+else()
+	set(_kbe_cell_event_python_home "${KBE_PYTHON_ROOT}")
+endif()
+set_tests_properties(cellapp.event_migration PROPERTIES
+	LABELS "cellapp;cxx;entity;python;teleport;unit"
+	PASS_REGULAR_EXPRESSION "CELL_EVENT_MIGRATION_TEST_PASS"
+	ENVIRONMENT "PYTHONHOME=${_kbe_cell_event_python_home}"
+)
+
 add_executable(kbe_test_blowfish_compat
 	debug_helper_stubs.cpp
 	blowfish_compat.cpp

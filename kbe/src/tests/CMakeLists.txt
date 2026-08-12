@@ -109,6 +109,24 @@ set_tests_properties(source.database_id_policy_contract PROPERTIES
     LABELS "database;mysql;postgresql;serverconfig;source"
 )
 
+add_test(NAME source.bots_component_visibility_contract
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_BOTS_SOURCE=${CMAKE_SOURCE_DIR}/server/tools/bots/bots.cpp"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyBotsComponentVisibility.cmake"
+)
+set_tests_properties(source.bots_component_visibility_contract PROPERTIES
+    LABELS "bots;machine;network;source"
+)
+
+add_test(NAME source.cell_event_migration_contract
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyCellEventMigration.cmake"
+)
+set_tests_properties(source.cell_event_migration_contract PROPERTIES
+    LABELS "cellapp;entity;python;source;teleport"
+)
+
 set(KBE_TEST_ASSETS "" CACHE PATH "Assets directory used by CMake integration tests")
 option(KBE_TEST_SERVER_CLUSTER "Enable the server cluster integration test" OFF)
 set(KBE_TEST_DATABASE_HOST "127.0.0.1" CACHE STRING "Database host used by CMake integration tests")

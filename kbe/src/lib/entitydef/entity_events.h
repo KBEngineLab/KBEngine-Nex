@@ -7,8 +7,13 @@ This source file is part of KBEngine.
 
 #include "pyscript/scriptobject.h"
 
+#include <string>
+#include <vector>
+
 namespace KBEngine
 {
+
+class MemoryStream;
 
 class EntityEvents
 {
@@ -25,32 +30,8 @@ public:
 			return NULL;
 		}
 
-		PyObject* registry = getRegistry(entity, true);
-		if (registry == NULL)
-			return NULL;
-		PyObject* callbacks = PyDict_GetItemString(registry, eventName);
-		if (callbacks == NULL)
-		{
-			callbacks = PyList_New(0);
-			if (callbacks == NULL || PyDict_SetItemString(registry, eventName, callbacks) != 0)
-			{
-				Py_XDECREF(callbacks);
-				Py_DECREF(registry);
-				return NULL;
-			}
-			Py_DECREF(callbacks);
-			callbacks = PyDict_GetItemString(registry, eventName);
-		}
-
-		const int contains = PySequence_Contains(callbacks, callback);
-		if (contains < 0)
-		{
-			Py_DECREF(registry);
-			return NULL;
-		}
-		const bool added = contains == 0 && PyList_Append(callbacks, callback) == 0;
-		Py_DECREF(registry);
-		if (contains == 0 && !added)
+		const int added = registerCallback(entity, eventName, callback);
+		if (added < 0)
 			return NULL;
 		return PyBool_FromLong(added);
 	}
@@ -163,7 +144,50 @@ public:
 		Py_DECREF(dict);
 	}
 
+	static void addToStream(PyObject* entity, MemoryStream& stream);
+	static bool createFromStream(PyObject* entity, MemoryStream& stream);
+
 private:
+	static int registerCallback(PyObject* entity, const char* eventName, PyObject* callback)
+	{
+		PyObject* registry = getRegistry(entity, true);
+		if (registry == NULL)
+			return -1;
+
+		PyObject* callbacks = PyDict_GetItemString(registry, eventName);
+		if (callbacks == NULL)
+		{
+			callbacks = PyList_New(0);
+			if (callbacks == NULL || PyDict_SetItemString(registry, eventName, callbacks) != 0)
+			{
+				Py_XDECREF(callbacks);
+				Py_DECREF(registry);
+				return -1;
+			}
+			Py_DECREF(callbacks);
+			callbacks = PyDict_GetItemString(registry, eventName);
+		}
+
+		const int contains = PySequence_Contains(callbacks, callback);
+		if (contains < 0)
+		{
+			Py_DECREF(registry);
+			return -1;
+		}
+
+		if (contains != 0)
+		{
+			Py_DECREF(registry);
+			return 0;
+		}
+
+		const int added = PyList_Append(callbacks, callback);
+		Py_DECREF(registry);
+		if (added != 0)
+			return -1;
+		return 1;
+	}
+
 	static const char* registryKey()
 	{
 		return "__kbe_entity_events__";

@@ -116,6 +116,7 @@ reqCreateAndLoginTickCount_(g_kbeSrvConfig.getBots().defaultAddBots_tickCount),
 reqCreateAndLoginTickTime_(g_kbeSrvConfig.getBots().defaultAddBots_tickTime),
 pCreateAndLoginHandler_(NULL),
 pTelnetServer_(NULL),
+componentPublishingEnabled_(false),
 pActiveReportHandler_(NULL),
 totalKcpHandshakeSuccesses_(0),
 totalKcpHandshakeInvalidPackets_(0),
@@ -159,11 +160,6 @@ pythonLatencyInvalidResponses_(0)
 
 	KBEngine::Network::MessageHandlers::pMainMessageHandlers = &BotsInterface::messageHandlers;
 	Components::getSingleton().initialize(&ninterface, componentType, componentID);
-
-	// 使用内部通道超时的一半作为报告周期，并设置一秒下限，兼顾失联检测速度与大量组件场景下的消息开销。
-	// Report at half the internal-channel timeout with a one-second floor, balancing failure detection against message volume in large deployments.
-	pActiveReportHandler_ = new BotsActiveReportHandler(this);
-	pActiveReportHandler_->start(KBE_MAX(1.f, Network::g_channelInternalTimeout / 2.f));
 }
 
 //-------------------------------------------------------------------------------------
@@ -194,10 +190,18 @@ bool Bots::initialize()
 		{
 			WARNING_MSG("Bots::initialize: --dev requested but Logger is unavailable; continuing with local logs.\n");
 		}
+
+		// 普通 Bots 是外部压测客户端，不应进入 Machine 的服务端组件目录。
+		// Normal Bots are external load-test clients and must not enter Machine's server-component registry.
+		this->dispatcher().addTask(&Components::getSingleton());
+		componentPublishingEnabled_ = true;
+
+		// 开发模式注册后才需要维持内部组件心跳，避免普通压测产生无效的组件消息与连接。
+		// Internal-component heartbeats start only after development registration, avoiding irrelevant traffic and channels in load tests.
+		pActiveReportHandler_ = new BotsActiveReportHandler(this);
+		pActiveReportHandler_->start(KBE_MAX(1.f, Network::g_channelInternalTimeout / 2.f));
 	}
 
-	// 广播自己的地址给网上上的所有kbemachine
-	this->dispatcher().addTask(&Components::getSingleton());
 	return ClientApp::initialize() && initializeWatcher();
 }
 
@@ -506,6 +510,13 @@ void Bots::finalise()
 {
 	clientTickActive_ = false;
 	this->dispatcher().cancelTask(this);
+
+	SAFE_RELEASE(pActiveReportHandler_);
+	if (componentPublishingEnabled_)
+	{
+		this->dispatcher().cancelTask(&Components::getSingleton());
+		componentPublishingEnabled_ = false;
+	}
 
 	// 结束通知脚本
 	PyObject* pyResult = PyObject_CallMethod(getEntryScript().get(), 

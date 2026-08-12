@@ -493,8 +493,9 @@ protected:
 
 	TelnetServer*											pTelnetServer_;
 
-	// 独立心跳发送器使 Bots 保持 ClientApp 职责边界，不把服务端组件生命周期逻辑混入机器人客户端循环。
-	// A dedicated heartbeat publisher keeps Bots within ClientApp responsibilities instead of mixing server-component lifecycle work into bot client ticks.
+	// 仅开发模式把 Bots 暴露为内部组件；该状态用于保证注册 Task 与心跳发送器按同一生命周期成对启停。
+	// Only development Bots are exposed as internal components; this state keeps the registration task and heartbeat publisher lifecycle symmetric.
+	bool												componentPublishingEnabled_;
 	BotsActiveReportHandler*							pActiveReportHandler_;
 
 	// 累计计数与 Tick 高水位不在客户端删除时回退，用于定位长压测中的瞬时故障和延迟尖峰。
