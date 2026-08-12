@@ -1,19 +1,28 @@
 @echo off
-set curpath=%~dp0
+cd ..
+set PROJECT_PATH=%cd%
+for /r %%i in (site-packages) do @if exist "%%i" set KBE_VENV_PATH=%%i
 
 cd ..
-set KBE_ROOT=%cd%
-set KBE_RES_PATH=%KBE_ROOT%/kbe/res/;%curpath%/;%curpath%/scripts/;%curpath%/res/
+
+if not defined KBE_ROOT (
+    set KBE_ROOT=%cd%
+)
+
+set KBE_RES_PATH=%KBE_ROOT%/kbe/res/;%PROJECT_PATH%/;%PROJECT_PATH%/res/
 set KBE_BIN_PATH=%KBE_ROOT%/kbe/bin/server/
 
 if defined uid (echo UID = %uid%)
 
-cd %curpath%
+cd %~dp0
+
 call "kill_server.bat"
 
+echo PROJECT_PATH = %PROJECT_PATH%
 echo KBE_ROOT = %KBE_ROOT%
 echo KBE_RES_PATH = %KBE_RES_PATH%
 echo KBE_BIN_PATH = %KBE_BIN_PATH%
+echo KBE_VENV_PATH = %KBE_VENV_PATH%
 
 start "" "%KBE_BIN_PATH%/machine.exe" --cid=1000 --gus=1 --hide=1
 start "" "%KBE_BIN_PATH%/logger.exe" --cid=2000 --gus=2 --hide=1
