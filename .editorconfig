@@ -1,0 +1,27 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+# 历史源码包含大量有意保留的尾随空白；自动清理会让局部修改产生整文件噪声。
+# Legacy sources contain widespread trailing whitespace; automatic cleanup would inflate local diffs.
+trim_trailing_whitespace = false
+
+[*.{bat,cmd}]
+end_of_line = crlf
+
+[*.{c,cc,cpp,cxx,h,hh,hpp,hxx,inl}]
+indent_style = tab
+indent_size = 4
+
+[*.py]
+indent_style = space
+indent_size = 4
+
+[*.{cmake,json,xml,yml,yaml,md}]
+indent_style = space
+indent_size = 4
+
+[Makefile]
+indent_style = tab

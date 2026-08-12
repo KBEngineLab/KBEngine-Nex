@@ -1,0 +1,52 @@
+# 跨平台文本统一以 LF 存储和检出，避免开发系统改变整文件行尾。
+# Store and check out cross-platform text with LF so host platforms cannot rewrite whole files.
+* text=auto eol=lf
+
+# cmd.exe 批处理脚本保留 Windows 原生 CRLF。
+# Keep cmd.exe batch scripts in their native CRLF form.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Shell 脚本必须保持 LF，否则 Unix shebang 可能无法执行。
+# Shell scripts require LF or their Unix shebang may not execute.
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+
+# 二进制和特殊编码文件禁止 Git 做文本转换。
+# Disable text conversion for binary and specially encoded files.
+*.7z binary
+*.a binary
+*.bin binary
+*.bmp binary
+*.bz2 binary
+*.chm binary
+*.dll binary
+*.doc binary
+*.docx binary
+*.dylib binary
+*.eot binary
+*.exe binary
+*.gif binary
+*.gz binary
+*.ico binary
+*.jpeg binary
+*.jpg binary
+*.lib binary
+*.pdf binary
+*.pdb binary
+*.png binary
+*.ppt binary
+*.pptx binary
+*.pyc binary
+*.reg binary
+*.so binary
+*.tar binary
+*.ttf binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.xls binary
+*.xlsx binary
+*.xz binary
+*.zip binary
