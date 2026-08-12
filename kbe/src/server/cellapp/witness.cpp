@@ -461,8 +461,14 @@ void Witness::onEnterView(ViewTrigger* pViewTrigger, Entity* pEntity)
 			// state-skip，queueEntityRefVolatile 最多只补入一个缺失的 volatile 项。
 			const bool wasVisibleToClient =
 				(pEntityRef->flags() & ENTITYREF_FLAG_NORMAL) > 0;
-			pEntityRef->flags(wasVisibleToClient ?
-				ENTITYREF_FLAG_NORMAL : ENTITYREF_FLAG_ENTER_CLIENT_PENDING);
+			// 重连重建期间可能发生 AOI 离开后立即返回。只有尚未到达新客户端的 Entity
+			// 才保留待重放状态；已可见实体必须回到纯 NORMAL，满足后续更新状态约束。
+			// AOI may leave and re-enter during a reconnect rebuild. Preserve replay only for an
+			// Entity not yet delivered to the new client; visible entities must return to pure NORMAL.
+			const uint32 controlReplayFlag = wasVisibleToClient ? 0 :
+				(pEntityRef->flags() & ENTITYREF_FLAG_CONTROL_REPLAY_PENDING);
+			pEntityRef->flags((wasVisibleToClient ?
+				ENTITYREF_FLAG_NORMAL : ENTITYREF_FLAG_ENTER_CLIENT_PENDING) | controlReplayFlag);
 			pEntityRef->pEntity(pEntity);
 			queueEntityRefVolatile(pEntityRef);
 			g_witnessLoadMetrics.recordCancelledPendingLeave();
@@ -555,7 +561,11 @@ void Witness::resetViewEntities()
 			continue;
 		}
 
-		(*iter)->flags(ENTITYREF_FLAG_ENTER_CLIENT_PENDING);
+		// resetViewEntities() 表示客户端世界被整体重建。服务端保留的 controlledBy
+		// 不会再次触发 setControlledBy()，因此随 EnterWorld 标记一次控制状态重放。
+		// resetViewEntities() rebuilds the client's world. The retained controlledBy value does
+		// not call setControlledBy() again, so replay its state with the next EnterWorld.
+		(*iter)->flags(ENTITYREF_FLAG_ENTER_CLIENT_PENDING | ENTITYREF_FLAG_CONTROL_REPLAY_PENDING);
 		++iter;
 	}
 	synchronizeViewEntityMetrics();
@@ -1166,7 +1176,10 @@ bool Witness::processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pE
 		if (pOtherEntity == NULL)
 			return false;
 
-		pEntityRef->removeflags(ENTITYREF_FLAG_ENTER_CLIENT_PENDING);
+		const bool replayControlledBy =
+			(pEntityRef->flags() & ENTITYREF_FLAG_CONTROL_REPLAY_PENDING) > 0;
+		pEntityRef->removeflags(ENTITYREF_FLAG_ENTER_CLIENT_PENDING |
+			ENTITYREF_FLAG_CONTROL_REPLAY_PENDING);
 
 		MemoryStream* pStream = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 		pOtherEntity->addPositionAndDirectionToStream(*pStream, true);
@@ -1184,6 +1197,18 @@ bool Witness::processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pE
 		if (!pOtherEntity->isOnGround())
 			(*pSendBundle) << pOtherEntity->isOnGround();
 		ENTITY_MESSAGE_FORWARD_CLIENT_END(pSendBundle, ClientInterface::onEntityEnterWorld, entityEnterWorld);
+
+		// 客户端收到 EnterWorld 后才创建 Entity。控制状态必须紧随其后写入同一有序
+		// 消息流，否则 onControlEntity 会因目标尚不存在而被客户端丢弃。
+		// The client creates the Entity when handling EnterWorld. Append the control state to the
+		// same ordered stream so onControlEntity cannot arrive before its target exists.
+		if (replayControlledBy && pOtherEntity->controlledBy() != NULL &&
+			pOtherEntity->controlledBy()->id() == pEntity_->id())
+		{
+			ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onControlEntity, controlEntity);
+			(*pSendBundle) << pOtherEntity->id() << static_cast<int8>(1);
+			ENTITY_MESSAGE_FORWARD_CLIENT_END(pSendBundle, ClientInterface::onControlEntity, controlEntity);
+		}
 
 		pEntityRef->flags(ENTITYREF_FLAG_NORMAL);
 		pEntityRef->detailLevel(resolveEntityRefDetailLevel(pEntityRef));
