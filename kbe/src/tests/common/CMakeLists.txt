@@ -19,6 +19,26 @@ set_tests_properties(common.pooling PROPERTIES
     PASS_REGULAR_EXPRESSION "COMMON_POOLING_TEST_PASS"
 )
 
+add_executable(kbe_test_method_utype_allocator method_utype_allocator.cpp)
+target_include_directories(kbe_test_method_utype_allocator PRIVATE
+	"${CMAKE_SOURCE_DIR}"
+	"${CMAKE_SOURCE_DIR}/lib"
+)
+target_link_libraries(kbe_test_method_utype_allocator PRIVATE common)
+set_target_properties(kbe_test_method_utype_allocator PROPERTIES FOLDER "Tests/Common")
+
+if(MSVC)
+	target_compile_options(kbe_test_method_utype_allocator PRIVATE /W4 /WX /utf-8)
+else()
+	target_compile_options(kbe_test_method_utype_allocator PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
+add_test(NAME entitydef.method_utype_allocator COMMAND kbe_test_method_utype_allocator)
+set_tests_properties(entitydef.method_utype_allocator PROPERTIES
+	LABELS "entitydef;cxx;unit;portable;protocol"
+	PASS_REGULAR_EXPRESSION "METHOD_UTYPE_ALLOCATOR_TEST_PASS"
+)
+
 add_executable(kbe_test_cell_event_migration
 	debug_helper_stubs.cpp
 	cell_event_migration.cpp

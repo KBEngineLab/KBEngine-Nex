@@ -21,6 +21,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "entitydef.h"
 #include "scriptdef_module.h"
+#include "method_utype_allocator.h"
 #include "resmgr/plugins/plugin_manager.h"
 #include "datatypes.h"
 #include "common.h"
@@ -51,6 +52,7 @@ std::string EntityDef::__entitiesPath;
 EntityDef::Context EntityDef::__context;
 
 KBE_MD5 EntityDef::__md5;
+KBE_MD5 EntityDef::__clientMd5;
 bool EntityDef::_isInit = false;
 bool g_isReload = false;
 
@@ -366,12 +368,235 @@ static bool reloadChangedScriptModules()
 	return g_reloadStats.ok;
 }
 
-// 方法产生时自动产生utype用的
-ENTITY_METHOD_UID g_methodUtypeAuto = 1;
-std::vector<ENTITY_METHOD_UID> g_methodCusUtypes;																									
+// 方法 UType 的查找发生在各自通信域，因此三个域必须独立分配。
+// Method UType lookup is scoped to its communication domain, so each domain owns an allocator.
+struct ModuleMethodUTypeAllocators
+{
+	MethodUTypeAllocator cell;
+	MethodUTypeAllocator base;
+	MethodUTypeAllocator client;
+};
+
+std::map<ScriptDefModule*, ModuleMethodUTypeAllocators> g_methodUTypeAllocators;
 
 ENTITY_PROPERTY_UID g_propertyUtypeAuto = 1;
 std::vector<ENTITY_PROPERTY_UID> g_propertyUtypes;
+
+static MethodUTypeAllocator& methodUTypeAllocator(ScriptDefModule* pScriptModule,
+	COMPONENT_TYPE domain)
+{
+	ModuleMethodUTypeAllocators& allocators = g_methodUTypeAllocators[pScriptModule];
+	if (domain == CELLAPP_TYPE)
+		return allocators.cell;
+	if (domain == BASEAPP_TYPE)
+		return allocators.base;
+
+	return allocators.client;
+}
+
+static MethodDescription* findMethodDescription(ScriptDefModule* pScriptModule,
+	COMPONENT_TYPE domain, ENTITY_METHOD_UID utype)
+{
+	if (domain == CELLAPP_TYPE)
+		return pScriptModule->findCellMethodDescription(utype);
+	if (domain == BASEAPP_TYPE)
+		return pScriptModule->findBaseMethodDescription(utype);
+
+	return pScriptModule->findClientMethodDescription(utype);
+}
+
+static bool assignMethodUType(const std::string& moduleName,
+	MethodDescription* pMethodDescription, ScriptDefModule* pScriptModule)
+{
+	const COMPONENT_TYPE domain = static_cast<COMPONENT_TYPE>(pMethodDescription->domain());
+	MethodUTypeAllocator& allocator = methodUTypeAllocator(pScriptModule, domain);
+	ENTITY_METHOD_UID utype = pMethodDescription->getUType();
+
+	if (utype != 0)
+	{
+		MethodDescription* pConflict = findMethodDescription(pScriptModule, domain, utype);
+		if (pConflict != NULL)
+		{
+			ERROR_MSG(fmt::format(
+				"EntityDef::assignMethodUType: {}.{}, 'Utype' {} conflicts with {}.{} in the same domain({}).\n",
+				moduleName, pMethodDescription->getName(), utype, moduleName,
+				pConflict->getName(), domain));
+			return false;
+		}
+
+		allocator.reserve(utype);
+		return true;
+	}
+
+	// 暴露方法和 ClientMethods 属于客户端协议，从低位稳定增长；私有方法从高位增长，互不推移。
+	// Exposed methods and ClientMethods are client protocol. They grow from the low end,
+	// while private server methods grow from the high end so either side cannot renumber the other.
+	const bool clientVisible = domain == CLIENT_TYPE || pMethodDescription->isExposed() != MethodDescription::NO_EXPOSED;
+	const bool allocated = clientVisible ?
+		allocator.allocateClientVisible(utype) : allocator.allocateServerPrivate(utype);
+	if (!allocated)
+	{
+		ERROR_MSG(fmt::format(
+			"EntityDef::assignMethodUType: no free method UType remains for {}.{} in domain({}).\n",
+			moduleName, pMethodDescription->getName(), domain));
+		return false;
+	}
+
+	pMethodDescription->setUType(utype);
+	return true;
+}
+
+template<typename T>
+static void appendClientDigestValue(KBE_MD5& digest, const T& value)
+{
+	digest.append(&value, sizeof(T));
+}
+
+static void appendClientDigestString(KBE_MD5& digest, const char* value)
+{
+	const size_t length = value == NULL ? 0 : std::strlen(value);
+	const uint32 wireLength = static_cast<uint32>(length);
+	appendClientDigestValue(digest, wireLength);
+	if (length > 0)
+		digest.append(value, length);
+}
+
+static void appendClientDigestDataTypeRef(KBE_MD5& digest, DataType* pDataType)
+{
+	const DATATYPE_UID dataTypeUType = pDataType->id();
+	appendClientDigestValue(digest, dataTypeUType);
+	appendClientDigestString(digest, pDataType->getName());
+	appendClientDigestString(digest, pDataType->aliasName());
+}
+
+static void appendClientDigestDataType(KBE_MD5& digest, DataType* pDataType)
+{
+	appendClientDigestDataTypeRef(digest, pDataType);
+	const DATATYPE dataType = pDataType->type();
+	const int32 wireDataType = static_cast<int32>(dataType);
+	appendClientDigestValue(digest, wireDataType);
+
+	if (dataType == DATA_TYPE_FIXEDARRAY)
+	{
+		FixedArrayType* pArrayType = static_cast<FixedArrayType*>(pDataType);
+		appendClientDigestDataTypeRef(digest, pArrayType->getDataType());
+	}
+	else if (dataType == DATA_TYPE_FIXEDDICT)
+	{
+		FixedDictType* pDictType = static_cast<FixedDictType*>(pDataType);
+		FixedDictType::FIXEDDICT_KEYTYPE_MAP& keyTypes = pDictType->getKeyTypes();
+		const uint32 keyCount = static_cast<uint32>(keyTypes.size());
+		appendClientDigestValue(digest, keyCount);
+		for (FixedDictType::FIXEDDICT_KEYTYPE_MAP::const_iterator iter = keyTypes.begin();
+			iter != keyTypes.end(); ++iter)
+		{
+			appendClientDigestString(digest, iter->first.c_str());
+			appendClientDigestDataTypeRef(digest, iter->second->dataType);
+		}
+	}
+	else if (dataType == DATA_TYPE_ENTITY_COMPONENT)
+	{
+		EntityComponentType* pComponentType = static_cast<EntityComponentType*>(pDataType);
+		ScriptDefModule* pComponentModule = pComponentType->pScriptDefModule();
+		appendClientDigestString(digest, pComponentModule->getName());
+		const ENTITY_SCRIPT_UID moduleUType = pComponentModule->getUType();
+		appendClientDigestValue(digest, moduleUType);
+	}
+}
+
+static void appendClientDigestProperty(KBE_MD5& digest, const PropertyDescription* pProperty)
+{
+	appendClientDigestString(digest, pProperty->getName());
+	appendClientDigestString(digest, pProperty->getDefaultValStr());
+	appendClientDigestDataTypeRef(digest, pProperty->getDataType());
+	const ENTITY_PROPERTY_UID propertyUType = pProperty->getUType();
+	const uint32 flags = pProperty->getFlags();
+	const int16 aliasID = pProperty->aliasID();
+	appendClientDigestValue(digest, propertyUType);
+	appendClientDigestValue(digest, flags);
+	appendClientDigestValue(digest, aliasID);
+}
+
+static void appendClientDigestMethod(KBE_MD5& digest, COMPONENT_TYPE domain,
+	const MethodDescription* pMethod)
+{
+	appendClientDigestValue(digest, domain);
+	appendClientDigestString(digest, pMethod->getName());
+	const ENTITY_METHOD_UID methodUType = pMethod->getUType();
+	const MethodDescription::EXPOSED_TYPE exposedType = pMethod->isExposed();
+	const int16 aliasID = pMethod->aliasID();
+	appendClientDigestValue(digest, methodUType);
+	appendClientDigestValue(digest, exposedType);
+	appendClientDigestValue(digest, aliasID);
+
+	std::vector<DataType*>& argTypes = const_cast<MethodDescription*>(pMethod)->getArgTypes();
+	const uint32 argCount = static_cast<uint32>(argTypes.size());
+	appendClientDigestValue(digest, argCount);
+	for (std::vector<DataType*>::const_iterator iter = argTypes.begin(); iter != argTypes.end(); ++iter)
+		appendClientDigestDataTypeRef(digest, *iter);
+}
+
+void EntityDef::buildClientDigest()
+{
+	__clientMd5.clear();
+	static const uint32 digestFormatVersion = 1;
+	appendClientDigestValue(__clientMd5, digestFormatVersion);
+
+	// SDK 会导出所有非内部类型，因此类型表也是客户端协议的一部分。
+	// SDKs export every non-internal type, so the exported type table is part of the client protocol.
+	const DataTypes::UID_DATATYPE_MAP& dataTypes = DataTypes::uid_dataTypes();
+	for (DataTypes::UID_DATATYPE_MAP::const_iterator iter = dataTypes.begin();
+		iter != dataTypes.end(); ++iter)
+	{
+		DataType* pDataType = iter->second;
+		if (pDataType->aliasName()[0] == '_')
+			continue;
+
+		appendClientDigestDataType(__clientMd5, pDataType);
+	}
+
+	for (SCRIPT_MODULES::const_iterator moduleIter = __scriptModules.begin();
+		moduleIter != __scriptModules.end(); ++moduleIter)
+	{
+		ScriptDefModule* pModule = moduleIter->get();
+		if (!pModule->hasClient())
+			continue;
+
+		appendClientDigestString(__clientMd5, pModule->getName());
+		const ENTITY_SCRIPT_UID moduleUType = pModule->getUType();
+		appendClientDigestValue(__clientMd5, moduleUType);
+	const uint8 componentModule = pModule->isComponentModule() ? 1 : 0;
+		appendClientDigestValue(__clientMd5, componentModule);
+
+		ScriptDefModule::PROPERTYDESCRIPTION_MAP& properties = pModule->getClientPropertyDescriptions();
+		const uint32 propertyCount = static_cast<uint32>(properties.size());
+		appendClientDigestValue(__clientMd5, propertyCount);
+		for (ScriptDefModule::PROPERTYDESCRIPTION_MAP::const_iterator iter = properties.begin();
+			iter != properties.end(); ++iter)
+		{
+			appendClientDigestProperty(__clientMd5, iter->second);
+		}
+
+		const COMPONENT_TYPE domains[] = { CLIENT_TYPE, BASEAPP_TYPE, CELLAPP_TYPE };
+		ScriptDefModule::METHODDESCRIPTION_MAP* methodMaps[] = {
+			&pModule->getClientMethodDescriptions(),
+			&pModule->getBaseExposedMethodDescriptions(),
+			&pModule->getCellExposedMethodDescriptions()
+		};
+		for (size_t domainIndex = 0; domainIndex < 3; ++domainIndex)
+		{
+			const uint32 methodCount = static_cast<uint32>(methodMaps[domainIndex]->size());
+			appendClientDigestValue(__clientMd5, methodCount);
+			for (ScriptDefModule::METHODDESCRIPTION_MAP::const_iterator iter = methodMaps[domainIndex]->begin();
+				iter != methodMaps[domainIndex]->end(); ++iter)
+			{
+				appendClientDigestMethod(__clientMd5, domains[domainIndex], iter->second);
+			}
+		}
+	}
+
+	__clientMd5.final();
+}
 
 // Property UIDs are allocated through one path so component fields and ordinary fields share the same collision rules.
 // 属性 UID 通过同一路径分配，使组件字段与普通字段遵守相同的冲突规则。
@@ -442,7 +667,8 @@ bool EntityDef::finalise(bool isReload)
 	MethodDescription::resetDescriptionCount();
 
 	EntityDef::__md5.clear();
-	g_methodUtypeAuto = 1;
+	EntityDef::__clientMd5.clear();
+	g_methodUTypeAllocators.clear();
 	EntityDef::_isInit = false;
 
 	g_propertyUtypeAuto = 1;
@@ -468,7 +694,6 @@ bool EntityDef::finalise(bool isReload)
 
 	EntityDef::__scriptModules.clear();
 	EntityDef::__scriptTypeMappingUType.clear();
-	g_methodCusUtypes.clear();
 	// EntityDef 重建协议表时同步清空插件发现缓存，热重载才能重新读取 plugins.xml 和 manifest。
 	// Clear plugin discovery state together with the EntityDef protocol table so reloads reread plugins.xml and manifests.
 	PluginManager::instance().finalise();
@@ -696,6 +921,7 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 	}
 	XML_FOR_END(node);
 
+	EntityDef::buildClientDigest();
 	EntityDef::md5().final();
 
 	if(loadComponentType == DBMGR_TYPE)
@@ -1649,73 +1875,13 @@ bool EntityDef::loadDefCellMethods(const std::string& moduleName,
 						}
 
 						methodDescription->setUType(muid);
-						g_methodCusUtypes.push_back(muid);
 					}
 				}
 				XML_FOR_END(argNode);		
 			}
 
-			// 如果配置中没有设置过utype, 则产生
-			if(methodDescription->getUType() <= 0)
-			{
-				ENTITY_METHOD_UID muid = 0;
-				while(true)
-				{
-					muid = g_methodUtypeAuto++;
-					std::vector<ENTITY_METHOD_UID>::iterator iterutype = 
-						std::find(g_methodCusUtypes.begin(), g_methodCusUtypes.end(), muid);
-
-					if(iterutype == g_methodCusUtypes.end())
-					{
-						break;
-					}
-				}
-
-				methodDescription->setUType(muid);
-				g_methodCusUtypes.push_back(muid);
-			}
-			else
-			{
-				// 检查是否有重复的Utype
-				ENTITY_METHOD_UID muid = methodDescription->getUType();
-				std::vector<ENTITY_METHOD_UID>::iterator iter =
-					std::find(g_methodCusUtypes.begin(), g_methodCusUtypes.end(), muid);
-
-				if (iter != g_methodCusUtypes.end())
-				{
-					bool foundConflict = false;
-
-					MethodDescription* pConflictMethodDescription = pScriptModule->findBaseMethodDescription(muid);
-					if (pConflictMethodDescription)
-					{
-						ERROR_MSG(fmt::format("EntityDef::loadDefCellMethods: {}.{}, 'Utype' {} Conflict({}.{} 'Utype' {})!\n",
-							moduleName, name.c_str(), muid, moduleName, pConflictMethodDescription->getName(), muid));
-
-						foundConflict = true;
-					}
-
-					pConflictMethodDescription = pScriptModule->findCellMethodDescription(muid);
-					if (pConflictMethodDescription)
-					{
-						ERROR_MSG(fmt::format("EntityDef::loadDefCellMethods: {}.{}, 'Utype' {} Conflict({}.{} 'Utype' {})!\n",
-							moduleName, name.c_str(), muid, moduleName, pConflictMethodDescription->getName(), muid));
-
-						foundConflict = true;
-					}
-
-					pConflictMethodDescription = pScriptModule->findClientMethodDescription(muid);
-					if (pConflictMethodDescription)
-					{
-						ERROR_MSG(fmt::format("EntityDef::loadDefCellMethods: {}.{}, 'Utype' {} Conflict({}.{} 'Utype' {})!\n",
-							moduleName, name.c_str(), muid, moduleName, pConflictMethodDescription->getName(), muid));
-
-						foundConflict = true;
-					}
-
-					if (foundConflict)
-						return false;
-				}
-			}
+			if (!assignMethodUType(moduleName, methodDescription, pScriptModule))
+				return false;
 
 			if(!pScriptModule->addCellMethodDescription(name.c_str(), methodDescription))
 				return false;
@@ -1792,73 +1958,13 @@ bool EntityDef::loadDefBaseMethods(const std::string& moduleName, XML* xml,
 						}
 
 						methodDescription->setUType(muid);
-						g_methodCusUtypes.push_back(muid);
 					}
 				}
 				XML_FOR_END(argNode);		
 			}
 
-			// 如果配置中没有设置过utype, 则产生
-			if(methodDescription->getUType() <= 0)
-			{
-				ENTITY_METHOD_UID muid = 0;
-				while(true)
-				{
-					muid = g_methodUtypeAuto++;
-					std::vector<ENTITY_METHOD_UID>::iterator iterutype = 
-						std::find(g_methodCusUtypes.begin(), g_methodCusUtypes.end(), muid);
-
-					if(iterutype == g_methodCusUtypes.end())
-					{
-						break;
-					}
-				}
-
-				methodDescription->setUType(muid);
-				g_methodCusUtypes.push_back(muid);
-			}
-			else
-			{
-				// 检查是否有重复的Utype
-				ENTITY_METHOD_UID muid = methodDescription->getUType();
-				std::vector<ENTITY_METHOD_UID>::iterator iter =
-					std::find(g_methodCusUtypes.begin(), g_methodCusUtypes.end(), muid);
-
-				if (iter != g_methodCusUtypes.end())
-				{
-					bool foundConflict = false;
-
-					MethodDescription* pConflictMethodDescription = pScriptModule->findBaseMethodDescription(muid);
-					if (pConflictMethodDescription)
-					{
-						ERROR_MSG(fmt::format("EntityDef::loadDefBaseMethods: {}.{}, 'Utype' {} Conflict({}.{} 'Utype' {})!\n",
-							moduleName, name.c_str(), muid, moduleName, pConflictMethodDescription->getName(), muid));
-
-						foundConflict = true;
-					}
-
-					pConflictMethodDescription = pScriptModule->findCellMethodDescription(muid);
-					if (pConflictMethodDescription)
-					{
-						ERROR_MSG(fmt::format("EntityDef::loadDefBaseMethods: {}.{}, 'Utype' {} Conflict({}.{} 'Utype' {})!\n",
-							moduleName, name.c_str(), muid, moduleName, pConflictMethodDescription->getName(), muid));
-
-						foundConflict = true;
-					}
-
-					pConflictMethodDescription = pScriptModule->findClientMethodDescription(muid);
-					if (pConflictMethodDescription)
-					{
-						ERROR_MSG(fmt::format("EntityDef::loadDefBaseMethods: {}.{}, 'Utype' {} Conflict({}.{} 'Utype' {})!\n",
-							moduleName, name.c_str(), muid, moduleName, pConflictMethodDescription->getName(), muid));
-
-						foundConflict = true;
-					}
-
-					if (foundConflict)
-						return false;
-				}
-			}
+			if (!assignMethodUType(moduleName, methodDescription, pScriptModule))
+				return false;
 
 			if(!pScriptModule->addBaseMethodDescription(name.c_str(), methodDescription))
 				return false;
@@ -1931,73 +2037,13 @@ bool EntityDef::loadDefClientMethods(const std::string& moduleName, XML* xml,
 						}
 
 						methodDescription->setUType(muid);
-						g_methodCusUtypes.push_back(muid);
 					}
 				}
 				XML_FOR_END(argNode);		
 			}
 
-			// 如果配置中没有设置过utype, 则产生
-			if(methodDescription->getUType() <= 0)
-			{
-				ENTITY_METHOD_UID muid = 0;
-				while(true)
-				{
-					muid = g_methodUtypeAuto++;
-					std::vector<ENTITY_METHOD_UID>::iterator iterutype = 
-						std::find(g_methodCusUtypes.begin(), g_methodCusUtypes.end(), muid);
-
-					if(iterutype == g_methodCusUtypes.end())
-					{
-						break;
-					}
-				}
-
-				methodDescription->setUType(muid);
-				g_methodCusUtypes.push_back(muid);
-			}
-			else
-			{
-				// 检查是否有重复的Utype
-				ENTITY_METHOD_UID muid = methodDescription->getUType();
-				std::vector<ENTITY_METHOD_UID>::iterator iter =
-					std::find(g_methodCusUtypes.begin(), g_methodCusUtypes.end(), muid);
-
-				if (iter != g_methodCusUtypes.end())
-				{
-					bool foundConflict = false;
-
-					MethodDescription* pConflictMethodDescription = pScriptModule->findBaseMethodDescription(muid);
-					if (pConflictMethodDescription)
-					{
-						ERROR_MSG(fmt::format("EntityDef::loadDefClientMethods: {}.{}, 'Utype' {} Conflict({}.{} 'Utype' {})!\n",
-							moduleName, name.c_str(), muid, moduleName, pConflictMethodDescription->getName(), muid));
-
-						foundConflict = true;
-					}
-
-					pConflictMethodDescription = pScriptModule->findCellMethodDescription(muid);
-					if (pConflictMethodDescription)
-					{
-						ERROR_MSG(fmt::format("EntityDef::loadDefClientMethods: {}.{}, 'Utype' {} Conflict({}.{} 'Utype' {})!\n",
-							moduleName, name.c_str(), muid, moduleName, pConflictMethodDescription->getName(), muid));
-
-						foundConflict = true;
-					}
-
-					pConflictMethodDescription = pScriptModule->findClientMethodDescription(muid);
-					if (pConflictMethodDescription)
-					{
-						ERROR_MSG(fmt::format("EntityDef::loadDefClientMethods: {}.{}, 'Utype' {} Conflict({}.{} 'Utype' {})!\n",
-							moduleName, name.c_str(), muid, moduleName, pConflictMethodDescription->getName(), muid));
-
-						foundConflict = true;
-					}
-
-					if (foundConflict)
-						return false;
-				}
-			}
+			if (!assignMethodUType(moduleName, methodDescription, pScriptModule))
+				return false;
 
 			if(!pScriptModule->addClientMethodDescription(name.c_str(), methodDescription))
 				return false;

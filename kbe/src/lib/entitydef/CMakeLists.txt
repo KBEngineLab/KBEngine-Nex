@@ -12,6 +12,7 @@ add_library(entitydef STATIC
     fixedarray.cpp
     fixeddict.cpp
     method.cpp
+	method_utype_allocator.h
     property.cpp
     remote_entity_method.cpp
     scriptdef_module.cpp

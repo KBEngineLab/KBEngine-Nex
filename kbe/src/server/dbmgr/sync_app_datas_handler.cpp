@@ -156,7 +156,8 @@ bool SyncAppDatasHandler::process()
 	if(elapsed < SYNC_APP_DATAS_WAIT_NS)
 		return true;
 
-	std::string digest = EntityDef::md5().getDigestStr();
+	const std::string serverDigest = EntityDef::md5().getDigestStr();
+	const std::string clientDigest = EntityDef::clientMd5().getDigestStr();
 	bool hasUnavailableChannel = false;
 
 	// 如果是连接到dbmgr则需要等待接收app初始信息
@@ -201,7 +202,7 @@ bool SyncAppDatasHandler::process()
 					(*pBundle).newMessage(BaseappInterface::onDbmgrInitCompleted);
 					BaseappInterface::onDbmgrInitCompletedArgs6::staticAddToBundle((*pBundle), g_kbetime, idRange.first, 
 						idRange.second, cInitInfo.startGlobalOrder, cInitInfo.startGroupOrder, 
-						digest);
+						serverDigest);
 				}
 				break;
 			case CELLAPP_TYPE:
@@ -212,14 +213,14 @@ bool SyncAppDatasHandler::process()
 					(*pBundle).newMessage(CellappInterface::onDbmgrInitCompleted);
 					CellappInterface::onDbmgrInitCompletedArgs6::staticAddToBundle((*pBundle), g_kbetime, idRange.first, 
 						idRange.second, cInitInfo.startGlobalOrder, cInitInfo.startGroupOrder, 
-						digest);
+						serverDigest);
 				}
 				break;
 			case LOGINAPP_TYPE:
 				(*pBundle).newMessage(LoginappInterface::onDbmgrInitCompleted);
 				LoginappInterface::onDbmgrInitCompletedArgs3::staticAddToBundle((*pBundle), 
 						cInitInfo.startGlobalOrder, cInitInfo.startGroupOrder, 
-						digest);
+						clientDigest);
 
 				break;
 			default:

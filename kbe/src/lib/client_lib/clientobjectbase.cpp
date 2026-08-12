@@ -721,14 +721,14 @@ bool ClientObjectBase::login()
 	if (g_componentType == BOTS_TYPE)
 	{
 		if (!g_kbeSrvConfig.getDBMgr().allowEmptyDigest)
-			(*pBundle) << EntityDef::md5().getDigestStr();
+			(*pBundle) << EntityDef::clientMd5().getDigestStr();
 
 		ENGINE_COMPONENT_INFO& infos = g_kbeSrvConfig.getBots();
 		(*pBundle) << infos.forceInternalLogin;
 	}
 	else
 	{
-		(*pBundle) << EntityDef::md5().getDigestStr();
+		(*pBundle) << EntityDef::clientMd5().getDigestStr();
 	}
 
 	onLogin(pBundle);

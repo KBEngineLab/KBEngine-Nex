@@ -190,6 +190,7 @@ public:
 	}
 
 	static KBE_MD5& md5(){ return __md5; }
+	static KBE_MD5& clientMd5(){ return __clientMd5; }
 
 	static bool initializeWatcher();
 
@@ -221,6 +222,8 @@ public:
 	static bool isReload();
 
 private:
+	static void buildClientDigest();
+
 	static SCRIPT_MODULES __scriptModules;										// 所有的扩展脚本模块都存储在这里
 	static SCRIPT_MODULES __oldScriptModules;									// reload时旧的模块会放到这里用于判断
 
@@ -233,6 +236,7 @@ private:
 	static Context __context;
 
 	static KBE_MD5 __md5;														// defs-md5
+	static KBE_MD5 __clientMd5;											// 客户端可见协议摘要 / Client-visible protocol digest
 
 	static bool _isInit;
 
@@ -246,4 +250,3 @@ private:
 #include "entitydef.inl"
 #endif
 #endif // KBE_ENTITYDEF_H
-

@@ -5483,7 +5483,7 @@ void Baseapp::onHello(Network::Channel* pChannel,
 	(*pBundle) << KBEVersion::versionString();
 	(*pBundle) << KBEVersion::scriptVersionString();
 	(*pBundle) << Network::MessageHandlers::getDigestStr();
-	(*pBundle) << EntityDef::md5().getDigestStr();
+	(*pBundle) << EntityDef::clientMd5().getDigestStr();
 	(*pBundle) << g_componentType;
 
 	// 此消息不允许加密，所以设定已加密忽略再次加密，当第一次send消息不是立即发生而是交由epoll通知时会出现这种情况（一般用于测试，正规环境不会出现）
