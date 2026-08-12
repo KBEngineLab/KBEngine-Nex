@@ -25,13 +25,129 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "thread/threadguard.h"
 #include "math/math.h"
 
-namespace KBEngine{	
+#include <cfloat>
+
+namespace KBEngine{
 
 // Returns a random number [0..1)
 static float frand()
 {
 //	return ((float)(rand() & 0xffff)/(float)0xffff);
 	return (float)rand()/(float)RAND_MAX;
+}
+
+// 先用 tile 包围盒剔除不可能命中的区域，避免每条射线扫描全部 detail triangle。
+// Reject tiles by bounds first so each ray does not scan every detail triangle.
+static bool overlapSegmentAABB(const float* start, const float* end, const float* boundsMin, const float* boundsMax)
+{
+	const float epsilon = 0.001f;
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		const float segmentMin = dtMin(start[axis], end[axis]) - epsilon;
+		const float segmentMax = dtMax(start[axis], end[axis]) + epsilon;
+		if (segmentMax < boundsMin[axis] || segmentMin > boundsMax[axis])
+			return false;
+	}
+
+	return true;
+}
+
+// Detour raycast 描述导航平面内移动；检测 detail mesh 可补齐斜射线和垂直射线。
+// Detour raycast describes planar navigation; detail geometry adds sloped and vertical rays.
+static bool intersectSegmentTriangle(const float* start, const float* end, const float* vertex0,
+	const float* vertex1, const float* vertex2, float& distanceRatio)
+{
+	const float epsilon = 0.000001f;
+	float direction[3], edge1[3], edge2[3], perpendicular[3], startOffset[3], cross[3];
+	dtVsub(direction, end, start);
+	dtVsub(edge1, vertex1, vertex0);
+	dtVsub(edge2, vertex2, vertex0);
+	dtVcross(perpendicular, direction, edge2);
+
+	const float determinant = dtVdot(edge1, perpendicular);
+	if (fabsf(determinant) < epsilon)
+		return false;
+
+	const float inverseDeterminant = 1.0f / determinant;
+	dtVsub(startOffset, start, vertex0);
+	const float u = dtVdot(startOffset, perpendicular) * inverseDeterminant;
+	if (u < -epsilon || u > 1.0f + epsilon)
+		return false;
+
+	dtVcross(cross, startOffset, edge1);
+	const float v = dtVdot(direction, cross) * inverseDeterminant;
+	if (v < -epsilon || u + v > 1.0f + epsilon)
+		return false;
+
+	distanceRatio = dtVdot(edge2, cross) * inverseDeterminant;
+	return distanceRatio >= -epsilon && distanceRatio <= 1.0f + epsilon;
+}
+
+static const float* getDetailTriangleVertex(const dtMeshTile* tile, const dtPoly* polygon,
+	const dtPolyDetail* detail, unsigned char vertexIndex)
+{
+	if (vertexIndex < polygon->vertCount)
+		return tile->verts ? &tile->verts[polygon->verts[vertexIndex] * 3] : NULL;
+
+	return tile->detailVerts ?
+		&tile->detailVerts[(detail->vertBase + vertexIndex - polygon->vertCount) * 3] : NULL;
+}
+
+static bool passesDefaultQueryFilter(const dtQueryFilter& filter, const dtPoly* polygon)
+{
+	return (polygon->flags & filter.getIncludeFlags()) != 0 &&
+		(polygon->flags & filter.getExcludeFlags()) == 0;
+}
+
+static bool raycastNavmeshGeometry(const dtNavMesh* navmesh, const float* start, const float* end,
+	const dtQueryFilter& filter, float* hitPoint)
+{
+	float nearestDistanceRatio = FLT_MAX;
+	bool found = false;
+
+	for (int tileIndex = 0; tileIndex < navmesh->getMaxTiles(); ++tileIndex)
+	{
+		const dtMeshTile* tile = navmesh->getTile(tileIndex);
+		if (!tile || !tile->header || !tile->detailMeshes || !tile->detailTris ||
+			!overlapSegmentAABB(start, end, tile->header->bmin, tile->header->bmax))
+		{
+			continue;
+		}
+
+		for (int polygonIndex = 0; polygonIndex < tile->header->polyCount; ++polygonIndex)
+		{
+			const dtPoly* polygon = &tile->polys[polygonIndex];
+			if (polygon->getType() != DT_POLYTYPE_GROUND || !passesDefaultQueryFilter(filter, polygon))
+				continue;
+
+			const dtPolyDetail* detail = &tile->detailMeshes[polygonIndex];
+			for (int triangleIndex = 0; triangleIndex < detail->triCount; ++triangleIndex)
+			{
+				const unsigned char* triangle = &tile->detailTris[(detail->triBase + triangleIndex) * 4];
+				const float* vertex0 = getDetailTriangleVertex(tile, polygon, detail, triangle[0]);
+				const float* vertex1 = getDetailTriangleVertex(tile, polygon, detail, triangle[1]);
+				const float* vertex2 = getDetailTriangleVertex(tile, polygon, detail, triangle[2]);
+				if (!vertex0 || !vertex1 || !vertex2)
+					continue;
+
+				float distanceRatio = 0.0f;
+				if (intersectSegmentTriangle(start, end, vertex0, vertex1, vertex2, distanceRatio) &&
+					distanceRatio < nearestDistanceRatio)
+				{
+					nearestDistanceRatio = dtClamp(distanceRatio, 0.0f, 1.0f);
+					found = true;
+				}
+			}
+		}
+	}
+
+	if (!found)
+		return false;
+
+	hitPoint[0] = start[0] + (end[0] - start[0]) * nearestDistanceRatio;
+	hitPoint[1] = start[1] + (end[1] - start[1]) * nearestDistanceRatio;
+	hitPoint[2] = start[2] + (end[2] - start[2]) * nearestDistanceRatio;
+	return true;
 }
 
 //-------------------------------------------------------------------------------------
@@ -397,6 +513,12 @@ int NavMeshHandle::raycast(int layer, const Position3D& start, const Position3D&
 	dtQueryFilter filter;
 	filter.setIncludeFlags(0xffff);
 	filter.setExcludeFlags(0);
+
+	if (raycastNavmeshGeometry(iter->second.pNavmesh, spos, epos, filter, hitPoint))
+	{
+		hitPointVec.push_back(Position3D(hitPoint[0], hitPoint[1], hitPoint[2]));
+		return 1;
+	}
 
 	const float extents[3] = {2.f, 4.f, 2.f};
 
