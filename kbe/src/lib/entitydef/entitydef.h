@@ -42,6 +42,16 @@ namespace KBEngine{
 class ScriptDefModule;
 typedef SmartPointer<ScriptDefModule> ScriptDefModulePtr;
 
+struct ReloadScriptDefStats
+{
+	ReloadScriptDefStats() : ok(true), changedFiles(0), skippedFiles(0), reloadedModules(0) {}
+
+	bool ok;
+	uint32 changedFiles;
+	uint32 skippedFiles;
+	uint32 reloadedModules;
+};
+
 class EntityDef
 {
 public:
@@ -59,7 +69,7 @@ public:
 
 	static bool finalise(bool isReload = false);
 
-	static void reload(bool fullReload);
+	static ReloadScriptDefStats reload(bool fullReload);
 
 	/**
 		通过组件和实体 ID 查找当前进程中的实体实例。

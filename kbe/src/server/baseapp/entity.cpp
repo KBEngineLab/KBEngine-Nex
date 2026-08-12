@@ -1568,9 +1568,10 @@ PyObject* Entity::createCellEntity(PyObject* pyobj)
 	}
 	
 	EntityCallAbstract* cellEntityCall = static_cast<EntityCallAbstract*>(pyobj);
-	if(cellEntityCall->type() != ENTITYCALL_TYPE_CELL)
+	if(cellEntityCall->type() != ENTITYCALL_TYPE_CELL &&
+		cellEntityCall->type() != ENTITYCALL_TYPE_CELL_VIA_BASE)
 	{
-		PyErr_Format(PyExc_TypeError, "create %s args1 not is a direct cellEntityCall!", 
+		PyErr_Format(PyExc_TypeError, "create %s arg1 is not a cell EntityCall!",
 			this->scriptName());
 
 		PyErr_PrintEx(0);

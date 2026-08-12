@@ -124,9 +124,9 @@ INLINE float ServerConfig::asyncioRepeatOffset(void) const { return asyncioRepea
 //-------------------------------------------------------------------------------------
 INLINE bool ServerConfig::performanceProbesEnabled(void) const { return performanceProbesEnabled_; }
 
-// GUIConsole 管理协议默认启用共享 token，避免 Python、Profiler、生命周期控制裸奔。
-// GUIConsole admin protocols use a shared token by default so Python, profiling and lifecycle controls are not exposed unauthenticated.
-INLINE const std::string& ServerConfig::guiConsoleAdminToken(void) const { return guiConsoleAdminToken_; }
+// 管理协议统一使用共享 token，避免 Python、Profiler、生命周期和集群控制裸奔。
+// Management protocols share one token so Python, profiling, lifecycle, and cluster controls are not exposed unauthenticated.
+INLINE const std::string& ServerConfig::managementAdminToken(void) const { return managementAdminToken_; }
 
 //-------------------------------------------------------------------------------------	
 INLINE std::string ServerConfig::interfacesAddress(void) const { return interfacesAddress_; }

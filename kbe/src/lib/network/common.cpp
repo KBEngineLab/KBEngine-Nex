@@ -42,6 +42,8 @@ float g_channelExternalTimeout = 60.f;
 int8 g_channelExternalEncryptType = 0;
 
 uint32 g_SOMAXCONN = 5;
+uint32 g_maxCompletionsPerTick = 1024;
+uint32 g_maxCompletionProcessingTimeMS = 8;
 
 // 这些默认值与 Nex 2.8 SDK 的 KCP 参数保持一致，避免协议两端窗口与更新频率失配。
 // These defaults match the Nex 2.8 SDK KCP settings to avoid mismatched windows and update cadence across peers.

@@ -391,7 +391,7 @@ public:
 	INLINE int16 gameUpdateHertz(void) const;
 	INLINE float asyncioRepeatOffset(void) const;
 	INLINE bool performanceProbesEnabled(void) const;
-	INLINE const std::string& guiConsoleAdminToken(void) const;
+	INLINE const std::string& managementAdminToken(void) const;
 
 	std::string interfacesAddress(void) const;
 	int32 interfacesPortMin(void) const;
@@ -436,7 +436,7 @@ public:
 	int16 gameUpdateHertz_;
 	float asyncioRepeatOffset_;
 	bool performanceProbesEnabled_;
-	std::string guiConsoleAdminToken_;
+	std::string managementAdminToken_;
 	uint32 tick_max_buffered_logs_;
 	uint32 tick_max_sync_logs_;
 

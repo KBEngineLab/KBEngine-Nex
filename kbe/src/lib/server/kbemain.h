@@ -43,6 +43,49 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{
 
+inline std::string& selectedKBEngineConfig()
+{
+	static std::string configFile = "server/kbengine.xml";
+	return configFile;
+}
+
+inline bool fetchCommandArgValue(const std::string& command, const std::string& key, std::string& value)
+{
+	if(command.find(key) != 0)
+		return false;
+
+	value = command.substr(key.size());
+	return !value.empty();
+}
+
+inline void parseLoadConfigCommandArgs(int argc, char* argv[])
+{
+	std::string property;
+	std::string location;
+	for(int index = 1; index < argc; ++index)
+	{
+		const std::string command = argv[index];
+		std::string value;
+		if(fetchCommandArgValue(command, "--KBE_ROOT=", value))
+			setenv("KBE_ROOT", value.c_str(), 1);
+		else if(fetchCommandArgValue(command, "--KBE_RES_PATH=", value))
+			setenv("KBE_RES_PATH", value.c_str(), 1);
+		else if(fetchCommandArgValue(command, "--KBE_BIN_PATH=", value))
+			setenv("KBE_BIN_PATH", value.c_str(), 1);
+		else if(fetchCommandArgValue(command, "--KBE_VENV_PATH=", value))
+			setenv("KBE_VENV_PATH", value.c_str(), 1);
+		else if(fetchCommandArgValue(command, "--prop=", value))
+			property = strutil::kbe_trim(value);
+		else if(fetchCommandArgValue(command, "--location=", value))
+			location = strutil::kbe_trim(value);
+	}
+
+	if(!location.empty())
+		selectedKBEngineConfig() = location;
+	else if(!property.empty())
+		selectedKBEngineConfig() = "server/kbengine_" + property + ".xml";
+}
+
 inline void START_MSG(const char * name, uint64 appuid)
 {
 	MachineInfos machineInfo;
@@ -52,13 +95,14 @@ inline void START_MSG(const char * name, uint64 appuid)
 			"ScriptVersion: {}. "
 			"Pythoncore: {}. "
 			"Protocol: {}. "
+			"ConfigFile: {}. "
 			"Config: {} {}. "
 			"Built: {} {}. "
 			"AppID: {}. "
 			"UID: {}. "
 			"PID: {} ----\n",
 		name, KBEVersion::versionString(), KBEVersion::scriptVersionString(), PY_VERSION,
-		Network::MessageHandlers::getDigestStr(),
+		Network::MessageHandlers::getDigestStr(), selectedKBEngineConfig(),
 		KBE_CONFIG, KBE_ARCH, __TIME__, __DATE__,
 		appuid, getUserUID(), getProcessPID()));
 
@@ -81,15 +125,23 @@ inline void START_MSG(const char * name, uint64 appuid)
 
 }
 
-inline void loadConfig()
+inline bool loadConfig()
 {
 	Resmgr::getSingleton().initialize();
 
 	// "../../res/server/kbengine_defaults.xml"
-	g_kbeSrvConfig.loadConfig("server/kbengine_defaults.xml");
+	if(!g_kbeSrvConfig.loadConfig("server/kbengine_defaults.xml"))
+		return false;
 
-	// "../../../assets/res/server/kbengine.xml"
-	g_kbeSrvConfig.loadConfig("server/kbengine.xml");
+	std::string resolvedConfig = Resmgr::getSingleton().matchRes(selectedKBEngineConfig());
+	if(resolvedConfig.empty() || access(resolvedConfig.c_str(), 0) != 0)
+	{
+		printf("[ERROR] config file not found: %s (resolved: %s)\n",
+			selectedKBEngineConfig().c_str(), resolvedConfig.c_str());
+		return false;
+	}
+
+	return g_kbeSrvConfig.loadConfig(selectedKBEngineConfig());
 }
 
 inline void setEvns()
@@ -172,6 +224,11 @@ int kbeMainT(int argc, char * argv[], COMPONENT_TYPE componentType,
 	startLeakDetection(componentType, g_componentID);
 
 	g_componentType = componentType;
+#if KBE_PLATFORM == PLATFORM_WIN32
+	// 组件 ID 已确定后刷新 dump 标签，后续崩溃文件可直接定位进程角色。
+	// Refresh the dump identity once the component ID is known so artifacts identify the process role.
+	KBEngine::exception::installCrashHandler(COMPONENT_NAME_EX(componentType), g_componentID);
+#endif
 	DebugHelper::initialize(componentType);
 
 	INFO_MSG( "-----------------------------------------------------------------------------------------\n\n\n");
@@ -402,29 +459,30 @@ inline void parseMainCommandArgs(int argc, char* argv[])
 }
 
 #if KBE_PLATFORM == PLATFORM_WIN32
-#define KBENGINE_MAIN																									\
-kbeMain(int argc, char* argv[]);																						\
-int main(int argc, char* argv[])																						\
-{																														\
-	loadConfig();																										\
-	g_componentID = genUUID64();																						\
-	parseMainCommandArgs(argc, argv);																					\
-	char dumpname[MAX_BUF] = {0};																						\
-	kbe_snprintf(dumpname, MAX_BUF, "%" PRAppID, g_componentID);														\
-	KBEngine::exception::installCrashHandler(1, dumpname);																\
-	int retcode = -1;																									\
-	THREAD_TRY_EXECUTION;																								\
-	retcode = kbeMain(argc, argv);																						\
-	THREAD_HANDLE_CRASH;																								\
-	return retcode;																										\
-}																														\
+#define KBENGINE_MAIN \
+kbeMain(int argc, char* argv[]); \
+int main(int argc, char* argv[]) \
+{ \
+	KBEngine::exception::installCrashHandler("bootstrap", g_componentID); \
+	int retcode = -1; \
+	THREAD_TRY_EXECUTION; \
+	parseLoadConfigCommandArgs(argc, argv); \
+	if(!loadConfig()) return -1; \
+	g_componentID = genUUID64(); \
+	parseMainCommandArgs(argc, argv); \
+	KBEngine::exception::installCrashHandler("bootstrap", g_componentID); \
+	retcode = kbeMain(argc, argv); \
+	THREAD_HANDLE_CRASH; \
+	return retcode; \
+} \
 int kbeMain
 #else
 #define KBENGINE_MAIN																									\
 kbeMain(int argc, char* argv[]);																						\
 int main(int argc, char* argv[])																						\
 {																														\
-	loadConfig();																										\
+	parseLoadConfigCommandArgs(argc, argv);																			\
+	if(!loadConfig()) return -1;																					\
 	g_componentID = genUUID64();																						\
 	parseMainCommandArgs(argc, argv);																					\
 	return kbeMain(argc, argv);																							\

@@ -58,6 +58,11 @@ extern int8 g_channelExternalEncryptType;
 // listen监听队列最大值
 extern uint32 g_SOMAXCONN;
 
+// Completion 后端每 Tick 的数量上限和自适应时间预算上限。
+// Per-tick completion count limit and adaptive processing-time ceiling.
+extern uint32 g_maxCompletionsPerTick;
+extern uint32 g_maxCompletionProcessingTimeMS;
+
 // KCP 可靠 UDP 的队列、时钟和拥塞控制参数由 Channel 统一读取，后续配置层只需覆盖这些默认值。
 // KCP reliable-UDP queue, clock, and congestion parameters are centralized here so the configuration layer can override the defaults later.
 extern uint32 g_rudp_intWritePacketsQueueSize;

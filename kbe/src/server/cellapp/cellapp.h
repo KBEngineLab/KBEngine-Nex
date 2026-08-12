@@ -268,6 +268,7 @@ public:
 
 	uint32 flags() const { return flags_; }
 	void flags(uint32 v) { flags_ = v; }
+	void reqSetFlags(Network::Channel* pChannel, MemoryStream& s);
 	static PyObject* __py_setFlags(PyObject* self, PyObject* args);
 	static PyObject* __py_getFlags(PyObject* self, PyObject* args);
 

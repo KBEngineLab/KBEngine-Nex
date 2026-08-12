@@ -47,6 +47,20 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 	
 namespace KBEngine{
 
+/**
+	脚本热更时刷新 Timer 回调的统计信息。
+	Timer handle、剩余触发时间和 ID 均保持不变，只替换可安全重新定位的 Python 回调。
+	Timer handles, remaining delays, and IDs stay intact; only safely resolvable Python callbacks are replaced.
+*/
+struct ReloadScriptTimerStats
+{
+	ReloadScriptTimerStats() : refreshed(0), keptOld(0) {}
+
+	uint32 refreshed;
+	uint32 keptOld;
+	std::vector<std::string> keptOldCallbacks;
+};
+
 class PythonApp : public ServerApp
 {
 public:
@@ -116,6 +130,7 @@ public:
 	*/
 	virtual void reloadScript(bool fullReload);
 	virtual void onReloadScript(bool fullReload);
+	static ReloadScriptTimerStats reloadScriptTimers();
 
 	/**
 		通过相对路径获取资源的全路径

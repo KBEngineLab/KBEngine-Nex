@@ -1092,13 +1092,13 @@ int IoUringPoller::processPendingEvents(double maxWait)
 		{
 			lastCompletionBudgetWarningTime_ = now;
 			WARNING_MSG(fmt::format("IoUringPoller::processPendingEvents: completion processing took too long, count={}, maxCount={}, maxTimeMS={}, elapsedMS={}\n",
-				readyCount, COMPLETION_MAX_COMPLETIONS_PER_TICK, completionProcessingBudgetMs,
+				readyCount, g_maxCompletionsPerTick, completionProcessingBudgetMs,
 				completionProcessingElapsed * 1000 / stampsPerSecond()));
 		}
 	}
 
 	recordCompletionBatch(static_cast<uint32>(readyCount),
-		readyCount >= static_cast<int>(COMPLETION_MAX_COMPLETIONS_PER_TICK),
+		readyCount >= static_cast<int>(g_maxCompletionsPerTick),
 		completionTimeBudgetExhausted(static_cast<uint32>(readyCount),
 			completionProcessingElapsed, completionProcessingBudget));
 

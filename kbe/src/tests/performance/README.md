@@ -60,7 +60,7 @@ Bots 默认只写自身滚动日志且不连接 Logger。只有需要 IDE/PyChar
 `--bots-dev`，或直接启动 `bots.exe` 时添加 `--dev`。开发模式会额外产生序列化、网络、Logger CPU
 和集中磁盘 IO，因此发布正式性能数据时必须关闭。
 
-Watcher 的 `guiConsole/adminToken` 会按运行时资源路径顺序自动读取：先读取
+Watcher 的 `management/adminToken` 会按运行时资源路径顺序自动读取：先读取
 `kbengine_defaults.xml` 的默认值，再用首个 `kbengine.xml` 覆盖，保持和服务端配置加载一致。
 
 Bots always use TCP for the LoginApp authentication exchange. The BaseApp gameplay connection can

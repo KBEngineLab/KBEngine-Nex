@@ -720,6 +720,17 @@ protected:
 	// entity y轴最高移动速度
 	float													topSpeedY_;
 
+	// 同一 Tick 内累计客户端移动，避免把一次超速拆成多个小包绕过单包检测。
+	// Accumulate client movement within one tick so packet splitting cannot bypass the speed limit.
+	GAME_TIME lastTopSpeedCheckTick_;
+	Position3D accumulatedMoveForTick_;
+
+	// 一秒窗口补充检测渐进式超速；这些值只属于运行时检测状态，不参与 Entity 迁移序列化。
+	// The one-second window detects gradual overspeed and remains transient across Entity migration.
+	float topSpeedWindowAccumDist_;
+	float topSpeedWindowAccumDistY_;
+	int topSpeedWindowTickCount_;
+
 	// 自身在space的entities中的位置
 	SPACE_ENTITIES::size_type								spaceEntityIdx_;
 

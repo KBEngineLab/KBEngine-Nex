@@ -62,7 +62,7 @@ ServerConfig::ServerConfig():
 	gameUpdateHertz_(10),
 	asyncioRepeatOffset_(0.f),
 	performanceProbesEnabled_(false),
-	guiConsoleAdminToken_("8be0f32909da7702f7cf2424af6e9422b4881f70bd5991f973424fed24004e5e"),
+	managementAdminToken_("8be0f32909da7702f7cf2424af6e9422b4881f70bd5991f973424fed24004e5e"),
 	tick_max_buffered_logs_(4096),
 	tick_max_sync_logs_(32),
 	channelCommon_(),
@@ -125,13 +125,13 @@ bool ServerConfig::loadConfig(std::string fileName)
 		}
 	}
 
-	rootNode = xml->getRootNode("guiConsole");
+	rootNode = xml->getRootNode("management");
 	if (rootNode != NULL)
 	{
 		TiXmlNode* childnode = xml->enterNode(rootNode, "adminToken");
 		if (childnode != NULL)
 		{
-			guiConsoleAdminToken_ = strutil::kbe_trim(xml->getValStr(childnode));
+			managementAdminToken_ = strutil::kbe_trim(xml->getValStr(childnode));
 		}
 	}
 
@@ -358,6 +358,18 @@ bool ServerConfig::loadConfig(std::string fileName)
 			childnode1 = xml->enterNode(childnode, "external");
 			if(childnode1)
 				channelCommon_.extWriteBufferSize = KBE_MAX(0, xml->getValInt(childnode1));
+		}
+
+		childnode = xml->enterNode(rootNode, "completionBudget");
+		if(childnode)
+		{
+			TiXmlNode* childnode1 = xml->enterNode(childnode, "maxCompletionsPerTick");
+			if(childnode1)
+				Network::g_maxCompletionsPerTick = KBE_MAX(1, xml->getValInt(childnode1));
+
+			childnode1 = xml->enterNode(childnode, "maxProcessingTimeMS");
+			if(childnode1)
+				Network::g_maxCompletionProcessingTimeMS = KBE_MAX(0, xml->getValInt(childnode1));
 		}
 
 		childnode = xml->enterNode(rootNode, "windowOverflow");

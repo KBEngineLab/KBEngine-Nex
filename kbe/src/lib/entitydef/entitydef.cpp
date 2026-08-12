@@ -31,6 +31,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "entitydef/entity_call.h"
 
 #include <cmath>
+#include <set>
+#include <sys/stat.h>
 
 #ifndef CODE_INLINE
 #include "entitydef.inl"
@@ -54,6 +56,315 @@ bool g_isReload = false;
 
 bool EntityDef::__entityAliasID = false;
 bool EntityDef::__entitydefAliasID = false;
+
+// 文件戳按物理路径记录，避免包名别名绕过变更检测。
+// File stamps are keyed by physical path so package aliases cannot bypass change detection.
+static std::map<std::string, uint64> g_scriptFileStamps;
+static ReloadScriptDefStats g_reloadStats;
+
+static std::string normalizeScriptPath(std::string path)
+{
+	strutil::kbe_replace(path, "\\", "/");
+#if KBE_PLATFORM == PLATFORM_WIN32
+	std::transform(path.begin(), path.end(), path.begin(), ::tolower);
+#endif
+	return path;
+}
+
+static uint64 scriptFileStamp(const std::string& filePath)
+{
+#if KBE_PLATFORM == PLATFORM_WIN32
+	WIN32_FILE_ATTRIBUTE_DATA fileInfo;
+	if (GetFileAttributesExA(filePath.c_str(), GetFileExInfoStandard, &fileInfo))
+	{
+		ULARGE_INTEGER modified;
+		modified.HighPart = fileInfo.ftLastWriteTime.dwHighDateTime;
+		modified.LowPart = fileInfo.ftLastWriteTime.dwLowDateTime;
+		ULARGE_INTEGER size;
+		size.HighPart = fileInfo.nFileSizeHigh;
+		size.LowPart = fileInfo.nFileSizeLow;
+		return static_cast<uint64>(modified.QuadPart ^ (size.QuadPart << 1));
+	}
+#endif
+
+	struct stat st;
+	if (stat(filePath.c_str(), &st) != 0)
+		return 0;
+	return (static_cast<uint64>(st.st_mtime) << 32) ^ static_cast<uint64>(st.st_size);
+}
+
+static std::string pythonModuleFile(PyObject* pyModule)
+{
+	PyObject* pyFile = PyModule_GetFilenameObject(pyModule);
+	if (!pyFile)
+	{
+		PyErr_Clear();
+		return "";
+	}
+
+	const char* file = PyUnicode_AsUTF8(pyFile);
+	std::string result = file ? normalizeScriptPath(file) : "";
+	if (!file)
+		PyErr_Clear();
+	Py_DECREF(pyFile);
+	return result;
+}
+
+static std::vector<std::string> reloadScriptRoots()
+{
+	std::vector<std::string> roots;
+	std::string componentRoot = Resmgr::getSingleton().getPyUserScriptsPath();
+	const char* componentFolder = getComponentFolder(g_componentType);
+	if (componentFolder[0] != '\0')
+		componentRoot += componentFolder;
+	roots.push_back(normalizeScriptPath(componentRoot));
+
+	std::vector<std::string> pluginRoots = PluginManager::instance().getComponentPythonPaths(g_componentType);
+	for (std::vector<std::string>::iterator iter = pluginRoots.begin(); iter != pluginRoots.end(); ++iter)
+		roots.push_back(normalizeScriptPath(*iter));
+	return roots;
+}
+
+static bool isReloadableScriptFile(const std::string& filePath, const std::vector<std::string>& roots)
+{
+	if (filePath.size() < 3 || filePath.substr(filePath.size() - 3) != ".py")
+		return false;
+
+	for (std::vector<std::string>::const_iterator iter = roots.begin(); iter != roots.end(); ++iter)
+	{
+		if (filePath.compare(0, iter->size(), *iter) == 0)
+			return true;
+	}
+	return false;
+}
+
+static std::set<std::string> pluginEntryModuleNames()
+{
+	std::set<std::string> names;
+	const std::vector<PluginDescriptor>& plugins = PluginManager::instance().plugins();
+	const char* componentFolder = getComponentFolder(g_componentType);
+	for (std::vector<PluginDescriptor>::const_iterator plugin = plugins.begin(); plugin != plugins.end(); ++plugin)
+	{
+		std::map<COMPONENT_TYPE, PluginComponentDescriptor>::const_iterator component =
+			plugin->components.find(g_componentType);
+		if (component == plugin->components.end() || component->second.entry.empty())
+			continue;
+
+		std::string entry = component->second.entry;
+		if (entry.size() > 3 && entry.substr(entry.size() - 3) == ".py")
+			entry.erase(entry.size() - 3);
+		strutil::kbe_replace(entry, "\\", ".");
+		strutil::kbe_replace(entry, "/", ".");
+		if (entry.compare(0, 8, "plugins.") == 0)
+			names.insert(entry);
+		else if (componentFolder[0] != '\0')
+			names.insert("plugins." + plugin->name + "." + componentFolder + "." + entry);
+	}
+	return names;
+}
+
+static void collectDeclaredTypes(PyObject* module, const std::string& moduleName,
+	std::map<std::string, PyObject*>& oldTypes)
+{
+	PyObject* dict = PyModule_GetDict(module);
+	PyObject* key = NULL;
+	PyObject* value = NULL;
+	Py_ssize_t pos = 0;
+	while (dict && PyDict_Next(dict, &pos, &key, &value))
+	{
+		if (!PyUnicode_Check(key) || !PyType_Check(value))
+			continue;
+		PyObject* typeModule = PyObject_GetAttrString(value, "__module__");
+		if (!typeModule)
+		{
+			PyErr_Clear();
+			continue;
+		}
+		const char* typeModuleName = PyUnicode_AsUTF8(typeModule);
+		bool declaredHere = typeModuleName && moduleName == typeModuleName;
+		Py_DECREF(typeModule);
+		if (!declaredHere)
+			continue;
+		const char* typeName = PyUnicode_AsUTF8(key);
+		if (!typeName)
+		{
+			PyErr_Clear();
+			continue;
+		}
+		Py_INCREF(value);
+		oldTypes[typeName] = value;
+	}
+}
+
+static void patchOldTypes(PyObject* reloadedModule, std::map<std::string, PyObject*>& oldTypes)
+{
+	for (std::map<std::string, PyObject*>::iterator type = oldTypes.begin(); type != oldTypes.end(); ++type)
+	{
+		PyObject* newType = PyObject_GetAttrString(reloadedModule, type->first.c_str());
+		if (!newType)
+		{
+			PyErr_Clear();
+			Py_DECREF(type->second);
+			continue;
+		}
+
+		if (PyType_Check(newType) && newType != type->second)
+		{
+			PyObject* newDict = PyObject_GetAttrString(newType, "__dict__");
+			PyObject* items = newDict ? PyMapping_Items(newDict) : NULL;
+			if (items)
+			{
+				for (Py_ssize_t i = 0; i < PyList_Size(items); ++i)
+				{
+					PyObject* item = PyList_GetItem(items, i);
+					PyObject* attr = PyTuple_GET_ITEM(item, 0);
+					PyObject* value = PyTuple_GET_ITEM(item, 1);
+					const char* attrName = PyUnicode_Check(attr) ? PyUnicode_AsUTF8(attr) : NULL;
+					if (!attrName || strcmp(attrName, "__dict__") == 0 || strcmp(attrName, "__weakref__") == 0)
+						continue;
+					if (PyObject_SetAttrString(type->second, attrName, value) == -1)
+						PyErr_Clear();
+				}
+				Py_DECREF(items);
+			}
+			else
+			{
+				PyErr_Clear();
+			}
+			Py_XDECREF(newDict);
+			PyType_Modified(reinterpret_cast<PyTypeObject*>(type->second));
+		}
+
+		Py_DECREF(newType);
+		Py_DECREF(type->second);
+	}
+	oldTypes.clear();
+}
+
+static void releaseOldTypes(std::map<std::string, PyObject*>& oldTypes)
+{
+	for (std::map<std::string, PyObject*>::iterator type = oldTypes.begin(); type != oldTypes.end(); ++type)
+		Py_DECREF(type->second);
+	oldTypes.clear();
+}
+
+static void rememberLoadedScriptStamps()
+{
+	const std::vector<std::string> roots = reloadScriptRoots();
+	PyObject* modules = PyImport_GetModuleDict();
+	PyObject* key = NULL;
+	PyObject* value = NULL;
+	Py_ssize_t pos = 0;
+	while (PyDict_Next(modules, &pos, &key, &value))
+	{
+		if (!PyModule_Check(value))
+			continue;
+		std::string filePath = pythonModuleFile(value);
+		if (!isReloadableScriptFile(filePath, roots))
+			continue;
+		uint64 stamp = scriptFileStamp(filePath);
+		if (stamp > 0)
+			g_scriptFileStamps[filePath] = stamp;
+	}
+}
+
+static bool reloadChangedScriptModules()
+{
+	struct Candidate
+	{
+		std::string moduleName;
+		std::string filePath;
+		uint64 stamp;
+		PyObject* module;
+		bool pluginEntry;
+		std::map<std::string, PyObject*> oldTypes;
+	};
+
+	const std::vector<std::string> roots = reloadScriptRoots();
+	const std::set<std::string> pluginEntries = pluginEntryModuleNames();
+	std::vector<Candidate> candidates;
+	std::set<std::string> changedFiles;
+	std::set<std::string> unchangedFiles;
+	PyObject* modules = PyImport_GetModuleDict();
+	PyObject* key = NULL;
+	PyObject* value = NULL;
+	Py_ssize_t pos = 0;
+	while (PyDict_Next(modules, &pos, &key, &value))
+	{
+		if (!PyUnicode_Check(key) || !PyModule_Check(value))
+			continue;
+		std::string filePath = pythonModuleFile(value);
+		if (!isReloadableScriptFile(filePath, roots))
+			continue;
+
+		uint64 stamp = scriptFileStamp(filePath);
+		std::map<std::string, uint64>::const_iterator previous = g_scriptFileStamps.find(filePath);
+		if (stamp == 0 || (previous != g_scriptFileStamps.end() && previous->second == stamp))
+		{
+			unchangedFiles.insert(filePath);
+			continue;
+		}
+
+		const char* moduleName = PyUnicode_AsUTF8(key);
+		if (!moduleName)
+		{
+			PyErr_Clear();
+			continue;
+		}
+		Candidate candidate = { moduleName, filePath, stamp, value,
+			pluginEntries.find(moduleName) != pluginEntries.end(), std::map<std::string, PyObject*>() };
+		Py_INCREF(value);
+		if (!candidate.pluginEntry)
+			collectDeclaredTypes(value, moduleName, candidate.oldTypes);
+		candidates.push_back(candidate);
+		changedFiles.insert(filePath);
+	}
+
+	g_reloadStats.changedFiles = static_cast<uint32>(changedFiles.size());
+	g_reloadStats.skippedFiles = static_cast<uint32>(unchangedFiles.size());
+	std::map<std::string, bool> fileSucceeded;
+	for (std::set<std::string>::const_iterator iter = changedFiles.begin(); iter != changedFiles.end(); ++iter)
+		fileSucceeded[*iter] = true;
+
+	for (std::vector<Candidate>::iterator iter = candidates.begin(); iter != candidates.end(); ++iter)
+	{
+		// 插件入口由 PluginRuntime 统一执行 onFini -> reload -> onInit，通用扫描只负责发现变更。
+		// PluginRuntime owns onFini -> reload -> onInit for entry modules; the generic scan only detects their changes.
+		if (iter->pluginEntry)
+		{
+			Py_DECREF(iter->module);
+			continue;
+		}
+
+		PyObject* reloaded = PyImport_ReloadModule(iter->module);
+		Py_DECREF(iter->module);
+		if (!reloaded)
+		{
+			ERROR_MSG(fmt::format("EntityDef::reload: failed to reload module [{}], file=[{}].\n",
+				iter->moduleName, iter->filePath));
+			PyErr_Print();
+			fileSucceeded[iter->filePath] = false;
+			g_reloadStats.ok = false;
+			releaseOldTypes(iter->oldTypes);
+			continue;
+		}
+		patchOldTypes(reloaded, iter->oldTypes);
+		Py_DECREF(reloaded);
+		++g_reloadStats.reloadedModules;
+	}
+
+	for (std::vector<Candidate>::const_iterator iter = candidates.begin(); iter != candidates.end(); ++iter)
+	{
+		// 只有同一物理文件的所有模块别名都成功后才提交文件戳，失败项下一轮仍会重试。
+		// Commit a file stamp only after every module alias succeeds, so failures remain retryable.
+		if (fileSucceeded[iter->filePath])
+			g_scriptFileStamps[iter->filePath] = iter->stamp;
+	}
+
+	for (std::set<std::string>::const_iterator iter = changedFiles.begin(); iter != changedFiles.end(); ++iter)
+		INFO_MSG(fmt::format("EntityDef::reload: changed script file [{}].\n", *iter));
+	return g_reloadStats.ok;
+}
 
 // 方法产生时自动产生utype用的
 ENTITY_METHOD_UID g_methodUtypeAuto = 1;
@@ -173,9 +484,18 @@ bool EntityDef::isReload()
 }
 
 //-------------------------------------------------------------------------------------
-void EntityDef::reload(bool fullReload)
+ReloadScriptDefStats EntityDef::reload(bool fullReload)
 {
 	g_isReload = true;
+	g_reloadStats = ReloadScriptDefStats();
+	reloadChangedScriptModules();
+
+	if (!g_reloadStats.ok)
+	{
+		g_isReload = false;
+		return g_reloadStats;
+	}
+
 	if(fullReload)
 	{
 		EntityDef::__oldScriptModules.clear();
@@ -189,17 +509,37 @@ void EntityDef::reload(bool fullReload)
 		}
 
 		bool ret = finalise(true);
-		KBE_ASSERT(ret && "EntityDef::reload: finalise error!");
+		if (!ret)
+		{
+			ERROR_MSG("EntityDef::reload: finalise failed.\n");
+			g_reloadStats.ok = false;
+			g_isReload = false;
+			return g_reloadStats;
+		}
 
+		// 变更模块已在上面完成 reload；定义重建阶段只重新绑定类型，避免模块顶层代码执行两次。
+		// Changed modules were already reloaded above; definition rebuilding only rebinds types to avoid running module code twice.
+		g_isReload = false;
 		ret = initialize(EntityDef::__scriptBaseTypes, EntityDef::__loadComponentType);
-		KBE_ASSERT(ret && "EntityDef::reload: initialize error!");
+		if (!ret)
+		{
+			ERROR_MSG("EntityDef::reload: initialize failed.\n");
+			g_reloadStats.ok = false;
+			return g_reloadStats;
+		}
 	}
-	else
+	else if (g_reloadStats.changedFiles > 0)
 	{
-		loadAllScriptModules(EntityDef::__entitiesPath, EntityDef::__scriptBaseTypes);
+		// 增量路径只重新绑定已成功 reload 的类；协议描述与在线数据均保持不变。
+		// The incremental path only rebinds successfully reloaded classes; protocol descriptions and live data remain intact.
+		g_isReload = false;
+		if (!loadAllScriptModules(EntityDef::__entitiesPath, EntityDef::__scriptBaseTypes))
+			g_reloadStats.ok = false;
 	}
 
 	EntityDef::_isInit = true;
+	g_isReload = false;
+	return g_reloadStats;
 }
 
 //-------------------------------------------------------------------------------------
@@ -361,7 +701,10 @@ bool EntityDef::initialize(std::vector<PyTypeObject*>& scriptBaseTypes,
 	if(loadComponentType == DBMGR_TYPE)
 		return true;
 
-	return loadAllScriptModules(__entitiesPath, scriptBaseTypes) && initializeWatcher();
+	bool initialized = loadAllScriptModules(__entitiesPath, scriptBaseTypes) && initializeWatcher();
+	if (initialized)
+		rememberLoadedScriptStamps();
+	return initialized;
 }
 
 //-------------------------------------------------------------------------------------

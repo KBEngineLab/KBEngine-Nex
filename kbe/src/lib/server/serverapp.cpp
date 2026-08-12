@@ -384,7 +384,7 @@ void ServerApp::queryWatcher(Network::Channel* pChannel, MemoryStream& s)
 
 	std::string path;
 	s >> path;
-	if (!validateGuiConsoleAdminToken(pChannel, s, "queryWatcher"))
+	if (!validateManagementAdminToken(pChannel, s, "queryWatcher"))
 	{
 		return;
 	}
@@ -847,7 +847,7 @@ void ServerApp::startProfile(Network::Channel* pChannel, KBEngine::MemoryStream&
 	uint32 timelen;
 
 	s >> profileName >> profileType >> timelen;
-	if (!validateGuiConsoleAdminToken(pChannel, s, "startProfile"))
+	if (!validateManagementAdminToken(pChannel, s, "startProfile"))
 	{
 		return;
 	}
@@ -856,9 +856,9 @@ void ServerApp::startProfile(Network::Channel* pChannel, KBEngine::MemoryStream&
 }
 
 //-------------------------------------------------------------------------------------
-bool ServerApp::validateGuiConsoleAdminToken(Network::Channel* pChannel, MemoryStream& s, const char* operationName) const
+bool ServerApp::validateManagementAdminToken(Network::Channel* pChannel, MemoryStream& s, const char* operationName) const
 {
-	const std::string& expectedToken = ServerConfig::getSingleton().guiConsoleAdminToken();
+	const std::string& expectedToken = ServerConfig::getSingleton().managementAdminToken();
 	if (expectedToken.empty())
 	{
 		return true;
@@ -877,7 +877,7 @@ bool ServerApp::validateGuiConsoleAdminToken(Network::Channel* pChannel, MemoryS
 
 	// 不打印 Token 明文，避免认证失败本身把密钥泄露到 Logger。
 	// Do not log token contents; an auth failure must not leak the shared secret into Logger.
-	WARNING_MSG(fmt::format("ServerApp::validateGuiConsoleAdminToken: reject operation={}, addr={}.\n",
+	WARNING_MSG(fmt::format("ServerApp::validateManagementAdminToken: reject operation={}, addr={}.\n",
 		operationName, pChannel->c_str()));
 	return false;
 }

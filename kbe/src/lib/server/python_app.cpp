@@ -226,14 +226,46 @@ class ScriptTimerHandler : public TimerHandler
 public:
 	ScriptTimerHandler(ScriptTimers* scriptTimers, PyObject * callback) :
 		pyCallback_(callback),
+		pyCallbackOwner_(NULL),
 		scriptTimers_(scriptTimers)
 	{
 		Py_INCREF(pyCallback_);
+		captureReloadPath(callback);
+		handlers_.push_back(this);
 	}
 
 	~ScriptTimerHandler()
 	{
+		std::vector<ScriptTimerHandler*>::iterator iter =
+			std::find(handlers_.begin(), handlers_.end(), this);
+		if (iter != handlers_.end())
+			handlers_.erase(iter);
+
+		Py_XDECREF(pyCallbackOwner_);
 		Py_DECREF(pyCallback_);
+	}
+
+	static ReloadScriptTimerStats reloadAllCallbacks()
+	{
+		ReloadScriptTimerStats stats;
+		// 使用快照遍历，并在每次操作前确认 handler 仍存活，避免回调解析间接删除 Timer 后悬空访问。
+		// Iterate a snapshot and recheck liveness so callback resolution cannot leave a dangling handler after indirect timer deletion.
+		std::vector<ScriptTimerHandler*> handlers = handlers_;
+		for (std::vector<ScriptTimerHandler*>::iterator iter = handlers.begin(); iter != handlers.end(); ++iter)
+		{
+			if (std::find(handlers_.begin(), handlers_.end(), *iter) == handlers_.end())
+				continue;
+
+			if ((*iter)->reloadCallback())
+				++stats.refreshed;
+			else
+			{
+				++stats.keptOld;
+				stats.keptOldCallbacks.push_back((*iter)->describeCallback());
+			}
+		}
+
+		return stats;
 	}
 
 private:
@@ -256,9 +288,131 @@ private:
 		delete this;
 	}
 
+	bool getStringAttr(PyObject* pyObj, const char* attrName, std::string& out)
+	{
+		PyObject* pyAttr = PyObject_GetAttrString(pyObj, attrName);
+		if (!pyAttr)
+		{
+			PyErr_Clear();
+			return false;
+		}
+
+		const char* attr = PyUnicode_AsUTF8AndSize(pyAttr, NULL);
+		if (!attr)
+		{
+			PyErr_Clear();
+			Py_DECREF(pyAttr);
+			return false;
+		}
+
+		out = attr;
+		Py_DECREF(pyAttr);
+		return true;
+	}
+
+	void captureReloadPath(PyObject* callback)
+	{
+		// 绑定方法从原 owner 重新取同名属性；Entity/Component 换类后会自然绑定到新实现。
+		// Bound methods are resolved again from their owner, naturally binding to the new Entity/Component class.
+		if (PyMethod_Check(callback))
+		{
+			PyObject* pySelf = PyMethod_GET_SELF(callback);
+			if (pySelf && getStringAttr(callback, "__name__", callbackName_))
+			{
+				pyCallbackOwner_ = pySelf;
+				Py_INCREF(pyCallbackOwner_);
+			}
+			return;
+		}
+
+		getStringAttr(callback, "__module__", callbackModule_);
+		getStringAttr(callback, "__qualname__", callbackQualName_);
+	}
+
+	PyObject* resolveModuleCallback()
+	{
+		if (callbackModule_.empty() || callbackQualName_.empty() ||
+			callbackQualName_.find("<locals>") != std::string::npos)
+		{
+			return NULL;
+		}
+
+		PyObject* pyObj = PyDict_GetItemString(PyImport_GetModuleDict(), callbackModule_.c_str());
+		if (!pyObj)
+			return NULL;
+
+		Py_INCREF(pyObj);
+		std::string::size_type start = 0;
+		while (start < callbackQualName_.size())
+		{
+			std::string::size_type end = callbackQualName_.find('.', start);
+			std::string attrName = callbackQualName_.substr(start,
+				end == std::string::npos ? std::string::npos : end - start);
+			PyObject* pyNext = PyObject_GetAttrString(pyObj, attrName.c_str());
+			Py_DECREF(pyObj);
+			if (!pyNext)
+			{
+				PyErr_Clear();
+				return NULL;
+			}
+
+			pyObj = pyNext;
+			if (end == std::string::npos)
+				break;
+			start = end + 1;
+		}
+
+		return pyObj;
+	}
+
+	bool reloadCallback()
+	{
+		PyObject* pyNewCallback = NULL;
+		if (pyCallbackOwner_ && !callbackName_.empty())
+		{
+			pyNewCallback = PyObject_GetAttrString(pyCallbackOwner_, callbackName_.c_str());
+			if (!pyNewCallback)
+				PyErr_Clear();
+		}
+		else
+		{
+			pyNewCallback = resolveModuleCallback();
+		}
+
+		// 无法稳定定位的闭包或已删除函数继续使用旧对象，Timer 不能因热更静默丢失。
+		// Closures or removed functions that cannot be resolved keep the old object; hot reload must not silently drop a timer.
+		if (!pyNewCallback)
+			return false;
+		if (!PyCallable_Check(pyNewCallback))
+		{
+			Py_DECREF(pyNewCallback);
+			return false;
+		}
+
+		Py_DECREF(pyCallback_);
+		pyCallback_ = pyNewCallback;
+		return true;
+	}
+
+	std::string describeCallback() const
+	{
+		if (pyCallbackOwner_ && !callbackName_.empty())
+			return fmt::format("{}.{}", pyCallbackOwner_->ob_type->tp_name, callbackName_);
+		if (!callbackModule_.empty() || !callbackQualName_.empty())
+			return fmt::format("{}.{}", callbackModule_, callbackQualName_);
+		return "<unknown>";
+	}
+
 	PyObject* pyCallback_;
+	PyObject* pyCallbackOwner_;
+	std::string callbackModule_;
+	std::string callbackQualName_;
+	std::string callbackName_;
 	ScriptTimers* scriptTimers_;
+	static std::vector<ScriptTimerHandler*> handlers_;
 };
+
+std::vector<ScriptTimerHandler*> ScriptTimerHandler::handlers_;
 
 //-------------------------------------------------------------------------------------
 PythonApp::PythonApp(Network::EventDispatcher& dispatcher, 
@@ -966,7 +1120,7 @@ void PythonApp::onExecScriptCommand(Network::Channel* pChannel, KBEngine::Memory
 	
 	std::string cmd;
 	s.readBlob(cmd);
-	if (!validateGuiConsoleAdminToken(pChannel, s, "onExecScriptCommand"))
+	if (!validateManagementAdminToken(pChannel, s, "onExecScriptCommand"))
 	{
 		return;
 	}
@@ -1009,10 +1163,42 @@ void PythonApp::onReloadScript(bool fullReload)
 //-------------------------------------------------------------------------------------
 void PythonApp::reloadScript(bool fullReload)
 {
+	static bool isReloading = false;
+	if (isReloading)
+	{
+		WARNING_MSG(fmt::format("{}::reloadScript: ignored reentrant reload request, fullReload={}.\n",
+			COMPONENT_NAME_EX(g_componentType), fullReload));
+		return;
+	}
+
+	isReloading = true;
+	struct ReloadGuard
+	{
+		bool& value;
+		ReloadGuard(bool& v) : value(v) {}
+		~ReloadGuard() { value = false; }
+	} reloadGuard(isReloading);
+
+	if (g_appPublish != 0 && fullReload)
+	{
+		WARNING_MSG(fmt::format("{}::reloadScript: production mode forces fullReload=false.\n",
+			COMPONENT_NAME_EX(g_componentType)));
+		fullReload = false;
+	}
+
 	if (usesPythonAppPluginRuntime(componentType_))
 		PluginRuntime::instance().finalise();
 
 	onReloadScript(fullReload);
+	ReloadScriptTimerStats timerStats = reloadScriptTimers();
+	INFO_MSG(fmt::format("{}::reloadScript: fullReload={}, timersRefreshed={}, timersKeptOld={}.\n",
+		COMPONENT_NAME_EX(g_componentType), fullReload, timerStats.refreshed, timerStats.keptOld));
+	for (std::vector<std::string>::const_iterator iter = timerStats.keptOldCallbacks.begin();
+		iter != timerStats.keptOldCallbacks.end(); ++iter)
+	{
+		WARNING_MSG(fmt::format("{}::reloadScript: timer kept old callback: {}.\n",
+			COMPONENT_NAME_EX(g_componentType), *iter));
+	}
 
 	// SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
@@ -1035,6 +1221,12 @@ void PythonApp::reloadScript(bool fullReload)
 	{
 		ERROR_MSG("PythonApp::reloadScript: plugin lifecycle reload failed.\n");
 	}
+}
+
+//-------------------------------------------------------------------------------------
+ReloadScriptTimerStats PythonApp::reloadScriptTimers()
+{
+	return ScriptTimerHandler::reloadAllCallbacks();
 }
 
 //-------------------------------------------------------------------------------------

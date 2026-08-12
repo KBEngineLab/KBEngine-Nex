@@ -409,7 +409,7 @@ void Logger::registerLogWatcher(Network::Channel* pChannel, KBEngine::MemoryStre
 
 	bool first;
 	s >> first;
-	if (!validateGuiConsoleAdminToken(pChannel, s, "registerLogWatcher"))
+	if (!validateManagementAdminToken(pChannel, s, "registerLogWatcher"))
 	{
 		logWatchers_.erase(pChannel->addr());
 		return;
@@ -422,7 +422,7 @@ void Logger::registerLogWatcher(Network::Channel* pChannel, KBEngine::MemoryStre
 //-------------------------------------------------------------------------------------
 void Logger::deregisterLogWatcher(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 {
-	if (!validateGuiConsoleAdminToken(pChannel, s, "deregisterLogWatcher"))
+	if (!validateManagementAdminToken(pChannel, s, "deregisterLogWatcher"))
 	{
 		return;
 	}

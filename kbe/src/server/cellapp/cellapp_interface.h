@@ -155,6 +155,10 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
 	// 开始profile
 	CELLAPP_MESSAGE_DECLARE_STREAM(startProfile,									NETWORK_VARIABLE_MESSAGE)
 
+	// Machine 转发的运行标志更新，目标 App 会再次校验 management token。
+	// Runtime flag update forwarded by Machine; the target App validates the management token again.
+	CELLAPP_MESSAGE_DECLARE_STREAM(reqSetFlags,								NETWORK_VARIABLE_MESSAGE)
+
 	// 请求teleport到当前cellapp上
 	CELLAPP_MESSAGE_DECLARE_STREAM(reqTeleportToCellApp,							NETWORK_VARIABLE_MESSAGE)
 

@@ -63,9 +63,9 @@ def configure_transport_readiness(scenario: dict[str, object], transport: str) -
     return configured
 
 
-def resolve_gui_console_admin_token(environment: dict[str, str] | None) -> str:
-    """Resolve the shared GUIConsole admin token from the active resource path chain.
-    从当前资源路径链解析 GUIConsole 共享管理 Token。
+def resolve_management_admin_token(environment: dict[str, str] | None) -> str:
+    """Resolve the shared management admin token from the active resource path chain.
+    从当前资源路径链解析统一管理 Token。
 
     The engine applies defaults first, then lets the first project kbengine.xml
     override the node. Mirror that two-stage precedence so performance Watcher
@@ -81,18 +81,18 @@ def resolve_gui_console_admin_token(environment: dict[str, str] | None) -> str:
 
     roots = [Path(item) for item in resource_path.split(os.pathsep) if item]
 
-    token = _read_first_gui_console_admin_token(
+    token = _read_first_management_admin_token(
         roots,
         ("server/kbengine_defaults.xml", "kbengine_defaults.xml"),
     )
-    override = _read_first_gui_console_admin_token(
+    override = _read_first_management_admin_token(
         roots,
         ("server/kbengine.xml", "kbengine.xml"),
     )
     return token if override is None else override
 
 
-def _read_first_gui_console_admin_token(roots: list[Path], names: tuple[str, ...]) -> str | None:
+def _read_first_management_admin_token(roots: list[Path], names: tuple[str, ...]) -> str | None:
     for root in roots:
         for name in names:
             candidate = root / name
@@ -102,7 +102,7 @@ def _read_first_gui_console_admin_token(roots: list[Path], names: tuple[str, ...
                 tree = ET.parse(candidate)
             except (OSError, ET.ParseError):
                 continue
-            token_node = tree.getroot().find("./guiConsole/adminToken")
+            token_node = tree.getroot().find("./management/adminToken")
             if token_node is not None:
                 return (token_node.text or "").strip()
     return None
@@ -372,7 +372,7 @@ def main() -> int:
             owned_processes.update({f"cluster:{item.name}": item.pid for item in cluster.start()})
             if not args.tools_root:
                 raise ValueError("--tools-root is required to verify server onReadyForLogin readiness")
-            admin_token = resolve_gui_console_admin_token(environment)
+            admin_token = resolve_management_admin_token(environment)
             wait_for_cluster_ready_for_login(
                 args.tools_root,
                 [cluster.run_root / "server/logs"],
@@ -423,7 +423,7 @@ def main() -> int:
     if cluster is not None:
         log_roots.add((cluster.run_root / "server/logs").resolve())
     log_collectors = [IncrementalLogCollector(path) for path in sorted(log_roots)]
-    admin_token = resolve_gui_console_admin_token(environment)
+    admin_token = resolve_management_admin_token(environment)
     watcher_collector = (
         WatcherCollector(args.tools_root, args.watcher_timeout, admin_token)
         if args.tools_root and watcher_targets

@@ -939,7 +939,7 @@ void Cellappmgr::querySpaces(Network::Channel* pChannel, MemoryStream& s)
 				return;
 			}
 
-			if (!validateGuiConsoleAdminToken(pChannel, s, "querySpaces"))
+			if (!validateManagementAdminToken(pChannel, s, "querySpaces"))
 			{
 				return;
 			}

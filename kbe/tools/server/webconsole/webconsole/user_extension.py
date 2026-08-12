@@ -17,7 +17,7 @@ class KBEUserExtensionContext:
     kbe_root: str
     kbe_res_path: str
     kbe_bin_path: str
-    gui_console_admin_token: str
+    management_admin_token: str
 
 
 def get_kbe_user_extension(user: User) -> KBEUserExtension:
@@ -46,20 +46,20 @@ def get_kbe_user_context(user: User) -> KBEUserExtensionContext:
         kbe_root=_safe_str(extension.kbe_root),
         kbe_res_path=_safe_str(extension.kbe_res_path),
         kbe_bin_path=_safe_str(extension.kbe_bin_path),
-        gui_console_admin_token=resolve_gui_console_admin_token(extension),
+        management_admin_token=resolve_management_admin_token(extension),
     )
 
 
-def resolve_gui_console_admin_token(extension: KBEUserExtension) -> str:
-    """Resolve GUIConsole admin token using the same defaults-then-override rule as the server.
-    按服务端一致的 defaults 后 overlay 规则解析 GUIConsole 管理 Token。
+def resolve_management_admin_token(extension: KBEUserExtension) -> str:
+    """Resolve management admin token using the same defaults-then-override rule as the server.
+    按服务端一致的 defaults 后 overlay 规则解析统一管理 Token。
     """
     roots = _resource_roots(extension)
-    token = _read_first_gui_console_admin_token(
+    token = _read_first_management_admin_token(
         roots,
         ("server/kbengine_defaults.xml", "kbengine_defaults.xml"),
     )
-    override = _read_first_gui_console_admin_token(
+    override = _read_first_management_admin_token(
         roots,
         ("server/kbengine.xml", "kbengine.xml"),
     )
@@ -82,7 +82,7 @@ def _resource_roots(extension: KBEUserExtension) -> list[Path]:
     return roots
 
 
-def _read_first_gui_console_admin_token(roots: list[Path], names: tuple[str, ...]) -> str | None:
+def _read_first_management_admin_token(roots: list[Path], names: tuple[str, ...]) -> str | None:
     for root in roots:
         for name in names:
             candidate = root / name
@@ -92,7 +92,7 @@ def _read_first_gui_console_admin_token(roots: list[Path], names: tuple[str, ...
                 tree = ET.parse(candidate)
             except (OSError, ET.ParseError):
                 continue
-            token_node = tree.getroot().find("./guiConsole/adminToken")
+            token_node = tree.getroot().find("./management/adminToken")
             if token_node is not None:
                 return (token_node.text or "").strip()
     return None

@@ -40,6 +40,7 @@ public:
 	bool reload(COMPONENT_TYPE componentType);
 	bool onComponentReady(bool isFirstGroup);
 	void finalise();
+	bool initialized() const { return initialized_; }
 
 private:
 	struct ModuleEntry

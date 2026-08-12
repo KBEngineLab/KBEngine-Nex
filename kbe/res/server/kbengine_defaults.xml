@@ -16,12 +16,12 @@
 		<enabled> false </enabled>
 	</performanceProbes>
 
-	<!-- GUIConsole 管理协议共享 Token；为空会关闭认证，仅建议本机调试临时使用。
-		GUIConsole admin protocol shared token; leave empty only for temporary local debugging.
+	<!-- 远程管理协议共享 Token；为空会关闭认证，仅建议本机调试临时使用。
+		Remote management protocol shared token; leave empty only for temporary local debugging.
 	-->
-	<guiConsole>
+	<management>
 		<adminToken> 8be0f32909da7702f7cf2424af6e9422b4881f70bd5991f973424fed24004e5e </adminToken>
-	</guiConsole>
+	</management>
 	
 	<!-- 每秒发送到客户端的带宽限制(bit) 
 		(The data sent to the client, the second bandwidth limit (bit))
@@ -137,6 +137,17 @@
 			<internal>	16777216	</internal>				<!-- 16M -->
 			<external>	0			</external>				<!-- 系统默认(system default) -->
 		</writeBufferSize>
+
+		<!--
+			Completion 后端的主循环公平性预算。数量限制是硬上限，时间限制是自适应算法的封顶值；
+			0 表示关闭时间让步，但数量限制仍生效。未处理的 completion 会留到下一 Tick，不会丢失。
+			Completion backend fairness budget. The count is a hard limit while the time value caps the
+			adaptive budget; zero disables time yielding without disabling the count limit.
+		-->
+		<completionBudget>
+			<maxCompletionsPerTick> 1024 </maxCompletionsPerTick>
+			<maxProcessingTimeMS> 8 </maxProcessingTimeMS>
+		</completionBudget>
 		
 		<!-- 发送与接收窗口溢出值，0无限制
 			(the value of the send/receive window overflow, 0 is unlimited)

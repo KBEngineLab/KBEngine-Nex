@@ -2466,6 +2466,34 @@ bool Cellapp::removeUpdatable(Updatable* pObject)
 }
 
 //-------------------------------------------------------------------------------------
+void Cellapp::reqSetFlags(Network::Channel* pChannel, MemoryStream& s)
+{
+	if(pChannel->isExternal())
+		return;
+
+	uint32 flags = APP_FLAGS_NONE;
+	s >> flags;
+	if (!validateManagementAdminToken(pChannel, s, "reqSetFlags"))
+	{
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		(*pBundle) << false;
+		pChannel->send(pBundle);
+		return;
+	}
+
+	const uint32 allowedFlags = APP_FLAGS_NOT_PARTCIPATING_LOAD_BALANCING;
+	bool success = (flags & ~allowedFlags) == 0;
+	if(success)
+		this->flags(flags);
+	else
+		WARNING_MSG(fmt::format("Cellapp::reqSetFlags: reject unsupported flags=0x{:08x}.\n", flags));
+
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	(*pBundle) << success;
+	pChannel->send(pBundle);
+}
+
+//-------------------------------------------------------------------------------------
 void Cellapp::lookApp(Network::Channel* pChannel)
 {
 	if(pChannel->isExternal())
@@ -2496,7 +2524,9 @@ void Cellapp::lookApp(Network::Channel* pChannel)
 //-------------------------------------------------------------------------------------
 PyObject* Cellapp::__py_reloadScript(PyObject* self, PyObject* args)
 {
-	bool fullReload = true;
+	// 无参数默认只刷新行为层，完整定义重建必须显式传 True。
+	// No-argument reload updates behavior only; rebuilding definitions requires an explicit True.
+	bool fullReload = false;
 	int argCount = (int)PyTuple_Size(args);
 	if(argCount == 1)
 	{
@@ -2529,6 +2559,12 @@ void Cellapp::onReloadScript(bool fullReload)
 	}
 
 	EntityApp<Entity>::onReloadScript(fullReload);
+
+	// onReload 必须在 Entity、EntityCall 和 EntityComponent 都切换完成后触发。
+	// onReload runs only after Entity, EntityCall, and EntityComponent have all switched.
+	eiter = entities.begin();
+	for(; eiter != entities.end(); ++eiter)
+		callEntityOnReload(static_cast<Entity*>(eiter->second.get()), fullReload);
 }
 
 //-------------------------------------------------------------------------------------
@@ -3049,7 +3085,7 @@ void Cellapp::setSpaceViewer(Network::Channel* pChannel, MemoryStream& s)
 				return;
 			}
 
-			if (!this->validateGuiConsoleAdminToken(pChannel, s, "setSpaceViewer"))
+			if (!this->validateManagementAdminToken(pChannel, s, "setSpaceViewer"))
 			{
 				return;
 			}

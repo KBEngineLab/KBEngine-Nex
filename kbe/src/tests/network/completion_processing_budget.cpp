@@ -4,6 +4,17 @@
 #include <cstdlib>
 #include <iostream>
 
+namespace KBEngine
+{
+namespace Network
+{
+// 该夹具刻意不链接完整 network 库，因此在这里提供启动期配置变量。
+// This fixture intentionally avoids the full network library, so it owns the startup config values it exercises.
+uint32 g_maxCompletionsPerTick = 1024;
+uint32 g_maxCompletionProcessingTimeMS = 8;
+}
+}
+
 namespace
 {
 bool require(bool condition, const char* message)
@@ -21,6 +32,10 @@ int main()
 {
 	using namespace KBEngine::Network;
 	const KBEngine::uint64 budget = 2000;
+	const uint32_t originalMaxCompletions = g_maxCompletionsPerTick;
+	const uint32_t originalMaxProcessingTimeMs = g_maxCompletionProcessingTimeMS;
+	g_maxCompletionsPerTick = 1024;
+	g_maxCompletionProcessingTimeMS = 8;
 
 	// 客户端与共享 listener 必须使用不同接收深度：前者控制每连接内存，后者吸收聚合突发。
 	// Client and shared-listener depths differ to bound per-connection memory while absorbing aggregate bursts.
@@ -72,15 +87,25 @@ int main()
 	// Fast callbacks may continue to the hard bound; disabling the time budget must still retain that count bound.
 	if (!require(shouldProcessAnotherCompletion(COMPLETION_MIN_COMPLETIONS_PER_TICK, budget - 1, budget),
 		"fast completion batch stopped before its budget") ||
-		!require(shouldProcessAnotherCompletion(COMPLETION_MAX_COMPLETIONS_PER_TICK - 1, budget * 2, 0),
+		!require(shouldProcessAnotherCompletion(g_maxCompletionsPerTick - 1, budget * 2, 0),
 			"disabled time budget stopped before the hard bound") ||
-		!require(!shouldProcessAnotherCompletion(COMPLETION_MAX_COMPLETIONS_PER_TICK, 0, 0),
+		!require(!shouldProcessAnotherCompletion(g_maxCompletionsPerTick, 0, 0),
 			"hard completion bound was exceeded") ||
-		!require(!completionTimeBudgetExhausted(COMPLETION_MAX_COMPLETIONS_PER_TICK, budget * 2, 0),
+		!require(!completionTimeBudgetExhausted(g_maxCompletionsPerTick, budget * 2, 0),
 			"disabled time budget was reported as exhausted"))
 	{
 		return EXIT_FAILURE;
 	}
+
+	g_maxCompletionProcessingTimeMS = 0;
+	if (!require(completionProcessingTimeBudgetMs(1000) == 0,
+		"zero configured time budget did not disable time yielding"))
+	{
+		return EXIT_FAILURE;
+	}
+
+	g_maxCompletionsPerTick = originalMaxCompletions;
+	g_maxCompletionProcessingTimeMS = originalMaxProcessingTimeMs;
 
 	std::cout << "COMPLETION_PROCESSING_BUDGET_TEST_PASS" << std::endl;
 	return EXIT_SUCCESS;

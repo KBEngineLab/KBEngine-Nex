@@ -1270,7 +1270,7 @@ int IocpPoller::processPendingEvents(double maxWait)
 		}
 
 		const uint64 completionProcessingElapsed = timestamp() - completionProcessingStart;
-		const bool countBudgetExhausted = readyCount >= static_cast<int>(COMPLETION_MAX_COMPLETIONS_PER_TICK);
+		const bool countBudgetExhausted = readyCount >= static_cast<int>(g_maxCompletionsPerTick);
 		const bool timeBudgetExceeded = Network::completionTimeBudgetExhausted(
 			static_cast<uint32>(readyCount), completionProcessingElapsed, completionProcessingBudget);
 		completionTimeBudgetExhausted = timeBudgetExceeded;
@@ -1290,7 +1290,7 @@ int IocpPoller::processPendingEvents(double maxWait)
 				lastCompletionBudgetWarningTime_ = now;
 				WARNING_MSG(fmt::format("IocpPoller::processPendingEvents: completion processing took too long, count={}, countBudget={}, timeBudget={}, maxCount={}, maxTimeMS={}, elapsedMS={}\n",
 					readyCount, countBudgetExhausted, timeBudgetExceeded,
-					COMPLETION_MAX_COMPLETIONS_PER_TICK,
+					g_maxCompletionsPerTick,
 					completionProcessingBudgetMs,
 					completionProcessingElapsed * 1000 / stampsPerSecond()));
 			}
@@ -1303,7 +1303,7 @@ int IocpPoller::processPendingEvents(double maxWait)
 	}
 
 	recordCompletionBatch(static_cast<uint32>(readyCount),
-		readyCount >= static_cast<int>(COMPLETION_MAX_COMPLETIONS_PER_TICK),
+		readyCount >= static_cast<int>(g_maxCompletionsPerTick),
 		completionTimeBudgetExhausted);
 
 	return readyCount;

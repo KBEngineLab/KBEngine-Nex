@@ -131,7 +131,7 @@ class LogConsumer(AsyncWebsocketConsumer):
         groupOrder = int(groupOrder)
         searchDate = query_params.get("searchDate", [''])[0]
         keystr = query_params.get("keystr", [''])[0]
-        admin_token = get_kbe_user_context(self.scope["user"]).gui_console_admin_token
+        admin_token = get_kbe_user_context(self.scope["user"]).management_admin_token
 
         self.console = LogWatch(self, extaddr, extport, uid, components_check, logtype, globalOrder, groupOrder,
                            searchDate, keystr, admin_token)

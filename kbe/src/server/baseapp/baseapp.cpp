@@ -3486,6 +3486,21 @@ void Baseapp::createCellEntity(EntityCallAbstract* createToCellEntityCall, Entit
 		return;
 	}
 
+	if(createToCellEntityCall->type() == ENTITYCALL_TYPE_CELL_VIA_BASE)
+	{
+		Entity* pSpaceEntity = pEntities_->find(createToCellEntityCall->id());
+		if(pSpaceEntity != NULL && pSpaceEntity->cellEntityCall() != NULL &&
+			pSpaceEntity->cellEntityCall()->getChannel() != NULL)
+		{
+			createToCellEntityCall = pSpaceEntity->cellEntityCall();
+		}
+		else
+		{
+			forwardCreateCellEntityToOtherBaseapp(createToCellEntityCall, pEntity);
+			return;
+		}
+	}
+
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(CellappInterface::onCreateCellEntityFromBaseapp);
 
@@ -3536,6 +3551,100 @@ void Baseapp::createCellEntity(EntityCallAbstract* createToCellEntityCall, Entit
 }
 
 //-------------------------------------------------------------------------------------
+void Baseapp::forwardCreateCellEntityToOtherBaseapp(EntityCallAbstract* createToCellEntityCall, Entity* pEntity)
+{
+	Network::Channel* pTargetChannel = createToCellEntityCall->getChannel();
+	Components::ComponentInfos* pTargetInfo =
+		Components::getSingleton().findComponent(BASEAPP_TYPE, createToCellEntityCall->componentID());
+
+	// CELL_VIA_BASE 只能指向已注册 BaseApp 的权威内部 Channel，避免把高权限转发发往伪造连接。
+	// CELL_VIA_BASE must resolve to the authoritative internal Channel of a registered BaseApp.
+	if(pTargetInfo == NULL || pTargetChannel == NULL || pTargetInfo->pChannel != pTargetChannel ||
+		pTargetChannel->isExternal())
+	{
+		ERROR_MSG(fmt::format("Baseapp::forwardCreateCellEntityToOtherBaseapp: invalid target "
+			"BaseApp(componentID={}, entityID={}), create failed.\n",
+			createToCellEntityCall->componentID(), createToCellEntityCall->id()));
+		pEntity->onCreateCellFailure();
+		return;
+	}
+
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	pBundle->newMessage(BaseappInterface::onForwardCreateCellEntity);
+
+	(*pBundle) << createToCellEntityCall->id();
+	(*pBundle) << pEntity->ob_type->tp_name;
+	(*pBundle) << pEntity->id();
+	(*pBundle) << componentID_;
+	(*pBundle) << (pEntity->clientEntityCall() != NULL);
+	(*pBundle) << pEntity->inRestore();
+
+	MemoryStream* pCellData = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
+	try
+	{
+		pEntity->addCellDataToStream(CELLAPP_TYPE, ED_FLAG_ALL, pCellData);
+	}
+	catch (MemoryStreamWriteOverflow& err)
+	{
+		ERROR_MSG(fmt::format("{}::forwardCreateCellEntityToOtherBaseapp({}): {}\n",
+			pEntity->scriptName(), pEntity->id(), err.what()));
+		MemoryStream::reclaimPoolObject(pCellData);
+		Network::Bundle::reclaimPoolObject(pBundle);
+		pEntity->onCreateCellFailure();
+		return;
+	}
+
+	pBundle->append(*pCellData);
+	MemoryStream::reclaimPoolObject(pCellData);
+	pTargetChannel->send(pBundle);
+}
+
+//-------------------------------------------------------------------------------------
+void Baseapp::onForwardCreateCellEntity(Network::Channel* pChannel, MemoryStream& s)
+{
+	if(pChannel->isExternal())
+		return;
+
+	ENTITY_ID spaceEntityID = 0;
+	std::string entityType;
+	ENTITY_ID newEntityID = 0;
+	COMPONENT_ID sourceComponentID = 0;
+	bool hasClient = false;
+	bool inRestore = false;
+	s >> spaceEntityID >> entityType >> newEntityID >> sourceComponentID >> hasClient >> inRestore;
+
+	Components::ComponentInfos* pSourceInfo =
+		Components::getSingleton().findComponent(BASEAPP_TYPE, sourceComponentID);
+	if(pSourceInfo == NULL || pSourceInfo->pChannel != pChannel)
+	{
+		WARNING_MSG(fmt::format("Baseapp::onForwardCreateCellEntity: reject unauthoritative "
+			"source componentID={}, addr={}.\n", sourceComponentID, pChannel->c_str()));
+		return;
+	}
+
+	Entity* pSpaceEntity = pEntities_->find(spaceEntityID);
+	EntityCallAbstract* pCellCall = pSpaceEntity != NULL ? pSpaceEntity->cellEntityCall() : NULL;
+	if(pCellCall == NULL || pCellCall->getChannel() == NULL)
+	{
+		ERROR_MSG(fmt::format("Baseapp::onForwardCreateCellEntity: target Space entity({}) "
+			"or its cell is unavailable.\n", spaceEntityID));
+
+		Network::Bundle* pFailureBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		pFailureBundle->newMessage(BaseappInterface::onCreateCellFailure);
+		BaseappInterface::onCreateCellFailureArgs1::staticAddToBundle(*pFailureBundle, newEntityID);
+		pChannel->send(pFailureBundle);
+		return;
+	}
+
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	pBundle->newMessage(CellappInterface::onCreateCellEntityFromBaseapp);
+	(*pBundle) << pCellCall->id() << entityType << newEntityID << sourceComponentID
+		<< hasClient << inRestore;
+	pBundle->append(s);
+	pCellCall->getChannel()->send(pBundle);
+}
+
+//-------------------------------------------------------------------------------------
 void Baseapp::onCreateCellFailure(Network::Channel* pChannel, ENTITY_ID entityID)
 {
 	if(pChannel->isExternal())
@@ -3551,6 +3660,34 @@ void Baseapp::onCreateCellFailure(Network::Channel* pChannel, ENTITY_ID entityID
 	}
 
 	pEntity->onCreateCellFailure();
+}
+
+//-------------------------------------------------------------------------------------
+void Baseapp::reqSetFlags(Network::Channel* pChannel, MemoryStream& s)
+{
+	if(pChannel->isExternal())
+		return;
+
+	uint32 flags = APP_FLAGS_NONE;
+	s >> flags;
+	if (!validateManagementAdminToken(pChannel, s, "reqSetFlags"))
+	{
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		(*pBundle) << false;
+		pChannel->send(pBundle);
+		return;
+	}
+
+	const uint32 allowedFlags = APP_FLAGS_NOT_PARTCIPATING_LOAD_BALANCING;
+	bool success = (flags & ~allowedFlags) == 0;
+	if(success)
+		this->flags(flags);
+	else
+		WARNING_MSG(fmt::format("Baseapp::reqSetFlags: reject unsupported flags=0x{:08x}.\n", flags));
+
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	(*pBundle) << success;
+	pChannel->send(pBundle);
 }
 
 //-------------------------------------------------------------------------------------
@@ -5634,7 +5771,9 @@ void Baseapp::importClientEntityDef(Network::Channel* pChannel)
 //-------------------------------------------------------------------------------------
 PyObject* Baseapp::__py_reloadScript(PyObject* self, PyObject* args)
 {
-	bool fullReload = true;
+	// 无参数默认只刷新行为层，完整定义重建必须显式传 True。
+	// No-argument reload updates behavior only; rebuilding definitions requires an explicit True.
+	bool fullReload = false;
 	int argCount = (int)PyTuple_Size(args);
 	if(argCount == 1)
 	{
@@ -5673,6 +5812,12 @@ void Baseapp::onReloadScript(bool fullReload)
 	}
 
 	EntityApp<Entity>::onReloadScript(fullReload);
+
+	// onReload 必须在 Entity、EntityCall 和 EntityComponent 都切换完成后触发。
+	// onReload runs only after Entity, EntityCall, and EntityComponent have all switched.
+	eiter = entities.begin();
+	for(; eiter != entities.end(); ++eiter)
+		callEntityOnReload(static_cast<Entity*>(eiter->second.get()), fullReload);
 }
 
 //-------------------------------------------------------------------------------------

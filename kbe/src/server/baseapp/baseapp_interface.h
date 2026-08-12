@@ -152,6 +152,14 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappInterface)
 	BASEAPP_MESSAGE_DECLARE_ARGS1(onCreateCellFailure,								NETWORK_FIXED_MESSAGE,
 									ENTITY_ID,										entityID)
 
+	// 由目标 Space 所在 BaseApp 接收并转发跨 BaseApp 的 createCellEntity 请求。
+	// The BaseApp owning the target Space forwards a cross-BaseApp createCellEntity request.
+	BASEAPP_MESSAGE_DECLARE_STREAM(onForwardCreateCellEntity,						NETWORK_VARIABLE_MESSAGE)
+
+	// Machine 转发的运行标志更新，目标 App 会再次校验 management token。
+	// Runtime flag update forwarded by Machine; the target App validates the management token again.
+	BASEAPP_MESSAGE_DECLARE_STREAM(reqSetFlags,								NETWORK_VARIABLE_MESSAGE)
+
 	// loginapp向自己注册一个将要登录的账号, 由baseappmgr转发。
 	BASEAPP_MESSAGE_DECLARE_STREAM(registerPendingLogin,							NETWORK_VARIABLE_MESSAGE)
 

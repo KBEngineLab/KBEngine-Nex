@@ -17,6 +17,7 @@ MachineInterface_killserver = 6
 MachineInterface_setflags = 7
 
 from . import Define, MessageStream
+from .ManagementConfig import resolve_admin_token
 
 class ComponentInfo( object ):
 	"""
@@ -86,7 +87,7 @@ class ComponentInfo( object ):
 
 
 class Machines:
-	def __init__(self, uid = None, username = None, listenPort = 0):
+	def __init__(self, uid = None, username = None, listenPort = 0, adminToken = None):
 		"""
 		"""
 		self.udp_socket = None
@@ -103,6 +104,7 @@ class Machines:
 				username = getpass.getuser()
 
 		self.uid = uid
+		self.adminToken = resolve_admin_token() if adminToken is None else str(adminToken).strip()
 		self.username = username
 		if type(self.username) is str:
 			self.username = username.encode( "utf-8" )
@@ -248,6 +250,7 @@ class Machines:
 		msg.writeString(kbe_root)
 		msg.writeString(kbe_res_path)
 		msg.writeString(kbe_bin_path)
+		msg.writeString(self.adminToken)
 
 		if trycount <= 0:
 			self.send( msg.build(), targetIP )
@@ -263,6 +266,7 @@ class Machines:
 		msg.writeInt32(componentType)
 		msg.writeUint64(componentID)
 		msg.writeUint16(socket.htons(self.replyPort)) # reply port
+		msg.writeString(self.adminToken)
 
 		if trycount <= 0:
 			self.send( msg.build(), targetIP )
@@ -278,6 +282,7 @@ class Machines:
 		msg.writeInt32(componentType)
 		msg.writeUint64(componentID)
 		msg.writeUint16(socket.htons(self.replyPort)) # reply port
+		msg.writeString(self.adminToken)
 
 		if trycount <= 0:
 			self.send( msg.build(), targetIP )
@@ -294,6 +299,7 @@ class Machines:
 		msg.writeUint64(componentID)
 		msg.writeUint32(flags)
 		msg.writeUint16(socket.htons(self.replyPort)) # reply port
+		msg.writeString(self.adminToken)
 
 		if trycount <= 0:
 			self.send( msg.build(), targetIP )

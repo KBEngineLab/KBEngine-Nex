@@ -273,6 +273,13 @@ public:
 	*/
 	void onCreateCellFailure(Network::Channel* pChannel, ENTITY_ID entityID);
 
+	/**
+		通过 Space 所在 BaseApp 转发 createCellEntity 请求。
+		Forward createCellEntity through the BaseApp that owns the target Space.
+	*/
+	void forwardCreateCellEntityToOtherBaseapp(EntityCallAbstract* createToCellEntityCall, Entity* pEntity);
+	void onForwardCreateCellEntity(Network::Channel* pChannel, MemoryStream& s);
+
 	/** 网络接口
 		createCellEntity的cell实体创建成功回调。
 	*/
@@ -543,6 +550,7 @@ public:
 
 	uint32 flags() const { return flags_; }
 	void flags(uint32 v) { flags_ = v; }
+	void reqSetFlags(Network::Channel* pChannel, MemoryStream& s);
 	static PyObject* __py_setFlags(PyObject* self, PyObject* args);
 	static PyObject* __py_getFlags(PyObject* self, PyObject* args);
 	

@@ -47,11 +47,13 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "entitydef/entitydef.h"
 #include "entitydef/entities.h"
 #include "entitydef/entity_call.h"
+#include "entitydef/entity_component.h"
 #include "entitydef/scriptdef_module.h"
 #include "network/message_handler.h"
 #include "resmgr/resmgr.h"
 #include "helper/console_helper.h"
 #include "server/serverapp.h"
+#include <sys/stat.h>
 
 #if KBE_PLATFORM == PLATFORM_WIN32
 #pragma warning (disable : 4996)
@@ -251,6 +253,12 @@ public:
 	}
 
 protected:
+	/**
+		调用可选的脚本 onReload(fullReload)。不存在时静默跳过，错误只影响当前 Entity。
+		Invoke the optional script onReload(fullReload); missing callbacks are ignored and failures stay local to the Entity.
+	*/
+	bool callEntityOnReload(E* entity, bool fullReload);
+
 	KBEngine::script::Script								script_;
 	std::vector<PyTypeObject*>								scriptBaseTypes_;
 
@@ -1420,7 +1428,7 @@ void EntityApp<E>::onExecScriptCommand(Network::Channel* pChannel, KBEngine::Mem
 	
 	std::string cmd;
 	s.readBlob(cmd);
-	if (!this->validateGuiConsoleAdminToken(pChannel, s, "onExecScriptCommand"))
+	if (!this->validateManagementAdminToken(pChannel, s, "onExecScriptCommand"))
 	{
 		return;
 	}
@@ -1531,6 +1539,28 @@ void EntityApp<E>::updateLoad()
 
 	calcLoad((float)spareTime);
 	onUpdateLoad();
+
+	// 开发环境可通过修改 scripts/.hotreload 触发逻辑热更；只比较元数据，不增加目录扫描的每 Tick IO。
+	// Development builds can touch scripts/.hotreload to trigger a logic reload; metadata checks avoid per-tick directory scans.
+	if (g_appPublish == 0)
+	{
+		static bool initialized = false;
+		static bool existed = false;
+		static uint64 lastStamp = 0;
+		std::string hotreloadFile = Resmgr::getSingleton().getPyUserScriptsPath() + ".hotreload";
+		struct stat st;
+		bool exists = stat(hotreloadFile.c_str(), &st) == 0;
+		uint64 stamp = exists ? ((static_cast<uint64>(st.st_mtime) << 32) ^ static_cast<uint64>(st.st_size)) : 0;
+		if (initialized && exists && (!existed || stamp != lastStamp))
+		{
+			INFO_MSG(fmt::format("{}::updateLoad: .hotreload changed, triggering reloadScript(false).\n",
+				COMPONENT_NAME_EX(g_componentType)));
+			reloadScript(false);
+		}
+		initialized = true;
+		existed = exists;
+		lastStamp = stamp;
+	}
 }
 
 template<class E>
@@ -1553,19 +1583,102 @@ void EntityApp<E>::onReloadScript(bool fullReload)
 	{
 		(*iter)->reload();
 	}
+
+	EntityComponent::ENTITY_COMPONENTS::iterator componentIter = EntityComponent::entity_components.begin();
+	for (; componentIter != EntityComponent::entity_components.end(); ++componentIter)
+		(*componentIter)->reload(fullReload);
+}
+
+template<class E>
+bool EntityApp<E>::callEntityOnReload(E* entity, bool fullReload)
+{
+	PyObject* callback = PyObject_GetAttrString(static_cast<PyObject*>(entity), "onReload");
+	if (!callback)
+	{
+		PyErr_Clear();
+		return false;
+	}
+	if (!PyCallable_Check(callback))
+	{
+		WARNING_MSG(fmt::format("{}::callEntityOnReload: {} {}.onReload is not callable.\n",
+			COMPONENT_NAME_EX(g_componentType), entity->scriptName(), entity->id()));
+		Py_DECREF(callback);
+		return false;
+	}
+
+	PyObject* result = PyObject_CallFunction(callback, const_cast<char*>("i"), fullReload ? 1 : 0);
+	Py_DECREF(callback);
+	if (!result)
+	{
+		SCRIPT_ERROR_CHECK();
+		return false;
+	}
+	AsyncioHelper::submitCoroutine(result);
+	Py_DECREF(result);
+	return true;
 }
 
 template<class E>
 void EntityApp<E>::reloadScript(bool fullReload)
 {
-	PluginRuntime::instance().finalise();
-	EntityDef::reload(fullReload);
-	onReloadScript(fullReload);
-	if (!PluginRuntime::instance().initialize(componentType_, true))
+	static bool isReloading = false;
+	if (isReloading)
 	{
-		ERROR_MSG("EntityApp::reloadScript: plugin lifecycle reload failed.\n");
+		WARNING_MSG(fmt::format("{}::reloadScript: ignored reentrant request.\n",
+			COMPONENT_NAME_EX(g_componentType)));
 		return;
 	}
+
+	isReloading = true;
+	struct ReloadGuard
+	{
+		bool& value;
+		ReloadGuard(bool& v) : value(v) {}
+		~ReloadGuard() { value = false; }
+	} reloadGuard(isReloading);
+
+	if (g_appPublish != 0 && fullReload)
+	{
+		WARNING_MSG(fmt::format("{}::reloadScript: production mode forces fullReload=false.\n",
+			COMPONENT_NAME_EX(g_componentType)));
+		fullReload = false;
+	}
+
+	ReloadScriptDefStats defStats = EntityDef::reload(fullReload);
+	INFO_MSG(fmt::format("{}::reloadScript: definitions ok={}, changedFiles={}, skippedFiles={}, reloadedModules={}.\n",
+		COMPONENT_NAME_EX(g_componentType), defStats.ok, defStats.changedFiles,
+		defStats.skippedFiles, defStats.reloadedModules));
+	if (!defStats.ok)
+	{
+		ERROR_MSG(fmt::format("{}::reloadScript: aborted after script reload failure.\n",
+			COMPONENT_NAME_EX(g_componentType)));
+		return;
+	}
+	if (!fullReload && defStats.changedFiles == 0 && PluginRuntime::instance().initialized())
+	{
+		INFO_MSG(fmt::format("{}::reloadScript: no changed files, online state unchanged.\n",
+			COMPONENT_NAME_EX(g_componentType)));
+		return;
+	}
+
+	EntityComponent::beginReload();
+	onReloadScript(fullReload);
+
+	ReloadScriptTimerStats timerStats = PythonApp::reloadScriptTimers();
+	INFO_MSG(fmt::format("{}::reloadScript: componentsReloaded={}, timersRefreshed={}, timersKeptOld={}.\n",
+		COMPONENT_NAME_EX(g_componentType), EntityComponent::reloadCount(),
+		timerStats.refreshed, timerStats.keptOld));
+	for (std::vector<std::string>::const_iterator iter = timerStats.keptOldCallbacks.begin();
+		iter != timerStats.keptOldCallbacks.end(); ++iter)
+	{
+		WARNING_MSG(fmt::format("{}::reloadScript: timer kept old callback: {}.\n",
+			COMPONENT_NAME_EX(g_componentType), *iter));
+	}
+
+	// 定义和在线对象都切换成功后才重启插件，脚本语法错误不会先卸载仍可用的插件运行时。
+	// Restart plugins only after definitions and live objects switch successfully, so syntax errors do not first unload a working runtime.
+	if (!PluginRuntime::instance().reload(componentType_))
+		ERROR_MSG("EntityApp::reloadScript: plugin lifecycle reload failed.\n");
 
 	// SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 

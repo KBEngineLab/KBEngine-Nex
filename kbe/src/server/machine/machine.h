@@ -144,6 +144,12 @@ public:
 	*/
 	void killserver(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
+	/** 网络接口
+		设置 BaseApp/CellApp 的运行标志。
+		Set runtime flags for a BaseApp or CellApp.
+	*/
+	void setflags(Network::Channel* pChannel, KBEngine::MemoryStream& s);
+
 	/**
 		对本机运行的组件进行检查是否可用
 	*/

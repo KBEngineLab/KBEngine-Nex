@@ -1075,7 +1075,7 @@ void Machine::startserver(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 		s >> KBE_BIN_PATH;
 	}
 
-	if (!validateGuiConsoleAdminToken(pChannel, s, "startserver"))
+	if (!validateManagementAdminToken(pChannel, s, "startserver"))
 	{
 		Network::Bundle::reclaimPoolObject(pBundle);
 		sendLifecycleReply(pChannel, finderRecvPort, false, "startserver");
@@ -1148,7 +1148,7 @@ void Machine::stopserver(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 		s >> finderRecvPort;
 	}
 
-	if (!validateGuiConsoleAdminToken(pChannel, s, "stopserver"))
+	if (!validateManagementAdminToken(pChannel, s, "stopserver"))
 	{
 		sendLifecycleReply(pChannel, finderRecvPort, false, "stopserver");
 		return;
@@ -1357,7 +1357,7 @@ void Machine::killserver(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 		s >> finderRecvPort;
 	}
 
-	if (!validateGuiConsoleAdminToken(pChannel, s, "killserver"))
+	if (!validateManagementAdminToken(pChannel, s, "killserver"))
 	{
 		sendLifecycleReply(pChannel, finderRecvPort, false, "killserver");
 		return;
@@ -1474,6 +1474,100 @@ void Machine::killserver(Network::Channel* pChannel, KBEngine::MemoryStream& s)
 	{
 		pChannel->send(pBundle);
 	}
+}
+
+//-------------------------------------------------------------------------------------
+void Machine::setflags(Network::Channel* pChannel, KBEngine::MemoryStream& s)
+{
+	int32 uid = 0;
+	COMPONENT_TYPE componentType = UNKNOWN_COMPONENT_TYPE;
+	COMPONENT_ID componentID = 0;
+	uint32 flags = APP_FLAGS_NONE;
+	uint16 finderRecvPort = 0;
+
+	s >> uid >> componentType >> componentID >> flags;
+	if(s.length() > 0)
+		s >> finderRecvPort;
+
+	if (!validateManagementAdminToken(pChannel, s, "setflags"))
+	{
+		sendLifecycleReply(pChannel, finderRecvPort, false, "setflags");
+		return;
+	}
+
+	const uint32 allowedFlags = APP_FLAGS_NOT_PARTCIPATING_LOAD_BALANCING;
+	if((flags & ~allowedFlags) != 0 ||
+		(componentType != BASEAPP_TYPE && componentType != CELLAPP_TYPE))
+	{
+		WARNING_MSG(fmt::format("Machine::setflags: reject componentType={}, flags=0x{:08x}, addr={}.\n",
+			COMPONENT_NAME_EX(componentType), flags, pChannel->c_str()));
+		sendLifecycleReply(pChannel, finderRecvPort, false, "setflags");
+		return;
+	}
+
+	bool success = true;
+	bool matched = false;
+	Components::COMPONENTS& components = Components::getSingleton().getComponents(componentType);
+	for(Components::COMPONENTS::iterator iter = components.begin(); iter != components.end(); ++iter)
+	{
+		Components::ComponentInfos& info = *iter;
+		if(info.uid != uid || (componentID > 0 && info.cid != componentID))
+			continue;
+
+		matched = true;
+		if(!checkComponentUsable(&info, false, false) || info.pIntAddr == NULL)
+		{
+			success = false;
+			continue;
+		}
+
+		Network::Bundle request;
+		ENTITTAPP_COMMON_NETWORK_MESSAGE(componentType, request, reqSetFlags);
+		request << flags << ServerConfig::getSingleton().managementAdminToken();
+
+		Network::EndPoint endpoint;
+		endpoint.socket(SOCK_STREAM);
+		if(!endpoint.good() || endpoint.connect(info.pIntAddr->port, info.pIntAddr->ip) == -1)
+		{
+			ERROR_MSG(fmt::format("Machine::setflags: connect {}({}) failed: {}.\n",
+				COMPONENT_NAME_EX(componentType), info.cid, kbe_strerror()));
+			success = false;
+			continue;
+		}
+
+		endpoint.setnonblocking(false);
+		endpoint.send(&request);
+
+		Network::TCPPacket reply;
+		reply.resize(16);
+		fd_set fds;
+		struct timeval timeout = { 1, 0 };
+		FD_ZERO(&fds);
+		FD_SET(endpoint, &fds);
+#if KBE_PLATFORM == PLATFORM_WIN32
+		int selected = select(0, &fds, NULL, NULL, &timeout);
+#else
+		int selected = select(endpoint + 1, &fds, NULL, NULL, &timeout);
+#endif
+		if(selected <= 0 || endpoint.recv(reply.data(), 1) != 1)
+		{
+			WARNING_MSG(fmt::format("Machine::setflags: {}({}) did not acknowledge.\n",
+				COMPONENT_NAME_EX(componentType), info.cid));
+			success = false;
+			continue;
+		}
+
+		bool componentSuccess = false;
+		reply >> componentSuccess;
+		success = success && componentSuccess;
+	}
+
+	if(!matched)
+		success = false;
+
+	INFO_MSG(fmt::format("Machine::setflags: uid={}, componentType={}, componentID={}, flags=0x{:08x}, success={}.\n",
+		uid, COMPONENT_NAME_EX(componentType), componentID, flags, success));
+	sendLifecycleReply(pChannel, finderRecvPort, success, "setflags");
 }
 
 //-------------------------------------------------------------------------------------		
