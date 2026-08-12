@@ -127,6 +127,15 @@ set_tests_properties(source.cell_event_migration_contract PROPERTIES
     LABELS "cellapp;entity;python;source;teleport"
 )
 
+add_test(NAME source.cellapp_create_entity_python_contract
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_CELLAPP_SOURCE=${CMAKE_SOURCE_DIR}/server/cellapp/cellapp.cpp"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyCellappCreateEntityPythonContract.cmake"
+)
+set_tests_properties(source.cellapp_create_entity_python_contract PROPERTIES
+    LABELS "cellapp;entity;python;source;shutdown"
+)
+
 set(KBE_TEST_ASSETS "" CACHE PATH "Assets directory used by CMake integration tests")
 option(KBE_TEST_SERVER_CLUSTER "Enable the server cluster integration test" OFF)
 set(KBE_TEST_DATABASE_HOST "127.0.0.1" CACHE STRING "Database host used by CMake integration tests")

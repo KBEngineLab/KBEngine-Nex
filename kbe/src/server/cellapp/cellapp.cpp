@@ -766,37 +766,35 @@ PyObject* Cellapp::__py_createEntity(PyObject* self, PyObject* args)
 {
 	PyObject* params = NULL;
 	char* entityType = NULL;
-	SPACE_ID spaceID;
-	PyObject* position, *direction;
+	SPACE_ID spaceID = 0;
+	PyObject* position = NULL;
+	PyObject* direction = NULL;
 	
-	if(!PyArg_ParseTuple(args, "s|I|O|O|O", &entityType, &spaceID, &position, &direction, &params))
-	{
-		PyErr_Format(PyExc_TypeError, 
-			"KBEngine::createEntity: args error! args[scriptName, spaceID, position, direction, states].");
-		PyErr_PrintEx(0);
-		return 0;
-	}
+	// spaceID、position和direction是创建Cell实体的必要上下文；params保持可选。
+	// spaceID, position, and direction are required Cell creation context; params remains optional.
+	if(!PyArg_ParseTuple(args, "sIOO|O:createEntity", &entityType, &spaceID, &position, &direction, &params))
+		return NULL;
 	
-	if(entityType == NULL || strlen(entityType) == 0)
+	if(entityType[0] == '\0')
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::createEntity: entityType is NULL.");
-		PyErr_PrintEx(0);
-		return 0;
+		PyErr_SetString(PyExc_ValueError, "KBEngine.createEntity: entityType must not be empty");
+		return NULL;
 	}
 
 	Space* space = Spaces::findSpace(spaceID);
 	if(space == NULL || !space->isGood())
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::createEntity: spaceID %ld not found.", spaceID);
-		PyErr_PrintEx(0);
-		return 0;
+		PyErr_Format(PyExc_ValueError, "KBEngine.createEntity: spaceID %u was not found", spaceID);
+		return NULL;
 	}
 	
 	if(Cellapp::getSingleton().isShuttingdown())
 	{
-		PyErr_Format(PyExc_TypeError, "KBEngine::createEntity: shutting down! entityType=%s", entityType);
-		PyErr_PrintEx(0);
-		return 0;
+		// 运行状态拒绝不是参数类型错误，并且异常必须保留给Python调用方。
+		// A runtime-state rejection is not a type error, and the exception must remain visible to Python.
+		PyErr_Format(PyExc_RuntimeError,
+			"KBEngine.createEntity: cellapp is shutting down, entityType=%s", entityType);
+		return NULL;
 	}
 	
 	// 创建entity
@@ -821,6 +819,13 @@ PyObject* Cellapp::__py_createEntity(PyObject* self, PyObject* args)
 		//	Py_DECREF(pEntity);
 		//	return NULL;
 		//}
+	}
+	else if(!PyErr_Occurred())
+	{
+		// 旧的底层创建路径可能记录并清除具体异常；Python C API返回NULL时仍必须存在异常。
+		// Legacy creation paths may log and clear the specific error; the Python C API still requires an exception with NULL.
+		PyErr_Format(PyExc_RuntimeError,
+			"KBEngine.createEntity: failed to create entityType=%s", entityType);
 	}
 
 	//Py_XDECREF(params);
