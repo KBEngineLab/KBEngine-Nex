@@ -366,13 +366,24 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+          skip-decompress: true
 
       - name: Generate checksums
         shell: sh
         run: |
           set -eu
           cd dist
-          sha256sum KBEngine-Nex-1x-* > SHA256SUMS.txt
+          find . -maxdepth 1 -type f \
+            \( -name 'KBEngine-Nex-1x-*.zip' -o -name 'KBEngine-Nex-1x-*.tar.gz' \) \
+            -printf '%f\n' | sort > release-archives.txt
+          archive_count="$(wc -l < release-archives.txt | tr -d '[:space:]')"
+          if [ "$archive_count" -ne 3 ]; then
+            echo "[ERROR] Expected 3 release archives, found $archive_count." >&2
+            find . -maxdepth 2 -print >&2
+            exit 1
+          fi
+          xargs sha256sum < release-archives.txt > SHA256SUMS.txt
+          rm release-archives.txt
           cat SHA256SUMS.txt
 
       - name: Create or update GitHub Release
@@ -384,9 +395,16 @@ jobs:
         run: |
           set -eu
           if gh release view "$VERSION" >/dev/null 2>&1; then
-            gh release upload "$VERSION" dist/* --clobber
+            gh release upload "$VERSION" \
+              dist/KBEngine-Nex-1x-*.zip \
+              dist/KBEngine-Nex-1x-*.tar.gz \
+              dist/SHA256SUMS.txt \
+              --clobber
           else
-            gh release create "$VERSION" dist/* \
+            gh release create "$VERSION" \
+              dist/KBEngine-Nex-1x-*.zip \
+              dist/KBEngine-Nex-1x-*.tar.gz \
+              dist/SHA256SUMS.txt \
               --target "$GITHUB_SHA" \
               --title "KBEngine Nex 1.x $VERSION" \
               --notes "Release binaries for Windows, Linux, and macOS."
