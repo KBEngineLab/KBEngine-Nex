@@ -1,44 +1,60 @@
 <root>
-	<!-- 游戏逻辑处理频率HZ
-		(Update frequency process, HZ)
+	<!-- 服务端游戏逻辑 Tick 频率，单位 Hz。提高该值会同步增加脚本、移动、AOI 和网络调度频率，
+		应根据实际 Entity 数量和 Tick 延迟压测调整。
+		Server game-logic tick rate in Hz. Increasing it also raises script, movement, AOI and network
+		scheduling frequency; tune it against real entity counts and tick latency.
 	-->
 	<gameUpdateHertz> 10 </gameUpdateHertz>
 
-	<!-- asyncio主线程调度间隔（秒），0表示关闭实验性async支持
-		(Main-thread asyncio scheduling interval in seconds; 0 disables experimental async support)
+	<!-- Python asyncio事件循环在组件主线程中的调度间隔，单位为秒。
+		0表示关闭引擎托管的asyncio；正值最低按0.01秒处理。
+		仅在Python回调会返回协程或其他awaitable时启用。间隔越小，协程恢复延迟越低，
+		但主线程调度开销越高；CPU密集型协程仍会阻塞组件Tick。
+		Python asyncio event-loop scheduling interval on the component main thread, in seconds.
+		0 disables engine-managed asyncio; positive values are clamped to at least 0.01 seconds.
+		Enable it only when Python callbacks return coroutines or other awaitables. A shorter interval
+		reduces coroutine resume latency but increases main-thread scheduling overhead; CPU-bound
+		coroutines still block the component tick.
 	-->
 	<asyncioRepeatOffset> 0 </asyncioRepeatOffset>
 
-	<!-- 性能探针会增加高频计数、时钟读取和百分位窗口内存，生产环境默认关闭。
-		Performance probes add hot-path counters, clock reads and percentile-window memory, so production defaults to disabled.
+	<!-- 启用网络、Witness、Space 等高频路径的性能探针。探针会增加计数、时钟读取和
+		百分位统计窗口内存，生产环境默认关闭。
+		Enable performance probes on hot paths such as Network, Witness and Space. Probes add counters,
+		clock reads and percentile-window memory, so they are disabled in production by default.
 	-->
 	<performanceProbes>
 		<enabled> false </enabled>
 	</performanceProbes>
 
-	<!-- 远程管理协议共享 Token；为空会关闭认证，仅建议本机调试临时使用。
-		Remote management protocol shared token; leave empty only for temporary local debugging.
+	<!-- GUIConsole、PyCluster 等远程管理协议共享的 Token，所有管理端必须配置相同值。
+		空值会关闭认证，仅可用于隔离环境中的临时本机调试；项目必须覆盖默认示例值。
+		Shared token for remote management clients such as GUIConsole and PyCluster. Every management
+		client must use the same value. Empty disables authentication and is only suitable for temporary,
+		isolated local debugging; projects must override this example value.
 	-->
 	<management>
 		<adminToken> 8be0f32909da7702f7cf2424af6e9422b4881f70bd5991f973424fed24004e5e </adminToken>
 	</management>
 	
-	<!-- 每秒发送到客户端的带宽限制(bit) 
-		(The data sent to the client, the second bandwidth limit (bit))
+	<!-- 单客户端发送带宽限制，单位 bit/s。设置过低会造成发送积压，过高会放大慢客户端
+		和瞬时流量对组件 Tick 的影响。
+		Per-client send bandwidth limit in bits per second. Too low builds a send backlog; too high
+		amplifies slow-client and burst-traffic impact on the component tick.
 	-->
 	<bitsPerSecondToClient> 20000 </bitsPerSecondToClient>				<!-- Type: Integer -->
 	
-	<!-- 非0则不优化， 不带包长信息的包强制都携带长度信息， 某些情况下方便某些前端对接协议
-	什么样的包不带长度信息? 所有能够预先计算出包大小的且永远不变的包不带长度信息， 
-	如果有可变字符串参数则一定需要带长度信息
-	(Non-0 is not optimized, Force all packets contain length information, Some convenient docking protocol client.
-	What of data packet length information does not? All packages can be calculated in advance 
-	and never change the size of the package with no length information.) 
+	<!-- 非 0 时固定长度消息也强制携带包长，便于某些客户端协议实现；0 保留默认协议优化。
+		可预先确定大小的固定消息通常省略包长，可变长度消息始终携带包长。
+		When non-zero, fixed-size messages also carry a length field for clients that require it; zero
+		keeps the normal protocol optimization. Variable-size messages always carry their length.
 	-->
 	<packetAlwaysContainLength> 0 </packetAlwaysContainLength>
 	
-	<!-- 是否需要将任何接收和发送的包以文本输出到log中提供调试
-		(Whether the contents of the log output packet)
+	<!-- 将收发包内容输出到日志用于临时诊断。包格式化和独立日志会增加 CPU、磁盘 IO 及
+		Logger 网络流量，不应在高负载环境长期启用。
+		Dump sent and received packets for temporary diagnostics. Formatting and packet logs add CPU,
+		disk I/O and Logger traffic and should not remain enabled under production load.
 		
 		debug_type:
 			0: 不输出(Not output)
@@ -49,7 +65,7 @@
 			是否独立一个log文件来记录包内容，文件名通常为
 			(Whether the use of other log files ? such as:)
 			appname_packetlogs.log
-		disable_msgs:
+		disables/item:
 			关闭某些包的输出
 			(Some messages are not output)
 	-->
@@ -95,9 +111,10 @@
 		</disables>
 	</trace_packet>
 	
-	<!-- 是否输出entity的创建， 脚本获取属性， 初始化属性等调试信息， 以及def信息 
-		(Whether the output the logs: create the entity, Script get attributes, 
-			Initialization attributes information, Def information.)
+	<!-- 输出 Entity 创建、属性访问、初始化和 EntityDef 调试信息。该日志位于高频路径，
+		正式环境不要长期启用。
+		Log Entity creation, property access, initialization and EntityDef diagnostics. This is a
+		hot-path diagnostic and should not remain enabled in production.
 	-->
 	<debugEntity> 0 </debugEntity>
 
@@ -111,8 +128,9 @@
 		-->
 		<state> 0 </state>
 
-		<!-- 脚本层发布的版本号
-			(Script layer released version number)
+		<!-- 客户端登录和协议检查使用的脚本版本标识；发布新客户端逻辑时由项目维护。
+			Script version identifier used during client login and compatibility checks; update it when
+			releasing new client-side game logic.
 		 -->
 		<script_version> 0.1.0 </script_version>
 	</publish>
@@ -126,8 +144,10 @@
 			<external> 60.0 </external>
 		</timeout>
 		
-		<!-- socket读写缓冲大小 
-			(socket send/recv buffer size)
+		<!-- Socket 读写缓冲区大小，单位字节；0 使用操作系统默认值。内部通道较大的缓冲区
+			会减少突发阻塞，但会增加每个连接可能占用的内核内存。
+			Socket send/receive buffer sizes in bytes; zero uses the operating-system default. Larger
+			internal buffers absorb bursts but increase potential kernel memory per connection.
 		-->
 		<readBufferSize> 
 			<internal>	16777216	</internal> 			<!-- 16M -->
@@ -149,8 +169,10 @@
 			<maxProcessingTimeMS> 8 </maxProcessingTimeMS>
 		</completionBudget>
 		
-		<!-- 发送与接收窗口溢出值，0无限制
-			(the value of the send/receive window overflow, 0 is unlimited)
+		<!-- 发送与接收窗口阈值。messages 按消息数、bytes 按字节数、tickSentBytes 按单 Tick
+			发送量限制；0 表示不限制。critical 是告警或处置阈值，不会预分配对应大小的队列。
+			Send/receive window thresholds. messages counts messages, bytes counts bytes, and tickSentBytes
+			limits one tick's output; zero is unlimited. critical is an alert/action threshold, not preallocation.
 		-->
 		<windowOverflow>
 			<send>
@@ -199,8 +221,10 @@
 		 -->
 		<encrypt_type> 1 </encrypt_type>
 
-		<!-- 可靠 UDP/KCP 队列和重传参数。
-			Reliable UDP/KCP queue and retransmission settings. -->
+		<!-- 可靠 UDP/KCP 队列和重传参数。队列值以数据段计数，设置过大会增加单连接内存和
+			网络突发，设置过小会在丢包或 Tick 抖动时过早触发拥塞处置。
+			Reliable UDP/KCP queue and retransmission settings. Queue sizes count segments; values that are
+			too large increase per-channel memory and bursts, while small values react too early to loss or tick jitter. -->
 		<reliableUDP>
 			<readPacketsQueueSize>
 				<internal> 1024 </internal>
@@ -224,20 +248,35 @@
 			<!-- 外部 KCP 达到高水位时暂停对应 Cell Witness 的位置更新，降到低水位后恢复；high=0 表示关闭。
 				Pause positional updates for the matching Cell Witness at the high watermark and resume below low; high=0 disables it. -->
 			<volatileBackpressure>
+				<!-- highSegments/highBytes 任一达到高水位时暂停对应 Witness 的位置/方向生产；
+					两项都回落到 lowSegments/lowBytes 后恢复。高水位为 0 时关闭对应判断，
+					低水位会被限制在高水位以内。
+					Pause matching Witness position/direction production when either high watermark is reached;
+					resume after both values fall below their low watermarks. A zero high value disables that test. -->
 				<highSegments> 128 </highSegments>
 				<lowSegments> 32 </lowSegments>
 				<highBytes> 32768 </highBytes>
 				<lowBytes> 8192 </lowBytes>
 			</volatileBackpressure>
+			<!-- KCP 更新周期和最小重传超时，单位毫秒；过低会增加 CPU、重传和网络放大。
+				KCP update interval and minimum retransmission timeout in milliseconds; overly small values
+				increase CPU usage, retransmissions and network amplification. -->
 			<tickInterval> 10 </tickInterval>
 			<minRTO> 50 </minRTO>
+			<!-- 快速重传前允许跳过的 ACK 次数。
+				Number of skipped ACKs before fast retransmission. -->
 			<missAcksResend> 2 </missAcksResend>
+			<!-- KCP MTU；0 使用实现默认值。公网部署需结合路径 MTU 验证，避免 IP 分片。
+				KCP MTU; zero uses the implementation default. Validate against the path MTU to avoid IP fragmentation. -->
 			<mtu> 0 </mtu>
+			<!-- 是否启用 KCP 拥塞控制，以及是否启用低延迟模式。
+				Enable KCP congestion control and low-latency mode respectively. -->
 			<congestionControl> false </congestionControl>
 			<nodelay> true </nodelay>
 		</reliableUDP>
 
-		<!-- Certificate file required for HTTPS/WSS/SSL communication -->
+		<!-- HTTPS、WSS 或 SSL 通道使用的证书和私钥路径，按 KBE_RES_PATH 解析。
+			Certificate and private-key paths for HTTPS, WSS or SSL channels, resolved through KBE_RES_PATH. -->
 		<sslCertificate> key/server_cert.pem </sslCertificate>
 		<sslPrivateKey> key/server_key.pem </sslPrivateKey>
 	</channelCommon> 
@@ -275,11 +314,14 @@
 	</urlopen>
 	
 	<thread_pool>
-		<!-- 默认超时时间(秒) 
-			(default timeout(seconds))
+		<!-- 线程任务默认超时时间，单位秒。
+			Default worker-task timeout in seconds.
 		-->
 		<timeout> 300.0 </timeout>
-		
+		<!-- 初始创建线程数、空闲时预创建线程数和最大线程数。提高这些值会增加栈内存，
+			并可能放大数据库及 IO 后端的并发压力。
+			Initial thread count, idle pre-created count and maximum thread count. Higher values consume
+			more stack memory and may amplify concurrency against database and I/O backends. -->
 		<init_create> 1 </init_create>
 		<pre_create> 2 </pre_create>
 		<max_create> 8 </max_create>
@@ -291,59 +333,66 @@
 	<email_service_config>server/email_service_defaults.xml</email_service_config>
 		
 	<interfaces>
-		<!-- 脚本入口模块， 相当于main函数 
-			(Entry module, like the main-function)
+		<!-- Python 入口模块，默认加载 kbemain。
+			Python entry module; kbemain is loaded by default.
 		-->
 		<entryScriptFile> kbemain </entryScriptFile>
 		
-		<!-- interfaces的地址，多组游戏服务端可以共用一个interfaces
-			(interfaces address, multiple gameserver can share a interfaces)
+		<!-- Interfaces 服务地址和监听端口范围，多组游戏服务可共享一个 Interfaces。
+			port_max 为 0 时从 port_min 开始选择可用端口。
+			Interfaces service address and listening port range; multiple game clusters may share one
+			Interfaces service. A zero port_max selects an available port starting at port_min.
 		-->
 		<host> localhost </host>
 		<port_min> 30099 </port_min>
 		<port_max> 30199 </port_max>
 		
-		<!-- 订单超时(秒) 
-			(Orders timeout(seconds))
+		<!-- 订单或外部请求上下文超时，单位秒。
+			Order or external-request context timeout in seconds.
 		-->
 		<orders_timeout> 3600 	</orders_timeout>
 		
-		<!-- listen监听队列最大值
-		    (listen: Maximum listen queue)
+		<!-- TCP listen backlog，最终有效值还受操作系统 SOMAXCONN 上限约束。
+			TCP listen backlog; the operating-system SOMAXCONN limit still applies.
 		 -->
 		<SOMAXCONN> 511 </SOMAXCONN>
 		
-		<!-- Telnet服务, 如果端口被占用则向后尝试33001.. 
-			(Telnet service, if the port is occupied backwards to try 33001)
+		<!-- Telnet 调试服务。端口占用时向后尝试；正式环境必须修改密码并限制网络访问。
+			Telnet diagnostics service. Later ports are tried when occupied; change the password and
+			restrict network access in production.
 		-->
 		<telnet_service>
 			<port> 33000 </port>
 			<password> pwd123456 </password>
-			<!-- 命令默认层 
-				(layer of default the command)
+			<!-- 连接后使用的默认命令层，通常为 python。
+				Default command layer selected after connection, normally python.
 			-->
 			<default_layer> python </default_layer>
 		</telnet_service>
 	</interfaces>
 	
 	<dbmgr>
-		<!-- 脚本入口模块， 相当于main函数 
-			(Entry module, like the main-function)
+		<!-- Python 入口模块，默认加载 kbemain。
+			Python entry module; kbemain is loaded by default.
 		-->
 		<entryScriptFile> kbemain </entryScriptFile>
 			
-		<!-- debug模式下可输出读写操作信息
-		    (Debug mode can output the read and write informations)
+		<!-- 输出数据库读写调试信息，会显著增加日志量，正式环境不要长期启用。
+			Log database read/write diagnostics; this can substantially increase log volume and should
+			not remain enabled in production.
 		 -->
 		<debug> false </debug>
 
-		<!-- 是否共享数据库
-		    (Whether to share the database)
+		<!-- 是否允许多个服务组共享数据库。启用前必须明确账号、Entity ID、表结构和服务组隔离策略。
+			Allow multiple server clusters to share the database. Define account, Entity ID, schema and
+			cluster-isolation rules before enabling it.
 		 -->
 		<shareDB> false </shareDB>
 		
-		<!-- 是否检查defs-MD5
-			(Check whether the defs-MD5) 
+		<!-- 是否允许客户端使用空 EntityDef 摘要。false 会保持协议一致性检查；不要用 true
+			作为绕过 SDK 或 EntityDef 不一致的常规方案。
+			Allow an empty client EntityDef digest. False preserves compatibility checks; do not use true
+			as a routine workaround for stale SDK or EntityDef data.
 		-->
 		<allowEmptyDigest> false </allowEmptyDigest>					<!-- Type: Boolean -->
 		
@@ -358,6 +407,10 @@
 			Separate words with commas; matching is case-insensitive and loaded independently for each backend.
 		-->
 		<rawDatabaseCommandBlacklist>
+			<!-- enable 只控制脚本 executeRawDatabaseCommand 的黑名单过滤，不替代最小权限数据库账号、
+				审计和备份。各后端规则为英文逗号分隔且不区分大小写。
+				enable only filters script-issued executeRawDatabaseCommand calls; it does not replace
+				least-privilege database accounts, auditing or backups. Rules are comma-separated and case-insensitive. -->
 			<enable> false </enable>
 			<mysql>delete,drop,truncate,alter,rename,replace,grant,revoke,flush,lock,unlock,shutdown,load_file,load data,outfile,dumpfile,handler,optimize,repair,analyze,reset</mysql>
 			<mongodb>drop,dropDatabase,delete,deleteOne,deleteMany,remove,findAndModify,findOneAndDelete,findOneAndReplace,renameCollection,eval,mapReduce,createUser,updateUser,dropUser,grantRolesToUser,revokeRolesFromUser,shutdown,shutdownServer,fsync,auth,logout,createIndexes,dropIndexes</mongodb>
@@ -368,16 +421,20 @@
 			(Address of Interfaces process)
 		-->
 		<InterfacesServiceAddr>
-			<!-- 如果enable为false则相关数据不转发到Interfaces进程 
-				注意：如果为true，dbmgr认为数据将由interfaces交给第三方平台处理
+			<!-- false 时不向 Interfaces 转发相关账号和外部服务请求；true 时 DBMgr 认为这些请求
+				由 Interfaces 或其第三方平台处理。
+				When false, related account and external-service requests are not forwarded. When true,
+				DBMgr delegates them to Interfaces or its third-party platform.
 			-->
 			<enable> true </enable>
 
-			<!-- 如果为true，则自动将配置中的Interfaces地址加入到地址池，以免改动Interfaces端口需要修改多处
+			<!-- true 时自动把根级 interfaces.host/port 范围加入地址池，避免重复维护地址。
+				Automatically add the root interfaces host/port range to the pool to avoid duplicate configuration.
 			-->
 			<addDefaultAddress> true </addDefaultAddress>
 
-			<!-- 可额外的添加多个interfaces到地址池分担压力
+			<!-- 可增加多个 item/host/port 分担 Interfaces 请求压力。
+				Additional item/host/port entries may distribute Interfaces request load.
 			<item>
 				<host>	 localhost1	</host>
 				<port>	 30098		</port>
@@ -385,26 +442,26 @@
 			-->
 		</InterfacesServiceAddr>
 
-		<!-- 数据库接口 
-			(database interfaces)
+		<!-- 每个子节点定义一个命名数据库接口，至少必须存在 default。
+			Each child defines a named database interface; default is required.
 		-->
 		<databaseInterfaces>
-			<!-- 数据库接口名称 （可以定义多个不同的接口，但至少存在一个default）
-				（Database interface name)
+			<!-- default 是 Entity 持久化使用的默认接口，也可按同样结构增加其他命名接口。
+				default is the Entity persistence interface; other named interfaces may use the same structure.
 			-->
 			<default>
-				<!-- 如果为true，则为纯净的数据库，引擎不创建实体表 
-					（If true is pure database, engine does not create the entity table)
+				<!-- true 时作为纯业务数据库连接，引擎不会在其中创建 Entity 表。
+					When true, use this as an application-only database connection and do not create Entity tables.
 				-->
 				<pure> false </pure>
 
-				<!-- 数据库类型 （mysql、mongodb、postgresql）
-					（Database type(mysql, mongodb, postgresql))
+				<!-- 数据库后端类型：mysql、mongodb 或 postgresql。
+					Database backend type: mysql, mongodb or postgresql.
 				-->
 				<type> mysql </type>											<!-- Type: String -->
 
-				<!-- 数据库地址 
-					（Database address)
+				<!-- 数据库地址和端口；port 为 0 时使用对应驱动的默认端口。
+					Database host and port; zero uses the selected driver's default port.
 				-->
 				<host> 127.0.0.1 </host>										<!-- Type: String -->
 				<port> 0 </port>												<!-- Type: Integer -->
@@ -417,8 +474,9 @@
 				<!-- Initial ID for new MySQL auto-increment tables in Default mode; existing schemas require an explicit database migration when switching modes. -->
 				<autoIncrementInit> 1 </autoIncrementInit>
 
-				<!-- 数据库账号验证 
-					（Database auth)
+				<!-- 数据库认证信息。不要把生产凭据提交到仓库，应通过受控覆盖配置或 Secret 注入。
+					Database credentials. Do not commit production secrets; inject them through controlled
+					configuration overrides or a secret-management system.
 				-->
 				<auth>  
 					<username> kbe </username>									<!-- Type: String -->
@@ -428,8 +486,8 @@
 						 MongoDB can use a separate authentication database here (for example, admin); empty uses databaseName. -->
 					<authSource>  </authSource>								<!-- Type: String -->
 					
-					<!-- 为true则表示password是加密(rsa)的, 可防止明文配置 
-						(is true, password is RSA)
+					<!-- true 表示 password 使用引擎约定的 RSA 密文；填写明文密码时必须设为 false。
+						True means password contains engine-format RSA ciphertext; set false for plaintext input.
 					-->
 					<encrypt> true </encrypt>
 
@@ -453,13 +511,16 @@
 				-->
 				<databaseName> kbe </databaseName> 								<!-- Type: String -->
 				
-				<!-- 数据库允许的连接数 
-					(Number of connections allowed by the database)
+				<!-- 连接池大小。提高它会增加进程内存、数据库并发和服务端连接数，应结合慢查询与
+					数据库容量压测。
+					Connection-pool size. Higher values increase process memory, database concurrency and server
+					connections; tune against slow queries and database capacity.
 				-->
 				<numConnections> 5 </numConnections>							<!-- Type: Integer -->
 				
-				<!-- 字符编码类型 
-					(Character encoding type)
+				<!-- MySQL 字符集和排序规则。utf8mb4 支持完整 Unicode；bin 排序保持字节级区分。
+					MySQL character set and collation. utf8mb4 supports full Unicode; bin collation preserves
+					byte-level distinctions.
 				-->
 				<unicodeString>
 					<characterSet> utf8mb4 </characterSet> 						<!-- Type: String -->
@@ -468,12 +529,13 @@
 			</default>
 		</databaseInterfaces>
 
-		<!-- 账号系统
-			(Account system)
+		<!-- 内建账号流程配置。它只定义引擎账号行为，项目仍需在脚本层实现相应验证和业务策略。
+			Built-in account-flow settings. These define engine behavior; matching validation and business
+			policies must still be implemented by project scripts.
 		-->
 		<account_system>
-			<!-- 账号Entity的名称
-			    (Name of AccountEntity)
+			<!-- 登录成功后使用的账号 Entity 类型名。
+				Account Entity type created after successful login.
 			 -->
 			<accountEntityScriptType>	Account	</accountEntityScriptType>
 			
@@ -485,8 +547,8 @@
 			-->
 			<accountDefaultFlags> 0 </accountDefaultFlags>							<!-- Type: Integer -->
 			
-			<!-- 新账号默认过期时间(秒, 引擎会加上当前时间) 
-				(New account default expiration time (seconds, the engine will add the current time))
+			<!-- 新账号有效期，单位秒，引擎会加上当前时间；0 表示不额外设置期限。
+				New-account lifetime in seconds, added to the current time; zero adds no deadline.
 			-->
 			<accountDefaultDeadline> 0 </accountDefaultDeadline>						<!-- Type: Integer -->
 
@@ -494,8 +556,8 @@
 				(Account reset password)
 			-->
 			<account_resetPassword>
-				<!-- 是否开放重设密码
-					(Whether open reset password)
+				<!-- 是否开放密码重置流程；启用时还需正确配置 Interfaces 和邮件服务。
+					Enable password reset; Interfaces and the email service must also be configured correctly.
 				-->
 				<enable>	false	</enable>
 			</account_resetPassword>
@@ -504,13 +566,15 @@
 				(Account registration)
 			-->
 			<account_registration> 
-				<!-- 是否开放注册 
-					(Whether open registration)
+				<!-- 是否允许创建新账号。
+					Allow creation of new accounts.
 				-->
 				<enable>	false	</enable>
 				
-				<!-- 登录合法时游戏数据库找不到游戏账号则自动创建 
-					(When logged in, the game database can not find the game account is automatically created)
+				<!-- 登录验证通过但游戏数据库中不存在账号时是否自动创建。正式环境应结合防刷、
+					限流和账号审计策略使用。
+					Automatically create an account after valid authentication when none exists in the game
+					database. Combine with abuse prevention, rate limiting and account auditing in production.
 				-->
 				<loginAutoCreate> false </loginAutoCreate>
 			</account_registration>
@@ -528,8 +592,10 @@
 			<default_layer> python </default_layer>
 		</telnet_service>
 		
-		<!-- entityID分配器，进入溢出范围则请求获取新的ID资源 
-			(The entityID allocator, enter the overflow area will get the new ID's)
+		<!-- 本地 Entity ID 资源低于 increasing_range 时向管理器申请新范围。过小会增加申请频率，
+			过大会扩大一次预留范围。
+			Request a new Entity ID range when local resources fall below increasing_range. Small values
+			increase request frequency; large values reserve a wider range at once.
 		-->
 		<ids>
 			<increasing_range> 2000 </increasing_range>				<!-- Type: Integer -->
@@ -542,13 +608,15 @@
 	</dbmgr>
 	
 	<cellapp>
-		<!-- 脚本入口模块， 相当于main函数 
-			(Entry module, like the main-function)
+		<!-- Python 入口模块，默认加载 kbemain。
+			Python entry module; kbemain is loaded by default.
 		-->
 		<entryScriptFile> kbemain </entryScriptFile>
 		
-		<!-- 默认View半径, 脚本中可以改变它 
-			(Default View radius, the script can change it)
+		<!-- 默认 View 半径及离开 View 时使用的滞回区域。脚本可通过 Entity.setViewRadius 修改半径；
+			hysteresisArea 可减少边界附近反复 Enter/Leave。
+			Default View radius and leave hysteresis. Scripts may change the radius with Entity.setViewRadius;
+			hysteresisArea reduces repeated Enter/Leave events near the boundary.
 		-->
 		<defaultViewRadius>			
 			<radius> 80.0 </radius>
@@ -572,15 +640,17 @@
 		-->
 		<internalInterface>  </internalInterface>
 		
-		<!-- entityID分配器，进入溢出范围则请求获取新的ID资源 
-			(The entityID allocator, enter the overflow area will get the new ID's)
+		<!-- 本地 Entity ID 数量低于该阈值时申请新批次。过小会增加跨组件申请频率。
+			Request another Entity ID batch below this local threshold. Small values increase cross-component requests.
 		-->
 		<ids>
 			<criticallyLowSize> 1000 </criticallyLowSize>				<!-- Type: Integer -->
 		</ids>
 		
-		<!-- 程序的性能分析
-			（Analysis of program performance） 
+		<!-- 启动即开启的 C++、Python、事件和网络性能采集。采集会增加运行时与退出导出开销，
+			只应在诊断窗口启用。
+			Start C++, Python, event and network profiling at process startup. Profiling adds runtime and
+			exit-report overhead and should be enabled only during diagnostics.
 		-->
 		<profiles>
 			<!-- 如果设置为true，引擎启动时就会开始记录相关profile信息， 进程退出后将导出一份报告 
@@ -593,22 +663,25 @@
 			<networkprofile> false </networkprofile>
 		</profiles>
 		
-		<!-- 负载平衡滤波器指标值
-			（Load balancing Smoothing Bias value） 
+		<!-- 负载平滑系数，用于降低瞬时抖动对负载均衡决策的影响。
+			Load-smoothing bias used to reduce transient jitter in balancing decisions.
 		-->
 		<loadSmoothingBias> 0.01 </loadSmoothingBias>
 		
+		<!-- Cell 边界 Ghost 区域距离，以及单次 Ghost 检查最多处理的 Entity 数量。
+			更大的距离或批量会增加跨 Cell 内存、消息量和单 Tick 工作。
+			Cell-boundary Ghost distance and maximum Entities handled by one Ghost check. Larger distances
+			or batches increase cross-cell memory, traffic and per-tick work. -->
 		<ghostDistance> 500.0 </ghostDistance>
 		<ghostingMaxPerCheck> 64 </ghostingMaxPerCheck> <!-- Type: Integer -->
 		
-		<!-- ghost更新频率 
-			(Update frequency process)
+		<!-- Ghost 更新频率，单位 Hz。过高会增加跨 Cell 消息和 Tick 压力。
+			Ghost update frequency in Hz. Higher values increase cross-cell traffic and tick pressure.
 		-->
 		<ghostUpdateHertz> 30 </ghostUpdateHertz>		<!-- Type: Integer -->
 		
-		<!-- 是否使用坐标系统, 如果设置为false， 那么View、Trap、 Move等功能将不可用 
-			(Whether the use of coordinate-system, if is false, 
-			View, Trap, Move and other functions will not be available)
+		<!-- 坐标系统总开关。false 时 View、Trap、Move 等空间能力不可用。
+			Master coordinate-system switch. View, Trap, Move and related spatial features are unavailable when false.
 		-->
 		<coordinate_system> 
 			<enable> true </enable>
@@ -660,6 +733,12 @@
 				and methods remain immediate. Stable entity-ID phasing avoids synchronized encoding bursts.
 			-->
 			<witness_volatile_lod>
+				<!-- View 内 Entity 少于 minimumViewEntities 时每 Tick 更新；nearDistance 内每 Tick 更新；
+					near 到 medium 使用 mediumIntervalTicks，超过 medium 使用 farIntervalTicks。
+					两个间隔限制在 1-64，mediumDistance 不小于 nearDistance。
+					Update every tick below minimumViewEntities and within nearDistance; use mediumIntervalTicks
+					between near and medium, then farIntervalTicks beyond medium. Intervals clamp to 1-64 and
+					mediumDistance cannot be less than nearDistance. -->
 				<enable> true </enable>
 				<minimumViewEntities> 32 </minimumViewEntities>
 				<nearDistance> 20 </nearDistance>
@@ -668,10 +747,12 @@
 				<farIntervalTicks> 4 </farIntervalTicks>
 			</witness_volatile_lod>
 						
-			<!-- 实体位置更新方式，
+			<!-- 实体位置更新协议：
 				0：直接同步高精度浮点数据，View范围无限制。 
-				1：优化同步，降低海量同屏时带宽使用，有小许精度损耗，View范围限制在500以内。 
-				2：智能选择模式，当同屏人数小于等于smartThreshold时使用0方式同步，否则使用1方式。View范围限制在500以内。
+				1：紧凑同步，降低高同屏带宽，存在少量精度损耗，View范围限制在500以内。
+				2：同屏数量小于等于 smartThreshold 时使用0，否则使用1；View范围限制在500以内。
+				Entity position protocol: 0 sends full-precision floats; 1 uses compact encoding with minor
+				precision loss; 2 selects 0 at or below smartThreshold and 1 above it. Compact/smart View is limited to 500.
 			-->
 			<entity_posdir_updates> 
 				<type> 2 </type>
@@ -723,13 +804,15 @@
 	</cellapp>
 	
 	<baseapp>
-		<!-- 脚本入口模块， 相当于main函数 
-			(Entry module, like the main-function)
+		<!-- Python 入口模块，默认加载 kbemain。
+			Python entry module; kbemain is loaded by default.
 		-->
 		<entryScriptFile> kbemain </entryScriptFile>
 
-		<!-- 指定接口地址，可配置网卡名、MAC、IP
-			（Interface address specified, configurable NIC/MAC/IP） 
+		<!-- internalInterface 用于组件内部通信，externalInterface 用于客户端连接；可填写网卡名、
+			MAC 或 IP。多网卡和容器部署建议显式配置。
+			internalInterface serves component traffic and externalInterface serves clients; values may be
+			NIC names, MAC addresses or IPs. Configure explicitly on multi-NIC or container deployments.
 		-->
 		<internalInterface>  </internalInterface>
 		<externalInterface>  </externalInterface>						<!-- Type: String -->
@@ -744,26 +827,27 @@
 		-->
 		<externalAddress>  </externalAddress>							<!-- Type: String -->
 		
-		<!-- 暴露给客户端的端口范围
-			（Exposed to the client port range） 
+		<!-- 客户端游戏连接端口范围：TCP 用于 TCP 通道，UDP 用于 KCP 通道。
+			Client gameplay port ranges: TCP for TCP channels and UDP for KCP channels.
 		-->
 		<externalTcpPorts_min> 20015 </externalTcpPorts_min>			<!-- Type: Integer -->
 		<externalTcpPorts_max> 20019 </externalTcpPorts_max>			<!-- Type: Integer -->
 		<externalUdpPorts_min> 20005 </externalUdpPorts_min>			<!-- Type: Integer -->
 		<externalUdpPorts_max> 20009 </externalUdpPorts_max>			<!-- Type: Integer -->
 
-		<!-- 自动存档的时间周期(秒)
-			（Automatic archiving time period(secs)） 
+		<!-- 自动归档 Entity 的周期，单位秒。缩短周期会增加脚本回调和数据库写入压力。
+			Automatic Entity archive period in seconds. Shorter periods increase callback and database-write load.
 		-->
 		<archivePeriod> 300 </archivePeriod> 							<!-- Type: Float -->
 		
-		<!-- 自动备份的时间(秒)
-			（Automatic backup time period(secs)） 
+		<!-- 自动备份 Entity 的周期，单位秒。缩短周期会增加 BaseApp/CellApp 间消息和内存复制。
+			Automatic Entity backup period in seconds. Shorter periods increase BaseApp/CellApp traffic and copying.
 		-->
 		<backupPeriod> 300 </backupPeriod>								<!-- Type: Float -->
 		
-		<!-- 是否备份未定义的属性
-			（Whether backup undefined property） 
+		<!-- 是否保留已从当前 EntityDef 删除、但旧备份数据仍携带的属性。仅在明确需要迁移旧备份时启用。
+			Preserve properties removed from the current EntityDef but still present in old backups. Enable only
+			when an explicit legacy-backup migration requires it.
 		-->
 		<backUpUndefinedProperties> 0 </backUpUndefinedProperties>		<!-- Type: Boolean -->
 
@@ -772,23 +856,25 @@
 		-->
 		<loadSmoothingBias> 0.01 </loadSmoothingBias>
 
-		<!-- 资源下载带宽限制
-			（Download bandwidth limits） 
+		<!-- 资源下载总带宽和单客户端带宽限制，单位 bit/s。总值应不小于合理的单客户端值；
+			提高限制会增加 BaseApp 网络和慢客户端积压风险。
+			Total and per-client resource-download bandwidth limits in bits per second. Keep the total sensible
+			relative to the per-client value; higher limits increase BaseApp network and slow-client backlog risk.
 		-->
 		<downloadStreaming>
 			<bitsPerSecondTotal> 1000000 </bitsPerSecondTotal>			<!-- Type: Int -->
 			<bitsPerSecondPerClient> 100000 </bitsPerSecondPerClient>	<!-- Type: Int -->
 		</downloadStreaming>
 
-		<!-- entityID分配器，进入溢出范围则请求获取新的ID资源 
-			(The entityID allocator, enter the overflow area will get the new ID's)
+		<!-- 本地 Entity ID 数量低于该阈值时申请新批次。过小会增加跨组件申请频率。
+			Request another Entity ID batch below this local threshold. Small values increase cross-component requests.
 		-->
 		<ids>
 			<criticallyLowSize> 1000 </criticallyLowSize>				<!-- Type: Integer -->
 		</ids>
 		
-		<!-- 当灾难发生后，baseapp进行灾难恢复时，每次恢复entity的数量 
-			(When after the disaster, When baseapp recovery, Each time the number of recovery entity's)
+		<!-- 灾难恢复时每批恢复的 Entity 数量。批量过大会造成单 Tick CPU、内存和数据库突发。
+			Entities restored per disaster-recovery batch. Large batches create CPU, memory and database bursts.
 		-->
 		<entityRestoreSize> 32 </entityRestoreSize>
 		
@@ -827,26 +913,27 @@
 			(Parameter server shutdown process)
 		-->
 		<shutdown>
-			<!-- 每秒销毁base的数量
-				(The destroy of the per-seconds base's)
+			<!-- 正常关服阶段每秒销毁的 Base Entity 数量。过大会放大销毁回调和持久化峰值，
+				过小会延长关服时间。
+				Base Entities destroyed per second during orderly shutdown. Large values amplify callback and
+				persistence spikes; small values extend shutdown.
 			-->
 			<perSecsDestroyEntitySize> 100 </perSecsDestroyEntitySize>
 		</shutdown>
 		
 		<respool>
-			<!-- 缓冲区大小也等于资源大小， 在这个KB大小范围以内的资源才可以进入资源池 
-				(Buffer size is equal to the size of resources, 
-				Less than the buffer resources before they can enter the resource pool)
+			<!-- 可进入资源池的最大单资源大小，单位 KB。提高它会增加缓存内存上限。
+				Maximum individual resource size admitted to the pool, in KB. Higher values increase cache memory exposure.
 			-->
 			<buffer_size> 1024 </buffer_size>
 			
-			<!-- 资源池中的资源超过这个时间未被访问则销毁(秒) 
-			(Resources have not been accessed overtime will be destroyed (s))
+			<!-- 资源在池内超过该时间未访问后销毁，单位秒。
+				Destroy pooled resources after this many seconds without access.
 			-->
 			<timeout> 600 </timeout>
 			
-			<!-- 资源池检查tick(秒) 
-				(Resource pool check tick (secs))
+			<!-- 资源池过期检查周期，单位秒。更短会提高回收及时性，也会增加扫描频率。
+				Resource-pool expiry scan period in seconds. Shorter values reclaim sooner but scan more often.
 			-->
 			<checktick>60</checktick>
 		</respool>
@@ -889,8 +976,8 @@
 	</baseappmgr>
 	
 	<loginapp>
-		<!-- 脚本入口模块， 相当于main函数 
-			(Entry module, like the main-function)
+		<!-- Python 入口模块，默认加载 kbemain。
+			Python entry module; kbemain is loaded by default.
 		-->
 		<entryScriptFile> kbemain </entryScriptFile>
 		
@@ -910,8 +997,10 @@
 		-->
 		<externalAddress>  </externalAddress>							<!-- Type: String -->
 		
-		<!-- 暴露给客户端的端口范围
-			（Exposed to the client port range） 
+		<!-- LoginApp 客户端监听端口范围。TCP max=0 时从 min 开始选择可用端口；UDP 的 -1
+			表示不提供 UDP 登录端口，登录阶段始终使用 TCP。
+			LoginApp client port ranges. TCP max=0 selects an available port starting at min; UDP -1 disables
+			the UDP login listener. Login always uses TCP.
 		-->
 		<externalTcpPorts_min> 20013 </externalTcpPorts_min>			<!-- Type: Integer -->
 		<externalTcpPorts_max> 0 </externalTcpPorts_max>				<!-- Type: Integer -->
@@ -940,9 +1029,10 @@
 		-->
 		<account_type> 3 </account_type>
 		
-		<!-- http回调接口，处理认证、密码重置等 
-			（注意：http_cbhost一般会被引擎替换为externalInterface或者externalAddress，仅第一个loginapp才会开启这个服务）
-			(Http-callback interface, handling authentication, password reset, etc.)
+		<!-- 认证、激活和密码重置等 HTTP 回调服务地址。通常只有首个 LoginApp 开启，host 可能
+			被 externalInterface 或 externalAddress 替换。
+			HTTP callback service for authentication, activation and password reset. Normally only the first
+			LoginApp enables it, and host may be replaced by externalInterface or externalAddress.
 		-->
 		<http_cbhost> localhost </http_cbhost>
 		<http_cbport> 21103 </http_cbport>
@@ -961,15 +1051,16 @@
 	</loginapp>		
 	
 	<machine>
-		<!-- 暴露给客户端的端口范围
-			（Exposed to the tools port range） 
+		<!-- 工具和管理连接使用的 TCP 端口范围；max=0 时从 min 开始选择可用端口。
+			TCP port range used by tools and management clients; max=0 selects an available port from min.
 		-->
 		<externalTcpPorts_min> 20099 </externalTcpPorts_min>			<!-- Type: Integer -->
 		<externalTcpPorts_max> 0 </externalTcpPorts_max>				<!-- Type: Integer -->
 		
-		<!-- 服务组使用多台硬件组成网络，在某些网络环境由于路由器的设置不允许UDP广播造成跨物理机组网不成功时
-			可在此填入所有相关物理机的地址，引擎将会向具体的地址发送探测包来完成组网。
-			（When the network is composed of a plurality of hardware, the specific network address is detected.） 
+		<!-- UDP 广播无法跨主机发现组件时，在 addresses/item 中显式填写需要探测的主机地址。
+			当前 Machine 不再读取 externalUdpPorts_min/max，不要保留旧配置节点。
+			When UDP broadcast cannot discover components across hosts, list explicit probe destinations in
+			addresses/item. Machine no longer reads externalUdpPorts_min/max; remove those legacy nodes.
 		-->
 		<addresses>
 			<!--<item> 127.0.0.1 </item>-->
@@ -978,46 +1069,49 @@
 	</machine>
 	
 	<bots>
-		<!-- 脚本入口模块， 相当于main函数 
-			(Entry module, like the main-function)
+		<!-- Python 入口模块，默认加载 kbemain。
+			Python entry module; kbemain is loaded by default.
 		-->
 		<entryScriptFile> kbemain </entryScriptFile>
 			
-		<!-- 指定接口地址，可配置网卡名、MAC、IP
-			（Interface address specified, configurable NIC/MAC/IP） 
+		<!-- Bots 内部通信接口，可填写网卡名、MAC 或 IP。
+			Bots internal interface; accepts a NIC name, MAC address or IP.
 		-->
 		<internalInterface>  </internalInterface>
 		
-		<!-- 对应baseapp的externalAddress的解决方案，当externalAddress强制下发公网IP提供登陆时，
-			如果局域网内部使用机器人测试也走公网IP和流量可能会不合适，此时可以设置为true，登陆时强制直接使用内网环境。
-			Corresponding to baseapp->externalAddress solution, when externalAddress mandatory release of the public network to provide landing IP,
-			If the use of robot within the LAN test also take the public network IP and traffic may be inappropriate, can be set to true, 
-			when landing forced to use the internal network environment. -->
+		<!-- BaseApp 下发公网 externalAddress 时，true 让局域网 Bots 强制改用内网地址，避免压测
+			流量绕行公网；公网端到端测试应保持 false。
+			When BaseApp advertises a public externalAddress, true forces LAN Bots to use the internal address
+			and avoids routing load traffic over the public network. Keep false for public end-to-end tests. -->
 		<forceInternalLogin> false </forceInternalLogin>
 
-		<!-- LoginApp 始终使用 TCP；该选项只切换登录成功后的 BaseApp 游戏连接。
-			LoginApp always uses TCP; this option switches only the BaseApp gameplay connection. -->
+		<!-- 登录成功后的 BaseApp 游戏连接协议，可选 kcp 或 tcp；LoginApp 登录阶段始终使用 TCP。
+			纯协议压测必须固定该值，避免样本混杂。
+			BaseApp gameplay transport after login: kcp or tcp. LoginApp authentication always uses TCP.
+			Keep this fixed during protocol benchmarks so samples remain comparable. -->
 		<transport> kcp </transport>
 
 		<!-- KCP 建立失败时是否允许回退 TCP。纯 KCP 压测应设为 false，避免协议样本混杂。
 			Whether failed KCP setup may fall back to TCP. Set false for pure KCP benchmarks. -->
 		<allowTcpFallback> true </allowTcpFallback>
 		
-		<!-- loginapp地址 
-			（loginapp address)
+		<!-- LoginApp 地址和 TCP 端口范围；port_max=0 时从 port_min 开始选择可用端口。
+			LoginApp address and TCP port range; port_max=0 selects an available port from port_min.
 		-->
 		<host> localhost </host>										<!-- Type: String -->
 		<port_min> 20013 </port_min>									<!-- Type: Integer -->
 		<port_max> 0 </port_max>									<!-- Type: Integer -->
 		
-		<!-- 在Entity初始化时是否触发属性的set_*事件 -->
+		<!-- 客户端 Entity 初始化时是否触发属性 set_* 回调。关闭会改变 Bots 脚本初始化行为，
+			应与真实客户端 SDK 的预期保持一致。
+			Invoke property set_* callbacks during client Entity initialization. Disabling changes Bots script
+			initialization behavior; keep it aligned with the real client SDK expectation. -->
 		<isOnInitCallPropertysSetMethods> true </isOnInitCallPropertysSetMethods>
 		
-		<!-- 默认启动进程后自动添加这么多个机器人 
-			(After starting the process, automatically add some robots)
-			totalCount	： 添加总数量			(Add the total-number)
-			tickTime	： 每次添加所用时间(s)	(Interval time-secs)
-			tickCount	： 每次添加数量			(Each time you add the number of)
+		<!-- 启动后自动创建 Bots：totalCount 为总数，tickTime 为批次间隔（秒），tickCount 为每批数量。
+			批次过大会形成登录、数据库、AOI 和 Logger 瞬时峰值。
+			Automatically create Bots after startup: totalCount is total Bots, tickTime is batch interval in
+			seconds and tickCount is batch size. Large batches spike login, database, AOI and Logger load.
 		-->
 		<defaultAddBots> 
 			<totalCount> 10  </totalCount>								<!-- Type: Integer -->
@@ -1025,8 +1119,8 @@
 			<tickCount> 5  </tickCount>									<!-- Type: Integer -->
 		</defaultAddBots>
 		
-		<!-- 机器人账号相关 
-			(about bots-accounts)
+		<!-- Bots 账号生成和登录密码。压测应使用隔离账号并替换默认密码。
+			Bots account generation and login password. Use isolated load-test accounts and replace the default password.
 		-->
 		<account_infos>
 			<!-- 机器人账号名称的前缀 
@@ -1034,9 +1128,10 @@
 			-->
 			<account_name_prefix>		bot_	</account_name_prefix>
 			
-			<!-- 机器人账号名称的后缀递增, 0使用随机数递增， 否则按照填写的数递增 
-				注意：想让机器人每次登陆使用相同的账号请设置固定的bots程序启动时的cid参数，具体参考服务器启动脚本，机器人账号由"前缀+cid+后缀组成"。
-				(The account name suffix, 0 is the use of random number, Otherwise, use account_name_suffix_inc and increasing.)
+			<!-- 后缀增量为 0 时使用随机递增策略，否则按配置值递增。账号由前缀、Bots cid 和后缀组成；
+				固定 cid 可让多次测试复用相同账号序列。
+				A zero suffix increment uses randomized progression; otherwise the configured increment is used.
+				Accounts combine prefix, Bots cid and suffix. Fix cid to reuse the same account sequence across runs.
 			-->
 			<account_name_suffix_inc>	0		</account_name_suffix_inc><!-- Type: Integer -->
 
@@ -1057,8 +1152,8 @@
 	</bots>
 	
 	<logger>
-		<!-- 脚本入口模块， 相当于main函数 
-			(Entry module, like the main-function)
+		<!-- Python 入口模块，默认加载 kbemain。
+			Python entry module; kbemain is loaded by default.
 		-->
 		<entryScriptFile> kbemain </entryScriptFile>
 			
@@ -1067,13 +1162,17 @@
 		-->
 		<internalInterface>  </internalInterface>
 		
-		<!-- 单个app(baseapp, cellapp, 等等..)进程上, 一个tick最多缓存的log数量
-			（The number of single-process(baseapp, cellapp, etc..), The number of log a tick buffer.） 
+		<!-- 单个组件进程一个 Tick 最多缓存的日志数量。提高该值会扩大组件内存和突发日志量，
+			不能替代对高频日志源的治理。
+			Maximum logs buffered by one component in a tick. Higher values increase component memory and
+			log bursts and do not replace fixing excessive log producers.
 		-->
 		<tick_max_buffered_logs> 131070 </tick_max_buffered_logs>
 
-		<!-- 单个app(baseapp, cellapp, 等等..)进程上, 一个tick同步给logger的log数量
-			（The number of single-process(baseapp, cellapp, etc..), A tick synchronization to the number of logger） 
+		<!-- 单个组件一个 Tick 同步给 Logger 的日志数量；0 表示同步全部。设置上限可平滑内部网络
+			和磁盘 IO，但会增加组件侧日志积压及内存占用。
+			Logs sent from one component to Logger per tick; zero sends all. A limit smooths internal network
+			and disk I/O but increases component-side backlog and memory use.
 		-->
 		<tick_sync_logs> 0 </tick_sync_logs>
 
