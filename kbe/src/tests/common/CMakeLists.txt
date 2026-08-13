@@ -54,7 +54,11 @@ set_target_properties(kbe_test_cell_event_migration PROPERTIES FOLDER "Tests/Com
 if(MSVC)
 	target_compile_options(kbe_test_cell_event_migration PRIVATE /W4 /WX /utf-8)
 else()
-	target_compile_options(kbe_test_cell_event_migration PRIVATE -Wall -Wextra -Wpedantic -Werror)
+	# CPython 回调签名由 ABI 固定，部分参数在特定实现中无需使用；保留参数名有助于表达接口语义。
+	# CPython callback signatures are ABI-defined; keep named parameters for interface clarity even when an implementation does not use them.
+	target_compile_options(kbe_test_cell_event_migration PRIVATE
+		-Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter
+	)
 endif()
 
 add_test(NAME cellapp.event_migration COMMAND kbe_test_cell_event_migration)
