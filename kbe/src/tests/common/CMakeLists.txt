@@ -331,20 +331,9 @@ set_tests_properties(cellapp.coordinate_system_near_insert PROPERTIES
 	PASS_REGULAR_EXPRESSION "COORDINATE_SYSTEM_NEAR_INSERT_TEST_PASS"
 )
 
-add_custom_target(kbe_common_tests DEPENDS
-	kbe_test_common_pooling
-	kbe_test_blowfish_compat
-	kbe_test_timer_fairness
-	kbe_test_receive_window_policy
-	kbe_test_profile_latency
-	kbe_test_profile_warning_limiter
-	kbe_test_message_processing_metrics
-	kbe_test_script_stage_metrics
-	kbe_test_witness_dirty_queue
-	kbe_test_witness_load_metrics
-	kbe_test_witness_volatile_budget
-	kbe_test_cellapp_placement
-	kbe_test_baseapp_placement
-	kbe_test_coordinate_system_near_insert
-)
+# 自动收集本目录的测试程序，避免新增 CTest 后忘记同步聚合目标，导致 CI 只注册测试却没有生成可执行文件。
+# Collect test executables from this directory automatically so a newly registered CTest cannot be omitted from the CI build aggregate.
+get_property(_kbe_common_test_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+list(FILTER _kbe_common_test_targets INCLUDE REGEX "^kbe_test_")
+add_custom_target(kbe_common_tests DEPENDS ${_kbe_common_test_targets})
 set_target_properties(kbe_common_tests PROPERTIES FOLDER "Tests/Common")
