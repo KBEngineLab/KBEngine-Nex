@@ -3,6 +3,8 @@
 
 ## 3.0.1
 
+**注意：3.x 正式从KBEngine baseline 2.x迁移到1.x，用于解决协议不合规问题**
+
 - [security] 完成服务端跨组件入口与会话路由安全收口
   - 加固 BaseApp、CellApp、BaseAppMgr、CellAppMgr、DBMgr、Interfaces 等组件之间的实体、回调、注册和销毁入口校验。
   - 增加固定头、长度、实体类型、索引/标志和目标会话校验，阻止截断数据、非法实体类型、失效端点及过期回调继续进入业务处理。
@@ -35,6 +37,10 @@
   - Bots 支持开发模式日志转发；非开发模式默认写入自身日志文件，避免大量日志经 Logger 放大压测开销。
   - 压测服务端就绪判定、日志级别覆盖、Watcher 重连和部分启动进程清理流程得到统一，降低“未启动完成就开始压测”的误判。
 
+- [fix] 改动服务器def不应该导致客户端def md5改变
+
+- [fix] controlledBy 有值时，玩家断线重连后，不会同步给客户端
+
 - [feat] 扩展工具、协议和跨平台构建能力
   - 接入 Space Viewer V2 与地图边界信息，补充全新的 GUIConsole 协议入口。
   - Windows 构建入口统一切换到 CMake Preset/Ninja，和 Linux/WSL2、macOS 共用同一套现代 CMake 构建结构，减少旧 VS 工程与脚本分叉。
@@ -42,6 +48,8 @@
   - 将嵌入式 Python runtime 迁入独立的 vcpkg manifest 和 triplet，统一 Python 头文件、库文件及扩展依赖的恢复路径。
   - 迁移 utf8-cpp 到 vcpkg，适配 OpenSSL 3，修复 Windows/Linux/macOS 编译差异，并清理不再需要的 SDK 测试入口。
   - 公共 C++ 测试聚合目标补齐 Blowfish 兼容性测试，统一 `kbe_runtime`、`kbe_tests` 和 CTest 回归入口。
+
+- [feat] DetailLevel完整实现
 
 - [security] 收口数据库与组件生命周期数据流
   - DBMgr 增加实体操作固定头、索引、标志和实体类型校验，拒绝截断、错位和非法类型数据进入数据库任务队列。
