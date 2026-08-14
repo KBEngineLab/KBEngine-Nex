@@ -160,7 +160,8 @@ void PyTickProfileHandler::sendStream(MemoryStream* s)
 	{
 		WARNING_MSG(fmt::format("PyTickProfileHandler::sendStream: not found {} addr({})\n",
 			name_, addr_.c_str()));
-		networkInterface_.dispatcher().cancelTask(this);
+		// Do not remove this task synchronously while Tasks::process() is iterating it.
+		// 不能在 Tasks::process() 迭代当前任务期间同步移除自身，否则会使外层迭代器失效。
 		timeout();
 		return;
 	}
