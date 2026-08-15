@@ -1509,13 +1509,16 @@ def main() -> int:
         log_path.write_text(
             "ordinary line\nWARNING split across chunks\n"
             "WARN root - ClientObject::onNetworkError: error=channel inactivity timeout\n"
+            "S_ERR baseapp01 - script traceback\n"
+            "   baseapp01: [S_ERROR]: KeyError: 1002\n"
+            "ordinary payload mentions S_ERR and [S_ERROR] but has no severity prefix\n"
             "ERROR final\n",
             encoding="utf-8",
         )
         log_collector = IncrementalLogCollector(root)
         log_collector.READ_CHUNK_CHARS = 7
         log_counts = log_collector.sample()
-        assert log_counts["warning"] == 2 and log_counts["error"] == 1
+        assert log_counts["warning"] == 2 and log_counts["error"] == 3
         assert log_collector.sample()["warning"] == 0
         path = Path(directory) / "raw.jsonl"
         with JsonlRecorder(path, "test-run", "contract") as recorder:
