@@ -269,6 +269,15 @@ def evaluate_quality(
             if is_tick_sample and values.get("unit") == "micros" and values["p99"] / 1000.0 > tick_limit:
                 slow.append(f"{name} p99={values['p99'] / 1000.0:.2f}ms > {tick_limit:.2f}ms")
 
+    owned_cpu_limit = float(thresholds.get("owned_cpu_p95_max_percent", 0.0))
+    owned_cpu = summary.get("samples", {}).get("process.owned-total.cpu.percent")
+    if owned_cpu_limit > 0 and owned_cpu and float(owned_cpu["p95"]) > owned_cpu_limit:
+        slow.append(
+            "owned process CPU "
+            f"p95={float(owned_cpu['p95']):.2f}% > {owned_cpu_limit:.2f}% "
+            "(local capacity saturated)"
+        )
+
     status = "BLOCKER" if blockers else "SLOW" if slow else "PASS"
     if not request_result.get("total", 0) and not blockers and not slow:
         status = "UNKNOWN"

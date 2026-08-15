@@ -101,9 +101,14 @@ Win32 API，不再每秒启动 `Get-Process`，避免主机饱和时因 PowerShe
 
 Process samples include CPU normalized to the machine's logical processor count, working set,
 thread count, and, on Windows, private committed memory, peak working set, and handle count.
+Each sampling cycle also publishes `process.owned-total.*`, aggregated from the controller, owned
+server components, and workload processes in the same OS snapshot. Its CPU P95 is the capacity
+guardrail used to distinguish engine latency from a saturated single-host benchmark.
 进程采样包含按整机逻辑处理器数归一化的 CPU、工作集和线程数；Windows 还会记录私有提交量、
 进程启动以来的峰值工作集和句柄数。工作集包含共享驻留页，判断真实进程内存成本时应优先比较
 `memory.private`，并结合 `memory.working_set` 判断当前物理内存压力。
+每个采样周期还会发布 `process.owned-total.*`，在同一次 OS 快照内聚合控制器、自有服务端组件和
+负载进程；其 CPU P95 作为容量保护线，用于区分引擎长尾与单机压测环境本身已经饱和。
 
 Watcher sampling runs from the controller process. The built-in `baseline` and `stress` scenarios
 carry a versioned 25-target publication set; `--watcher-target` adds asset-specific targets without

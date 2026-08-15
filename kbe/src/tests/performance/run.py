@@ -1181,7 +1181,12 @@ def record_process_samples(recorder: JsonlRecorder, collector: ProcessGroupColle
     """Record one batch obtained by the collector's single OS query.
     记录采集器通过一次系统查询取得的一批进程快照。
     """
-    for process_name, sample in collector.sample().items():
+    samples = collector.sample()
+    total_cpu_percent = 0.0
+    total_working_set_bytes = 0
+    for process_name, sample in samples.items():
+        total_cpu_percent += sample.cpu_percent
+        total_working_set_bytes += sample.working_set_bytes
         recorder.record_sample("process", process_name, "cpu.percent", sample.cpu_percent, "%")
         recorder.record_sample("process", process_name, "memory.working_set", sample.working_set_bytes, "bytes")
         if sample.private_bytes is not None:
@@ -1197,6 +1202,17 @@ def record_process_samples(recorder: JsonlRecorder, collector: ProcessGroupColle
         recorder.record_sample("process", process_name, "threads.active", sample.thread_count, "count")
         if sample.handle_count is not None:
             recorder.record_sample("process", process_name, "handles.active", sample.handle_count, "count")
+
+    if samples:
+        # 进程级分位数不能相加得到同一时刻的整机占用；在单次 OS 快照内先聚合，
+        # 才能区分引擎长尾与压测机自身容量耗尽。
+        # Per-process percentiles cannot be summed into a concurrent machine load.
+        # Aggregate inside the single OS snapshot so host saturation remains explicit.
+        recorder.record_sample("process", "owned-total", "cpu.percent", total_cpu_percent, "%")
+        recorder.record_sample(
+            "process", "owned-total", "memory.working_set", total_working_set_bytes, "bytes"
+        )
+        recorder.record_sample("process", "owned-total", "processes.active", len(samples), "count")
 
 
 def record_log_samples(recorder: JsonlRecorder, collector: IncrementalLogCollector, phase: str) -> None:

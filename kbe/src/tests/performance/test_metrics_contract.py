@@ -20,7 +20,7 @@ from performance.assets import build_environment, create_config_overlay, resolve
 from performance.cluster import PerformanceCluster
 from performance.log_metrics import IncrementalLogCollector
 from performance.metrics import JsonlRecorder
-from performance.process_metrics import ProcessCollector, ProcessGroupCollector, _parse_windows_process_row
+from performance.process_metrics import ProcessCollector, ProcessGroupCollector, ProcessSample, _parse_windows_process_row
 from performance.report import build_summary, load_events, validate_event
 from performance.run import (
     _repository_root,
@@ -33,6 +33,7 @@ from performance.run import (
     manager_readiness_satisfied,
     merge_watcher_target_specs,
     partition_workload_bots,
+    record_process_samples,
     record_watcher_samples,
     readiness_value_matches,
     resolve_server_binary_dir,
@@ -1582,6 +1583,27 @@ def main() -> int:
         assert all("tickMaxMicros" not in item for item in sampled["quality"]["slow"])
         assert sampled["labels"]["watcher.CELLAPP_TYPE.root/scriptStages/slow0Name"] == "Avatar.move"
         assert sampled["labels"]["watcher.CELLAPP_TYPE.root/scriptStages/slow0Stage"] == "pythonCall"
+
+        process_path = root / "process-total.jsonl"
+
+        class StaticProcessCollector:
+            def sample(self):
+                return {
+                    "cluster:baseapp:7001": ProcessSample(40.0, 100, None, None, 2, None),
+                    "workload:10000": ProcessSample(55.0, 200, None, None, 3, None),
+                }
+
+        with JsonlRecorder(process_path, "test-run", "contract") as recorder:
+            record_process_samples(recorder, StaticProcessCollector())
+        process_summary = build_summary(
+            load_events(process_path), {"owned_cpu_p95_max_percent": 90.0}
+        )
+        assert process_summary["samples"]["process.owned-total.cpu.percent"]["max"] == 95.0
+        assert process_summary["samples"]["process.owned-total.memory.working_set"]["max"] == 300
+        assert process_summary["samples"]["process.owned-total.processes.active"]["max"] == 2
+        assert any(
+            "owned process CPU p95=95.00%" in item for item in process_summary["quality"]["slow"]
+        )
 
         readiness_path = root / "multi-process-readiness.jsonl"
         with JsonlRecorder(readiness_path, "test-run", "contract") as recorder:
