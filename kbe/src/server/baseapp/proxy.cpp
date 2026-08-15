@@ -411,19 +411,19 @@ void Proxy::giveClientTo(Proxy* proxy)
 		this->setClientType(UNKNOWN_CLIENT_COMPONENT_TYPE);
 		this->setLoginDatas("");
 		clientEntityCall(NULL);
-		proxy->onGiveClientTo(lpChannel);
+		proxy->onGiveClientTo(lpChannel, this->id());
 		addr(Network::Address::NONE);
 	}
 }
 
 //-------------------------------------------------------------------------------------
-void Proxy::onGiveClientTo(Network::Channel* lpChannel)
+void Proxy::onGiveClientTo(Network::Channel* lpChannel, ENTITY_ID previousProxyID)
 {
 	clientEntityCall(new EntityCall(this->pScriptModule_, 
 		&lpChannel->addr(), 0, id_, ENTITYCALL_TYPE_CLIENT));
 
 	addr(lpChannel->addr());
-	Baseapp::getSingleton().createClientProxies(this);
+	Baseapp::getSingleton().createClientProxies(this, lpChannel, false, previousProxyID);
 
 	// 如果有cell, 需要通知其获得witness， 因为这个客户端刚刚绑定到这个proxy
 	// 此时这个entity即使有cell正常情况必须是没有witness的。

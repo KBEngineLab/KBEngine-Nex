@@ -61,15 +61,20 @@ PacketSender::~PacketSender()
 //-------------------------------------------------------------------------------------
 Channel* PacketSender::getChannel()
 {
+	const ProtocolType expectedProtocol = type() == UDP_PACKET_SENDER ? PROTOCOL_UDP : PROTOCOL_TCP;
 	if (pChannel_)
 	{
-		if (pChannel_->isDestroyed())
-			return NULL;
+		if (!pChannel_->isDestroyed() && pChannel_->protocoltype() == expectedProtocol)
+			return pChannel_;
 
-		return pChannel_;
+		pChannel_ = NULL;
 	}
 
-	pChannel_ = pNetworkInterface_->findChannel(pEndpoint_->addr());
+	// Keep sender binding in the same transport namespace as its receiver peer;
+	// address-only lookup is ambiguous when TCP and KCP reuse a numeric port.
+	// sender 必须与 receiver 使用相同的传输命名空间；当 TCP 与 KCP 复用
+	// 数值端口时，仅地址查找存在歧义。
+	pChannel_ = pNetworkInterface_->findChannel(pEndpoint_->addr(), expectedProtocol);
 	return pChannel_;
 }
 

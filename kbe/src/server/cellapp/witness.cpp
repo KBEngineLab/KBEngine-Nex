@@ -1667,6 +1667,27 @@ uint64 Witness::structuralWhileSuppressedCount()
 }
 
 //-------------------------------------------------------------------------------------
+uint64 Witness::producerBackpressureDeferredCount()
+{
+	return g_witnessLoadMetrics.producerBackpressureDeferred();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Witness::immediateBundleCount() { return g_witnessLoadMetrics.immediateBundles(); }
+uint64 Witness::immediateBytesCount() { return g_witnessLoadMetrics.immediateBytes(); }
+uint64 Witness::immediateBackpressuredBundleCount() { return g_witnessLoadMetrics.immediateBackpressuredBundles(); }
+uint64 Witness::immediatePropertyBundleCount() { return g_witnessLoadMetrics.immediateKindBundles(WitnessLoadMetrics::IMMEDIATE_PROPERTY); }
+uint64 Witness::immediatePropertyBytesCount() { return g_witnessLoadMetrics.immediateKindBytes(WitnessLoadMetrics::IMMEDIATE_PROPERTY); }
+uint64 Witness::immediateRpcBundleCount() { return g_witnessLoadMetrics.immediateKindBundles(WitnessLoadMetrics::IMMEDIATE_RPC); }
+uint64 Witness::immediateRpcBytesCount() { return g_witnessLoadMetrics.immediateKindBytes(WitnessLoadMetrics::IMMEDIATE_RPC); }
+uint64 Witness::immediatePositionBundleCount() { return g_witnessLoadMetrics.immediateKindBundles(WitnessLoadMetrics::IMMEDIATE_POSITION); }
+uint64 Witness::immediatePositionBytesCount() { return g_witnessLoadMetrics.immediateKindBytes(WitnessLoadMetrics::IMMEDIATE_POSITION); }
+uint64 Witness::immediateSpaceDataBundleCount() { return g_witnessLoadMetrics.immediateKindBundles(WitnessLoadMetrics::IMMEDIATE_SPACE_DATA); }
+uint64 Witness::immediateSpaceDataBytesCount() { return g_witnessLoadMetrics.immediateKindBytes(WitnessLoadMetrics::IMMEDIATE_SPACE_DATA); }
+uint64 Witness::immediateOtherBundleCount() { return g_witnessLoadMetrics.immediateKindBundles(WitnessLoadMetrics::IMMEDIATE_OTHER); }
+uint64 Witness::immediateOtherBytesCount() { return g_witnessLoadMetrics.immediateKindBytes(WitnessLoadMetrics::IMMEDIATE_OTHER); }
+
+//-------------------------------------------------------------------------------------
 uint64 Witness::bundlesSentCount()
 {
 	return g_witnessLoadMetrics.bundlesSent();
@@ -1701,6 +1722,18 @@ bool Witness::update()
 	Network::Channel* pChannel = pEntity_->clientEntityCall()->getChannel();
 	if(!pChannel)
 		return true;
+
+	// CellApp 到 BaseApp 的共享 completion TCP 链路一旦达到高水位，就把可靠结构消息
+	// 留在按 Witness 去重的业务队列中，易变位姿也只保留最新状态。这样不会把同一拥塞
+	// 复制成数万个 Channel Bundle，也不会丢弃 Enter/Leave、属性、RPC 或迁移消息。
+	// Once the shared CellApp-to-BaseApp completion TCP link reaches its high watermark, reliable
+	// structural work stays in the per-Witness deduplicated queue while volatile poses retain only
+	// their latest state. This avoids cloning congestion into Channel bundles without dropping semantics.
+	if (pChannel->completionSendBackpressured())
+	{
+		g_witnessLoadMetrics.recordProducerBackpressureDeferred();
+		return true;
+	}
 
 	Py_INCREF(pEntity_);
 
@@ -2544,8 +2577,41 @@ uint32 Witness::getEntityVolatileDataUpdateFlags(Entity* otherEntity)
 //-------------------------------------------------------------------------------------
 bool Witness::sendToClient(const Network::MessageHandler& msgHandler, Network::Bundle* pBundle)
 {
-	if(pushBundle(pBundle))
+	Network::Channel* pTargetChannel = pChannel();
+	if (pTargetChannel)
+	{
+		WitnessLoadMetrics::ImmediateMessageKind kind = WitnessLoadMetrics::IMMEDIATE_OTHER;
+		if (msgHandler.msgID == ClientInterface::onUpdatePropertys.msgID ||
+			msgHandler.msgID == ClientInterface::onUpdatePropertysOptimized.msgID)
+		{
+			kind = WitnessLoadMetrics::IMMEDIATE_PROPERTY;
+		}
+		else if (msgHandler.msgID == ClientInterface::onRemoteMethodCall.msgID ||
+			msgHandler.msgID == ClientInterface::onRemoteMethodCallOptimized.msgID)
+		{
+			kind = WitnessLoadMetrics::IMMEDIATE_RPC;
+		}
+		else if (msgHandler.msgID == ClientInterface::onSetEntityPosAndDir.msgID)
+		{
+			kind = WitnessLoadMetrics::IMMEDIATE_POSITION;
+		}
+		else if (msgHandler.msgID == ClientInterface::setSpaceData.msgID ||
+			msgHandler.msgID == ClientInterface::delSpaceData.msgID ||
+			msgHandler.msgID == ClientInterface::initSpaceData.msgID)
+		{
+			kind = WitnessLoadMetrics::IMMEDIATE_SPACE_DATA;
+		}
+
+		// 即时属性和 RPC 路径绕过 Witness::update()，单独统计才能判断业务生产是否在
+		// completion 高水位后仍持续增长。这里只读取 Bundle 长度并累加主线程计数，不扫描队列。
+		// Immediate property and RPC paths bypass Witness::update(); separate counters reveal
+		// whether business production continues after the completion high watermark without queue scans.
+		g_witnessLoadMetrics.recordImmediateBundle(kind,
+			static_cast<uint64>(pBundle->packetsLength()),
+			pTargetChannel->completionSendBackpressured());
+		pTargetChannel->send(pBundle);
 		return true;
+	}
 
 	ERROR_MSG(fmt::format("Witness::sendToClient: {} pBundles is NULL, not found channel.\n", pEntity_->id()));
 	Network::Bundle::reclaimPoolObject(pBundle);

@@ -2,7 +2,7 @@
   "name": "gameplay-10000",
   "duration_seconds": 300,
   "bots": 10000,
-  "workload_processes": 40,
+  "workload_processes": 20,
   "workload_cid_start": 10000,
   "workload_gus_start": 40,
   "bots_account_suffix_start": 1,
@@ -74,8 +74,9 @@
     "CELLAPP_TYPE=@cellapp:root/witness/scheduler",
     "CELLAPP_TYPE=@cellapp:root/witness/messages",
     "CELLAPP_TYPE=@cellapp:root/witness/queues",
-	"CELLAPP_TYPE=@cellapp:root/witness/lod",
-    "CELLAPP_TYPE=@cellapp:root/witness/backpressure"
+    "CELLAPP_TYPE=@cellapp:root/witness/lod",
+    "CELLAPP_TYPE=@cellapp:root/witness/backpressure",
+    "CELLAPP_TYPE=@cellapp:root/witness/immediate"
   ],
   "watcher_intervals": {
     "BOTS_TYPE:root/bots/performance": 5.0,
@@ -127,7 +128,8 @@
     "CELLAPP_TYPE:root/witness/messages": 30.0,
     "CELLAPP_TYPE:root/witness/queues": 30.0,
 	"CELLAPP_TYPE:root/witness/lod": 30.0,
-    "CELLAPP_TYPE:root/witness/backpressure": 30.0
+    "CELLAPP_TYPE:root/witness/backpressure": 30.0,
+    "CELLAPP_TYPE:root/witness/immediate": 30.0
   },
   "readiness": {
     "root/bots/performance/clientsTotal": "$bots",

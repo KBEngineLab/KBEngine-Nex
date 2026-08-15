@@ -122,6 +122,8 @@ public:
 	INLINE COMPONENT_ID ghostCell(void) const;
 	INLINE void ghostCell(COMPONENT_ID cellID);
 	INLINE uint64 routingEpoch(void) const;
+	INLINE COMPONENT_ID migrationRelayCell(void) const;
+	INLINE void migrationRelayCell(COMPONENT_ID cellID);
 
 	/**
 		定义属性数据被改变，组件属性通过 pEntityComponent 标识所属父属性。
@@ -690,6 +692,12 @@ protected:
 	COMPONENT_ID											ghostCell_;	
 
 	uint64 routingEpoch_;
+
+	// Teleport clears ghostCell_ to prevent property-sync loops, but the previous
+	// Source may still own ordered client RPC bytes. Keep that authorization edge
+	// separate from Ghost replication state. / 传送会清空 ghostCell_ 以避免属性同步
+	// 回环，但旧 Source 仍可能持有有序客户端 RPC，因此单独保存该授权关系。
+	COMPONENT_ID											migrationRelayCell_;
 
 	// entity的当前位置
 	Position3D												lastpos_;

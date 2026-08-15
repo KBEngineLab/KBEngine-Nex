@@ -26,6 +26,32 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace
 {
+std::string formatPacketByteWindow(const KBEngine::MemoryStream& stream, size_t focus,
+	size_t bytesBefore, size_t bytesAfter, size_t& windowStart, size_t& windowEnd)
+{
+	const size_t streamEnd = stream.wpos();
+	if(focus > streamEnd)
+		focus = streamEnd;
+
+	windowStart = focus > bytesBefore ? focus - bytesBefore : 0;
+	windowEnd = streamEnd - focus > bytesAfter ? focus + bytesAfter : streamEnd;
+
+	static const char HEX_DIGITS[] = "0123456789abcdef";
+	std::string result;
+	result.reserve((windowEnd - windowStart) * 3);
+	const KBEngine::uint8* bytes = stream.data();
+	for(size_t i = windowStart; i < windowEnd; ++i)
+	{
+		if(i > windowStart)
+			result.push_back(' ');
+
+		result.push_back(HEX_DIGITS[(bytes[i] >> 4) & 0x0f]);
+		result.push_back(HEX_DIGITS[bytes[i] & 0x0f]);
+	}
+
+	return result;
+}
+
 class ScopedMessageProcessingSample
 {
 public:
@@ -74,6 +100,9 @@ PacketReader::PacketReader(Channel* pChannel):
 	pFragmentStream_(NULL),
 	currMsgID_(0),
 	currMsgLen_(0),
+	currMsgIDFragmented_(false),
+	lastCompletedMsgID_(0),
+	lastCompletedMsgLen_(0),
 	pChannel_(pChannel)
 {
 }
@@ -93,6 +122,9 @@ void PacketReader::reset()
 	pFragmentDatasRemain_ = 0;
 	currMsgID_ = 0;
 	currMsgLen_ = 0;
+	currMsgIDFragmented_ = false;
+	lastCompletedMsgID_ = 0;
+	lastCompletedMsgLen_ = 0;
 	
 	SAFE_RELEASE_ARRAY(pFragmentDatas_);
 	MemoryStream::reclaimPoolObject(pFragmentStream_);
@@ -116,6 +148,7 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 				}
 
 				(*pPacket) >> currMsgID_;
+				currMsgIDFragmented_ = false;
 				pPacket->messageID(currMsgID_);
 			}
 
@@ -132,11 +165,28 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 				TRACE_MESSAGE_PACKET(true, pPacket1, pMsgHandler, pPacket1->length(), pChannel_->c_str(), false);
 				pPacket1->rpos(rpos);
 
-				ERROR_MSG(fmt::format("PacketReader::processMessages: not found msgID={}, msglen={}, from {}.\n",
-					currMsgID_, pPacket1->length(), pChannel_->c_str()));
+				Network::MessageHandler* pLastCompletedHandler =
+					lastCompletedMsgID_ != 0 ? pMsgHandlers->find(lastCompletedMsgID_) : NULL;
+				// 仅在致命协议错误时生成有限窗口，正常收包路径不承担格式化和内存分配开销。
+				// Build a bounded window only for fatal protocol errors, keeping formatting and allocation off the normal receive path.
+				const size_t packetReadPos = pPacket->rpos();
+				const size_t messageIDOffset = !currMsgIDFragmented_ && packetReadPos >= NETWORK_MESSAGE_ID_SIZE ?
+					packetReadPos - NETWORK_MESSAGE_ID_SIZE : packetReadPos;
+				size_t byteWindowStart = 0;
+				size_t byteWindowEnd = 0;
+				const std::string byteWindow = formatPacketByteWindow(*pPacket, messageIDOffset,
+					32, 64, byteWindowStart, byteWindowEnd);
+				ERROR_MSG(fmt::format("PacketReader::processMessages: not found msgID={}, msglen={}, "
+					"lastCompletedMsgID={}, lastCompletedMsgName={}, lastCompletedMsgLen={}, "
+					"messageIDFragmented={}, packetReadPos={}, byteWindow=[{},{}), messageIDOffset={}, bytes={}, from {}.\n",
+					currMsgID_, pPacket1->length(), lastCompletedMsgID_,
+					pLastCompletedHandler != NULL ? pLastCompletedHandler->name : std::string("none"),
+					lastCompletedMsgLen_, currMsgIDFragmented_, packetReadPos, byteWindowStart,
+					byteWindowEnd, messageIDOffset, byteWindow, pChannel_->c_str()));
 
 				currMsgID_ = 0;
 				currMsgLen_ = 0;
+				currMsgIDFragmented_ = false;
 				pChannel_->condemn("PacketReader::processMessages: not found msgID");
 				break;
 			}
@@ -267,8 +317,12 @@ void PacketReader::processMessages(KBEngine::Network::MessageHandlers* pMsgHandl
 				pPacket->wpos(wpos);
 			}
 
+			lastCompletedMsgID_ = currMsgID_;
+			lastCompletedMsgLen_ = currMsgLen_;
+
 			currMsgID_ = 0;
 			currMsgLen_ = 0;
+			currMsgIDFragmented_ = false;
 		}
 		else
 		{
@@ -321,6 +375,7 @@ void PacketReader::mergeFragmentMessage(Packet* pPacket)
 		{
 		case FRAGMENT_DATA_MESSAGE_ID:			// 消息ID信息不全
 			memcpy(&currMsgID_, pFragmentDatas_, NETWORK_MESSAGE_ID_SIZE);
+			currMsgIDFragmented_ = true;
 			break;
 
 		case FRAGMENT_DATA_MESSAGE_LENGTH:		// 消息长度信息不全

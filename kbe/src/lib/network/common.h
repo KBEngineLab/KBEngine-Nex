@@ -63,6 +63,11 @@ extern uint32 g_SOMAXCONN;
 extern uint32 g_maxCompletionsPerTick;
 extern uint32 g_maxCompletionProcessingTimeMS;
 
+// 内部 completion TCP 链路的生产端背压水位。高水位为零时关闭，低水位用于恢复迟滞。
+// Producer-side watermarks for internal completion TCP links. A zero high watermark disables it.
+extern uint32 g_completionIntTcpSendBackpressureHighBytes;
+extern uint32 g_completionIntTcpSendBackpressureLowBytes;
+
 // KCP 可靠 UDP 的队列、时钟和拥塞控制参数由 Channel 统一读取，后续配置层只需覆盖这些默认值。
 // KCP reliable-UDP queue, clock, and congestion parameters are centralized here so the configuration layer can override the defaults later.
 extern uint32 g_rudp_intWritePacketsQueueSize;

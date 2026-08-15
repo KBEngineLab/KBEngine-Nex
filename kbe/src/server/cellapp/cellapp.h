@@ -250,6 +250,7 @@ public:
 	*/
 	void reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s);
 	void reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s);
+	void reqTeleportToCellAppPrepare(Network::Channel* pChannel, MemoryStream& s);
 	void reqTeleportToCellAppOver(Network::Channel* pChannel, MemoryStream& s);
 
 	/**

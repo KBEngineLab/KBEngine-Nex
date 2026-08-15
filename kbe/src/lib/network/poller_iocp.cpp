@@ -5,6 +5,7 @@
 #if KBE_PLATFORM == PLATFORM_WIN32
 
 #include "helper/profile.h"
+#include <algorithm>
 #include <cmath>
 
 namespace KBEngine {
@@ -18,7 +19,19 @@ namespace Network
 
 namespace
 {
-const size_t IOCP_TCP_SEND_BATCH_BYTES = 64 * 1024;
+// 1 MiB keeps each context bounded while amortizing completion and copy cost for dense internal traffic.
+// 1 MiB 在限制单个 context 内存的同时，摊薄高密度内部流量的 completion 与合批复制开销。
+const size_t IOCP_TCP_SEND_BATCH_BYTES = 1024 * 1024;
+// Only poll the completion port from the send hot path after one legacy-sized packet is queued.
+// 仅当积压达到一个传统最大包大小后，才从发送热路径探测 completion port，避免小包增加系统调用。
+const size_t IOCP_TCP_SEND_PROGRESS_BYTES = 64 * 1024;
+// Completion fairness is enforced between completion packets, so one receive must remain
+// a bounded upper-layer work unit. A 64 KiB receive can execute hundreds of Entity callbacks
+// before IOCP observes the time budget. / completion 公平性只能在完成包之间让步，因此
+// 单次接收必须保持为有界的上层工作单元；64 KiB 会在 IOCP 检查时间预算前执行
+// 数百个 Entity 回调。
+const size_t IOCP_TCP_RECEIVE_BYTES = PACKET_MAX_SIZE_TCP;
+const uint32 IOCP_TCP_SEND_PRIORITY_BURST_SIZE = 4;
 const size_t COMPLETION_CONTEXT_CACHE_LIMIT = 256;
 const size_t COMPLETION_CONTEXT_RETAINED_BUFFER_BYTES = 64 * 1024;
 // 析构排空设置有限等待，避免异常驱动或损坏的 socket 让进程永久卡住；超时对象保留到进程退出以保证内核访问安全。
@@ -109,6 +122,8 @@ IocpPoller::IocpPoller() :
 	completionPort_(CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0)),
 	lastCompletionBudgetWarningTime_(0),
 	pendingCompletions_(),
+	pendingTcpSendCompletions_(),
+	consecutiveTcpSendCompletionCount_(0),
 	completionDequeueCallCount_(0),
 	completionDequeuedCount_(0),
 	completionMaxDequeuedBatchCount_(0),
@@ -145,7 +160,10 @@ uint64 IocpPoller::contextCachedBytes() const { return static_cast<uint64>(conte
 uint64 IocpPoller::completionDequeueCallCount() const { return completionDequeueCallCount_; }
 uint64 IocpPoller::completionDequeuedCount() const { return completionDequeuedCount_; }
 uint64 IocpPoller::completionMaxDequeuedBatchCount() const { return completionMaxDequeuedBatchCount_; }
-uint64 IocpPoller::completionPendingLocalCount() const { return static_cast<uint64>(pendingCompletions_.size()); }
+uint64 IocpPoller::completionPendingLocalCount() const
+{
+	return static_cast<uint64>(pendingCompletions_.size() + pendingTcpSendCompletions_.size());
+}
 uint64 IocpPoller::tcpSendSubmissionCount() const { return tcpSendSubmissionCount_; }
 uint64 IocpPoller::tcpSendSubmittedBytes() const { return tcpSendSubmittedBytes_; }
 uint64 IocpPoller::tcpSendMaxSubmissionBytes() const { return tcpSendMaxSubmissionBytes_; }
@@ -163,7 +181,7 @@ IocpPoller::~IocpPoller()
 }
 
 //-------------------------------------------------------------------------------------
-bool IocpPoller::queueTcpSend(KBESOCKET fd, const void* data, int len)
+bool IocpPoller::queueTcpSend(KBESOCKET fd, const void* data, int len, size_t maxPendingBytes)
 {
 	if (len <= 0)
 	{
@@ -202,16 +220,33 @@ bool IocpPoller::queueTcpSend(KBESOCKET fd, const void* data, int len)
 
 	// 关联成功后共享基类才接管数据所有权，随后首次 WSASend 失败也由 completion 生命周期处理。
 	// The shared queue takes ownership only after association; completion lifecycle then handles a failed first WSASend attempt.
-	if (!CompletionPoller::queueTcpSend(fd, data, len))
+	if (!CompletionPoller::queueTcpSend(fd, data, len, maxPendingBytes))
 	{
 		return false;
 	}
 
-	// Defer only until the next dispatcher round. Rearm deduplicates by fd, allowing
-	// all small writes produced by the current callback to enter the 64 KiB batch.
-	// 仅延迟到下一 dispatcher 轮次；rearm 按 fd 去重，使当前回调产生的小包先进入
-	// 64 KiB 合批队列，避免每个逻辑消息各自触发一次 WSASend/completion。
-	requestRearm(fd, REARM_WRITE);
+	if (state.pPendingWriteContext == NULL)
+	{
+		// Submit the first WSASend immediately. Its outstanding lifetime batches
+		// subsequent writes from the same callback while bounding user-space backlog
+		// growth during long script or migration work.
+		// 空闲 socket 的首个 WSASend 立即提交；它的 outstanding 生命期会合并同一回调的
+		// 后续小包，同时限制长脚本或迁移任务期间的用户态积压增长。
+		if (!armTcpSend(fd, state))
+		{
+			requestRearm(fd, REARM_WRITE);
+		}
+	}
+	else
+	{
+		const size_t pendingBytes = state.pendingTcpSends.pendingBytes();
+		const size_t queuedBytes = static_cast<size_t>(len);
+		const size_t previousBytes = pendingBytes >= queuedBytes ? pendingBytes - queuedBytes : 0;
+		if (pendingBytes / IOCP_TCP_SEND_PROGRESS_BYTES > previousBytes / IOCP_TCP_SEND_PROGRESS_BYTES)
+		{
+			progressTcpSend(fd, state);
+		}
+	}
 	return true;
 }
 
@@ -287,7 +322,7 @@ bool IocpPoller::loadAcceptEx(SocketState& state)
 bool IocpPoller::armTcpRead(KBESOCKET fd, SocketState& state)
 {
 	IocpContext* pContext = acquireContext(fd, state.socket, SOCKET_KIND_TCP, OP_TCP_RECV, state.generation);
-	pContext->data.resize(PACKET_MAX_SIZE_TCP);
+	pContext->data.resize(IOCP_TCP_RECEIVE_BYTES);
 	pContext->buffer.buf = pContext->data.data();
 	pContext->buffer.len = static_cast<ULONG>(pContext->data.size());
 
@@ -422,6 +457,7 @@ bool IocpPoller::armTcpSend(KBESOCKET fd, SocketState& state)
 	{
 		trackContext(*pContext);
 		state.pPendingWriteContext = pContext;
+		state.pendingTcpWriteBytes = pContext->tcpSendData.size();
 		++tcpSendSubmissionCount_;
 		tcpSendSubmittedBytes_ += static_cast<uint64>(pContext->tcpSendData.size());
 		tcpSendMaxSubmissionBytes_ = std::max<uint64>(tcpSendMaxSubmissionBytes_, pContext->tcpSendData.size());
@@ -433,6 +469,65 @@ bool IocpPoller::armTcpSend(KBESOCKET fd, SocketState& state)
 	pushTcpSendFront(state, pContext->tcpSendData, 0);
 	recycleContext(pContext);
 	return false;
+}
+
+//-------------------------------------------------------------------------------------
+bool IocpPoller::progressTcpSend(KBESOCKET fd, SocketState& state)
+{
+	IocpContext* pCurrent = reinterpret_cast<IocpContext*>(state.pPendingWriteContext);
+	if (pCurrent == NULL || pCurrent->operation != OP_TCP_SEND)
+	{
+		return false;
+	}
+
+	auto findCurrent = [this, pCurrent]()
+	{
+		return std::find_if(pendingTcpSendCompletions_.begin(), pendingTcpSendCompletions_.end(),
+			[pCurrent](const PendingCompletion& pending)
+			{
+				return pending.overlapped == &pCurrent->overlapped;
+			});
+	};
+
+	auto pendingIter = findCurrent();
+	if (pendingIter == pendingTcpSendCompletions_.end())
+	{
+		// IOCP port 是进程内共享队列。为推进一个 TCP send 而反复调用 GQCSEx 会同时
+		// 移走其他 socket 的 recv/send completion；若业务回调尚未返回，这些事件只能
+		// 堆在用户态。达到单 Tick completion 上限后停止内联 dequeue，让主循环按预算
+		// 消费，避免发送优化反过来制造无界接收积压。
+		// The IOCP port is shared by all sockets. Once the local fairness window is full,
+		// leave additional completions in the kernel and let the dispatcher consume them.
+		if (completionPendingLocalCount() >= static_cast<uint64>(g_maxCompletionsPerTick))
+		{
+			return false;
+		}
+
+		const DWORD errorCode = dequeueCompletions(0);
+		if (errorCode != ERROR_SUCCESS)
+		{
+			return false;
+		}
+		pendingIter = findCurrent();
+	}
+
+	// 错误 completion 仍由正常 poll 路径处理，避免在 Entity/脚本回调中重入 Channel 销毁。
+	// Leave failed completions to the normal poll path so Channel destruction cannot re-enter an Entity or script callback.
+	if (pendingIter == pendingTcpSendCompletions_.end() || !pendingIter->success)
+	{
+		return false;
+	}
+
+	const PendingCompletion pending = *pendingIter;
+	pendingTcpSendCompletions_.erase(pendingIter);
+	handleCompletion(pending.completionKey, pending.overlapped, pending.bytesTransferred,
+		pending.success, pending.errorCode);
+	++tcpSendInlineCompletionCount_;
+
+	// queueTcpSend 已经放入新数据；成功 completion 会立即投递下一批，因此不能在这里触发上层写回调。
+	// queueTcpSend already added new data; the successful completion immediately submits the next batch without an upper-layer write callback.
+	(void)fd;
+	return true;
 }
 
 //-------------------------------------------------------------------------------------
@@ -878,14 +973,20 @@ void IocpPoller::cancelAndDrainContexts()
 //-------------------------------------------------------------------------------------
 void IocpPoller::releasePendingCompletions()
 {
-	while (!pendingCompletions_.empty())
+	auto releaseQueue = [this](std::deque<PendingCompletion>& completions)
 	{
-		const PendingCompletion pending = pendingCompletions_.front();
-		pendingCompletions_.pop_front();
-		OutstandingContexts::iterator iter = outstandingContexts_.find(pending.overlapped);
-		if (iter != outstandingContexts_.end())
-			releaseContext(*iter->second);
-	}
+		while (!completions.empty())
+		{
+			const PendingCompletion pending = completions.front();
+			completions.pop_front();
+			OutstandingContexts::iterator iter = outstandingContexts_.find(pending.overlapped);
+			if (iter != outstandingContexts_.end())
+				releaseContext(*iter->second);
+		}
+	};
+
+	releaseQueue(pendingTcpSendCompletions_);
+	releaseQueue(pendingCompletions_);
 }
 
 //-------------------------------------------------------------------------------------
@@ -915,7 +1016,16 @@ DWORD IocpPoller::dequeueCompletions(DWORD timeoutMs)
 		// Internal 是 NTSTATUS，不是 Winsock 错误；后续统一由
 		// WSAGetOverlappedResult 转换，避免把取消误判成业务错误。
 		pending.errorCode = pending.success ? 0 : static_cast<DWORD>(entries[index].Internal);
-		pendingCompletions_.push_back(pending);
+		OutstandingContexts::iterator contextIter = outstandingContexts_.find(pending.overlapped);
+		if (contextIter != outstandingContexts_.end() &&
+			contextIter->second->operation == OP_TCP_SEND)
+		{
+			pendingTcpSendCompletions_.push_back(pending);
+		}
+		else
+		{
+			pendingCompletions_.push_back(pending);
+		}
 	}
 	return ERROR_SUCCESS;
 }
@@ -981,7 +1091,11 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 		if (isUdpReadContext)
 			pState->pendingReadContexts.erase(pContext);
 		else
+		{
 			*ppCurrentContext = NULL;
+			if (pContext->operation == OP_TCP_SEND)
+				pState->pendingTcpWriteBytes = 0;
+		}
 	}
 
 	// 取消 IO 是正常注销路径，不算网络错误。
@@ -1064,6 +1178,16 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 			const bool queued = pushTcpReceivedData(fd, pContext->data, success && bytesTransferred == 0, success ? 0 : socketErrorCode);
 			if (queued)
 			{
+				// 先挂下一次 WSARecv，再同步进入 PacketReader/Entity。业务回调可能持续数十毫秒
+				// 甚至更久；预挂让内核接收窗口保持打开，同时仍保证每个 TCP socket 只有一个读请求。
+				// Post the next WSARecv before synchronously entering PacketReader/Entity. Business
+				// callbacks can run for tens of milliseconds or longer; pre-arming keeps the receive
+				// window open while preserving exactly one read request per TCP socket.
+				if (!terminal && pState->registeredRead &&
+					(!ensureReadArmed(fd, *pState) || !isReadArmComplete(*pState)))
+				{
+					requestRearm(fd, REARM_READ);
+				}
 				this->triggerRead(fd);
 			}
 			else if (!terminal)
@@ -1131,6 +1255,13 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 
 			releaseContext(*pContext);
 			return;
+		}
+
+		if (success && bytesTransferred > 0)
+		{
+			// IOCP 只有正字节 WSASend completion 才能作为对端仍可达的传输进度；排队成功不属于存活证据。
+			// Only a positive-byte WSASend completion is transport progress proving the peer remains reachable; queue acceptance is not liveness evidence.
+			pState->lastTcpSendProgressTime = timestamp();
 		}
 
 		if (success && bytesTransferred < pContext->tcpSendData.size())
@@ -1215,7 +1346,7 @@ int IocpPoller::processPendingEvents(double maxWait)
 #endif
 
 	DWORD dequeueError = ERROR_SUCCESS;
-	if (pendingCompletions_.empty())
+	if (pendingCompletions_.empty() && pendingTcpSendCompletions_.empty())
 	{
 		KBEConcurrency::onStartMainThreadIdling();
 		dequeueError = dequeueCompletions(timeoutMs);
@@ -1231,7 +1362,7 @@ int IocpPoller::processPendingEvents(double maxWait)
 
 	int readyCount = 0;
 	bool completionTimeBudgetExhausted = false;
-	if (!pendingCompletions_.empty())
+	if (!pendingCompletions_.empty() || !pendingTcpSendCompletions_.empty())
 	{
 		const uint64 completionProcessingStart = timestamp();
 		// completionBudget 是主线程公平性保护：
@@ -1244,12 +1375,25 @@ int IocpPoller::processPendingEvents(double maxWait)
 		const uint64 completionProcessingBudget = completionProcessingBudgetMs > 0 ?
 			(uint64(completionProcessingBudgetMs) * stampsPerSecond() / 1000) : 0;
 
-		while (!pendingCompletions_.empty() &&
+		while ((!pendingCompletions_.empty() || !pendingTcpSendCompletions_.empty()) &&
 			(readyCount == 0 || shouldProcessAnotherCompletion(static_cast<uint32>(readyCount),
 				timestamp() - completionProcessingStart, completionProcessingBudget)))
 		{
-			const PendingCompletion pending = pendingCompletions_.front();
-			pendingCompletions_.pop_front();
+			const bool takeTcpSend = !pendingTcpSendCompletions_.empty() &&
+				(pendingCompletions_.empty() ||
+					consecutiveTcpSendCompletionCount_ < IOCP_TCP_SEND_PRIORITY_BURST_SIZE);
+			const PendingCompletion pending = takeTcpSend ?
+				pendingTcpSendCompletions_.front() : pendingCompletions_.front();
+			if (takeTcpSend)
+			{
+				pendingTcpSendCompletions_.pop_front();
+				++consecutiveTcpSendCompletionCount_;
+			}
+			else
+			{
+				pendingCompletions_.pop_front();
+				consecutiveTcpSendCompletionCount_ = 0;
+			}
 			++readyCount;
 			handleCompletion(pending.completionKey, pending.overlapped, pending.bytesTransferred,
 				pending.success, pending.errorCode);
@@ -1257,7 +1401,8 @@ int IocpPoller::processPendingEvents(double maxWait)
 			// The first kernel batch may have been fully consumed. Refill only while
 			// the current tick still has budget; a zero-timeout dequeue never blocks.
 			// 首批内核完成项可能已消费完；仅在本 tick 仍有预算时补批次，零超时不会阻塞。
-			if (pendingCompletions_.empty() && shouldProcessAnotherCompletion(static_cast<uint32>(readyCount),
+			if (pendingCompletions_.empty() && pendingTcpSendCompletions_.empty() &&
+				shouldProcessAnotherCompletion(static_cast<uint32>(readyCount),
 				timestamp() - completionProcessingStart, completionProcessingBudget))
 			{
 				const DWORD refillError = dequeueCompletions(0);

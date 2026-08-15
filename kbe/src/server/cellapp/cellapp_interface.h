@@ -165,7 +165,12 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
 	// entity传送到目的cellapp上的space之后， 返回给之前cellapp的回调
 	CELLAPP_MESSAGE_DECLARE_STREAM(reqTeleportToCellAppCB,							NETWORK_VARIABLE_MESSAGE)
 
-	// 当跨cellapp传送后需要baseapp设置完成状态再清除cellapp记录的标记，此后cellapp才可以继续teleport
+	// BaseApp 提交迁移前要求 Target 再次确认实体、Space 和来源关系仍然有效。
+	// Before committing a migration, BaseApp asks Target to revalidate Entity, Space, and predecessor identity.
+	CELLAPP_MESSAGE_DECLARE_STREAM(reqTeleportToCellAppPrepare,						NETWORK_VARIABLE_MESSAGE)
+
+	// BaseApp 切换权威路由后通知 Target 解锁迁移，并通知 Source 释放转发 Ghost。
+	// After switching the authoritative route, BaseApp unlocks Target and releases Source's forwarding Ghost.
 	CELLAPP_MESSAGE_DECLARE_STREAM(reqTeleportToCellAppOver,						NETWORK_VARIABLE_MESSAGE)
 		
 	// real请求更新属性到ghost

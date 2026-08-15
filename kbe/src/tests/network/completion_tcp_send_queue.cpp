@@ -1,4 +1,6 @@
 #include "network/completion_tcp_send_queue.h"
+#include "network/completion_send_backpressure.h"
+#include "network/channel_inactivity_policy.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -150,6 +152,63 @@ bool testDrainRetryOrdering()
 		require(bufferText(ordered) == "rstnext", "retry crossed the partially sent stream prefix") &&
 		require(queue.empty() && queue.pendingBytes() == 0, "drain fixture did not empty");
 }
+
+bool testProducerBackpressureHysteresis()
+{
+	using KBEngine::Network::CompletionSendBackpressure;
+	return require(!CompletionSendBackpressure::next(false, 2047, false, 2048, 512),
+			"producer backpressure activated below the high watermark") &&
+		require(CompletionSendBackpressure::next(false, 2048, false, 2048, 512),
+			"producer backpressure did not activate at the high watermark") &&
+		require(CompletionSendBackpressure::next(true, 513, false, 2048, 512),
+			"producer backpressure resumed above the low watermark") &&
+		require(!CompletionSendBackpressure::next(true, 512, false, 2048, 512),
+			"producer backpressure did not resume at the low watermark") &&
+		require(CompletionSendBackpressure::next(false, 0, true, 2048, 512),
+			"buffered Channel bundles did not force producer backpressure") &&
+		require(!CompletionSendBackpressure::next(true, 4096, false, 0, 0),
+			"zero high watermark did not disable producer backpressure") &&
+		require(!CompletionSendBackpressure::next(true, 4096, true, 0, 0),
+			"buffered bundles bypassed the disabled producer backpressure setting");
+}
+
+bool testStandaloneBundleCoalescingPolicy()
+{
+	using KBEngine::Network::CompletionSendBackpressure;
+	return require(CompletionSendBackpressure::shouldCoalesceStandaloneBundle(
+			false, true, true, true, true),
+			"backlogged standalone internal completion Bundle was not coalesced") &&
+		require(!CompletionSendBackpressure::shouldCoalesceStandaloneBundle(
+			true, true, true, true, true),
+			"Channel-owned Bundle was coalesced twice") &&
+		require(!CompletionSendBackpressure::shouldCoalesceStandaloneBundle(
+			false, false, true, true, true),
+			"external Channel entered internal Bundle compaction") &&
+		require(!CompletionSendBackpressure::shouldCoalesceStandaloneBundle(
+			false, true, false, true, true),
+			"readiness backend entered completion Bundle compaction") &&
+		require(!CompletionSendBackpressure::shouldCoalesceStandaloneBundle(
+			false, true, true, false, true),
+			"idle Channel entered backlog compaction") &&
+		require(!CompletionSendBackpressure::shouldCoalesceStandaloneBundle(
+			false, true, true, true, false),
+			"empty Channel entered backlog compaction");
+}
+
+bool testInternalCompletionInactivityPolicy()
+{
+	using KBEngine::Network::ChannelInactivityPolicy;
+	return require(ChannelInactivityPolicy::effectiveLastActivity(100, 150, true) == 150,
+			"internal completion liveness ignored positive send progress") &&
+		require(ChannelInactivityPolicy::effectiveLastActivity(100, 150, false) == 100,
+			"external/readiness liveness unexpectedly used send progress") &&
+		require(!ChannelInactivityPolicy::expired(209, 150, 60),
+			"channel expired before the inactivity period") &&
+		require(ChannelInactivityPolicy::expired(210, 150, 60),
+			"channel did not expire at the inactivity boundary") &&
+		require(!ChannelInactivityPolicy::expired(149, 150, 60),
+			"timestamp ordering underflow expired the channel");
+}
 }
 
 int main()
@@ -158,7 +217,10 @@ int main()
 		!testCoalescingAndBoundaries() ||
 		!testPartialCompletionRestore() ||
 		!testBacklogLimit() ||
-		!testDrainRetryOrdering())
+		!testDrainRetryOrdering() ||
+		!testProducerBackpressureHysteresis() ||
+		!testStandaloneBundleCoalescingPolicy() ||
+		!testInternalCompletionInactivityPolicy())
 	{
 		return EXIT_FAILURE;
 	}

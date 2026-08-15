@@ -19,6 +19,45 @@ set_tests_properties(common.pooling PROPERTIES
     PASS_REGULAR_EXPRESSION "COMMON_POOLING_TEST_PASS"
 )
 
+add_executable(kbe_test_common_strutil_conversion
+	debug_helper_stubs.cpp
+	strutil_conversion.cpp
+)
+target_link_libraries(kbe_test_common_strutil_conversion PRIVATE common)
+set_target_properties(kbe_test_common_strutil_conversion PROPERTIES FOLDER "Tests/Common")
+
+if(MSVC)
+	target_compile_options(kbe_test_common_strutil_conversion PRIVATE /W4 /WX /utf-8)
+else()
+	target_compile_options(kbe_test_common_strutil_conversion PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
+add_test(NAME common.strutil_conversion COMMAND kbe_test_common_strutil_conversion)
+set_tests_properties(common.strutil_conversion PROPERTIES
+	LABELS "common;cxx;unit;portable;runtime"
+	PASS_REGULAR_EXPRESSION "COMMON_STRUTIL_CONVERSION_TEST_PASS"
+)
+
+add_executable(kbe_test_script_vector_repr script_vector_repr.cpp)
+target_include_directories(kbe_test_script_vector_repr PRIVATE
+	"${CMAKE_SOURCE_DIR}"
+	"${CMAKE_SOURCE_DIR}/lib"
+)
+target_link_libraries(kbe_test_script_vector_repr PRIVATE KBE::BuildOptions fmt::fmt)
+set_target_properties(kbe_test_script_vector_repr PROPERTIES FOLDER "Tests/Common")
+
+if(MSVC)
+	target_compile_options(kbe_test_script_vector_repr PRIVATE /W4 /WX /utf-8)
+else()
+	target_compile_options(kbe_test_script_vector_repr PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
+add_test(NAME pyscript.vector_repr COMMAND kbe_test_script_vector_repr)
+set_tests_properties(pyscript.vector_repr PROPERTIES
+	LABELS "cellapp;cxx;python;runtime;unit"
+	PASS_REGULAR_EXPRESSION "SCRIPT_VECTOR_REPR_TEST_PASS"
+)
+
 add_executable(kbe_test_method_utype_allocator method_utype_allocator.cpp)
 target_include_directories(kbe_test_method_utype_allocator PRIVATE
 	"${CMAKE_SOURCE_DIR}"

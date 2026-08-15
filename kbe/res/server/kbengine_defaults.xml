@@ -168,6 +168,15 @@
 			<maxCompletionsPerTick> 1024 </maxCompletionsPerTick>
 			<maxProcessingTimeMS> 8 </maxProcessingTimeMS>
 		</completionBudget>
+
+		<!-- 内部 completion TCP 链路的生产端迟滞背压。达到高水位后，Witness 等可延后生产者
+			保留去重后的业务待办，不再生成 Channel Bundle；降到低水位后恢复。0 表示关闭。
+			Producer-side hysteresis for internal completion TCP links. At the high watermark, deferrable
+			producers retain deduplicated business work instead of creating Channel bundles; zero disables it. -->
+		<completionSendBackpressure>
+			<internalHighBytes> 131072 </internalHighBytes>
+			<internalLowBytes> 32768 </internalLowBytes>
+		</completionSendBackpressure>
 		
 		<!-- 发送与接收窗口阈值。messages 按消息数、bytes 按字节数、tickSentBytes 按单 Tick
 			发送量限制；0 表示不限制。critical 是告警或处置阈值，不会预分配对应大小的队列。

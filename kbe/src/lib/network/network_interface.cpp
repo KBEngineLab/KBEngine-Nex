@@ -213,7 +213,7 @@ void NetworkInterface::cleanupChannel(ChannelMap::iterator iter)
 	Channel* pChannel = iter->second;
 	const bool ownsCurrentEntry = pChannel != NULL && pChannel->registeredInNetworkInterface() &&
 		pChannel->pNetworkInterface() == this && pChannel->pEndPoint() != NULL &&
-		pChannel->addr() == iter->first;
+		iter->first.matches(pChannel->addr(), pChannel->protocoltype());
 	channelMap_.erase(iter);
 	kcpWatcherSnapshotValid_ = false;
 
@@ -455,7 +455,21 @@ Channel * NetworkInterface::findChannel(const Address & addr)
 	if (addr.ip == 0)
 		return NULL;
 
-	ChannelMap::iterator iter = channelMap_.find(addr);
+	// Address-only callers historically refer to stream/internal channels. Prefer TCP
+	// while retaining UDP fallback for compatibility with address-driven tooling.
+	// 仅地址调用历史上主要用于流式或内部 Channel，因此优先 TCP；若不存在则回退
+	// UDP，以保持地址驱动工具的兼容性。
+	Channel* pChannel = findChannel(addr, PROTOCOL_TCP);
+	return pChannel != NULL ? pChannel : findChannel(addr, PROTOCOL_UDP);
+}
+
+//-------------------------------------------------------------------------------------
+Channel * NetworkInterface::findChannel(const Address & addr, ProtocolType protocolType)
+{
+	if (addr.ip == 0)
+		return NULL;
+
+	ChannelMap::iterator iter = channelMap_.find(ChannelKey(addr, protocolType));
 	if (iter == channelMap_.end())
 		return NULL;
 
@@ -467,6 +481,38 @@ Channel * NetworkInterface::findChannel(const Address & addr)
 	}
 
 	return pChannel;
+}
+
+//-------------------------------------------------------------------------------------
+Channel * NetworkInterface::findExternalChannel(const Address & addr, ENTITY_ID proxyID)
+{
+	if (addr.ip == 0 || proxyID <= 0)
+		return NULL;
+
+	// TCP 与 UDP 端口空间彼此独立，本机高并发时客户端 KCP 地址可能与内部 TCP 地址完全重号。
+	// Client EntityCalls therefore require both external-channel and bound-proxy identity instead of address-only lookup.
+	Channel* matched = NULL;
+	const ProtocolType protocols[] = { PROTOCOL_TCP, PROTOCOL_UDP };
+	for (ProtocolType protocol : protocols)
+	{
+		Channel* candidate = findChannel(addr, protocol);
+		if (candidate == NULL || !candidate->isExternal() || candidate->proxyID() != proxyID)
+			continue;
+
+		if (matched != NULL && matched != candidate)
+		{
+			// 两条外部连接同时绑定同一 Proxy 表示重连生命周期尚未闭合；拒绝猜测可避免向旧连接泄露数据。
+			// Two external transports bound to one Proxy indicate an unfinished reconnect lifecycle; fail closed instead of leaking to a stale peer.
+			ERROR_MSG(fmt::format(
+				"NetworkInterface::findExternalChannel: ambiguous client channel, addr={}, proxyID={}, tcp/udp both matched.\n",
+				addr.c_str(), proxyID));
+			return NULL;
+		}
+
+		matched = candidate;
+	}
+
+	return matched;
 }
 
 //-------------------------------------------------------------------------------------
@@ -528,7 +574,8 @@ bool NetworkInterface::registerChannel(Channel* pChannel, bool replaceExistingAc
 	const Address & addr = pChannel->addr();
 	KBE_ASSERT(addr.ip != 0);
 	KBE_ASSERT(&pChannel->networkInterface() == this);
-	ChannelMap::iterator iter = channelMap_.find(addr);
+	const ChannelKey key(addr, pChannel->protocoltype());
+	ChannelMap::iterator iter = channelMap_.find(key);
 	Channel * pExisting = iter != channelMap_.end() ? iter->second : NULL;
 	if (pExisting != NULL && currentRegisteredChannel(iter) == NULL)
 	{
@@ -563,7 +610,7 @@ bool NetworkInterface::registerChannel(Channel* pChannel, bool replaceExistingAc
 		cleanupChannel(iter);
 	}
 
-	channelMap_[addr] = ChannelIndexEntry(pChannel, pChannel->sessionEpoch());
+	channelMap_[key] = ChannelIndexEntry(pChannel, pChannel->sessionEpoch());
 	kcpWatcherSnapshotValid_ = false;
 	pChannel->registeredInNetworkInterface(true);
 	if (pChannel->isDestroyed() || pChannel->condemn() > 0)
@@ -586,7 +633,7 @@ bool NetworkInterface::deregisterAllChannels()
 		Channel * pChannel = oldIter->second;
 		const bool ownsCurrentEntry = pChannel != NULL && pChannel->registeredInNetworkInterface() &&
 			pChannel->pNetworkInterface() == this && pChannel->pEndPoint() != NULL &&
-			pChannel->addr() == oldIter->first;
+			oldIter->first.matches(pChannel->addr(), pChannel->protocoltype());
 		if (ownsCurrentEntry)
 		{
 			pChannel->registeredInNetworkInterface(false);
@@ -612,8 +659,9 @@ bool NetworkInterface::deregisterChannel(Channel* pChannel)
 {
 	const Address & addr = pChannel->addr();
 	KBE_ASSERT(pChannel->pEndPoint() != NULL);
-	cancelChannelMaintenance(addr);
-	ChannelMap::iterator iter = channelMap_.find(addr);
+	const ChannelKey key(addr, pChannel->protocoltype());
+	cancelChannelMaintenance(key);
+	ChannelMap::iterator iter = channelMap_.find(key);
 
 	if (iter == channelMap_.end() || !iter->second.matches(pChannel, pChannel->sessionEpoch()) ||
 		!pChannel->registeredInNetworkInterface() || pChannel->pNetworkInterface() != this)
@@ -648,7 +696,7 @@ const Channel* NetworkInterface::currentRegisteredChannel(ChannelMap::const_iter
 	const Channel* pChannel = iter->second;
 	if (pChannel == NULL || !pChannel->registeredInNetworkInterface() ||
 		pChannel->pNetworkInterface() != this || pChannel->pEndPoint() == NULL ||
-		pChannel->addr() != iter->first ||
+		!iter->first.matches(pChannel->addr(), pChannel->protocoltype()) ||
 		!iter->second.matches(pChannel, pChannel->sessionEpoch()))
 	{
 		return NULL;
@@ -723,15 +771,16 @@ void NetworkInterface::requestChannelMaintenance(Channel* pChannel)
 	if (pChannel == NULL || pChannel->pEndPoint() == NULL)
 		return;
 
-	ChannelMap::iterator iter = channelMap_.find(pChannel->addr());
+	const ChannelKey key(pChannel->addr(), pChannel->protocoltype());
+	ChannelMap::iterator iter = channelMap_.find(key);
 	if (iter != channelMap_.end() && iter->second == pChannel)
 		channelMaintenance_.insert(iter->first);
 }
 
 //-------------------------------------------------------------------------------------
-void NetworkInterface::cancelChannelMaintenance(const Address& address)
+void NetworkInterface::cancelChannelMaintenance(const ChannelKey& key)
 {
-	channelMaintenance_.erase(address);
+	channelMaintenance_.erase(key);
 }
 
 //-------------------------------------------------------------------------------------
@@ -784,6 +833,7 @@ KBE_POLLER_METRIC(pollerTcpSendBatchCopiedBytes, tcpSendBatchCopiedBytes)
 KBE_POLLER_METRIC(pollerTcpSendSubmissions, tcpSendSubmissionCount)
 KBE_POLLER_METRIC(pollerTcpSendSubmittedBytes, tcpSendSubmittedBytes)
 KBE_POLLER_METRIC(pollerTcpSendMaxSubmissionBytes, tcpSendMaxSubmissionBytes)
+KBE_POLLER_METRIC(pollerTcpSendInlineCompletions, tcpSendInlineCompletionCount)
 KBE_POLLER_METRIC(pollerTcpSendBacklogBytes, tcpSendBacklogBytes)
 KBE_POLLER_METRIC(pollerTcpSendBacklogPeakBytes, tcpSendBacklogPeakBytes)
 KBE_POLLER_METRIC(pollerTcpSendBackpressureCount, tcpSendBackpressureCount)
@@ -806,6 +856,19 @@ KBE_POLLER_METRIC(pollerCompletionDequeueCallCount, completionDequeueCallCount)
 KBE_POLLER_METRIC(pollerCompletionDequeuedCount, completionDequeuedCount)
 KBE_POLLER_METRIC(pollerCompletionMaxDequeuedBatchCount, completionMaxDequeuedBatchCount)
 KBE_POLLER_METRIC(pollerCompletionPendingLocalCount, completionPendingLocalCount)
+KBE_POLLER_METRIC(pollerIoUringSubmitCalls, ioUringSubmitCallCount)
+KBE_POLLER_METRIC(pollerIoUringSubmitFailures, ioUringSubmitFailureCount)
+KBE_POLLER_METRIC(pollerIoUringSubmitPartials, ioUringSubmitPartialCount)
+KBE_POLLER_METRIC(pollerIoUringSqCapacityExhaustions, ioUringSqCapacityExhaustionCount)
+KBE_POLLER_METRIC(pollerIoUringSqDropped, ioUringSqDroppedCount)
+KBE_POLLER_METRIC(pollerIoUringCqOverflow, ioUringCqOverflowCount)
+KBE_POLLER_METRIC(pollerIoUringCancelRequests, ioUringCancelRequestCount)
+KBE_POLLER_METRIC(pollerIoUringCancelCompletions, ioUringCancelCompletionCount)
+KBE_POLLER_METRIC(pollerIoUringStaleCompletions, ioUringStaleCompletionCount)
+KBE_POLLER_METRIC(pollerIoUringUdpReceiveDepthDeficits, ioUringUdpReceiveDepthDeficitCount)
+KBE_POLLER_METRIC(pollerIoUringUdpReceiveWouldBlocks, ioUringUdpReceiveWouldBlockCount)
+KBE_POLLER_METRIC(pollerIoUringSqEntries, ioUringSqEntryCount)
+KBE_POLLER_METRIC(pollerIoUringCqEntries, ioUringCqEntryCount)
 
 #undef KBE_POLLER_METRIC
 

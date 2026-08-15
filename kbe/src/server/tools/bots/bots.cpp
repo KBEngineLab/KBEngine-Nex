@@ -83,6 +83,7 @@ uint64 pythonLatencyWindowNanoseconds()
 }
 
 bool g_botsDevMode = false;
+bool g_botsPublishComponent = false;
 bool g_botsReuseAccounts = false;
 int8 g_botsTransportOverride = -1;
 int8 g_botsAllowTcpFallbackOverride = -1;
@@ -191,13 +192,17 @@ bool Bots::initialize()
 			WARNING_MSG("Bots::initialize: --dev requested but Logger is unavailable; continuing with local logs.\n");
 		}
 
-		// 普通 Bots 是外部压测客户端，不应进入 Machine 的服务端组件目录。
-		// Normal Bots are external load-test clients and must not enter Machine's server-component registry.
+	}
+
+	// 性能采集需要通过 Machine 发现 Bots Watcher，但不应因此启用 Logger 转发。
+	// Performance collection needs Machine discovery for the Bots Watcher without enabling Logger forwarding.
+	if (g_botsPublishComponent)
+	{
 		this->dispatcher().addTask(&Components::getSingleton());
 		componentPublishingEnabled_ = true;
 
-		// 开发模式注册后才需要维持内部组件心跳，避免普通压测产生无效的组件消息与连接。
-		// Internal-component heartbeats start only after development registration, avoiding irrelevant traffic and channels in load tests.
+		// 仅在显式发布后维持内部组件心跳，普通 Bots 不产生额外组件消息与连接。
+		// Maintain internal-component heartbeats only after explicit publishing so normal Bots add no component traffic or channels.
 		pActiveReportHandler_ = new BotsActiveReportHandler(this);
 		pActiveReportHandler_->start(KBE_MAX(1.f, Network::g_channelInternalTimeout / 2.f));
 	}
@@ -209,6 +214,7 @@ bool Bots::initialize()
 bool Bots::initializeWatcher()
 {
 	WATCH_OBJECT("bots/devMode", g_botsDevMode);
+	WATCH_OBJECT("bots/publishComponent", g_botsPublishComponent);
 	WATCH_OBJECT("bots/reuseAccounts", g_botsReuseAccounts);
 	WATCH_OBJECT("bots/transport/configured", this, &Bots::configuredTransport);
 	WATCH_OBJECT("bots/transport/allowTcpFallback", this, &Bots::configuredAllowTcpFallback);
@@ -319,9 +325,23 @@ bool Bots::initializeWatcher()
 	WATCH_OBJECT("bots/performance/completionDequeued", &networkInterface(), &Network::NetworkInterface::pollerCompletionDequeuedCount);
 	WATCH_OBJECT("bots/performance/completionMaxDequeuedBatch", &networkInterface(), &Network::NetworkInterface::pollerCompletionMaxDequeuedBatchCount);
 	WATCH_OBJECT("bots/performance/completionPendingLocal", &networkInterface(), &Network::NetworkInterface::pollerCompletionPendingLocalCount);
+	WATCH_OBJECT("bots/performance/ioUringSubmitCalls", &networkInterface(), &Network::NetworkInterface::pollerIoUringSubmitCalls);
+	WATCH_OBJECT("bots/performance/ioUringSubmitFailures", &networkInterface(), &Network::NetworkInterface::pollerIoUringSubmitFailures);
+	WATCH_OBJECT("bots/performance/ioUringSubmitPartials", &networkInterface(), &Network::NetworkInterface::pollerIoUringSubmitPartials);
+	WATCH_OBJECT("bots/performance/ioUringSqCapacityExhaustions", &networkInterface(), &Network::NetworkInterface::pollerIoUringSqCapacityExhaustions);
+	WATCH_OBJECT("bots/performance/ioUringSqDropped", &networkInterface(), &Network::NetworkInterface::pollerIoUringSqDropped);
+	WATCH_OBJECT("bots/performance/ioUringCqOverflow", &networkInterface(), &Network::NetworkInterface::pollerIoUringCqOverflow);
+	WATCH_OBJECT("bots/performance/ioUringCancelRequests", &networkInterface(), &Network::NetworkInterface::pollerIoUringCancelRequests);
+	WATCH_OBJECT("bots/performance/ioUringCancelCompletions", &networkInterface(), &Network::NetworkInterface::pollerIoUringCancelCompletions);
+	WATCH_OBJECT("bots/performance/ioUringStaleCompletions", &networkInterface(), &Network::NetworkInterface::pollerIoUringStaleCompletions);
+	WATCH_OBJECT("bots/performance/ioUringUdpReceiveDepthDeficits", &networkInterface(), &Network::NetworkInterface::pollerIoUringUdpReceiveDepthDeficits);
+	WATCH_OBJECT("bots/performance/ioUringUdpReceiveWouldBlocks", &networkInterface(), &Network::NetworkInterface::pollerIoUringUdpReceiveWouldBlocks);
+	WATCH_OBJECT("bots/performance/ioUringSqEntries", &networkInterface(), &Network::NetworkInterface::pollerIoUringSqEntries);
+	WATCH_OBJECT("bots/performance/ioUringCqEntries", &networkInterface(), &Network::NetworkInterface::pollerIoUringCqEntries);
 	WATCH_OBJECT("bots/performance/tcpSendSubmissions", &networkInterface(), &Network::NetworkInterface::pollerTcpSendSubmissions);
 	WATCH_OBJECT("bots/performance/tcpSendSubmittedBytes", &networkInterface(), &Network::NetworkInterface::pollerTcpSendSubmittedBytes);
 	WATCH_OBJECT("bots/performance/tcpSendMaxSubmissionBytes", &networkInterface(), &Network::NetworkInterface::pollerTcpSendMaxSubmissionBytes);
+	WATCH_OBJECT("bots/performance/tcpSendInlineCompletions", &networkInterface(), &Network::NetworkInterface::pollerTcpSendInlineCompletions);
 	WATCH_OBJECT("bots/performance/discardedPacketsAfterClose", &networkInterface(), &Network::NetworkInterface::discardedPacketsAfterCloseCount);
 	WATCH_OBJECT("bots/performance/contextsOutstandingBytes", &networkInterface(), &Network::NetworkInterface::pollerContextsOutstandingBytes);
 	WATCH_OBJECT("bots/performance/contextsCachedBytes", &networkInterface(), &Network::NetworkInterface::pollerContextsCachedBytes);
@@ -2078,6 +2098,9 @@ void Bots::delSpaceData(Network::Channel* pChannel, SPACE_ID spaceID, const std:
 //-------------------------------------------------------------------------------------		
 void Bots::queryWatcher(Network::Channel* pChannel, MemoryStream& s)
 {
+	if (pChannel->isExternal())
+		return;
+
 	// Bots 的连接创建/重试会高频复用 Channel 对象；统计扫描前清除失效地址索引。
 	// Bots creation and retry reuse Channel objects aggressively; remove stale address entries before metric scans.
 	networkInterface().purgeStaleChannelIndexEntries();
@@ -2086,6 +2109,23 @@ void Bots::queryWatcher(Network::Channel* pChannel, MemoryStream& s)
 
 	std::string path;
 	s >> path;
+
+	const std::string& expectedToken = ServerConfig::getSingleton().managementAdminToken();
+	if (!expectedToken.empty())
+	{
+		std::string actualToken;
+		if (s.length() > 0)
+			s >> actualToken;
+
+		if (actualToken != expectedToken)
+		{
+			// 认证失败不得输出 Token 明文，避免诊断入口把共享密钥写入日志。
+			// Authentication failures must not log token contents or leak the shared secret through diagnostics.
+			WARNING_MSG(fmt::format("Bots::queryWatcher: reject unauthorized request from {}.\n",
+				pChannel->c_str()));
+			return;
+		}
+	}
 
 	MemoryStream::SmartPoolObjectPtr readStreamPtr = MemoryStream::createSmartPoolObj(OBJECTPOOL_POINT);
 	WatcherPaths::root().readWatchers(path, readStreamPtr.get()->get());

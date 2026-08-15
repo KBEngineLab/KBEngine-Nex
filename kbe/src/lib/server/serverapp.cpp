@@ -244,6 +244,7 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/poller/tcpSendSubmissions", &networkInterface_, &Network::NetworkInterface::pollerTcpSendSubmissions);
 	WATCH_OBJECT("network/poller/tcpSendSubmittedBytes", &networkInterface_, &Network::NetworkInterface::pollerTcpSendSubmittedBytes);
 	WATCH_OBJECT("network/poller/tcpSendMaxSubmissionBytes", &networkInterface_, &Network::NetworkInterface::pollerTcpSendMaxSubmissionBytes);
+	WATCH_OBJECT("network/poller/tcpSendInlineCompletions", &networkInterface_, &Network::NetworkInterface::pollerTcpSendInlineCompletions);
 	WATCH_OBJECT("network/poller/tcpSendBacklogBytes", &networkInterface_, &Network::NetworkInterface::pollerTcpSendBacklogBytes);
 	WATCH_OBJECT("network/poller/tcpSendBacklogPeakBytes", &networkInterface_, &Network::NetworkInterface::pollerTcpSendBacklogPeakBytes);
 	WATCH_OBJECT("network/poller/tcpSendBackpressure", &networkInterface_, &Network::NetworkInterface::pollerTcpSendBackpressureCount);
@@ -268,6 +269,19 @@ bool ServerApp::initializeWatcher()
 	WATCH_OBJECT("network/poller/completionDequeued", &networkInterface_, &Network::NetworkInterface::pollerCompletionDequeuedCount);
 	WATCH_OBJECT("network/poller/completionMaxDequeuedBatch", &networkInterface_, &Network::NetworkInterface::pollerCompletionMaxDequeuedBatchCount);
 	WATCH_OBJECT("network/poller/completionPendingLocal", &networkInterface_, &Network::NetworkInterface::pollerCompletionPendingLocalCount);
+	WATCH_OBJECT("network/poller/ioUringSubmitCalls", &networkInterface_, &Network::NetworkInterface::pollerIoUringSubmitCalls);
+	WATCH_OBJECT("network/poller/ioUringSubmitFailures", &networkInterface_, &Network::NetworkInterface::pollerIoUringSubmitFailures);
+	WATCH_OBJECT("network/poller/ioUringSubmitPartials", &networkInterface_, &Network::NetworkInterface::pollerIoUringSubmitPartials);
+	WATCH_OBJECT("network/poller/ioUringSqCapacityExhaustions", &networkInterface_, &Network::NetworkInterface::pollerIoUringSqCapacityExhaustions);
+	WATCH_OBJECT("network/poller/ioUringSqDropped", &networkInterface_, &Network::NetworkInterface::pollerIoUringSqDropped);
+	WATCH_OBJECT("network/poller/ioUringCqOverflow", &networkInterface_, &Network::NetworkInterface::pollerIoUringCqOverflow);
+	WATCH_OBJECT("network/poller/ioUringCancelRequests", &networkInterface_, &Network::NetworkInterface::pollerIoUringCancelRequests);
+	WATCH_OBJECT("network/poller/ioUringCancelCompletions", &networkInterface_, &Network::NetworkInterface::pollerIoUringCancelCompletions);
+	WATCH_OBJECT("network/poller/ioUringStaleCompletions", &networkInterface_, &Network::NetworkInterface::pollerIoUringStaleCompletions);
+	WATCH_OBJECT("network/poller/ioUringUdpReceiveDepthDeficits", &networkInterface_, &Network::NetworkInterface::pollerIoUringUdpReceiveDepthDeficits);
+	WATCH_OBJECT("network/poller/ioUringUdpReceiveWouldBlocks", &networkInterface_, &Network::NetworkInterface::pollerIoUringUdpReceiveWouldBlocks);
+	WATCH_OBJECT("network/poller/ioUringSqEntries", &networkInterface_, &Network::NetworkInterface::pollerIoUringSqEntries);
+	WATCH_OBJECT("network/poller/ioUringCqEntries", &networkInterface_, &Network::NetworkInterface::pollerIoUringCqEntries);
 	WATCH_OBJECT("network/poller/discardedPacketsAfterClose", &networkInterface_, &Network::NetworkInterface::discardedPacketsAfterCloseCount);
 	// Message categories are classified once when handlers are installed. Watcher reads
 	// process-local counters directly, so collection does not scan handlers or channels.

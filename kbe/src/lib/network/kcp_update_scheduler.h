@@ -21,6 +21,7 @@ public:
 
 	void schedule(Channel& channel, int64 microseconds);
 	void scheduleAck(Channel& channel);
+	void scheduleReceive(Channel& channel);
 	void cancel(Channel& channel);
 	bool isScheduled(const Channel& channel) const;
 
@@ -72,6 +73,7 @@ private:
 	EventDispatcher& dispatcher_;
 	KcpUpdateQueue queue_;
 	KcpUpdateQueue ackQueue_;
+	KcpUpdateQueue receiveQueue_;
 	TimerHandle timerHandle_;
 	uint64 timerDueTime_;
 	bool processing_;

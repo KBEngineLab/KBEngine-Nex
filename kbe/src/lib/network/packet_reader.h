@@ -79,6 +79,13 @@ protected:
 
 	Network::MessageID			currMsgID_;
 	Network::MessageLength1		currMsgLen_;
+	// 区分消息ID是否跨包读取，以便协议错误日志准确标记原始字节窗口中的故障位置。
+	// Track fragmented message IDs so protocol-error logs can mark the correct focus within the raw byte window.
+	bool						currMsgIDFragmented_;
+	// 保留上一条成功完成的消息边界，未知消息ID出现时可直接定位首个破坏字节流的前驱消息。
+	// Retain the last completed boundary so an unknown message ID identifies the predecessor that first corrupted the byte stream.
+	Network::MessageID			lastCompletedMsgID_;
+	Network::MessageLength1		lastCompletedMsgLen_;
 	
 	Channel*					pChannel_;
 };

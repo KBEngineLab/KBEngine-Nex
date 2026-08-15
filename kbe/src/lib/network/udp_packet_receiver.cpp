@@ -86,7 +86,12 @@ UDPPacketReceiver::~UDPPacketReceiver()
 //-------------------------------------------------------------------------------------
 Channel* UDPPacketReceiver::findChannel(const Address& address)
 {
-	return pNetworkInterface_->findChannel(address);
+	// TCP and UDP may legitimately share the same numeric peer port. The listener
+	// must query the UDP namespace explicitly or a transient TCP Channel can consume
+	// the lookup and prevent the KCP handshake from ever receiving its ACK.
+	// TCP 与 UDP 可以合法共享同一数值对端端口。listener 必须显式查询 UDP
+	// 命名空间，否则临时 TCP Channel 会占用查找结果并使 KCP 握手永远收不到 ACK。
+	return pNetworkInterface_->findChannel(address, PROTOCOL_UDP);
 }
 
 //-------------------------------------------------------------------------------------

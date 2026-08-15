@@ -28,6 +28,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "helper/debug_helper.h"
 #include "server/components.h"
 #include "network/address.h"
+#include "network/common.h"
 
 namespace KBEngine { 
 
@@ -55,6 +56,8 @@ public:
 			lastProcessTime = 0;
 			forceInternalLogin = false;
 			needCheckPassword = true;
+			clientProtocolType = Network::PROTOCOL_TCP;
+			clientChannelEpoch = 0;
 		}
 
 		Network::Address addr;
@@ -69,6 +72,10 @@ public:
 		uint64 deadline;
 		bool forceInternalLogin;
 		bool needCheckPassword;
+		// BaseApp 的数据库查询是异步的；保存传输命名空间和生命周期号，避免回调时仅凭地址命中重号或复用的 Channel。
+		// BaseApp database queries are asynchronous; preserve transport namespace and lifetime identity so callbacks cannot bind a colliding or reused Channel by address alone.
+		Network::ProtocolType clientProtocolType;
+		uint64 clientChannelEpoch;
 	};
 
 	typedef KBEUnordered_map<std::string, PLInfos*> PTINFO_MAP;

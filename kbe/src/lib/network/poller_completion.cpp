@@ -42,6 +42,8 @@ CompletionPoller::SocketState::SocketState(KBESOCKET socketArg) :
 	pPendingReadContext(NULL),
 	pendingReadContexts(),
 	pPendingWriteContext(NULL),
+	pendingTcpWriteBytes(0),
+	lastTcpSendProgressTime(0),
 	pendingTcpSends(),
 	pendingUdpSends(),
 	pendingUdpSendBytes(0),
@@ -68,6 +70,7 @@ CompletionPoller::CompletionPoller() :
 	tcpSendOwnershipTransferCount_(0),
 	tcpSendBatchCopyCount_(0),
 	tcpSendBatchCopiedBytes_(0),
+	tcpSendInlineCompletionCount_(0),
 	tcpSendBacklogPeakBytes_(0),
 	tcpSendBackpressureCount_(0),
 	tcpSendOversizedRejectCount_(0),
@@ -193,7 +196,7 @@ bool CompletionPoller::takeUdpReceivedData(KBESOCKET fd, std::vector<char>& data
 }
 
 //-------------------------------------------------------------------------------------
-bool CompletionPoller::queueTcpSend(KBESOCKET fd, const void* data, int len)
+bool CompletionPoller::queueTcpSend(KBESOCKET fd, const void* data, int len, size_t maxPendingBytes)
 {
 	// 上层交来的 TCP 数据只入队，真正发送由具体 poller arm/write 完成。
 	// The upper layer only queues TCP data here; the concrete poller performs the actual arm/write.
@@ -229,8 +232,9 @@ bool CompletionPoller::queueTcpSend(KBESOCKET fd, const void* data, int len)
 		state.kind = SOCKET_KIND_TCP;
 	}
 
+	const size_t backlogLimit = maxPendingBytes > 0 ? maxPendingBytes : COMPLETION_TCP_SEND_BACKLOG_BYTES;
 	const CompletionTcpSendQueue::PushResult result = state.pendingTcpSends.pushResult(
-		data, static_cast<size_t>(len), COMPLETION_TCP_SEND_BACKLOG_BYTES);
+		data, static_cast<size_t>(len), backlogLimit);
 	if (result != CompletionTcpSendQueue::PUSH_ACCEPTED)
 	{
 		if (result == CompletionTcpSendQueue::PUSH_BACKPRESSURED)
@@ -252,7 +256,7 @@ bool CompletionPoller::queueTcpSend(KBESOCKET fd, const void* data, int len)
 	}
 
 	tcpSendBacklogPeakBytes_ = std::max<uint64>(tcpSendBacklogPeakBytes_,
-		static_cast<uint64>(state.pendingTcpSends.pendingBytes()));
+		static_cast<uint64>(state.pendingTcpSends.pendingBytes() + state.pendingTcpWriteBytes));
 
 	return true;
 }
@@ -320,6 +324,24 @@ bool CompletionPoller::hasPendingSend(KBESOCKET fd) const
 }
 
 //-------------------------------------------------------------------------------------
+uint64 CompletionPoller::tcpSendPendingBytes(KBESOCKET fd) const
+{
+	SocketStates::const_iterator iter = socketStates_.find(fd);
+	if (iter == socketStates_.end())
+		return 0;
+
+	return static_cast<uint64>(iter->second->pendingTcpSends.pendingBytes() +
+		iter->second->pendingTcpWriteBytes);
+}
+
+//-------------------------------------------------------------------------------------
+uint64 CompletionPoller::tcpSendLastProgressTime(KBESOCKET fd) const
+{
+	SocketStates::const_iterator iter = socketStates_.find(fd);
+	return iter != socketStates_.end() ? iter->second->lastTcpSendProgressTime : 0;
+}
+
+//-------------------------------------------------------------------------------------
 uint32 CompletionPoller::pendingRearmCount() const
 {
 	return static_cast<uint32>(rearmQueue_.size());
@@ -341,12 +363,14 @@ uint64 CompletionPoller::rearmRetryCount() const
 uint64 CompletionPoller::tcpSendOwnershipTransferCount() const { return tcpSendOwnershipTransferCount_; }
 uint64 CompletionPoller::tcpSendBatchCopyCount() const { return tcpSendBatchCopyCount_; }
 uint64 CompletionPoller::tcpSendBatchCopiedBytes() const { return tcpSendBatchCopiedBytes_; }
+uint64 CompletionPoller::tcpSendInlineCompletionCount() const { return tcpSendInlineCompletionCount_; }
 uint64 CompletionPoller::tcpSendBacklogBytes() const
 {
 	uint64 bytes = 0;
 	for (SocketStates::const_iterator iter = socketStates_.begin(); iter != socketStates_.end(); ++iter)
 	{
-		bytes += static_cast<uint64>(iter->second->pendingTcpSends.pendingBytes());
+		bytes += static_cast<uint64>(iter->second->pendingTcpSends.pendingBytes() +
+			iter->second->pendingTcpWriteBytes);
 	}
 	return bytes;
 }
@@ -640,6 +664,7 @@ void CompletionPoller::clearPendingSends(SocketState& state)
 	// 之前多个后端各自写一遍 clear + 归零，未来一旦新增队列字段很容易漏改；
 	// 这里集中处理，保证 TCP/UDP 两条发送路径的状态始终同步。
 	state.pendingTcpSends.clear();
+	state.pendingTcpWriteBytes = 0;
 	state.pendingUdpSends.clear();
 	state.pendingUdpSendBytes = 0;
 	state.pendingUdpSendBudget.clear();

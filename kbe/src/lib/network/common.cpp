@@ -45,6 +45,14 @@ uint32 g_SOMAXCONN = 5;
 uint32 g_maxCompletionsPerTick = 1024;
 uint32 g_maxCompletionProcessingTimeMS = 8;
 
+// 8 MiB 是内部 completion 发送队列的故障保护上限，不是正常排队目标。可延后生产者在
+// 128 KiB 停止、32 KiB 恢复，使迁移和生命周期控制消息不会排在数十秒的 Witness 数据之后。
+// The 8 MiB internal completion cap is a failure boundary, not a normal queue target. Deferrable
+// producers pause at 128 KiB and resume at 32 KiB so migration/lifecycle control does not wait
+// behind tens of seconds of Witness traffic.
+uint32 g_completionIntTcpSendBackpressureHighBytes = 128 * 1024;
+uint32 g_completionIntTcpSendBackpressureLowBytes = 32 * 1024;
+
 // 这些默认值与 Nex 2.8 SDK 的 KCP 参数保持一致，避免协议两端窗口与更新频率失配。
 // These defaults match the Nex 2.8 SDK KCP settings to avoid mismatched windows and update cadence across peers.
 uint32 g_rudp_intWritePacketsQueueSize = 65535;

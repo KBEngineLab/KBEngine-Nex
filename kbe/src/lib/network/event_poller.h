@@ -99,7 +99,7 @@ public:
 
 	// 将 TCP 数据交给完成后端排队；旧后端返回 false，继续使用原有 PacketSender 发送路径。
 	// Queue TCP data in a completion backend; legacy backends return false and keep the original PacketSender path.
-	virtual bool queueTcpSend(KBESOCKET fd, const void* data, int len);
+	virtual bool queueTcpSend(KBESOCKET fd, const void* data, int len, size_t maxPendingBytes = 0);
 
 	// 将 UDP 数据报交给完成后端排队；旧后端返回 false，保持原有 UDP 发送语义。
 	// Queue a UDP datagram in a completion backend; legacy backends return false and preserve existing UDP send semantics.
@@ -108,6 +108,14 @@ public:
 	// 查询指定 socket 是否仍有完成后端待发送数据，用于避免重复注册写事件。
 	// Report whether a socket still has pending completion-backend sends to avoid duplicate write registration.
 	virtual bool hasPendingSend(KBESOCKET fd) const;
+
+	// 返回指定 TCP socket 尚未提交完成的用户态队列字节数；readiness 后端返回 0。
+	// Return user-space queued bytes not yet completed for one TCP socket; readiness backends return zero.
+	virtual uint64 tcpSendPendingBytes(KBESOCKET fd) const;
+
+	// 返回指定 TCP socket 最近一次实际完成正数字节发送的时间；非 completion 后端返回 0。
+	// Return the timestamp of the latest positive-byte TCP send completion; non-completion backends return zero.
+	virtual uint64 tcpSendLastProgressTime(KBESOCKET fd) const;
 
 	// 返回 completion 后端重新投递队列的诊断指标；readiness 后端始终返回 0。
 	// Return diagnostic counters for the completion rearm queue; readiness backends always report zero.
@@ -127,6 +135,7 @@ public:
 	virtual uint64 tcpSendSubmissionCount() const;
 	virtual uint64 tcpSendSubmittedBytes() const;
 	virtual uint64 tcpSendMaxSubmissionBytes() const;
+	virtual uint64 tcpSendInlineCompletionCount() const;
 	virtual uint64 tcpSendBacklogBytes() const;
 	virtual uint64 tcpSendBacklogPeakBytes() const;
 	virtual uint64 tcpSendBackpressureCount() const;
@@ -151,6 +160,21 @@ public:
 	virtual uint64 completionDequeuedCount() const;
 	virtual uint64 completionMaxDequeuedBatchCount() const;
 	virtual uint64 completionPendingLocalCount() const;
+	// Raw io_uring diagnostics. Non-io_uring backends return zero without platform casts.
+	// raw io_uring 诊断指标；非 io_uring 后端统一返回 0，观察者无需平台类型转换。
+	virtual uint64 ioUringSubmitCallCount() const;
+	virtual uint64 ioUringSubmitFailureCount() const;
+	virtual uint64 ioUringSubmitPartialCount() const;
+	virtual uint64 ioUringSqCapacityExhaustionCount() const;
+	virtual uint64 ioUringSqDroppedCount() const;
+	virtual uint64 ioUringCqOverflowCount() const;
+	virtual uint64 ioUringCancelRequestCount() const;
+	virtual uint64 ioUringCancelCompletionCount() const;
+	virtual uint64 ioUringStaleCompletionCount() const;
+	virtual uint64 ioUringUdpReceiveDepthDeficitCount() const;
+	virtual uint64 ioUringUdpReceiveWouldBlockCount() const;
+	virtual uint64 ioUringSqEntryCount() const;
+	virtual uint64 ioUringCqEntryCount() const;
 
 	void clearSpareTime()		{spareTime_ = 0;}
 	uint64 spareTime() const	{return spareTime_;}

@@ -40,6 +40,16 @@ namespace KBEngine {
 namespace Network
 {
 
+namespace
+{
+// Internal component links are few and trusted, but one game-thread callback can
+// legitimately generate several MiB before completion callbacks run again. Keep
+// the external per-socket limit unchanged and bound only internal links at 8 MiB.
+// 内部组件链路数量少且受信，但单个游戏线程回调可能在 completion 再次运行前
+// 合法产生数 MiB 数据。外部 socket 仍保持原限制，仅将内部链路有界扩展到 8 MiB。
+const size_t INTERNAL_COMPLETION_TCP_SEND_BACKLOG_BYTES = 8 * 1024 * 1024;
+}
+
 //-------------------------------------------------------------------------------------
 static ObjectPool<TCPPacketSender> _g_objPool("TCPPacketSender");
 ObjectPool<TCPPacketSender>& TCPPacketSender::ObjPool()
@@ -246,7 +256,8 @@ Reason TCPPacketSender::processFilterPacket(Channel* pChannel, Packet * pPacket,
 				return REASON_GENERAL_NETWORK;
 			}
 		}
-		else if (!pPoller->queueTcpSend(*pEndpoint, pPacket->data() + pPacket->sentSize, remaining))
+		else if (!pPoller->queueTcpSend(*pEndpoint, pPacket->data() + pPacket->sentSize, remaining,
+			pChannel->isInternal() ? INTERNAL_COMPLETION_TCP_SEND_BACKLOG_BYTES : 0))
 		{
 			// 队列上限会设置 would-block 并保持可重试；无效或已关闭 socket 必须沿用同步发送的错误分类并关闭 Channel。
 			// Queue backpressure sets would-block and remains retryable; an invalid or closed socket follows synchronous-send error mapping and closes the Channel.
@@ -286,4 +297,3 @@ Reason TCPPacketSender::processFilterPacket(Channel* pChannel, Packet * pPacket,
 //-------------------------------------------------------------------------------------
 }
 }
-

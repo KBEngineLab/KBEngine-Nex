@@ -35,6 +35,11 @@ def create_config_overlay(
     server_runtime_log_level: str | None = None,
     bots_account_suffix_start: int | None = None,
     database_connections: int | None = None,
+    database_host: str | None = None,
+    database_port: int | None = None,
+    database_name: str | None = None,
+    database_username: str | None = None,
+    database_password: str | None = None,
     baseapp_external_port_count: int | None = None,
     performance_probes_enabled: bool = False,
     bots_transport: str = "kcp",
@@ -86,15 +91,44 @@ def create_config_overlay(
             account_infos = ET.SubElement(bots_node, "account_infos")
         set_xml_value(account_infos, "account_name_suffix_inc", bots_account_suffix_start)
 
+    database_interface = root.find("./dbmgr/databaseInterfaces/default")
     if database_connections is not None:
         if not 1 <= database_connections <= 1024:
             raise ValueError("database connections must be between 1 and 1024")
-        database_interface = root.find("./dbmgr/databaseInterfaces/default")
         if database_interface is None:
             raise ValueError("assets do not define the default database interface")
         # 连接池容量属于压测拓扑的一部分；仅写隔离 overlay，避免污染业务资产配置。
         # Pool capacity is part of the benchmark topology; only the isolated overlay is changed.
         set_xml_value(database_interface, "numConnections", database_connections)
+
+    database_override_requested = any(
+        value is not None
+        for value in (database_host, database_port, database_name, database_username, database_password)
+    )
+    if database_override_requested:
+        if database_interface is None:
+            raise ValueError("assets do not define the default database interface")
+        if not database_name or not database_username or database_password is None:
+            raise ValueError("database override requires name, username, and password")
+        if database_host is not None:
+            if not database_host.strip():
+                raise ValueError("database host must not be empty")
+            set_xml_value(database_interface, "host", database_host.strip())
+        if database_port is not None:
+            if not 1 <= database_port <= 65535:
+                raise ValueError("database port must be between 1 and 65535")
+            set_xml_value(database_interface, "port", database_port)
+        set_xml_value(database_interface, "databaseName", database_name)
+        auth = database_interface.find("auth")
+        if auth is None:
+            auth = ET.SubElement(database_interface, "auth")
+        set_xml_value(auth, "username", database_username)
+        set_xml_value(auth, "password", database_password)
+        # Password overrides are plaintext test credentials. Keeping the encrypted
+        # marker would make DBMgr attempt RSA decryption before the run can start.
+        # 数据库覆盖参数是明文测试凭据；若保留加密标记，DBMgr 会尝试 RSA 解密并在
+        # 压测开始前失败，因此隔离 overlay 必须同步关闭 encrypt。
+        set_xml_value(auth, "encrypt", "false")
 
     if baseapp_external_port_count is not None:
         if not 1 <= baseapp_external_port_count <= 1000:
@@ -332,4 +366,3 @@ def write_scenario_metadata(output_root: Path, scenario: dict[str, Any], bots: i
     metadata = dict(scenario)
     metadata["configured_bots"] = bots
     (output_root / "scenario.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
-

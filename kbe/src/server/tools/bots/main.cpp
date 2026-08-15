@@ -122,6 +122,11 @@ int KBENGINE_MAIN(int argc, char* argv[])
 		if (std::string(argv[index]) == "--dev")
 		{
 			g_botsDevMode = true;
+			g_botsPublishComponent = true;
+		}
+		else if (std::string(argv[index]) == "--publish-component")
+		{
+			g_botsPublishComponent = true;
 		}
 		else if (std::string(argv[index]) == "--reuse-existing-accounts")
 		{
@@ -150,4 +155,3 @@ int KBENGINE_MAIN(int argc, char* argv[])
 
 	return kbeMainT<Bots>(argc, argv, g_componentType, -1, -1, 0, 0, 0, "");
 }
-

@@ -23,6 +23,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "vector3.h"
 #include "vector4.h"
 #include "pyscript/py_gc.h"
+#include "vector_repr.h"
 
 namespace KBEngine{ namespace script{
 
@@ -178,19 +179,11 @@ PyObject* ScriptVector4::tp_new(PyTypeObject* type, PyObject* args, PyObject* kw
 //-------------------------------------------------------------------------------------
 PyObject* ScriptVector4::tp_repr()
 {
-	char str[128];
-	Vector4 v = this->getVector();
-
-	strcpy(str, "Vector4(");
-	for(int i=0; i < VECTOR_SIZE; ++i)
-	{
-		if (i > 0)
-			strcat(str, ", ");
-		kbe_snprintf(str + strlen(str), 128, "%f", v[i]);
-	}
-
-	strcat(str, ")");
-	return PyUnicode_FromString(str);
+	const Vector4& v = this->getVector();
+	// 与 Vector2/3 使用同一动态格式化策略，避免四分量类型在更短输入下再次触发同类边界错误。
+	// Use the same dynamic strategy as Vector2/3 so the four-component type cannot reproduce the same boundary failure with even shorter input.
+	const std::string repr = detail::formatVector4Repr(v);
+	return PyUnicode_FromStringAndSize(repr.data(), static_cast<Py_ssize_t>(repr.size()));
 }
 
 //-------------------------------------------------------------------------------------

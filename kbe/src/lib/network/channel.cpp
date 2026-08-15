@@ -42,6 +42,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/udp_packet.h"
 #include "network/message_handler.h"
 #include "network/network_stats.h"
+#include "network/completion_send_backpressure.h"
+#include "network/channel_inactivity_policy.h"
 #include "helper/profile.h"
 #include "common/ssl.h"
 #include "common/kbeversion.h"
@@ -54,15 +56,14 @@ namespace Network
 
 namespace
 {
-// 空闲 KCP 没有需要刷新、确认或重传的状态；它不需要继续占用全局调度堆。
-// 收到数据或提交发送队列时，接收器/发送器会重新调用 scheduleKcpUpdate() 唤醒它。
-// A fully idle KCP has nothing to flush, acknowledge, or retransmit, so it does not
-// need to occupy the global scheduler heap. Receives and sends call scheduleKcpUpdate()
-// again before touching KCP state and wake the connection on demand.
-bool isKcpIdle(const ikcpcb& kcp)
+// Reassembled and out-of-order receive data does not require a protocol clock: incoming
+// datagrams explicitly wake ACK/update work, while complete application messages use the
+// independent receive queue. Only send, probe, or pending ACK state keeps this timer active.
+// 已重组及乱序接收数据不需要协议时钟：新数据报会显式唤醒 ACK/update，完整应用消息则由
+// 独立接收队列续处理。只有发送、探测或待发 ACK 状态需要保留该 Timer。
+bool isKcpProtocolIdle(const ikcpcb& kcp)
 {
 	return kcp.nsnd_que == 0 && kcp.nsnd_buf == 0 &&
-		kcp.nrcv_que == 0 && kcp.nrcv_buf == 0 &&
 		kcp.ackcount == 0 && kcp.probe == 0 &&
 		kcp.probe_wait == 0 && kcp.rmt_wnd != 0;
 }
@@ -113,7 +114,7 @@ size_t Channel::getPoolObjectBytes()
 		+ sizeof(componentID_) + sizeof(sessionEpoch_) + sizeof(pMsgHandlers_) + sizeof(pKCP_) + condemnReason_.size()
 		+ sizeof(sendWindowMessagesOverflowWarningActive_) + sizeof(sendWindowBytesOverflowWarningActive_)
 		+ sizeof(receiveWindowMessagesOverflowWarningActive_) + sizeof(receiveWindowMessagesOverflowState_)
-		+ sizeof(registeredInNetworkInterface_);
+		+ sizeof(registeredInNetworkInterface_) + sizeof(completionSendBackpressureActive_);
 
 	return bytes;
 }
@@ -186,7 +187,8 @@ Channel::Channel(NetworkInterface & networkInterface,
 	webSocketCloseSent_(false),
 	webSocketCloseReceived_(false),
 	tlsCloseNotifyReceived_(false),
-	gracefulCloseDeadline_(0)
+	gracefulCloseDeadline_(0),
+	completionSendBackpressureActive_(false)
 {
 	this->clearBundle();
 	initialize(networkInterface, pEndPoint, traits, pt, pFilter, id, protocolSubtype);
@@ -236,7 +238,8 @@ Channel::Channel():
 	webSocketCloseSent_(false),
 	webSocketCloseReceived_(false),
 	tlsCloseNotifyReceived_(false),
-	gracefulCloseDeadline_(0)
+	gracefulCloseDeadline_(0),
+	completionSendBackpressureActive_(false)
 {
 	this->clearBundle();
 }
@@ -519,10 +522,31 @@ void Channel::scheduleKcpAck()
 }
 
 //-------------------------------------------------------------------------------------
+void Channel::scheduleKcpReceive()
+{
+	if (!pKCP_ || isDestroyed() || !pNetworkInterface_)
+		return;
+
+	pNetworkInterface_->kcpUpdateScheduler_.scheduleReceive(*this);
+}
+
+//-------------------------------------------------------------------------------------
 void Channel::flushKcpAcks()
 {
 	if (pKCP_ && !isDestroyed())
 		ikcp_flushacks(pKCP_);
+}
+
+//-------------------------------------------------------------------------------------
+void Channel::drainKcpReceive()
+{
+	if (!pKCP_ || isDestroyed() || condemn() > 0 || !pPacketReceiver_ ||
+		protocolSubtype_ != SUB_PROTOCOL_KCP)
+	{
+		return;
+	}
+
+	static_cast<KCPPacketReceiver*>(pPacketReceiver_)->drainReassembledPackets(this);
 }
 
 //-------------------------------------------------------------------------------------
@@ -537,21 +561,9 @@ void Channel::updateKcp()
 	if (!pKCP_ || isDestroyed())
 		return;
 
-	// A previous UDP completion may have yielded with complete application packets still queued.
-	// Continue through the fair KCP scheduler instead of waiting for another datagram to arrive.
-	// 上一个 UDP completion 可能按预算让出，但 KCP 中仍有完整应用包；通过公平调度器续处理，
-	// 不能依赖下一份数据报到达，否则安静连接的尾包会永久滞留。
-	if (ikcp_peeksize(pKCP_) >= 0 && pPacketReceiver_ &&
-		protocolSubtype_ == SUB_PROTOCOL_KCP)
-	{
-		static_cast<KCPPacketReceiver*>(pPacketReceiver_)->drainReassembledPackets(this);
-		if (isDestroyed() || condemn() > 0)
-			return;
-	}
-
 	const IUINT32 current = static_cast<IUINT32>(kbe_clock());
 	ikcp_update(pKCP_, current);
-	if (isKcpIdle(*pKCP_))
+	if (isKcpProtocolIdle(*pKCP_))
 	{
 		// 完全空闲时取消当前队列项；真实 UDP 收包和 KCP 发送会在进入 KCP 前重新入队。
 		// Cancel the queue entry for a fully idle connection; real UDP receives and KCP sends
@@ -681,6 +693,7 @@ void Channel::clearState( bool warnOnDiscard /*=false*/ )
 	webSocketCloseReceived_ = false;
 	tlsCloseNotifyReceived_ = false;
 	gracefulCloseDeadline_ = 0;
+	completionSendBackpressureActive_ = false;
 
 	if(pEndPoint_ && protocoltype_ == PROTOCOL_TCP && !this->isDestroyed())
 	{
@@ -746,6 +759,36 @@ void Channel::delayedSend()
 }
 
 //-------------------------------------------------------------------------------------
+bool Channel::completionSendBackpressured()
+{
+	if (!isInternal() || protocoltype_ != PROTOCOL_TCP || pEndPoint_ == NULL)
+	{
+		completionSendBackpressureActive_ = false;
+		return false;
+	}
+
+	if (pNetworkInterface_ == NULL)
+	{
+		completionSendBackpressureActive_ = false;
+		return false;
+	}
+
+	EventPoller* pPoller = pNetworkInterface_->dispatcher().pPoller();
+	if (pPoller == NULL || !pPoller->supportsCompletion())
+	{
+		completionSendBackpressureActive_ = false;
+		return false;
+	}
+
+	const uint64 pendingBytes = pPoller->tcpSendPendingBytes(*pEndPoint_);
+	completionSendBackpressureActive_ = CompletionSendBackpressure::next(
+		completionSendBackpressureActive_, pendingBytes, !bundles_.empty(),
+		g_completionIntTcpSendBackpressureHighBytes,
+		g_completionIntTcpSendBackpressureLowBytes);
+	return completionSendBackpressureActive_;
+}
+
+//-------------------------------------------------------------------------------------
 const char * Channel::c_str() const
 {
 	static char dodgyString[MAX_BUF * 2] = { "None" };
@@ -779,7 +822,17 @@ void Channel::handleTimeout(TimerHandle, void * arg)
 	{
 		case TIMEOUT_INACTIVITY_CHECK:
 		{
-			if (timestamp() - lastReceivedTime_ >= inactivityExceptionPeriod_)
+			const uint64 now = timestamp();
+			EventPoller* pPoller = pNetworkInterface_ != NULL ?
+				pNetworkInterface_->dispatcher().pPoller() : NULL;
+			const bool useSendProgress = isInternal() && protocoltype_ == PROTOCOL_TCP &&
+				pEndPoint_ != NULL && pPoller != NULL && pPoller->supportsCompletion();
+			const uint64 lastSendProgressTime = useSendProgress ?
+				pPoller->tcpSendLastProgressTime(*pEndPoint_) : 0;
+			const uint64 lastActivityTime = ChannelInactivityPolicy::effectiveLastActivity(
+				lastReceivedTime_, lastSendProgressTime, useSendProgress);
+
+			if (ChannelInactivityPolicy::expired(now, lastActivityTime, inactivityExceptionPeriod_))
 			{
 				this->networkInterface().onChannelTimeOut(this);
 			}
@@ -826,10 +879,32 @@ void Channel::send(Bundle * pBundle)
 		return;
 	}
 
+	EventPoller* pPoller = pNetworkInterface_->dispatcher().pPoller();
+
 	if(pBundle)
 	{
+		const bool channelOwnedBundle = pBundle->pChannel() == this;
 		pBundle->pChannel(this);
 		pBundle->finiMessage(true);
+
+		// 独立创建的可靠 Bundle 在 completion 队列满时会逐条滞留到 Channel。大量几十字节的
+		// 属性、RPC、迁移通知如果各占一个节点，会先触发 65535 条历史消息阈值，尽管实际积压
+		// 仍只有数 MiB。仅在内部 completion Channel 已有用户态积压时，把这类已完成序列化的
+		// Bundle 原样并入队尾；createSendBundle() 创建的 Bundle 已经参与尾包复用，不能再次合并。
+		// Standalone reliable Bundles otherwise occupy one Channel node each when the completion queue is
+		// full. Coalesce their serialized bytes into the existing tail only for an already-buffered internal
+		// completion Channel. Channel-owned Bundles already reuse that tail and must not be merged twice.
+		if (CompletionSendBackpressure::shouldCoalesceStandaloneBundle(channelOwnedBundle,
+			isInternal(), pPoller != NULL && pPoller->supportsCompletion(), sending(), !bundles_.empty()))
+		{
+			Bundle* pCoalescedBundle = createSendBundle();
+			pCoalescedBundle->append(*pBundle);
+			Bundle::reclaimPoolObject(pBundle);
+			pBundle = pCoalescedBundle;
+			pBundle->pChannel(this);
+			pBundle->finiMessage(true);
+		}
+
 		bundles_.push_back(pBundle);
 	}
 	
@@ -844,7 +919,6 @@ void Channel::send(Bundle * pBundle)
 
 		pPacketSender_->processSend(this);
 
-		EventPoller* pPoller = pNetworkInterface_->dispatcher().pPoller();
 		const bool hasCompletionPendingSend = pPoller != NULL && pPoller->supportsCompletion() &&
 			pPoller->hasPendingSend(*pEndPoint_);
 
@@ -859,6 +933,18 @@ void Channel::send(Bundle * pBundle)
 			flags_ |= FLAG_SENDING;
 			pNetworkInterface_->dispatcher().registerWriteFileDescriptor(*pEndPoint_, pPacketSender_);
 		}
+	}
+	else if (pPoller != NULL && pPoller->supportsCompletion())
+	{
+		// Completion backends own copied packet bytes after queueTcpSend(). Continue
+		// transferring Bundles even while one native send is outstanding so a long
+		// migration/script callback can use the backend's bounded queue and inline
+		// successful-send progress instead of accumulating thousands of Channel Bundles.
+		// completion 后端在 queueTcpSend() 后持有 packet 字节副本。即使已有一个原生
+		// send outstanding，也继续转移新 Bundle，使长迁移/脚本回调能够使用后端有界队列
+		// 和成功 send completion 内联推进，避免在 Channel 中积压数千个 Bundle。
+		KBE_ASSERT(pPacketSender_ != NULL);
+		pPacketSender_->processSend(this);
 	}
 
 	// 同步发送可能已经排空队列，窗口判定必须使用发送后的实际积压。

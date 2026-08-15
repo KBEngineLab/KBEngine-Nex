@@ -288,7 +288,8 @@ public:
 	/** 
 		通知客户端创建一个proxy对应的实体 
 	*/
-	bool createClientProxies(Proxy* pEntity, bool reload = false);
+	bool createClientProxies(Proxy* pEntity, Network::Channel* pChannel, bool reload = false,
+		ENTITY_ID expectedPreviousProxyID = 0);
 
 	/** 
 		向dbmgr请求执行一个数据库命令

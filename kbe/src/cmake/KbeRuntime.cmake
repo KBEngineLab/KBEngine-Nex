@@ -34,6 +34,16 @@ function(kbe_prepare_runtime)
         @ONLY
     )
 
+    # 所有服务进程共享同一套 Python 运行时。将部署建模为唯一构建目标，Ninja 会在
+    # 并行链接前只执行一次，避免每个 POST_BUILD 进程在大目录复制期间争抢文件锁。
+    # All server processes share one Python runtime. Model deployment as a single build target
+    # so Ninja executes it once before parallel links instead of contending in every POST_BUILD.
+    add_custom_target(kbe_python_runtime_deploy
+        COMMAND "${CMAKE_COMMAND}" -P "${KBE_PYTHON_DEPLOY_SCRIPT}"
+        BYPRODUCTS "${KBE_PYTHON_DEPLOY_STAMP}"
+        VERBATIM
+    )
+
 endfunction()
 
 function(kbe_configure_runtime)
@@ -78,13 +88,11 @@ function(kbe_configure_runtime)
                 "${KBE_SERVER_RUNTIME_DIR}"
         )
     endforeach()
-    list(APPEND _kbe_server_deploy_commands
-        COMMAND "${CMAKE_COMMAND}" -P "${KBE_PYTHON_DEPLOY_SCRIPT}"
-    )
     add_custom_command(TARGET kbe_servers POST_BUILD
         ${_kbe_server_deploy_commands}
         VERBATIM
     )
+    add_dependencies(kbe_servers kbe_python_runtime_deploy)
 
     set(_kbe_runtime_python_files)
     foreach(_kbe_python_runtime_file IN LISTS KBE_PYTHON_RUNTIME_FILES)

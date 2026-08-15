@@ -63,11 +63,42 @@ struct ChannelIndexEntry
 	uint64 sessionEpoch;
 };
 
+// TCP and UDP use independent native port namespaces, so an address alone is not
+// a complete Channel identity. Keeping the transport in the key prevents a temporary
+// TCP connection from shadowing a KCP peer that happens to use the same numeric port.
+// TCP 与 UDP 使用独立的原生端口命名空间，因此仅靠地址无法完整标识 Channel。
+// 将传输协议纳入键可避免临时 TCP 连接遮蔽恰好使用相同数值端口的 KCP 对端。
+struct ChannelKey
+{
+	ChannelKey() : ip(0), port(0), protocolType(PROTOCOL_TCP) {}
+	ChannelKey(const Address& channelAddress, ProtocolType channelProtocol) :
+		ip(channelAddress.ip), port(channelAddress.port), protocolType(channelProtocol) {}
+	ChannelKey(uint32 channelIP, uint16 channelPort, ProtocolType channelProtocol) :
+		ip(channelIP), port(channelPort), protocolType(channelProtocol) {}
+
+	bool operator<(const ChannelKey& other) const
+	{
+		return ip < other.ip ||
+			(ip == other.ip && (port < other.port ||
+				(port == other.port && protocolType < other.protocolType)));
+	}
+
+	bool matches(const Address& channelAddress, ProtocolType channelProtocol) const
+	{
+		return ip == channelAddress.ip && port == channelAddress.port &&
+			protocolType == channelProtocol;
+	}
+
+	uint32 ip;
+	uint16 port;
+	ProtocolType protocolType;
+};
+
 class NetworkInterface : public TimerHandler
 {
 public:
-	typedef std::map<Address, ChannelIndexEntry>	ChannelMap;
-	typedef std::set<Address>			ChannelMaintenanceSet;
+	typedef std::map<ChannelKey, ChannelIndexEntry>	ChannelMap;
+	typedef std::set<ChannelKey>			ChannelMaintenanceSet;
 	
 	NetworkInterface(EventDispatcher * pDispatcher,
 		int32 extlisteningPort_min = -1, int32 extlisteningPort_max = -1, const char * extlisteningInterface = "",
@@ -94,6 +125,8 @@ public:
 	bool deregisterAllChannels();
 	uint32 purgeStaleChannelIndexEntries();
 	Channel * findChannel(const Address & addr);
+	Channel * findChannel(const Address & addr, ProtocolType protocolType);
+	Channel * findExternalChannel(const Address & addr, ENTITY_ID proxyID);
 	Channel * findChannel(KBESOCKET fd);
 
 	ChannelTimeOutHandler * pChannelTimeOutHandler() const
@@ -160,6 +193,7 @@ public:
 	uint64 pollerTcpSendSubmissions() const;
 	uint64 pollerTcpSendSubmittedBytes() const;
 	uint64 pollerTcpSendMaxSubmissionBytes() const;
+	uint64 pollerTcpSendInlineCompletions() const;
 	uint64 pollerTcpSendBacklogBytes() const;
 	uint64 pollerTcpSendBacklogPeakBytes() const;
 	uint64 pollerTcpSendBackpressureCount() const;
@@ -182,6 +216,19 @@ public:
 	uint64 pollerCompletionDequeuedCount() const;
 	uint64 pollerCompletionMaxDequeuedBatchCount() const;
 	uint64 pollerCompletionPendingLocalCount() const;
+	uint64 pollerIoUringSubmitCalls() const;
+	uint64 pollerIoUringSubmitFailures() const;
+	uint64 pollerIoUringSubmitPartials() const;
+	uint64 pollerIoUringSqCapacityExhaustions() const;
+	uint64 pollerIoUringSqDropped() const;
+	uint64 pollerIoUringCqOverflow() const;
+	uint64 pollerIoUringCancelRequests() const;
+	uint64 pollerIoUringCancelCompletions() const;
+	uint64 pollerIoUringStaleCompletions() const;
+	uint64 pollerIoUringUdpReceiveDepthDeficits() const;
+	uint64 pollerIoUringUdpReceiveWouldBlocks() const;
+	uint64 pollerIoUringSqEntries() const;
+	uint64 pollerIoUringCqEntries() const;
 	uint64 discardedPacketsAfterCloseCount() const { return discardedPacketsAfterCloseCount_; }
 	uint64 receiveWindowOverflowBurstCount() const { return receiveWindowOverflowBurstCount_; }
 	uint64 receiveWindowCriticalBurstCount() const { return receiveWindowCriticalBurstCount_; }
@@ -317,7 +364,7 @@ private:
 	const Channel* currentRegisteredChannel(ChannelMap::const_iterator iter) const;
 	bool registerChannel(Channel* pChannel, bool replaceExistingAcceptedChannel);
 	void requestChannelMaintenance(Channel* pChannel);
-	void cancelChannelMaintenance(const Address& address);
+	void cancelChannelMaintenance(const ChannelKey& key);
 	void accumulateFinalizedKcpDiagnostics(uint64 ackSent, uint64 ackReceived,
 		uint64 timeoutRetransmissions, uint64 fastRetransmissions,
 		uint64 streamCoalesces, uint64 streamCoalescedBytes,

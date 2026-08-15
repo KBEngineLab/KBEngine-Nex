@@ -1,13 +1,16 @@
 """Contract tests for the Performance Lab. / 性能实验室契约测试。"""
 
 import ast
+from contextlib import contextmanager
 import importlib.util
 import json
 import os
+import shutil
 import types
 import tempfile
 import sys
 from pathlib import Path
+import uuid
 import xml.etree.ElementTree as ET
 
 if __package__ in (None, ""):
@@ -40,8 +43,30 @@ from performance.run import (
     wait_for_workload_ready,
     start_workload_commands,
 )
-from performance.topology import build_local_cluster_components, partition_batch_size
+from performance.topology import (
+    build_local_cluster_components,
+    partition_batch_size,
+    platform_executable_name,
+)
 from performance.watcher_metrics import WatcherCollector, WatcherSchedule, parse_target, resolve_target
+
+
+@contextmanager
+def writable_temporary_directory():
+    """Create a temporary directory that remains writable under restricted Windows tokens."""
+    if os.name != "nt":
+        with tempfile.TemporaryDirectory() as directory:
+            yield directory
+        return
+
+    # Python 3.13 在 Windows 上会为 tempfile 的 0700 目录创建专用 ACL，受限测试令牌可能随即失去写权限。
+    # Python 3.13 gives tempfile's 0700 directories a dedicated Windows ACL, which can deny a restricted test token immediately after creation.
+    path = Path(tempfile.gettempdir()) / f"kbe-performance-{uuid.uuid4().hex}"
+    path.mkdir()
+    try:
+        yield str(path)
+    finally:
+        shutil.rmtree(path)
 
 
 def load_cluster_controller_module():
@@ -349,7 +374,7 @@ def assert_cprofile_window_metrics() -> None:
     )
     stamps = {}
     previous = {}
-    with tempfile.TemporaryDirectory() as directory:
+    with writable_temporary_directory() as directory:
         path = Path(directory) / "cprofile.jsonl"
         with JsonlRecorder(path, "test-run", "contract") as recorder:
             record_watcher_samples(recorder, stats, {"stampsPerSecond": 1000}, 1.0, stamps, previous)
@@ -409,7 +434,7 @@ def assert_cprofile_window_metrics() -> None:
 def assert_network_counter_rates() -> None:
     target = parse_target("BASEAPP_TYPE=@baseapp#7001:root/network")
     previous = {}
-    with tempfile.TemporaryDirectory() as directory:
+    with writable_temporary_directory() as directory:
         path = Path(directory) / "network-rates.jsonl"
         with JsonlRecorder(path, "test-run", "contract") as recorder:
             record_watcher_samples(
@@ -443,7 +468,7 @@ def assert_network_counter_rates() -> None:
 def assert_watcher_instance_isolation() -> None:
     first = parse_target("BASEAPP_TYPE=@baseapp#7001:root/network/kcp")
     second = parse_target("BASEAPP_TYPE=@baseapp#7002:root/network/kcp")
-    with tempfile.TemporaryDirectory() as directory:
+    with writable_temporary_directory() as directory:
         path = Path(directory) / "watcher-instances.jsonl"
         with JsonlRecorder(path, "test-run", "contract") as recorder:
             record_watcher_samples(recorder, first, {"overdueChannels": 3}, 1.0, {}, {})
@@ -547,6 +572,8 @@ def assert_python_latency_scenario() -> None:
     assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/coordinateSystem"] == 30.0
     assert "CELLAPP_TYPE=@cellapp:root/witness/backpressure" in gameplay["watcher_targets"]
     assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/witness/backpressure"] == 30.0
+    assert "CELLAPP_TYPE=@cellapp:root/witness/immediate" in gameplay["watcher_targets"]
+    assert gameplay["watcher_intervals"]["CELLAPP_TYPE:root/witness/immediate"] == 30.0
     assert "CELLAPP_TYPE=@cellapp:root/witness/scheduler" in gameplay["watcher_targets"]
     assert "CELLAPP_TYPE=@cellapp:root/witness/messages" in gameplay["watcher_targets"]
     assert "CELLAPP_TYPE=@cellapp:root/witness/queues" in gameplay["watcher_targets"]
@@ -570,6 +597,8 @@ def assert_python_latency_scenario() -> None:
     assert "<witness_total_bytes_per_tick> 2048 </witness_total_bytes_per_tick>" in defaults_source
     assert "<witness_global_bytes_per_tick> 1048576 </witness_global_bytes_per_tick>" in defaults_source
     assert "<witness_global_updates_per_tick> 1024 </witness_global_updates_per_tick>" in defaults_source
+    assert "<internalHighBytes> 131072 </internalHighBytes>" in defaults_source
+    assert "<internalLowBytes> 32768 </internalLowBytes>" in defaults_source
     assert "<minimumViewEntities> 32 </minimumViewEntities>" in defaults_source
     assert "<farIntervalTicks> 4 </farIntervalTicks>" in defaults_source
     assert "<highSegments> 128 </highSegments>" in defaults_source
@@ -577,6 +606,11 @@ def assert_python_latency_scenario() -> None:
     assert "<spaceAllocationMaxSkew> 2 </spaceAllocationMaxSkew>" in defaults_source
     baseapp_source = (Path(__file__).resolve().parents[2] / "server/baseapp/baseapp.cpp").read_text(encoding="utf-8")
     cellapp_source = (Path(__file__).resolve().parents[2] / "server/cellapp/cellapp.cpp").read_text(encoding="utf-8")
+    assert 'WATCH_OBJECT("witness/backpressure/producerDeferred"' in cellapp_source
+    assert 'WATCH_OBJECT("witness/immediate/backpressuredBundles"' in cellapp_source
+    assert 'WATCH_OBJECT("witness/immediate/propertyBytes"' in cellapp_source
+    assert 'WATCH_OBJECT("witness/immediate/rpcBytes"' in cellapp_source
+    assert 'WATCH_OBJECT("witness/immediate/positionBytes"' in cellapp_source
     witness_source = (Path(__file__).resolve().parents[2] / "server/cellapp/witness.cpp").read_text(encoding="utf-8")
     profile_source = (Path(__file__).resolve().parents[2] / "lib/helper/profile.cpp").read_text(encoding="utf-8")
     profile_inline = (Path(__file__).resolve().parents[2] / "lib/helper/profile.inl").read_text(encoding="utf-8")
@@ -736,7 +770,7 @@ def assert_python_latency_scenario() -> None:
 
 
 def assert_multi_component_cluster_manifest() -> None:
-    with tempfile.TemporaryDirectory() as directory:
+    with writable_temporary_directory() as directory:
         root = Path(directory)
         run_root = root / "run"
         manifest_root = run_root / "server"
@@ -769,7 +803,7 @@ def assert_gameplay_stress_scenario() -> None:
     assert scenario["reliable_udp_min_rto_ms"] == 50
     assert scenario["runtime_log_level"] == "warn"
     assert scenario["server_runtime_log_level"] == "warn"
-    assert scenario["workload_processes"] == 40
+    assert scenario["workload_processes"] == 20
     assert scenario["watcher_timeout_seconds"] == 10
     assert scenario["watcher_concurrency"] == 8
     assert scenario["workload_cid_start"] == 10000
@@ -826,11 +860,11 @@ def assert_gameplay_stress_scenario() -> None:
 
 
 def assert_parameterized_topology_and_manager_readiness() -> None:
-    with tempfile.TemporaryDirectory() as directory:
+    with writable_temporary_directory() as directory:
         binary_dir = Path(directory)
         for name in ("machine", "logger", "interfaces", "dbmgr", "baseappmgr",
                      "cellappmgr", "baseapp", "cellapp", "loginapp"):
-            (binary_dir / f"{name}.exe").touch()
+            (binary_dir / platform_executable_name(name)).touch()
 
         components, watcher_ids = build_local_cluster_components(binary_dir, 3, 6)
         declarations = components.split("|")
@@ -847,11 +881,12 @@ def assert_parameterized_topology_and_manager_readiness() -> None:
             "cellapp": [8001, 8002, 8003, 8004, 8005, 8006],
         }
 
-        (binary_dir / "cellapp.exe").unlink()
+        cellapp_executable = platform_executable_name("cellapp")
+        (binary_dir / cellapp_executable).unlink()
         try:
             build_local_cluster_components(binary_dir, 3, 6)
         except FileNotFoundError as exc:
-            assert "cellapp.exe" in str(exc)
+            assert cellapp_executable in str(exc)
         else:
             raise AssertionError("a missing server executable must fail before startup")
 
@@ -882,9 +917,21 @@ def assert_bots_dev_and_manager_watcher_source_contract() -> None:
     cellapp_source = (source_root / "server/cellapp/cellapp.cpp").read_text(encoding="utf-8")
     components_source = (source_root / "lib/server/components.cpp").read_text(encoding="utf-8")
     assert 'std::string(argv[index]) == "--dev"' in bots_main
+    assert 'std::string(argv[index]) == "--publish-component"' in bots_main
     assert 'std::string(argv[index]) == "--reuse-existing-accounts"' in bots_main
     assert 'WATCH_OBJECT("bots/devMode", g_botsDevMode)' in bots_source
+    assert 'WATCH_OBJECT("bots/publishComponent", g_botsPublishComponent)' in bots_source
     assert 'WATCH_OBJECT("bots/reuseAccounts", g_botsReuseAccounts)' in bots_source
+    assert "if (g_botsPublishComponent)" in bots_source
+    assert "if (pChannel->isExternal())" in bots_source[bots_source.index("void Bots::queryWatcher"):]
+    assert "ServerConfig::getSingleton().managementAdminToken()" in bots_source
+    assert "actualToken != expectedToken" in bots_source
+    publish_index = bots_source.index("if (g_botsPublishComponent)")
+    logger_index = bots_source.index("Components::getSingleton().findLogger(true)")
+    assert publish_index > logger_index
+    runner_source = (source_root / "tests/performance/run.py").read_text(encoding="utf-8")
+    assert 'platform_executable_name("bots")' in runner_source
+    assert '--hide=1 --publish-component' in runner_source
     assert "processClientTickBatch();" in bots_source
     assert "dispatcher().addTask(this)" in bots_source
     assert "dispatcher().cancelTask(this)" in bots_source
@@ -913,17 +960,24 @@ def assert_bots_dev_and_manager_watcher_source_contract() -> None:
     ):
         assert f'WATCH_OBJECT("bots/performance/{watcher_path}"' in bots_source
     network_index = bots_source.index("DebugHelper::getSingleton().pNetworkInterface(&networkInterface())")
-    logger_index = bots_source.index("Components::getSingleton().findLogger(true)")
     assert network_index < logger_index
     assert "g_componentType == BOTS_TYPE && !allowBots" in components_source
-    # TCP batching must defer by one dispatcher round, while UDP/KCP keeps immediate submission.
-    # TCP 合批只延迟一个调度轮次；UDP/KCP 仍保持立即投递，避免协议 ACK 延迟。
+    # An idle TCP socket submits its first send immediately; the outstanding
+    # request batches later writes. UDP/KCP also keeps immediate submission.
+    # 空闲 TCP socket 立即提交首个发送，outstanding 请求合并后续写入；
+    # UDP/KCP 同样保持立即投递。
     tcp_queue = iocp_source[iocp_source.index("bool IocpPoller::queueTcpSend"):iocp_source.index("bool IocpPoller::queueUdpSend")]
     udp_queue = iocp_source[iocp_source.index("bool IocpPoller::queueUdpSend"):iocp_source.index("bool IocpPoller::ensureAssociated")]
     assert "requestRearm(fd, REARM_WRITE);" in tcp_queue
-    assert "armTcpSend(fd, state)" not in tcp_queue
+    assert "if (state.pPendingWriteContext == NULL)" in tcp_queue
+    assert "armTcpSend(fd, state)" in tcp_queue
     assert "armUdpSend(fd, state)" in udp_queue
-    for watcher_path in ("tcpSendSubmissions", "tcpSendSubmittedBytes", "tcpSendMaxSubmissionBytes"):
+    for watcher_path in (
+        "tcpSendSubmissions",
+        "tcpSendSubmittedBytes",
+        "tcpSendMaxSubmissionBytes",
+        "tcpSendInlineCompletions",
+    ):
         assert f'WATCH_OBJECT("bots/performance/{watcher_path}"' in bots_source
         assert f'WATCH_OBJECT("network/poller/{watcher_path}"' in serverapp_source
     assert "stale local EntityCall" in entity_call_source
@@ -1139,7 +1193,19 @@ def main() -> int:
     adaptive_scheduler_source = (
         repository_root / "kbe/src/lib/network/kcp_adaptive_scheduling.h"
     ).read_text(encoding="utf-8")
-    assert "KCP_MAX_ADAPTIVE_PROCESSING_TIME_BUDGET_MICROS = 8000" in adaptive_scheduler_source
+    assert (
+        "KCP_MAX_ADAPTIVE_PROCESSING_TIME_BUDGET_MICROS = 32000"
+        in adaptive_scheduler_source
+    )
+    assert (
+        "KCP_MAX_ADAPTIVE_ACK_PROCESSING_TIME_BUDGET_MICROS = 4000"
+        in adaptive_scheduler_source
+    )
+    assert "KCP_RECEIVE_PROCESSING_TIME_BUDGET_MICROS = 2000" in scheduler_source
+    assert "receiveQueue_" in scheduler_source
+    assert "channel->drainKcpReceive()" in scheduler_source
+    assert "queue_.takeDue(selectionTime, key, &dueTime)" in scheduler_source
+    assert "nextDueTime <= backlogCheckTime" in scheduler_source
     iocp_source = (
         repository_root / "kbe/src/lib/network/poller_iocp.cpp"
     ).read_text(encoding="utf-8")
@@ -1154,12 +1220,73 @@ def main() -> int:
         "this->triggerRead(fd)"
     )
     assert "state.pendingReadContexts.insert(pContext)" in iocp_source
-    assert "IOCP_CONNECTED_UDP_RECEIVE_DEPTH = 4" in (
-        repository_root / "kbe/src/lib/network/iocp_udp_receive_depth.h"
+    udp_receive_depth_source = (
+        repository_root / "kbe/src/lib/network/completion_udp_receive_depth.h"
     ).read_text(encoding="utf-8")
-    assert "IOCP_UNCONNECTED_UDP_RECEIVE_DEPTH = 64" in (
-        repository_root / "kbe/src/lib/network/iocp_udp_receive_depth.h"
+    assert "IOCP_CONNECTED_UDP_RECEIVE_DEPTH = 4" in udp_receive_depth_source
+    assert "IOCP_UNCONNECTED_UDP_RECEIVE_DEPTH = 64" in udp_receive_depth_source
+    assert "IO_URING_UDP_KERNEL_RECEIVE_DEPTH = 1" in udp_receive_depth_source
+    assert "return iocpUdpReceiveDepth(connected)" in udp_receive_depth_source
+    io_uring_source = (
+        repository_root / "kbe/src/lib/network/poller_io_uring.cpp"
     ).read_text(encoding="utf-8")
+    tcp_queue_start = io_uring_source.index("bool IoUringPoller::queueTcpSend")
+    tcp_queue_end = io_uring_source.index("bool IoUringPoller::queueUdpSend", tcp_queue_start)
+    tcp_queue_source = io_uring_source[tcp_queue_start:tcp_queue_end]
+    assert "requestRearm(fd, REARM_WRITE)" in tcp_queue_source
+    assert "if (state.pPendingWriteContext == NULL)" in tcp_queue_source
+    assert "armTcpSend(fd, state)" in tcp_queue_source
+    assert "submitSqes()" in tcp_queue_source
+    udp_queue_start = tcp_queue_end
+    udp_queue_end = io_uring_source.index("bool IoUringPoller::doRegisterForWrite", udp_queue_start)
+    udp_queue_source = io_uring_source[udp_queue_start:udp_queue_end]
+    assert "armUdpSend(fd, state)" in udp_queue_source
+    assert "submitSqes()" in udp_queue_source
+    assert "state.pendingReadContexts.insert(context)" in io_uring_source
+    assert "++udpReceiveWouldBlockCount_" in io_uring_source
+    assert "remainingSlots, remainingBurstSize" in io_uring_source
+    assert "uint32 IoUringPoller::drainUdpReceiveBurst" in io_uring_source
+    assert "canQueueUdpReceivedData(fd, PACKET_MAX_SIZE_UDP)" in io_uring_source
+    assert "::recvmsg(fd, &message, MSG_DONTWAIT)" in io_uring_source
+    network_interface_header = (
+        repository_root / "kbe/src/lib/network/network_interface.h"
+    ).read_text(encoding="utf-8")
+    udp_receiver_source = (
+        repository_root / "kbe/src/lib/network/udp_packet_receiver.cpp"
+    ).read_text(encoding="utf-8")
+    packet_receiver_source = (
+        repository_root / "kbe/src/lib/network/packet_receiver.cpp"
+    ).read_text(encoding="utf-8")
+    packet_sender_source = (
+        repository_root / "kbe/src/lib/network/packet_sender.cpp"
+    ).read_text(encoding="utf-8")
+    kcp_receiver_source = (
+        repository_root / "kbe/src/lib/network/kcp_packet_receiver.cpp"
+    ).read_text(encoding="utf-8")
+    assert "struct ChannelKey" in network_interface_header
+    assert "std::map<ChannelKey, ChannelIndexEntry>" in network_interface_header
+    assert "findChannel(address, PROTOCOL_UDP)" in udp_receiver_source
+    assert "type() == UDP_PACKET_RECEIVER ? PROTOCOL_UDP : PROTOCOL_TCP" in packet_receiver_source
+    assert "findChannel(pEndpoint_->addr(), expectedProtocol)" in packet_receiver_source
+    assert "type() == UDP_PACKET_SENDER ? PROTOCOL_UDP : PROTOCOL_TCP" in packet_sender_source
+    assert "findChannel(pEndpoint_->addr(), expectedProtocol)" in packet_sender_source
+    assert "!pChannel->isKcpTransport()" in kcp_receiver_source
+    assert "missing KCP control block" in kcp_receiver_source
+    prepare_start = io_uring_source.index("void IoUringPoller::prepareUdpCompletions")
+    process_start = io_uring_source.index("int IoUringPoller::processPendingEvents", prepare_start)
+    prepare_source = io_uring_source[prepare_start:process_start]
+    assert prepare_source.index("ensureUdpReadsArmed(fd, state)") < prepare_source.index(
+        "submitSqes()"
+    )
+    process_source = io_uring_source[process_start:]
+    assert process_source.index("prepareUdpCompletions(completionPendingLimit)") < process_source.index(
+        "this->triggerRead(pending.preparedUdpFd)"
+    )
+    assert "discardPreparedUdpCompletions(fd, state.socket, state.generation);" in io_uring_source
+    assert "normal lifetime race, not a stale kernel CQE" in io_uring_source
+    assert "IORING_OP_ASYNC_CANCEL" in io_uring_source
+    assert "IORING_ASYNC_CANCEL_USERDATA" in io_uring_source
+    assert "storeRelease(ring_.cqHead, head + removed)" in io_uring_source
     ikcp_source = (
         repository_root / "kbe/src/lib/network/ikcp.c"
     ).read_text(encoding="utf-8")
@@ -1269,7 +1396,7 @@ def main() -> int:
     assert target.path.endswith("poller")
     discovered = parse_target("BOTS_TYPE=@bots:root/bots")
     assert discovered.component_name == "bots"
-    with tempfile.TemporaryDirectory() as directory:
+    with writable_temporary_directory() as directory:
         root = Path(directory)
         fixture = resolve_fixture_root("network-baseline")
         assert fixture is not None and (fixture / "entity_defs/Avatar.def").is_file()
@@ -1322,6 +1449,11 @@ def main() -> int:
             runtime_log_level="warn",
             server_runtime_log_level="info",
             database_connections=32,
+            database_host="127.0.0.1",
+            database_port=3306,
+            database_name="kbe_io_uring_stress",
+            database_username="root",
+            database_password="root",
             baseapp_external_port_count=10,
             performance_probes_enabled=True,
             bots_transport="tcp",
@@ -1339,6 +1471,12 @@ def main() -> int:
         assert xml_root.findtext("./channelCommon/reliableUDP/minRTO") == "50"
         assert xml_root.find("./networkInterface/reliableUDP") is None
         assert xml_root.findtext("./dbmgr/databaseInterfaces/default/numConnections") == "32"
+        assert xml_root.findtext("./dbmgr/databaseInterfaces/default/host") == "127.0.0.1"
+        assert xml_root.findtext("./dbmgr/databaseInterfaces/default/port") == "3306"
+        assert xml_root.findtext("./dbmgr/databaseInterfaces/default/databaseName") == "kbe_io_uring_stress"
+        assert xml_root.findtext("./dbmgr/databaseInterfaces/default/auth/username") == "root"
+        assert xml_root.findtext("./dbmgr/databaseInterfaces/default/auth/password") == "root"
+        assert xml_root.findtext("./dbmgr/databaseInterfaces/default/auth/encrypt") == "false"
         assert xml_root.findtext("./baseapp/externalTcpPorts_min") == "21015"
         assert xml_root.findtext("./baseapp/externalTcpPorts_max") == "21024"
         assert xml_root.findtext("./performanceProbes/enabled") == "true"

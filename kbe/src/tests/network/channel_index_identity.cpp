@@ -40,12 +40,31 @@ bool testPointerAndGenerationAreBothRequired()
 		require(!empty.matches(NULL, 0),
 			"empty index entry was accepted as a current channel");
 }
+
+bool testTransportNamespacesAreIndependent()
+{
+	const KBEngine::Network::ChannelKey tcpKey(0x0100007f, 32000,
+		KBEngine::Network::PROTOCOL_TCP);
+	const KBEngine::Network::ChannelKey udpKey(0x0100007f, 32000,
+		KBEngine::Network::PROTOCOL_UDP);
+	KBEngine::Network::NetworkInterface::ChannelMap channels;
+
+	channels[tcpKey] = KBEngine::Network::ChannelIndexEntry();
+	channels[udpKey] = KBEngine::Network::ChannelIndexEntry();
+	return require(channels.size() == 2,
+		"TCP and UDP channels sharing one numeric peer port collided in the index") &&
+		require(channels.find(tcpKey) != channels.end(),
+			"TCP namespace lookup was lost") &&
+		require(channels.find(udpKey) != channels.end(),
+			"UDP namespace lookup was lost");
+}
 }
 
 int main()
 {
 	if (!testPoolAddressReuseRequiresMatchingGeneration() ||
-		!testPointerAndGenerationAreBothRequired())
+		!testPointerAndGenerationAreBothRequired() ||
+		!testTransportNamespacesAreIndependent())
 		return EXIT_FAILURE;
 
 	std::cout << "CHANNEL_INDEX_IDENTITY_TEST_PASS" << std::endl;

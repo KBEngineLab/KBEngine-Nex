@@ -121,6 +121,29 @@ bool isCurrentGhostPeer(Entity* entity, COMPONENT_ID sourceCellID)
 	return peerCellID != 0 && peerCellID == sourceCellID;
 }
 
+bool forwardRemoteRealMethodCall(GhostManager* ghostManager, ENTITY_ID entityID,
+	COMPONENT_ID sourceCellID, COMPONENT_ID targetCellID, MemoryStream& stream)
+{
+	if (ghostManager == NULL || targetCellID == 0 || targetCellID == g_componentID ||
+		targetCellID == sourceCellID)
+	{
+		return false;
+	}
+
+	Network::Bundle* pForwardBundle = ghostManager->createSendBundle(targetCellID);
+	(*pForwardBundle).newMessage(CellappInterface::onRemoteRealMethodCall);
+	(*pForwardBundle) << entityID;
+	pForwardBundle->append(stream);
+
+	// 旧 Ghost 可以跨越多个迁移代际继续调用 real。每一跳都刷新 route，直到
+	// 上游 Ghost/缓存自然失效；禁止回发给来源 Cell，避免陈旧环路自激。
+	// An old Ghost may call the real entity across several migration generations.
+	// Refresh the route at every hop while rejecting a bounce to the source Cell.
+	ghostManager->pushRouteMessage(entityID, targetCellID, pForwardBundle);
+	stream.done();
+	return true;
+}
+
 Components::ComponentInfos* validateBaseappEntityCreationSource(
 	Network::Channel* pChannel, COMPONENT_ID componentID,
 	const std::string& entityType, bool hasClient, bool allowCellappmgrRelay,
@@ -410,6 +433,20 @@ bool Cellapp::initializeWatcher()
 	WATCH_OBJECT("witness/backpressure/suppressedUpdateSkips", &Witness::suppressedUpdateSkipCount);
 	WATCH_OBJECT("witness/backpressure/suppressedVolatileRefreshes", &Witness::suppressedVolatileRefreshCount);
 	WATCH_OBJECT("witness/backpressure/structuralWhileSuppressed", &Witness::structuralWhileSuppressedCount);
+	WATCH_OBJECT("witness/backpressure/producerDeferred", &Witness::producerBackpressureDeferredCount);
+	WATCH_OBJECT("witness/immediate/bundles", &Witness::immediateBundleCount);
+	WATCH_OBJECT("witness/immediate/bytes", &Witness::immediateBytesCount);
+	WATCH_OBJECT("witness/immediate/backpressuredBundles", &Witness::immediateBackpressuredBundleCount);
+	WATCH_OBJECT("witness/immediate/propertyBundles", &Witness::immediatePropertyBundleCount);
+	WATCH_OBJECT("witness/immediate/propertyBytes", &Witness::immediatePropertyBytesCount);
+	WATCH_OBJECT("witness/immediate/rpcBundles", &Witness::immediateRpcBundleCount);
+	WATCH_OBJECT("witness/immediate/rpcBytes", &Witness::immediateRpcBytesCount);
+	WATCH_OBJECT("witness/immediate/positionBundles", &Witness::immediatePositionBundleCount);
+	WATCH_OBJECT("witness/immediate/positionBytes", &Witness::immediatePositionBytesCount);
+	WATCH_OBJECT("witness/immediate/spaceDataBundles", &Witness::immediateSpaceDataBundleCount);
+	WATCH_OBJECT("witness/immediate/spaceDataBytes", &Witness::immediateSpaceDataBytesCount);
+	WATCH_OBJECT("witness/immediate/otherBundles", &Witness::immediateOtherBundleCount);
+	WATCH_OBJECT("witness/immediate/otherBytes", &Witness::immediateOtherBytesCount);
 	WATCH_OBJECT("witness/bundlesSent", &Witness::bundlesSentCount);
 	WATCH_OBJECT("witness/maxBundleBytes", &Witness::maxBundleBytes);
 	return EntityApp<Entity>::initializeWatcher() && WatchObjectPool::initWatchPools();
@@ -1492,6 +1529,9 @@ void Cellapp::onCreateCellEntityFromBaseapp(Network::Channel* pChannel, KBEngine
 	{
 		MemoryStream* pCellData = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 		pCellData->append(s);
+		// 延迟处理使用独立副本；原始网络消息必须在当前 ingress 内完整消费。
+		// Deferred processing owns an independent copy; consume the original network message in this ingress.
+		s.done();
 
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		ForwardItem* pFI = new ForwardItem();
@@ -1511,6 +1551,9 @@ void Cellapp::onCreateCellEntityFromBaseapp(Network::Channel* pChannel, KBEngine
 
 	_onCreateCellEntityFromBaseapp(entityType, createToEntityID, entityID, 
 					&s, hasClient, inRescore, componentID, spaceID);
+	// Helper 的生命周期失败分支可能无需读取 cellData，但 PacketReader 仍要求变量消息完整消费。
+	// Helper lifecycle failures may not need cellData, while PacketReader still requires full variable-message consumption.
+	s.done();
 
 }
 
@@ -1904,16 +1947,27 @@ void Cellapp::onRemoteCallMethodFromClient(Network::Channel* pChannel, KBEngine:
 	if (fromBaseapp)
 	{
 		KBEngine::Entity* sourceEntity = KBEngine::Cellapp::getSingleton().findEntity(srcEntityID);
-		const bool sourceBoundToChannel = sourceEntity != NULL && sourceEntity->isReal() &&
+		const bool sourceBoundToChannel = sourceEntity != NULL &&
 			sourceEntity->baseEntityCall() != NULL &&
 			sourceEntity->baseEntityCall()->componentID() == sourceComponent->cid;
+		const bool migrationSelfCall = sourceEntity == e && srcEntityID == targetID &&
+			!sourceEntity->isReal();
+		const bool sourceCanAuthorize = sourceBoundToChannel &&
+			(sourceEntity->isReal() || migrationSelfCall);
 
 		const bool controlledBySource = e->controlledBy() != NULL &&
 			e->controlledBy()->id() == srcEntityID;
 		const bool inSourceView = sourceEntity != NULL && sourceEntity->pWitness() != NULL &&
 			sourceEntity->pWitness()->entityInView(targetID);
 
-		if (!sourceBoundToChannel ||
+		// BaseApp may still have self-RPC bytes queued on the old CellApp Channel
+		// while migration switches the authoritative route. The old Source Ghost
+		// remains bound to the same Base EntityCall and may forward only that
+		// entity's self call; cross-entity authorization still requires a real Source.
+		// BaseApp 切换权威路由时，旧 CellApp Channel 中可能仍有已排队的 self RPC。
+		// 旧 Source Ghost 仍绑定同一个 Base EntityCall，因此只允许转发该实体的
+		// 自调用；跨实体授权仍必须由 real Source 执行。
+		if (!sourceCanAuthorize ||
 			!Security::isAuthorizedClientCellTarget(srcEntityID, targetID,
 				sourceEntity != NULL ? sourceEntity->spaceID() : 0, e->spaceID(),
 				controlledBySource, inSourceView))
@@ -1927,11 +1981,13 @@ void Cellapp::onRemoteCallMethodFromClient(Network::Channel* pChannel, KBEngine:
 		}
 	}
 	else if (fromCellapp && !Security::isAuthorizedCellRelay(e->isReal(),
-		sourceComponent->cid, e->ghostCell()))
+		sourceComponent->cid, e->ghostCell(), e->migrationRelayCell()))
 	{
 		WARNING_MSG(fmt::format("Cellapp::onRemoteCallMethodFromClient: rejected stale CellApp relay, "
-			"srcEntityID={}, targetID={}, sourceCellappID={}, targetGhostCellID={}, targetIsReal={}.\n",
-			srcEntityID, targetID, sourceComponent->cid, e->ghostCell(), e->isReal()));
+			"srcEntityID={}, targetID={}, sourceCellappID={}, targetGhostCellID={}, "
+			"migrationRelayCellID={}, targetIsReal={}.\n",
+			srcEntityID, targetID, sourceComponent->cid, e->ghostCell(),
+			e->migrationRelayCell(), e->isReal()));
 		s.done();
 		return;
 	}
@@ -1951,6 +2007,11 @@ void Cellapp::onRemoteCallMethodFromClient(Network::Channel* pChannel, KBEngine:
 				(*pBundle) << targetID;
 				(*pBundle) << e->routingEpoch();
 				pBundle->append(s);
+				// Bundle::append copies bytes without advancing the source stream. Consume
+				// the ingress message so PacketReader does not treat successful forwarding
+				// as a malformed partial read. / Bundle::append 只复制字节，不推进源流；
+				// 转发成功后必须消费入口消息，避免 PacketReader 误报部分读取。
+				s.done();
 				gm->pushMessage(e->realCell(), pBundle);
 			}
 
@@ -2188,32 +2249,34 @@ void Cellapp::onRemoteRealMethodCall(Network::Channel* pChannel, KBEngine::Memor
 	if(entity == NULL)
 	{
 		GhostManager* gm = Cellapp::getSingleton().pGhostManager();
-		if(gm)
+		const COMPONENT_ID targetCell = gm ? gm->getRoute(entityID) : 0;
+		if (forwardRemoteRealMethodCall(gm, entityID, sourceInfos->cid, targetCell, s))
 		{
-			COMPONENT_ID targetCell = gm->getRoute(entityID);
-			if(targetCell > 0)
-			{
-				Network::Bundle* pForwardBundle = gm->createSendBundle(targetCell);
-				(*pForwardBundle).newMessage(CellappInterface::onRemoteRealMethodCall);
-				(*pForwardBundle) << entityID;
-				pForwardBundle->append(s);
-
-				gm->pushRouteMessage(entityID, targetCell, pForwardBundle);
-				s.done();
-				return;
-			}
+			return;
 		}
 
-		ERROR_MSG(fmt::format("Cellapp::onRemoteRealMethodCall: not found entity({})\n", 
+		// A route can expire after the final real Entity is destroyed while an older
+		// Ghost still has a queued call. This is a terminal lifecycle race, not a
+		// process integrity failure. / 最终 real Entity 销毁后，旧 Ghost 仍可能有
+		// 已排队调用；路由已失效属于终态生命周期竞态，不是进程完整性错误。
+		WARNING_MSG(fmt::format("Cellapp::onRemoteRealMethodCall: not found entity({})\n",
 			entityID));
 
 		s.done();
 		return;
 	}
-	if (!isCurrentGhostPeer(entity, sourceInfos->cid))
+
+	if (!entity->isReal())
 	{
-		WARNING_MSG(fmt::format("Cellapp::onRemoteRealMethodCall: rejected stale CellApp source, entityID={}, sourceCellID={}.\n",
-			entityID, sourceInfos->cid));
+		GhostManager* gm = Cellapp::getSingleton().pGhostManager();
+		if (forwardRemoteRealMethodCall(gm, entityID, sourceInfos->cid, entity->realCell(), s))
+		{
+			return;
+		}
+
+		WARNING_MSG(fmt::format("Cellapp::onRemoteRealMethodCall: rejected invalid Ghost route, "
+			"entityID={}, sourceCellID={}, targetCellID={}.\n",
+			entityID, sourceInfos->cid, entity->realCell()));
 		s.done();
 		return;
 	}
@@ -2714,6 +2777,11 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 	// 当前实体做出的任何改变不需要同步到原有cell，这可能会产生网络消息死循环
 	//ghostCell = 0;
 	e->ghostCell(0);
+	// ghostCell must stay clear to avoid replication loops. Retain only the
+	// authenticated predecessor used to drain client RPCs queued before the
+	// BaseApp route switch. / ghostCell 必须保持为空以避免同步回环；这里只
+	// 保留已认证的前驱 Cell，用于排空 BaseApp 切路由前已入队的客户端 RPC。
+	e->migrationRelayCell(ghostCell);
 
 	e->spaceID(space->id());
 	e->setPositionAndDirection(pos, dir);
@@ -2724,13 +2792,6 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 		
 		// 如果是有base的实体，需要将baseappID填入，以便在reqTeleportToCellAppCB中回调给baseapp传输结束状态
 		entityBaseappID = e->baseEntityCall()->componentID();
-
-		// 向baseapp发送传送到达通知
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-		(*pBundle).newMessage(BaseappInterface::onMigrationCellappEnd);
-		(*pBundle) << e->id();
-		(*pBundle) << ghostCell << g_componentID;
-		e->baseEntityCall()->sendCall(pBundle);
 	}
 
 	// 进入新space之前必须通知客户端leaveSpace
@@ -2754,6 +2815,17 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 
 	Entity* nearbyMBRef = Cellapp::getSingleton().findEntity(nearbyMBRefID);
 	e->onTeleportSuccess(nearbyMBRef, space->id());
+
+	if (e->baseEntityCall())
+	{
+		// Target 的实体、Space、Witness 和脚本回调全部就绪后才能允许 BaseApp 切换 RPC 路由。
+		// BaseApp may switch RPC routing only after Target's Entity, Space, Witness, and script callbacks are ready.
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		(*pBundle).newMessage(BaseappInterface::onMigrationCellappEnd);
+		(*pBundle) << e->id();
+		(*pBundle) << ghostCell << g_componentID;
+		e->baseEntityCall()->sendCall(pBundle);
+	}
 
 	success = true;
 
@@ -2813,10 +2885,13 @@ void Cellapp::reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s
 		return;
 	}
 
-	// 传送成功，我们销毁这个entity
+	// 无 Base 的实体没有权威路由切换点，可以在目标成功后立即释放 Source。
+	// Entities without a Base have no authoritative routing switch and can release Source immediately.
 	if(success)
 	{
-		destroyEntity(teleportEntityID, false);
+		if (entityBaseappID == 0)
+			destroyEntity(teleportEntityID, false);
+
 		scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_CALLBACK,
 			scriptStageDurationNanos(callbackStart), true, "reqTeleportToCellAppCB");
 		return;
@@ -2881,9 +2956,56 @@ void Cellapp::reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s
 }
 
 //-------------------------------------------------------------------------------------
+void Cellapp::reqTeleportToCellAppPrepare(Network::Channel* pChannel, MemoryStream& s)
+{
+	const size_t prepareHeaderSize = sizeof(ENTITY_ID) + sizeof(COMPONENT_ID) * 2;
+	if (s.length() < prepareHeaderSize)
+	{
+		WARNING_MSG("Cellapp::reqTeleportToCellAppPrepare: rejected incomplete fixed header.\n");
+		s.done();
+		return;
+	}
+	if (!Components::getSingleton().isExpectedComponentChannel(BASEAPP_TYPE, pChannel))
+	{
+		WARNING_MSG("Cellapp::reqTeleportToCellAppPrepare: rejected non-BaseApp source.\n");
+		s.done();
+		return;
+	}
+
+	ENTITY_ID teleportEntityID = 0;
+	COMPONENT_ID sourceCellAppID = 0;
+	COMPONENT_ID targetCellAppID = 0;
+	s >> teleportEntityID >> sourceCellAppID >> targetCellAppID;
+
+	Entity* entity = Cellapp::getSingleton().findEntity(teleportEntityID);
+	Space* space = entity != NULL ? Spaces::findSpace(entity->spaceID()) : NULL;
+	const bool ready = targetCellAppID == g_componentID && sourceCellAppID != 0 &&
+		entity != NULL && !entity->isDestroyed() && entity->isReal() &&
+		entity->hasFlags(ENTITY_FLAGS_TELEPORT_START) &&
+		entity->migrationRelayCell() == sourceCellAppID &&
+		entity->baseEntityCall() != NULL &&
+		entity->baseEntityCall()->componentID() == pChannel->componentID() &&
+		space != NULL && space->isGood();
+
+	if (!ready)
+	{
+		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellAppPrepare: Target validation failed, "
+			"entity={}, sourceCellAppID={}, targetCellAppID={}, localCellAppID={}.\n",
+			teleportEntityID, sourceCellAppID, targetCellAppID, g_componentID));
+	}
+
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	(*pBundle).newMessage(BaseappInterface::onMigrationCellappPrepared);
+	(*pBundle) << teleportEntityID << sourceCellAppID << targetCellAppID << ready;
+	pChannel->send(pBundle);
+	s.done();
+}
+
+//-------------------------------------------------------------------------------------
 void Cellapp::reqTeleportToCellAppOver(Network::Channel* pChannel, MemoryStream& s)
 {
-	if (s.length() < sizeof(ENTITY_ID))
+	const size_t completionHeaderSize = sizeof(ENTITY_ID) + sizeof(COMPONENT_ID) * 2;
+	if (s.length() < completionHeaderSize)
 	{
 		WARNING_MSG("Cellapp::reqTeleportToCellAppOver: rejected incomplete fixed header.\n");
 		s.done();
@@ -2897,8 +3019,19 @@ void Cellapp::reqTeleportToCellAppOver(Network::Channel* pChannel, MemoryStream&
 	}
 
 	ENTITY_ID teleportEntityID = 0;
+	COMPONENT_ID sourceCellAppID = 0;
+	COMPONENT_ID targetCellAppID = 0;
 
-	s >> teleportEntityID;
+	s >> teleportEntityID >> sourceCellAppID >> targetCellAppID;
+	if (sourceCellAppID == 0 || targetCellAppID == 0 ||
+		(g_componentID != sourceCellAppID && g_componentID != targetCellAppID))
+	{
+		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellAppOver: rejected invalid route, "
+			"entity={}, sourceCellAppID={}, targetCellAppID={}, localCellAppID={}.\n",
+			teleportEntityID, sourceCellAppID, targetCellAppID, g_componentID));
+		s.done();
+		return;
+	}
 	
 	// 某些情况下实体可能此时找不到了，例如：副本销毁了
 	Entity* entity = Cellapp::getSingleton().findEntity(teleportEntityID);
@@ -2919,7 +3052,52 @@ void Cellapp::reqTeleportToCellAppOver(Network::Channel* pChannel, MemoryStream&
 		return;
 	}
 
-	entity->removeFlags(ENTITY_FLAGS_TELEPORT_START);
+	if (sourceCellAppID == targetCellAppID)
+	{
+		// Failed migration restores the Source as real and keeps BaseApp routing on
+		// the same Cell. This is a one-sided completion, not a Source/Target release.
+		// 迁移失败会把 Source 恢复为 real，BaseApp 路由也保持不变；这是单端完成，
+		// 不能按跨 Cell 的 Source/Target 释放流程处理。
+		if (!entity->isReal())
+		{
+			WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellAppOver: ignored stale rollback completion, "
+				"entity={}, realCell={}, cellAppID={}.\n",
+				teleportEntityID, entity->realCell(), sourceCellAppID));
+			s.done();
+			return;
+		}
+
+		entity->removeFlags(ENTITY_FLAGS_TELEPORT_START);
+		s.done();
+		return;
+	}
+
+	if (g_componentID == sourceCellAppID)
+	{
+		if (entity->isReal() || entity->realCell() != targetCellAppID)
+		{
+			WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellAppOver: ignored stale Source release, "
+				"entity={}, isReal={}, realCell={}, targetCellAppID={}.\n",
+				teleportEntityID, entity->isReal(), entity->realCell(), targetCellAppID));
+			s.done();
+			return;
+		}
+
+		destroyEntity(teleportEntityID, false);
+	}
+	else
+	{
+		if (!entity->isReal())
+		{
+			WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellAppOver: ignored stale Target unlock, "
+				"entity={}, realCell={}, sourceCellAppID={}.\n",
+				teleportEntityID, entity->realCell(), sourceCellAppID));
+			s.done();
+			return;
+		}
+
+		entity->removeFlags(ENTITY_FLAGS_TELEPORT_START);
+	}
 }
 
 //-------------------------------------------------------------------------------------

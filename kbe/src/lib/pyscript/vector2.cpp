@@ -22,6 +22,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "vector2.h"
 #include "vector3.h"
 #include "pyscript/py_gc.h"
+#include "vector_repr.h"
 
 namespace KBEngine{ namespace script{
 
@@ -176,20 +177,11 @@ PyObject* ScriptVector2::tp_new(PyTypeObject* type, PyObject* args, PyObject* kw
 //-------------------------------------------------------------------------------------
 PyObject* ScriptVector2::tp_repr()
 {
-	char str[128];
-	Vector2 v = this->getVector();
-
-	strcpy(str, "Vector2(");
-	for(int i=0; i < VECTOR_SIZE; ++i)
-	{
-		if (i > 0)
-			strcat(str, ", ");
-
-		kbe_snprintf(str + strlen(str), 128, "%f", v[i]);
-	}
-
-	strcat(str, ")");
-	return PyUnicode_FromString(str);
+	const Vector2& v = this->getVector();
+	// 极大浮点值的定点表示可能远超旧的 128 字节缓冲区；动态格式化保持原有六位小数协议，同时消除截断和越界。
+	// Fixed-point text for extreme floats can exceed the former 128-byte buffer; dynamic formatting preserves six decimals without truncation or overflow.
+	const std::string repr = detail::formatVector2Repr(v);
+	return PyUnicode_FromStringAndSize(repr.data(), static_cast<Py_ssize_t>(repr.size()));
 }
 
 //-------------------------------------------------------------------------------------

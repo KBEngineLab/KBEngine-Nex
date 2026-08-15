@@ -566,10 +566,37 @@ Entity* Space::findEntity(ENTITY_ID entityID)
 }
 
 //-------------------------------------------------------------------------------------
+bool Space::hasPendingMigrationEntities() const
+{
+	for (SPACE_ENTITIES::const_iterator iter = entities_.begin(); iter != entities_.end(); ++iter)
+	{
+		const Entity* entity = (*iter).get();
+		if (entity != NULL && entity->isReal() && !entity->isDestroyed() &&
+			entity->hasFlags(ENTITY_FLAGS_TELEPORT_START))
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
 bool Space::destroy(ENTITY_ID entityID, bool ignoreGhost)
 {
 	if(state_ != STATE_NORMAL)
 		return false;
+
+	if (entityID != 0 && hasPendingMigrationEntities())
+	{
+		// 脚本驱动的空房间清理不能销毁尚未提交的 Target。关服 finalise 使用 entityID=0，
+		// 仍可强制回收全部对象，不会让协议租约阻断进程退出。
+		// Script-driven empty-room cleanup cannot destroy an uncommitted Target. Shutdown
+		// finalise uses entityID=0 and may still reclaim every object without blocking exit.
+		WARNING_MSG(fmt::format("Space::destroy: deferred space {} while a migration Target is pending, requester={}.\n",
+			id_, entityID));
+		return false;
+	}
 
 	state_ = STATE_DESTROYING;
 	destroyTime_ = timestamp();

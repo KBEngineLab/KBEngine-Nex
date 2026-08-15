@@ -207,11 +207,12 @@ bool EventPoller::takeUdpReceivedData(KBESOCKET fd, std::vector<char>& data, Add
 }
 
 //-------------------------------------------------------------------------------------
-bool EventPoller::queueTcpSend(KBESOCKET fd, const void* data, int len)
+bool EventPoller::queueTcpSend(KBESOCKET fd, const void* data, int len, size_t maxPendingBytes)
 {
 	(void)fd;
 	(void)data;
 	(void)len;
+	(void)maxPendingBytes;
 	return false;
 }
 
@@ -258,12 +259,15 @@ uint64 EventPoller::contextCachedCount() const { return 0; }
 uint64 EventPoller::contextPeakOutstandingCount() const { return 0; }
 uint64 EventPoller::contextOutstandingBytes() const { return 0; }
 uint64 EventPoller::contextCachedBytes() const { return 0; }
+uint64 EventPoller::tcpSendPendingBytes(KBESOCKET) const { return 0; }
+uint64 EventPoller::tcpSendLastProgressTime(KBESOCKET) const { return 0; }
 uint64 EventPoller::tcpSendOwnershipTransferCount() const { return 0; }
 uint64 EventPoller::tcpSendBatchCopyCount() const { return 0; }
 uint64 EventPoller::tcpSendBatchCopiedBytes() const { return 0; }
 uint64 EventPoller::tcpSendSubmissionCount() const { return 0; }
 uint64 EventPoller::tcpSendSubmittedBytes() const { return 0; }
 uint64 EventPoller::tcpSendMaxSubmissionBytes() const { return 0; }
+uint64 EventPoller::tcpSendInlineCompletionCount() const { return 0; }
 uint64 EventPoller::tcpSendBacklogBytes() const { return 0; }
 uint64 EventPoller::tcpSendBacklogPeakBytes() const { return 0; }
 uint64 EventPoller::tcpSendBackpressureCount() const { return 0; }
@@ -286,6 +290,19 @@ uint64 EventPoller::completionDequeueCallCount() const { return 0; }
 uint64 EventPoller::completionDequeuedCount() const { return 0; }
 uint64 EventPoller::completionMaxDequeuedBatchCount() const { return 0; }
 uint64 EventPoller::completionPendingLocalCount() const { return 0; }
+uint64 EventPoller::ioUringSubmitCallCount() const { return 0; }
+uint64 EventPoller::ioUringSubmitFailureCount() const { return 0; }
+uint64 EventPoller::ioUringSubmitPartialCount() const { return 0; }
+uint64 EventPoller::ioUringSqCapacityExhaustionCount() const { return 0; }
+uint64 EventPoller::ioUringSqDroppedCount() const { return 0; }
+uint64 EventPoller::ioUringCqOverflowCount() const { return 0; }
+uint64 EventPoller::ioUringCancelRequestCount() const { return 0; }
+uint64 EventPoller::ioUringCancelCompletionCount() const { return 0; }
+uint64 EventPoller::ioUringStaleCompletionCount() const { return 0; }
+uint64 EventPoller::ioUringUdpReceiveDepthDeficitCount() const { return 0; }
+uint64 EventPoller::ioUringUdpReceiveWouldBlockCount() const { return 0; }
+uint64 EventPoller::ioUringSqEntryCount() const { return 0; }
+uint64 EventPoller::ioUringCqEntryCount() const { return 0; }
 
 //-------------------------------------------------------------------------------------
 const char* EventPoller::defaultIOModelName()

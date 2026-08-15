@@ -912,9 +912,9 @@ def flatten_values(values):
     return result
 
 
-def query_watcher_snapshot(watcher, path, timeout=5):
+def query_watcher_snapshot(watcher, path, timeout=5, admin_token=None):
     watcher.clearWatchData()
-    watcher.requireQueryWatcher(path)
+    watcher.requireQueryWatcher(path, admin_token)
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline and len(watcher.watchData) < 2:
         watcher.processOne(min(0.25, max(deadline - time.monotonic(), 0.01)))
@@ -931,6 +931,7 @@ def query_message_contract(repository_root, component_type_name, endpoint, messa
     watcher = None
     try:
         from pycommon import Define, Watcher
+        from pycommon.ManagementConfig import resolve_admin_token
 
         component_type = getattr(Define, component_type_name)
         watcher = Watcher.Watcher(component_type)
@@ -940,8 +941,14 @@ def query_message_contract(repository_root, component_type_name, endpoint, messa
         # then read both protocol leaves from that snapshot.
         # Watcher 的 readWatchers 从 ``root`` 节点解析目录路径；直接查询 ``.../id`` 会得到空快照。
         # 一次查询消息目录，再从同一快照读取两个协议叶子。
+        # Resolve the token through the shared tool helper so this probe follows the
+        # same defaults/project override order as production management clients.
+        # 复用管理工具的配置解析顺序，避免测试硬编码令牌或绕过生产环境认证。
+        admin_token = resolve_admin_token()
         snapshot = query_watcher_snapshot(
-            watcher, f"root/network/messages/{message_name}"
+            watcher,
+            f"root/network/messages/{message_name}",
+            admin_token=admin_token,
         )
         values = next((item["values"] for item in snapshot if item["type"] == 0), {})
         contract = flatten_values(values)
@@ -1071,7 +1078,7 @@ def probe_body(probe_case, component_uid):
     }:
         return b""
     if probe_case == "cellappmgr-spoofed-update":
-        return struct.pack("=QifI", 8001, 0, float("nan"), 0)
+        return struct.pack("=QifIQQ", 8001, 0, float("nan"), 0, 0, 0)
     if probe_case == "baseapp-spoofed-callback":
         return struct.pack("=I", 1) + b"Account\0" + struct.pack("=iQ", 1, 7001)
     if probe_case in {

@@ -141,16 +141,19 @@ bool EntityMessagesForwardCellappHandler::process()
 }
 
 //-------------------------------------------------------------------------------------
-BaseMessagesForwardClientHandler::BaseMessagesForwardClientHandler(Entity* pEntity, COMPONENT_ID cellappID):
+BaseMessagesForwardClientHandler::BaseMessagesForwardClientHandler(Entity* pEntity,
+	COMPONENT_ID sourceCellappID, COMPONENT_ID targetCellappID):
 Task(),
 pEntity_(pEntity),
 completed_(false),
 startForward_(false),
-cellappID_(cellappID),
+sourceCellappID_(sourceCellappID),
+targetCellappID_(targetCellappID),
 createTime_(0)
 {
-	DEBUG_MSG(fmt::format("BaseMessagesForwardClientHandler::BaseMessagesForwardClientHandler() : cellappID({}), entityID({})!\n", 
-		cellappID_, (pEntity_ ? pEntity_->id() : 0)));
+	DEBUG_MSG(fmt::format("BaseMessagesForwardClientHandler::BaseMessagesForwardClientHandler() : "
+		"sourceCellappID({}), targetCellappID({}), entityID({})!\n",
+		sourceCellappID_, targetCellappID_, (pEntity_ ? pEntity_->id() : 0)));
 	
 	Baseapp::getSingleton().networkInterface().dispatcher().addTask(this);
 
@@ -160,8 +163,10 @@ createTime_(0)
 //-------------------------------------------------------------------------------------
 BaseMessagesForwardClientHandler::~BaseMessagesForwardClientHandler()
 {
-	DEBUG_MSG(fmt::format("BaseMessagesForwardClientHandler::~BaseMessagesForwardClientHandler(): size({}), cellappID({}), entityID({})!\n", 
-		bufferedSendToClientMessages_.size(), cellappID_, (pEntity_ ? pEntity_->id() : 0)));
+	DEBUG_MSG(fmt::format("BaseMessagesForwardClientHandler::~BaseMessagesForwardClientHandler(): "
+		"size({}), sourceCellappID({}), targetCellappID({}), entityID({})!\n",
+		bufferedSendToClientMessages_.size(), sourceCellappID_, targetCellappID_,
+		(pEntity_ ? pEntity_->id() : 0)));
 
 	if(!completed_)
 		Baseapp::getSingleton().networkInterface().dispatcher().cancelTask(this);
@@ -184,13 +189,15 @@ void BaseMessagesForwardClientHandler::pushMessages(Network::Bundle* pBundle)
 	
 	if(msgsize > 4096 && msgsize <= 10240)
 	{
-		WARNING_MSG(fmt::format("BaseMessagesForwardClientHandler::pushMessages(): size({}) > 4096! cellappID={}, entityID={}\n", 
-			msgsize, cellappID_, (pEntity_ ? pEntity_->id() : 0)));
+		WARNING_MSG(fmt::format("BaseMessagesForwardClientHandler::pushMessages(): size({}) > 4096! "
+			"targetCellappID={}, entityID={}\n",
+			msgsize, targetCellappID_, (pEntity_ ? pEntity_->id() : 0)));
 	}
 	else if(msgsize > 10240)
 	{
-		ERROR_MSG(fmt::format("BaseMessagesForwardClientHandler::pushMessages(): size({}) > 10240! cellappID={}, entityID={}\n", 
-			msgsize, cellappID_, (pEntity_ ? pEntity_->id() : 0)));
+		ERROR_MSG(fmt::format("BaseMessagesForwardClientHandler::pushMessages(): size({}) > 10240! "
+			"targetCellappID={}, entityID={}\n",
+			msgsize, targetCellappID_, (pEntity_ ? pEntity_->id() : 0)));
 	}
 }
 
@@ -199,8 +206,9 @@ void BaseMessagesForwardClientHandler::startForward()
 {
 	startForward_ = true;
 
-	DEBUG_MSG(fmt::format("BaseMessagesForwardClientHandler::startForward(): size({}), cellappID({}), entityID({})!\n", 
-		bufferedSendToClientMessages_.size(), cellappID_, (pEntity_ ? pEntity_->id() : 0)));
+	DEBUG_MSG(fmt::format("BaseMessagesForwardClientHandler::startForward(): size({}), "
+		"targetCellappID({}), entityID({})!\n",
+		bufferedSendToClientMessages_.size(), targetCellappID_, (pEntity_ ? pEntity_->id() : 0)));
 }
 
 //-------------------------------------------------------------------------------------

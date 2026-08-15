@@ -27,7 +27,7 @@ public:
 	int getFileDescriptor() const override { return kqfd_; }
 
 	// 将 TCP 发送数据入队，并启用 kqueue 写唤醒来驱动一次 send completion。
-	bool queueTcpSend(KBESOCKET fd, const void* data, int len) override;
+	bool queueTcpSend(KBESOCKET fd, const void* data, int len, size_t maxPendingBytes = 0) override;
 
 	// 将 UDP 发送数据入队，并启用 kqueue 写唤醒来驱动一次 sendto completion。
 	bool queueUdpSend(KBESOCKET fd, const void* data, int len, const Address& dstAddr) override;

@@ -60,6 +60,19 @@ PacketReceiver::~PacketReceiver()
 //-------------------------------------------------------------------------------------
 int PacketReceiver::handleInputNotification(KBESOCKET fd)
 {
+	EventPoller* pPoller = this->dispatcher().pPoller();
+	if (pPoller != NULL && pPoller->supportsCompletion())
+	{
+		// 完成后端的每次通知只消费一个已完成接收，使 completion 时间/数量预算
+		// 与实际报文一一对应。io_uring 会把 socket burst 搬入用户态队列，但不能
+		// 再由一个 CQE 无界清空整队，否则 KCP 会长期挤占内部 TCP 与游戏 Tick。
+		// A completion notification consumes exactly one completed receive so count/time
+		// budgets correspond to real packets. io_uring may stage a socket burst in user
+		// space, but one CQE must not drain the whole queue and starve internal TCP or ticks.
+		this->processRecv(true);
+		return 0;
+	}
+
 	if (this->processRecv(true))
 	{
 		while (this->processRecv(false))
@@ -95,15 +108,20 @@ EventDispatcher & PacketReceiver::dispatcher()
 //-------------------------------------------------------------------------------------
 Channel* PacketReceiver::getChannel()
 {
+	const ProtocolType expectedProtocol = type() == UDP_PACKET_RECEIVER ? PROTOCOL_UDP : PROTOCOL_TCP;
 	if (pChannel_)
 	{
-		if (pChannel_->isDestroyed())
-			return NULL;
+		if (!pChannel_->isDestroyed() && pChannel_->protocoltype() == expectedProtocol)
+			return pChannel_;
 
-		return pChannel_;
+		pChannel_ = NULL;
 	}
 
-	pChannel_ = pNetworkInterface_->findChannel(pEndpoint_->addr());
+	// TCP and UDP may share the same numeric peer port. Bind by the receiver's
+	// transport type so a KCP receiver can never cache an unrelated TCP Channel.
+	// TCP 与 UDP 可以共享同一数值对端端口。必须按 receiver 的传输类型绑定，
+	// 避免 KCP receiver 缓存无关的 TCP Channel。
+	pChannel_ = pNetworkInterface_->findChannel(pEndpoint_->addr(), expectedProtocol);
 	return pChannel_;
 }
 

@@ -75,6 +75,16 @@ private:
 class WitnessLoadMetrics
 {
 public:
+	enum ImmediateMessageKind
+	{
+		IMMEDIATE_PROPERTY = 0,
+		IMMEDIATE_RPC,
+		IMMEDIATE_POSITION,
+		IMMEDIATE_SPACE_DATA,
+		IMMEDIATE_OTHER,
+		IMMEDIATE_KIND_COUNT
+	};
+
 	void synchronizeViewCount(std::size_t& trackedCount, std::size_t currentCount)
 	{
 		if (!g_performanceProbesEnabled)
@@ -221,6 +231,20 @@ public:
 	void recordSuppressedUpdateSkip() { if (g_performanceProbesEnabled) ++suppressedUpdateSkips_; }
 	void recordSuppressedVolatileRefresh() { if (g_performanceProbesEnabled) ++suppressedVolatileRefreshes_; }
 	void recordStructuralWhileSuppressed() { if (g_performanceProbesEnabled) ++structuralWhileSuppressed_; }
+	void recordProducerBackpressureDeferred() { if (g_performanceProbesEnabled) ++producerBackpressureDeferred_; }
+	void recordImmediateBundle(ImmediateMessageKind kind, std::uint64_t bytes, bool backpressured)
+	{
+		if (!g_performanceProbesEnabled)
+			return;
+
+		assert(kind >= IMMEDIATE_PROPERTY && kind < IMMEDIATE_KIND_COUNT);
+		++immediateBundles_;
+		immediateBytes_ += bytes;
+		++immediateKindBundles_[kind];
+		immediateKindBytes_[kind] += bytes;
+		if (backpressured)
+			++immediateBackpressuredBundles_;
+	}
 	void recordBundle(std::size_t bytes)
 	{
 		if (!g_performanceProbesEnabled)
@@ -281,6 +305,12 @@ public:
 	std::uint64_t suppressedUpdateSkips() const { return suppressedUpdateSkips_; }
 	std::uint64_t suppressedVolatileRefreshes() const { return suppressedVolatileRefreshes_; }
 	std::uint64_t structuralWhileSuppressed() const { return structuralWhileSuppressed_; }
+	std::uint64_t producerBackpressureDeferred() const { return producerBackpressureDeferred_; }
+	std::uint64_t immediateBundles() const { return immediateBundles_; }
+	std::uint64_t immediateBytes() const { return immediateBytes_; }
+	std::uint64_t immediateBackpressuredBundles() const { return immediateBackpressuredBundles_; }
+	std::uint64_t immediateKindBundles(ImmediateMessageKind kind) const { return immediateKindBundles_[kind]; }
+	std::uint64_t immediateKindBytes(ImmediateMessageKind kind) const { return immediateKindBytes_[kind]; }
 	std::uint64_t bundlesSent() const { return bundlesSent_; }
 	std::uint64_t maxBundleBytes() const { return maxBundleBytes_; }
 
@@ -335,6 +365,12 @@ private:
 	std::uint64_t suppressedUpdateSkips_ = 0;
 	std::uint64_t suppressedVolatileRefreshes_ = 0;
 	std::uint64_t structuralWhileSuppressed_ = 0;
+	std::uint64_t producerBackpressureDeferred_ = 0;
+	std::uint64_t immediateBundles_ = 0;
+	std::uint64_t immediateBytes_ = 0;
+	std::uint64_t immediateBackpressuredBundles_ = 0;
+	std::uint64_t immediateKindBundles_[IMMEDIATE_KIND_COUNT] = {};
+	std::uint64_t immediateKindBytes_[IMMEDIATE_KIND_COUNT] = {};
 	std::uint64_t bundlesSent_ = 0;
 	std::uint64_t maxBundleBytes_ = 0;
 };

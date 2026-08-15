@@ -246,6 +246,20 @@ public:
 	static uint64 suppressedUpdateSkipCount();
 	static uint64 suppressedVolatileRefreshCount();
 	static uint64 structuralWhileSuppressedCount();
+	static uint64 producerBackpressureDeferredCount();
+	static uint64 immediateBundleCount();
+	static uint64 immediateBytesCount();
+	static uint64 immediateBackpressuredBundleCount();
+	static uint64 immediatePropertyBundleCount();
+	static uint64 immediatePropertyBytesCount();
+	static uint64 immediateRpcBundleCount();
+	static uint64 immediateRpcBytesCount();
+	static uint64 immediatePositionBundleCount();
+	static uint64 immediatePositionBytesCount();
+	static uint64 immediateSpaceDataBundleCount();
+	static uint64 immediateSpaceDataBytesCount();
+	static uint64 immediateOtherBundleCount();
+	static uint64 immediateOtherBytesCount();
 	static uint64 bundlesSentCount();
 	static uint64 maxBundleBytes();
 

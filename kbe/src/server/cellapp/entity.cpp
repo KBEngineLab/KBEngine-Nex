@@ -124,6 +124,7 @@ baseEntityCall_(NULL),
 realCell_(0),
 ghostCell_(0),
 routingEpoch_(1),
+migrationRelayCell_(0),
 lastpos_(),
 position_(),
 pPyPosition_(NULL),
@@ -301,53 +302,48 @@ void Entity::onDestroy(bool callScript)
 	// 在进程强制关闭时这里可能不为0
 	//KBE_ASSERT(spaceID() == 0);
 
-	// 此时不应该还有witnesses，否则为View BUG
+	// Coordinate/AOI 离开通知可以排在 Entity 销毁之后。销毁路径必须同步拆除双方关系，
+	// 否则 observer 仍会保留指向即将释放对象的 EntityRef。该清理是幂等的：已由
+	// onLeaveView 完成的关系会直接跳过，仍活跃的关系通过 Witness::_onLeaveView 正常收口。
+	// Coordinate/AOI leave notifications may trail Entity destruction. Synchronously detach both
+	// sides so observers never retain EntityRefs to freed objects. The cleanup is idempotent: relations
+	// already removed by onLeaveView are skipped, while live relations use Witness::_onLeaveView.
 	if (witnesses_count_ > 0)
 	{
-		ERROR_MSG(fmt::format("{}::onDestroy(): id={}, witnesses_count({}/{}) != 0, isReal={}, spaceID={}, position=({},{},{})\n", 
-			scriptName(), id(), witnesses_count_, witnesses_.size(), isReal(), this->spaceID(), position().x, position().y, position().z));
-
 		WITNESS_IDS witnesses_copy = witnesses_;
 		WITNESS_IDS::iterator it = witnesses_copy.begin();
 		for (; it != witnesses_copy.end(); ++it)
 		{
-			Entity *ent = Cellapp::getSingleton().findEntity((*it));
+			if (!entityInWitnessed(*it))
+				continue;
 
-			if (ent)
-			{
-				bool inTargetView = false;
+			Entity* ent = Cellapp::getSingleton().findEntity(*it);
 
-				if (ent->pWitness())
-				{
-					Witness::VIEW_ENTITIES::iterator view_iter = ent->pWitness()->viewEntities().begin();
-					for (; view_iter != ent->pWitness()->viewEntities().end(); ++view_iter)
-					{
-						if ((*view_iter)->pEntity() == this)
-						{
-							inTargetView = true;
-							ent->pWitness()->_onLeaveView((*view_iter));
-							break;
-						}
-					}
-				}
-				else
-				{
-					ent->delWitnessed(this);
-				}
-				
-				ERROR_MSG(fmt::format("\t=>witnessed={}({}), isDestroyed={}, isReal={}, inTargetView={}, spaceID={}, position=({},{},{})\n", 
-					ent->scriptName(), (*it), ent->isDestroyed(), ent->isReal(), inTargetView, ent->spaceID(), ent->position().x, ent->position().y, ent->position().z));
-			}
-			else
+			if (ent && ent->pWitness())
 			{
-				ERROR_MSG(fmt::format("\t=> witnessed={}, not found entity!\n", (*it)));
+				EntityRef* pEntityRef = ent->pWitness()->getViewEntityRef(id());
+				if (pEntityRef && pEntityRef->pEntity() == this)
+				{
+					ent->pWitness()->_onLeaveView(pEntityRef);
+				}
 			}
-			
-			witnesses_count_ = 0;
-			witnesses_.clear();
+
+			// 缺失 observer 或半关系表示对端已先完成生命周期清理。只移除本地残留，
+			// 避免在销毁中的 Entity 上触发脚本回调或制造二次错误日志。
+			// A missing observer or half-relation means the peer already completed lifecycle cleanup.
+			// Remove only the local residue without invoking script callbacks on a destroying Entity.
+			if (entityInWitnessed(*it))
+			{
+				WITNESS_IDS::iterator relation = std::find(witnesses_.begin(), witnesses_.end(), *it);
+				if (relation != witnesses_.end())
+					witnesses_.erase(relation);
+
+				witnesses_count_ = witnesses_.size();
+			}
 		}
 
-		//KBE_ASSERT(witnesses_count_ == 0);
+		KBE_ASSERT(witnesses_.empty());
+		witnesses_count_ = 0;
 	}
 
 	pPyPosition_->onLoseRef();
@@ -384,6 +380,19 @@ PyObject* Entity::__py_pyDestroyEntity(PyObject* self, PyObject* args, PyObject 
 			__FUNCTION__, 0, currargsSize, pobj->scriptName(), pobj->id());
 		PyErr_PrintEx(0);
 		return NULL;
+	}
+
+	Space* pSpace = Spaces::findSpace(pobj->spaceID());
+	if ((pobj->isReal() && pobj->hasFlags(ENTITY_FLAGS_TELEPORT_START)) ||
+		(pobj->isSpace() && pSpace != NULL && pSpace->hasPendingMigrationEntities()))
+	{
+		// 迁移 Target 及其 Space 在 BaseApp 提交前必须保持存活。脚本定时清理会在下一次
+		// 检查时自然重试；这里返回成功，避免把正常的生命周期租约暴露为 Python 异常。
+		// Migration Target and owning Space stay alive until BaseApp commits. Script timers
+		// naturally retry later; return success so the lifecycle lease is not exposed as a Python error.
+		WARNING_MSG(fmt::format("{}::destroy: deferred entity {} while migration commit is pending.\n",
+			pobj->scriptName(), pobj->id()));
+		S_Return;
 	}
 
 	pobj->destroyEntity();
@@ -3984,6 +3993,24 @@ void Entity::teleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Dir
 		onTeleportFailure();
 		return;
 	}
+
+	if (nearbyMBRef == NULL || nearbyMBRef->componentID() == 0 ||
+		nearbyMBRef->componentID() == g_componentID)
+	{
+		// teleport() 仅在本地查不到目标实体后才进入此分支；若 EntityCall 仍指向当前
+		// CellApp，它已经陈旧。继续执行会把 authoritative Entity 改成指向自身的 Ghost，
+		// 后续所有 RPC 都会被 GhostManager 丢弃且无法自动恢复。
+		// teleport() reaches this branch only after the local target lookup misses. A call
+		// still pointing at this CellApp is therefore stale; proceeding would turn the
+		// authoritative Entity into a self-routed Ghost whose RPCs are permanently dropped.
+		WARNING_MSG(fmt::format("{}::teleport: entity={} rejected stale local target EntityCall, "
+			"targetEntity={}, targetCellapp={}.\n",
+			scriptName(), id(), nearbyMBRef != NULL ? nearbyMBRef->id() : 0,
+			nearbyMBRef != NULL ? nearbyMBRef->componentID() : 0));
+
+		onTeleportFailure();
+		return;
+	}
 	
 	if (!nearbyMBRef->isCellReal())
 	{
@@ -4569,10 +4596,11 @@ void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s)
 	// 序列化controller并停止所有的controller(timer, navigate, trap,...)
 	// 卸载witness， 并且序列化
 	KBE_ASSERT(isReal() == true && "Entity::changeToGhost(): not is real.\n");
-	KBE_ASSERT(realCell_ != g_componentID);
+	KBE_ASSERT(realCell > 0 && realCell != g_componentID);
 
 	realCell_ = realCell;
 	ghostCell_ = 0;
+	migrationRelayCell_ = 0;
 	if (++routingEpoch_ == 0)
 		routingEpoch_ = 1;
 	
@@ -4620,6 +4648,7 @@ void Entity::changeToReal(COMPONENT_ID ghostCell, KBEngine::MemoryStream& s)
 
 	ghostCell_ = ghostCell;
 	realCell_ = 0;
+	migrationRelayCell_ = 0;
 
 	DEBUG_MSG(fmt::format("{}::changeToReal(): {}, ghostCell={}, spaceID={}, position=({},{},{}).\n",
 		scriptName(), id(), ghostCell_, spaceID_, position().x, position().y, position().z));
@@ -4943,21 +4972,39 @@ void Entity::addTimersToStream(KBEngine::MemoryStream& s)
 {
 	ScriptTimers::Map& map = scriptTimers_.map();
 	KBE_ASSERT(map.size() <= static_cast<size_t>(std::numeric_limits<uint32>::max()));
-	const uint32 size = static_cast<uint32>(map.size());
+
+	// 取消回调通常会同步移除 ScriptTimers 条目，但迁移序列化不能依赖该时序。
+	// getTimerInfo() 对已取消句柄返回 false 且不初始化输出；先计数再写流，既避免
+	// 未定义数据，也确保条目数与实际载荷一致。
+	// Cancellation normally removes ScriptTimers entries synchronously, but migration
+	// serialization must not depend on that timing. getTimerInfo() leaves outputs untouched
+	// for cancelled handles, so count valid timers first to keep the stream deterministic.
+	uint32 size = 0;
+	for (ScriptTimers::Map::const_iterator iter = map.begin(); iter != map.end(); ++iter)
+	{
+		uint32 time = 0;
+		uint32 interval = 0;
+		void* pUser = NULL;
+		if (Cellapp::getSingleton().timers().getTimerInfo(iter->second, time, interval, pUser))
+			++size;
+	}
+
 	s << size;
 
 	ScriptTimers::Map::const_iterator iter = map.begin();
 	while (iter != map.end())
 	{
-		// timerID
+		uint32 time = 0;
+		uint32 interval = 0;
+		void* pUser = NULL;
+		if (!Cellapp::getSingleton().timers().getTimerInfo(iter->second, time, interval, pUser))
+		{
+			++iter;
+			continue;
+		}
+
+		const int32 userData = int32(uintptr(pUser));
 		s << iter->first;
-
-		uint32 time;
-		uint32 interval;
-		void* pUser;
-
-		Cellapp::getSingleton().timers().getTimerInfo(iter->second, time, interval, pUser);
-		int32 userData = int32(uintptr(pUser));
 		s << time << interval << userData;
 		++iter;
 	}

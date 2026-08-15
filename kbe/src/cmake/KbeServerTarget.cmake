@@ -16,6 +16,7 @@ function(kbe_add_server_executable target_name component_definition)
 
     add_executable(${target_name} ${KBE_SERVER_TARGET_SOURCES})
     kbe_configure_target(${target_name})
+    add_dependencies(${target_name} kbe_python_runtime_deploy)
     # 各配置必须保留独立链接产物，避免多配置生成器把较新的 Debug 文件误判为已完成的 Release 输出。
     # Configurations retain separate link artifacts so a multi-config generator cannot mistake a newer Debug file for a completed Release output.
     set_target_properties(${target_name} PROPERTIES
@@ -28,9 +29,6 @@ function(kbe_add_server_executable target_name component_definition)
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different
             "$<TARGET_FILE:${target_name}>"
             "${KBE_SERVER_RUNTIME_DIR}"
-        # 部署脚本不创建额外工程；文件锁会串行化多个服务端并行链接后的 Python 更新。
-        # The script adds no project; its file lock serializes Python updates after parallel server links.
-        COMMAND "${CMAKE_COMMAND}" -P "${KBE_PYTHON_DEPLOY_SCRIPT}"
         VERBATIM
     )
     target_compile_definitions(${target_name} PRIVATE

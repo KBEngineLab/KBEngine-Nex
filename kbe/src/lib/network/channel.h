@@ -165,6 +165,9 @@ public:
 	// reliable=true queues data through KCP; false sends it directly as a UDP datagram.
 	void sendTo(bool reliable, Bundle* pBundle = NULL);
 	void delayedSend();
+	// 仅供可重建或可延后的生产者使用；可靠消息应保留在业务队列中等待恢复。
+	// Only deferrable producers use this signal; reliable messages stay in their business queue until recovery.
+	bool completionSendBackpressured();
 
 	ikcpcb* pKCP() const { return pKCP_; }
 	bool isKcpTransport() const { return protocolSubtype_ == SUB_PROTOCOL_KCP && pKCP_ != NULL; }
@@ -181,7 +184,9 @@ public:
 	bool hasKcpUpdateTimer() const;
 	void scheduleKcpUpdate(int64 microseconds = 0);
 	void scheduleKcpAck();
+	void scheduleKcpReceive();
 	void flushKcpAcks();
+	void drainKcpReceive();
 
 
 	INLINE PacketReader* pPacketReader() const;
@@ -377,6 +382,7 @@ private:
 	bool						webSocketCloseReceived_;
 	bool						tlsCloseNotifyReceived_;
 	uint64						gracefulCloseDeadline_;
+	bool						completionSendBackpressureActive_;
 
 	// 将已经完成协议封装的数据按当前 TLS/IO 后端发送，不再经过 PacketFilter 二次封装。
 	// Send protocol-framed bytes through the active TLS/IO backend without a second PacketFilter pass.

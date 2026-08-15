@@ -539,8 +539,17 @@ static void appendClientDigestMethod(KBE_MD5& digest, COMPONENT_TYPE domain,
 void EntityDef::buildClientDigest()
 {
 	__clientMd5.clear();
-	static const uint32 digestFormatVersion = 1;
+	static const uint32 digestFormatVersion = 2;
 	appendClientDigestValue(__clientMd5, digestFormatVersion);
+	// Alias switches change the on-wire width of entity IDs, property IDs, method IDs,
+	// and module IDs. Include them before schema data so configuration drift is rejected
+	// during login instead of corrupting later packet decoding.
+	// 别名开关会改变实体、属性、方法和模块 ID 的线协议宽度；在 schema 前纳入摘要，
+	// 让配置漂移在登录阶段被拒绝，避免进入业务阶段后才发生数据包错位解析。
+	const uint8 entityAliasEnabled = entityAliasID() ? 1 : 0;
+	const uint8 entityDefAliasEnabled = entitydefAliasID() ? 1 : 0;
+	appendClientDigestValue(__clientMd5, entityAliasEnabled);
+	appendClientDigestValue(__clientMd5, entityDefAliasEnabled);
 
 	// SDK 会导出所有非内部类型，因此类型表也是客户端协议的一部分。
 	// SDKs export every non-internal type, so the exported type table is part of the client protocol.
@@ -565,7 +574,7 @@ void EntityDef::buildClientDigest()
 		appendClientDigestString(__clientMd5, pModule->getName());
 		const ENTITY_SCRIPT_UID moduleUType = pModule->getUType();
 		appendClientDigestValue(__clientMd5, moduleUType);
-	const uint8 componentModule = pModule->isComponentModule() ? 1 : 0;
+		const uint8 componentModule = pModule->isComponentModule() ? 1 : 0;
 		appendClientDigestValue(__clientMd5, componentModule);
 
 		ScriptDefModule::PROPERTYDESCRIPTION_MAP& properties = pModule->getClientPropertyDescriptions();

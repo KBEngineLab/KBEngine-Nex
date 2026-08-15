@@ -372,6 +372,25 @@ bool ServerConfig::loadConfig(std::string fileName)
 				Network::g_maxCompletionProcessingTimeMS = KBE_MAX(0, xml->getValInt(childnode1));
 		}
 
+		childnode = xml->enterNode(rootNode, "completionSendBackpressure");
+		if(childnode)
+		{
+			TiXmlNode* childnode1 = xml->enterNode(childnode, "internalHighBytes");
+			if(childnode1)
+				Network::g_completionIntTcpSendBackpressureHighBytes = KBE_MAX(0, xml->getValInt(childnode1));
+
+			childnode1 = xml->enterNode(childnode, "internalLowBytes");
+			if(childnode1)
+				Network::g_completionIntTcpSendBackpressureLowBytes = KBE_MAX(0, xml->getValInt(childnode1));
+
+			if(Network::g_completionIntTcpSendBackpressureHighBytes > 0)
+			{
+				Network::g_completionIntTcpSendBackpressureLowBytes = KBE_MIN(
+					Network::g_completionIntTcpSendBackpressureLowBytes,
+					Network::g_completionIntTcpSendBackpressureHighBytes);
+			}
+		}
+
 		childnode = xml->enterNode(rootNode, "windowOverflow");
 		if(childnode)
 		{

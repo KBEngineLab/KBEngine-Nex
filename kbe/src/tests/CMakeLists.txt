@@ -118,6 +118,15 @@ set_tests_properties(source.bots_component_visibility_contract PROPERTIES
     LABELS "bots;machine;network;source"
 )
 
+add_test(NAME source.entitydef_client_digest_contract
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyEntityDefClientDigest.cmake"
+)
+set_tests_properties(source.entitydef_client_digest_contract PROPERTIES
+    LABELS "bots;dbmgr;entitydef;protocol;source"
+)
+
 add_test(NAME source.cell_event_migration_contract
     COMMAND "${CMAKE_COMMAND}"
         "-DKBE_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
@@ -134,6 +143,60 @@ add_test(NAME source.cellapp_create_entity_python_contract
 )
 set_tests_properties(source.cellapp_create_entity_python_contract PROPERTIES
     LABELS "cellapp;entity;python;source;shutdown"
+)
+
+add_test(NAME source.cellapp_create_entity_stream_contract
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_CELLAPP_SOURCE=${CMAKE_SOURCE_DIR}/server/cellapp/cellapp.cpp"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyCellappCreateEntityStreamContract.cmake"
+)
+set_tests_properties(source.cellapp_create_entity_stream_contract PROPERTIES
+    LABELS "cellapp;entity;network;source;protocol"
+)
+
+add_test(NAME source.entitycall_transport_routing_contract
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyEntityCallTransportRouting.cmake"
+)
+set_tests_properties(source.entitycall_transport_routing_contract PROPERTIES
+    LABELS "baseapp;entity;network;source;protocol"
+)
+
+add_test(NAME source.migration_release_barrier_contract
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyMigrationReleaseBarrier.cmake"
+)
+set_tests_properties(source.migration_release_barrier_contract PROPERTIES
+    LABELS "baseapp;cellapp;entity;network;source;teleport"
+)
+
+add_test(NAME source.completion_fairness_contract
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyCompletionFairness.cmake"
+)
+set_tests_properties(source.completion_fairness_contract PROPERTIES
+    LABELS "io_uring;iocp;kcp;linux;network;performance;source"
+)
+
+add_test(NAME source.ghost_multihop_routing_contract
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyGhostMultiHopRouting.cmake"
+)
+set_tests_properties(source.ghost_multihop_routing_contract PROPERTIES
+    LABELS "cellapp;entity;network;source;teleport"
+)
+
+add_test(NAME source.trap_authority_contract
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyTrapAuthority.cmake"
+)
+set_tests_properties(source.trap_authority_contract PROPERTIES
+    LABELS "cellapp;entity;source;teleport"
 )
 
 set(KBE_TEST_ASSETS "" CACHE PATH "Assets directory used by CMake integration tests")

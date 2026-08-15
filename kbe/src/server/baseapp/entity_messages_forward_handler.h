@@ -53,7 +53,8 @@ private:
 class BaseMessagesForwardClientHandler : public Task
 {
 public:
-	BaseMessagesForwardClientHandler(Entity* pEntity, COMPONENT_ID cellappID);
+	BaseMessagesForwardClientHandler(Entity* pEntity, COMPONENT_ID sourceCellappID,
+		COMPONENT_ID targetCellappID);
 	~BaseMessagesForwardClientHandler();
 	
 	bool process();
@@ -66,11 +67,15 @@ public:
 	bool isStop() const{ return !startForward_; }
 	
 	COMPONENT_ID cellappID() const {
-		return cellappID_;
+		return targetCellappID_;
 	}
 
 	void cellappID(COMPONENT_ID cid) {
-		cellappID_ = cid;
+		targetCellappID_ = cid;
+	}
+
+	COMPONENT_ID sourceCellappID() const {
+		return sourceCellappID_;
 	}
 
 private:
@@ -78,7 +83,8 @@ private:
 	bool completed_;
 	std::vector<Network::Bundle*> bufferedSendToClientMessages_;
 	bool startForward_;
-	COMPONENT_ID cellappID_;
+	COMPONENT_ID sourceCellappID_;
+	COMPONENT_ID targetCellappID_;
 	uint64 createTime_;
 };
 

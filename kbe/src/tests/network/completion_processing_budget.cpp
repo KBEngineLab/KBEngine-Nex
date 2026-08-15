@@ -1,5 +1,5 @@
 #include "network/completion_processing_budget.h"
-#include "network/iocp_udp_receive_depth.h"
+#include "network/completion_udp_receive_depth.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -37,12 +37,22 @@ int main()
 	g_maxCompletionsPerTick = 1024;
 	g_maxCompletionProcessingTimeMS = 8;
 
-	// 客户端与共享 listener 必须使用不同接收深度：前者控制每连接内存，后者吸收聚合突发。
-	// Client and shared-listener depths differ to bound per-connection memory while absorbing aggregate bursts.
+	// IOCP 用多 outstanding buffer 吸收突发；raw io_uring 用单 waiter 加有界 drain，
+	// 避免 Linux 非独占唤醒把一个可读事件放大为大量 EAGAIN CQE。
+	// IOCP absorbs bursts with several outstanding buffers; raw io_uring uses one waiter
+	// plus a bounded drain to avoid amplifying one Linux readiness event into EAGAIN CQEs.
 	if (!require(iocpUdpReceiveDepth(true) == 4,
-		"connected UDP receive depth changed unexpectedly") ||
+		"connected IOCP UDP receive depth changed unexpectedly") ||
 		!require(iocpUdpReceiveDepth(false) == 64,
-			"shared UDP listener receive depth changed unexpectedly"))
+			"shared IOCP UDP listener receive depth changed unexpectedly") ||
+		!require(ioUringUdpReceiveDepth(true) == 1,
+			"connected io_uring UDP receive depth changed unexpectedly") ||
+		!require(ioUringUdpReceiveDepth(false) == 1,
+			"shared io_uring UDP listener receive depth changed unexpectedly") ||
+		!require(ioUringUdpReceiveBurstSize(true) == 4,
+			"connected io_uring logical receive window changed unexpectedly") ||
+		!require(ioUringUdpReceiveBurstSize(false) == 64,
+			"shared io_uring logical receive window changed unexpectedly"))
 	{
 		return EXIT_FAILURE;
 	}

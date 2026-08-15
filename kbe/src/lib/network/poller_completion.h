@@ -39,19 +39,22 @@ public:
 	bool takeUdpReceivedData(KBESOCKET fd, std::vector<char>& data, Address& srcAddr, int& errorCode) override;
 
 	// 将 TCP 发送数据排入 completion poller 的发送队列。
-	bool queueTcpSend(KBESOCKET fd, const void* data, int len) override;
+	bool queueTcpSend(KBESOCKET fd, const void* data, int len, size_t maxPendingBytes = 0) override;
 
 	// 将 UDP 发送数据排入 completion poller 的发送队列。
 	bool queueUdpSend(KBESOCKET fd, const void* data, int len, const Address& dstAddr) override;
 
 	// 查询指定 fd 是否还有未完成或待投递的发送数据。
 	bool hasPendingSend(KBESOCKET fd) const override;
+	uint64 tcpSendPendingBytes(KBESOCKET fd) const override;
+	uint64 tcpSendLastProgressTime(KBESOCKET fd) const override;
 	uint32 pendingRearmCount() const override;
 	uint64 rearmAttemptCount() const override;
 	uint64 rearmRetryCount() const override;
 	uint64 tcpSendOwnershipTransferCount() const override;
 	uint64 tcpSendBatchCopyCount() const override;
 	uint64 tcpSendBatchCopiedBytes() const override;
+	uint64 tcpSendInlineCompletionCount() const override;
 	uint64 tcpSendBacklogBytes() const override;
 	uint64 tcpSendBacklogPeakBytes() const override;
 	uint64 tcpSendBackpressureCount() const override;
@@ -112,11 +115,17 @@ protected:
 		uint64 generation;
 		// 平台私有 pending context，IOCP 用它保存 OVERLAPPED context 指针。
 		void* pPendingReadContext;
-		// IOCP UDP can keep several WSARecvFrom operations in flight. The set is
-		// also the authoritative lifetime list when a socket is deregistered.
-		// IOCP UDP 可同时挂起多个 WSARecvFrom；注销时以此集合为准取消所有操作。
+		// Native completion backends keep several UDP receives in flight. The set is
+		// also the authoritative per-socket lifetime list during deregistration.
+		// 原生 completion 后端可同时挂起多个 UDP receive；注销时以此集合为准取消所有操作。
 		std::set<void*> pendingReadContexts;
 		void* pPendingWriteContext;
+		// 已从用户态队列取出、但 native completion 尚未返回的 TCP 字节。
+		// TCP bytes removed from the user-space queue but still owned by a native send completion.
+		size_t pendingTcpWriteBytes;
+		// 只记录 native send 真正完成的正数字节，供内部组件在反向心跳被业务流量阻塞时判断对端仍可达。
+		// Record only positive-byte native send completions so internal links remain live while reverse heartbeats wait behind business traffic.
+		uint64 lastTcpSendProgressTime;
 		// TCP 发送队列保存上层已交给 poller、但尚未完成发送的数据。
 		CompletionTcpSendQueue pendingTcpSends;
 		std::deque<PendingUdpSend> pendingUdpSends;
@@ -256,6 +265,7 @@ protected:
 	uint64 tcpSendOwnershipTransferCount_;
 	uint64 tcpSendBatchCopyCount_;
 	uint64 tcpSendBatchCopiedBytes_;
+	uint64 tcpSendInlineCompletionCount_;
 	uint64 tcpSendBacklogPeakBytes_;
 	uint64 tcpSendBackpressureCount_;
 	uint64 tcpSendOversizedRejectCount_;

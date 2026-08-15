@@ -3737,12 +3737,38 @@ void Baseapp::onClientEntityEnterWorld(Proxy* pEntity, COMPONENT_ID componentID)
 }
 
 //-------------------------------------------------------------------------------------
-bool Baseapp::createClientProxies(Proxy* pEntity, bool reload)
+bool Baseapp::createClientProxies(Proxy* pEntity, Network::Channel* pChannel, bool reload,
+	ENTITY_ID expectedPreviousProxyID)
 {
+	if (pEntity == NULL || pEntity->clientEntityCall() == NULL || pChannel == NULL)
+	{
+		ERROR_MSG("Baseapp::createClientProxies: invalid Proxy, Client EntityCall, or Channel.\n");
+		return false;
+	}
+
+	// 首次登录时 Channel 尚未绑定 proxyID；giveClientTo 则只允许从调用方证明的旧 owner 原子换绑。
+	// Bootstrap an unbound login Channel, or atomically transfer only from the caller-proven previous owner.
+	const ENTITY_ID boundProxyID = pChannel->proxyID();
+	const bool validOwner = boundProxyID == 0 || boundProxyID == pEntity->id() ||
+		(expectedPreviousProxyID > 0 && boundProxyID == expectedPreviousProxyID);
+	const bool external = pChannel->isExternal();
+	const bool destroyed = pChannel->isDestroyed();
+	const uint32 condemnFlags = pChannel->condemn();
+	const bool addressMatched = pChannel->addr() == pEntity->clientEntityCall()->addr();
+	if (!external || destroyed || condemnFlags > 0 || !addressMatched || !validOwner)
+	{
+		ERROR_MSG(fmt::format(
+			"Baseapp::createClientProxies: rejected channel binding, entityID={}, channel={}, protocol={}, "
+			"epoch={}, external={}, destroyed={}, condemn={}, addressMatched={}, boundProxyID={}, expectedPreviousProxyID={}.\n",
+			pEntity->id(), pChannel->c_str(), static_cast<int>(pChannel->protocoltype()),
+			pChannel->sessionEpoch(), external, destroyed, condemnFlags, addressMatched,
+			boundProxyID, expectedPreviousProxyID));
+		return false;
+	}
+
 	Py_INCREF(pEntity);
 	
 	// 将通道代理的关系与该entity绑定， 在后面通信中可提供身份合法性识别
-	Network::Channel* pChannel = pEntity->clientEntityCall()->getChannel();
 	pChannel->proxyID(pEntity->id());
 	pEntity->addr(pChannel->addr());
 
@@ -4553,7 +4579,7 @@ void Baseapp::loginBaseapp(Network::Channel* pChannel,
 				pEntity->addr(pChannel->addr());
 				pEntity->setClientType(ptinfos->ctype);
 				pEntity->setLoginDatas(ptinfos->datas);
-				createClientProxies(pEntity, true);
+				createClientProxies(pEntity, pChannel, true);
 				pEntity->onGetWitness();
 			}
 			else
@@ -4567,9 +4593,7 @@ void Baseapp::loginBaseapp(Network::Channel* pChannel,
 				pEntity->setClientType(ptinfos->ctype);
 				pEntity->setLoginDatas(ptinfos->datas);
 
-				// 将通道代理的关系与该entity绑定， 在后面通信中可提供身份合法性识别
-				entityClientEntityCall->getChannel()->proxyID(pEntity->id());
-				createClientProxies(pEntity, true);
+				createClientProxies(pEntity, pChannel, true);
 				pEntity->onGetWitness();
 			}
 			break;
@@ -4590,6 +4614,12 @@ void Baseapp::loginBaseapp(Network::Channel* pChannel,
 
 		ENTITY_ID entityID = idClient_.alloc();
 		KBE_ASSERT(entityID > 0);
+
+		// DBMgr 回调必须恢复发起查询的同一条外部 Channel，不能在 TCP/KCP 同地址命名空间中重新猜测。
+		// The DBMgr callback must recover the exact external Channel that initiated the query instead of guessing across TCP/KCP namespaces sharing one address.
+		ptinfos->addr = pChannel->addr();
+		ptinfos->clientProtocolType = pChannel->protocoltype();
+		ptinfos->clientChannelEpoch = pChannel->sessionEpoch();
 
 		DbmgrInterface::queryAccountArgs8::staticAddToBundle((*pBundle), accountName, password, ptinfos->needCheckPassword, g_componentID,
 			entityID, ptinfos->entityDBID, pChannel->addr().ip, pChannel->addr().port);
@@ -4708,7 +4738,7 @@ void Baseapp::reloginBaseapp(Network::Channel* pChannel, std::string& accountNam
 	// 因为断线期间不能确保包括场景等数据已发生变化
 	// 客户端需要重建所有数据
 	Py_INCREF(proxy);
-	createClientProxies(proxy, true);
+	createClientProxies(proxy, pChannel, true);
 	proxy->onGetWitness();
 	Py_DECREF(proxy);
 	// proxy->onClientEnabled();
@@ -4776,7 +4806,18 @@ void Baseapp::onQueryAccountCBFromDbmgr(Network::Channel* pChannel, KBEngine::Me
 		return;
 	}
 
-	Network::Channel* pClientChannel = this->networkInterface().findChannel(ptinfos->addr);
+	Network::Channel* pClientChannel = this->networkInterface().findChannel(
+		ptinfos->addr, ptinfos->clientProtocolType);
+	if (pClientChannel != NULL && (!pClientChannel->isExternal() ||
+		pClientChannel->sessionEpoch() != ptinfos->clientChannelEpoch))
+	{
+		WARNING_MSG(fmt::format(
+			"Baseapp::onQueryAccountCBFromDbmgr: pending client Channel identity changed, account={}, "
+			"addr={}, protocol={}, expectedEpoch={}, actualEpoch={}, external={}.\n",
+			accountName, ptinfos->addr.c_str(), static_cast<int>(ptinfos->clientProtocolType),
+			ptinfos->clientChannelEpoch, pClientChannel->sessionEpoch(), pClientChannel->isExternal()));
+		pClientChannel = NULL;
+	}
 
 	if (!success)
 	{
@@ -4845,7 +4886,7 @@ void Baseapp::onQueryAccountCBFromDbmgr(Network::Channel* pChannel, KBEngine::Me
 		pEntity->clientEntityCall(entityClientEntityCall);
 		pEntity->addr(pClientChannel->addr());
 
-		createClientProxies(pEntity);
+		createClientProxies(pEntity, pClientChannel);
 		
 		/*
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);

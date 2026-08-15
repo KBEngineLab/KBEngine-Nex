@@ -26,6 +26,19 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace KBEngine{	
 
+namespace
+{
+// Internal component channels use a ten-minute inactivity window. A migration
+// route must survive that full interval so a valid RPC delayed behind transport
+// backpressure can still reach the current real Entity. Active lookups refresh
+// the deadline, while routes that outlive the channel's own liveness contract
+// are discarded to keep retained migration state bounded.
+// 内部组件 Channel 使用十分钟无活动窗口。迁移路由必须覆盖完整窗口，确保因
+// 传输背压延迟的合法 RPC 仍能到达当前 Real Entity；有效查询会刷新期限，超过
+// Channel 自身存活约定的旧路由则被清理，从而保持迁移状态有界。
+const uint64 GHOST_ROUTE_IDLE_TIMEOUT_SECONDS = 10 * 60;
+}
+
 //-------------------------------------------------------------------------------------
 GhostManager::GhostManager():
 realEntities_(),
@@ -133,6 +146,7 @@ COMPONENT_ID GhostManager::getRoute(ENTITY_ID entityID)
 	if(iter == ghost_route_.end())
 		return 0;
 
+	iter->second.lastTime = timestamp();
 	return iter->second.componentID;
 }
 
@@ -142,7 +156,8 @@ void GhostManager::checkRoute()
 	std::map<ENTITY_ID, ROUTE_INFO>::iterator iter = ghost_route_.begin();
 	for(; iter != ghost_route_.end(); )
 	{
-		if(timestamp() - iter->second.lastTime > uint64( 5 * stampsPerSecond() ))
+		if(timestamp() - iter->second.lastTime >
+			GHOST_ROUTE_IDLE_TIMEOUT_SECONDS * stampsPerSecond())
 		{
 			ghost_route_.erase(iter++);
 		}

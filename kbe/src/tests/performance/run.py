@@ -26,7 +26,7 @@ from .log_metrics import IncrementalLogCollector
 from .metrics import JsonlRecorder, monotonic_milliseconds
 from .process_metrics import ProcessGroupCollector
 from .report import build_summary, load_events, write_report
-from .topology import build_local_cluster_components, partition_batch_size
+from .topology import build_local_cluster_components, partition_batch_size, platform_executable_name
 from .watcher_metrics import WatcherCollector, WatcherSchedule, WatcherTarget, parse_target, resolve_target
 
 
@@ -145,6 +145,11 @@ def parse_args() -> argparse.Namespace:
                                 action="store_false",
                                 help="Fail KCP clients instead of mixing TCP fallback into the run")
     parser.set_defaults(bots_allow_tcp_fallback=None)
+    parser.add_argument("--database-host", help="Per-run database host written only to the config overlay")
+    parser.add_argument("--database-port", type=int, help="Per-run database port written only to the config overlay")
+    parser.add_argument("--database-name", help="Per-run database name written only to the config overlay")
+    parser.add_argument("--database-username", help="Per-run database username written only to the config overlay")
+    parser.add_argument("--database-password", help="Per-run plaintext database password written only to the config overlay")
     parser.add_argument("--tools-root", type=Path, help="kbe/tools/server root for Watcher queries")
     parser.add_argument("--watcher-target", action="append", default=[], metavar="TYPE=HOST:PORT:PATH|TYPE=@COMPONENT:PATH")
     parser.add_argument("--watcher-timeout", type=float,
@@ -254,14 +259,17 @@ def main() -> int:
                 f" --bots-allow-tcp-fallback={str(bots_allow_tcp_fallback).lower()}"
             )
             args.command = (
-                f'"{args.server_binary_dir / "bots.exe"}" '
-                f"--cid={{cid}} --gus={{gus}} --hide=1{dev_argument}{reuse_argument}{transport_arguments}"
+                f'"{args.server_binary_dir / platform_executable_name("bots")}" '
+                f"--cid={{cid}} --gus={{gus}} --hide=1 --publish-component"
+                f"{dev_argument}{reuse_argument}{transport_arguments}"
             )
         scenario = dict(scenario)
         scenario["watcher_component_ids"] = generated_component_ids
-    elif args.bots_dev or args.reuse_existing_accounts:
-        if not args.command:
-            raise ValueError("Bots mode flags require --server-binary-dir or --command")
+    elif args.command and configured_bots > 0:
+        # Bots watcher discovery is a control-plane requirement and must not force
+        # Logger forwarding. 组件发现属于压测控制面，不能因此开启 Logger 转发。
+        if "--publish-component" not in args.command:
+            args.command = f"{args.command} --publish-component"
         if args.bots_dev:
             args.command = f"{args.command} --dev"
         if args.reuse_existing_accounts:
@@ -270,6 +278,9 @@ def main() -> int:
             f"{args.command} --bots-transport={bots_transport}"
             f" --bots-allow-tcp-fallback={str(bots_allow_tcp_fallback).lower()}"
         )
+    elif args.bots_dev or args.reuse_existing_accounts:
+        if not args.command:
+            raise ValueError("Bots mode flags require --server-binary-dir or --command")
 
     bots_per_process = partition_workload_bots(configured_bots, workload_process_count)
     interval = max(float(args.sample_interval), 0.1)
@@ -332,6 +343,11 @@ def main() -> int:
             str(scenario["server_runtime_log_level"]) if "server_runtime_log_level" in scenario else None,
             int(scenario["bots_account_suffix_start"]) if "bots_account_suffix_start" in scenario else None,
             int(scenario["database_connections"]) if "database_connections" in scenario else None,
+            args.database_host,
+            args.database_port,
+            args.database_name,
+            args.database_username,
+            args.database_password,
             baseapp_count,
             bool(scenario.get("performance_probes_enabled", False)),
             bots_transport,

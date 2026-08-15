@@ -241,7 +241,10 @@ public:
 	*/
 	void onMigrationCellappStart(Network::Channel* pChannel, COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID);
 	void onMigrationCellappEnd(Network::Channel* pChannel, COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID);
-	void onMigrationCellappOver(COMPONENT_ID targetCellAppID);
+	void onMigrationCellappPrepared(Network::Channel* pChannel, COMPONENT_ID sourceCellAppID,
+		COMPONENT_ID targetCellAppID, bool success);
+	void onMigrationCellappOver(COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID);
+	void commitMigrationCellapp(COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID);
 	
 	/**
 		设置获取是否自动存档
@@ -330,6 +333,16 @@ protected:
 	bool									pendingMigrationEnd_;
 	COMPONENT_ID							pendingMigrationSourceCellAppID_;
 	COMPONENT_ID							pendingMigrationTargetCellAppID_;
+	// End may arrive from Target before Start drains from Source's channel. Keep the
+	// authoritative End route after the forwarding task times out so a late Start can
+	// be consumed idempotently instead of dereferencing a released task. / Target 的 End
+	// 可能先于 Source Channel 中的 Start 到达；即使转发任务超时释放，也保留 End 路由，
+	// 让迟到 Start 幂等收口而不是访问已释放任务。
+	COMPONENT_ID							deferredMigrationSourceCellAppID_;
+	COMPONENT_ID							deferredMigrationTargetCellAppID_;
+	bool									migrationCommitPending_;
+	COMPONENT_ID							migrationCommitSourceCellAppID_;
+	COMPONENT_ID							migrationCommitTargetCellAppID_;
 	
 	// 需要持久化的数据是否变脏（内存sha1），如果没有变脏不需要持久化
 	uint32									persistentDigest_[5];

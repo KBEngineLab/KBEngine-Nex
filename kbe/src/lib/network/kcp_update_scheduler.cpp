@@ -27,6 +27,7 @@ const size_t KCP_MIN_ACK_FLUSHES_PER_WAKEUP = 4;
 const size_t KCP_MAX_UPDATES_PER_WAKEUP = 2048;
 const uint64 KCP_PROCESSING_TIME_BUDGET_MICROS = 2000;
 const uint64 KCP_ACK_PROCESSING_TIME_BUDGET_MICROS = 2000;
+const uint64 KCP_RECEIVE_PROCESSING_TIME_BUDGET_MICROS = 2000;
 const int64 KCP_BACKLOG_RETRY_DELAY_MICROS = 1000;
 }
 
@@ -34,6 +35,7 @@ KcpUpdateScheduler::KcpUpdateScheduler(EventDispatcher& dispatcher) :
 	dispatcher_(dispatcher),
 	queue_(),
 	ackQueue_(),
+	receiveQueue_(),
 	timerHandle_(),
 	timerDueTime_(0),
 	processing_(false),
@@ -127,12 +129,21 @@ void KcpUpdateScheduler::scheduleAck(Channel& channel)
 }
 
 //-------------------------------------------------------------------------------------
+void KcpUpdateScheduler::scheduleReceive(Channel& channel)
+{
+	const uint64 dueTime = timestamp() + delayToStamps(1);
+	if (receiveQueue_.schedule(channelKey(channel), dueTime) && !processing_)
+		armNextTimer();
+}
+
+//-------------------------------------------------------------------------------------
 void KcpUpdateScheduler::cancel(Channel& channel)
 {
 	const KcpUpdateQueue::Key key = channelKey(channel);
 	const bool dataChanged = queue_.cancel(key);
 	const bool ackChanged = ackQueue_.cancel(key);
-	const bool changed = dataChanged || ackChanged;
+	const bool receiveChanged = receiveQueue_.cancel(key);
+	const bool changed = dataChanged || ackChanged || receiveChanged;
 	if (changed && !processing_)
 	{
 		armNextTimer();
@@ -150,9 +161,11 @@ void KcpUpdateScheduler::armNextTimer()
 {
 	uint64 dataDueTime = 0;
 	uint64 ackDueTime = 0;
+	uint64 receiveDueTime = 0;
 	const bool hasData = queue_.nextDue(dataDueTime);
 	const bool hasAck = ackQueue_.nextDue(ackDueTime);
-	if (!hasData && !hasAck)
+	const bool hasReceive = receiveQueue_.nextDue(receiveDueTime);
+	if (!hasData && !hasAck && !hasReceive)
 	{
 		if (timerHandle_.isSet())
 		{
@@ -161,8 +174,11 @@ void KcpUpdateScheduler::armNextTimer()
 		timerDueTime_ = 0;
 		return;
 	}
-	const uint64 dueTime = hasData && hasAck
-		? std::min(dataDueTime, ackDueTime) : (hasData ? dataDueTime : ackDueTime);
+	uint64 dueTime = hasData ? dataDueTime : (hasAck ? ackDueTime : receiveDueTime);
+	if (hasAck)
+		dueTime = std::min(dueTime, ackDueTime);
+	if (hasReceive)
+		dueTime = std::min(dueTime, receiveDueTime);
 
 	// An already armed earlier timer is a harmless early wakeup and avoids another global timer cancellation/allocation.
 	// 已投递的更早 timer 只会产生一次无害的提前唤醒，保留它可避免再次取消和分配全局 timer。
@@ -199,7 +215,7 @@ void KcpUpdateScheduler::handleTimeout(TimerHandle handle, void*)
 
 	processing_ = true;
 	const uint64 processingStart = timestamp();
-	const uint64 ackBudgetMicros = adaptiveKcpBudgetMicros(
+	const uint64 ackBudgetMicros = adaptiveKcpAckBudgetMicros(
 		KCP_ACK_PROCESSING_TIME_BUDGET_MICROS, consecutiveBudgetExhaustions_);
 	const uint64 ackBudget = delayToStamps(ackBudgetMicros);
 	KcpUpdateQueue::Key key = 0;
@@ -232,7 +248,6 @@ void KcpUpdateScheduler::handleTimeout(TimerHandle handle, void*)
 	const uint64 processingBudgetMicros = adaptiveKcpBudgetMicros(
 		KCP_PROCESSING_TIME_BUDGET_MICROS, consecutiveBudgetExhaustions_);
 	const uint64 processingBudget = delayToStamps(processingBudgetMicros);
-	const uint64 now = dataProcessingStart;
 	size_t processed = 0;
 	for (; processed < KCP_MAX_UPDATES_PER_WAKEUP; ++processed)
 	{
@@ -241,12 +256,20 @@ void KcpUpdateScheduler::handleTimeout(TimerHandle handle, void*)
 		{
 			break;
 		}
-		if (!queue_.takeDue(now, key, &dueTime))
+
+		// A busy ikcp_update slice can span several milliseconds. Re-read the monotonic
+		// clock before selecting the next entry so Channels that become due during this
+		// slice consume the remaining budget instead of waiting for another global timer.
+		// 一轮繁忙的 ikcp_update 可能持续数毫秒。选择下一项前重新读取单调时钟，使本轮
+		// 期间新到期的 Channel 直接使用剩余预算，而不是额外等待下一次全局 Timer。
+		const uint64 selectionTime = timestamp();
+		if (!queue_.takeDue(selectionTime, key, &dueTime))
 			break;
-		if (now > dueTime)
+		if (selectionTime > dueTime)
 		{
 			++deadlineMissCount_;
-			const uint64 scheduleDelayMicros = static_cast<uint64>(stampsToDelay(now - dueTime));
+			const uint64 scheduleDelayMicros = static_cast<uint64>(
+				stampsToDelay(selectionTime - dueTime));
 			maxScheduleDelayMicros_ = std::max<uint64>(maxScheduleDelayMicros_, scheduleDelayMicros);
 			// deadlineMisses 包含正常的微秒级定时器抖动；只有超过一个完整 KCP tick
 			// 才表示协议调度已真正落后一轮。tickInterval=0 对应 KCP 默认 100ms。
@@ -283,8 +306,9 @@ void KcpUpdateScheduler::handleTimeout(TimerHandle handle, void*)
 		++timeBudgetExhaustionCount_;
 
 	KcpUpdateQueue::Time nextDueTime = 0;
+	const uint64 backlogCheckTime = timestamp();
 	const bool budgetExhausted = (processed == KCP_MAX_UPDATES_PER_WAKEUP || timeBudgetExhausted) &&
-		queue_.nextDue(nextDueTime) && nextDueTime <= now;
+		queue_.nextDue(nextDueTime) && nextDueTime <= backlogCheckTime;
 	if (budgetExhausted)
 	{
 		++budgetExhaustionCount_;
@@ -295,6 +319,30 @@ void KcpUpdateScheduler::handleTimeout(TimerHandle handle, void*)
 	else
 	{
 		consecutiveBudgetExhaustions_ = 0;
+	}
+
+	// Reassembled application messages have their own slice after protocol work. This keeps
+	// retransmission deadlines moving even when one message synchronously enters a slow script
+	// handler, while still guaranteeing quiet Channels a continuation without another datagram.
+	// 已重组应用消息在协议工作之后使用独立切片。即使单条消息同步进入慢脚本处理器，重传
+	// 截止时间仍能继续推进；安静 Channel 也无需等待下一份数据报即可续处理尾包。
+	const uint64 receiveProcessingStart = timestamp();
+	const uint64 receiveBudget = delayToStamps(KCP_RECEIVE_PROCESSING_TIME_BUDGET_MICROS);
+	size_t receiveProcessed = 0;
+	const uint64 receiveNow = receiveProcessingStart;
+	for (; receiveProcessed < KCP_MAX_UPDATES_PER_WAKEUP; ++receiveProcessed)
+	{
+		if (receiveProcessed >= KCP_MIN_UPDATES_PER_WAKEUP &&
+			timestamp() - receiveProcessingStart >= receiveBudget)
+		{
+			break;
+		}
+		if (!receiveQueue_.takeDue(receiveNow, key, &dueTime))
+			break;
+		Channel* channel = reinterpret_cast<Channel*>(key);
+		channel->drainKcpReceive();
+		if (!receiveQueue_.isScheduled(key))
+			receiveQueue_.cancel(key);
 	}
 	processing_ = false;
 	armNextTimer();

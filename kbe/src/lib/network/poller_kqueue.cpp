@@ -46,10 +46,10 @@ KqueuePoller::~KqueuePoller()
 }
 
 //-------------------------------------------------------------------------------------
-bool KqueuePoller::queueTcpSend(KBESOCKET fd, const void* data, int len)
+bool KqueuePoller::queueTcpSend(KBESOCKET fd, const void* data, int len, size_t maxPendingBytes)
 {
 	// 发送入队后启用 EVFILT_WRITE，真正 send 只在 kqueue 报可写时执行。
-	if (!CompletionPoller::queueTcpSend(fd, data, len))
+	if (!CompletionPoller::queueTcpSend(fd, data, len, maxPendingBytes))
 	{
 		return false;
 	}
@@ -587,6 +587,7 @@ int KqueuePoller::flushPendingSends(KBESOCKET fd, SocketState& state)
 		if (ret > 0)
 		{
 			const size_t sent = static_cast<size_t>(ret);
+			state.lastTcpSendProgressTime = timestamp();
 			const bool completedChunk = sent == state.pendingTcpSends.frontSize();
 			state.pendingTcpSends.consumeFront(sent);
 			if (!completedChunk)

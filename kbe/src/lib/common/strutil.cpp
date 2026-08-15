@@ -213,11 +213,23 @@ namespace strutil {
 
 	wchar_t* char2wchar(const char* cs, size_t* outlen)
 	{
-		int len = (int)((strlen(cs) + 1) * sizeof(wchar_t));
-		wchar_t* ccattr =(wchar_t *)malloc(len);
-		memset(ccattr, 0, len);
+		// A multibyte string cannot produce more wide characters than input bytes.
+		// mbstowcs() takes a wchar_t element count, not an allocation size in bytes;
+		// passing the byte count trips glibc Fortify and can permit a real overflow.
+		// 多字节字符串转换后的宽字符数不会超过输入字节数。mbstowcs() 的第三个参数
+		// 是 wchar_t 元素数而非分配字节数；传入字节数会触发 glibc Fortify，并可能真实越界。
+		const size_t capacity = strlen(cs) + 1;
+		const size_t allocationBytes = capacity * sizeof(wchar_t);
+		wchar_t* ccattr = (wchar_t*)malloc(allocationBytes);
+		if (ccattr == NULL)
+		{
+			if (outlen)
+				*outlen = 0;
+			return NULL;
+		}
+		memset(ccattr, 0, allocationBytes);
 
-		size_t slen = mbstowcs(ccattr, cs, len);
+		size_t slen = mbstowcs(ccattr, cs, capacity);
 
 		if (outlen)
 		{

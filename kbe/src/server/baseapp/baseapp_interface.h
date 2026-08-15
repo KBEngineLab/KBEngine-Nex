@@ -355,6 +355,13 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappInterface)
 								COMPONENT_ID,										sourceCellAppID,
 								COMPONENT_ID,										targetCellAppID)
 
+	// Target 在提交点再次确认迁移实体仍然存活，BaseApp 收到成功确认后才切路由并释放 Source。
+	// The Target revalidates the migrating Entity at commit time; BaseApp switches routing and releases Source only after success.
+	ENTITY_MESSAGE_DECLARE_ARGS3(onMigrationCellappPrepared,						NETWORK_FIXED_MESSAGE,
+								COMPONENT_ID,										sourceCellAppID,
+								COMPONENT_ID,										targetCellAppID,
+								bool,											success)
+
 	//--------------------------------------------Proxy---------------------------------------------------------
 	/**
 		远程呼叫entity方法

@@ -4,5 +4,8 @@
   "duration_seconds": 60,
   "bots": 4000,
   "workload_processes": 8,
-  "performance_probes_enabled": true
+  "performance_probes_enabled": true,
+  "readiness": {
+    "root/witness/active": {"min": 3800}
+  }
 }

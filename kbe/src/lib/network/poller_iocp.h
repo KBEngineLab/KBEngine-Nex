@@ -5,7 +5,7 @@
 
 #include "poller_completion.h"
 #include "completion_context_pool.h"
-#include "iocp_udp_receive_depth.h"
+#include "completion_udp_receive_depth.h"
 
 #if KBE_PLATFORM == PLATFORM_WIN32
 
@@ -29,7 +29,7 @@ public:
 
 	// IOCP 入队后在下一 dispatcher 轮次投递，同轮小包可合并为一次 WSASend。
 	// Submit on the next dispatcher round so small writes produced in one callback can share a WSASend.
-	bool queueTcpSend(KBESOCKET fd, const void* data, int len) override;
+	bool queueTcpSend(KBESOCKET fd, const void* data, int len, size_t maxPendingBytes = 0) override;
 
 	// IOCP 入队后立即尝试投递 WSASendTo，避免 UDP/KCP 发送只滞留在队列里。
 	bool queueUdpSend(KBESOCKET fd, const void* data, int len, const Address& dstAddr) override;
@@ -118,6 +118,9 @@ private:
 	bool isReadArmComplete(const SocketState& state) const;
 	// 投递一次 TCP WSASend。
 	bool armTcpSend(KBESOCKET fd, SocketState& state);
+	// 在业务回调仍运行时仅收割当前 socket 已成功的 send completion，保持单 outstanding 和字节顺序。
+	// Harvest only a successful send completion for the current socket while business code is still running, preserving one outstanding request and byte order.
+	bool progressTcpSend(KBESOCKET fd, SocketState& state);
 	// 投递一次 UDP WSASendTo。
 	bool armUdpSend(KBESOCKET fd, SocketState& state);
 	// 投递一次 AcceptEx。
@@ -158,6 +161,10 @@ private:
 	HANDLE completionPort_;
 	uint64 lastCompletionBudgetWarningTime_;
 	std::deque<PendingCompletion> pendingCompletions_;
+	// Keep TCP send completions visible while receive callbacks consume the tick budget.
+	// 接收回调耗尽本轮预算时，TCP 发送完成仍保持可调度。
+	std::deque<PendingCompletion> pendingTcpSendCompletions_;
+	uint32 consecutiveTcpSendCompletionCount_;
 	uint64 completionDequeueCallCount_;
 	uint64 completionDequeuedCount_;
 	uint64 completionMaxDequeuedBatchCount_;

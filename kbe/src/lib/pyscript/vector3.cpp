@@ -22,6 +22,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "vector3.h"
 #include "vector2.h"
 #include "pyscript/py_gc.h"
+#include "vector_repr.h"
 
 namespace KBEngine{ namespace script{
 
@@ -191,25 +192,11 @@ PyObject* ScriptVector3::tp_new(PyTypeObject* type, PyObject* args, PyObject* kw
 //-------------------------------------------------------------------------------------
 PyObject* ScriptVector3::tp_repr()
 {
-	char str[128];
-	Vector3 v = this->getVector();
-
-	strcpy(str, "Vector3(");
-	for(int i=0; i < VECTOR_SIZE; ++i)
-	{
-		if (i > 0)
-			strcat(str, ", ");
-		kbe_snprintf(str + strlen(str), 128, "%f", v[i]);
-	}
-
-	strcat(str, "), ref=");
-	
-	if(isRef_)
-		strcat(str, "true");
-	else
-		strcat(str, "false");
-
-	return PyUnicode_FromString(str);
+	const Vector3& v = this->getVector();
+	// Entity 定时器日志会隐式调用 repr；动态字符串使异常坐标值只能扩大日志文本，不能破坏 CellApp 进程内存。
+	// Entity timer logs invoke repr implicitly; a dynamic string lets exceptional coordinates grow only the log text, never corrupt CellApp memory.
+	const std::string repr = detail::formatVector3Repr(v, isRef_);
+	return PyUnicode_FromStringAndSize(repr.data(), static_cast<Py_ssize_t>(repr.size()));
 }
 
 //-------------------------------------------------------------------------------------

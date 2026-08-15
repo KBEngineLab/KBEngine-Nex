@@ -52,20 +52,23 @@ inline bool isAuthorizedClientCellTarget(ENTITY_ID sourceEntityID,
 }
 
 /**
- * Bind a CellApp relay to the CellApp that currently owns the target Ghost.
- * 将 CellApp 中继绑定到当前持有目标 Ghost 的 CellApp。
+ * Bind a CellApp relay to a verified predecessor of the real target.
+ * 将 CellApp 中继绑定到 real 目标已验证的前驱 CellApp。
  *
- * The final real CellApp can verify this relationship from its migration state;
- * a registered component ID alone is not sufficient because it does not prove
- * that the sender has a live Ghost route for this entity.
- * 目标 real CellApp 可以从迁移状态验证该关系；仅凭已注册组件 ID 不能证明
- * 发送方确实持有该实体的有效 Ghost 路由。
+ * Ordinary Ghost forwarding uses targetGhostCellID. Teleport migration clears
+ * ghostCell to prevent property-sync loops, so client RPC bytes already queued
+ * on the Source use the separate migrationRelayCellID relationship. A registered
+ * component ID alone is never sufficient.
+ * 普通 Ghost 转发使用 targetGhostCellID。传送迁移会清空 ghostCell 以避免属性同步
+ * 回环，因此已经进入 Source 队列的客户端 RPC 使用独立的 migrationRelayCellID
+ * 关系；仅凭已注册组件 ID 始终不足以授权。
  */
 inline bool isAuthorizedCellRelay(bool targetIsReal,
-	COMPONENT_ID sourceCellID, COMPONENT_ID targetGhostCellID) noexcept
+	COMPONENT_ID sourceCellID, COMPONENT_ID targetGhostCellID,
+	COMPONENT_ID migrationRelayCellID) noexcept
 {
-	return targetIsReal && sourceCellID > 0 && targetGhostCellID > 0 &&
-		sourceCellID == targetGhostCellID;
+	return targetIsReal && sourceCellID > 0 &&
+		(sourceCellID == targetGhostCellID || sourceCellID == migrationRelayCellID);
 }
 
 }

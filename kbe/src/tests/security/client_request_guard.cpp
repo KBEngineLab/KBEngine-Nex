@@ -51,16 +51,18 @@ bool testCellTargetRelationshipFailsClosed()
 
 bool testCellRelayRequiresLiveGhostOwnership()
 {
-	return require(KBEngine::Security::isAuthorizedCellRelay(true, 7, 7),
+	return require(KBEngine::Security::isAuthorizedCellRelay(true, 7, 7, 0),
 		"CellApp relay from the live Ghost holder was rejected") &&
-		require(!KBEngine::Security::isAuthorizedCellRelay(true, 7, 8),
-		"CellApp relay from an unrelated component was accepted") &&
-		require(!KBEngine::Security::isAuthorizedCellRelay(false, 7, 7),
-		"CellApp relay to a non-real target was accepted") &&
-		require(!KBEngine::Security::isAuthorizedCellRelay(true, 0, 7),
-		"CellApp relay with an unbound source was accepted") &&
-		require(!KBEngine::Security::isAuthorizedCellRelay(true, 7, 0),
-		"CellApp relay without a live Ghost route was accepted");
+		require(KBEngine::Security::isAuthorizedCellRelay(true, 7, 0, 7),
+			"CellApp relay from the teleport predecessor was rejected") &&
+		require(!KBEngine::Security::isAuthorizedCellRelay(true, 7, 8, 9),
+			"CellApp relay from an unrelated component was accepted") &&
+		require(!KBEngine::Security::isAuthorizedCellRelay(false, 7, 7, 7),
+			"CellApp relay to a non-real target was accepted") &&
+		require(!KBEngine::Security::isAuthorizedCellRelay(true, 0, 7, 7),
+			"CellApp relay with an unbound source was accepted") &&
+		require(!KBEngine::Security::isAuthorizedCellRelay(true, 7, 0, 0),
+			"CellApp relay without a verified predecessor was accepted");
 }
 }
 

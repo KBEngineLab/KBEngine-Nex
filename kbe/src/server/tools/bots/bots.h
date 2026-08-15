@@ -53,6 +53,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 extern bool g_botsDevMode;
+extern bool g_botsPublishComponent;
 extern bool g_botsReuseAccounts;
 // 命令行覆盖使用三态值，-1 表示沿用 XML，避免默认参数无意覆盖项目配置。
 // Command-line overrides use tri-state values; -1 preserves XML instead of silently replacing project configuration.
@@ -493,8 +494,8 @@ protected:
 
 	TelnetServer*											pTelnetServer_;
 
-	// 仅开发模式把 Bots 暴露为内部组件；该状态用于保证注册 Task 与心跳发送器按同一生命周期成对启停。
-	// Only development Bots are exposed as internal components; this state keeps the registration task and heartbeat publisher lifecycle symmetric.
+	// 组件发布与 Logger 转发相互独立；该状态用于保证注册 Task 与心跳发送器按同一生命周期成对启停。
+	// Component publishing is independent from Logger forwarding; this state keeps the registration task and heartbeat publisher lifecycle symmetric.
 	bool												componentPublishingEnabled_;
 	BotsActiveReportHandler*							pActiveReportHandler_;
 

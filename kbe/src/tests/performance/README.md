@@ -22,7 +22,7 @@ python -B -m performance.run `
   --baseapp-count 3 `
   --cellapp-count 6 `
   --bots 10000 `
-  --bots-processes 40 `
+  --bots-processes 20 `
   --server-ready-timeout 300 `
   --workload-ready-timeout 300
 ```
@@ -32,13 +32,16 @@ With `--start-cluster`, the runner defaults `--server-binary-dir` to the reposit
 processes, and supplies the Bots executable automatically. Pass `--server-binary-dir` only to
 override that location. `--bots-batch-size` is the aggregate batch across all Bots processes and
 must divide evenly. Without explicit batch arguments, the scenario's aggregate connection rate is
-partitioned across all Bots processes; the example creates about 100 Bots/second.
+partitioned across all Bots processes; the example creates about 100 Bots/second. The formal
+10,000-player scenario uses 20 processes with 500 clients each, which keeps controller and
+per-process scheduling overhead bounded while preserving the aggregate connection rate.
 Server startup waits for BaseAppMgr and CellAppMgr `root/readiness` values derived from
 `onReadyForLogin`, including exact expected process counts. It does not depend on game Space logs.
 使用 `--start-cluster` 时，运行器默认从仓库稳定目录 `kbe/bin/server` 生成单例组件和指定数量的
 BaseApp/CellApp，并自动选择 Bots 可执行文件；只有覆盖该位置时才需要传 `--server-binary-dir`。
 `--bots-batch-size` 表示全部 Bots 进程合计的单批数量且必须可整除。未显式传入批次参数时，
-运行器会把场景的聚合连接速率分摊给全部 Bots 进程；示例约为每秒 100 Bots。
+运行器会把场景的聚合连接速率分摊给全部 Bots 进程；示例约为每秒 100 Bots。正式 10000 人
+场景使用 20 个进程、每进程 500 个客户端，在保持总连接速率不变的同时控制进程和调度开销。
 服务端启动通过 BaseAppMgr/CellAppMgr 的 `root/readiness` 等待底层 `onReadyForLogin` 聚合结果，
 同时校验精确进程数，不再依赖业务 Space 日志。
 

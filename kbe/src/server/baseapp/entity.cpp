@@ -81,6 +81,11 @@ createdSpace_(false),
 	pendingMigrationEnd_(false),
 	pendingMigrationSourceCellAppID_(0),
 	pendingMigrationTargetCellAppID_(0),
+	deferredMigrationSourceCellAppID_(0),
+	deferredMigrationTargetCellAppID_(0),
+	migrationCommitPending_(false),
+	migrationCommitSourceCellAppID_(0),
+	migrationCommitTargetCellAppID_(0),
 	dbInterfaceIndex_(0)
 {
 	setDirty();
@@ -1695,17 +1700,102 @@ void Entity::onMigrationCellappStart(Network::Channel* pChannel, COMPONENT_ID so
 	DEBUG_MSG(fmt::format("{}::onMigrationCellappStart: {}, sourceCellAppID={}, targetCellappID={}\n",
 		scriptName(), id(), sourceCellAppID, targetCellAppID));
 
+	if (sourceCellAppID == 0 || targetCellAppID == 0)
+	{
+		WARNING_MSG(fmt::format("{}::onMigrationCellappStart: rejected invalid migration route, "
+			"entity={}, sourceCellAppID={}, targetCellAppID={}.\n",
+			scriptName(), id(), sourceCellAppID, targetCellAppID));
+		return;
+	}
+
 	if (hasFlags(ENTITY_FLAGS_TELEPORT_STOP))
 	{
-		removeFlags(ENTITY_FLAGS_TELEPORT_STOP);
+		// End and Start travel over different CellApp channels and may be reordered. Only
+		// the Start matching the saved End route may consume STOP; a stale Start must not
+		// release another migration's buffered client messages. / End 与 Start 经过不同
+		// CellApp Channel，可能乱序；只有匹配已保存 End 路由的 Start 才能消费 STOP。
+		if (deferredMigrationSourceCellAppID_ != sourceCellAppID ||
+			deferredMigrationTargetCellAppID_ != targetCellAppID)
+		{
+			WARNING_MSG(fmt::format("{}::onMigrationCellappStart: ignored stale route while waiting "
+				"for deferred Start, entity={}, deferredSource={}, deferredTarget={}, source={}, target={}.\n",
+				scriptName(), id(), deferredMigrationSourceCellAppID_,
+				deferredMigrationTargetCellAppID_, sourceCellAppID, targetCellAppID));
+			return;
+		}
 
-		KBE_ASSERT(pBufferedSendToClientMessages_);
-		pBufferedSendToClientMessages_->startForward();
+		const COMPONENT_ID deferredSourceCellAppID = deferredMigrationSourceCellAppID_;
+		const COMPONENT_ID deferredTargetCellAppID = deferredMigrationTargetCellAppID_;
+		removeFlags(ENTITY_FLAGS_TELEPORT_STOP);
+		deferredMigrationSourceCellAppID_ = 0;
+		deferredMigrationTargetCellAppID_ = 0;
+
+		if (pBufferedSendToClientMessages_)
+		{
+			pBufferedSendToClientMessages_->startForward();
+			return;
+		}
+
+		// The forwarding task can deliberately self-complete after its bounded wait. Its
+		// callback has already started (or completed) the saved End route, so a later Start
+		// is a recoverable ordering event, never a process-fatal invariant. If commit could
+		// not start earlier (for example Target discovery was transiently unavailable), retry
+		// the same saved route now. / 转发任务会在有界等待后主动完成；其回调已按保存的
+		// End 路由开始收口。迟到 Start 属于可恢复乱序；若此前提交未启动，则重试同一路由。
+		const bool sameCommitPending = migrationCommitPending_ &&
+			migrationCommitSourceCellAppID_ == deferredSourceCellAppID &&
+			migrationCommitTargetCellAppID_ == deferredTargetCellAppID;
+		EntityCall* pCellEntityCall = cellEntityCall();
+		const bool routeAlreadyCommitted = pCellEntityCall != NULL &&
+			pCellEntityCall->componentID() == deferredTargetCellAppID;
+
+		if (sameCommitPending || routeAlreadyCommitted)
+		{
+			WARNING_MSG(fmt::format("{}::onMigrationCellappStart: consumed delayed Start after "
+				"forwarding completion, entity={}, sourceCellAppID={}, targetCellAppID={}, committed={}.\n",
+				scriptName(), id(), deferredSourceCellAppID, deferredTargetCellAppID,
+				routeAlreadyCommitted));
+			return;
+		}
+
+		WARNING_MSG(fmt::format("{}::onMigrationCellappStart: retrying deferred migration completion "
+			"after forwarding task release, entity={}, sourceCellAppID={}, targetCellAppID={}.\n",
+			scriptName(), id(), deferredSourceCellAppID, deferredTargetCellAppID));
+		onMigrationCellappOver(deferredSourceCellAppID, deferredTargetCellAppID);
+		return;
 	}
-	else
+
+	const bool sameCommitPending = migrationCommitPending_ &&
+		migrationCommitSourceCellAppID_ == sourceCellAppID &&
+		migrationCommitTargetCellAppID_ == targetCellAppID;
+	EntityCall* pCellEntityCall = cellEntityCall();
+	const COMPONENT_ID currentCellAppID = pCellEntityCall != NULL ?
+		pCellEntityCall->componentID() : 0;
+	if (sameCommitPending || (sourceCellAppID != targetCellAppID && currentCellAppID == targetCellAppID))
 	{
-		addFlags(ENTITY_FLAGS_TELEPORT_START);
+		WARNING_MSG(fmt::format("{}::onMigrationCellappStart: ignored duplicate Start, "
+			"entity={}, sourceCellAppID={}, targetCellAppID={}, currentCellAppID={}.\n",
+			scriptName(), id(), sourceCellAppID, targetCellAppID, currentCellAppID));
+		return;
 	}
+
+	if (currentCellAppID != sourceCellAppID)
+	{
+		WARNING_MSG(fmt::format("{}::onMigrationCellappStart: rejected stale source route, "
+			"entity={}, sourceCellAppID={}, targetCellAppID={}, currentCellAppID={}.\n",
+			scriptName(), id(), sourceCellAppID, targetCellAppID, currentCellAppID));
+		return;
+	}
+
+	if (hasFlags(ENTITY_FLAGS_TELEPORT_START))
+	{
+		WARNING_MSG(fmt::format("{}::onMigrationCellappStart: ignored repeated in-progress Start, "
+			"entity={}, sourceCellAppID={}, targetCellAppID={}.\n",
+			scriptName(), id(), sourceCellAppID, targetCellAppID));
+		return;
+	}
+
+	addFlags(ENTITY_FLAGS_TELEPORT_START);
 }
 
 //-------------------------------------------------------------------------------------
@@ -1716,6 +1806,54 @@ void Entity::onMigrationCellappEnd(Network::Channel* pChannel, COMPONENT_ID sour
 	
 	DEBUG_MSG(fmt::format("{}::onMigrationCellappEnd: {}, sourceCellAppID={}, targetCellappID={}\n",
 		scriptName(), id(), sourceCellAppID, targetCellAppID));
+
+	if (sourceCellAppID == 0 || targetCellAppID == 0)
+	{
+		WARNING_MSG(fmt::format("{}::onMigrationCellappEnd: rejected invalid migration route, "
+			"entity={}, sourceCellAppID={}, targetCellAppID={}.\n",
+			scriptName(), id(), sourceCellAppID, targetCellAppID));
+		return;
+	}
+
+	if (migrationCommitPending_ &&
+		migrationCommitSourceCellAppID_ == sourceCellAppID &&
+		migrationCommitTargetCellAppID_ == targetCellAppID)
+	{
+		// Target 已经进入提交确认阶段；重复 End 不能重新创建转发缓冲或改变迁移状态。
+		// Target is already in commit validation; a duplicate End must not recreate forwarding state.
+		return;
+	}
+
+	EntityCall* pCellEntityCall = cellEntityCall();
+	if (sourceCellAppID != targetCellAppID && pCellEntityCall != NULL &&
+		pCellEntityCall->componentID() == targetCellAppID)
+	{
+		WARNING_MSG(fmt::format("{}::onMigrationCellappEnd: ignored completion for an already "
+			"committed route, entity={}, sourceCellAppID={}, targetCellAppID={}.\n",
+			scriptName(), id(), sourceCellAppID, targetCellAppID));
+		return;
+	}
+
+	if (hasFlags(ENTITY_FLAGS_TELEPORT_STOP) && pBufferedSendToClientMessages_ == NULL)
+	{
+		if (deferredMigrationSourceCellAppID_ != sourceCellAppID ||
+			deferredMigrationTargetCellAppID_ != targetCellAppID)
+		{
+			WARNING_MSG(fmt::format("{}::onMigrationCellappEnd: ignored stale End while waiting "
+				"for deferred Start, entity={}, deferredSource={}, deferredTarget={}, source={}, target={}.\n",
+				scriptName(), id(), deferredMigrationSourceCellAppID_,
+				deferredMigrationTargetCellAppID_, sourceCellAppID, targetCellAppID));
+			return;
+		}
+
+		// The prior forwarding task has already drained and attempted this End route. A
+		// duplicate End may retry commit discovery, but must not allocate another long-lived
+		// task while the matching Start is still in flight. / 前一转发任务已经排空并尝试
+		// 该 End 路由；重复 End 可以重试提交发现，但不能在等待 Start 时再创建长生命周期任务。
+		onMigrationCellappOver(deferredMigrationSourceCellAppID_,
+			deferredMigrationTargetCellAppID_);
+		return;
+	}
 
 	if (pBufferedSendToClientMessages_)
 	{
@@ -1742,34 +1880,161 @@ void Entity::onMigrationCellappEnd(Network::Channel* pChannel, COMPONENT_ID sour
 	if (!hasFlags(ENTITY_FLAGS_TELEPORT_START))
 	{
 		addFlags(ENTITY_FLAGS_TELEPORT_STOP);
+		deferredMigrationSourceCellAppID_ = sourceCellAppID;
+		deferredMigrationTargetCellAppID_ = targetCellAppID;
 
 		if (pBufferedSendToClientMessages_ == NULL)
-			pBufferedSendToClientMessages_ = new BaseMessagesForwardClientHandler(this, targetCellAppID);
+		{
+			pBufferedSendToClientMessages_ = new BaseMessagesForwardClientHandler(
+				this, sourceCellAppID, targetCellAppID);
+		}
 
 		pBufferedSendToClientMessages_->stopForward();
 	}
 	else
 	{
 		removeFlags(ENTITY_FLAGS_TELEPORT_START);
-		onMigrationCellappOver(targetCellAppID);
+		onMigrationCellappOver(sourceCellAppID, targetCellAppID);
 	}
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::onMigrationCellappOver(COMPONENT_ID targetCellAppID)
+void Entity::onMigrationCellappOver(COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID)
 {
-	Components::ComponentInfos* pInfos = Components::getSingleton().findComponent(targetCellAppID);
-	if (pInfos && pInfos->pChannel)
+	if (sourceCellAppID == 0 || targetCellAppID == 0)
 	{
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-		(*pBundle).newMessage(CellappInterface::reqTeleportToCellAppOver);
-		(*pBundle) << id();
-		pInfos->pChannel->send(pBundle);
+		ERROR_MSG(fmt::format("{}::onMigrationCellappOver: invalid migration route, "
+			"entity={}, sourceCellAppID={}, targetCellAppID={}.\n",
+			scriptName(), id(), sourceCellAppID, targetCellAppID));
+		return;
 	}
-	
-	// 改变cell的指向到新的cellapp
+
+	// 目标创建失败时 Source 已经由 CellApp 恢复为 real，直接收口单端回滚。
+	// A failed Target creation has already restored Source as real, so finish the one-sided rollback directly.
+	if (sourceCellAppID == targetCellAppID)
+	{
+		commitMigrationCellapp(sourceCellAppID, targetCellAppID);
+		return;
+	}
+
+	if (migrationCommitPending_)
+	{
+		if (migrationCommitSourceCellAppID_ == sourceCellAppID &&
+			migrationCommitTargetCellAppID_ == targetCellAppID)
+		{
+			return;
+		}
+
+		ERROR_MSG(fmt::format("{}::onMigrationCellappOver: another commit validation is pending, "
+			"entity={}, pendingSource={}, pendingTarget={}, source={}, target={}.\n",
+			scriptName(), id(), migrationCommitSourceCellAppID_, migrationCommitTargetCellAppID_,
+			sourceCellAppID, targetCellAppID));
+		return;
+	}
+
+	Components::ComponentInfos* pTargetInfos =
+		Components::getSingleton().findComponent(targetCellAppID);
+	if (pTargetInfos == NULL || pTargetInfos->pChannel == NULL)
+	{
+		ERROR_MSG(fmt::format("{}::onMigrationCellappOver: unavailable Target CellApp {}, "
+			"entity={}, sourceCellAppID={}.\n",
+			scriptName(), targetCellAppID, id(), sourceCellAppID));
+		return;
+	}
+
+	// End 只表示 Target 曾完成初始化。真正提交前必须沿 BaseApp->Target 独立往返再次
+	// 验证实体和 Space 仍存活；在成功响应前不切路由，也绝不释放 Source。
+	// End only proves that Target finished initialization at an earlier instant. Before commit,
+	// an independent BaseApp-to-Target round trip revalidates Entity and Space lifetime; routing
+	// remains on Source and Source is never released before the successful response.
+	migrationCommitPending_ = true;
+	migrationCommitSourceCellAppID_ = sourceCellAppID;
+	migrationCommitTargetCellAppID_ = targetCellAppID;
+
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	(*pBundle).newMessage(CellappInterface::reqTeleportToCellAppPrepare);
+	(*pBundle) << id() << sourceCellAppID << targetCellAppID;
+	pTargetInfos->pChannel->send(pBundle);
+}
+
+//-------------------------------------------------------------------------------------
+void Entity::onMigrationCellappPrepared(Network::Channel* pChannel,
+	COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID, bool success)
+{
+	if (pChannel == NULL || pChannel->isExternal() ||
+		!Components::getSingleton().isExpectedComponentChannel(CELLAPP_TYPE, pChannel) ||
+		pChannel->componentID() != targetCellAppID)
+	{
+		WARNING_MSG(fmt::format("{}::onMigrationCellappPrepared: rejected invalid Target source, "
+			"entity={}, sourceCellAppID={}, targetCellAppID={}.\n",
+			scriptName(), id(), sourceCellAppID, targetCellAppID));
+		return;
+	}
+
+	if (!migrationCommitPending_ ||
+		migrationCommitSourceCellAppID_ != sourceCellAppID ||
+		migrationCommitTargetCellAppID_ != targetCellAppID)
+	{
+		WARNING_MSG(fmt::format("{}::onMigrationCellappPrepared: ignored stale validation, "
+			"entity={}, sourceCellAppID={}, targetCellAppID={}, pendingSource={}, pendingTarget={}.\n",
+			scriptName(), id(), sourceCellAppID, targetCellAppID,
+			migrationCommitSourceCellAppID_, migrationCommitTargetCellAppID_));
+		return;
+	}
+
+	migrationCommitPending_ = false;
+	migrationCommitSourceCellAppID_ = 0;
+	migrationCommitTargetCellAppID_ = 0;
+
+	if (!success)
+	{
+		// Target 验证失败时保留 Source Ghost，禁止形成“路由已切换且两端都不存在”的状态。
+		// Preserve Source Ghost when Target validation fails; never create a switched route with neither peer alive.
+		ERROR_MSG(fmt::format("{}::onMigrationCellappPrepared: Target validation failed; "
+			"Source is retained, entity={}, sourceCellAppID={}, targetCellAppID={}.\n",
+			scriptName(), id(), sourceCellAppID, targetCellAppID));
+		return;
+	}
+
+	commitMigrationCellapp(sourceCellAppID, targetCellAppID);
+}
+
+//-------------------------------------------------------------------------------------
+void Entity::commitMigrationCellapp(COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID)
+{
+	// BaseApp 是客户端到 Cell RPC 的唯一权威路由点。Target 已完成提交时存活确认后，
+	// 必须先切换路由，再确认两端完成，保证 Source Ghost 覆盖旧 Channel 的尾部 RPC。
+	// BaseApp is the authoritative client-to-Cell routing point. After Target's commit-time
+	// liveness validation, switch routing before confirming either peer so Source Ghost covers
+	// the tail of RPCs already queued on the old Channel.
 	if(this->cellEntityCall())
 		this->cellEntityCall()->componentID(targetCellAppID);
+
+	const COMPONENT_ID completionCellappIDs[] = { targetCellAppID, sourceCellAppID };
+	// A failed migration reports source==target after restoring the Source real Entity.
+	// Confirm it once; sending the same completion twice races lifecycle callbacks and
+	// can duplicate script-visible Cell-loss handling. / 迁移失败恢复 Source real Entity
+	// 后会报告 source==target；此时只确认一次，避免重复完成与生命周期回调竞态。
+	const size_t completionCount = targetCellAppID == sourceCellAppID ? 1 :
+		sizeof(completionCellappIDs) / sizeof(completionCellappIDs[0]);
+	for (size_t i = 0; i < completionCount; ++i)
+	{
+		const COMPONENT_ID cellappID = completionCellappIDs[i];
+		Components::ComponentInfos* pInfos = Components::getSingleton().findComponent(cellappID);
+		if (pInfos && pInfos->pChannel)
+		{
+			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+			(*pBundle).newMessage(CellappInterface::reqTeleportToCellAppOver);
+			(*pBundle) << id() << sourceCellAppID << targetCellAppID;
+			pInfos->pChannel->send(pBundle);
+		}
+		else
+		{
+			ERROR_MSG(fmt::format("{}::commitMigrationCellapp: unavailable CellApp {}, "
+				"entity={}, sourceCellAppID={}, targetCellAppID={}.\n",
+				scriptName(), cellappID, id(), sourceCellAppID, targetCellAppID));
+		}
+	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -1780,7 +2045,8 @@ void Entity::onBufferedForwardToCellappMessagesOver()
 //-------------------------------------------------------------------------------------
 void Entity::onBufferedForwardToClientMessagesOver()
 {
-	onMigrationCellappOver(pBufferedSendToClientMessages_->cellappID());
+	onMigrationCellappOver(pBufferedSendToClientMessages_->sourceCellappID(),
+		pBufferedSendToClientMessages_->cellappID());
 	SAFE_RELEASE(pBufferedSendToClientMessages_);
 
 	if (pendingMigrationEnd_)

@@ -131,33 +131,61 @@ def set_xml_value(parent, name, value):
     element.text = value
 
 
-def create_database_overlay(args, run_root):
+def find_server_config(args):
+    if args.config_overlay:
+        return args.config_overlay / "server" / "kbengine.xml"
+
     candidates = (
         args.assets_root / "res" / "server" / "kbengine.xml",
         args.assets_root / "kbengine.xml",
     )
     source = next((path for path in candidates if path.is_file()), None)
     if source is None:
-        raise RuntimeError(f"assets do not contain a kbengine.xml database configuration: {args.assets_root}")
+        raise RuntimeError(f"assets do not contain kbengine.xml: {args.assets_root}")
+    return source
+
+
+def select_interfaces_port():
+    # Reserve through INADDR_ANY while selecting the port so a listener on any local
+    # interface is considered. The engine binds immediately after the overlay is written.
+    # 通过 INADDR_ANY 选端口，确保任一本地网卡上的监听都会参与冲突检测；
+    # overlay 写入后引擎会立即启动并绑定该端口。
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as reservation:
+        reservation.bind(("", 0))
+        return reservation.getsockname()[1]
+
+
+def create_runtime_config_overlay(args, run_root):
+    source = find_server_config(args)
 
     tree = ET.parse(source)
-    database = tree.getroot().find("./dbmgr/databaseInterfaces/default")
-    if database is None:
-        raise RuntimeError(f"database interface 'default' is missing from {source}")
+    root = tree.getroot()
+    interfaces = root.find("./interfaces")
+    if interfaces is None:
+        interfaces = ET.SubElement(root, "interfaces")
+    interfaces_port = select_interfaces_port()
+    set_xml_value(interfaces, "host", "127.0.0.1")
+    set_xml_value(interfaces, "port_min", str(interfaces_port))
+    set_xml_value(interfaces, "port_max", str(interfaces_port))
 
-    set_xml_value(database, "type", args.database_type)
-    set_xml_value(database, "host", args.database_host)
-    set_xml_value(database, "port", str(args.database_port))
-    set_xml_value(database, "databaseName", args.database_name)
-    auth = database.find("auth")
-    if auth is None:
-        auth = ET.SubElement(database, "auth")
-    set_xml_value(auth, "username", args.database_username)
-    set_xml_value(auth, "password", args.database_password)
-    set_xml_value(auth, "encrypt", "false")
-    set_xml_value(auth, "authSource", "admin" if args.database_type == "mongodb" else "")
+    if args.database_type:
+        database = root.find("./dbmgr/databaseInterfaces/default")
+        if database is None:
+            raise RuntimeError(f"database interface 'default' is missing from {source}")
 
-    destination = run_root / "config-overlay" / "res" / "server" / "kbengine.xml"
+        set_xml_value(database, "type", args.database_type)
+        set_xml_value(database, "host", args.database_host)
+        set_xml_value(database, "port", str(args.database_port))
+        set_xml_value(database, "databaseName", args.database_name)
+        auth = database.find("auth")
+        if auth is None:
+            auth = ET.SubElement(database, "auth")
+        set_xml_value(auth, "username", args.database_username)
+        set_xml_value(auth, "password", args.database_password)
+        set_xml_value(auth, "encrypt", "false")
+        set_xml_value(auth, "authSource", "admin" if args.database_type == "mongodb" else "")
+
+    destination = run_root / "runtime-config" / "res" / "server" / "kbengine.xml"
     destination.parent.mkdir(parents=True, exist_ok=True)
     tree.write(destination, encoding="utf-8", xml_declaration=True)
     return destination.parents[1]
@@ -265,14 +293,21 @@ def wait_for_process_stability(entries, seconds=2.0):
         time.sleep(min(0.1, max(deadline - time.monotonic(), 0.0)))
 
 
-def wait_for_discovery(entries, run_root):
-    deadline = time.monotonic() + 30
+def wait_for_discovery(entries, run_root, timeout):
+    deadline = time.monotonic() + timeout
     managers = [entry for entry in entries if entry["spec"]["name"] in ("baseappmgr", "cellappmgr")]
     while time.monotonic() < deadline:
         if all(component_discovery_complete(entry, run_root) for entry in managers):
             return
         time.sleep(0.25)
-    raise RuntimeError("BaseAppMgr and CellAppMgr did not complete component discovery before timeout")
+    pending = [
+        entry["spec"]["name"]
+        for entry in managers
+        if not component_discovery_complete(entry, run_root)
+    ]
+    raise RuntimeError(
+        f"component discovery did not complete before timeout: {', '.join(pending)}"
+    )
 
 
 def stop_processes(entries):
@@ -354,7 +389,12 @@ def run_cluster(args):
     remove_run_root(args.run_root)
     args.run_root.mkdir(parents=True)
 
-    resource_roots = []
+    # Every cluster receives a writable, per-run configuration first. Besides keeping
+    # source assets read-only, this gives Interfaces and DBMgr the same fresh port and
+    # prevents a previous cluster's TCP teardown state from shifting only Interfaces.
+    # 每轮集群优先使用可写隔离配置；除保持源资产只读外，还让 Interfaces 与 DBMgr
+    # 共享同一个新端口，避免上一轮 TCP 回收状态只让 Interfaces 发生端口漂移。
+    resource_roots = [create_runtime_config_overlay(args, args.run_root)]
     if args.config_overlay:
         resource_roots.append(args.config_overlay)
         if args.resource_overlay:
@@ -373,10 +413,6 @@ def run_cluster(args):
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
                     )
     resource_roots.extend(args.resource_overlay)
-    if args.database_type:
-        # 数据库覆盖只写构建树并排在原 assets 前面，保证源资产只读且覆盖项优先命中。
-        # The database overlay stays in the build tree and precedes source assets, keeping them read-only while giving overrides priority.
-        resource_roots.append(create_database_overlay(args, args.run_root))
     resource_roots.extend(
         (
             args.repository_root / "kbe" / "res",
@@ -446,7 +482,7 @@ def run_cluster(args):
             wait_for_process_stability(entries)
         else:
             wait_for_running(entries, args.run_root, args.startup_timeout_seconds)
-            wait_for_discovery(entries, args.run_root)
+            wait_for_discovery(entries, args.run_root, args.startup_timeout_seconds)
         for entry in entries:
             result = entry["process"].poll()
             if result is not None:

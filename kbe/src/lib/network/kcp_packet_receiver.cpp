@@ -126,6 +126,22 @@ bool KCPPacketReceiver::processRecv(UDPPacket* pReceiveWindow)
 //-------------------------------------------------------------------------------------
 Reason KCPPacketReceiver::processPacket(Channel* pChannel, Packet * pPacket)
 {
+	if (pChannel == NULL || !pChannel->isKcpTransport())
+	{
+		// A KCP receiver without a live control block violates the transport lifecycle.
+		// Drop the datagram at the C++ boundary instead of passing NULL into ikcp_input.
+		// KCP receiver 若没有有效控制块，说明传输生命周期不变量已被破坏。
+		// 必须在 C++ 边界丢弃数据报，不能把空指针传给 ikcp_input。
+		if (pChannel != NULL)
+		{
+			WARNING_MSG(fmt::format(
+				"KCPPacketReceiver::processPacket: missing KCP control block, addr={}, sessionEpoch={}, protocolSubtype={}.\n",
+				pChannel->c_str(), pChannel->sessionEpoch(), static_cast<int>(pChannel->protocolSubtype())));
+		}
+		RECLAIM_PACKET(pPacket->isTCPPacket(), pPacket);
+		return REASON_CHANNEL_LOST;
+	}
+
 	if (pChannel != NULL && pChannel->hasHandshake())
 	{
 		if (pChannel->handshake(pPacket))
@@ -231,7 +247,14 @@ Reason KCPPacketReceiver::drainReassembledPackets(Channel* pChannel)
 	const bool budgetYield = hasCompletePacket && processedPackets > 0;
 	pChannel->networkInterface().recordKcpReceiveDrain(processedPackets, pendingSegments, budgetYield);
 	if (hasCompletePacket)
-		pChannel->scheduleKcpUpdate(1);
+	{
+		// Application dispatch is intentionally independent from protocol deadlines. A slow
+		// Entity/Python handler must not consume the scheduler slice that advances retransmits
+		// for every other KCP Channel.
+		// 应用消息派发与协议截止时间独立调度。慢 Entity/Python 回调不能占用其他 KCP Channel
+		// 推进重传时钟所需的协议切片。
+		pChannel->scheduleKcpReceive();
+	}
 
 	return REASON_SUCCESS;
 }

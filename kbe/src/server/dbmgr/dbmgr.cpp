@@ -449,6 +449,13 @@ bool Dbmgr::inInitialize()
 	if (!PythonApp::inInitialize())
 		return false;
 
+	// DBMgr publishes the client protocol digest used by LoginApp. It must build the
+	// same alias table as BaseApp and Bots or identical EntityDefs produce different digests.
+	// DBMgr 负责发布 LoginApp 使用的客户端协议摘要，因此必须与 BaseApp、Bots 使用同一套
+	// 别名表配置，否则相同 EntityDef 会被计算为不同摘要。
+	EntityDef::entityAliasID(ServerConfig::getSingleton().getCellApp().aliasEntityID);
+	EntityDef::entitydefAliasID(ServerConfig::getSingleton().getCellApp().entitydefAliasID);
+
 	std::vector<PyTypeObject*>	scriptBaseTypes;
 	if(!EntityDef::initialize(scriptBaseTypes, componentType_)){
 		return false;

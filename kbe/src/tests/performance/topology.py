@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 
@@ -13,6 +14,13 @@ SINGLETON_COMPONENTS = (
     ("baseappmgr", 5000),
     ("cellappmgr", 6000),
 )
+
+
+def platform_executable_name(name: str) -> str:
+    """Return the native executable name without allowing WSL to launch PE binaries.
+    返回当前平台的原生可执行文件名，避免 WSL 通过互操作误启动 PE 二进制。
+    """
+    return f"{name}.exe" if os.name == "nt" else name
 
 
 def build_local_cluster_components(
@@ -36,7 +44,7 @@ def build_local_cluster_components(
 
     specs: list[str] = []
     for global_order, (name, component_id) in enumerate(declarations, start=1):
-        executable = binary_dir / f"{name}.exe"
+        executable = binary_dir / platform_executable_name(name)
         if not executable.is_file():
             raise FileNotFoundError(f"server component is missing: {executable}")
         specs.append(f"{name}::{executable}::{component_id}::{global_order}")

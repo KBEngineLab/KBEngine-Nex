@@ -759,7 +759,12 @@ Network::Channel* EntityApp<E>::findChannelByEntityCall(EntityCall& entitycall)
 	}
 	else
 	{
-		return Components::getSingleton().pNetworkInterface()->findChannel(entitycall.addr());
+		// 客户端 EntityCall 必须同时校验传输命名空间、外部属性和绑定的 Proxy，
+		// 否则同机 KCP/内部 TCP 临时端口重号会把 ClientInterface 数据写入组件连接。
+		// Client EntityCalls must match transport namespace, external scope, and bound Proxy;
+		// otherwise a local KCP/internal-TCP port collision can route ClientInterface bytes into a component link.
+		return Components::getSingleton().pNetworkInterface()->findExternalChannel(
+			entitycall.addr(), entitycall.id());
 	}
 
 	return NULL;

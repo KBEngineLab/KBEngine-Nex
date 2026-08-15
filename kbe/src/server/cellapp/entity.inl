@@ -189,6 +189,18 @@ INLINE uint64 Entity::routingEpoch(void) const
 }
 
 //-------------------------------------------------------------------------------------
+INLINE COMPONENT_ID Entity::migrationRelayCell(void) const
+{
+	return migrationRelayCell_;
+}
+
+//-------------------------------------------------------------------------------------
+INLINE void Entity::migrationRelayCell(COMPONENT_ID cellID)
+{
+	migrationRelayCell_ = cellID;
+}
+
+//-------------------------------------------------------------------------------------
 INLINE SPACE_ENTITIES::size_type Entity::spaceEntityIdx() const
 {
 	return spaceEntityIdx_;

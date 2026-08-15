@@ -127,6 +127,9 @@ public:
 
 	bool isDestroyed() const{ return state_ == STATE_DESTROYED; }
 	bool isGood() const{ return state_ == STATE_NORMAL; }
+	// 未提交迁移实体持有 Space 生命周期租约，脚本清理必须等待 BaseApp 完成路由切换。
+	// Uncommitted migration Targets lease the Space lifetime until BaseApp completes the route switch.
+	bool hasPendingMigrationEntities() const;
 
 protected:
 	void _addSpaceDatasToEntityClient(const Entity* pEntity);
