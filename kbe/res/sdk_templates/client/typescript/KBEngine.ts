@@ -2082,19 +2082,6 @@ export class KBEngineApp {
         this.UpdateVolatileData(eid, xz[0], y, xz[1], KBE_FLT_MAX, KBE_FLT_MAX, r, 0, true);
     }
 
-    Client_onImportClientSDK(stream: MemoryStream) {
-        let remainingFiles = stream.ReadInt32();
-
-        let fileName = stream.ReadString();
-
-        let fileSize = stream.ReadInt32();
-
-        let fileDatas = stream.ReadBlob();
-
-        // this.Event.fireIn("onImportClientSDK", remainingFiles, fileName, fileSize, fileDatas);
-    }
-
-
 }
 
 //#endregion

@@ -24,7 +24,6 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "profile.h"	
 #include "http_cb_handler.h"
 #include "loginapp_interface.h"
-#include "clientsdk_downloader.h"
 #include "network/common.h"
 #include "network/tcp_packet.h"
 #include "network/udp_packet.h"
@@ -1622,45 +1621,6 @@ void Loginapp::importServerErrorsDescr(Network::Channel* pChannel)
 	Network::Bundle* pNewBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	pNewBundle->copy(bundle);
 	pChannel->send(pNewBundle);
-}
-
-//-------------------------------------------------------------------------------------
-void Loginapp::importClientSDK(Network::Channel* pChannel, MemoryStream& s)
-{
-	// 防止线上被恶意调用
-	static uint8 getcount = 0;
-	if(++getcount == 0)
-	{
-		ERROR_MSG(fmt::format("Loginapp::importClientSDK: The number of requests exceeded the limit!\n"));
-		return;
-	}
-
-	std::string options;
-	s >> options;
-
-	int clientWindowSize = 0;
-	s >> clientWindowSize;
-
-	// 如果ip不等于空， 那么新建一个tcp连接返回数据，否则原路返回
-	std::string callbackIP = "";
-	s >> callbackIP;
-
-	uint16 callbackPort = 0;
-	s >> callbackPort;
-
-	INFO_MSG(fmt::format("Loginapp::importClientSDK: options={}! reqaAdr={}, callbackAddr={}:{}\n",
-		options, pChannel->c_str(), callbackIP, callbackPort));
-
-	std::string assetsPath = Resmgr::getSingleton().getPyUserAssetsPath();
-	std::string binPath = Resmgr::getSingleton().getEnv().bin_path;
-
-	if (binPath.size() == 0)
-	{
-		ERROR_MSG(fmt::format("Loginapp::importClientSDK: KBE_BIN_PATH no set!\n"));
-		return;
-	}
-
-	new ClientSDKDownloader(networkInterface(), pChannel->addr(), clientWindowSize, assetsPath, binPath, options);
 }
 
 //-------------------------------------------------------------------------------------

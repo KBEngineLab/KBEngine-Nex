@@ -50,8 +50,4 @@ const KBString KBEventTypes::onStreamDataStarted = "onStreamDataStarted";
 const KBString KBEventTypes::onStreamDataRecv = "onStreamDataRecv";
 const KBString KBEventTypes::onStreamDataCompleted = "onStreamDataCompleted";
 
-// ------------------------------------SDK更新相关-------------------------------------
-const KBString KBEventTypes::onImportClientSDKSuccessfully = "onImportClientSDKSuccessfully";
-const KBString KBEventTypes::onDownloadSDK = "onDownloadSDK";
-
 }

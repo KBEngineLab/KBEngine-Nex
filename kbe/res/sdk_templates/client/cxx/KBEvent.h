@@ -789,28 +789,3 @@ public:
 	int resID;
 };
 
-class UKBEventData_onImportClientSDK : public UKBEventData
-{
-
-public:
-	int remainingFiles;
-
-	int fileSize;
-
-	KBString fileName;
-
-	KBArray<uint8> fileDatas;
-};
-
-class UKBEventData_onImportClientSDKSuccessfully : public UKBEventData
-{
-public:
-
-};
-
-class UKBEventData_onDownloadSDK : public UKBEventData
-{
-public:
-	bool isDownload;
-};
-

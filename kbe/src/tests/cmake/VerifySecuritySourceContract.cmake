@@ -73,6 +73,10 @@ file(READ "${KBE_SOURCE_ROOT}/server/cellappmgr/cellappmgr.cpp" _kbe_cellappmgr)
 file(READ "${KBE_SOURCE_ROOT}/server/dbmgr/dbmgr.cpp" _kbe_dbmgr)
 file(READ "${KBE_SOURCE_ROOT}/server/dbmgr/interfaces_handler.cpp" _kbe_interfaces_handler)
 file(READ "${KBE_SOURCE_ROOT}/server/loginapp/loginapp.cpp" _kbe_loginapp)
+file(READ "${KBE_SOURCE_ROOT}/server/loginapp/loginapp_interface.h" _kbe_loginapp_interface)
+file(READ "${KBE_SOURCE_ROOT}/server/loginapp/CMakeLists.txt" _kbe_loginapp_cmake)
+file(READ "${KBE_SOURCE_ROOT}/lib/client_lib/client_interface.h" _kbe_client_interface)
+file(READ "${KBE_SOURCE_ROOT}/../res/server/messages_fixed_defaults.xml" _kbe_fixed_messages)
 file(READ "${KBE_SOURCE_ROOT}/lib/server/entity_app.h" _kbe_entity_app)
 file(READ "${KBE_SOURCE_ROOT}/lib/server/callbackmgr.h" _kbe_callbackmgr)
 file(READ "${KBE_SOURCE_ROOT}/lib/server/serverapp.cpp" _kbe_serverapp)
@@ -84,6 +88,23 @@ file(READ "${KBE_SOURCE_ROOT}/../res/sdk_templates/client/gdscript/BlowfishFilte
 file(READ "${KBE_SOURCE_ROOT}/../res/sdk_templates/client/csharp/Blowfish.cs" _kbe_sdk_csharp_blowfish)
 file(READ "${KBE_SOURCE_ROOT}/../res/sdk_templates/client/cxx/blowfish/Blowfish.cpp" _kbe_sdk_cxx_blowfish)
 file(READ "${KBE_SOURCE_ROOT}/../res/sdk_templates/client/gdscript/Blowfish.gd" _kbe_sdk_gdscript_blowfish)
+
+# SDK generation must remain a local developer operation. The old LoginApp
+# message started kbcmd on the server and streamed project files to clients.
+# SDK 生成只能由开发者在本地显式执行；禁止恢复 LoginApp 远程下载路径。
+foreach(_kbe_forbidden IN ITEMS
+	"importClientSDK"
+	"onImportClientSDK"
+	"clientsdk_downloader"
+)
+	string(FIND
+		"${_kbe_loginapp}\n${_kbe_loginapp_interface}\n${_kbe_loginapp_cmake}\n${_kbe_client_interface}\n${_kbe_fixed_messages}"
+		"${_kbe_forbidden}"
+		_kbe_forbidden_position)
+	if(NOT _kbe_forbidden_position EQUAL -1)
+		message(FATAL_ERROR "Remote SDK download contract regressed: ${_kbe_forbidden}")
+	endif()
+endforeach()
 
 # Generated SDKs must reject malformed Blowfish frames before decrypting or
 # passing bytes to a message reader. 生成 SDK 必须在解密和消息解析前拒绝非法帧。

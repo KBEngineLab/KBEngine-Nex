@@ -175,10 +175,6 @@ struct KBEventTypes
 	// <para> param1(uint16): resouce id</para>
 	static const KBString onStreamDataCompleted;
 
-	// ------------------------------------SDK更新相关-----------------------------------
-	static const KBString onImportClientSDKSuccessfully;
-	static const KBString onDownloadSDK;
-
 };
 
 }

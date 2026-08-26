@@ -517,23 +517,6 @@ namespace KBEngine
 			// 无需实现，已由插件生成静态代码
 		}
 
-		public void Client_onImportClientSDK(MemoryStream stream)
-		{
-			int remainingFiles = 0;
-			remainingFiles = stream.readInt32();
-
-			string fileName;
-			fileName = stream.readString();
-
-			int fileSize = 0;
-			fileSize = stream.readInt32();
-
-			byte[] fileDatas = new byte[0];
-			fileDatas = stream.readBlob();
-
-			Event.fireIn("onImportClientSDK", remainingFiles, fileName, fileSize, fileDatas);
-		}
-		
 		/*
 			引擎版本不匹配
 		*/

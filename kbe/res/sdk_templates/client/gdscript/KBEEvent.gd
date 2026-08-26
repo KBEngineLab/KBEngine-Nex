@@ -191,7 +191,6 @@ signal newPassword(_oldPassword:String, _newPassword:String)
 signal bindAccountEmail(_emailAddress:String)
 
 signal closeNetwork
-signal onImportClientSDK
 
 
 # ============================================================================

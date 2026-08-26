@@ -333,13 +333,6 @@ func Client_onImportClientMessages(_stream:MemoryStream)-> void:
 func Client_onImportClientEntityDef(_stream:MemoryStream)-> void:
 	pass  # 无需实现，已由插件生成静态代码
 
-func Client_onImportClientSDK(_stream:MemoryStream)-> void:
-	var remainingFiles:int = _stream.readInt32()
-	var fileName:String = _stream.readString()
-	var fileSize:int = _stream.readInt32()
-	var fileDatas:PackedByteArray = _stream.readBlob()
-	KBEEvent.Event.onImportClientSDK.emit(remainingFiles, fileName, fileSize, fileDatas)
-
 ## 引擎版本不匹配
 func Client_onVersionNotMatch(_stream:MemoryStream)-> void:
 	self.serverVersion = _stream.readString()
