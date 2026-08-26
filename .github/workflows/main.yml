@@ -409,3 +409,245 @@ jobs:
               --title "KBEngine Nex $VERSION" \
               --notes "Release binaries for Windows, Linux, and macOS."
           fi
+
+  publish-gitcode:
+    name: Publish GitCode Release
+    if: needs.metadata.outputs.is_release == 'true'
+    needs:
+      - metadata
+      - publish
+    runs-on: ubuntu-latest
+    env:
+      GITCODE_OWNER: KBEngineLab
+      GITCODE_REPO: KBEngine-Nex
+      GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+
+    steps:
+      - name: Validate GitCode credentials
+        shell: sh
+        run: |
+          set -eu
+          if [ -z "$GITCODE_TOKEN" ]; then
+            echo "::error::Repository secret GITCODE_TOKEN is required to publish this release to GitCode."
+            exit 1
+          fi
+
+      - name: Checkout released source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Synchronize branches and tags to GitCode
+        shell: bash
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          git fetch --force --prune origin \
+            '+refs/heads/*:refs/remotes/origin/*' \
+            '+refs/tags/*:refs/tags/*'
+
+          release_commit="$(git rev-parse HEAD)"
+          if ! git rev-parse --verify "refs/tags/$VERSION^{commit}" >/dev/null 2>&1; then
+            git tag --annotate "$VERSION" "$release_commit" --message "Release $VERSION"
+          fi
+
+          tag_commit="$(git rev-parse "refs/tags/$VERSION^{commit}")"
+          if [ "$tag_commit" != "$release_commit" ]; then
+            echo "::error::Release tag $VERSION points to $tag_commit instead of $release_commit."
+            exit 1
+          fi
+
+          git remote add gitcode \
+            "https://oauth2:${GITCODE_TOKEN}@gitcode.com/${GITCODE_OWNER}/${GITCODE_REPO}.git"
+
+          mapfile -t branch_refspecs < <(
+            git for-each-ref \
+              --format='+%(refname):refs/heads/%(refname:lstrip=3)' \
+              refs/remotes/origin \
+              | grep -v '^+refs/remotes/origin/HEAD:'
+          )
+          if [ "${#branch_refspecs[@]}" -eq 0 ]; then
+            echo "::error::No GitHub branches were fetched for GitCode synchronization."
+            exit 1
+          fi
+
+          git push gitcode "${branch_refspecs[@]}"
+          git push gitcode '+refs/tags/*:refs/tags/*'
+
+      - name: Download published GitHub Release
+        shell: sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -eu
+          mkdir -p dist
+          gh release download "$VERSION" \
+            --dir dist \
+            --pattern 'KBEngine-Nex-*.zip' \
+            --pattern 'KBEngine-Nex-*.tar.gz' \
+            --pattern 'SHA256SUMS.txt'
+          gh release view "$VERSION" --json name,body > github-release.json
+
+          archive_count="$(find dist -maxdepth 1 -type f \
+            \( -name 'KBEngine-Nex-*.zip' -o -name 'KBEngine-Nex-*.tar.gz' \) \
+            -printf '.' | wc -c | tr -d '[:space:]')"
+          if [ "$archive_count" -ne 3 ] || [ ! -f dist/SHA256SUMS.txt ]; then
+            echo "::error::Expected three archives and SHA256SUMS.txt from the GitHub Release."
+            find dist -maxdepth 1 -type f -printf '%f\n' | sort
+            exit 1
+          fi
+
+          (cd dist && sha256sum --check SHA256SUMS.txt)
+
+      - name: Create GitCode Release
+        shell: bash
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          release_payload="$(jq \
+            --arg version "$VERSION" \
+            '{
+              tag_name: $version,
+              name: (.name // ("KBEngine Nex " + $version)),
+              body: (.body // ""),
+              release_status: "latest"
+            }' github-release.json)"
+          response_file="$(mktemp)"
+          http_code="$(curl --silent --show-error \
+            --output "$response_file" \
+            --write-out '%{http_code}' \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --data "$release_payload" \
+            "https://api.gitcode.com/api/v5/repos/${GITCODE_OWNER}/${GITCODE_REPO}/releases?access_token=${GITCODE_TOKEN}")"
+
+          case "$http_code" in
+            200|201)
+              echo "Created GitCode Release $VERSION."
+              ;;
+            409)
+              echo "GitCode Release $VERSION already exists; its attachments will be refreshed."
+              ;;
+            *)
+              echo "::error::Creating GitCode Release $VERSION failed with HTTP $http_code."
+              cat "$response_file"
+              exit 1
+              ;;
+          esac
+          rm -f "$response_file"
+
+      - name: Upload GitCode Release attachments
+        shell: bash
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          api_base="https://api.gitcode.com/api/v5/repos/${GITCODE_OWNER}/${GITCODE_REPO}"
+          release_file="$(mktemp)"
+          release_http_code="$(curl --silent --show-error \
+            --output "$release_file" \
+            --write-out '%{http_code}' \
+            --get \
+            --data-urlencode "access_token=$GITCODE_TOKEN" \
+            "$api_base/releases/tags/$VERSION")"
+          if [ "$release_http_code" != "200" ]; then
+            echo "::error::Reading GitCode Release $VERSION failed with HTTP $release_http_code."
+            cat "$release_file"
+            exit 1
+          fi
+
+          mapfile -d '' release_files < <(find dist -maxdepth 1 -type f -print0 | sort -z)
+          if [ "${#release_files[@]}" -ne 4 ]; then
+            echo "::error::Expected exactly four GitCode Release attachments."
+            exit 1
+          fi
+
+          for file in "${release_files[@]}"; do
+            file_name="$(basename "$file")"
+            echo "::group::Publishing $file_name"
+
+            mapfile -t existing_asset_ids < <(
+              jq -r --arg file_name "$file_name" \
+                '.assets[]? | select(.type == "attach" and .name == $file_name) | .id' \
+                "$release_file"
+            )
+            for asset_id in "${existing_asset_ids[@]}"; do
+              delete_response="$(mktemp)"
+              delete_http_code="$(curl --silent --show-error \
+                --output "$delete_response" \
+                --write-out '%{http_code}' \
+                --request DELETE \
+                --get \
+                --data-urlencode "access_token=$GITCODE_TOKEN" \
+                "$api_base/releases/$VERSION/attach_files/$asset_id")"
+              case "$delete_http_code" in
+                200|204) ;;
+                *)
+                  echo "::error::Deleting existing attachment $file_name failed with HTTP $delete_http_code."
+                  cat "$delete_response"
+                  exit 1
+                  ;;
+              esac
+              rm -f "$delete_response"
+            done
+
+            upload_info_file="$(mktemp)"
+            upload_info_http_code="$(curl --silent --show-error \
+              --output "$upload_info_file" \
+              --write-out '%{http_code}' \
+              --get \
+              --data-urlencode "access_token=$GITCODE_TOKEN" \
+              --data-urlencode "file_name=$file_name" \
+              "$api_base/releases/$VERSION/upload_url")"
+            if [ "$upload_info_http_code" != "200" ]; then
+              echo "::error::Getting an upload URL for $file_name failed with HTTP $upload_info_http_code."
+              cat "$upload_info_file"
+              exit 1
+            fi
+
+            upload_url="$(jq -er '.url | select(type == "string" and length > 0)' "$upload_info_file")"
+            upload_args=(
+              --silent
+              --show-error
+              --retry 3
+              --retry-delay 5
+              --retry-all-errors
+              --connect-timeout 30
+              --request PUT
+              --data-binary "@$file"
+            )
+            while IFS= read -r header; do
+              upload_args+=(--header "$header")
+            done < <(
+              jq -r '.headers // {} | to_entries[] | "\(.key): \(.value)"' "$upload_info_file"
+            )
+
+            upload_response="$(mktemp)"
+            upload_http_code="$(curl "${upload_args[@]}" \
+              --output "$upload_response" \
+              --write-out '%{http_code}' \
+              "$upload_url")"
+            case "$upload_http_code" in
+              200|201|204)
+                echo "Uploaded $file_name."
+                ;;
+              *)
+                echo "::error::Uploading $file_name failed with HTTP $upload_http_code."
+                cat "$upload_response"
+                exit 1
+                ;;
+            esac
+
+            rm -f "$upload_info_file" "$upload_response"
+            echo "::endgroup::"
+          done
+
+          rm -f "$release_file"
