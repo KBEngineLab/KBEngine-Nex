@@ -36,6 +36,19 @@ set_tests_properties(runtime.kbcmd_getuid PROPERTIES
     ENVIRONMENT "KBE_ROOT=${CMAKE_SOURCE_DIR}/../..;KBE_RES_PATH=${CMAKE_SOURCE_DIR}/../res;KBE_BIN_PATH=${KBE_RUNTIME_BIN_DIR}"
 )
 
+add_test(NAME runtime.kbcmd_new_assets
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_EXECUTABLE=${KBE_RUNTIME_BIN_DIR}/kbcmd${CMAKE_EXECUTABLE_SUFFIX}"
+        "-DKBE_REPOSITORY_ROOT=${CMAKE_SOURCE_DIR}/../.."
+        "-DKBE_OUTPUT_ROOT=${CMAKE_BINARY_DIR}/Testing/kbcmd-new-assets-$<CONFIG>"
+        "-DKBE_BINARY_ROOT=${CMAKE_BINARY_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunKbcmdNewAssetsSmoke.cmake"
+)
+set_tests_properties(runtime.kbcmd_new_assets PROPERTIES
+    LABELS "assets;runtime;smoke"
+    TIMEOUT 90
+)
+
 add_test(NAME runtime.relocated_kbcmd
     COMMAND "${CMAKE_COMMAND}"
         "-DKBE_EXECUTABLE=${KBE_RUNTIME_BIN_DIR}/kbcmd${CMAKE_EXECUTABLE_SUFFIX}"

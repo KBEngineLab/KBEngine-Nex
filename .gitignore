@@ -1,6 +1,4 @@
 # Local migration notes. Keep these paths outside Git and exclude them from destructive git-clean commands.
-/迁移文档/
-/从1.x重建Nex迁移规划.md
 
 # IDE and editor state
 .vs/
