@@ -677,6 +677,8 @@ KBE_GDSCRIPT_PROPERTY_IMPL(ENTITYCALL)
 
 bool ClientSDKGDScript::writeEntityProcessMessagesMethod(ScriptDefModule* pEntityScriptDefModule)
 {
+	const std::string lifecycleOwner = pEntityScriptDefModule->isComponentModule() ? "owner." : "self.";
+
 	ScriptDefModule::PROPERTYDESCRIPTION_MAP& props = pEntityScriptDefModule->getClientPropertyDescriptions();
 	ScriptDefModule::METHODDESCRIPTION_MAP& methods = pEntityScriptDefModule->getClientMethodDescriptions();
 
@@ -880,7 +882,10 @@ bool ClientSDKGDScript::writeEntityProcessMessagesMethod(ScriptDefModule* pEntit
 			sourcefileBody_ += fmt::format("\t\t\t\t{}:\n\t\t\t\t\t{}.onUpdatePropertys(_t_child_utype, _stream, -1)\n\t\t\t\t\tcontinue\n", p->getUType(), p->getName());
 		}
 		sourcefileBody_ += "\t\t\t\t_:\n\t\t\t\t\t_stream.rpos -= 1 if sm.usePropertyDescrAlias else 2\n\t\telse:\n\t\t\tDbg.ERROR_MSG(\"unknown property utype \" + str(_t_utype))\n\t\t\tbreak\n\t\tmatch (prop.properUtype):\n";
-		sourcefileBody_ += "\t\t\t40000:\n\t\t\t\tvar oldval_position = position\n\t\t\t\tposition = _stream.readVector3()\n\t\t\t\tonPositionChanged(oldval_position)\n\t\t\t40001:\n\t\t\t\tvar oldval_direction = direction\n\t\t\t\tdirection = _stream.readVector3()\n\t\t\t\tonDirectionChanged(oldval_direction)\n\t\t\t40002:\n\t\t\t\tvar oldval_spaceID = spaceID\n\t\t\t\tspaceID = _stream.readUint32()\n\t\t\t\tonSpaceIDChanged(oldval_spaceID)\n";
+		// Initial property deserialization must only populate state. Runtime callbacks are
+		// gated by the same lifecycle flags used by the other generated SDKs.
+		// 初始化反序列化阶段只填充状态；运行期回调使用与其他 SDK 一致的生命周期门控。
+		sourcefileBody_ += "\t\t\t40000:\n\t\t\t\tvar oldval_position = position\n\t\t\t\tposition = _stream.readVector3()\n\t\t\t\tif self.inWorld:\n\t\t\t\t\tonPositionChanged(oldval_position)\n\t\t\t40001:\n\t\t\t\tvar oldval_direction = direction\n\t\t\t\tdirection = _stream.readVector3()\n\t\t\t\tif self.inWorld:\n\t\t\t\t\tonDirectionChanged(oldval_direction)\n\t\t\t40002:\n\t\t\t\tvar oldval_spaceID = spaceID\n\t\t\t\tspaceID = _stream.readUint32()\n\t\t\t\tif self.inWorld:\n\t\t\t\t\tonSpaceIDChanged(oldval_spaceID)\n";
 	}
 
 	for (ScriptDefModule::PROPERTYDESCRIPTION_MAP::iterator it = props.begin(); it != props.end(); ++it)
@@ -901,18 +906,30 @@ bool ClientSDKGDScript::writeEntityProcessMessagesMethod(ScriptDefModule* pEntit
 				sourcefileBody_ += fmt::format("\t\t\t\t{} = prop.defaultVal\n", p->getName());
 			else
 				sourcefileBody_ += fmt::format("\t\t\t\t{} = _stream.{}()\n", p->getName(), fn);
-			sourcefileBody_ += fmt::format("\t\t\t\ton{}Changed(oldval_{})\n", cap(p->getName()), p->getName());
+
+			// Base properties become callback-eligible after __init__; Cell properties only
+			// after EnterWorld. This keeps isOnInitCallPropertysSetMethods authoritative.
+			// Base 属性在 __init__ 后才允许回调，Cell 属性在 EnterWorld 后才允许回调，
+			// 从而确保 isOnInitCallPropertysSetMethods 是初始化回调的唯一控制入口。
+			sourcefileBody_ += fmt::format("\t\t\t\tif prop.isBase():\n\t\t\t\t\tif {}inited:\n\t\t\t\t\t\ton{}Changed(oldval_{})\n", lifecycleOwner, cap(p->getName()), p->getName());
+			sourcefileBody_ += fmt::format("\t\t\t\telse:\n\t\t\t\t\tif {}inWorld:\n\t\t\t\t\t\ton{}Changed(oldval_{})\n", lifecycleOwner, cap(p->getName()), p->getName());
 		}
 	}
 	sourcefileBody_ += "\t\t\t_:\n\t\t\t\tpass\n\n";
 
 	sourcefileBody_ += "func callPropertysSetMethods()-> void:\n";
+	sourcefileBody_ += fmt::format("\tvar sm:ScriptModule = EntityDef.moduledefs[\"{}\"]\n", pEntityScriptDefModule->getName());
 	for (ScriptDefModule::PROPERTYDESCRIPTION_MAP::iterator it = props.begin(); it != props.end(); ++it)
 	{
 		PropertyDescription* p = it->second;
 		if (p->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)
 			continue;
-		sourcefileBody_ += fmt::format("\tvar oldval_{} = {}\n\ton{}Changed(oldval_{})\n", p->getName(), p->getName(), cap(p->getName()), p->getName());
+
+		sourcefileBody_ += fmt::format("\tvar oldval_{} = {}\n", p->getName(), p->getName());
+		sourcefileBody_ += fmt::format("\tvar prop_{}:Property = sm.idpropertys[{}]\n", p->getName(),
+			pEntityScriptDefModule->usePropertyDescrAlias() ? p->aliasID() : p->getUType());
+		sourcefileBody_ += fmt::format("\tif prop_{}.isBase():\n\t\tif {}inited and not {}inWorld:\n\t\t\ton{}Changed(oldval_{})\n", p->getName(), lifecycleOwner, lifecycleOwner, cap(p->getName()), p->getName());
+		sourcefileBody_ += fmt::format("\telse:\n\t\tif {}inWorld:\n\t\t\tif not prop_{}.isOwnerOnly() or {}isPlayer():\n\t\t\t\ton{}Changed(oldval_{})\n", lifecycleOwner, p->getName(), lifecycleOwner, cap(p->getName()), p->getName());
 	}
 	if (!pEntityScriptDefModule->isComponentModule())
 	{

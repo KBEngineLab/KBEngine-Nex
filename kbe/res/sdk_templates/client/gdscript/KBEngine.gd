@@ -680,28 +680,32 @@ func getViewEntityIDFromStream(_stream:MemoryStream)-> int:
 ## 服务端使用优化的方式更新实体属性数据
 func Client_onUpdatePropertysOptimized(_stream:MemoryStream)-> void:
 	var _eid:int = getViewEntityIDFromStream(_stream)
-	onUpdatePropertys_(_eid, _stream, -1)
+	if _eid == 0:
+		# An unresolved alias is stale; never create a cache entry for entity 0.
+		# 别名无法解析时属于过期更新，不能为实体 0 创建缓存。
+		_stream.done()
+		return
+	onUpdatePropertys_(_eid, _stream)
 
 ## 服务端更新实体属性数据
 func Client_onUpdatePropertys(_stream:MemoryStream)-> void:
-	var _messageStart:int = _stream.rpos
 	var _eid:int = _stream.readInt32()
-	onUpdatePropertys_(_eid, _stream, _messageStart)
+	onUpdatePropertys_(_eid, _stream)
 
-func onUpdatePropertys_(_eid:int, _stream:MemoryStream, _messageStart:int)-> void:
+func onUpdatePropertys_(_eid:int, _stream:MemoryStream)-> void:
 	var _entity:Entity = self.entities.get(_eid)
 	if not _entity:
 		var entityMessage:MemoryStream = self.m_bufferedCreateEntityMessages.get(_eid)
 		if entityMessage:
-			Dbg.ERROR_MSG("KBEngine::Client_onUpdatePropertys: entity(" + str(_eid) + ") not found!")
-			return
-		if _messageStart < 0:
-			Dbg.ERROR_MSG("KBEngine::Client_onUpdatePropertys: optimized update for entity(" + str(_eid) + ") arrived before entity creation; dropping buffered-incompatible message.")
+			# Preserve all pre-EnterWorld property payloads in wire order.
+			# 按线序保留 EnterWorld 前收到的全部属性 payload，生成代码会按长度连续消费。
+			entityMessage.append(_stream.data(), _stream.rpos, _stream.length())
 			return
 		var stream1:MemoryStream = ObjectPool.createObject(MemoryStream)
-		stream1.wpos = _stream.wpos
-		stream1.rpos = _messageStart
-		stream1.setBuffer(_stream.data().slice(0, _stream.wpos)) # Array.Copy(_stream.data(), stream1.data(), _stream.wpos)
+		# Normalize normal and optimized messages to the same replay header.
+		# 统一普通消息和优化消息的缓存头，确保二者使用相同的回放路径。
+		stream1.writeInt32(_eid)
+		stream1.append(_stream.data(), _stream.rpos, _stream.length())
 		self.m_bufferedCreateEntityMessages[_eid] = stream1
 		return
 	_entity.onUpdatePropertys(_stream)

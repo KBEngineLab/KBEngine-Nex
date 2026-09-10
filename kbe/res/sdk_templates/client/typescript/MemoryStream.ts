@@ -60,6 +60,14 @@ export class MemoryStream
         this.buffer = replacement;
     }
 
+    Append(data: ArrayBuffer): void
+    {
+        const bytes = new Uint8Array(data);
+        this.EnsureSpace(bytes.byteLength);
+        new Uint8Array(this.buffer, this.wpos, bytes.byteLength).set(bytes);
+        this.wpos += bytes.byteLength;
+    }
+
     Insert(offset: number, size: number): void
     {
         if(!Number.isSafeInteger(offset) || offset < 0 || offset > this.wpos)

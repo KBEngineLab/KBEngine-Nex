@@ -1053,6 +1053,14 @@ ENTITY_ID KBEngineApp::getViewEntityIDFromStream(MemoryStream& stream)
 void KBEngineApp::Client_onUpdatePropertysOptimized(MemoryStream& stream)
 {
 	ENTITY_ID eid = getViewEntityIDFromStream(stream);
+	if (eid == 0)
+	{
+		// An unresolved alias is stale and must not create an entity-zero cache entry.
+		// 别名无法解析时属于过期更新，不能为实体 0 创建缓存。
+		stream.done();
+		return;
+	}
+
 	onUpdatePropertys_(eid, stream);
 }
 
@@ -1072,13 +1080,18 @@ void KBEngineApp::onUpdatePropertys_(ENTITY_ID eid, MemoryStream& stream)
 		MemoryStream** entityMessageFind = bufferedCreateEntityMessages_.Find(eid);
 		if (entityMessageFind)
 		{
-			ERROR_MSG("KBEngineApp::onUpdatePropertys_(): entity(%d) not found!", eid);
+			// Generated readers already consume property records until the stream is empty,
+			// so retaining every pre-EnterWorld payload preserves wire order without framing.
+			// 按线序保留 EnterWorld 前收到的全部属性 payload，生成代码会按长度连续消费。
+			(*entityMessageFind)->append(stream.data(), stream.rpos(), stream.length());
 			return;
 		}
 
 		MemoryStream* stream1 = MemoryStream::createObject();
-		stream1->append(stream);
-		stream1->rpos(stream.rpos() - 4);
+		// Normalize normal and optimized messages to the same replay header.
+		// 统一普通消息和优化消息的缓存头，确保二者使用相同的回放路径。
+		stream1->writeInt32(eid);
+		stream1->append(stream.data(), stream.rpos(), stream.length());
 		bufferedCreateEntityMessages_.Add(eid, stream1);
 		return;
 	}

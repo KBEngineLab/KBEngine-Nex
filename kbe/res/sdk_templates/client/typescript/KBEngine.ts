@@ -924,6 +924,13 @@ export class KBEngineApp {
     // 服务端使用优化的方式更新实体属性数据
     Client_onUpdatePropertysOptimized(stream: MemoryStream) {
         let eid = this.GetViewEntityIDFromStream(stream);
+        if (eid === 0) {
+            // An unresolved alias is a stale update; never create a cache entry for entity 0.
+            // 别名无法解析时属于过期更新，不能为实体 0 创建缓存。
+            stream.Done();
+            return;
+        }
+
         this.OnUpdatePropertys(eid, stream);
     }
 
@@ -938,13 +945,18 @@ export class KBEngineApp {
         if (entity === undefined) {
             let entityStream = this.bufferedCreateEntityMessage[eid];
             if (entityStream !== undefined) {
-                KBELog.ERROR_MSG("KBEngineApp::OnUpdatePropertys: entity(%i) not found.", eid);
+                // Preserve every pre-EnterWorld payload in wire order. Generated entity readers
+                // consume the concatenated property records with their existing length loop.
+                // 按线序保留 EnterWorld 前收到的全部属性 payload，生成代码会按长度连续消费。
+                entityStream.Append(stream.GetBuffer());
                 return;
             }
 
-            let tempStream = new MemoryStream(stream.GetRawBuffer());
-            tempStream.wpos = stream.wpos;
-            tempStream.rpos = stream.rpos - 4;
+            // Normalize normal and optimized messages to the same replay header.
+            // 统一普通消息和优化消息的缓存头，确保二者使用相同的回放路径。
+            let tempStream = new MemoryStream(4 + stream.Length());
+            tempStream.WriteInt32(eid);
+            tempStream.Append(stream.GetBuffer());
             this.bufferedCreateEntityMessage[eid] = tempStream;
             return;
         }
@@ -985,7 +997,7 @@ export class KBEngineApp {
                 entity.inited = true;
 
                 if (this.args.isOnInitCallPropertysSetMethods)
-                    entity.CallPropertysSetMethods();
+                    entity.callPropertysSetMethods();
             }
             catch(e)
             {
@@ -1091,7 +1103,7 @@ export class KBEngineApp {
                 entity.EnterWorld();
 
                 if (this.args.isOnInitCallPropertysSetMethods)
-                    entity.CallPropertysSetMethods();
+                    entity.callPropertysSetMethods();
             }
             catch(e)
             {
@@ -1125,7 +1137,7 @@ export class KBEngineApp {
                 entity.onPositionChanged(entity.position);
                 
                 if (this.args.isOnInitCallPropertysSetMethods)
-                    entity.CallPropertysSetMethods();
+                    entity.callPropertysSetMethods();
             }
         }
     }
@@ -2310,7 +2322,10 @@ export class Entity
 
     CallPropertysSetMethods()
     {
-        // 动态生成
+        // Keep the historical public entry point as a compatibility alias. Generated entities
+        // override the lower-camel-case method, so dispatch must end there.
+        // 保留历史公开入口作为兼容别名；生成实体覆盖的是小驼峰方法，最终必须分派到该实现。
+        this.callPropertysSetMethods();
     }
 
     GetPropertyValue(name: string)
