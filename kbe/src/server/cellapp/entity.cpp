@@ -53,6 +53,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "math/math.h"
 #include "common/sha1.h"
 
+#include <algorithm>
+
 #include "../../server/baseapp/baseapp_interface.h"
 #include "../../server/cellapp/cellapp_interface.h"
 
@@ -137,8 +139,11 @@ isOnGround_(false),
 isOnNavigate_(false),
 topSpeed_(-0.1f),
 topSpeedY_(-0.1f),
-lastTopSpeedCheckTick_(0),
+lastTopSpeedCheckTick_(g_kbetime),
 accumulatedMoveForTick_(),
+topSpeedCheckInitialized_(false),
+topSpeedAllowance_(0.f),
+topSpeedYAllowance_(0.f),
 topSpeedWindowAccumDist_(0.f),
 topSpeedWindowAccumDistY_(0.f),
 topSpeedWindowTickCount_(0),
@@ -2652,24 +2657,46 @@ bool Entity::checkMoveForTopSpeed(const Position3D& position)
 {
 	Position3D movement = position - this->position();
 
-	// 同 Tick 累计用于阻止客户端用多个小包绕过单包位移上限。
-	// Per-tick accumulation prevents a client from splitting one oversized move across packets.
-	if (g_kbetime == lastTopSpeedCheckTick_)
+	// 客户端上报周期与服务端 Tick 不会严格同相。使用一个上限为两 Tick 的令牌额度吸收
+	// 首次加载、GC 和帧调度造成的短时抖动；经过再久也只补两 Tick，避免静止后积攒传送额度。
+	// Client reports are not phase-locked to server ticks. A two-tick token allowance absorbs short
+	// loading, GC, and scheduling stalls, while the hard cap prevents idle time from banking a teleport.
+	static const GAME_TIME MAX_TOP_SPEED_ALLOWANCE_TICKS = 2;
+	GAME_TIME elapsedTicks = 0;
+	if (!topSpeedCheckInitialized_)
 	{
-		accumulatedMoveForTick_ += movement;
-		movement = accumulatedMoveForTick_;
+		topSpeedCheckInitialized_ = true;
+		elapsedTicks = g_kbetime - lastTopSpeedCheckTick_;
+		if (elapsedTicks == 0)
+			elapsedTicks = 1;
+		else if (elapsedTicks > MAX_TOP_SPEED_ALLOWANCE_TICKS)
+			elapsedTicks = MAX_TOP_SPEED_ALLOWANCE_TICKS;
+
+		lastTopSpeedCheckTick_ = g_kbetime;
+		topSpeedAllowance_ = topSpeed_ > 0.01f ?
+			topSpeed_ * elapsedTicks : 0.f;
+		topSpeedYAllowance_ = topSpeedY_ > 0.01f ?
+			topSpeedY_ * elapsedTicks : 0.f;
 	}
-	else
+	else if (g_kbetime != lastTopSpeedCheckTick_)
 	{
+		elapsedTicks = g_kbetime - lastTopSpeedCheckTick_;
 		Position3D previousTickMove = accumulatedMoveForTick_;
 		Position3D previousTickXZ = previousTickMove;
 		previousTickXZ.y = 0.f;
 
 		topSpeedWindowAccumDist_ += previousTickXZ.length();
 		topSpeedWindowAccumDistY_ += fabs(previousTickMove.y);
-		++topSpeedWindowTickCount_;
 
 		const int windowSize = g_kbeSrvConfig.gameUpdateHertz();
+		if (windowSize > 0)
+		{
+			const GAME_TIME remainingWindowTicks = topSpeedWindowTickCount_ < windowSize ?
+				static_cast<GAME_TIME>(windowSize - topSpeedWindowTickCount_) : 0;
+			topSpeedWindowTickCount_ += static_cast<int>(
+				std::min(elapsedTicks, remainingWindowTicks));
+		}
+
 		if (windowSize > 0 && topSpeedWindowTickCount_ >= windowSize)
 		{
 			const bool xzViolation = topSpeed_ > 0.01f &&
@@ -2691,24 +2718,66 @@ bool Entity::checkMoveForTopSpeed(const Position3D& position)
 			topSpeedWindowTickCount_ = 0;
 		}
 
-		accumulatedMoveForTick_ = movement;
+		const GAME_TIME allowanceTicks = std::min(
+			elapsedTicks, MAX_TOP_SPEED_ALLOWANCE_TICKS);
+
+		if (topSpeed_ > 0.01f)
+		{
+			const float maxAllowance = topSpeed_ * MAX_TOP_SPEED_ALLOWANCE_TICKS;
+			topSpeedAllowance_ = std::min(maxAllowance,
+				topSpeedAllowance_ + topSpeed_ * allowanceTicks);
+		}
+
+		if (topSpeedY_ > 0.01f)
+		{
+			const float maxAllowanceY = topSpeedY_ * MAX_TOP_SPEED_ALLOWANCE_TICKS;
+			topSpeedYAllowance_ = std::min(maxAllowanceY,
+				topSpeedYAllowance_ + topSpeedY_ * allowanceTicks);
+		}
+
+		accumulatedMoveForTick_ = Position3D();
 		lastTopSpeedCheckTick_ = g_kbetime;
 	}
 
+	// 运行时调低 topSpeed 时立即收紧旧额度，不能等到下一 Tick 才生效。
+	// Clamp an existing allowance immediately when topSpeed is lowered at runtime.
+	if (topSpeed_ > 0.01f)
+		topSpeedAllowance_ = std::min(topSpeedAllowance_,
+			topSpeed_ * MAX_TOP_SPEED_ALLOWANCE_TICKS);
+
+	if (topSpeedY_ > 0.01f)
+		topSpeedYAllowance_ = std::min(topSpeedYAllowance_,
+			topSpeedY_ * MAX_TOP_SPEED_ALLOWANCE_TICKS);
+
 	bool move = true;
-	
-	// 检查移动
-	if(topSpeedY_ > 0.01f && movement.y > topSpeedY_)
+	// 保持原有语义：topSpeedY 只限制向上移动，正常坠落不消耗垂直额度。
+	// Preserve the existing contract: topSpeedY limits ascent only, so falling consumes no vertical allowance.
+	const float requiredY = movement.y > 0.f ? movement.y : 0.f;
+	Position3D movementXZ = movement;
+	movementXZ.y = 0.f;
+	const float requiredXZ = movementXZ.length();
+
+	if(topSpeedY_ > 0.01f && requiredY > topSpeedYAllowance_)
 	{
 		move = false;
 	}
 
-	if(move && topSpeed_ > 0.01f)
+	if(move && topSpeed_ > 0.01f && requiredXZ > topSpeedAllowance_)
 	{
-		movement.y = 0.f;
-		
-		if(movement.length() > topSpeed_)
-			move = false;
+		move = false;
+	}
+
+	if (move)
+	{
+		if (topSpeed_ > 0.01f)
+			topSpeedAllowance_ -= requiredXZ;
+
+		if (topSpeedY_ > 0.01f)
+			topSpeedYAllowance_ -= requiredY;
+
+		// 这里只累计已接受的位移，拒绝包不能污染后续窗口审计。
+		// Only accepted movement contributes to the audit window; rejected packets cannot poison it.
+		accumulatedMoveForTick_ += movement;
 	}
 
 	return move;
@@ -2766,12 +2835,12 @@ void Entity::onUpdateDataFromClient(KBEngine::MemoryStream& s)
 		if (this->pWitness() == NULL && this->controlledBy_ == NULL)
 			return;
 
-		DEBUG_MSG(fmt::format("{}::onUpdateDataFromClient: {} position[({},{},{}) -> ({},{},{}), (xzDist={})>(topSpeed={}) || (yDist={})>(topSpeedY={})] invalid. reset client!\n", 
+		DEBUG_MSG(fmt::format("{}::onUpdateDataFromClient: {} position[({},{},{}) -> ({},{},{}), (xzDist={})>(xzAllowance={}, topSpeedPerTick={}) || (yDist={})>(yAllowance={}, topSpeedYPerTick={})] invalid. reset client!\n",
 			this->scriptName(), this->id(),
 			this->position().x, this->position().y, this->position().z,
 			pos.x, pos.y, pos.z,
-			xzDist, topSpeed_,
-			ydist, topSpeedY_));
+			xzDist, topSpeedAllowance_, topSpeed_,
+			ydist, topSpeedYAllowance_, topSpeedY_));
 		
 		// this->position(currpos);
 

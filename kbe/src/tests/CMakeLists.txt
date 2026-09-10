@@ -93,6 +93,16 @@ set_tests_properties(source.teleport_state_contract PROPERTIES
     LABELS "cellapp;source;teleport"
 )
 
+add_test(NAME source.cellapp_top_speed_allowance_contract
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_CELLAPP_ENTITY_SOURCE=${CMAKE_SOURCE_DIR}/server/cellapp/entity.cpp"
+        "-DKBE_CELLAPP_ENTITY_HEADER=${CMAKE_SOURCE_DIR}/server/cellapp/entity.h"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyCellappTopSpeedAllowance.cmake"
+)
+set_tests_properties(source.cellapp_top_speed_allowance_contract PROPERTIES
+    LABELS "cellapp;entity;movement;source"
+)
+
 add_test(NAME source.custom_cfg_contract
     COMMAND "${CMAKE_COMMAND}"
         "-DKBE_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"

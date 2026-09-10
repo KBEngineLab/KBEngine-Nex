@@ -732,9 +732,12 @@ protected:
 	// Accumulate client movement within one tick so packet splitting cannot bypass the speed limit.
 	GAME_TIME lastTopSpeedCheckTick_;
 	Position3D accumulatedMoveForTick_;
+	bool topSpeedCheckInitialized_;
+	float topSpeedAllowance_;
+	float topSpeedYAllowance_;
 
-	// 一秒窗口补充检测渐进式超速；这些值只属于运行时检测状态，不参与 Entity 迁移序列化。
-	// The one-second window detects gradual overspeed and remains transient across Entity migration.
+	// 短时额度与一秒窗口只属于运行时检测状态，不参与 Entity 迁移序列化。
+	// The burst allowance and one-second window are transient runtime checks and are not migrated.
 	float topSpeedWindowAccumDist_;
 	float topSpeedWindowAccumDistY_;
 	int topSpeedWindowTickCount_;
