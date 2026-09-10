@@ -174,6 +174,12 @@ protected:
 	// 底层socket和OpenSSL接口仍使用int长度，统一在系统调用边界拒绝超限缓冲区。
 	// Native socket and OpenSSL APIs still use int lengths, so reject oversized buffers once at the system-call boundary.
 	INLINE static bool toNativeSocketSize(size_t gramSize, int& nativeSize);
+	// Windows 默认把 UDP ICMP Port Unreachable 转成下一次 recv 的 WSAECONNRESET；
+	// listener 无法据此识别具体对端，因此关闭该行为并继续依赖 KCP/Channel 超时。
+	// Windows turns UDP ICMP Port Unreachable into WSAECONNRESET on a later recv by
+	// default. A listener cannot identify the peer from that socket-wide error, so
+	// disable the behavior and retain KCP/Channel timeout as the ownership boundary.
+	void configureDatagramSocket();
 
 	// 驱动一次非阻塞服务端握手，并把输出 BIO 中的数据收集到待发送队列。
 	// Advance the nonblocking server handshake once and collect output BIO bytes for transmission.

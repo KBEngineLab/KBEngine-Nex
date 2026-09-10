@@ -1,7 +1,6 @@
 ﻿#if UNITY_5_3_OR_NEWER
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using KBEngine;
 using UnityEngine;
 
@@ -23,26 +22,18 @@ public class UnityKBEMain : MonoBehaviour
 	public KBEngineApp.NETWORK_ENCRYPT_TYPE networkEncryptType = KBEngineApp.NETWORK_ENCRYPT_TYPE.ENCRYPT_TYPE_NONE;
 	
 	public KBEngineApp.NETWORK_TYPE networkType = KBEngineApp.NETWORK_TYPE.KCP;
-	
-
-	// 域名映射表，主要为wss提供支持
-	public Dictionary<string, string> domainMapping =  new Dictionary<string, string>();
-	// 端口映射表，主要为wss提供支持
-	public Dictionary<int, int> portMapping =  new Dictionary<int, int>();
-
-	
-	public bool enableWSS = false;
 	public int syncPlayerMS = 1000 / @{KBE_UPDATEHZ};
 
 	public int threadUpdateHZ = @{KBE_UPDATEHZ} * 2;
 	public int serverHeartbeatTick = @{KBE_SERVER_EXTERNAL_TIMEOUT};
-	public int TCP_SEND_BUFFER_MAX = (int)KBEngine.NetworkInterfaceBase.TCP_PACKET_MAX;
+	public int TCP_SEND_BUFFER_MAX = KBEngine.NetworkLimits.TCP_PACKET_MAX;
 	// 限制尚未完成的应用层发送字节，独立于单个 socket 包缓冲大小。
 	// Limits unfinished application send bytes independently from the per-socket packet buffer size.
 	public int SEND_QUEUE_MAX = 256 * 1024;
-	public int TCP_RECV_BUFFER_MAX = (int)KBEngine.NetworkInterfaceBase.TCP_PACKET_MAX;
-	public int UDP_SEND_BUFFER_MAX = (int)KBEngine.NetworkInterfaceBase.UDP_PACKET_MAX;
-	public int UDP_RECV_BUFFER_MAX = (int)KBEngine.NetworkInterfaceBase.UDP_PACKET_MAX;
+	public int TCP_RECV_BUFFER_MAX = KBEngine.NetworkLimits.TCP_PACKET_MAX;
+	public int UDP_SEND_BUFFER_MAX = KBEngine.NetworkLimits.UDP_PACKET_MAX;
+	public int UDP_RECV_BUFFER_MAX = KBEngine.NetworkLimits.UDP_PACKET_MAX;
+	public int MESSAGE_MAX = KBEngine.NetworkLimits.DEFAULT_MESSAGE_MAX;
 	public bool useAliasEntityID = @{KBE_USE_ALIAS_ENTITYID};
 	public bool isOnInitCallPropertysSetMethods = true;
 
@@ -72,21 +63,19 @@ public class UnityKBEMain : MonoBehaviour
 		args.port = port;
 		args.clientType = clientType;
 		args.networkType = networkType;
-		args.enableWSS =  enableWSS;
+		args.customNetworkProviderFactory = CreateCustomNetworkProviderFactory();
         args.networkEncryptType = networkEncryptType;
         args.syncPlayerMS = syncPlayerMS;
 		args.threadUpdateHZ = threadUpdateHZ;
 		args.serverHeartbeatTick = serverHeartbeatTick / 2;
 		args.useAliasEntityID = useAliasEntityID;
 		args.isOnInitCallPropertysSetMethods = isOnInitCallPropertysSetMethods;
-		args.domainMapping = domainMapping;
-		args.portMapping = portMapping;
-
 		args.TCP_SEND_BUFFER_MAX = (UInt32)TCP_SEND_BUFFER_MAX;
 		args.SEND_QUEUE_MAX = (UInt32)SEND_QUEUE_MAX;
 		args.TCP_RECV_BUFFER_MAX = (UInt32)TCP_RECV_BUFFER_MAX;
 		args.UDP_SEND_BUFFER_MAX = (UInt32)UDP_SEND_BUFFER_MAX;
 		args.UDP_RECV_BUFFER_MAX = (UInt32)UDP_RECV_BUFFER_MAX;
+		args.MESSAGE_MAX = (UInt32)MESSAGE_MAX;
 
 		args.isMultiThreads = isMultiThreads;
 		
@@ -94,6 +83,13 @@ public class UnityKBEMain : MonoBehaviour
 			gameapp = new KBEngineAppThread(args);
 		else
 			gameapp = new KBEngineApp(args);
+	}
+
+	// 平台集成可覆写此工厂入口注入 Unity、WebGL 或其他自定义传输。
+	// Platform integrations override this factory hook to inject Unity, WebGL, or another custom transport.
+	protected virtual INetworkProviderFactory CreateCustomNetworkProviderFactory()
+	{
+		return null;
 	}
 	
 	protected virtual void OnDestroy()

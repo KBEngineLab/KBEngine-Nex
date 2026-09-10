@@ -1,8 +1,6 @@
 ﻿namespace KBEngine
 {
 	using System;
-	using System.Collections.Generic;
-	
 	using MessageLengthEx = System.UInt32;
 	
 	/*
@@ -27,13 +25,9 @@
         // 网络类型
         public KBEngineApp.NETWORK_TYPE networkType = KBEngineApp.NETWORK_TYPE.KCP;
 
-        public bool enableWSS = false;
-        
-
-        // 域名映射表，主要为wss提供支持
-        public Dictionary<string, string> domainMapping =  new Dictionary<string, string>();
-        // 端口映射表，主要为wss提供支持
-        public Dictionary<int, int> portMapping =  new Dictionary<int, int>();
+        // CUSTOM/CUSTOM_ALL 每次建立连接都通过工厂创建独立 Provider，避免 loginapp、baseapp 与重登录共享连接状态。
+        // CUSTOM/CUSTOM_ALL create a fresh provider per connection so loginapp, baseapp, and relogin never share transport state.
+        public INetworkProviderFactory customNetworkProviderFactory = null;
 
 
         // Allow synchronization role position information to the server
@@ -49,15 +43,19 @@
         public bool isOnInitCallPropertysSetMethods = true;
         
 		// 发送缓冲大小
-		public MessageLengthEx TCP_SEND_BUFFER_MAX = NetworkInterfaceBase.TCP_PACKET_MAX;
+		public MessageLengthEx TCP_SEND_BUFFER_MAX = NetworkLimits.TCP_PACKET_MAX;
 		public MessageLengthEx UDP_SEND_BUFFER_MAX = 128;
 		// 应用发送队列与 socket/KCP 窗口分开配置，使合法大消息不受单个网络包大小限制，同时保持明确的内存上限。
 		// Configure the application send queue separately from socket/KCP windows so valid large messages are not limited by one network packet while memory remains bounded.
 		public MessageLengthEx SEND_QUEUE_MAX = 256 * 1024;
 
 		// 接收缓冲区大小
-		public MessageLengthEx TCP_RECV_BUFFER_MAX = NetworkInterfaceBase.TCP_PACKET_MAX;
+		public MessageLengthEx TCP_RECV_BUFFER_MAX = NetworkLimits.TCP_PACKET_MAX;
 		public MessageLengthEx UDP_RECV_BUFFER_MAX = 128;
+
+		// 单条协议消息的最大长度，用于在分配消息体前拒绝异常长度。
+		// Maximum protocol message size; malformed lengths are rejected before allocating a message body.
+		public MessageLengthEx MESSAGE_MAX = NetworkLimits.DEFAULT_MESSAGE_MAX;
 
 		// 是否多线程启动
 		public bool isMultiThreads = false;
@@ -92,6 +90,11 @@
 		public int getSendQueueSize()
 		{
 			return checked((int)SEND_QUEUE_MAX);
+		}
+
+		public int getMessageMaxSize()
+		{
+			return checked((int)MESSAGE_MAX);
 		}
     }
 

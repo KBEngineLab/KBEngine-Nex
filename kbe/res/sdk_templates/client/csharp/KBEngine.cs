@@ -27,7 +27,7 @@ namespace KBEngine
 	public class KBEngineApp
 	{
 		public static KBEngineApp app = null;
-		private NetworkInterfaceBase _networkInterface = null;
+		private NetworkSession _networkSession = null;
 		
 		KBEngineArgs _args = null;
 		
@@ -73,7 +73,8 @@ namespace KBEngine
 		{
 			TCP = 0,
 			KCP = 1,
-			UNITY_WEB_SOCKET = 2,
+			CUSTOM = 2,
+			CUSTOM_ALL = 3,
 		}
 
 
@@ -138,7 +139,7 @@ namespace KBEngine
 		private const int _1MS_TO_100NS = 10000;
 
 		//加密过滤器
-		private EncryptionFilter _filter = null;
+		private INetworkFrameCodec _filter = null;
 
 		// 玩家当前所在空间的id， 以及空间对应的资源
 		public UInt32 spaceID = 0;
@@ -150,13 +151,24 @@ namespace KBEngine
 		
 		public KBEngineApp(KBEngineArgs args)
 		{
+			if (args == null)
+				throw new ArgumentNullException(nameof(args));
 			if (app != null)
 				throw new Exception("Only one instance of KBEngineApp!");
 			
 			app = this;
-			Event.outEventsImmediately = !args.isMultiThreads;
-
-			initialize(args);
+			try
+			{
+				Event.outEventsImmediately = !args.isMultiThreads;
+				initialize(args);
+			}
+			catch
+			{
+				// 初始化失败不能留下一个不可用的全局实例，否则修正参数后也无法重新创建 SDK。
+				// Failed initialization must not leave a poisoned singleton that prevents retrying with corrected arguments.
+				app = null;
+				throw;
+			}
 		}
 
 		public static KBEngineApp getSingleton() 
@@ -171,6 +183,14 @@ namespace KBEngine
 
 		public virtual bool initialize(KBEngineArgs args)
 		{
+			if (args == null)
+				throw new ArgumentNullException(nameof(args));
+			if ((args.networkType == NETWORK_TYPE.CUSTOM || args.networkType == NETWORK_TYPE.CUSTOM_ALL) &&
+				args.customNetworkProviderFactory == null)
+			{
+				throw new InvalidOperationException("CUSTOM network mode requires customNetworkProviderFactory.");
+			}
+
 			_args = args;
 			_updatePlayerToServerPeroid = (float)_args.syncPlayerMS;
 
@@ -188,14 +208,103 @@ namespace KBEngine
 		{
 			_filter = null;
 			Messages.init();
-			if (_args.networkType is NETWORK_TYPE.TCP or NETWORK_TYPE.KCP)
+		}
+
+		private void connectSession(
+			NetworkConnectionRole role,
+			NetworkEndpoint endpoint,
+			Action<string, int, bool, object> callback)
+		{
+			int port = _args.networkType == NETWORK_TYPE.KCP && role == NetworkConnectionRole.Baseapp
+				? endpoint.UdpPort
+				: endpoint.TcpPort;
+
+			if (_networkSession != null)
 			{
-				_networkInterface = new NetworkInterfaceTCP();
-			}else if (_args.networkType is NETWORK_TYPE.UNITY_WEB_SOCKET)
-			{
-				_networkInterface = new NetworkInterfaceUnityWS();
+				_networkSession.Reset();
+				_networkSession = null;
 			}
-			
+
+			try
+			{
+				NetworkProviderContext context = new NetworkProviderContext(role, endpoint, _args, serverVersion);
+				int maximumMessageSize = _args.getMessageMaxSize();
+				if (maximumMessageSize <= 0)
+					throw new InvalidOperationException("MESSAGE_MAX must be greater than zero.");
+
+				INetworkProvider provider = createNetworkProvider(context);
+				NetworkSession session = new NetworkSession(
+					role,
+					endpoint,
+					provider,
+					maximumMessageSize,
+					onNetworkSessionClosed);
+				_networkSession = session;
+
+				session.Connect((success, closeInfo) =>
+				{
+					if (!Object.ReferenceEquals(session, _networkSession))
+						return;
+
+					if (!success && closeInfo != null)
+						KBELog.ERROR_MSG("KBEngine::connectSession(): " + closeInfo.Message +
+							(closeInfo.Exception == null ? string.Empty : " " + closeInfo.Exception));
+
+					Event.fireAll(EventOutTypes.onConnectionState, success);
+					callback?.Invoke(endpoint.Host, port, success, null);
+				});
+			}
+			catch (Exception exception)
+			{
+				KBELog.ERROR_MSG("KBEngine::connectSession(): provider creation failed: " + exception);
+				Event.fireAll(EventOutTypes.onConnectionState, false);
+				callback?.Invoke(endpoint.Host, port, false, null);
+			}
+		}
+
+		private INetworkProvider createNetworkProvider(NetworkProviderContext context)
+		{
+			switch (_args.networkType)
+			{
+				case NETWORK_TYPE.TCP:
+					return new TcpNetworkProvider(context);
+
+				case NETWORK_TYPE.KCP:
+					if (context.Role == NetworkConnectionRole.Loginapp)
+						return new TcpNetworkProvider(context);
+					if (context.Endpoint.UdpPort == 0)
+						throw new InvalidOperationException("KCP baseapp connection requires a non-zero UDP port.");
+					return new KcpNetworkProvider(context);
+
+				case NETWORK_TYPE.CUSTOM:
+					if (context.Role == NetworkConnectionRole.Loginapp)
+						return new TcpNetworkProvider(context);
+					return createCustomNetworkProvider(context);
+
+				case NETWORK_TYPE.CUSTOM_ALL:
+					return createCustomNetworkProvider(context);
+
+				default:
+					throw new InvalidOperationException("Unsupported network type: " + _args.networkType);
+			}
+		}
+
+		private INetworkProvider createCustomNetworkProvider(NetworkProviderContext context)
+		{
+			if (_args.customNetworkProviderFactory == null)
+				throw new InvalidOperationException("CUSTOM network mode requires customNetworkProviderFactory.");
+
+			INetworkProvider provider = _args.customNetworkProviderFactory.Create(context);
+			return provider ?? throw new InvalidOperationException("The custom network provider factory returned null.");
+		}
+
+		private void onNetworkSessionClosed(NetworkSession session, NetworkCloseInfo closeInfo)
+		{
+			if (closeInfo != null)
+				KBELog.ERROR_MSG("KBEngine::onNetworkSessionClosed(): " + closeInfo.Message +
+					(closeInfo.Exception == null ? string.Empty : " " + closeInfo.Exception));
+
+			Event.fireIn("_closeNetwork", new object[] { session });
 		}
 		
 		void installEvents()
@@ -231,9 +340,9 @@ namespace KBEngine
 			KBEngineApp.app = null;
 		}
 		
-		public NetworkInterfaceBase networkInterface()
+		public NetworkSession networkSession()
 		{
-			return _networkInterface;
+			return _networkSession;
 		}
 		
 		public byte[] serverdatas()
@@ -282,17 +391,11 @@ namespace KBEngine
 			spaceResPath = "";
 			isLoadedGeometry = false;
 			
-			if (_networkInterface != null)
-				_networkInterface.reset();
+			if (_networkSession != null)
+				_networkSession.Reset();
 
+			_networkSession = null;
 			_filter = null;
-			if (_args.networkType is NETWORK_TYPE.TCP or NETWORK_TYPE.KCP)
-			{
-				_networkInterface = new NetworkInterfaceTCP();
-			}else if (_args.networkType is NETWORK_TYPE.UNITY_WEB_SOCKET)
-			{
-				_networkInterface = new NetworkInterfaceUnityWS();
-			}
 			
 			_spacedatas.Clear();
 		}
@@ -309,8 +412,8 @@ namespace KBEngine
 		public virtual void process()
 		{
 			// 处理网络
-			if (_networkInterface != null)
-				_networkInterface.process();
+			if (_networkSession != null)
+				_networkSession.Process();
 			
 			// 处理外层抛入的事件
 			Event.processInEvents();
@@ -331,17 +434,17 @@ namespace KBEngine
 			return null;
 		}
 
-		public void _closeNetwork(NetworkInterfaceBase networkInterface)
+		public void _closeNetwork(NetworkSession networkSession)
 		{
-			// 旧接收/发送任务可能在重登录建立新接口后才投递关闭事件；旧接口只能静默清理，不能关闭或通知当前连接。
-			// Old receive/send tasks may enqueue closure after relogin installs a new interface; a stale interface may only clean up silently and cannot close or notify the current connection.
-			if (!Object.ReferenceEquals(networkInterface, _networkInterface))
+			// 迟到的旧 Session 事件只能静默释放，不能关闭后来建立的新连接。
+			// A late event from an old session may only release that session; it cannot close a newer connection.
+			if (!Object.ReferenceEquals(networkSession, _networkSession))
 			{
-				networkInterface.reset();
+				networkSession.Reset();
 				return;
 			}
 
-			networkInterface.close();
+			networkSession.Close();
 		}
 		
 		/*
@@ -349,7 +452,7 @@ namespace KBEngine
 		*/
 		public void sendTick()
 		{
-			if(_networkInterface == null || _networkInterface.connected == false)
+			if(_networkSession == null || !_networkSession.Connected)
 				return;
 
 			long now = HeartbeatState.timestamp();
@@ -364,7 +467,7 @@ namespace KBEngine
 				if(_heartbeatState.replyPending)
 				{
 					KBELog.ERROR_MSG("sendTick: Receive appTick timeout!");
-					_networkInterface.close();
+					_networkSession.Close();
 					return;
 				}
 
@@ -381,7 +484,7 @@ namespace KBEngine
 					{
 						Bundle bundle = Bundle.createObject();
 						bundle.newMessage(Messages.messages["Loginapp_onClientActiveTick"]);
-						heartbeatSent = bundle.send(_networkInterface);
+						heartbeatSent = bundle.send(_networkSession);
 					}
 				}
 				else
@@ -390,7 +493,7 @@ namespace KBEngine
 					{
 						Bundle bundle = Bundle.createObject();
 						bundle.newMessage(Messages.messages["Baseapp_onClientActiveTick"]);
-						heartbeatSent = bundle.send(_networkInterface);
+						heartbeatSent = bundle.send(_networkSession);
 					}
 				}
 				
@@ -428,15 +531,15 @@ namespace KBEngine
 
 			if (_args.networkEncryptType == NETWORK_ENCRYPT_TYPE.ENCRYPT_TYPE_BLOWFISH)
 			{
-				_filter = new BlowfishFilter();
-				_encryptedKey = ((BlowfishFilter)_filter).key();
-				_networkInterface.setFilter(null);
+				_filter = new BlowfishFrameCodec();
+				_encryptedKey = ((BlowfishFrameCodec)_filter).Key;
+				_networkSession.SetFrameCodec(null);
 			}
 
 			bundle.writeString(clientVersion);
 			bundle.writeString(clientScriptVersion);
 			bundle.writeBlob(_encryptedKey);
-			bundle.send(_networkInterface);
+			bundle.send(_networkSession);
 		}
 
 		/*
@@ -477,7 +580,7 @@ namespace KBEngine
 
 			if (_args.networkEncryptType == NETWORK_ENCRYPT_TYPE.ENCRYPT_TYPE_BLOWFISH)
 			{
-				_networkInterface.setFilter(_filter);
+				_networkSession.SetFrameCodec(_filter);
 				_filter = null;
 			}
 
@@ -568,7 +671,10 @@ namespace KBEngine
 			if(noconnect)
 			{
 				reset();
-				_networkInterface.connectTo(_args.ip, _args.port, onConnectTo_loginapp_callback, null,_args.domainMapping,_args.portMapping);
+				connectSession(
+					NetworkConnectionRole.Loginapp,
+					new NetworkEndpoint(_args.ip, _args.port, 0),
+					onConnectTo_loginapp_callback);
 			}
 			else
 			{
@@ -579,7 +685,7 @@ namespace KBEngine
 				bundle.writeBlob(KBEngineApp.app._clientdatas);
 				bundle.writeString(username);
 				bundle.writeString(password);
-				bundle.send(_networkInterface);
+				bundle.send(_networkSession);
 			}
 		}
 		
@@ -615,31 +721,10 @@ namespace KBEngine
 			if(noconnect)
 			{
 				Event.fireOut(EventOutTypes.onLoginBaseapp);
-				
-				_networkInterface.reset();
-
-				if (_args.networkType is NETWORK_TYPE.TCP || (_args.networkType is NETWORK_TYPE.KCP && baseappUdpPort == 0))
-				{
-					if (_args.networkType is NETWORK_TYPE.KCP)
-					{
-						// 旧服务端可能不提供 UDP 端点；自动回退 TCP 保持现有账号能够登录。
-						// Older servers may not expose a UDP endpoint; automatically fall back to TCP so existing accounts can still log in.
-						KBELog.WARNING_MSG("KBEngine::login_baseapp(): UDP port is unavailable, falling back to TCP.");
-					}
-					_networkInterface = new NetworkInterfaceTCP();
-					
-					_networkInterface.connectTo(baseappIP, baseappTcpPort, onConnectTo_baseapp_callback, null,_args.domainMapping,_args.portMapping);
-				}else if (_args.networkType is NETWORK_TYPE.KCP)
-				{
-					_networkInterface = new NetworkInterfaceKCP();
-					
-					_networkInterface.connectTo(baseappIP, baseappUdpPort, onConnectTo_baseapp_callback, null,_args.domainMapping,_args.portMapping);
-				}else if (_args.networkType is NETWORK_TYPE.UNITY_WEB_SOCKET)
-				{
-					_networkInterface = new NetworkInterfaceUnityWS();
-					_networkInterface.connectTo(baseappIP, baseappTcpPort, onConnectTo_baseapp_callback, null,_args.domainMapping,_args.portMapping);
-				}
-				
+				connectSession(
+					NetworkConnectionRole.Baseapp,
+					new NetworkEndpoint(baseappIP, baseappTcpPort, baseappUdpPort),
+					onConnectTo_baseapp_callback);
 			}
 			else
 			{
@@ -647,7 +732,7 @@ namespace KBEngine
 				bundle.newMessage(Messages.messages["Baseapp_loginBaseapp"]);
 				bundle.writeString(username);
 				bundle.writeString(password);
-				bundle.send(_networkInterface);
+				bundle.send(_networkSession);
 			}
 		}
 
@@ -683,34 +768,15 @@ namespace KBEngine
 		{
 			resetHeartbeatState();
 
-			if(_networkInterface.valid())
+			if(_networkSession != null && _networkSession.Connected)
 				return;
 
 			Event.fireAll(EventOutTypes.onReloginBaseapp);
 
-			_networkInterface.reset();
-
-			if (_args.networkType is NETWORK_TYPE.TCP || (_args.networkType is NETWORK_TYPE.KCP && baseappUdpPort == 0))
-			{
-				if (_args.networkType is NETWORK_TYPE.KCP)
-				{
-					// 重登录必须采用与首次登录相同的 UDP 缺失回退规则。
-					// Relogin must use the same missing-UDP fallback rule as the initial login.
-					KBELog.WARNING_MSG("KBEngine::reloginBaseapp(): UDP port is unavailable, falling back to TCP.");
-				}
-				_networkInterface = new NetworkInterfaceTCP();
-				
-				_networkInterface.connectTo(baseappIP, baseappTcpPort, onReConnectTo_baseapp_callback, null,_args.domainMapping,_args.portMapping);
-			}else if (_args.networkType is NETWORK_TYPE.KCP)
-			{
-				_networkInterface = new NetworkInterfaceKCP();
-				
-				_networkInterface.connectTo(baseappIP, baseappUdpPort, onReConnectTo_baseapp_callback, null,_args.domainMapping,_args.portMapping);
-			}else if (_args.networkType is NETWORK_TYPE.UNITY_WEB_SOCKET)
-			{
-				_networkInterface = new NetworkInterfaceUnityWS();	
-				_networkInterface.connectTo(baseappIP, baseappTcpPort, onReConnectTo_baseapp_callback, null,_args.domainMapping,_args.portMapping);
-			}
+			connectSession(
+				NetworkConnectionRole.Baseapp,
+				new NetworkEndpoint(baseappIP, baseappTcpPort, baseappUdpPort),
+				onReConnectTo_baseapp_callback);
 		}
 
 		private void onReConnectTo_baseapp_callback(string ip, int port, bool success, object userData)
@@ -729,7 +795,7 @@ namespace KBEngine
 			bundle.writeString(password);
 			bundle.writeUint64(entity_uuid);
 			bundle.writeInt32(entity_id);
-			bundle.send(_networkInterface);
+			bundle.send(_networkSession);
 			
 			resetHeartbeatState();
 		}
@@ -743,7 +809,7 @@ namespace KBEngine
 			bundle.newMessage(Messages.messages["Baseapp_logoutBaseapp"]);
 			bundle.writeUint64(entity_uuid);
 			bundle.writeInt32(entity_id);
-			bundle.send(_networkInterface);
+			bundle.send(_networkSession);
 		}
 
 		/*
@@ -781,14 +847,17 @@ namespace KBEngine
 			if(noconnect)
 			{
 				reset();
-				_networkInterface.connectTo(_args.ip, _args.port, onConnectTo_resetpassword_callback, null,_args.domainMapping,_args.portMapping);
+				connectSession(
+					NetworkConnectionRole.Loginapp,
+					new NetworkEndpoint(_args.ip, _args.port, 0),
+					onConnectTo_resetpassword_callback);
 			}
 			else
 			{
 				Bundle bundle = Bundle.createObject();
 				bundle.newMessage(Messages.messages["Loginapp_reqAccountResetPassword"]);
 				bundle.writeString(username);
-				bundle.send(_networkInterface);
+				bundle.send(_networkSession);
 			}
 		}
 
@@ -829,7 +898,7 @@ namespace KBEngine
 			bundle.writeInt32(entity_id);
 			bundle.writeString(password);
 			bundle.writeString(emailAddress);
-			bundle.send(_networkInterface);
+			bundle.send(_networkSession);
 		}
 
 		public void Client_onReqAccountBindEmailCB(UInt16 failcode)
@@ -855,7 +924,7 @@ namespace KBEngine
 			bundle.writeInt32(entity_id);
 			bundle.writeString(old_password);
 			bundle.writeString(new_password);
-			bundle.send(_networkInterface);
+			bundle.send(_networkSession);
 		}
 
 		public void Client_onReqAccountNewPasswordCB(UInt16 failcode)
@@ -888,7 +957,10 @@ namespace KBEngine
 			if(noconnect)
 			{
 				reset();
-				_networkInterface.connectTo(_args.ip, _args.port, onConnectTo_createAccount_callback, null,_args.domainMapping,_args.portMapping);
+				connectSession(
+					NetworkConnectionRole.Loginapp,
+					new NetworkEndpoint(_args.ip, _args.port, 0),
+					onConnectTo_createAccount_callback);
 			}
 			else
 			{
@@ -897,7 +969,7 @@ namespace KBEngine
 				bundle.writeString(username);
 				bundle.writeString(password);
 				bundle.writeBlob(KBEngineApp.app._clientdatas);
-				bundle.send(_networkInterface);
+				bundle.send(_networkSession);
 			}
 		}
 
@@ -1504,7 +1576,7 @@ namespace KBEngine
 				bundle.writeFloat((float)z);
 				bundle.writeUint8((Byte)(playerEntity.isOnGround == true ? 1 : 0));
 				bundle.writeUint32(spaceID);
-				bundle.send(_networkInterface);
+				bundle.send(_networkSession);
 			}
 
 			// 开始同步所有被控制了的entity的位置
@@ -1549,7 +1621,7 @@ namespace KBEngine
 					bundle.writeFloat((float)z);
 					bundle.writeUint8((Byte)(entity.isOnGround == true ? 1 : 0));
 					bundle.writeUint32(spaceID);
-					bundle.send(_networkInterface);
+					bundle.send(_networkSession);
 				}
 			}
 		}

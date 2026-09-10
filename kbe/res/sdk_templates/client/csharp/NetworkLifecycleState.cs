@@ -2,8 +2,8 @@ namespace KBEngine
 {
 	using System.Threading;
 
-	// 网络生命周期只保存断线通知资格；transport 资源仍由 NetworkInterfaceBase 在自己的锁内释放。
-	// Network lifecycle stores only disconnect-notification eligibility; NetworkInterfaceBase still releases transport resources under its own lock.
+	// 网络生命周期只保存断线通知资格；transport 资源由 NetworkSession 确定性释放。
+	// Network lifecycle stores only disconnect-notification eligibility; NetworkSession releases transport resources deterministically.
 	internal sealed class NetworkLifecycleState
 	{
 		private int _disconnectNotificationArmed;

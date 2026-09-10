@@ -1,6 +1,30 @@
 kbengine_unity3d_plugins
 ========================
 
+Network Providers
+---------------------
+
+The C# SDK keeps four stable network modes. The selected mode determines the Provider used for each server role:
+
+| Mode | loginapp | baseapp |
+| --- | --- | --- |
+| `TCP` | built-in TCP | built-in TCP |
+| `KCP` | built-in TCP | built-in KCP |
+| `CUSTOM` | built-in TCP | custom Provider |
+| `CUSTOM_ALL` | custom Provider | custom Provider |
+
+`KCP` requires a non-zero baseapp UDP port and does not fall back to TCP. `CUSTOM` and `CUSTOM_ALL` require `KBEngineArgs.customNetworkProviderFactory`. The SDK calls the factory for every loginapp, baseapp, and relogin connection; the factory must return a fresh `INetworkProvider` rather than sharing connection state.
+
+Provider lifecycle and threading contract:
+
+- The application developer still chooses `KBEngineArgs.isMultiThreads`. A Provider must not override that choice or expose another SDK tick entry point.
+- A single-thread platform sets `isMultiThreads = false` and calls `KBEngineApp.process()` from its platform/main loop. There is no separate `platformTick()` or `processMainThread()`.
+- A Provider may use worker threads or platform callbacks internally, but those producers only enqueue results. It invokes `INetworkProviderListener` synchronously and in order from its `Process()` method, so protocol parsing always runs on the SDK process thread.
+- `Send()` is an atomic batch. Before returning `Accepted`, a Provider must copy or take ownership of every byte because the SDK immediately returns the source `MemoryStream` objects to its pool. `Backpressure` and `Failed` reject the entire batch.
+- `Close()` and `Dispose()` must be idempotent. Connection failures call `OnClosed` once through `Process()`; an explicit `Close()` only releases transport resources.
+
+Unity and Godot integrations can override `CreateCustomNetworkProviderFactory()` in their `KBEMain` subclass. Provider implementations receive a `NetworkProviderContext` containing the role, both TCP/UDP endpoints, server version, buffer/window limits, and send-queue limit.
+
 Usage
 ---------------------
 
@@ -361,5 +385,4 @@ KBE-Plugin fire-in events(Unity => KBE):
 
 			Event-datas: 
 				string: emailAddress
-
 

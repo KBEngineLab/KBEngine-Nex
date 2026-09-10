@@ -1,8 +1,8 @@
 class_name NetworkInterfaceKCP extends NetworkInterfaceBase
 ## KCP 可靠 UDP 网络接口
 ## KCP reliable UDP network interface.
-## 参考 C# NetworkInterfaceKCP.cs，使用 KCPProtocol.gd 实现
-## Uses KCPProtocol.gd and follows the C# NetworkInterfaceKCP behavior.
+## 参考 C# KcpNetworkProvider.cs，使用 KCPProtocol.gd 实现
+## Uses KCPProtocol.gd and follows the C# KcpNetworkProvider behavior.
 
 const HANDSHAKE_TIMEOUT_MSEC:int = 30000
 const HELLO_RETRY_MSEC:int = 1000

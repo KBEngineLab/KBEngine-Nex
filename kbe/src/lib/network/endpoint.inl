@@ -138,6 +138,11 @@ INLINE void EndPoint::socket(int type)
 				"EndPoint::socket: create socket error!");
 	}
 #endif
+
+	if (type == SOCK_DGRAM && this->good())
+	{
+		this->configureDatagramSocket();
+	}
 }
 
 INLINE int EndPoint::setnodelay(bool nodelay)

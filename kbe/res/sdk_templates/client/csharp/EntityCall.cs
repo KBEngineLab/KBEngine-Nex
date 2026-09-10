@@ -70,7 +70,7 @@
 			if(inbundle == null)
 				inbundle = bundle;
 			
-			inbundle.send(KBEngineApp.app.networkInterface());
+			inbundle.send(KBEngineApp.app.networkSession());
 			
 			if(inbundle == bundle)
 				bundle = null;

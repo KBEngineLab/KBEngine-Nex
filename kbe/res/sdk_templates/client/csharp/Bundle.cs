@@ -104,13 +104,14 @@
 			_curMsgStreamIndex = 0;
 		}
 		
-		public bool send(NetworkInterfaceBase networkInterface)
+		public bool send(NetworkSession networkSession)
 		{
 			fini(true);
 			bool sent = false;
 			try
 			{
-				sent = networkInterface != null && networkInterface.send(streamList);
+				sent = networkSession != null &&
+					networkSession.Send(streamList) == NetworkSendResult.Accepted;
 			}
 			catch (Exception exception)
 			{
@@ -123,10 +124,10 @@
 				reclaimObject();
 			}
 
-			if (!sent && networkInterface != null)
+			if (!sent && networkSession != null)
 			{
 				KBELog.ERROR_MSG("Bundle::send: atomic batch rejected; closing the current transport!");
-				Event.fireIn("_closeNetwork", new object[] { networkInterface });
+				Event.fireIn("_closeNetwork", new object[] { networkSession });
 			}
 
 			return sent;

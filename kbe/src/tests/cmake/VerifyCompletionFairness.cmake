@@ -9,6 +9,8 @@ file(READ "${KBE_SOURCE_ROOT}/lib/network/poller_iocp.cpp" _iocp)
 file(READ "${KBE_SOURCE_ROOT}/lib/network/poller_completion.cpp" _completion)
 file(READ "${KBE_SOURCE_ROOT}/lib/network/poller_completion.h" _completion_header)
 file(READ "${KBE_SOURCE_ROOT}/lib/network/completion_udp_receive_depth.h" _udp_receive_depth)
+file(READ "${KBE_SOURCE_ROOT}/lib/network/endpoint.cpp" _endpoint)
+file(READ "${KBE_SOURCE_ROOT}/lib/network/endpoint.inl" _endpoint_inline)
 file(READ "${KBE_SOURCE_ROOT}/lib/network/common.cpp" _network_common)
 file(READ "${KBE_SOURCE_ROOT}/../res/server/kbengine_defaults.xml" _defaults)
 
@@ -64,6 +66,38 @@ foreach(_required
 	string(FIND "${_udp_receive_depth}" "${_required}" _required_pos)
 	if(_required_pos EQUAL -1)
 		message(FATAL_ERROR "io_uring UDP single-waiter receive contract is missing: ${_required}")
+	endif()
+endforeach()
+
+# Windows UDP listeners must not turn one client's ICMP Port Unreachable into a
+# socket-wide IOCP receive storm. Keep both the socket option and completion-side
+# fallback because Winsock providers can report either native error code.
+# Windows UDP listener 不能把单个客户端的 ICMP Port Unreachable 放大为整个 socket
+# 的 IOCP 接收风暴。socket 选项与 completion 防线都必须保留，因为不同 Winsock
+# provider 可能返回不同错误码。
+foreach(_required
+		"type == SOCK_DGRAM && this->good()"
+		"this->configureDatagramSocket()")
+	string(FIND "${_endpoint_inline}" "${_required}" _required_pos)
+	if(_required_pos EQUAL -1)
+		message(FATAL_ERROR "Endpoint UDP initialization contract is missing: ${_required}")
+	endif()
+endforeach()
+foreach(_required
+		"SIO_UDP_CONNRESET"
+		"BOOL newBehavior = FALSE")
+	string(FIND "${_endpoint}" "${_required}" _required_pos)
+	if(_required_pos EQUAL -1)
+		message(FATAL_ERROR "Windows UDP connreset suppression is missing: ${_required}")
+	endif()
+endforeach()
+foreach(_required
+		"socketErrorCode == WSAECONNRESET"
+		"socketErrorCode == ERROR_PORT_UNREACHABLE"
+		"!isUdpPeerUnreachable")
+	string(FIND "${_iocp}" "${_required}" _required_pos)
+	if(_required_pos EQUAL -1)
+		message(FATAL_ERROR "IOCP UDP peer-unreachable fallback is missing: ${_required}")
 	endif()
 endforeach()
 foreach(_required

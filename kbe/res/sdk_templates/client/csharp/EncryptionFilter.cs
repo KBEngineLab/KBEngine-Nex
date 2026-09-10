@@ -1,233 +1,153 @@
-﻿namespace KBEngine
+namespace KBEngine
 {
-    using System;
-    using System.Collections;
-    using System.Collections.Generic;
+	using System;
 
-    public abstract class EncryptionFilter
-    {
-        public abstract void encrypt(MemoryStream stream);
+	public interface INetworkFrameCodec
+	{
+		void Encode(MemoryStream stream);
+		void Decode(byte[] buffer, int offset, int count, Action<byte[], int, int> plaintextCallback);
+		void Reset();
+	}
 
-        public abstract void decrypt(MemoryStream stream);
-        public abstract void decrypt(byte[] buffer, int startIndex, int length);
+	public sealed class BlowfishFrameCodec : INetworkFrameCodec
+	{
+		private const int BLOCK_SIZE = 8;
+		private const int HEADER_SIZE = sizeof(UInt16) + sizeof(Byte);
+		private const int MIN_FRAME_SIZE = HEADER_SIZE + BLOCK_SIZE;
+		private const int MAX_FRAME_PAYLOAD = (UInt16.MaxValue - 1) / BLOCK_SIZE * BLOCK_SIZE;
+		private readonly Blowfish _blowfish = new Blowfish();
+		private readonly MemoryStream _encodedStream = new MemoryStream();
+		private readonly byte[] _encodeBlock = new byte[MAX_FRAME_PAYLOAD];
+		private readonly byte[] _pending = new byte[UInt16.MaxValue + HEADER_SIZE];
+		private int _pendingCount;
+		private int _resetGeneration;
 
-        public abstract bool send(PacketSenderBase sender, MemoryStream stream);
-        public abstract bool send(PacketSenderBase sender, IReadOnlyList<MemoryStream> streams);
-        public abstract bool recv(MessageReaderBase reader, byte[] buffer, UInt32 rpos, UInt32 len);
-    }
+		public byte[] Key => _blowfish.key();
 
+		public void Encode(MemoryStream stream)
+		{
+			if (stream == null)
+				throw new ArgumentNullException(nameof(stream));
+			if (!_blowfish.isGood())
+				throw new InvalidOperationException("Blowfish codec is not initialized.");
 
-    class BlowfishFilter : EncryptionFilter
-    {
-        private Blowfish _blowfish = new Blowfish();
-        
-        private MemoryStream _packet = new MemoryStream();
-        MemoryStream _enctyptStrem = new MemoryStream();
+			int remaining = checked((int)stream.length());
+			if (remaining == 0)
+				throw new InvalidOperationException("Blowfish cannot encode an empty frame.");
 
-        private UINT8 _padSize = 0;
-        private UInt16 _packLen = 0;
-        const UInt32 BLOCK_SIZE = 8;
-        const UInt32 MIN_PACKET_SIZE = sizeof(UInt16) + 1 + BLOCK_SIZE;
+			int sourceOffset = stream.rpos;
+			_encodedStream.clear();
+			while (remaining > 0)
+			{
+				int payloadLength = Math.Min(remaining, MAX_FRAME_PAYLOAD);
+				int padSize = payloadLength % BLOCK_SIZE == 0 ? 0 : BLOCK_SIZE - payloadLength % BLOCK_SIZE;
+				int encryptedLength = checked(payloadLength + padSize);
 
-        private static bool validFrame(int encodedLength, int padSize, out int payloadLength)
-        {
-            payloadLength = encodedLength > 0 ? encodedLength - 1 : 0;
-            return payloadLength > 0 && payloadLength % (int)BLOCK_SIZE == 0 &&
-                padSize >= 0 && padSize < (int)BLOCK_SIZE && padSize <= payloadLength;
-        }
+				Buffer.BlockCopy(stream.data(), sourceOffset, _encodeBlock, 0, payloadLength);
+				if (padSize > 0)
+					Array.Clear(_encodeBlock, payloadLength, padSize);
+				_blowfish.encipher(_encodeBlock, encryptedLength);
 
-        private void resetReceiveFrame()
-        {
-            _packet.clear();
-            _packLen = 0;
-            _padSize = 0;
-        }
+				_encodedStream.ensureSpace(HEADER_SIZE + encryptedLength);
+				_encodedStream.writeUint16(checked((UInt16)(encryptedLength + 1)));
+				_encodedStream.writeUint8(checked((Byte)padSize));
+				_encodedStream.append(_encodeBlock, 0, checked((UInt32)encryptedLength));
 
-        public BlowfishFilter()
-        {
-        }
+				sourceOffset += payloadLength;
+				remaining -= payloadLength;
+			}
 
-        ~BlowfishFilter()
-        {
-        }
+			stream.swap(_encodedStream);
+			_encodedStream.clear();
+		}
 
-        public  byte[] key()
-        {
-            return _blowfish.key();
-        }
+		public void Decode(
+			byte[] buffer,
+			int offset,
+			int count,
+			Action<byte[], int, int> plaintextCallback)
+		{
+			if (buffer == null)
+				throw new ArgumentNullException(nameof(buffer));
+			if (plaintextCallback == null)
+				throw new ArgumentNullException(nameof(plaintextCallback));
+			if (offset < 0 || count < 0 || offset > buffer.Length - count)
+				throw new ArgumentOutOfRangeException(nameof(offset));
+			if (!_blowfish.isGood())
+				throw new InvalidOperationException("Blowfish codec is not initialized.");
 
-        public override void encrypt(MemoryStream stream)
-        {
-            int padSize = 0;
-            if (stream.length() % BLOCK_SIZE != 0)
-            {
-                padSize = (int)(BLOCK_SIZE - (stream.length() % BLOCK_SIZE));
-                stream.wpos += padSize;
+			while (count > 0)
+			{
+				int copyCount = Math.Min(count, _pending.Length - _pendingCount);
+				if (copyCount == 0)
+					throw new InvalidOperationException("invalid encrypted frame: buffered data exceeds the wire frame limit.");
 
-				if(stream.wpos > MemoryStream.BUFFER_MAX)
-                    KBELog.ERROR_MSG("BlowfishFilter::encrypt: stream.wpos(" + stream.wpos + ") > MemoryStream.BUFFER_MAX(" + MemoryStream.BUFFER_MAX + ")!");
-            }
+				Buffer.BlockCopy(buffer, offset, _pending, _pendingCount, copyCount);
+				_pendingCount += copyCount;
+				offset += copyCount;
+				count -= copyCount;
+				int generation = _resetGeneration;
+				DrainFrames(plaintextCallback);
+				if (generation != _resetGeneration)
+					return;
+			}
+		}
 
-            _blowfish.encipher(stream.data(), (int)stream.length());
+		public void Reset()
+		{
+			if (_pendingCount > 0)
+				Array.Clear(_pending, 0, _pendingCount);
+			_pendingCount = 0;
+			_encodedStream.clear();
+			unchecked { ++_resetGeneration; }
+		}
 
-            UInt16 packLen = (UInt16)(stream.length() + 1);
-            _enctyptStrem.writeUint16(packLen);
-            _enctyptStrem.writeUint8((UINT8)padSize);
-            _enctyptStrem.append(stream.data(), (UInt32)stream.rpos, stream.length());
+		private void DrainFrames(Action<byte[], int, int> plaintextCallback)
+		{
+			int consumed = 0;
+			int generation = _resetGeneration;
+			while (_pendingCount - consumed >= HEADER_SIZE)
+			{
+				int encodedLength = _pending[consumed] | (_pending[consumed + 1] << 8);
+				int padSize = _pending[consumed + sizeof(UInt16)];
+				int payloadLength;
+				if (!ValidFrame(encodedLength, padSize, out payloadLength))
+				{
+					Reset();
+					throw new InvalidOperationException("invalid encrypted frame");
+				}
 
-            stream.swap(_enctyptStrem);
-            _enctyptStrem.clear();
-        }
+				int frameLength = HEADER_SIZE + payloadLength;
+				if (_pendingCount - consumed < frameLength)
+					break;
 
-        public override void decrypt(MemoryStream stream)
-        {
-            _blowfish.decipher(stream.data(), stream.rpos, (int)stream.length());
-        }
+				int payloadOffset = consumed + HEADER_SIZE;
+				_blowfish.decipher(_pending, payloadOffset, payloadLength);
+				plaintextCallback(_pending, payloadOffset, payloadLength - padSize);
+				// 消息处理可能同步销毁 Session 并 Reset codec；此时缓存游标已失效，不能继续扣减。
+				// Message handling may synchronously destroy the session and reset this codec; its cache cursors are then invalid.
+				if (generation != _resetGeneration)
+					return;
+				consumed += frameLength;
+			}
 
-        public override void decrypt(byte[] buffer, int startIndex, int length)
-        {
-            _blowfish.decipher(buffer, startIndex, length);
-        }
+			if (consumed == 0)
+				return;
 
-        public override bool send(PacketSenderBase sender, MemoryStream stream)
-        {
-            if(!_blowfish.isGood())
-            {
-                KBELog.ERROR_MSG("BlowfishFilter::send: Dropping packet, due to invalid filter");
-                return false;
-            }
+			_pendingCount -= consumed;
+			if (_pendingCount > 0)
+				Buffer.BlockCopy(_pending, consumed, _pending, 0, _pendingCount);
+		}
 
-            encrypt(stream);
-            return sender.send(stream);
-        }
-
-        public override bool send(PacketSenderBase sender, IReadOnlyList<MemoryStream> streams)
-        {
-            if(!_blowfish.isGood())
-            {
-                KBELog.ERROR_MSG("BlowfishFilter::send: Dropping batch, due to invalid filter");
-                return false;
-            }
-
-            // 每个 MemoryStream 保持独立加密 frame，批量化只改变队列提交原子性，不改变 2.8 的线上 framing。
-            // Each MemoryStream keeps its own encrypted frame; batching changes queue commit atomicity only and preserves 2.8 wire framing.
-            for (int index = 0; index < streams.Count; ++index)
-                encrypt(streams[index]);
-
-            return sender.send(streams);
-        }
-
-        public override bool recv(MessageReaderBase reader, byte[] buffer, UInt32 rpos, UInt32 len)
-        {
-            if (!_blowfish.isGood())
-            {
-                KBELog.ERROR_MSG("BlowfishFilter::recv: Dropping packet, due to invalid filter");
-                return false;
-            }
-
-            if (_packet.length() == 0 && len >= MIN_PACKET_SIZE)
-            {
-                int encodedLength = BitConverter.ToUInt16(buffer, (int)rpos);
-                int padSize = buffer[rpos + 2];
-                int packLen;
-                if (!validFrame(encodedLength, padSize, out packLen))
-                {
-                    KBELog.ERROR_MSG("BlowfishFilter::recv: invalid encrypted frame");
-                    resetReceiveFrame();
-                    return false;
-                }
-
-                if ((UInt32)packLen == len - 3)
-                {
-                    decrypt(buffer, (int)(rpos + 3), packLen);
-
-                    if (reader != null)
-                        reader.process(buffer, rpos + 3, (UInt32)(packLen - padSize));
-
-                    return true;
-                }
-            }
-
-            _packet.append(buffer, rpos, len);
-
-            while(_packet.length() > 0)
-            {
-                UInt32 currLen = 0;
-                int oldwpos = 0;
-                if (_packLen <= 0)
-                {
-                    // 如果满足一个最小包则尝试解包, 否则缓存这个包待与下一个包合并然后解包
-                    if (_packet.length() >= MIN_PACKET_SIZE)
-                    {
-                        int encodedLength = _packet.readUint16();
-                        _padSize = _packet.readUint8();
-                        int payloadLength;
-                        if (!validFrame(encodedLength, _padSize, out payloadLength))
-                        {
-                            KBELog.ERROR_MSG("BlowfishFilter::recv: invalid encrypted frame");
-                            resetReceiveFrame();
-                            return false;
-                        }
-                        _packLen = (UInt16)payloadLength;
-
-                        if (_packet.length() > _packLen)
-                        {
-                            currLen = (UInt32)(_packet.rpos + _packLen);
-                            oldwpos = _packet.wpos;
-                            _packet.wpos = (int)currLen;
-                        }
-                        else if (_packet.length() < _packLen)
-                        {
-                            return false;
-                        }
-                    }
-                    else
-                    {
-                        return false;
-                    }
-                }
-                else
-                {
-                    // 如果上一次有做过解包行为但包还没有完整则继续处理
-                    // 如果包是完整的下面流程会解密， 如果有多余的内容需要将其剪裁出来待与下一个包合并
-                    if (_packet.length() > _packLen)
-                    {
-                        currLen = (UInt32)(_packet.rpos + _packLen);
-                        oldwpos = _packet.wpos;
-                        _packet.wpos = (int)currLen;
-                    }
-                    else if (_packet.length() < _packLen)
-                    {
-                        return false;
-                    }
-                }
-
-                decrypt(_packet);
-                _packet.wpos -= _padSize;
-
-                // 上面的流程能保证wpos之后不会有多余的包
-                // 如果有多余的包数据会放在_recvStream
-                if (reader != null)
-                {
-                    reader.process(_packet.data(), (UInt32)_packet.rpos, _packet.length());
-                }
-
-                if (currLen > 0)
-                {
-                    _packet.rpos = (int)currLen;
-                    _packet.wpos = oldwpos;
-                }
-                else
-                {
-                    _packet.clear();
-                }
-
-                _packLen = 0;
-                _padSize = 0;
-            }
-            
-            return true;
-        }
-    }
+		private static bool ValidFrame(int encodedLength, int padSize, out int payloadLength)
+		{
+			payloadLength = encodedLength > 0 ? encodedLength - 1 : 0;
+			return payloadLength > 0 &&
+				payloadLength % (int)BLOCK_SIZE == 0 &&
+				padSize >= 0 &&
+				padSize < (int)BLOCK_SIZE &&
+				padSize <= payloadLength &&
+				HEADER_SIZE + payloadLength >= MIN_FRAME_SIZE;
+		}
+	}
 }
-

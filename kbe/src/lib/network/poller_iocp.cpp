@@ -1083,8 +1083,13 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 				socketErrorCode = overlappedError;
 		}
 	}
-	const bool isUdpPortUnreachable = (pContext->kind == SOCKET_KIND_UDP &&
-		socketErrorCode == ERROR_PORT_UNREACHABLE);
+	// Winsock normally reports an ICMP Port Unreachable as WSAECONNRESET for UDP,
+	// while some providers surface ERROR_PORT_UNREACHABLE. Both are socket-wide
+	// notifications without a trustworthy peer address on a shared listener.
+	// Winsock 通常把 UDP 的 ICMP Port Unreachable 报为 WSAECONNRESET，部分 provider
+	// 则返回 ERROR_PORT_UNREACHABLE。共享 listener 上两者都不携带可信的具体对端。
+	const bool isUdpPeerUnreachable = (pContext->kind == SOCKET_KIND_UDP &&
+		(socketErrorCode == WSAECONNRESET || socketErrorCode == ERROR_PORT_UNREACHABLE));
 
 	if (isCurrentContext)
 	{
@@ -1202,7 +1207,7 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 		}
 	else if (pContext->operation == OP_UDP_RECV)
 	{
-		if (!success && errorCode != 0 && !isUdpPortUnreachable)
+		if (!success && errorCode != 0 && !isUdpPeerUnreachable)
 		{
 			WARNING_MSG(fmt::format("IocpPoller::handleCompletion: udp recv completion failed on fd {}, completionError={}, socketError={}: {}\n",
 				fd, errorCode, socketErrorCode, kbe_strerror(socketErrorCode)));
@@ -1230,7 +1235,7 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 				this->triggerRead(fd);
 			}
 		}
-		else if (!success && isUdpPortUnreachable)
+		else if (!success && isUdpPeerUnreachable)
 		{
 			// Windows 会把 ICMP port unreachable 转成 UDP recv completion 错误。
 			// KCP/UDP 客户端断开时这很常见，而且 completion 里没有可靠的
@@ -1288,7 +1293,7 @@ void IocpPoller::handleCompletion(ULONG_PTR completionKey, LPOVERLAPPED overlapp
 	}
 	else if (pContext->operation == OP_UDP_SEND)
 	{
-		if (!success && errorCode != 0 && !isUdpPortUnreachable)
+		if (!success && errorCode != 0 && !isUdpPeerUnreachable)
 		{
 			WARNING_MSG(fmt::format("IocpPoller::handleCompletion: udp send completion failed on fd {}, completionError={}, socketError={}: {}\n",
 				fd, errorCode, socketErrorCode, kbe_strerror(socketErrorCode)));

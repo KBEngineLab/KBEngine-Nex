@@ -1,6 +1,7 @@
 class_name NetworkInterfaceWS extends NetworkInterfaceBase
 ## Godot WebSocket 网络接口
-## 参考 C# NetworkInterfaceUnityWS.cs 实现，使用 Godot 原生 WebSocketPeer
+## 使用 Godot 原生 WebSocketPeer；C# SDK 中的等价平台适配通过自定义 Provider 注入
+## Uses Godot's native WebSocketPeer; the C# SDK injects equivalent platform transports through a custom Provider.
 
 func valid()-> bool:
 	return self.m_socket and self.m_socket.isConnected()

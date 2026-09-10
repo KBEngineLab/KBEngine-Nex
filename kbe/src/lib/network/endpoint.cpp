@@ -250,6 +250,27 @@ void EndPoint::onReclaimObject()
 }
 
 //-------------------------------------------------------------------------------------
+void EndPoint::configureDatagramSocket()
+{
+#if KBE_PLATFORM == PLATFORM_WIN32
+	// A shared UDP listener may have many overlapped WSARecvFrom operations in flight.
+	// One unreachable client must not fail that socket-wide receive window and create
+	// an IOCP completion storm. KCP and Channel timeouts already own peer liveness.
+	// 共享 UDP listener 会同时挂起多个 WSARecvFrom。单个不可达客户端不能让整个
+	// socket 的接收窗口失败并形成 IOCP completion 风暴；对端存活仍由 KCP/Channel
+	// 超时负责。
+	BOOL newBehavior = FALSE;
+	DWORD bytesReturned = 0;
+	if (WSAIoctl(socket_, SIO_UDP_CONNRESET, &newBehavior, sizeof(newBehavior),
+		NULL, 0, &bytesReturned, NULL, NULL) == SOCKET_ERROR)
+	{
+		WARNING_MSG(fmt::format("EndPoint::configureDatagramSocket: disabling SIO_UDP_CONNRESET failed on fd {}: {}\n",
+			static_cast<uint64>(socket_), kbe_strerror(WSAGetLastError())));
+	}
+#endif
+}
+
+//-------------------------------------------------------------------------------------
 bool EndPoint::getClosedPort(Network::Address & closedPort)
 {
 	bool isResultSet = false;

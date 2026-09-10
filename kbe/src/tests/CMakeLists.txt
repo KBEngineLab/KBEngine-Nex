@@ -178,6 +178,15 @@ set_tests_properties(source.client_sdk_init_property_contract PROPERTIES
     LABELS "client;sdk;entity;network;source;protocol"
 )
 
+add_test(NAME source.csharp_network_provider_contract
+    COMMAND "${CMAKE_COMMAND}"
+        "-DKBE_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyCSharpNetworkProviderContract.cmake"
+)
+set_tests_properties(source.csharp_network_provider_contract PROPERTIES
+    LABELS "client;csharp;sdk;network;source;protocol"
+)
+
 add_test(NAME source.entitycall_transport_routing_contract
     COMMAND "${CMAKE_COMMAND}"
         "-DKBE_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
