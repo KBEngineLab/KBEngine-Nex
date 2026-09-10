@@ -1,6 +1,12 @@
 
 # 更新日志
 
+## 3.0.6
+
+- C# SDK 网络层重构，支持开发者自定义网络层Provider（TS、C++未支持，后续会逐步支持，并开放更多的Provider）
+- 客户端移动优化moveSpeed Tick 配额，同 Tick 累计、跨 Tick 有限放宽、空闲过久不能无限积攒
+- 修复一处 IOCP 把 ERROR_PORT_UNREACHABLE 当成可忽略的 UDP ICMP 错误
+
 ## 3.0.5
 
 - [fix] 修复SDK属性同步时序问题
