@@ -1114,6 +1114,14 @@ namespace KBEngine
 		public void Client_onUpdatePropertysOptimized(MemoryStream stream)
 		{
 			Int32 eid = getViewEntityIDFromStream(stream);
+			if(eid == 0)
+			{
+				// An unresolved alias is a stale update; never create a cache entry for entity 0.
+				// 别名无法解析时属于过期更新，不能为实体 0 创建缓存。
+				stream.done();
+				return;
+			}
+
 			onUpdatePropertys_(eid, stream);
 		}
 		
@@ -1135,14 +1143,17 @@ namespace KBEngine
 				MemoryStream entityMessage = null;
 				if(_bufferedCreateEntityMessages.TryGetValue(eid, out entityMessage))
 				{
-					KBELog.ERROR_MSG("KBEngine::Client_onUpdatePropertys: entity(" + eid + ") not found!");
+					// CellApp messages can converge before EnterWorld; retain every complete property payload in wire order.
+					// 多个 CellApp 消息可能在 EnterWorld 前汇聚，必须按线序保留每一条完整属性 payload。
+					entityMessage.append(stream.data(), (UInt32)stream.rpos, stream.length());
 					return;
 				}
 
 				MemoryStream stream1 = MemoryStream.createObject();
-				stream1.wpos = stream.wpos;
-				stream1.rpos = stream.rpos - 4;
-				Array.Copy(stream.data(), stream1.data(), stream.wpos);
+				// Normalize the cached header so optimized (1-byte alias) and normal (4-byte ID) updates replay identically.
+				// 统一缓存头部，确保优化消息（1 字节别名）与普通消息（4 字节 ID）回放行为一致。
+				stream1.writeInt32(eid);
+				stream1.append(stream.data(), (UInt32)stream.rpos, stream.length());
 				_bufferedCreateEntityMessages[eid] = stream1;
 				return;
 			}

@@ -69,7 +69,14 @@ void FMH_Baseapp_onEntityGetCellFrom_onCreateCellEntityInNewSpaceFromBaseapp::pr
 
 	if (_e->clientEntityCall())
 	{
-		_e->onGetWitness();
+		// ForwardComponent_MessageBuffer sends onEntityGetCell before invoking this handler.
+		// Send the current Cell snapshot and attach only now, preserving __init__ changes while
+		// keeping the initial BaseApp properties ahead of Witness::onAttach's EnterWorld.
+		// ForwardComponent_MessageBuffer 会先发送 onEntityGetCell 再执行本回调。
+		// 此时才发送 Cell 当前快照并绑定 Witness，既保留 __init__ 变更，
+		// 又保证 BaseApp 初始属性早于 EnterWorld 进入传输队列。
+		KBE_ASSERT(!_e->hasWitness());
+		_e->onGetWitness(true);
 	}
 	else
 	{

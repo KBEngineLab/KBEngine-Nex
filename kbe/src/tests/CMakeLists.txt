@@ -161,6 +161,8 @@ set_tests_properties(source.cellapp_create_entity_python_contract PROPERTIES
 add_test(NAME source.cellapp_create_entity_stream_contract
     COMMAND "${CMAKE_COMMAND}"
         "-DKBE_CELLAPP_SOURCE=${CMAKE_SOURCE_DIR}/server/cellapp/cellapp.cpp"
+        "-DKBE_FORWARD_HANDLER_SOURCE=${CMAKE_SOURCE_DIR}/server/cellapp/forward_message_over_handler.cpp"
+        "-DKBE_FORWARD_BUFFER_SOURCE=${CMAKE_SOURCE_DIR}/lib/server/forward_messagebuffer.cpp"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyCellappCreateEntityStreamContract.cmake"
 )
 set_tests_properties(source.cellapp_create_entity_stream_contract PROPERTIES

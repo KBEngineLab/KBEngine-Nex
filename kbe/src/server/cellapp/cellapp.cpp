@@ -179,9 +179,10 @@ Components::ComponentInfos* validateBaseappEntityCreationSource(
 	return sourceInfos;
 }
 
-bool bindClientStateForCreatedEntity(Entity* entity, const char* operation)
+bool bindClientEntityCallForCreatedEntity(Entity* entity, const char* operation)
 {
-	if (entity == NULL || entity->baseEntityCall() == NULL || entity->hasWitness())
+	if (entity == NULL || entity->baseEntityCall() == NULL ||
+		entity->clientEntityCall() != NULL || entity->pWitness() != NULL)
 	{
 		ERROR_MSG(fmt::format("{}: rejected invalid client binding state, entityID={}.\n",
 			operation, entity != NULL ? entity->id() : 0));
@@ -202,7 +203,13 @@ bool bindClientStateForCreatedEntity(Entity* entity, const char* operation)
 	// PyObject_GetAttrString returns a new reference; the Entity owns it after binding.
 	// PyObject_GetAttrString 返回新引用，绑定后由 Entity 持有该引用。
 	entity->clientEntityCall(static_cast<EntityCall*>(clientEntityCall));
-	entity->setWitness(Witness::createPoolObject(OBJECTPOOL_POINT));
+
+	// Keep the client EntityCall visible to initialization scripts, matching the 2.5 lifecycle.
+	// Witness attachment is deliberately deferred because it immediately sends EnterWorld;
+	// BaseApp must process onEntityGetCell and queue the initial Cell properties first.
+	// 保留 2.5 的生命周期：初始化脚本仍可访问客户端 EntityCall。
+	// Witness::attach 会立即发送 EnterWorld，因此必须延迟到 BaseApp 处理
+	// onEntityGetCell 并将 Cell 初始属性排入客户端队列之后。
 	return true;
 }
 }
@@ -1296,7 +1303,7 @@ void Cellapp::onCreateCellEntityInNewSpaceFromBaseapp(Network::Channel* pChannel
 		
 		if (hasClient)
 		{
-			if (!bindClientStateForCreatedEntity(e,
+			if (!bindClientEntityCallForCreatedEntity(e,
 				"Cellapp::onCreateCellEntityInNewSpaceFromBaseapp"))
 			{
 				Py_XDECREF(cellData);
@@ -1339,19 +1346,25 @@ void Cellapp::onCreateCellEntityInNewSpaceFromBaseapp(Network::Channel* pChannel
 		// 添加到space
 		space->addEntityToNode(e);
 
+		// BaseApp must initialize the client's cell properties before the Witness sends EnterWorld.
+		// 必须先通知 BaseApp 初始化客户端 Cell 属性，再由 Witness 发送 EnterWorld，确保初始化顺序稳定。
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		(*pBundle).newMessage(BaseappInterface::onEntityGetCell);
+		BaseappInterface::onEntityGetCellArgs3::staticAddToBundle((*pBundle), entitycallEntityID, componentID_, spaceID);
+		cinfos->pChannel->send(pBundle);
+
 		if (hasClient)
 		{
-			e->onGetWitness();
+			// Re-send the authoritative post-__init__ Cell snapshot before Witness emits EnterWorld.
+			// This preserves 2.5's initialization semantics without relying on internal Channel timing.
+			// Witness 发送 EnterWorld 前重发 __init__ 后的 Cell 权威快照。
+			// 这既保留 2.5 的初始化语义，又不再依赖内部 Channel 时序。
+			e->onGetWitness(true);
 		}
 		else
 		{
 			space->onEnterWorld(e);
 		}
-
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-		(*pBundle).newMessage(BaseappInterface::onEntityGetCell);
-		BaseappInterface::onEntityGetCellArgs3::staticAddToBundle((*pBundle), entitycallEntityID, componentID_, spaceID);
-		cinfos->pChannel->send(pBundle);
 
 		return;
 	}
@@ -1418,7 +1431,7 @@ void Cellapp::onRestoreSpaceInCellFromBaseapp(Network::Channel* pChannel, KBEngi
 		
 		if (hasClient)
 		{
-			if (!bindClientStateForCreatedEntity(e,
+			if (!bindClientEntityCallForCreatedEntity(e,
 				"Cellapp::onRestoreSpaceInCellFromBaseapp"))
 			{
 				Py_XDECREF(cellData);
@@ -1460,12 +1473,17 @@ void Cellapp::onRestoreSpaceInCellFromBaseapp(Network::Channel* pChannel, KBEngi
 		// 添加到space
 		e->onRestore();
 
-		space->addEntityAndEnterWorld(e, true);
-
+		// Keep the BaseApp acknowledgement ahead of restoration's Witness EnterWorld message.
+		// 恢复流程同样必须让 BaseApp 先排入客户端初始化属性，避免 EnterWorld 抢先到达。
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(BaseappInterface::onEntityGetCell);
 		BaseappInterface::onEntityGetCellArgs3::staticAddToBundle((*pBundle), entitycallEntityID, componentID_, spaceID);
 		cinfos->pChannel->send(pBundle);
+
+		if (hasClient)
+			e->setWitness(Witness::createPoolObject(OBJECTPOOL_POINT));
+
+		space->addEntityAndEnterWorld(e, true);
 		return;
 	}
 	
@@ -1628,7 +1646,7 @@ void Cellapp::_onCreateCellEntityFromBaseapp(std::string& entityType, ENTITY_ID 
 
 		if(hasClient)
 		{
-			if (!bindClientStateForCreatedEntity(e,
+			if (!bindClientEntityCallForCreatedEntity(e,
 				"Cellapp::_onCreateCellEntityFromBaseapp"))
 			{
 				Py_XDECREF(cellData);
@@ -1674,7 +1692,7 @@ void Cellapp::_onCreateCellEntityFromBaseapp(std::string& entityType, ENTITY_ID 
 		// 如果是有client的entity则设置它的cliententitycall, baseapp部分的onEntityGetCell会告知客户端enterworld.
 		if(hasClient)
 		{
-			e->onGetWitness();
+			e->onGetWitness(true);
 		}
 		else
 		{
