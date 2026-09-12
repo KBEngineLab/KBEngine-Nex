@@ -181,9 +181,13 @@ void Witness::attach(Entity* pEntity)
 
 	if(g_kbeSrvConfig.getCellApp().use_coordinate_system)
 	{
-		// 初始化默认View范围
+		// 初始化默认View范围；若初始化脚本在 Witness 绑定前调用了 setViewRadius，优先使用脚本配置。
+		// Initialize the default View range, preferring a script-configured value staged before Witness attachment.
 		ENGINE_COMPONENT_INFO& ecinfo = ServerConfig::getSingleton().getCellApp();
-		setViewRadius(ecinfo.defaultViewRadius, ecinfo.defaultViewHysteresisArea);
+		float radius = ecinfo.defaultViewRadius;
+		float hyst = ecinfo.defaultViewHysteresisArea;
+		pEntity_->takePendingViewRadius(radius, hyst);
+		setViewRadius(radius, hyst);
 	}
 
 	Cellapp::getSingleton().addUpdatable(this);

@@ -296,6 +296,11 @@ public:
 	int32 setViewRadius(float radius, float hyst);
 	float getViewRadius(void) const;
 	float getViewHystArea(void) const;
+	/**
+		初始化脚本可能先于 Witness 绑定执行；取出该阶段暂存的 View 配置。
+		Initialization scripts may run before Witness attachment; consume the staged View configuration.
+	*/
+	bool takePendingViewRadius(float& radius, float& hyst);
 	DECLARE_PY_MOTHOD_ARG2(pySetViewRadius, float, float);
 	DECLARE_PY_MOTHOD_ARG0(pyGetViewRadius);
 	DECLARE_PY_MOTHOD_ARG0(pyGetViewHystArea);
@@ -752,6 +757,13 @@ protected:
 	size_t													witnesses_count_;
 
 	uint32											witnessesVolatilePendingCount_;
+
+	// Witness 绑定被延后到初始化脚本之后时，暂存脚本设置的 View 范围，避免被默认值覆盖。
+	// When Witness attachment is deferred past initialization scripts, retain the script-configured
+	// View range so it is not lost or replaced by the default radius.
+	float										pendingViewRadius_;
+	float										pendingViewHysteresisArea_;
+	bool										pendingViewRadiusSet_;
 
 	// 观察者对象
 	Witness*												pWitness_;

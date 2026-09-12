@@ -7,8 +7,16 @@ endif()
 if(NOT DEFINED KBE_FORWARD_BUFFER_SOURCE OR NOT EXISTS "${KBE_FORWARD_BUFFER_SOURCE}")
     message(FATAL_ERROR "KBE_FORWARD_BUFFER_SOURCE must identify forward_messagebuffer.cpp")
 endif()
+if(NOT DEFINED KBE_CELLAPP_ENTITY_SOURCE OR NOT EXISTS "${KBE_CELLAPP_ENTITY_SOURCE}")
+    message(FATAL_ERROR "KBE_CELLAPP_ENTITY_SOURCE must identify entity.cpp")
+endif()
+if(NOT DEFINED KBE_CELLAPP_WITNESS_SOURCE OR NOT EXISTS "${KBE_CELLAPP_WITNESS_SOURCE}")
+    message(FATAL_ERROR "KBE_CELLAPP_WITNESS_SOURCE must identify witness.cpp")
+endif()
 
 file(READ "${KBE_CELLAPP_SOURCE}" _kbe_cellapp_source)
+file(READ "${KBE_CELLAPP_ENTITY_SOURCE}" _kbe_entity_source)
+file(READ "${KBE_CELLAPP_WITNESS_SOURCE}" _kbe_witness_source)
 file(READ "${KBE_FORWARD_HANDLER_SOURCE}" _kbe_forward_handler_source)
 file(READ "${KBE_FORWARD_BUFFER_SOURCE}" _kbe_forward_buffer_source)
 
@@ -195,6 +203,51 @@ string(FIND "${_kbe_forward_handler_body}"
     "_e->onGetWitness(true);" _kbe_forward_handler_witness)
 if(_kbe_forward_handler_witness EQUAL -1)
     message(FATAL_ERROR "Delayed new Space creation must synchronize and attach Witness in the completion handler")
+endif()
+
+# Initialization scripts may call setViewRadius before Witness is attached. The value must be
+# staged successfully instead of being discarded, then consumed by Witness::attach before the
+# coordinate-system trigger is installed.
+# 初始化脚本可能在 Witness 绑定前调用 setViewRadius。配置必须成功暂存，不能丢弃，
+# 并且要由 Witness::attach 在安装坐标系统触发器前消费。
+string(FIND "${_kbe_entity_source}"
+    "int32 Entity::setViewRadius(float radius, float hyst)" _kbe_set_view_start)
+string(FIND "${_kbe_entity_source}"
+    "PyObject* Entity::pySetViewRadius" _kbe_set_view_end)
+if(_kbe_set_view_start EQUAL -1 OR _kbe_set_view_end EQUAL -1 OR
+        NOT _kbe_set_view_start LESS _kbe_set_view_end)
+    message(FATAL_ERROR "Cannot isolate Entity::setViewRadius")
+endif()
+math(EXPR _kbe_set_view_length "${_kbe_set_view_end} - ${_kbe_set_view_start}")
+string(SUBSTRING "${_kbe_entity_source}" ${_kbe_set_view_start}
+    ${_kbe_set_view_length} _kbe_set_view_body)
+string(FIND "${_kbe_set_view_body}" "pendingViewRadius_ = radius;" _kbe_pending_radius)
+string(FIND "${_kbe_set_view_body}"
+    "pendingViewHysteresisArea_ = hyst;" _kbe_pending_hyst)
+string(FIND "${_kbe_set_view_body}" "pendingViewRadiusSet_ = true;" _kbe_pending_flag)
+string(FIND "${_kbe_set_view_body}" "return 1;" _kbe_pending_success)
+if(_kbe_pending_radius EQUAL -1 OR _kbe_pending_hyst EQUAL -1 OR
+        _kbe_pending_flag EQUAL -1 OR _kbe_pending_success EQUAL -1)
+    message(FATAL_ERROR "Entity::setViewRadius must stage pre-Witness configuration and return success")
+endif()
+
+string(FIND "${_kbe_witness_source}"
+    "void Witness::attach(Entity* pEntity)" _kbe_attach_start)
+string(FIND "${_kbe_witness_source}"
+    "void Witness::onAttach(Entity* pEntity)" _kbe_attach_end)
+if(_kbe_attach_start EQUAL -1 OR _kbe_attach_end EQUAL -1 OR
+        NOT _kbe_attach_start LESS _kbe_attach_end)
+    message(FATAL_ERROR "Cannot isolate Witness::attach")
+endif()
+math(EXPR _kbe_attach_length "${_kbe_attach_end} - ${_kbe_attach_start}")
+string(SUBSTRING "${_kbe_witness_source}" ${_kbe_attach_start}
+    ${_kbe_attach_length} _kbe_attach_body)
+string(FIND "${_kbe_attach_body}"
+    "pEntity_->takePendingViewRadius(radius, hyst);" _kbe_attach_pending)
+string(FIND "${_kbe_attach_body}" "setViewRadius(radius, hyst);" _kbe_attach_set)
+if(_kbe_attach_pending EQUAL -1 OR _kbe_attach_set EQUAL -1 OR
+        NOT _kbe_attach_pending LESS _kbe_attach_set)
+    message(FATAL_ERROR "Witness::attach must consume pending View configuration before installing triggers")
 endif()
 
 message(STATUS "CELLAPP_CREATE_ENTITY_STREAM_CONTRACT_PASS")

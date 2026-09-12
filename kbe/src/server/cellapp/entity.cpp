@@ -150,6 +150,9 @@ topSpeedWindowTickCount_(0),
 witnesses_(),
 witnesses_count_(0),
 witnessesVolatilePendingCount_(0),
+pendingViewRadius_(0.0f),
+pendingViewHysteresisArea_(0.0f),
+pendingViewRadiusSet_(false),
 pWitness_(NULL),
 allClients_(new AllClients(pScriptModule, id, false)),
 otherClients_(new AllClients(pScriptModule, id, true)),
@@ -2893,9 +2896,27 @@ int32 Entity::setViewRadius(float radius, float hyst)
 		return 1;
 	}
 
-	PyErr_Format(PyExc_AssertionError, "%s::setViewRadius: did not get witness.", scriptName());
-	PyErr_PrintEx(0);
-	return -1;
+	// 初始化脚本执行时 Witness 可能尚未绑定。先保存配置，attach 时会在安装触发器前应用，
+	// 这样既不打乱 BaseApp/EnterWorld 的消息顺序，也不会让默认半径短暂建立错误的 AOI 关系。
+	// Initialization scripts may run before Witness attachment. Stage the configuration and apply it
+	// before trigger installation, preserving BaseApp/EnterWorld ordering without creating a transient
+	// AOI relation set with the default radius.
+	pendingViewRadius_ = radius;
+	pendingViewHysteresisArea_ = hyst;
+	pendingViewRadiusSet_ = true;
+	return 1;
+}
+
+//-------------------------------------------------------------------------------------
+bool Entity::takePendingViewRadius(float& radius, float& hyst)
+{
+	if(!pendingViewRadiusSet_)
+		return false;
+
+	radius = pendingViewRadius_;
+	hyst = pendingViewHysteresisArea_;
+	pendingViewRadiusSet_ = false;
+	return true;
 }
 
 //-------------------------------------------------------------------------------------
@@ -2917,6 +2938,8 @@ float Entity::getViewRadius(void) const
 {
 	if(pWitness_)
 		return pWitness_->viewRadius();
+	if(pendingViewRadiusSet_)
+		return pendingViewRadius_;
 		
 	return 0.0; 
 }
@@ -2973,6 +2996,8 @@ float Entity::getViewHystArea(void) const
 {
 	if(pWitness_)
 		return pWitness_->viewHysteresisArea();
+	if(pendingViewRadiusSet_)
+		return pendingViewHysteresisArea_;
 		
 	return 0.0; 
 }
