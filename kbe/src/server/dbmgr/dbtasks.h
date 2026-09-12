@@ -66,8 +66,6 @@ public:
 
 	bool send(Network::Bundle* pBundle);
 
-	// 所有业务回调必须先经过提交状态门禁，派生任务只能实现已提交路径。
-	// Every business callback must pass the commit-state gate; derived tasks implement only the committed path.
 	virtual thread::TPTask::TPTaskState presentMainThread() final;
 	virtual thread::TPTask::TPTaskState presentMainThreadCommitted();
 	virtual thread::TPTask::TPTaskState presentMainThreadFailed();

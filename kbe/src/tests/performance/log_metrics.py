@@ -7,10 +7,6 @@ from pathlib import Path
 
 
 DEFAULT_PATTERNS = {
-    # Logger 将脚本异常记为 S_ERR，而组件 stdout 使用 [S_ERROR]；两者都必须进入错误门禁。
-    # 严格限制在行首，避免把业务字段中的 error=... 或普通正文误判为错误日志。
-    # Logger emits script exceptions as S_ERR while component stdout uses [S_ERROR]; both
-    # must feed the error gate. Anchor severity at line start so payload error=... remains data.
     "error": re.compile(
         r"^\s*(?:(?:ERROR|S_ERR(?:OR)?)\b|\[(?:ERROR|S_ERR(?:OR)?)\]|"
         r"[A-Za-z0-9_.-]+:\s*\[(?:ERROR|S_ERR(?:OR)?)\])",

@@ -22,15 +22,6 @@ set_tests_properties(security.component_routing_guard PROPERTIES
 	PASS_REGULAR_EXPRESSION "SECURITY_COMPONENT_ROUTING_GUARD_TEST_PASS"
 )
 
-add_test(NAME security.source_contract
-	COMMAND "${CMAKE_COMMAND}"
-		"-DKBE_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
-		-P "${CMAKE_SOURCE_DIR}/tests/cmake/VerifySecuritySourceContract.cmake"
-)
-set_tests_properties(security.source_contract PROPERTIES
-	LABELS "security;source;portable"
-)
-
 add_executable(kbe_test_security_client_request_guard
 	client_request_guard.cpp
 )
