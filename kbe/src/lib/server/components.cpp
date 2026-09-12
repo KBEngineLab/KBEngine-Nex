@@ -1295,132 +1295,148 @@ bool Components::findComponents()
 #endif
 			}
 
-			// 每轮请求独占系统临时端口，Machine 按消息中的实际端口回包。
-			// Each request owns an OS-assigned ephemeral port, and Machine replies to the actual port carried by the message.
-			Network::BundleBroadcast bhandler(*pNetworkInterface(), 0);
-			if(!bhandler.good())
-			{
-				//ERROR_MSG("Components::findComponents: bhandler error!\n");
-				return false;
-			}
-
-			bhandler.itry(0);
-			if(bhandler.pCurrPacket() != NULL)
-			{
-				bhandler.pCurrPacket()->resetPacket();
-			}
-
-			bhandler.newMessage(MachineInterface::onFindInterfaceAddr);
-			MachineInterface::onFindInterfaceAddrArgs7::staticAddToBundle(bhandler, getUserUID(), getUsername(), 
-				componentType_, componentID_, findComponentType, pNetworkInterface()->intaddr().ip, bhandler.epListen().addr().port);
-
-			ENGINE_COMPONENT_INFO cinfos = ServerConfig::getSingleton().getKBMachine();
-			std::vector< std::string >::iterator machine_addresses_iter = cinfos.machine_addresses.begin();
-			for(; machine_addresses_iter != cinfos.machine_addresses.end(); ++machine_addresses_iter)
-				bhandler.addBroadCastAddress((*machine_addresses_iter));
-			
-			if(!bhandler.broadcast())
-			{
-				ERROR_MSG("Components::findComponents: broadcast error!\n");
-				return false;
-			}
-		
-			int32 timeout = 1500000;
-			// 启动期间 Machine 可能正在处理集群状态查询；短暂超时属于正常重试，持续失败才升级为错误。
-			// Machine may be servicing a cluster-status query during startup; transient timeouts are normal retries, while persistent failures escalate.
+			// 一轮最多 5 次短探测；只有全部失败才进入下一轮发现。
+			// A round contains at most 5 short probes before discovery advances to the next round.
+			const int maxReceiveAttempts = 5;
 			const bool reportTimeout = count > 3;
-			MachineInterface::onBroadcastInterfaceArgs25 args;
+			bool advanceFindIdx = false;
 
-RESTART_RECV:
-
-			// BundleBroadcast不了解当前目标和已缓存组件，由本层统一决定何时输出可诊断错误。
-			// BundleBroadcast does not know the current target or cached components, so this layer decides when a diagnostic error is warranted.
-			if(bhandler.receive(&args, 0, timeout, false))
+			for(int findAttempt = 0; findAttempt < maxReceiveAttempts; ++findAttempt)
 			{
-				bool isContinue = false;
-				timeout = 1000000;
-
-				do
+				// 每次探测独占系统临时端口并重新广播，Machine 按消息中的实际端口回包。
+				// Every probe uses a fresh ephemeral port and broadcast; Machine replies to the port in the request.
+				Network::BundleBroadcast bhandler(*pNetworkInterface(), 0);
+				if(!bhandler.good())
 				{
-					if(isContinue)
-					{
-						try
-						{
-							args.createFromStream(*bhandler.pCurrPacket());
-						}catch(MemoryStreamException &)
-						{
-							break;
-						}
-					}
-					
-					if(args.componentIDEx != componentID_)
-					{
-						WARNING_MSG(fmt::format("Components::findComponents: msg.componentID {} != {}.\n", 
-							args.componentIDEx, componentID_));
-						
-						args.componentIDEx = 0;
-						goto RESTART_RECV;
-					}
+					//ERROR_MSG("Components::findComponents: bhandler error!\n");
+					return false;
+				}
 
-					// 如果找不到
-					if(args.componentType == UNKNOWN_COMPONENT_TYPE)
-					{
-						isContinue = true;
-						continue;
-					}
-
-					INFO_MSG(fmt::format("Components::findComponents: found {}, addr:{}:{}\n",
-						COMPONENT_NAME_EX((COMPONENT_TYPE)args.componentType),
-						inet_ntoa((struct in_addr&)args.intaddr),
-						ntohs(args.intport)));
-
-					Components::getSingleton().addComponent(args.uid, args.username.c_str(), 
-						(KBEngine::COMPONENT_TYPE)args.componentType, args.componentID, args.globalorderid, args.grouporderid, args.gus,
-						args.intaddr, args.intport, args.extaddr, args.extport, args.extaddrEx, args.pid, args.cpu, args.mem, 
-						args.usedmem, args.extradata, args.extradata1, args.extradata2, args.extradata3);
-
-					isContinue = true;
-				}while(bhandler.pCurrPacket()->length() > 0);
-
-				// 防止接收到的数据不是想要的数据
-				if(findComponentType == args.componentType)
+				bhandler.itry(0);
+				if(bhandler.pCurrPacket() != NULL)
 				{
-					// 这里做个特例， 是logger则优先连接上去， 这样可以尽早同步日志
-					if(findComponentType == (int8)LOGGER_TYPE)
+					bhandler.pCurrPacket()->resetPacket();
+				}
+
+				bhandler.newMessage(MachineInterface::onFindInterfaceAddr);
+				MachineInterface::onFindInterfaceAddrArgs7::staticAddToBundle(bhandler, getUserUID(), getUsername(),
+					componentType_, componentID_, findComponentType, pNetworkInterface()->intaddr().ip, bhandler.epListen().addr().port);
+
+				ENGINE_COMPONENT_INFO cinfos = ServerConfig::getSingleton().getKBMachine();
+				std::vector< std::string >::iterator machine_addresses_iter = cinfos.machine_addresses.begin();
+				for(; machine_addresses_iter != cinfos.machine_addresses.end(); ++machine_addresses_iter)
+					bhandler.addBroadCastAddress((*machine_addresses_iter));
+
+				if(!bhandler.broadcast())
+				{
+					ERROR_MSG("Components::findComponents: broadcast error!\n");
+					return false;
+				}
+
+				int32 timeout = 500000;
+				MachineInterface::onBroadcastInterfaceArgs25 args;
+
+	RESTART_RECV:
+
+				// BundleBroadcast不了解当前目标和已缓存组件，由本层统一决定何时输出可诊断错误。
+				// BundleBroadcast does not know the current target or cached components, so this layer decides when a diagnostic error is warranted.
+				if(bhandler.receive(&args, 0, timeout, false))
+				{
+					bool isContinue = false;
+					timeout = 1000000;
+
+					do
 					{
-						findComponentTypes_[findIdx_] = -1;
-						if(connectComponent(static_cast<COMPONENT_TYPE>(findComponentType), getUserUID(), 0) != 0)
+						if(isContinue)
 						{
-							ERROR_MSG(fmt::format("Components::findComponents: register self to {} error!\n",
-							COMPONENT_NAME_EX((COMPONENT_TYPE)findComponentType)));
-							findIdx_++;
-							//dispatcher().breakProcessing();
-							return false;
+							try
+							{
+								args.createFromStream(*bhandler.pCurrPacket());
+							}catch(MemoryStreamException &)
+							{
+								break;
+							}
 						}
-						else
+
+						if(args.componentIDEx != componentID_)
 						{
-							findIdx_++;
+							WARNING_MSG(fmt::format("Components::findComponents: msg.componentID {} != {}.\n",
+								args.componentIDEx, componentID_));
+
+							args.componentIDEx = 0;
+							goto RESTART_RECV;
+						}
+
+						// 如果找不到
+						if(args.componentType == UNKNOWN_COMPONENT_TYPE)
+						{
+							isContinue = true;
 							continue;
 						}
+
+						INFO_MSG(fmt::format("Components::findComponents: found {}, addr:{}:{}\n",
+							COMPONENT_NAME_EX((COMPONENT_TYPE)args.componentType),
+							inet_ntoa((struct in_addr&)args.intaddr),
+							ntohs(args.intport)));
+
+						Components::getSingleton().addComponent(args.uid, args.username.c_str(),
+							(KBEngine::COMPONENT_TYPE)args.componentType, args.componentID, args.globalorderid, args.grouporderid, args.gus,
+							args.intaddr, args.intport, args.extaddr, args.extport, args.extaddrEx, args.pid, args.cpu, args.mem,
+							args.usedmem, args.extradata, args.extradata1, args.extradata2, args.extradata3);
+
+						isContinue = true;
+					}while(bhandler.pCurrPacket()->length() > 0);
+
+					// 防止接收到的数据不是想要的数据
+					if(findComponentType == args.componentType)
+					{
+						// 这里做个特例， 是logger则优先连接上去， 这样可以尽早同步日志
+						if(findComponentType == (int8)LOGGER_TYPE)
+						{
+							findComponentTypes_[findIdx_] = -1;
+							if(connectComponent(static_cast<COMPONENT_TYPE>(findComponentType), getUserUID(), 0) != 0)
+							{
+								ERROR_MSG(fmt::format("Components::findComponents: register self to {} error!\n",
+								COMPONENT_NAME_EX((COMPONENT_TYPE)findComponentType)));
+								findIdx_++;
+								//dispatcher().breakProcessing();
+								return false;
+							}
+							else
+							{
+								findIdx_++;
+								advanceFindIdx = true;
+								break;
+							}
+						}
 					}
-				}
-				
-				goto RESTART_RECV;
-			}
-			else
-			{
-				if(Components::getSingleton().getComponents((COMPONENT_TYPE)findComponentType).size() > 0)
-				{
-					findIdx_++;
-					count = 0;
+
+					if(advanceFindIdx)
+						break;
+
+					goto RESTART_RECV;
 				}
 				else
 				{
+					if(Components::getSingleton().getComponents((COMPONENT_TYPE)findComponentType).size() > 0)
+					{
+						findIdx_++;
+						count = 0;
+						advanceFindIdx = true;
+						break;
+					}
+
+					if(findAttempt + 1 < maxReceiveAttempts)
+					{
+						KBEngine::sleep(50);
+						continue;
+					}
+
 					if(reportTimeout)
 					{
 						ERROR_MSG(fmt::format(
-							"Components::findComponents: no response while finding {} after {} attempts; retrying.\n",
-							COMPONENT_NAME_EX((COMPONENT_TYPE)findComponentType), count));
+							"Components::findComponents: no response while finding {} after {} rounds ({} probes each); retrying.\n",
+							COMPONENT_NAME_EX((COMPONENT_TYPE)findComponentType), count, maxReceiveAttempts));
 					}
 
 					// 如果是这些辅助组件没找到则跳过
@@ -1444,10 +1460,13 @@ RESTART_RECV:
 							return false;
 						}
 					}
+
+					return false;
+				}
 				}
 
-				return false;
-			}
+			if(advanceFindIdx)
+				continue;
 		}
 
 		state_ = 2;
