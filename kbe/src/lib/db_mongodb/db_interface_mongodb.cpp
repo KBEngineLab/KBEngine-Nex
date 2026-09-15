@@ -479,7 +479,13 @@ namespace KBEngine {
 
 	bool DBInterfaceMongodb::processException(std::exception& e)
 	{
-		mongodb::DBException* dbe = static_cast<mongodb::DBException*>(&e);
+		mongodb::DBException* dbe = dynamic_cast<mongodb::DBException*>(&e);
+		if (!dbe)
+		{
+			ERROR_MSG(fmt::format("DBInterfaceMongodb::processException: unsupported exception: {}\n", e.what()));
+			return false;
+		}
+
 		bool retry = false;
 
 		if (dbe->isLostConnection())

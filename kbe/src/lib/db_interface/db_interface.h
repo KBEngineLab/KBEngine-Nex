@@ -149,6 +149,7 @@ public:
 	*/
 	virtual bool lock() = 0;
 	virtual bool unlock() = 0;
+	virtual bool rollback() { return true; }
 
 	/**
 		处理异常

@@ -31,6 +31,7 @@ public:
 	DBTask(const Network::Address& addr):
 	DBTaskBase(),
 	pDatas_(0),
+	initialDataRpos_(0),
 	addr_(addr)
 	{
 	}
@@ -38,11 +39,13 @@ public:
 	DBTask():
 	DBTaskBase(),
 	pDatas_(0),
+	initialDataRpos_(0),
 	addr_()
 	{
 	}
 	
 	virtual ~DBTask();
+	virtual void resetForRetry();
 
 	bool send(Network::Bundle* pBundle);
 
@@ -52,6 +55,7 @@ public:
 
 protected:
 	MemoryStream* pDatas_;
+	size_t initialDataRpos_;
 	Network::Address addr_;
 };
 
@@ -107,6 +111,8 @@ public:
 	virtual ~DBTaskExecuteRawDatabaseCommand();
 	virtual bool db_thread_process();
 	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual void resetForRetry();
+	virtual void onDatabaseFailure(const std::string& error);
 
 	virtual std::string name() const {
 		return "DBTaskExecuteRawDatabaseCommand";
@@ -132,6 +138,8 @@ public:
 	virtual ~DBTaskExecuteRawDatabaseCommandByEntity();
 	virtual bool db_thread_process();
 	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual void resetForRetry();
+	virtual void onDatabaseFailure(const std::string& error);
 
 	virtual std::string name() const {
 		return "DBTaskExecuteRawDatabaseCommandByEntity";
@@ -158,6 +166,8 @@ public:
 	virtual ~DBTaskWriteEntity();
 	virtual bool db_thread_process();
 	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual void resetForRetry();
+	virtual void onDatabaseFailure(const std::string& error);
 
 	virtual std::string name() const {
 		return "DBTaskWriteEntity";
@@ -167,6 +177,7 @@ protected:
 	COMPONENT_ID componentID_;
 	ENTITY_ID eid_;
 	DBID entityDBID_;
+	DBID initialEntityDBID_;
 	ENTITY_SCRIPT_UID sid_;
 	CALLBACK_ID callbackID_;
 	int8 shouldAutoLoad_;
@@ -591,6 +602,8 @@ public:
 	virtual ~DBTaskQueryEntity();
 	virtual bool db_thread_process();
 	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual void resetForRetry();
+	virtual void onDatabaseFailure(const std::string& error);
 
 	virtual std::string name() const {
 		return "DBTaskQueryEntity";

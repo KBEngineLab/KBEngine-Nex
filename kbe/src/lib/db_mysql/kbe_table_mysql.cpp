@@ -189,23 +189,9 @@ bool KBEEntityLogTableMysql::logEntity(DBInterface * pdbi, const char* ip, uint3
 
 	SAFE_RELEASE_ARRAY(tbuf);
 
-	try
+	if(!pdbi->query(sqlstr.c_str(), sqlstr.size(), false))
 	{
-		if(!pdbi->query(sqlstr.c_str(), sqlstr.size(), false))
-		{
-			// 1062 int err = pdbi->getlasterror(); 
-			return false;
-		}
-	}
-	catch (std::exception & e)
-	{
-		DBException& dbe = static_cast<DBException&>(e);
-		if(dbe.isLostConnection())
-		{
-			if(pdbi->processException(e))
-				return true;
-		}
-
+		// 1062 int err = pdbi->getlasterror();
 		return false;
 	}
 
@@ -354,23 +340,9 @@ bool KBEServerLogTableMysql::updateServer(DBInterface * pdbi)
 	
 	SAFE_RELEASE_ARRAY(tbuf);
 
-	try
+	if(!pdbi->query(sqlstr.c_str(), sqlstr.size(), false))
 	{
-		if(!pdbi->query(sqlstr.c_str(), sqlstr.size(), false))
-		{
-			// 1062 int err = pdbi->getlasterror(); 
-			return false;
-		}
-	}
-	catch (std::exception & e)
-	{
-		DBException& dbe = static_cast<DBException&>(e);
-		if(dbe.isLostConnection())
-		{
-			if(pdbi->processException(e))
-				return true;
-		}
-
+		// 1062 int err = pdbi->getlasterror();
 		return false;
 	}
 

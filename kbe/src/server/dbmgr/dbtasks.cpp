@@ -33,6 +33,7 @@ namespace KBEngine{
 DBTask::DBTask(const Network::Address& addr, MemoryStream& datas):
 DBTaskBase(),
 pDatas_(0),
+initialDataRpos_(datas.rpos()),
 addr_(addr)
 {
 	pDatas_ = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
@@ -44,6 +45,16 @@ DBTask::~DBTask()
 {
 	if(pDatas_)
 		MemoryStream::reclaimPoolObject(pDatas_);
+}
+
+//-------------------------------------------------------------------------------------
+void DBTask::resetForRetry()
+{
+	if (!pDatas_)
+		return;
+
+	KBE_ASSERT(initialDataRpos_ <= static_cast<size_t>(std::numeric_limits<int>::max()));
+	pDatas_->rpos(static_cast<int>(initialDataRpos_));
 }
 
 //-------------------------------------------------------------------------------------
@@ -94,6 +105,22 @@ DBTaskExecuteRawDatabaseCommand::~DBTaskExecuteRawDatabaseCommand()
 }
 
 //-------------------------------------------------------------------------------------
+void DBTaskExecuteRawDatabaseCommand::resetForRetry()
+{
+	DBTask::resetForRetry();
+	pExecret_->clear(false);
+	sdatas_.clear();
+	error_.clear();
+}
+
+//-------------------------------------------------------------------------------------
+void DBTaskExecuteRawDatabaseCommand::onDatabaseFailure(const std::string& error)
+{
+	pExecret_->clear(false);
+	error_ = error;
+}
+
+//-------------------------------------------------------------------------------------
 bool DBTaskExecuteRawDatabaseCommand::db_thread_process()
 {
 	(*pDatas_) >> componentID_ >> componentType_;
@@ -103,22 +130,9 @@ bool DBTaskExecuteRawDatabaseCommand::db_thread_process()
 	if (!pdbi_->checkRawDatabaseCommandAllowed(sdatas_, error_))
 		return false;
 
-	try
+	if (!pdbi_->query(sdatas_.data(), (uint32)sdatas_.size(), false, pExecret_))
 	{
-		if (!pdbi_->query(sdatas_.data(), (uint32)sdatas_.size(), false, pExecret_))
-		{
-			error_ = pdbi_->getstrerror();
-		}
-	}
-	catch (std::exception & e)
-	{
-		// 异常恢复由当前数据库后端处理，避免把非 MySQL 异常强转成 DBException。
-		if(pdbi_->processException(e))
-		{
-			return true;
-		}
-
-		error_ = e.what();
+		error_ = pdbi_->getstrerror();
 	}
 
 	return false;
@@ -144,6 +158,22 @@ DBTaskExecuteRawDatabaseCommandByEntity::~DBTaskExecuteRawDatabaseCommandByEntit
 }
 
 //-------------------------------------------------------------------------------------
+void DBTaskExecuteRawDatabaseCommandByEntity::resetForRetry()
+{
+	DBTask::resetForRetry();
+	pExecret_->clear(false);
+	sdatas_.clear();
+	error_.clear();
+}
+
+//-------------------------------------------------------------------------------------
+void DBTaskExecuteRawDatabaseCommandByEntity::onDatabaseFailure(const std::string& error)
+{
+	pExecret_->clear(false);
+	error_ = error;
+}
+
+//-------------------------------------------------------------------------------------
 bool DBTaskExecuteRawDatabaseCommandByEntity::db_thread_process()
 {
 	(*pDatas_) >> componentID_ >> componentType_;
@@ -153,22 +183,9 @@ bool DBTaskExecuteRawDatabaseCommandByEntity::db_thread_process()
 	if (!pdbi_->checkRawDatabaseCommandAllowed(sdatas_, error_))
 		return false;
 
-	try
+	if (!pdbi_->query(sdatas_.data(), (uint32)sdatas_.size(), false, pExecret_))
 	{
-		if (!pdbi_->query(sdatas_.data(), (uint32)sdatas_.size(), false, pExecret_))
-		{
-			error_ = pdbi_->getstrerror();
-		}
-	}
-	catch (std::exception & e)
-	{
-		// 异常恢复由当前数据库后端处理，避免 PostgreSQL 异常走 MySQL 分支。
-		if(pdbi_->processException(e))
-		{
-			return true;
-		}
-
-		error_ = e.what();
+		error_ = pdbi_->getstrerror();
 	}
 
 	return false;
@@ -310,6 +327,7 @@ EntityDBTask(addr, datas, eid, entityDBID),
 componentID_(componentID),
 eid_(eid),
 entityDBID_(entityDBID),
+initialEntityDBID_(entityDBID),
 sid_(0),
 callbackID_(0),
 shouldAutoLoad_(-1),
@@ -320,6 +338,24 @@ success_(false)
 //-------------------------------------------------------------------------------------
 DBTaskWriteEntity::~DBTaskWriteEntity()
 {
+}
+
+//-------------------------------------------------------------------------------------
+void DBTaskWriteEntity::resetForRetry()
+{
+	// 重试时恢复请求数据和原始 DBID，避免再次读取已经消费完的数据。
+	DBTask::resetForRetry();
+	entityDBID_ = initialEntityDBID_;
+	sid_ = 0;
+	callbackID_ = 0;
+	shouldAutoLoad_ = -1;
+	success_ = false;
+}
+
+//-------------------------------------------------------------------------------------
+void DBTaskWriteEntity::onDatabaseFailure(const std::string&)
+{
+	success_ = false;
 }
 
 //-------------------------------------------------------------------------------------
@@ -1754,6 +1790,28 @@ DBTaskQueryEntity::~DBTaskQueryEntity()
 }
 
 //-------------------------------------------------------------------------------------
+void DBTaskQueryEntity::resetForRetry()
+{
+	s_->clear(false);
+	success_ = false;
+	wasActive_ = false;
+	wasActiveCID_ = 0;
+	wasActiveEntityID_ = 0;
+	serverGroupID_ = 0;
+}
+
+//-------------------------------------------------------------------------------------
+void DBTaskQueryEntity::onDatabaseFailure(const std::string&)
+{
+	s_->clear(false);
+	success_ = false;
+	wasActive_ = false;
+	wasActiveCID_ = 0;
+	wasActiveEntityID_ = 0;
+	serverGroupID_ = 0;
+}
+
+//-------------------------------------------------------------------------------------
 bool DBTaskQueryEntity::db_thread_process()
 {
 	EntityTables& entityTables = EntityTables::findByInterfaceName(pdbi_->name());
@@ -1768,42 +1826,14 @@ bool DBTaskQueryEntity::db_thread_process()
 
 		KBE_ASSERT(pELTable);
 
-		try
-		{
-			success_ = pELTable->logEntity(pdbi_, addr_.ipAsString(), addr_.port, dbid_, 
-				componentID_, entityID_, pModule->getUType());
-		}
-		catch (std::exception & e)
-		{
-			// 断线和可重试错误交给当前数据库后端判断。
-			if(pdbi_->processException(e))
-			{
-				return true;
-			}
-			else
-				success_ = false;
-		}
+		success_ = pELTable->logEntity(pdbi_, addr_.ipAsString(), addr_.port, dbid_,
+			componentID_, entityID_, pModule->getUType());
 
 		if(!success_)
 		{
 			KBEEntityLogTable::EntityLog entitylog;
 
-			try
-			{
-				pELTable->queryEntity(pdbi_, dbid_, entitylog, pModule->getUType());
-			}
-			catch (std::exception & e)
-			{
-				// 断线和可重试错误交给当前数据库后端判断。
-				if(pdbi_->processException(e))
-				{
-					return true;
-				}
-				else
-				{
-					success_ = false;
-				}
-			}
+			pELTable->queryEntity(pdbi_, dbid_, entitylog, pModule->getUType());
 
 			wasActive_ = true;
 			

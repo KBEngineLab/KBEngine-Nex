@@ -52,6 +52,7 @@ public:
 
 	virtual bool lock();
 	virtual bool unlock();
+	virtual bool rollback();
 	virtual bool processException(std::exception& e);
 	virtual const char* getAutoIncrementInit() const;
 

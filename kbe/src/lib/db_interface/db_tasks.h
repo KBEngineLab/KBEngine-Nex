@@ -23,6 +23,7 @@ class DBTaskBase : public thread::TPTask
 public:
 
 	DBTaskBase():
+	pdbi_(NULL),
 	initTime_(timestamp())
 	{
 	}
@@ -32,6 +33,9 @@ public:
 	virtual bool db_thread_process() = 0;
 	virtual DBTaskBase* tryGetNextTask(){ return NULL; }
 	virtual thread::TPTask::TPTaskState presentMainThread();
+	virtual void resetForRetry() {}
+	virtual void onDatabaseFailure(const std::string& error) {}
+	virtual std::string name() const { return "DBTaskBase"; }
 
 	virtual void pdbi(DBInterface* ptr){ pdbi_ = ptr; }
 

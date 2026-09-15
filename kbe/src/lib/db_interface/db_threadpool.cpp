@@ -63,33 +63,126 @@ public:
 	virtual void onProcessTaskStart(thread::TPTask* pTask)
 	{
 		static_cast<DBTaskBase*>(pTask)->pdbi(_pDBInterface);
-		_pDBInterface->lock();
 	}
 
 	virtual void processTask(thread::TPTask* pTask)
-	{ 
-		bool retry;
-
-		do
+	{
+		DBTaskBase* pDBTask = static_cast<DBTaskBase*>(pTask);
+		if (!_pDBInterface)
 		{
-			retry = false;
+			const std::string error = "database interface is null";
+			ERROR_MSG(fmt::format("DBThread::processTask: {}, task={}.\n", error, pDBTask->name()));
+			pDBTask->onDatabaseFailure(error);
+			return;
+		}
+
+		enum ProcessPhase
+		{
+			PROCESS_PHASE_START,
+			PROCESS_PHASE_EXECUTE,
+			PROCESS_PHASE_COMMIT
+		};
+
+		const uint32 maxRetryCount = 3;
+		const uint32 retryDelays[] = { 10, 30, 100 };
+
+		for (uint32 retryCount = 0; ; ++retryCount)
+		{
+			if (retryCount > 0)
+				KBEngine::sleep(retryDelays[std::min<uint32>(retryCount - 1, 2)]);
+
+			ProcessPhase phase = PROCESS_PHASE_START;
+			bool transactionStarted = false;
 
 			try
 			{
-				thread::TPThread::processTask(pTask);
-			}
-			catch (std::exception & e)
-			{
-				retry = _pDBInterface->processException(e);
-			}
+				if (!_pDBInterface->lock())
+				{
+					const std::string error = _pDBInterface->getstrerror();
+					ERROR_MSG(fmt::format("DBThread::processTask: start transaction failed, task={}, db={}, error={}.\n",
+						pDBTask->name(), dbinterfaceName_, error));
+					pDBTask->onDatabaseFailure(error);
+					return;
+				}
 
-		} while (retry);
+				transactionStarted = true;
+				phase = PROCESS_PHASE_EXECUTE;
+
+				// 事务开始后再恢复任务，避免 BEGIN 失败时丢失上一轮的回调信息。
+				if (retryCount > 0)
+					pDBTask->resetForRetry();
+
+				thread::TPThread::processTask(pTask);
+
+				phase = PROCESS_PHASE_COMMIT;
+				if (!_pDBInterface->unlock())
+				{
+					const std::string commitError = _pDBInterface->getstrerror();
+					_pDBInterface->rollback();
+					ERROR_MSG(fmt::format("DBThread::processTask: commit failed, result is unknown, task={}, db={}, error={}.\n",
+						pDBTask->name(), dbinterfaceName_, commitError));
+					pDBTask->onDatabaseFailure(commitError);
+					return;
+				}
+
+				return;
+			}
+			catch (std::exception& e)
+			{
+				if (transactionStarted)
+					_pDBInterface->rollback();
+
+				bool retry = false;
+				try
+				{
+					retry = _pDBInterface->processException(e);
+				}
+				catch (std::exception& processException)
+				{
+					ERROR_MSG(fmt::format("DBThread::processTask: process exception failed, task={}, error={}.\n",
+						pDBTask->name(), processException.what()));
+				}
+				catch (...)
+				{
+					ERROR_MSG(fmt::format("DBThread::processTask: process exception failed with unknown error, task={}.\n",
+						pDBTask->name()));
+				}
+
+				// 提交阶段失败时无法确定服务端是否已经提交，不能自动重放写任务。
+				if (phase == PROCESS_PHASE_COMMIT)
+				{
+					ERROR_MSG(fmt::format("DBThread::processTask: commit exception, result is unknown, task={}, db={}, error={}.\n",
+						pDBTask->name(), dbinterfaceName_, e.what()));
+					pDBTask->onDatabaseFailure(e.what());
+					return;
+				}
+
+				if (!retry || retryCount >= maxRetryCount)
+				{
+					ERROR_MSG(fmt::format("DBThread::processTask: task failed, task={}, db={}, retries={}, error={}.\n",
+						pDBTask->name(), dbinterfaceName_, retryCount, e.what()));
+					pDBTask->onDatabaseFailure(e.what());
+					return;
+				}
+
+				WARNING_MSG(fmt::format("DBThread::processTask: retry task, task={}, db={}, retry={}.\n",
+					pDBTask->name(), dbinterfaceName_, retryCount + 1));
+			}
+			catch (...)
+			{
+				if (transactionStarted)
+					_pDBInterface->rollback();
+
+				ERROR_MSG(fmt::format("DBThread::processTask: task failed with unknown exception, task={}, db={}.\n",
+					pDBTask->name(), dbinterfaceName_));
+				pDBTask->onDatabaseFailure("unknown database task exception");
+				return;
+			}
+		}
 	}
 
 	virtual void onProcessTaskEnd(thread::TPTask* pTask)
 	{
-		static_cast<DBTaskBase*>(pTask)->pdbi(_pDBInterface);
-		_pDBInterface->unlock();
 	}
 
 private:

@@ -10,11 +10,13 @@
 	
 namespace KBEngine{
 
-class MemoryStreamException
+class MemoryStreamException : public std::exception
 {
     public:
         MemoryStreamException(bool _add, size_t _pos, size_t _opsize, size_t _size)
-            : _m_add(_add), _m_pos(_pos), _m_opsize(_opsize), _m_size(_size)
+            : _m_add(_add), _m_pos(_pos), _m_opsize(_opsize), _m_size(_size),
+			errStr_(fmt::format("Attempted to {} in MemoryStream (pos:{}, size:{}, opsize:{})!\n",
+				(_m_add ? "put" : "get"), _m_pos, _m_size, _m_opsize))
         {
             PrintPosError();
         }
@@ -24,10 +26,9 @@ class MemoryStreamException
 			ERROR_MSG(what());
         }
 
-		std::string what() const
+		const char* what() const noexcept override
 		{
-			return fmt::format("Attempted to {} in MemoryStream (pos:{}, size:{}, opsize:{})!\n",
-				(_m_add ? "put" : "get"), _m_pos, _m_size, _m_opsize);
+			return errStr_.c_str();
 		}
 
     private:
@@ -35,6 +36,7 @@ class MemoryStreamException
         size_t 		_m_pos;
         size_t 		_m_opsize;
         size_t 		_m_size;
+		std::string errStr_;
 };
 
 class MemoryStreamWriteOverflow

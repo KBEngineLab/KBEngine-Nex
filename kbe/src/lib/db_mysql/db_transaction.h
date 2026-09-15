@@ -15,10 +15,11 @@ public:
 	DBTransaction(DBInterface* pdbi, bool autostart = true);
 	~DBTransaction();
 	
-	void start();
+	bool start();
 	void end();
 
-	void commit();
+	bool commit();
+	bool rollback();
 
 	bool shouldRetry() const;
 
@@ -26,6 +27,7 @@ public:
 	
 private:
 	DBInterface* pdbi_;
+	bool active_;
 	bool committed_;
 	bool autostart_;
 };
