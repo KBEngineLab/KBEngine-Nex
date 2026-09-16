@@ -53,6 +53,7 @@ set "SOLUTION_FILE=%PROJECT_ROOT%kbe\src\kbengine nex.sln"
 set "GUICONSOLE_SOLUTION_FILE=%PROJECT_ROOT%kbe\src\guiconsole.sln"
 set "LOG_FILE=%~dp0build.log"
 set "VCPKG_PATH="
+set "VCPKG_REF=2825cdd8fe079a9538032fd78c3102d033195a2c"
 
 REM =========================================
 REM Parse parameters
@@ -117,7 +118,8 @@ if defined VCPKG_PATH (
 
 
         git -C "%USERPROFILE%\AppData\Local\kbe-vcpkg" reset --hard HEAD
-        git -C "%USERPROFILE%\AppData\Local\kbe-vcpkg" pull
+        git -C "%USERPROFILE%\AppData\Local\kbe-vcpkg" fetch origin "!VCPKG_REF!"
+        git -C "%USERPROFILE%\AppData\Local\kbe-vcpkg" checkout --detach "!VCPKG_REF!"
 
         call "!VCPKG_PATH!\bootstrap-vcpkg.bat"
 
@@ -136,6 +138,8 @@ if defined VCPKG_PATH (
         echo [Error] vcpkg download failed
         exit /b 1
     )
+    git -C "!VCPKG_PATH!" fetch origin "!VCPKG_REF!"
+    git -C "!VCPKG_PATH!" checkout --detach "!VCPKG_REF!"
     set "VCPKG_EXE=!VCPKG_PATH!\vcpkg.exe"
     call "!VCPKG_PATH!\bootstrap-vcpkg.bat"
 )

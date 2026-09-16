@@ -173,6 +173,7 @@ echo "[SUCCESS] GitHub repository is accessible"
 # Install vcpkg
 # =========================================
 VCPKG_DIR="$HOME/kbe-vcpkg"
+VCPKG_REF="2825cdd8fe079a9538032fd78c3102d033195a2c"
 if [ ! -d "$VCPKG_DIR" ] || [ ! -f "$VCPKG_DIR/bootstrap-vcpkg.sh" ]; then
     echo "[INFO] Cloning vcpkg"
     git clone https://github.com/microsoft/vcpkg.git "$VCPKG_DIR"
@@ -180,9 +181,9 @@ else
     echo "[INFO] vcpkg already exists: $VCPKG_DIR"
 fi
 
-
 git -C "$VCPKG_DIR" reset --hard HEAD
-git -C "$VCPKG_DIR" pull
+git -C "$VCPKG_DIR" fetch origin "$VCPKG_REF"
+git -C "$VCPKG_DIR" checkout --detach "$VCPKG_REF"
 
 
 OLDPWD=$(pwd)
