@@ -33,9 +33,6 @@
     <ClCompile Include="profile.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="clientsdk_downloader.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="http_cb_handler.h">
@@ -51,9 +48,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="profile.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="clientsdk_downloader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

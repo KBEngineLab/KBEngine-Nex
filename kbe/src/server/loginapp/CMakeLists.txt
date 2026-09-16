@@ -1,7 +1,6 @@
 
 # 收集源文件
 set(SRCS
-	clientsdk_downloader.cpp
 	http_cb_handler.cpp
 	loginapp.cpp
 	loginapp_interface.cpp

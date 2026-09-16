@@ -130,7 +130,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup><ClCompile Include="clientsdk_downloader.cpp" />
+  <ItemGroup>
     <ClCompile Include="http_cb_handler.cpp" />
     <ClCompile Include="loginapp.cpp" />
     <ClCompile Include="loginapp_interface.cpp" />
@@ -138,7 +138,6 @@
     <ClCompile Include="profile.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="clientsdk_downloader.h" />
     <ClInclude Include="http_cb_handler.h" />
     <ClInclude Include="loginapp.h" />
     <ClInclude Include="loginapp_interface.h" />
