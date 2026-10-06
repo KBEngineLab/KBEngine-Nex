@@ -10,27 +10,20 @@
 #include <stdexcept>
 #include <string>
 
-
-#if defined(__UNREAL__) || defined(UE_BUILD_DEBUG) || defined(UE_SERVER) || defined(UE_GAME) || defined(UE_CLIENT) || defined(UE_BUILD_DEVELOPMENT) || defined(UE_BUILD_SHIPPING)
-    #define KBE_PLATFORM_UE 1
-#elif defined(CC_TARGET_PLATFORM)
-    #define KBE_PLATFORM_COCOS 1
-#else
-    #define KBE_PLATFORM_CPP 1
-#endif
+#include "KBEPlatform.h"
 
 
 // ---------------------------
 // UE Version
 // ---------------------------
-#if defined(KBE_PLATFORM_UE)
+#if KBE_PLATFORM_UE
 	#include "Misc/AssertionMacros.h"
 	#define KBE_ASSERT(expr) check(expr)
 
 // ---------------------------
 // Cocos2d-x Version
 // ---------------------------
-#elif defined(KBE_PLATFORM_COCOS)
+#elif KBE_PLATFORM_COCOS
 	#include "base/CCPlatformMacros.h" // cocos2d-x 宏
 	#define KBE_ASSERT(expr) CCASSERT(expr, "KBE_ASSERT failed")
 
@@ -384,5 +377,4 @@ inline float safe_atof(const KBString& s)
 // 	KBE_DIRECTION.Z = FMath::DegreesToRadians<float>(UE4_DIRECTION.Yaw);
 // 	KBE_DIRECTION.X = FMath::DegreesToRadians<float>(UE4_DIRECTION.Roll);
 // }
-
 

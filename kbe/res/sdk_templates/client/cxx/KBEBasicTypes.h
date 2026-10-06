@@ -21,14 +21,7 @@
 #include <utility>
 #include <vector>
 
-
-#if defined(__UNREAL__) || defined(UE_BUILD_DEBUG) || defined(UE_SERVER) || defined(UE_GAME) || defined(UE_CLIENT) || defined(UE_BUILD_DEVELOPMENT) || defined(UE_BUILD_SHIPPING)
-    #define KBE_PLATFORM_UE 1
-#elif defined(CC_TARGET_PLATFORM)
-    #define KBE_PLATFORM_COCOS 1
-#else
-    #define KBE_PLATFORM_CPP 1
-#endif
+#include "KBEPlatform.h"
 
 
 // #ifdef _WIN32
@@ -234,7 +227,7 @@ struct KBString : public KBStringBase
     }
 
     
-#if defined(KBE_PLATFORM_UE)
+#if KBE_PLATFORM_UE
     // 添加 FString 构造
     KBString(const FString& fstr)
     {
@@ -361,7 +354,7 @@ constexpr int64  MAX_INT64  = INT64_MAX;
 // -------------------------
 // 检测是否在 Unreal Engine 下
 // -------------------------
-#if defined(__UNREAL__) || defined(UE_BUILD_DEBUG) || defined(UE_BUILD_SHIPPING)
+#if KBE_PLATFORM_UE
     #include "CoreMinimal.h" // 引入 FVector 等
     #define KBVECTOR_USE_UE 1
 #else
@@ -539,7 +532,7 @@ public:
 
 
     // UE TArray 构造与赋值
-#if defined(KBE_PLATFORM_UE)
+#if KBE_PLATFORM_UE
     // ===========================
     // TArray 构造与赋值
     // ===========================
