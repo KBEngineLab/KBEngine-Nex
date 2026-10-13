@@ -30,7 +30,7 @@ namespace KBEngine{
 //-------------------------------------------------------------------------------------
 bool LoadNavmeshTask::process()
 {
-	loadSucceeded_ = Navigation::getSingleton().loadNavigation(resPath_, params_) != NULL;
+	Navigation::getSingleton().loadNavigation(resPath_, params_);
 	return false;
 }
 
@@ -52,24 +52,12 @@ thread::TPTask::TPTaskState LoadNavmeshTask::presentMainThread()
 		WARNING_MSG(fmt::format("LoadNavmeshTask::presentMainThread(): ignored stale navigation resource({}) generation({}) for space({})\n",
 			resPath_, loadGeneration_, spaceID_));
 	}
-	else if(!loadSucceeded_)
-	{
-		ERROR_MSG(fmt::format("LoadNavmeshTask::presentMainThread(): failed to load navigation resource({}) for space({})\n",
-			resPath_, spaceID_));
-
-		// 保留既有几何加载完成回调，避免改变脚本生命周期，同时明确传递空句柄。
-		// Preserve the existing geometry completion callback to avoid changing script lifecycle while explicitly passing a null handle.
-		pSpace->onLoadedSpaceGeometryMapping(resPath_, loadGeneration_, NULL);
-	}
 	else
 	{
 		NavigationHandlePtr pNavigationHandle = Navigation::getSingleton().findNavigation(resPath_);
-		if(pNavigationHandle == NULL)
-		{
-			ERROR_MSG(fmt::format("LoadNavmeshTask::presentMainThread(): navigation resource({}) disappeared from cache for space({})\n",
-				resPath_, spaceID_));
-		}
 
+		// 几何映射允许没有服务端导航数据；空句柄仍须完成映射并通知脚本。
+		// 导航文件存在但损坏时，具体加载器负责记录错误，不能把可选数据缺失误报为加载失败。
 		pSpace->onLoadedSpaceGeometryMapping(resPath_, loadGeneration_, pNavigationHandle);
 	}
 	

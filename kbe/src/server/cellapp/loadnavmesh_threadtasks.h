@@ -34,8 +34,7 @@ public:
 	resPath_(resPath),
 	spaceID_(spaceID),
 	loadGeneration_(loadGeneration),
-	params_(params),
-	loadSucceeded_(false)
+	params_(params)
 	{
 	}
 
@@ -48,9 +47,6 @@ protected:
 	SPACE_ID spaceID_;
 	uint64 loadGeneration_;
 	std::map< int, std::string > params_;
-	// 子线程只向主线程传递结果状态，导航句柄仍通过带锁缓存取得。
-	// The worker passes only result state to the main thread; the handle still comes from the locked cache.
-	bool loadSucceeded_;
 };
 
 
