@@ -24,6 +24,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 	
 #include "cellapp.h"
 #include "space_viewer.h"
+
+#include <set>
 #include "server/kbemain.h"
 #include "server/serverapp.h"
 #include "server/idallocate.h"
@@ -106,6 +108,10 @@ public:
 
 	bool componentsReady();
 	bool componentReady(COMPONENT_ID cid);
+	bool spacePartitioningEnabled() const;
+	uint32 spacePartitioningConfirmedApps() const;
+	void reportSpacePartitioningMode(Network::Channel* pChannel, COMPONENT_ID cid,
+		uint16 protocolVersion, uint8 mode);
 
 	void removeCellapp(COMPONENT_ID cid);
 	Cellapp& getCellapp(COMPONENT_ID cid);
@@ -154,6 +160,8 @@ public:
 	void setSpaceViewer(Network::Channel* pChannel, MemoryStream& s);
 
 protected:
+	bool spaceAssigned(SPACE_ID spaceID);
+
 	TimerHandle							gameTimer_;
 	ForwardAnywhere_MessageBuffer		forward_anywhere_cellapp_messagebuffer_;
 	ForwardComponent_MessageBuffer		forward_cellapp_messagebuffer_;
@@ -162,6 +170,9 @@ protected:
 
 	std::map< COMPONENT_ID, Cellapp >	cellapps_;
 	std::vector<COMPONENT_ID>			cellapp_cids_;
+	uint8								spacePartitioningMode_;
+	// 尚无可用 CellApp 时仍需保留编号，避免重复恢复请求绕过单区域限制。
+	std::set<SPACE_ID>					queuedSpaceIDs_;
 
 	// 通过工具查看space
 	SpaceViewers						spaceViewers_;

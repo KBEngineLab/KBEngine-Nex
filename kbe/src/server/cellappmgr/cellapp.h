@@ -45,6 +45,8 @@ public:
 
 	float initProgress() const{ return initProgress_; }
 	void initProgress(float v){ initProgress_ = v; }
+	bool spacePartitioningConfirmed() const { return spacePartitioningConfirmed_; }
+	void spacePartitioningConfirmed(bool value) { spacePartitioningConfirmed_ = value; }
 
 	ENTITY_ID numEntities() const { return numEntities_; }
 	void numEntities(ENTITY_ID num) { numEntities_ = num; }
@@ -55,6 +57,10 @@ public:
 	void pendingWitnesses(uint64 value) { pendingWitnesses_ = value; }
 
 	std::size_t pendingSpaceCreations() const { return pendingSpaceCreations_.size(); }
+	bool hasAssignedSpace(SPACE_ID spaceID) {
+		return spaces_.getSpace(spaceID) != NULL ||
+			pendingSpaceCreations_.find(spaceID) != pendingSpaceCreations_.end();
+	}
 	void reserveSpaceCreation(SPACE_ID spaceID) { pendingSpaceCreations_.insert(spaceID); }
 	void confirmSpaceCreation(SPACE_ID spaceID) { pendingSpaceCreations_.erase(spaceID); }
 	std::size_t assignedSpaces() const { return numSpaces() + pendingSpaceCreations_.size(); }
@@ -85,6 +91,7 @@ protected:
 	Spaces spaces_;
 
 	float initProgress_;
+	bool spacePartitioningConfirmed_;
 
 	uint32 flags_;
 

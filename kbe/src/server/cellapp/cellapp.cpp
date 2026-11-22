@@ -39,6 +39,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "server/client_request_guard.h"
 #include "server/bounded_stream_reader.h"
 #include "server/component_routing_guard.h"
+#include "server/space_partitioning.h"
 #include "server/components.h"
 #include "server/telnet_server.h"
 #include "server/py_file_descriptor.h"
@@ -231,7 +232,11 @@ Cellapp::Cellapp(Network::EventDispatcher& dispatcher,
 	pInitProgressHandler_(NULL),
 	staleWitnessVolatileControlDrops_(0),
 	staleClientInputEntityDrops_(0),
-	staleControlledClientInputEntityDrops_(0)
+	staleControlledClientInputEntityDrops_(0),
+	spacePartitioningMode_(0),
+	spacePartitioningConfirmed_(false),
+	spacePartitioningRejected_(false),
+	spacePartitioningRequestTime_(0)
 {
 	KBEngine::Network::MessageHandlers::pMainMessageHandlers = &CellappInterface::messageHandlers;
 
@@ -317,6 +322,8 @@ void Cellapp::onShutdown(bool first)
 //-------------------------------------------------------------------------------------		
 bool Cellapp::initializeWatcher()
 {
+	WATCH_OBJECT("spacePartitioning/enabled", this, &Cellapp::spacePartitioningEnabled);
+	WATCH_OBJECT("spacePartitioning/confirmed", this, &Cellapp::spacePartitioningConfirmed);
 	ProfileVal::setWarningPeriod(stampsPerSecond() / g_kbeSrvConfig.gameUpdateHertz());
 	// Publish zero-sample latency windows before the first script, timer, or client update.
 	// 在首次脚本、Timer 或客户端更新前发布零样本延迟窗口，避免空载场景缺少指标目录。
@@ -566,7 +573,8 @@ PyObject* Cellapp::__py_gametime(PyObject* self, PyObject* args)
 //-------------------------------------------------------------------------------------
 bool Cellapp::run()
 {
-	return EntityApp<Entity>::run();
+	const bool succeeded = EntityApp<Entity>::run();
+	return succeeded && !spacePartitioningRejected_;
 }
 
 //-------------------------------------------------------------------------------------
@@ -601,7 +609,77 @@ void Cellapp::handleGameTick()
 //-------------------------------------------------------------------------------------
 bool Cellapp::initializeBegin()
 {
+	spacePartitioningMode_ = SpacePartitioning::modeFlags(
+		g_serverConfig.getCellAppMgr().cellappmgr_space_partitioning_enabled,
+		g_serverConfig.getCellApp().use_coordinate_system,
+		g_serverConfig.getCellApp().coordinateSystem_hasY);
+	INFO_MSG(fmt::format("Cellapp::initializeBegin: spacePartitioning.enabled={}, protocol={}.\n",
+		spacePartitioningEnabled(), SpacePartitioning::PROTOCOL_VERSION));
 	return true;
+}
+
+//-------------------------------------------------------------------------------------
+bool Cellapp::spacePartitioningEnabled() const
+{
+	return (spacePartitioningMode_ & SpacePartitioning::ENABLED) != 0;
+}
+
+//-------------------------------------------------------------------------------------
+bool Cellapp::confirmSpacePartitioningMode(Network::Channel* pChannel)
+{
+	if (spacePartitioningConfirmed_)
+		return true;
+	if (spacePartitioningRejected_)
+		return false;
+
+	if (spacePartitioningRequestTime_ == 0)
+	{
+		// 复用已注册的内部连接，不通过额外端口或发现消息确认运行模式。
+		Network::Bundle* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		bundle->newMessage(CellappmgrInterface::reportSpacePartitioningMode);
+		CellappmgrInterface::reportSpacePartitioningModeArgs3::staticAddToBundle(*bundle,
+			componentID_, SpacePartitioning::PROTOCOL_VERSION, spacePartitioningMode_);
+		spacePartitioningRequestTime_ = timestamp();
+		pChannel->send(bundle);
+	}
+	else if (timestamp() - spacePartitioningRequestTime_ > stampsPerSecond() * 30)
+	{
+		ERROR_MSG("Cellapp::confirmSpacePartitioningMode: manager confirmation timed out.\n");
+		spacePartitioningRejected_ = true;
+		dispatcher().breakProcessing();
+	}
+
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::onSpacePartitioningMode(Network::Channel* pChannel, COMPONENT_ID managerID,
+	uint16 protocolVersion, uint8 mode, bool accepted)
+{
+	Components& components = Components::getSingleton();
+	Components::ComponentInfos* source = components.findComponent(CELLAPPMGR_TYPE, managerID);
+	if (pChannel == NULL || pChannel->isExternal() || pChannel->isDestroyed() ||
+		pChannel->condemn() != 0 || spacePartitioningRequestTime_ == 0 ||
+		!Security::isBoundBidirectionalComponentSource(managerID, source, pChannel, pChannel->componentID()))
+	{
+		WARNING_MSG("Cellapp::onSpacePartitioningMode: rejected unbound manager confirmation.\n");
+		return;
+	}
+
+	if (!accepted || !SpacePartitioning::compatible(spacePartitioningMode_, protocolVersion, mode))
+	{
+		ERROR_MSG(fmt::format(
+			"Cellapp::onSpacePartitioningMode: incompatible manager, localMode={}, remoteMode={}, localProtocol={}, remoteProtocol={}.\n",
+			spacePartitioningMode_, mode, SpacePartitioning::PROTOCOL_VERSION, protocolVersion));
+		spacePartitioningRejected_ = true;
+		spacePartitioningConfirmed_ = false;
+		dispatcher().breakProcessing();
+		return;
+	}
+
+	spacePartitioningConfirmed_ = true;
+	INFO_MSG(fmt::format("Cellapp::onSpacePartitioningMode: confirmed manager({}), enabled={}.\n",
+		managerID, spacePartitioningEnabled()));
 }
 
 //-------------------------------------------------------------------------------------

@@ -141,7 +141,18 @@ inline bool loadConfig()
 		return false;
 	}
 
-	return g_kbeSrvConfig.loadConfig(selectedKBEngineConfig());
+	if (!g_kbeSrvConfig.loadConfig(selectedKBEngineConfig()))
+		return false;
+
+	// spacePartitioning必须要要求coordinateSystem开启，这里做一遍显示检查
+	if (g_kbeSrvConfig.getCellAppMgr().cellappmgr_space_partitioning_enabled &&
+		!g_kbeSrvConfig.getCellApp().use_coordinate_system)
+	{
+		ERROR_MSG("loadConfig: space partitioning requires cellapp/coordinate_system/enable=true.\n");
+		return false;
+	}
+
+	return true;
 }
 
 inline void setEvns()

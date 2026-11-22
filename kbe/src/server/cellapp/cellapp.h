@@ -81,6 +81,11 @@ public:
 
 	float _getLoad() const { return getLoad(); }
 	virtual void onUpdateLoad();
+	bool spacePartitioningEnabled() const;
+	bool spacePartitioningConfirmed() const { return spacePartitioningConfirmed_; }
+	bool confirmSpacePartitioningMode(Network::Channel* pChannel);
+	void onSpacePartitioningMode(Network::Channel* pChannel, COMPONENT_ID managerID,
+		uint16 protocolVersion, uint8 mode, bool accepted);
 	uint64 staleClientInputEntityDrops() const { return staleClientInputEntityDrops_; }
 	uint64 staleControlledClientInputEntityDrops() const { return staleControlledClientInputEntityDrops_; }
 
@@ -308,6 +313,10 @@ protected:
 	// 客户端易变移动可能在迁移后到达旧 Cell；先验证 BaseApp 来源，再计数该生命周期竞态。
 	uint64								staleClientInputEntityDrops_;
 	uint64								staleControlledClientInputEntityDrops_;
+	uint8								spacePartitioningMode_;
+	bool								spacePartitioningConfirmed_;
+	bool								spacePartitioningRejected_;
+	uint64								spacePartitioningRequestTime_;
 };
 
 }

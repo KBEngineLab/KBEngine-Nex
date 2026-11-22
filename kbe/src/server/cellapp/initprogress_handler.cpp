@@ -136,6 +136,9 @@ bool InitProgressHandler::process()
 	if(pChannel == NULL)
 		return true;
 
+	if (!Cellapp::getSingleton().confirmSpacePartitioningMode(pChannel))
+		return true;
+
 	if(Cellapp::getSingleton().idClient().size() == 0)
 		return true;
 

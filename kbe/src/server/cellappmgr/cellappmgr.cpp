@@ -23,6 +23,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "cellapp_placement.h"
 #include "server/component_routing_guard.h"
 #include "server/bounded_stream_reader.h"
+#include "server/space_partitioning.h"
 #include "cellappmgr_interface.h"
 #include "network/common.h"
 #include "network/tcp_packet.h"
@@ -135,8 +136,11 @@ Cellappmgr::Cellappmgr(Network::EventDispatcher& dispatcher,
 	gameTimer_(),
 	forward_anywhere_cellapp_messagebuffer_(ninterface, CELLAPP_TYPE),
 	forward_cellapp_messagebuffer_(ninterface),
+	bestCellappID_(0),
 	cellapps_(),
-	cellapp_cids_()
+	cellapp_cids_(),
+	spacePartitioningMode_(0),
+	queuedSpaceIDs_()
 {
 	KBEngine::Network::MessageHandlers::pMainMessageHandlers = &CellappmgrInterface::messageHandlers;
 }
@@ -190,7 +194,8 @@ uint32 Cellappmgr::readyForLoginApps()
 	uint32 count = 0;
 	for (std::map< COMPONENT_ID, Cellapp >::const_iterator iter = cellapps_.begin(); iter != cellapps_.end(); ++iter)
 	{
-		if (!iter->second.isDestroyed() && iter->second.initProgress() >= 1.f)
+		if (!iter->second.isDestroyed() && iter->second.spacePartitioningConfirmed() &&
+			iter->second.initProgress() >= 1.f)
 			++count;
 	}
 	return count;
@@ -237,6 +242,8 @@ bool Cellappmgr::initializeWatcher()
 	WATCH_OBJECT("readiness/readyApps", this, &Cellappmgr::readyForLoginApps);
 	WATCH_OBJECT("readiness/totalApps", this, &Cellappmgr::totalReadyForLoginApps);
 	WATCH_OBJECT("readiness/minProgress", this, &Cellappmgr::minReadyForLoginProgress);
+	WATCH_OBJECT("spacePartitioning/enabled", this, &Cellappmgr::spacePartitioningEnabled);
+	WATCH_OBJECT("spacePartitioning/confirmedApps", this, &Cellappmgr::spacePartitioningConfirmedApps);
 	WATCH_OBJECT("allocation/confirmedSpaces", this, &Cellappmgr::confirmedSpaceCount);
 	WATCH_OBJECT("allocation/pendingSpaces", this, &Cellappmgr::pendingSpaceCount);
 	WATCH_OBJECT("allocation/minAssignedSpaces", this, &Cellappmgr::minAssignedSpaceCount);
@@ -344,6 +351,12 @@ void Cellappmgr::handleGameTick()
 //-------------------------------------------------------------------------------------
 bool Cellappmgr::initializeBegin()
 {
+	spacePartitioningMode_ = SpacePartitioning::modeFlags(
+		g_serverConfig.getCellAppMgr().cellappmgr_space_partitioning_enabled,
+		g_serverConfig.getCellApp().use_coordinate_system,
+		g_serverConfig.getCellApp().coordinateSystem_hasY);
+	INFO_MSG(fmt::format("Cellappmgr::initializeBegin: spacePartitioning.enabled={}, protocol={}.\n",
+		spacePartitioningEnabled(), SpacePartitioning::PROTOCOL_VERSION));
 	return true;
 }
 
@@ -424,7 +437,8 @@ COMPONENT_ID Cellappmgr::findFreeCellapp(void)
 	for (iter = cellapps_.begin(); iter != cellapps_.end(); ++iter)
 	{
 		if ((iter->second.flags() & APP_FLAGS_NOT_PARTCIPATING_LOAD_BALANCING) > 0 ||
-			iter->second.isDestroyed() || iter->second.initProgress() <= 1.f)
+			iter->second.isDestroyed() || !iter->second.spacePartitioningConfirmed() ||
+			iter->second.initProgress() <= 1.f)
 		{
 			continue;
 		}
@@ -444,7 +458,8 @@ COMPONENT_ID Cellappmgr::findFreeCellapp(void)
 			continue;
 		
 		// 首先进程必须活着且初始化完毕
-		if(!iter->second.isDestroyed() && iter->second.initProgress() > 1.f)
+		if(!iter->second.isDestroyed() && iter->second.spacePartitioningConfirmed() &&
+			iter->second.initProgress() > 1.f)
 		{
 			const std::size_t assignedSpaces = iter->second.assignedSpaces();
 			if (!cellappPlacementWithinSkew(
@@ -482,10 +497,7 @@ bool Cellappmgr::componentsReady()
 	Components::COMPONENTS::iterator ctiter = cts.begin();
 	for(; ctiter != cts.end(); ++ctiter)
 	{
-		if((*ctiter).pChannel == NULL)
-			return false;
-
-		if((*ctiter).state != COMPONENT_STATE_RUN)
+		if (!componentReady((*ctiter).cid))
 			return false;
 	}
 
@@ -496,7 +508,76 @@ bool Cellappmgr::componentsReady()
 bool Cellappmgr::componentReady(COMPONENT_ID cid)
 {
 	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(CELLAPP_TYPE, cid);
-	return isAvailableCellappTarget(cinfos, true);
+	std::map<COMPONENT_ID, Cellapp>::const_iterator iter = cellapps_.find(cid);
+	return isAvailableCellappTarget(cinfos, true) && iter != cellapps_.end() &&
+		iter->second.spacePartitioningConfirmed();
+}
+
+//-------------------------------------------------------------------------------------
+bool Cellappmgr::spacePartitioningEnabled() const
+{
+	return (spacePartitioningMode_ & SpacePartitioning::ENABLED) != 0;
+}
+
+//-------------------------------------------------------------------------------------
+bool Cellappmgr::spaceAssigned(SPACE_ID spaceID)
+{
+	if (queuedSpaceIDs_.find(spaceID) != queuedSpaceIDs_.end())
+		return true;
+	for (auto& entry : cellapps_)
+	{
+		if (!entry.second.isDestroyed() && entry.second.hasAssignedSpace(spaceID))
+			return true;
+	}
+	return false;
+}
+
+//-------------------------------------------------------------------------------------
+uint32 Cellappmgr::spacePartitioningConfirmedApps() const
+{
+	uint32 count = 0;
+	for (const auto& entry : cellapps_)
+	{
+		if (!entry.second.isDestroyed() && entry.second.spacePartitioningConfirmed())
+			++count;
+	}
+	return count;
+}
+
+//-------------------------------------------------------------------------------------
+void Cellappmgr::reportSpacePartitioningMode(Network::Channel* pChannel,
+	COMPONENT_ID cid, uint16 protocolVersion, uint8 mode)
+{
+	Components::ComponentInfos* source = Components::getSingleton().findComponent(CELLAPP_TYPE, cid);
+	auto iter = cellapps_.find(cid);
+	if (pChannel == NULL || pChannel->isExternal() || pChannel->isDestroyed() ||
+		pChannel->condemn() != 0 || iter == cellapps_.end() ||
+		!Security::isBoundBidirectionalComponentSource(cid, source, pChannel, pChannel->componentID()))
+	{
+		WARNING_MSG(fmt::format("Cellappmgr::reportSpacePartitioningMode: rejected unbound CellApp({}).\n", cid));
+		return;
+	}
+
+	const bool accepted = SpacePartitioning::compatible(spacePartitioningMode_, protocolVersion, mode);
+	iter->second.spacePartitioningConfirmed(accepted);
+	if (!accepted)
+	{
+		ERROR_MSG(fmt::format(
+			"Cellappmgr::reportSpacePartitioningMode: incompatible CellApp({}), localMode={}, remoteMode={}, localProtocol={}, remoteProtocol={}.\n",
+			cid, spacePartitioningMode_, mode, SpacePartitioning::PROTOCOL_VERSION, protocolVersion));
+		updateBestCellapp();
+	}
+	else
+	{
+		INFO_MSG(fmt::format("Cellappmgr::reportSpacePartitioningMode: confirmed CellApp({}), enabled={}.\n",
+			cid, spacePartitioningEnabled()));
+	}
+
+	Network::Bundle* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	bundle->newMessage(CellappInterface::onSpacePartitioningMode);
+	CellappInterface::onSpacePartitioningModeArgs4::staticAddToBundle(*bundle,
+		componentID_, SpacePartitioning::PROTOCOL_VERSION, spacePartitioningMode_, accepted);
+	pChannel->send(bundle);
 }
 
 //-------------------------------------------------------------------------------------
@@ -643,6 +724,19 @@ void Cellappmgr::reqCreateCellEntityInNewSpace(Network::Channel* pChannel, Memor
 	}
 
 	static SPACE_ID spaceID = 1;
+	// 恢复可能先占用旧编号，新建 Space 不能再次使用已确认或正在创建的编号。
+	while (spaceID != 0 && spaceAssigned(spaceID))
+		++spaceID;
+	if (spaceID == 0)
+	{
+		ERROR_MSG("Cellappmgr::reqCreateCellEntityInNewSpace: Space ID range exhausted.\n");
+		Network::Bundle* failure = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		failure->newMessage(BaseappInterface::onCreateCellFailure);
+		BaseappInterface::onCreateCellFailureArgs1::staticAddToBundle(*failure, id);
+		pChannel->send(failure);
+		s.done();
+		return;
+	}
 	const SPACE_ID assignedSpaceID = spaceID++;
 
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
@@ -680,9 +774,10 @@ void Cellappmgr::reqCreateCellEntityInNewSpace(Network::Channel* pChannel, Memor
 	if (bestCellappID_ > 0)
 		cinfos = Components::getSingleton().findComponent(CELLAPP_TYPE, bestCellappID_);
 
-	if (!isAvailableCellappTarget(cinfos, true))
+	if (!componentReady(bestCellappID_))
 	{
 		WARNING_MSG("Cellappmgr::reqCreateCellEntityInNewSpace: not found cellapp, message is buffered.\n");
+		queuedSpaceIDs_.insert(assignedSpaceID);
 
 		ForwardItem* pFI = new AppForwardItem();
 		pFI->pHandler = NULL;
@@ -753,6 +848,19 @@ void Cellappmgr::reqRestoreSpaceInCell(Network::Channel* pChannel, MemoryStream&
 		return;
 	}
 
+	if (!spacePartitioningEnabled() && spaceAssigned(spaceID))
+	{
+		ERROR_MSG(fmt::format(
+			"Cellappmgr::reqRestoreSpaceInCell: spacePartitioning is disabled, Space({}) is already assigned.\n",
+			spaceID));
+		Network::Bundle* failure = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		failure->newMessage(BaseappInterface::onCreateCellFailure);
+		BaseappInterface::onCreateCellFailureArgs1::staticAddToBundle(*failure, id);
+		pChannel->send(failure);
+		s.done();
+		return;
+	}
+
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(CellappInterface::onRestoreSpaceInCellFromBaseapp);
 	(*pBundle) << entityType;
@@ -769,9 +877,10 @@ void Cellappmgr::reqRestoreSpaceInCell(Network::Channel* pChannel, MemoryStream&
 
 	updateBestCellapp();
 	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(CELLAPP_TYPE, bestCellappID_);
-	if (!isAvailableCellappTarget(cinfos, true))
+	if (!componentReady(bestCellappID_))
 	{
 		WARNING_MSG("Cellappmgr::reqRestoreSpaceInCell: not found cellapp, message is buffered.\n");
+		queuedSpaceIDs_.insert(spaceID);
 		ForwardItem* pFI = new AppForwardItem();
 		pFI->pHandler = NULL;
 		pFI->pBundle = pBundle;
@@ -833,7 +942,8 @@ void Cellappmgr::onCellappInitProgress(Network::Channel* pChannel, COMPONENT_ID 
 	std::map<COMPONENT_ID, Cellapp>::iterator cellappIter = cellapps_.find(cid);
 	if (pChannel == NULL || pChannel->isExternal() ||
 		!Security::isBoundComponentSource(cid, sourceInfos, pChannel) ||
-		cellappIter == cellapps_.end() || !Security::isValidComponentMetric(progress))
+		cellappIter == cellapps_.end() || !cellappIter->second.spacePartitioningConfirmed() ||
+		!Security::isValidComponentMetric(progress))
 	{
 		WARNING_MSG(fmt::format("Cellappmgr::onCellappInitProgress: rejected cid({}), progress({})!\n",
 			cid, progress));
@@ -1029,6 +1139,13 @@ void Cellappmgr::querySpaces(Network::Channel* pChannel, MemoryStream& s)
 //-------------------------------------------------------------------------------------
 void Cellappmgr::updateSpaceData(Network::Channel* pChannel, MemoryStream& s)
 {
+	if (pChannel == NULL || pChannel->isExternal() || pChannel->isDestroyed() ||
+		pChannel->condemn() != 0)
+	{
+		s.done();
+		return;
+	}
+
 	COMPONENT_ID componentID;
 	SPACE_ID spaceID;
 	bool delspace = false;
@@ -1042,14 +1159,37 @@ void Cellappmgr::updateSpaceData(Network::Channel* pChannel, MemoryStream& s)
 	s >> geomappingPath;
 
 	std::map< COMPONENT_ID, Cellapp >::iterator iter = cellapps_.find(componentID);
-	if (iter == cellapps_.end())
+	Components::ComponentInfos* source = Components::getSingleton().findComponent(CELLAPP_TYPE, componentID);
+	if (iter == cellapps_.end() || !iter->second.spacePartitioningConfirmed() ||
+		!Security::isBoundBidirectionalComponentSource(componentID, source, pChannel, pChannel->componentID()))
+	{
+		WARNING_MSG(fmt::format("Cellappmgr::updateSpaceData: rejected unconfirmed CellApp({}).\n", componentID));
+		s.done();
 		return;
+	}
+
+	if (!spacePartitioningEnabled() && !delspace)
+	{
+		for (auto& entry : cellapps_)
+		{
+			if (entry.first != componentID && !entry.second.isDestroyed() &&
+				entry.second.hasAssignedSpace(spaceID))
+			{
+				ERROR_MSG(fmt::format(
+					"Cellappmgr::updateSpaceData: spacePartitioning is disabled, Space({}) already belongs to CellApp({}).\n",
+					spaceID, entry.first));
+				s.done();
+				return;
+			}
+		}
+	}
 
 	Cellapp& cellappref = iter->second;
 	const bool isNewSpace = !delspace && cellappref.spaces().getSpace(spaceID) == NULL;
 	cellappref.spaces().updateSpaceData(spaceID, scriptModuleName, geomappingPath, delspace);
 	if (isNewSpace)
 		cellappref.confirmSpaceCreation(spaceID);
+	queuedSpaceIDs_.erase(spaceID);
 }
 
 //-------------------------------------------------------------------------------------

@@ -208,6 +208,7 @@ typedef struct EngineComponentInfo
 		witness_volatile_lod_far_interval_ticks = 4;
 		cellappmgr_space_assignment_max_skew = 2;
 		cellappmgr_witness_pending_pressure_weight = 1.f;
+		cellappmgr_space_partitioning_enabled = false;
 	}
 
 	~EngineComponentInfo()
@@ -235,30 +236,26 @@ typedef struct EngineComponentInfo
 	bool use_coordinate_system;								// 是否使用坐标系统 如果为false, view, trap, move等功能将不再维护
 	bool coordinateSystem_hasY;								// 范围管理器是管理Y轴， 注：有y轴则view、trap等功能有了高度， 但y轴的管理会带来一定的消耗
 	uint16 entity_posdir_additional_updates;				// 实体位置停止发生改变后，引擎继续向客户端更新tick次的位置信息，为0则总是更新。
-	// 每个 Witness 每 Tick 的位置方向字节预算，零表示不限制。
-	// Per-Witness position and direction byte budget per tick; zero means unlimited.
+	// 每个 Witness 每 Tick 的位置方向字节预算，0表示不限制。
 	uint32 witness_volatile_bytes_per_tick;
-	// 每个 Witness 以及整个 CellApp 每 Tick 的总同步预算，零表示不限制。
-	// Per-Witness and whole-CellApp synchronization budgets per tick; zero means unlimited.
+	// 每个 Witness 以及整个 CellApp 每 Tick 的总同步预算，0表示不限制。
 	uint32 witness_total_bytes_per_tick;
 	uint32 witness_global_bytes_per_tick;
-	// 每 Tick 允许执行 AOI 序列化的 Witness 数；窗口会轮转，零表示不限制。
-	// Witnesses admitted for AOI serialization per tick; the window rotates and zero is unlimited.
+	// 每 Tick 允许执行 AOI 序列化的 Witness 数；窗口会轮转，0表示不限制。
 	uint32 witness_global_updates_per_tick;
 	// 高密度 AOI 仅降低位置/方向刷新频率，结构消息始终实时发送。
-	// Dense AOI reduces only position/direction refresh frequency; structural messages remain immediate.
 	bool witness_volatile_lod_enabled;
 	uint32 witness_volatile_lod_minimum_view_entities;
 	float witness_volatile_lod_near_distance;
 	float witness_volatile_lod_medium_distance;
 	uint32 witness_volatile_lod_medium_interval_ticks;
 	uint32 witness_volatile_lod_far_interval_ticks;
-	// 自动分配的新 Space 在 CellApp 间允许的最大数量差；零关闭硬约束。
-	// Maximum automatic Space-count skew between CellApps; zero disables the hard bound.
+	// 自动分配的新 Space 在 CellApp 间允许的最大数量差；0关闭。
 	uint32 cellappmgr_space_assignment_max_skew;
-	// 新 Space 分配时，CellApp Witness pending/active 比例的评分权重；零关闭。
-	// Placement weight for the CellApp Witness pending/active ratio; zero disables it.
+	// 新 Space 分配时，CellApp Witness pending/active 比例的评分权重；0关闭。
 	float cellappmgr_witness_pending_pressure_weight;
+	// 旧项目缺省时保持单个 Space 由一个 Cell 承载，不关闭已有显式传送。
+	bool cellappmgr_space_partitioning_enabled;
 	uint16 entity_posdir_updates_type;						// 实体位置更新方式，0：非优化高精度同步, 1:优化同步, 2:智能选择模式
 	uint16 entity_posdir_updates_smart_threshold;			// 实体位置更新智能模式下的同屏人数阈值
 

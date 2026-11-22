@@ -1635,6 +1635,25 @@ bool ServerConfig::loadConfig(std::string fileName)
 		if (node != NULL)
 			_cellAppMgrInfo.cellappmgr_witness_pending_pressure_weight =
 				std::max(0.f, static_cast<float>(xml->getValFloat(node)));
+
+		node = xml->enterNode(rootNode, "spacePartitioning");
+		if (node != NULL)
+		{
+			TiXmlNode* enabledNode = xml->enterNode(node, "enabled");
+			if (enabledNode != NULL)
+			{
+				const std::string value = strutil::toLower(strutil::kbe_trim(xml->getValStr(enabledNode)));
+				if (value != "true" && value != "false")
+				{
+					ERROR_MSG(fmt::format(
+						"ServerConfig::loadConfig: cellappmgr/spacePartitioning/enabled '{}' is invalid, expected true or false, file={}.\n",
+						value, fileName));
+					return false;
+				}
+
+				_cellAppMgrInfo.cellappmgr_space_partitioning_enabled = value == "true";
+			}
+		}
 	}
 	
 	rootNode = xml->getRootNode("baseappmgr");

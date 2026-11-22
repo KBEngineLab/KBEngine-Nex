@@ -120,6 +120,12 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappmgrInterface)
 	// 工具请求改变space查看器（含添加和删除功能）
 	CELLAPPMGR_MESSAGE_DECLARE_STREAM(setSpaceViewer,						NETWORK_VARIABLE_MESSAGE)
 
+	// 完成运行模式确认后，CellApp 才能进入初始化完成和空间分配流程。
+	CELLAPPMGR_MESSAGE_DECLARE_ARGS3(reportSpacePartitioningMode,			NETWORK_FIXED_MESSAGE,
+									COMPONENT_ID,							cid,
+									uint16,									protocolVersion,
+									uint8,									mode)
+
 NETWORK_INTERFACE_DECLARE_END()
 
 #ifdef DEFINE_IN_INTERFACE

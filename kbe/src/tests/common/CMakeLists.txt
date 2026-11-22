@@ -379,6 +379,23 @@ set_tests_properties(cellapp.coordinate_system_near_insert PROPERTIES
 	PASS_REGULAR_EXPRESSION "COORDINATE_SYSTEM_NEAR_INSERT_TEST_PASS"
 )
 
+add_executable(kbe_test_space_partitioning space_partitioning.cpp)
+target_include_directories(kbe_test_space_partitioning PRIVATE
+	"${CMAKE_SOURCE_DIR}/lib"
+)
+target_link_libraries(kbe_test_space_partitioning PRIVATE common)
+set_target_properties(kbe_test_space_partitioning PROPERTIES FOLDER "Tests/Common")
+if(MSVC)
+	target_compile_options(kbe_test_space_partitioning PRIVATE /W4 /WX /utf-8)
+else()
+	target_compile_options(kbe_test_space_partitioning PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+add_test(NAME cellapp.space_partitioning_mode COMMAND kbe_test_space_partitioning)
+set_tests_properties(cellapp.space_partitioning_mode PROPERTIES
+	LABELS "cellapp;cellappmgr;cxx;unit;portable;protocol"
+	PASS_REGULAR_EXPRESSION "SPACE_PARTITIONING_TEST_PASS"
+)
+
 # 自动收集本目录的测试程序，避免新增 CTest 后忘记同步聚合目标，导致 CI 只注册测试却没有生成可执行文件。
 # Collect test executables from this directory automatically so a newly registered CTest cannot be omitted from the CI build aggregate.
 get_property(_kbe_common_test_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)

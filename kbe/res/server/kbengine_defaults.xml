@@ -970,6 +970,13 @@
 			Placement score weight for the Witness pending/active ratio; 0 disables it.
 		-->
 		<witnessPendingPressureWeight> 1.0 </witnessPendingPressureWeight>
+
+		<!-- 是否开启 Space 的分割和自动跨 Cell 迁移，3.x有效。
+			Whether to enable Space partitioning and automatic cross-Cell migration; effective in 3.x.
+		-->
+		<spacePartitioning>
+			<enabled> false </enabled>
+		</spacePartitioning>
 	</cellappmgr>
 	
 	<baseappmgr>

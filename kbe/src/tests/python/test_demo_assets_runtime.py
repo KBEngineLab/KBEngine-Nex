@@ -68,6 +68,92 @@ def cell_entities(console):
     )
 
 
+def verify_partitioning_rejection(entries, run_root, environment, args, output):
+    extra_root = output / "rejected-cell"
+    config_path = extra_root / "res/server/kbengine.xml"
+    config_path.parent.mkdir(parents=True, exist_ok=False)
+    source_root = Path(environment["KBE_RES_PATH"].split(os.pathsep)[0])
+    tree = ET.parse(source_root / "server/kbengine.xml")
+    root = tree.getroot()
+    manager = root.find("cellappmgr")
+    partitioning = manager.find("spacePartitioning")
+    if partitioning is None:
+        partitioning = ET.SubElement(manager, "spacePartitioning")
+
+    enabled = args.space_partitioning == "true"
+    expected_error = "Cellapp::onSpacePartitioningMode: incompatible manager"
+    if args.partition_rejection == "mode":
+        set_xml_value(partitioning, "enabled", str(not enabled).lower())
+    elif args.partition_rejection == "invalid":
+        set_xml_value(partitioning, "enabled", "not-a-boolean")
+        expected_error = "cellappmgr/spacePartitioning/enabled 'not-a-boolean' is invalid"
+    else:
+        set_xml_value(partitioning, "enabled", "true")
+        cell = root.find("cellapp")
+        coordinates = cell.find("coordinate_system")
+        if coordinates is None:
+            coordinates = ET.SubElement(cell, "coordinate_system")
+        if args.partition_rejection == "coordinates":
+            set_xml_value(coordinates, "enable", "false")
+            expected_error = "space partitioning requires cellapp/coordinate_system/enable=true"
+        else:
+            require(enabled, "坐标轴不一致检查必须在分割开启模式下执行")
+            defaults = ET.parse(args.repository_root / "kbe/res/server/kbengine_defaults.xml").getroot()
+            default_y = defaults.findtext("./cellapp/coordinate_system/rangemgr_y").strip().lower()
+            has_y = coordinates.findtext("rangemgr_y", default_y).strip().lower() == "true"
+            set_xml_value(coordinates, "rangemgr_y", str(not has_y).lower())
+    tree.write(config_path, encoding="utf-8", xml_declaration=True)
+
+    extra_environment = dict(environment)
+    extra_environment["KBE_RES_PATH"] = os.pathsep.join(
+        (str(config_path.parents[1]), environment["KBE_RES_PATH"])
+    )
+    process = None
+    with (extra_root / "stdout.log").open("wb") as stdout, \
+            (extra_root / "stderr.log").open("wb") as stderr:
+        try:
+            process = subprocess.Popen(
+                [str(args.repository_root / "kbe/bin/server" / platform_executable_name("cellapp")),
+                 "--cid=8010", "--gus=20", "--hide=1"],
+                cwd=extra_root, env=extra_environment, stdin=subprocess.DEVNULL,
+                stdout=stdout, stderr=stderr,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+            )
+            exit_code = process.wait(timeout=60)
+            require(exit_code in (1, 255, 4294967295),
+                    f"不兼容节点没有按启动失败退出，退出码为 {exit_code}")
+        finally:
+            # 只清理本次启动且仍在运行的进程，不能按组件名或旧 PID 查找。
+            if process is not None and process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
+
+    logs = wait_until(
+        "不兼容节点拒绝日志",
+        lambda: read_text(extra_root / "stdout.log") + read_text(extra_root / "stderr.log")
+        + all_run_logs(entries, run_root)
+        + "".join(read_text(path) for path in (extra_root / "logs").glob("*.log")),
+        lambda text: expected_error in text, timeout=10,
+    )
+    require("confirmed CellApp(8010)" not in logs,
+            "不兼容节点被管理器确认为可用节点")
+    require("onCellappInitProgress: cid=8010" not in logs,
+            "不兼容节点仍上报了初始化完成")
+    require("Traceback (most recent call last)" not in logs and "KBE_ASSERT" not in logs,
+            "不兼容节点因脚本异常或断言退出，不能当作模式拒绝通过")
+    require(all(entry["process"].poll() is None for entry in entries),
+            "拒绝新增节点时原有服务进程退出")
+    result = {"status": "PASS", "rejection": args.partition_rejection,
+              "space_partitioning_configuration": args.space_partitioning,
+              "rejected_component": 8010, "exit_code": exit_code}
+    (output / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    print(f"SPACE_PARTITIONING_REJECTION_PASS result={output / 'result.json'}", flush=True)
+
+
 def verify_demo(entries, run_root, environment, args, output, password):
     sys.path.insert(0, str(args.repository_root / "kbe/tools/server"))
     from pycommon import Define, Machines
@@ -77,6 +163,16 @@ def verify_demo(entries, run_root, environment, args, output, password):
         args.repository_root / "kbe/tools/server", [run_root / "logs"],
         1, 2, 150, 5, None, token,
     )
+    expected_mode = "true" if args.space_partitioning == "true" else "false"
+    logs = all_run_logs(entries, run_root)
+    for cid in (8001, 8002):
+        require(
+            f"confirmed CellApp({cid}), enabled={expected_mode}." in logs,
+            f"CellApp {cid} 未完成预期的分割模式确认",
+        )
+    if args.partition_rejection:
+        verify_partitioning_rejection(entries, run_root, environment, args, output)
+        return
     machines = Machines.Machines(adminToken=token)
     consoles = {}
     bots = None
@@ -268,6 +364,8 @@ def verify_demo(entries, run_root, environment, args, output, password):
             )
             result = {
                 "status": "PASS", "entity": eid, "source_cellapp": source["cid"],
+                "space_partitioning_configuration": args.space_partitioning,
+                "space_partitioning_enabled": args.space_partitioning == "true",
                 "target_cellapp": target["cid"], "target_space": target["space"],
                 "client_preserved": route["client"] == original_route["client"],
                 "database_id_preserved": route["dbid"] == original_route["dbid"],
@@ -298,6 +396,10 @@ def main():
     parser.add_argument("--config-overlay", type=Path, required=True)
     parser.add_argument("--test-database-name", required=True,
                         help="必须与运行配置一致，且不同于原 assets 的数据库名")
+    parser.add_argument("--space-partitioning", choices=("default", "false", "true"), default="default",
+                        help="仅修改隔离运行配置；default 检查项目未填写新配置时的行为")
+    parser.add_argument("--partition-rejection", choices=("mode", "coordinates", "axes", "invalid"),
+                        help="启动真实额外 CellApp 检查拒绝行为，不运行正常业务流程")
     args = parser.parse_args()
     for name in ("repository_root", "assets_root", "binary_root", "config_overlay"):
         setattr(args, name, getattr(args, name).resolve())
@@ -321,6 +423,17 @@ def main():
         bots_transport="tcp", bots_allow_tcp_fallback=False,
     )
     runtime = ET.parse(config_path)
+    manager = runtime.getroot().find("cellappmgr")
+    if manager is None:
+        manager = ET.SubElement(runtime.getroot(), "cellappmgr")
+    partitioning = manager.find("spacePartitioning")
+    if args.space_partitioning == "default":
+        if partitioning is not None:
+            manager.remove(partitioning)
+    else:
+        if partitioning is None:
+            partitioning = ET.SubElement(manager, "spacePartitioning")
+        set_xml_value(partitioning, "enabled", args.space_partitioning)
     password = uuid.uuid4().hex
     for component in ("baseapp", "cellapp", "bots"):
         parent = runtime.getroot().find(component)

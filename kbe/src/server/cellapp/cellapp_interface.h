@@ -225,6 +225,13 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
 	CELLAPP_MESSAGE_DECLARE_ARGS2(setWitnessVolatileUpdatesEnabled,				NETWORK_FIXED_MESSAGE,
 									ENTITY_ID,								entityID,
 									uint8,									enabled)
+
+	// 管理器明确接受运行模式后，才能执行组件就绪业务并上报初始化完成。
+	CELLAPP_MESSAGE_DECLARE_ARGS4(onSpacePartitioningMode,					NETWORK_FIXED_MESSAGE,
+									COMPONENT_ID,							managerID,
+									uint16,									protocolVersion,
+									uint8,									mode,
+									bool,									accepted)
 NETWORK_INTERFACE_DECLARE_END()
 
 #ifdef DEFINE_IN_INTERFACE
