@@ -36,10 +36,15 @@ add_executable(kbe_test_network_kcp_adaptive_scheduling
     kcp_adaptive_scheduling.cpp
 )
 
-add_executable(kbe_test_network_kcp_protocol_metrics
-    kcp_protocol_metrics.cpp
+# VS 混合语言工程不能按语言分别设置这些告警选项，因此单独编译第三方 C 文件，
+# 避免测试代码的 /W4 /WX 被应用到 ikcp.c。
+add_library(kbe_test_network_kcp_protocol_impl OBJECT
     ${CMAKE_SOURCE_DIR}/lib/network/ikcp.c
 )
+set_target_properties(kbe_test_network_kcp_protocol_impl PROPERTIES FOLDER "Tests/Network")
+
+add_executable(kbe_test_network_kcp_protocol_metrics kcp_protocol_metrics.cpp)
+target_link_libraries(kbe_test_network_kcp_protocol_metrics PRIVATE kbe_test_network_kcp_protocol_impl)
 
 add_executable(kbe_test_network_udp_send_backpressure
     udp_send_backpressure.cpp
@@ -108,10 +113,8 @@ if(MSVC)
     target_compile_options(kbe_test_network_kcp_update_queue PRIVATE /W4 /WX /utf-8)
     target_compile_options(kbe_test_network_kcp_send_state PRIVATE /W4 /WX /utf-8)
     target_compile_options(kbe_test_network_kcp_adaptive_scheduling PRIVATE /W4 /WX /utf-8)
-    target_compile_options(kbe_test_network_kcp_protocol_metrics PRIVATE
-        $<$<COMPILE_LANGUAGE:CXX>:/W4;/WX;/utf-8>
-        $<$<COMPILE_LANGUAGE:C>:/W3;/utf-8>
-    )
+    target_compile_options(kbe_test_network_kcp_protocol_impl PRIVATE /W3 /utf-8)
+    target_compile_options(kbe_test_network_kcp_protocol_metrics PRIVATE /W4 /WX /utf-8)
     target_compile_options(kbe_test_network_udp_send_backpressure PRIVATE /W4 /WX /utf-8)
 	 target_compile_options(kbe_test_network_channel_index_identity PRIVATE /W4 /WX /utf-8)
 else()
@@ -143,7 +146,7 @@ else()
         -Wall -Wextra -Wpedantic -Werror
     )
     target_compile_options(kbe_test_network_kcp_protocol_metrics PRIVATE
-        $<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Wpedantic;-Werror>
+        -Wall -Wextra -Wpedantic -Werror
     )
     target_compile_options(kbe_test_network_udp_send_backpressure PRIVATE
         -Wall -Wextra -Wpedantic -Werror

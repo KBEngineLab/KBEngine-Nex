@@ -4,8 +4,7 @@
 
 namespace KBEngine
 {
-// 单元测试不初始化完整日志网络栈；这些边界实现仅满足 MemoryStream 异常分支的链接契约，成功路径不会调用它们。
-// Unit tests do not initialize the full logging network stack; these boundary implementations satisfy MemoryStream exception-path linkage and are not called on successful paths.
+// 单元测试使用空日志方法，避免连接 Logger。验证异常路径的测试需要先创建 DebugHelper 实例。
 KBE_SINGLETON_INIT(DebugHelper);
 
 void DebugHelper::debug_msg(const std::string&)

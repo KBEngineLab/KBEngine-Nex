@@ -80,6 +80,7 @@ set_tests_properties(entitydef.method_utype_allocator PROPERTIES
 
 add_executable(kbe_test_cell_event_migration
 	debug_helper_stubs.cpp
+	debug_helper_lifecycle_stubs.cpp
 	cell_event_migration.cpp
 	"${CMAKE_SOURCE_DIR}/lib/entitydef/entity_events.cpp"
 )
@@ -87,7 +88,7 @@ target_include_directories(kbe_test_cell_event_migration PRIVATE
 	"${CMAKE_SOURCE_DIR}"
 	"${CMAKE_SOURCE_DIR}/lib"
 )
-target_link_libraries(kbe_test_cell_event_migration PRIVATE common KBE::PythonRuntime)
+target_link_libraries(kbe_test_cell_event_migration PRIVATE common network KBE::PythonRuntime)
 set_target_properties(kbe_test_cell_event_migration PROPERTIES FOLDER "Tests/Common")
 
 if(MSVC)
@@ -103,6 +104,10 @@ endif()
 add_test(NAME cellapp.event_migration COMMAND kbe_test_cell_event_migration)
 if(WIN32)
 	set(_kbe_cell_event_python_home "${KBE_PYTHON_ROOT}/tools/python3")
+	# 测试程序保留在配置目录中，只为本次测试补充已部署的 Python DLL 路径。
+	set_property(TEST cellapp.event_migration APPEND PROPERTY
+		ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${KBE_RUNTIME_BIN_DIR}"
+	)
 else()
 	set(_kbe_cell_event_python_home "${KBE_PYTHON_ROOT}")
 endif()

@@ -82,7 +82,7 @@ if(KBE_TEST_ASSETS)
 
     add_test(NAME integration.kbcmd_typescript_sdk
         COMMAND "${CMAKE_COMMAND}"
-            "-DKBE_EXECUTABLE=$<TARGET_FILE:kbcmd>"
+            "-DKBE_EXECUTABLE=${KBE_RUNTIME_BIN_DIR}/kbcmd${CMAKE_EXECUTABLE_SUFFIX}"
             "-DKBE_REPOSITORY_ROOT=${CMAKE_SOURCE_DIR}/../.."
             "-DKBE_ASSETS_ROOT=${_kbe_test_assets}"
             "-DKBE_OUTPUT_ROOT=${CMAKE_BINARY_DIR}/Testing/kbcmd-typescript-$<CONFIG>"
@@ -96,16 +96,17 @@ if(KBE_TEST_ASSETS)
 
     if(KBE_TEST_SERVER_CLUSTER OR KBE_TEST_DATABASES)
         find_package(Python3 COMPONENTS Interpreter REQUIRED)
+        # 链接输出目录不部署 Python DLL，集群测试需与运行时检查使用同一套已部署程序。
         set(_kbe_cluster_components
-            "machine::$<TARGET_FILE:machine>::1000::1"
-            "logger::$<TARGET_FILE:logger>::2000::2"
-            "interfaces::$<TARGET_FILE:interfaces>::3000::3"
-            "dbmgr::$<TARGET_FILE:dbmgr>::4000::4"
-            "baseappmgr::$<TARGET_FILE:baseappmgr>::5000::5"
-            "cellappmgr::$<TARGET_FILE:cellappmgr>::6000::6"
-            "baseapp::$<TARGET_FILE:baseapp>::7001::7"
-            "cellapp::$<TARGET_FILE:cellapp>::8001::9"
-            "loginapp::$<TARGET_FILE:loginapp>::9000::11"
+            "machine::${KBE_RUNTIME_BIN_DIR}/machine${CMAKE_EXECUTABLE_SUFFIX}::1000::1"
+            "logger::${KBE_RUNTIME_BIN_DIR}/logger${CMAKE_EXECUTABLE_SUFFIX}::2000::2"
+            "interfaces::${KBE_RUNTIME_BIN_DIR}/interfaces${CMAKE_EXECUTABLE_SUFFIX}::3000::3"
+            "dbmgr::${KBE_RUNTIME_BIN_DIR}/dbmgr${CMAKE_EXECUTABLE_SUFFIX}::4000::4"
+            "baseappmgr::${KBE_RUNTIME_BIN_DIR}/baseappmgr${CMAKE_EXECUTABLE_SUFFIX}::5000::5"
+            "cellappmgr::${KBE_RUNTIME_BIN_DIR}/cellappmgr${CMAKE_EXECUTABLE_SUFFIX}::6000::6"
+            "baseapp::${KBE_RUNTIME_BIN_DIR}/baseapp${CMAKE_EXECUTABLE_SUFFIX}::7001::7"
+            "cellapp::${KBE_RUNTIME_BIN_DIR}/cellapp${CMAKE_EXECUTABLE_SUFFIX}::8001::9"
+            "loginapp::${KBE_RUNTIME_BIN_DIR}/loginapp${CMAKE_EXECUTABLE_SUFFIX}::9000::11"
         )
         list(JOIN _kbe_cluster_components "|" _kbe_cluster_components_arg)
     endif()

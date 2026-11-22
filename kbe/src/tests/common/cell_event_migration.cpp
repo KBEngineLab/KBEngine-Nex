@@ -1,5 +1,6 @@
 #include "entitydef/entity_events.h"
 #include "common/memorystream.h"
+#include "helper/debug_helper.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -20,6 +21,8 @@ bool require(bool condition, const char* message)
 
 int main()
 {
+	// 损坏数据校验会记录日志，先建立测试日志实例，避免异常路径触发单例断言。
+	KBEngine::DebugHelper debugHelper;
 	Py_Initialize();
 
 	PyObject* mainModule = PyImport_AddModule("__main__");
