@@ -244,6 +244,7 @@ bool Cellappmgr::initializeWatcher()
 	WATCH_OBJECT("readiness/minProgress", this, &Cellappmgr::minReadyForLoginProgress);
 	WATCH_OBJECT("spacePartitioning/enabled", this, &Cellappmgr::spacePartitioningEnabled);
 	WATCH_OBJECT("spacePartitioning/confirmedApps", this, &Cellappmgr::spacePartitioningConfirmedApps);
+	WATCH_OBJECT("spacePartitioning/managedSpaces", this, &Cellappmgr::managedSpaceCount);
 	WATCH_OBJECT("allocation/confirmedSpaces", this, &Cellappmgr::confirmedSpaceCount);
 	WATCH_OBJECT("allocation/pendingSpaces", this, &Cellappmgr::pendingSpaceCount);
 	WATCH_OBJECT("allocation/minAssignedSpaces", this, &Cellappmgr::minAssignedSpaceCount);
@@ -259,6 +260,7 @@ bool Cellappmgr::initializeWatcher()
 //-------------------------------------------------------------------------------------
 void Cellappmgr::removeCellapp(COMPONENT_ID cid)
 {
+	onSpaceLayoutCellLost(cid);
 	std::map< COMPONENT_ID, Cellapp >::iterator iter = cellapps_.find(cid);
 	if (iter != cellapps_.end())
 	{
@@ -346,6 +348,7 @@ void Cellappmgr::handleGameTick()
 	++g_kbetime;
 	threadPool_.onMainThreadTick();
 	networkInterface().processChannels(&CellappmgrInterface::messageHandlers);
+	updateSpaceLayouts();
 }
 
 //-------------------------------------------------------------------------------------
@@ -1168,15 +1171,19 @@ void Cellappmgr::updateSpaceData(Network::Channel* pChannel, MemoryStream& s)
 		return;
 	}
 
-	if (!spacePartitioningEnabled() && !delspace)
+	if (!delspace)
 	{
 		for (auto& entry : cellapps_)
 		{
 			if (entry.first != componentID && !entry.second.isDestroyed() &&
 				entry.second.hasAssignedSpace(spaceID))
 			{
+				auto managed = spaceLayouts_.find(spaceID);
+				if (spacePartitioningEnabled() && managed != spaceLayouts_.end() &&
+					managed->second.layout.cellForApp(componentID) != NULL)
+					continue;
 				ERROR_MSG(fmt::format(
-					"Cellappmgr::updateSpaceData: spacePartitioning is disabled, Space({}) already belongs to CellApp({}).\n",
+					"Cellappmgr::updateSpaceData: no confirmed layout permits Space({}) on another CellApp({}).\n",
 					spaceID, entry.first));
 				s.done();
 				return;

@@ -513,6 +513,9 @@ bool Cellapp::installPyModules()
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		getSpaceData,					Space::__py_GetSpaceData,								METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		delSpaceData,					Space::__py_DelSpaceData,								METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		spaces,						Spaces::__py_Spaces,									METH_VARARGS,			0);
+	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(), setSpaceLayout, __py_setSpaceLayout, METH_VARARGS, 0);
+	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(), getSpaceLayout, __py_getSpaceLayout, METH_VARARGS, 0);
+	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(), cellForPosition, __py_cellForPosition, METH_VARARGS, 0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		entitiesForSpace,				Spaces::__py_EntitiesForSpace,							METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		isShuttingDown,					__py_isShuttingDown,									METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		address,						__py_address,											METH_VARARGS,			0);
@@ -1691,7 +1694,7 @@ void Cellapp::_onCreateCellEntityFromBaseapp(std::string& entityType, ENTITY_ID 
 	//	spaceID, entityType.c_str(), entityID, componentID);
 
 	Space* space = Spaces::findSpace(spaceID);
-	if(space != NULL && space->isGood())
+	if(space != NULL && space->canAcceptEntities())
 	{
 		// 解包cellData信息.
 		PyObject* cellData = NULL;
@@ -2815,7 +2818,7 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 	}
 
 	Space* space = Spaces::findSpace(refEntity->spaceID());
-	if (space == NULL || !space->isGood())
+	if (space == NULL || !space->canAcceptEntities())
 	{
 		s.rpos((int)rpos);
 
@@ -2827,7 +2830,7 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 		(*pBundle).append(&s);
 		pChannel->send(pBundle);
 
-		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellApp: target space({}) was destroyed before migration, reqTeleportEntity({}).\n", spaceID, teleportEntityID));
+		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellApp: target space({}) is not accepting new entities, reqTeleportEntity({}).\n", spaceID, teleportEntityID));
 		s.done();
 		return;
 	}

@@ -53,26 +53,28 @@ void Navigation::finalise()
 bool Navigation::removeNavigation(std::string resPath)
 {
 	KBEngine::thread::ThreadGuard tg(&mutex_); 
-	KBEUnordered_map<std::string, NavigationHandlePtr>::iterator iter = navhandles_.find(resPath);
-	if(iter != navhandles_.end())
+	bool removed = false;
+	for (auto iter = navhandles_.begin(); iter != navhandles_.end(); )
 	{
-		// 容器中的 SmartPointer 会在擦除时释放自身引用，手动减引用会造成重复释放。
-		// The SmartPointer stored in the container releases its reference on erase; a manual decrement would release it twice.
-		navhandles_.erase(iter);
-
-		DEBUG_MSG(fmt::format("Navigation::removeNavigation: ({}) is destroyed!\n", resPath));
-		return true;
+		if (iter->first.first == resPath)
+		{
+			// 删除缓存引用不会影响仍由其他 Space 持有的导航句柄。
+			iter = navhandles_.erase(iter);
+			removed = true;
+		}
+		else
+			++iter;
 	}
-
-	return false;
+	return removed;
 }
 
 //-------------------------------------------------------------------------------------
-NavigationHandlePtr Navigation::findNavigation(std::string resPath)
+NavigationHandlePtr Navigation::findNavigation(std::string resPath,
+	const std::map<int, std::string>& params)
 {
 	KBEngine::thread::ThreadGuard tg(&mutex_); 
-	KBEUnordered_map<std::string, NavigationHandlePtr>::iterator iter = navhandles_.find(resPath);
-	if(navhandles_.find(resPath) != navhandles_.end())
+	NavigationHandles::iterator iter = navhandles_.find(NavigationKey(resPath, params));
+	if(iter != navhandles_.end())
 	{
 		if(iter->second == NULL)
 			return NULL;
@@ -99,7 +101,8 @@ NavigationHandlePtr Navigation::findNavigation(std::string resPath)
 bool Navigation::hasNavigation(std::string resPath)
 {
 	KBEngine::thread::ThreadGuard tg(&mutex_); 
-	return navhandles_.find(resPath) != navhandles_.end();
+	auto found = navhandles_.lower_bound(NavigationKey(resPath, {}));
+	return found != navhandles_.end() && found->first.first == resPath;
 }
 
 //-------------------------------------------------------------------------------------
@@ -109,7 +112,8 @@ NavigationHandlePtr Navigation::loadNavigation(std::string resPath, const std::m
 	if(resPath == "")
 		return NULL;
 	
-	KBEUnordered_map<std::string, NavigationHandlePtr>::iterator iter = navhandles_.find(resPath);
+	const NavigationKey key(resPath, params);
+	NavigationHandles::iterator iter = navhandles_.find(key);
 	if(iter != navhandles_.end())
 	{
 		return iter->second;
@@ -160,7 +164,7 @@ NavigationHandlePtr Navigation::loadNavigation(std::string resPath, const std::m
 		return NULL;
 
 	NavigationHandlePtr pNavigationHandle(pNavigationHandle_);
-	navhandles_[resPath] = pNavigationHandle;
+	navhandles_[key] = pNavigationHandle;
 	return pNavigationHandle;
 }
 

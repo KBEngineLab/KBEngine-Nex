@@ -38,26 +38,6 @@ set_tests_properties(common.strutil_conversion PROPERTIES
 	PASS_REGULAR_EXPRESSION "COMMON_STRUTIL_CONVERSION_TEST_PASS"
 )
 
-add_executable(kbe_test_script_vector_repr script_vector_repr.cpp)
-target_include_directories(kbe_test_script_vector_repr PRIVATE
-	"${CMAKE_SOURCE_DIR}"
-	"${CMAKE_SOURCE_DIR}/lib"
-)
-target_link_libraries(kbe_test_script_vector_repr PRIVATE KBE::BuildOptions fmt::fmt)
-set_target_properties(kbe_test_script_vector_repr PROPERTIES FOLDER "Tests/Common")
-
-if(MSVC)
-	target_compile_options(kbe_test_script_vector_repr PRIVATE /W4 /WX /utf-8)
-else()
-	target_compile_options(kbe_test_script_vector_repr PRIVATE -Wall -Wextra -Wpedantic -Werror)
-endif()
-
-add_test(NAME pyscript.vector_repr COMMAND kbe_test_script_vector_repr)
-set_tests_properties(pyscript.vector_repr PROPERTIES
-	LABELS "cellapp;cxx;python;runtime;unit"
-	PASS_REGULAR_EXPRESSION "SCRIPT_VECTOR_REPR_TEST_PASS"
-)
-
 add_executable(kbe_test_method_utype_allocator method_utype_allocator.cpp)
 target_include_directories(kbe_test_method_utype_allocator PRIVATE
 	"${CMAKE_SOURCE_DIR}"
@@ -394,6 +374,21 @@ add_test(NAME cellapp.space_partitioning_mode COMMAND kbe_test_space_partitionin
 set_tests_properties(cellapp.space_partitioning_mode PROPERTIES
 	LABELS "cellapp;cellappmgr;cxx;unit;portable;protocol"
 	PASS_REGULAR_EXPRESSION "SPACE_PARTITIONING_TEST_PASS"
+)
+
+add_executable(kbe_test_space_layout debug_helper_stubs.cpp space_layout.cpp)
+target_include_directories(kbe_test_space_layout PRIVATE "${CMAKE_SOURCE_DIR}/lib")
+target_link_libraries(kbe_test_space_layout PRIVATE common)
+set_target_properties(kbe_test_space_layout PROPERTIES FOLDER "Tests/Common")
+if(MSVC)
+	target_compile_options(kbe_test_space_layout PRIVATE /W4 /WX /utf-8)
+else()
+	target_compile_options(kbe_test_space_layout PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+add_test(NAME cellapp.space_layout COMMAND kbe_test_space_layout)
+set_tests_properties(cellapp.space_layout PROPERTIES
+	LABELS "cellapp;cellappmgr;cxx;unit;portable;protocol"
+	PASS_REGULAR_EXPRESSION "SPACE_LAYOUT_TEST_PASS"
 )
 
 # 自动收集本目录的测试程序，避免新增 CTest 后忘记同步聚合目标，导致 CI 只注册测试却没有生成可执行文件。

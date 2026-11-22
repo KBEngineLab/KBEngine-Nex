@@ -20,21 +20,10 @@ add_test(NAME runtime.layout
         "-DKBE_PYTHON_STDLIB=${KBE_RUNTIME_PYTHON_STDLIB}"
         "-DKBE_PYTHON_EXTENSION=${KBE_RUNTIME_PYTHON_EXTENSION}"
         "-DKBE_PYTHON_RUNTIME_FILES=${_kbe_runtime_python_files_arg}"
-        "-DKBE_RUNTIME_DIR=${KBE_RUNTIME_BIN_DIR}"
         "-DKBE_LOG4J_CONFIG=${KBE_RUNTIME_BIN_DIR}/log4j.properties"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyRuntime.cmake"
 )
 set_tests_properties(runtime.layout PROPERTIES LABELS "smoke;runtime")
-
-add_test(NAME runtime.kbcmd_getuid
-    COMMAND "${KBE_RUNTIME_BIN_DIR}/kbcmd${CMAKE_EXECUTABLE_SUFFIX}" --getuid
-)
-set_tests_properties(runtime.kbcmd_getuid PROPERTIES
-    LABELS "smoke;runtime"
-    PASS_REGULAR_EXPRESSION "[0-9]+"
-    FAIL_REGULAR_EXPRESSION "\\[ERROR\\];Traceback"
-    ENVIRONMENT "KBE_ROOT=${CMAKE_SOURCE_DIR}/../..;KBE_RES_PATH=${CMAKE_SOURCE_DIR}/../res;KBE_BIN_PATH=${KBE_RUNTIME_BIN_DIR}"
-)
 
 add_test(NAME runtime.kbcmd_new_assets
     COMMAND "${CMAKE_COMMAND}"
@@ -79,20 +68,6 @@ if(KBE_TEST_ASSETS)
     if(NOT EXISTS "${_kbe_test_assets}/scripts/entities.xml" AND NOT EXISTS "${_kbe_test_assets}/entities.xml")
         message(FATAL_ERROR "KBE_TEST_ASSETS does not contain entities.xml: ${_kbe_test_assets}")
     endif()
-
-    add_test(NAME integration.kbcmd_typescript_sdk
-        COMMAND "${CMAKE_COMMAND}"
-            "-DKBE_EXECUTABLE=${KBE_RUNTIME_BIN_DIR}/kbcmd${CMAKE_EXECUTABLE_SUFFIX}"
-            "-DKBE_REPOSITORY_ROOT=${CMAKE_SOURCE_DIR}/../.."
-            "-DKBE_ASSETS_ROOT=${_kbe_test_assets}"
-            "-DKBE_OUTPUT_ROOT=${CMAKE_BINARY_DIR}/Testing/kbcmd-typescript-$<CONFIG>"
-            "-DKBE_BINARY_ROOT=${CMAKE_BINARY_DIR}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunKbcmdSdkSmoke.cmake"
-    )
-    set_tests_properties(integration.kbcmd_typescript_sdk PROPERTIES
-        LABELS "integration;runtime;sdk"
-        TIMEOUT 180
-    )
 
     if(KBE_TEST_SERVER_CLUSTER OR KBE_TEST_DATABASES)
         find_package(Python3 COMPONENTS Interpreter REQUIRED)

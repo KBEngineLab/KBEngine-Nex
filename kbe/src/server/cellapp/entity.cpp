@@ -434,6 +434,12 @@ PyObject* Entity::pyDestroySpace()
 		S_Return;
 	}
 
+	Space* space = Spaces::findSpace(spaceID());
+	if (space != NULL && space->hasManagedCell() && space->layout().owner != g_componentID)
+	{
+		PyErr_SetString(PyExc_RuntimeError, "Only the Space owner CellApp can request logical Space destruction.");
+		return NULL;
+	}
 	destroySpace();
 	S_Return;
 }	
@@ -4049,12 +4055,17 @@ void Entity::teleportRefEntity(Entity* entity, Position3D& pos, Direction3D& dir
 		Space* space = Spaces::findSpace(spaceID);
 
 		// 如果要跳转的space不存在或者引用的entity是这个space的创建者且已经销毁， 那么都应该是跳转失败
-		if(space == NULL || !space->isGood() || entity->isDestroyed())
+		if(space == NULL || !space->canAcceptEntities() || entity->isDestroyed())
 		{
 			if (entity->isDestroyed())
 			{
 				PyErr_Format(PyExc_Exception, "%s::teleport: %d, nearbyEntityRef has been destroyed!\n", scriptName(), id());
 				PyErr_PrintEx(0);
+			}
+			else if (space != NULL && space->isGood())
+			{
+				WARNING_MSG(fmt::format("{}::teleport: target space({}) is not accepting new entities, entity={}.\n",
+					scriptName(), spaceID, id()));
 			}
 			else
 			{
@@ -4709,6 +4720,7 @@ void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s)
 	
 	// 必须放在前面
 	addToStream(s);
+	migrationSource_ = true;
 
 	//witnesses_.clear();
 	//witnesses_count_ = 0;
@@ -4743,6 +4755,7 @@ void Entity::changeToReal(COMPONENT_ID ghostCell, KBEngine::MemoryStream& s)
 	ghostCell_ = ghostCell;
 	realCell_ = 0;
 	migrationRelayCell_ = 0;
+	migrationSource_ = false;
 
 	DEBUG_MSG(fmt::format("{}::changeToReal(): {}, ghostCell={}, spaceID={}, position=({},{},{}).\n",
 		scriptName(), id(), ghostCell_, spaceID_, position().x, position().y, position().z));
@@ -4811,8 +4824,13 @@ void Entity::createFromStream(KBEngine::MemoryStream& s)
 
 	KBE_ASSERT(this->pScriptModule_);
 
-	// 设置entity的baseEntityCall
-	if(baseEntityCallComponentID > 0)
+	// 目标端要创建引用；源端回滚时保留原引用，避免覆盖并泄漏。
+	if (baseEntityCall_ != NULL && baseEntityCall_->componentID() != baseEntityCallComponentID)
+	{
+		S_RELEASE(clientEntityCall_);
+		S_RELEASE(baseEntityCall_);
+	}
+	if (baseEntityCallComponentID > 0 && baseEntityCall_ == NULL)
 		baseEntityCall(new EntityCall(pScriptModule(), NULL, baseEntityCallComponentID, id_, ENTITYCALL_TYPE_BASE));
 
 	// 如果传送前的控制者是系统或自己的客户端，则继续保持
@@ -4982,11 +5000,12 @@ void Entity::createWitnessFromStream(KBEngine::MemoryStream& s)
 
 	if(hasWitness)
 	{
-		PyObject* clientMB = PyObject_GetAttrString(baseEntityCall(), "client");
-		KBE_ASSERT(clientMB != Py_None);
-
-		EntityCall* client = static_cast<EntityCall*>(clientMB);	
-		clientEntityCall(client);
+		if (clientEntityCall() == NULL)
+		{
+			PyObject* clientMB = PyObject_GetAttrString(baseEntityCall(), "client");
+			KBE_ASSERT(clientMB != Py_None);
+			clientEntityCall(static_cast<EntityCall*>(clientMB));
+		}
 
 		// 不要使用setWitness，因为此时不需要走onAttach流程，客户端不需要重新enterworld。
 		// setWitness(Witness::createPoolObject());

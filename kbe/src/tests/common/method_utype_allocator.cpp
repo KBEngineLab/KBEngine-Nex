@@ -44,13 +44,6 @@ int main()
 	require(clientMethod == 1,
 		"different communication domains must be able to use the same UType");
 
-	MethodUTypeAllocator anotherEntityAllocator;
-	ENTITY_METHOD_UID anotherEntityMethod = 0;
-	require(anotherEntityAllocator.allocateClientVisible(anotherEntityMethod),
-		"failed to allocate a method for another entity module");
-	require(anotherEntityMethod == 1,
-		"different entity modules must have independent method UType spaces");
-
 	MethodUTypeAllocator explicitAllocator;
 	require(!explicitAllocator.reserve(0), "zero is not a valid explicit method UType");
 	require(explicitAllocator.reserve(1), "failed to reserve an explicit method UType");

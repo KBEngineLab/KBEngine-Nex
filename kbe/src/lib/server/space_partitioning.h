@@ -6,7 +6,7 @@
 namespace KBEngine {
 namespace SpacePartitioning {
 
-constexpr uint16 PROTOCOL_VERSION = 1;
+constexpr uint16 PROTOCOL_VERSION = 3;
 constexpr uint8 ENABLED = 1;
 constexpr uint8 COORDINATE_SYSTEM = 2;
 constexpr uint8 COORDINATE_SYSTEM_Y = 4;

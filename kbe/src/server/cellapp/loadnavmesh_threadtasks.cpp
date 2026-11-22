@@ -54,7 +54,7 @@ thread::TPTask::TPTaskState LoadNavmeshTask::presentMainThread()
 	}
 	else
 	{
-		NavigationHandlePtr pNavigationHandle = Navigation::getSingleton().findNavigation(resPath_);
+		NavigationHandlePtr pNavigationHandle = Navigation::getSingleton().findNavigation(resPath_, params_);
 
 		// 几何映射允许没有服务端导航数据；空句柄仍须完成映射并通知脚本。
 		// 导航文件存在但损坏时，具体加载器负责记录错误，不能把可选数据缺失误报为加载失败。

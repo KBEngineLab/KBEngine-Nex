@@ -36,6 +36,7 @@ kbe_add_server_executable(cellapp KBE_CELLAPP
         real_entity_method.cpp
         rotator_handler.cpp
         space.cpp
+        space_layout.cpp
         spaces.cpp
         space_viewer.cpp
         trap_trigger.cpp

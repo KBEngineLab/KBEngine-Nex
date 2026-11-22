@@ -31,11 +31,12 @@ bool testPointerAndGenerationAreBothRequired()
 	auto* first = reinterpret_cast<KBEngine::Network::Channel*>(&firstStorage);
 	auto* second = reinterpret_cast<KBEngine::Network::Channel*>(&secondStorage);
 	const KBEngine::Network::ChannelIndexEntry entry(first, 7);
+	const KBEngine::Network::ChannelIndexEntry unassigned(first, 0);
 	const KBEngine::Network::ChannelIndexEntry empty;
 
 	return require(!entry.matches(second, 7),
 		"different channel pointer was accepted for the same generation") &&
-		require(!entry.matches(first, 0),
+		require(!unassigned.matches(first, 0),
 			"unassigned channel generation was accepted") &&
 		require(!empty.matches(NULL, 0),
 			"empty index entry was accepted as a current channel");

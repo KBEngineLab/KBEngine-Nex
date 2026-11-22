@@ -7,6 +7,7 @@ kbe_add_server_executable(cellappmgr KBE_CELLAPPMGR
         cells.cpp
         main.cpp
         space.cpp
+        space_layout.cpp
         spaces.cpp
         space_viewer.cpp
 )

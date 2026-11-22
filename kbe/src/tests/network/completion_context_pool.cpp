@@ -8,7 +8,7 @@ namespace
 {
 struct TestContext
 {
-	TestContext() : fd(-1), generation(0), operation(0), data()
+	TestContext()
 	{
 		++liveCount;
 	}
@@ -18,26 +18,11 @@ struct TestContext
 		--liveCount;
 	}
 
-	void reset(int newFd, unsigned long long newGeneration, int newOperation)
-	{
-		fd = newFd;
-		generation = newGeneration;
-		operation = newOperation;
-		data.clear();
-		if (data.capacity() > 64)
-		{
-			std::vector<char>().swap(data);
-		}
-	}
-
 	size_t retainedBytes() const
 	{
 		return data.capacity();
 	}
 
-	int fd;
-	unsigned long long generation;
-	int operation;
 	std::vector<char> data;
 	static int liveCount;
 };
@@ -53,31 +38,31 @@ bool require(bool condition, const char* message)
 	return condition;
 }
 
-bool testReuseAndReset()
+bool testReuseAndCacheAccounting()
 {
 	KBEngine::Network::CompletionContextPool<TestContext> pool(2);
 	TestContext* first = pool.acquire();
-	first->reset(41, 7, 3);
 	first->data.resize(1024);
+	const size_t capacity = first->data.capacity();
 	pool.release(first);
 
-	TestContext* reused = pool.acquire();
-	if (!require(reused == first, "released context was not reused"))
+	if (!require(pool.cachedCount() == 1, "released context was not cached") ||
+		!require(pool.cachedBytes() == capacity, "released context buffer was not counted"))
 	{
 		return false;
 	}
-	reused->reset(52, 8, 4);
-	const bool valid = require(reused->fd == 52, "old fd survived context reset") &&
-		require(reused->generation == 8, "old generation survived context reset") &&
-		require(reused->operation == 4, "old operation survived context reset") &&
-		require(reused->data.empty() && reused->data.capacity() <= 64, "oversized buffer survived context reset") &&
+
+	TestContext* reused = pool.acquire();
+	const bool valid = require(reused == first, "released context was not reused") &&
+		require(pool.cachedCount() == 0, "reacquired context is still counted as cached") &&
+		require(pool.cachedBytes() == 0, "reacquired buffer is still counted as cached") &&
 		require(pool.allocationCount() == 1, "allocation count is incorrect") &&
 		require(pool.reuseCount() == 1, "reuse count is incorrect") &&
 		require(pool.outstandingCount() == 1, "outstanding count is incorrect") &&
 		require(pool.peakOutstandingCount() == 1, "peak outstanding count is incorrect");
 	pool.release(reused);
 	return valid && require(pool.cachedCount() == 1, "cached count is incorrect") &&
-		require(pool.cachedBytes() == reused->data.capacity(), "cached bytes are incorrect");
+		require(pool.cachedBytes() == capacity, "cached bytes are incorrect");
 }
 
 bool testOutstandingAndCacheLimit()
@@ -118,7 +103,7 @@ bool testDiscardAndDestructor()
 
 int main()
 {
-	if (!testReuseAndReset() || !testOutstandingAndCacheLimit() || !testDiscardAndDestructor())
+	if (!testReuseAndCacheAccounting() || !testOutstandingAndCacheLimit() || !testDiscardAndDestructor())
 	{
 		return EXIT_FAILURE;
 	}

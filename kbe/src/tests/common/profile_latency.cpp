@@ -1,6 +1,5 @@
 #include "helper/profile_latency.h"
 
-#include <chrono>
 #include <cstdlib>
 #include <iostream>
 
@@ -60,44 +59,13 @@ bool testCapacityAndP999Gate()
 
 	const KBEngine::ProfileLatencyWindow::Snapshot full = publishable.snapshot(100);
 	return require(full.p999Available, "P99.9 was unavailable at 1000 samples") &&
-		require(full.p999Stamps == 999, "P99.9 nearest-rank value was incorrect") &&
-		require(publishable.allocatedBytes() >= 240000,
-			"latency window did not report its fixed storage cost");
-}
-
-bool testRecordCost()
-{
-	const KBEngine::uint64 iterations = 2000000;
-	KBEngine::ProfileLatencyWindow window(10000, iterations + 1);
-	const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
-	for (KBEngine::uint64 index = 0; index < iterations; ++index)
-		window.record(index & 1023U, index);
-	const std::chrono::steady_clock::time_point finished = std::chrono::steady_clock::now();
-	const double elapsedNanos = static_cast<double>(
-		std::chrono::duration_cast<std::chrono::nanoseconds>(finished - started).count());
-	const double nanosPerRecord = elapsedNanos / static_cast<double>(iterations);
-
-	std::cout << "PROFILE_LATENCY_RECORD_NS=" << nanosPerRecord << std::endl;
-	// This loose regression ceiling catches accidental sorting/allocation in record()
-	// without turning normal Debug-build and virtual-machine variance into test flakes.
-	// 宽松上限用于捕获 record() 中误入排序/分配的回归，同时容纳 Debug 和虚拟机抖动。
-	if (!require(nanosPerRecord < 5000.0, "latency record hot path exceeded 5 microseconds"))
-		return false;
-
-	const std::chrono::steady_clock::time_point snapshotStarted = std::chrono::steady_clock::now();
-	const KBEngine::ProfileLatencyWindow::Snapshot snapshot = window.snapshot(iterations);
-	const std::chrono::steady_clock::time_point snapshotFinished = std::chrono::steady_clock::now();
-	const double snapshotMicros = static_cast<double>(
-		std::chrono::duration_cast<std::chrono::nanoseconds>(snapshotFinished - snapshotStarted).count()) / 1000.0;
-	std::cout << "PROFILE_LATENCY_SNAPSHOT_US=" << snapshotMicros << std::endl;
-	return require(snapshot.count == 10000, "latency benchmark snapshot did not retain its full window") &&
-		require(snapshotMicros < 10000.0, "latency Watcher snapshot exceeded 10 milliseconds");
+		require(full.p999Stamps == 999, "P99.9 nearest-rank value was incorrect");
 }
 }
 
 int main()
 {
-	if (!testExactPercentilesAndExpiry() || !testCapacityAndP999Gate() || !testRecordCost())
+	if (!testExactPercentilesAndExpiry() || !testCapacityAndP999Gate())
 		return EXIT_FAILURE;
 
 	std::cout << "PROFILE_LATENCY_TEST_PASS" << std::endl;

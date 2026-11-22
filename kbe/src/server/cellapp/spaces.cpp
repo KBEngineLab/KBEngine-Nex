@@ -56,7 +56,7 @@ void Spaces::finalise()
 		SPACES::iterator iter = spaces.begin();
 		KBEShared_ptr<Space> pSpace = iter->second;
 		spaces.erase(iter++);
-		pSpace->destroy(0, false);
+		pSpace->destroy(0, false, Space::DestroyMode::Shutdown);
 		pSpace->finalise();
 	}
 
@@ -64,7 +64,7 @@ void Spaces::finalise()
 }
 
 //-------------------------------------------------------------------------------------
-Space* Spaces::createNewSpace(SPACE_ID spaceID, const std::string& scriptModuleName)
+Space* Spaces::createNewSpace(SPACE_ID spaceID, const std::string& scriptModuleName, bool reportToManager)
 {
 	SPACES& registeredSpaces = Spaces::spaces();
 	SPACES::iterator iter = registeredSpaces.find(spaceID);
@@ -74,7 +74,7 @@ Space* Spaces::createNewSpace(SPACE_ID spaceID, const std::string& scriptModuleN
 		return NULL;
 	}
 	
-	Space* space = new Space(spaceID, scriptModuleName);
+	Space* space = new Space(spaceID, scriptModuleName, reportToManager);
 	registeredSpaces[spaceID].reset(space);
 	
 	DEBUG_MSG(fmt::format("Spaces::createNewSpace: new space({}) {}.\n", scriptModuleName, spaceID));

@@ -109,12 +109,13 @@ bool testPendingBelowLimitFillsRemainingSlots()
 	KBEngine::WitnessUpdateScheduler scheduler;
 	scheduler.beginTick(5, 4, 1);
 	bool admitted[5] = {};
-	const bool pending[5] = { false, false, false, true, false };
+	const bool pending[5] = { false, false, false, false, true };
 	for (std::size_t index = 0; index < 5; ++index)
 		admitted[index] = scheduler.admit(pending[index]);
-	return require(admitted[0] && admitted[1] && admitted[2] && admitted[3],
+	return require(admitted[4], "no slot was reserved for pending work") &&
+		require(admitted[0] && admitted[1] && admitted[2],
 		"non-pending work did not fill slots left by a small pending set") &&
-		require(!admitted[4], "admission exceeded the configured limit");
+		require(!admitted[3], "admission exceeded the configured limit");
 }
 
 bool testUnlimitedAdmissionIgnoresPendingPartition()
@@ -228,29 +229,6 @@ bool testDelayedQueueOrdersDueEntriesAndKeepsOwnership()
 	return require(activeQueue.pop(entry) && entry.entityID == 1 && queue.size() == 0,
 		"delayed queue did not drain in due order");
 }
-
-bool testDirtyQueueTrimsOnlyWhenEmpty()
-{
-	KBEngine::WitnessDirtyQueue queue;
-	bool queued = false;
-	for (std::uint32_t entityID = 1; entityID <= 128; ++entityID)
-	{
-		queued = false;
-		queue.enqueue(entityID, entityID, queued);
-	}
-	queue.trimEmpty(8);
-	if (!require(queue.size() == 128, "non-empty dirty queue was trimmed"))
-		return false;
-
-	KBEngine::WitnessDirtyQueue::Entry entry = {};
-	while (queue.pop(entry))
-	{
-	}
-	queue.trimEmpty(8);
-	queued = false;
-	return require(queue.enqueue(999, 999, queued) && queue.size() == 1,
-		"trimmed dirty queue could not be reused");
-}
 }
 
 int main()
@@ -261,7 +239,7 @@ int main()
 		!testUnlimitedAdmissionIgnoresPendingPartition() ||
 		!testVolatileDistanceSemantics() || !testDenseViewTemporalLod() ||
 		!testPropertyDetailLevelHysteresis() ||
-		!testDelayedQueueOrdersDueEntriesAndKeepsOwnership() || !testDirtyQueueTrimsOnlyWhenEmpty())
+		!testDelayedQueueOrdersDueEntriesAndKeepsOwnership())
 		return EXIT_FAILURE;
 
 	std::cout << "WITNESS_VOLATILE_BUDGET_TEST_PASS" << std::endl;

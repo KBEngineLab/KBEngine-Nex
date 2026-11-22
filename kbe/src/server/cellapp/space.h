@@ -28,6 +28,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "common/smartpointer.h"
 #include "pyscript/scriptobject.h"
 #include "navigation/navigation_handle.h"
+#include "server/space_layout.h"
 
 namespace KBEngine{
 
@@ -46,7 +47,7 @@ public:
 		VIEWER_BOUNDS_OBSERVED_ENTITIES = 3
 	};
 
-	Space(SPACE_ID spaceID, const std::string& scriptModuleName);
+	Space(SPACE_ID spaceID, const std::string& scriptModuleName, bool reportToManager = true);
 	~Space();
 
 	void unLoadSpaceGeometry();
@@ -81,7 +82,8 @@ public:
 	/**
 		销毁
 	*/
-	bool destroy(ENTITY_ID entityID, bool ignoreGhost = true);
+	enum class DestroyMode { Requested, LayoutRemoval, Shutdown };
+	bool destroy(ENTITY_ID entityID, bool ignoreGhost = true, DestroyMode mode = DestroyMode::Requested);
 
 	// 关服终结必须释放所有ghost引用，避免Space因外部共享引用延迟到实体注册表卸载后才析构。
 	// Shutdown finalization must release every ghost reference so external shared owners cannot defer Space destruction past entity-registry teardown.
@@ -108,6 +110,25 @@ public:
 	void onAllSpaceGeometryLoaded();
 	bool isGeometryLoadCurrent(const std::string& resPath, uint64 loadGeneration);
 	bool isGeometryLoading() const { return isGeometryLoading_; }
+	const SpaceLayout::Layout& layout() const { return layout_; }
+	uint64 layoutVersion() const { return layoutVersion_; }
+	uint64 resourceRevision() const { return resourceRevision_; }
+	SpaceLayout::State layoutState() const { return layoutState_; }
+	const std::string& layoutError() const { return layoutError_; }
+	bool hasManagedCell() const { return layoutPinned_; }
+	bool isLayoutReplica() const { return layoutReplica_; }
+	bool layoutShutdownRequested() const { return layoutShutdownRequested_; }
+	void markLayoutShutdownRequested() { layoutShutdownRequested_ = true; }
+	bool canChangeSpaceResources() const;
+	SpaceLayout::Resources layoutResources() const;
+	bool prepareLayout(const SpaceLayout::Packet& packet, bool replica, std::string& error);
+	void applyLayoutResources(const SpaceLayout::Resources& resources, uint64 revision, bool retryGeometry = false);
+	void applyLayoutData(const std::string& key, const std::string& value,
+		bool deleted, uint64 revision);
+	void setLayoutState(SpaceLayout::State state, const std::string& error = "");
+	void abortLayout(const std::string& error);
+	void removeLayoutSpace() { layoutRemovalPending_ = true; }
+	void updateLayoutPreparation();
 	
 	NavigationHandlePtr pNavHandle() const{ return pNavHandle_; }
 
@@ -127,9 +148,10 @@ public:
 
 	bool isDestroyed() const{ return state_ == STATE_DESTROYED; }
 	bool isGood() const{ return state_ == STATE_NORMAL; }
+	bool canAcceptEntities() const { return isGood() && !layoutShutdownRequested_ && !layoutRemovalPending_; }
 	// 未提交迁移实体持有 Space 生命周期租约，脚本清理必须等待 BaseApp 完成路由切换。
 	// Uncommitted migration Targets lease the Space lifetime until BaseApp completes the route switch.
-	bool hasPendingMigrationEntities() const;
+	bool hasPendingMigrationEntities(bool includeSources = false) const;
 
 protected:
 	void _addSpaceDatasToEntityClient(const Entity* pEntity);
@@ -181,6 +203,22 @@ protected:
 	int8						state_;
 	
 	uint64						destroyTime_;	
+	SpaceLayout::Layout			layout_;
+	uint64						layoutVersion_ = 0;
+	uint64						layoutPreparedVersion_ = 0;
+	uint64						resourceRevision_ = 0;
+	SpaceLayout::State			layoutState_ = SpaceLayout::NONE;
+	std::string					layoutError_;
+	bool						layoutPinned_ = false;
+	bool						layoutReplica_ = false;
+	bool						applyingLayoutResources_ = false;
+	bool						layoutReadySent_ = false;
+	bool						layoutPrepareReceived_ = false;
+	bool						layoutShutdownRequested_ = false;
+	bool						layoutRemovalPending_ = false;
+	uint64						layoutStarted_ = 0;
+	bool						geometryShouldLoad_ = false;
+	std::map<int, std::string>	geometryParams_;
 };
 
 

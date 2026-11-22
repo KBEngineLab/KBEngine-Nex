@@ -600,6 +600,7 @@ public:
 		转变为ghost, 自身必须为real
 	*/
 	void changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s);
+	bool isMigrationSource() const { return migrationSource_; }
 
 	/** 
 		转变为real, 自身必须为ghost
@@ -703,6 +704,7 @@ protected:
 	// separate from Ghost replication state. / 传送会清空 ghostCell_ 以避免属性同步
 	// 回环，但旧 Source 仍可能持有有序客户端 RPC，因此单独保存该授权关系。
 	COMPONENT_ID											migrationRelayCell_;
+	bool												migrationSource_ = false;
 
 	// entity的当前位置
 	Position3D												lastpos_;

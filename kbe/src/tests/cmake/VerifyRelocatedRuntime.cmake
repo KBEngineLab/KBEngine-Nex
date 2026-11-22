@@ -30,8 +30,10 @@ execute_process(
     RESULT_VARIABLE _kbe_result
     OUTPUT_VARIABLE _kbe_stdout
     ERROR_VARIABLE _kbe_stderr
+    OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-if(NOT _kbe_result EQUAL 0 OR NOT _kbe_stdout MATCHES "[0-9]+")
+if(NOT _kbe_result STREQUAL "0" OR NOT _kbe_stdout MATCHES "^[0-9]+$" OR
+   _kbe_stderr MATCHES "\\[ERROR\\]|Traceback")
     message(FATAL_ERROR
         "Relocated kbcmd failed with exit code ${_kbe_result}.\n"
         "stdout:\n${_kbe_stdout}\n"

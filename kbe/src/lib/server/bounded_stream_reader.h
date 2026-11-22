@@ -76,6 +76,16 @@ public:
 		return skip(static_cast<size_t>(wireLength));
 	}
 
+	bool readBlob(std::string& value, size_t maximumLength)
+	{
+		ArraySize wireLength = 0;
+		if (!read(wireLength) || wireLength > maximumLength || wireLength > remaining_)
+			return false;
+
+		value.assign(wireLength == 0 ? "" : reinterpret_cast<const char*>(data_), wireLength);
+		return skip(static_cast<size_t>(wireLength));
+	}
+
 	bool empty() const { return remaining_ == 0; }
 
 private:

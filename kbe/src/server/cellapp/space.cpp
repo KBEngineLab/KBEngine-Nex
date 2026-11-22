@@ -29,6 +29,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/network_stats.h"
 #include "server/script_stage_timing.h"
 
+#include <cstring>
+#include <limits>
 #include <sstream>
 
 #include "../../server/baseappmgr/baseappmgr_interface.h"
@@ -40,7 +42,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 namespace KBEngine{
 
 //-------------------------------------------------------------------------------------
-Space::Space(SPACE_ID spaceID, const std::string& scriptModuleName) :
+Space::Space(SPACE_ID spaceID, const std::string& scriptModuleName, bool reportToManager) :
 id_(spaceID),
 scriptModuleName_(scriptModuleName),
 entities_(),
@@ -59,7 +61,7 @@ state_(STATE_NORMAL),
 destroyTime_(0)
 {
 	Network::Channel* pChannel = Components::getSingleton().getCellappmgrChannel();
-	if (pChannel != NULL)
+	if (reportToManager && pChannel != NULL)
 	{
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(CellappmgrInterface::updateSpaceData);
@@ -213,7 +215,24 @@ PyObject* Space::__py_AddSpaceGeometryMapping(PyObject* self, PyObject* args)
 					return 0;
 				}
 				
-				params[PyLong_AsLong(key)] = PyUnicode_AsUTF8AndSize(value, NULL);
+				const long layer = PyLong_AsLong(key);
+				if (PyErr_Occurred())
+					return NULL;
+				if (layer < std::numeric_limits<int>::min() || layer > std::numeric_limits<int>::max())
+				{
+					PyErr_SetString(PyExc_OverflowError, "Navigation layer is outside the supported integer range.");
+					return NULL;
+				}
+				Py_ssize_t length = 0;
+				const char* filename = PyUnicode_AsUTF8AndSize(value, &length);
+				if (filename == NULL)
+					return NULL;
+				if (std::memchr(filename, '\0', static_cast<size_t>(length)) != NULL)
+				{
+					PyErr_SetString(PyExc_ValueError, "Navigation filename contains a null character.");
+					return NULL;
+				}
+				params.emplace(static_cast<int>(layer), std::string(filename, length));
 			}
 			
 			SCRIPT_ERROR_CHECK();
@@ -239,6 +258,12 @@ PyObject* Space::__py_AddSpaceGeometryMapping(PyObject* self, PyObject* args)
 		return 0;
 	}
 
+	if (!space->canChangeSpaceResources() || space->isLayoutReplica())
+	{
+		PyErr_SetString(PyExc_RuntimeError, "Geometry can only be changed by the ready Space owner.");
+		return NULL;
+	}
+
 	SCRIPT_ERROR_CHECK();
 
 	if (Resmgr::getSingleton().matchPath(path).size() == 0)
@@ -250,14 +275,24 @@ PyObject* Space::__py_AddSpaceGeometryMapping(PyObject* self, PyObject* args)
 		return 0;
 	}
 
-	if(!space->addSpaceGeometryMapping(path, shouldLoadOnServer, params))
+	if (space->hasManagedCell())
 	{
-		PyErr_Format(PyExc_AssertionError, "KBEngine::addSpaceGeometryMapping: (spaceID=%u respath=%s) error!", 
-			spaceID, path);
-
-		PyErr_PrintEx(0);
-		return 0;
+		// 等管理器返回已排序的资源版本后，各 Cell 再切换导航，包括属主本身。
+		SpaceLayout::Resources resources = space->layoutResources();
+		resources.setGeometry(path, shouldLoadOnServer, params);
+		if (!resources.validate())
+		{
+			PyErr_SetString(PyExc_ValueError, "Space geometry update exceeds the supported count or byte limits.");
+			return NULL;
+		}
+		if (!Cellapp::getSingleton().publishSpaceResources(*space, std::move(resources)))
+		{
+			PyErr_SetString(PyExc_RuntimeError, "Space geometry update could not be submitted.");
+			return NULL;
+		}
 	}
+	else
+		space->addSpaceGeometryMapping(path, shouldLoadOnServer, params);
 
 	S_Return;
 }
@@ -271,6 +306,19 @@ bool Space::addSpaceGeometryMapping(std::string respath, bool shouldLoadOnServer
 	hasGeometry_ = true;
 	if(getGeometryPath() == respath)
 	{
+		if (hasManagedCell() &&
+			(geometryShouldLoad_ != shouldLoadOnServer || geometryParams_ != params))
+		{
+			++geometryLoadGeneration_;
+			isGeometryLoading_ = false;
+			pNavHandle_.clear();
+			hasNavigationBounds_ = false;
+			geometryShouldLoad_ = shouldLoadOnServer;
+			geometryParams_ = params;
+			if (shouldLoadOnServer)
+				loadSpaceGeometry(params);
+			return true;
+		}
 		if(!shouldLoadOnServer || pNavHandle_ != NULL || isGeometryLoading_)
 		{
 			WARNING_MSG(fmt::format("KBEngine::addSpaceGeometryMapping: spaceID={}, respath={} exist!\n",
@@ -281,6 +329,8 @@ bool Space::addSpaceGeometryMapping(std::string respath, bool shouldLoadOnServer
 
 		// 上一次加载失败后允许相同路径重试，成功句柄和正在执行的任务仍保持幂等。
 		// Allow the same path to retry after a failed load while successful handles and active tasks remain idempotent.
+		geometryShouldLoad_ = shouldLoadOnServer;
+		geometryParams_ = params;
 		loadSpaceGeometry(params);
 		return true;
 	}
@@ -291,6 +341,8 @@ bool Space::addSpaceGeometryMapping(std::string respath, bool shouldLoadOnServer
 	isGeometryLoading_ = false;
 	pNavHandle_.clear();
 	hasNavigationBounds_ = false;
+	geometryShouldLoad_ = shouldLoadOnServer;
+	geometryParams_ = params;
 	setGeometryPath(respath);
 
 	if(shouldLoadOnServer)
@@ -319,6 +371,8 @@ void Space::unLoadSpaceGeometry()
 	isGeometryLoading_ = false;
 	pNavHandle_.clear();
 	hasGeometry_ = false;
+	geometryShouldLoad_ = false;
+	geometryParams_.clear();
 	delSpaceData("_mapping");
 
 	Network::Channel* pChannel = Components::getSingleton().getCellappmgrChannel();
@@ -349,13 +403,15 @@ void Space::onLoadedSpaceGeometryMapping(const std::string& resPath, uint64 load
 			id(), getGeometryPath()));
 
 	// 通知脚本
+	if (!isLayoutReplica())
 	{
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 		SCRIPT_OBJECT_CALL_ARGS2(Cellapp::getSingleton().getEntryScript().get(), const_cast<char*>("onSpaceGeometryLoaded"), 
 			const_cast<char*>("Is"), this->id(), getGeometryPath().c_str(), false);
 	}
 
-	onAllSpaceGeometryLoaded();
+	if (!isLayoutReplica())
+		onAllSpaceGeometryLoaded();
 
 	Network::Channel* pChannel = Components::getSingleton().getCellappmgrChannel();
 	if (pChannel != NULL)
@@ -394,6 +450,9 @@ void Space::onAllSpaceGeometryLoaded()
 //-------------------------------------------------------------------------------------
 bool Space::update()
 {
+	updateLayoutPreparation();
+	if (layoutRemovalPending_ && isGood())
+		destroy(0, false, DestroyMode::LayoutRemoval);
 	if(destroyTime_ > 0 && timestamp() - destroyTime_ >= uint64( 3.f * stampsPerSecond() ))
 	{
 		if(entities_.size() == 0)
@@ -491,7 +550,7 @@ void Space::removeEntity(Entity* pEntity)
 	pEntity->onLeaveSpace(this);
 
 	// 如果没有entity了则需要销毁space, 因为space最少存在一个entity
-	if(entities_.empty() && state_ == STATE_NORMAL)
+	if(entities_.empty() && state_ == STATE_NORMAL && !hasManagedCell())
 	{
 		Spaces::destroySpace(this->id(), 0);
 	}
@@ -566,13 +625,14 @@ Entity* Space::findEntity(ENTITY_ID entityID)
 }
 
 //-------------------------------------------------------------------------------------
-bool Space::hasPendingMigrationEntities() const
+bool Space::hasPendingMigrationEntities(bool includeSources) const
 {
 	for (SPACE_ENTITIES::const_iterator iter = entities_.begin(); iter != entities_.end(); ++iter)
 	{
 		const Entity* entity = (*iter).get();
-		if (entity != NULL && entity->isReal() && !entity->isDestroyed() &&
-			entity->hasFlags(ENTITY_FLAGS_TELEPORT_START))
+		if (entity != NULL && !entity->isDestroyed() &&
+			((entity->isReal() && entity->hasFlags(ENTITY_FLAGS_TELEPORT_START)) ||
+			 (includeSources && entity->isMigrationSource())))
 		{
 			return true;
 		}
@@ -582,19 +642,29 @@ bool Space::hasPendingMigrationEntities() const
 }
 
 //-------------------------------------------------------------------------------------
-bool Space::destroy(ENTITY_ID entityID, bool ignoreGhost)
+bool Space::destroy(ENTITY_ID entityID, bool ignoreGhost, DestroyMode mode)
 {
 	if(state_ != STATE_NORMAL)
 		return false;
 
-	if (entityID != 0 && hasPendingMigrationEntities())
+	if (mode == DestroyMode::Requested)
 	{
-		// 脚本驱动的空房间清理不能销毁尚未提交的 Target。关服 finalise 使用 entityID=0，
-		// 仍可强制回收全部对象，不会让协议租约阻断进程退出。
-		// Script-driven empty-room cleanup cannot destroy an uncommitted Target. Shutdown
-		// finalise uses entityID=0 and may still reclaim every object without blocking exit.
-		WARNING_MSG(fmt::format("Space::destroy: deferred space {} while a migration Target is pending, requester={}.\n",
-			id_, entityID));
+		if (layoutRemovalPending_)
+			return false;
+		if (hasManagedCell())
+		{
+			Cellapp::getSingleton().requestSpaceLayoutShutdown(*this);
+			return false;
+		}
+	}
+	const bool layoutRemoval = mode == DestroyMode::LayoutRemoval;
+	if (mode != DestroyMode::Shutdown && (layoutRemoval || entityID != 0) &&
+		hasPendingMigrationEntities(layoutRemoval))
+	{
+		// 布局删除由 Space::update 重试，等待迁移提交或回滚，不在每次 Tick 重复记日志。
+		if (!layoutRemoval)
+			WARNING_MSG(fmt::format("Space::destroy: deferred space {} while a migration Target is pending, requester={}.\n",
+				id_, entityID));
 		return false;
 	}
 
@@ -660,6 +730,22 @@ void Space::finalise(bool notifyCellappmgr)
 	if (!notifyCellappmgr)
 		return;
 
+	if (layoutVersion_ != 0)
+	{
+		SpaceLayout::Packet removed;
+		removed.sender = g_componentID;
+		removed.operation = SpaceLayout::REMOVED;
+		removed.spaceID = id_;
+		removed.version = layoutVersion_;
+		removed.revision = resourceRevision_;
+		Cellapp::getSingleton().sendSpaceLayout(removed);
+		// 最近一次申请可能在管理器登记前被拒绝，旧的失败布局仍需收到原版本的删除确认。
+		if (layoutPreparedVersion_ != 0 && layoutPreparedVersion_ != layoutVersion_)
+		{
+			removed.version = layoutPreparedVersion_;
+			Cellapp::getSingleton().sendSpaceLayout(removed);
+		}
+	}
 	// Only runtime removal may notify CellAppMgr. kbemain finalizes Components before Cellapp, so shutdown finalization cannot use that registry.
 	// 只有运行期移除可以通知 CellAppMgr；kbemain 会先终结 Components 再终结 Cellapp，因此关服清理不能使用该注册表。
 	Network::Channel* pChannel = Components::getSingleton().getCellappmgrChannel();
@@ -768,6 +854,11 @@ bool Space::getViewerBounds(float& minimumX, float& minimumZ, float& maximumX, f
 //-------------------------------------------------------------------------------------
 void Space::setSpaceData(const std::string& key, const std::string& value)
 {
+	if (hasManagedCell() && !applyingLayoutResources_ && key != "_mapping")
+	{
+		Cellapp::getSingleton().publishSpaceData(*this, key, value, false);
+		return;
+	}
 	SPACE_DATA::iterator iter = datas_.find(key);
 	if(iter == datas_.end())
 		datas_.insert(SPACE_DATA::value_type(key, value)); 
@@ -777,7 +868,10 @@ void Space::setSpaceData(const std::string& key, const std::string& value)
 		else
 			datas_[key] = value;
 
+	const bool applying = applyingLayoutResources_;
+	applyingLayoutResources_ = false;
 	onSpaceDataChanged(key, value, false);
+	applyingLayoutResources_ = applying;
 }
 
 //-------------------------------------------------------------------------------------
@@ -806,13 +900,21 @@ const std::string& Space::getSpaceData(const std::string& key)
 //-------------------------------------------------------------------------------------
 void Space::delSpaceData(const std::string& key)
 {
+	if (hasManagedCell() && !applyingLayoutResources_ && key != "_mapping")
+	{
+		Cellapp::getSingleton().publishSpaceData(*this, key, "", true);
+		return;
+	}
 	SPACE_DATA::iterator iter = datas_.find(key);
 	if(iter == datas_.end())
 		return;
 
 	datas_.erase(iter);
 
+	const bool applying = applyingLayoutResources_;
+	applyingLayoutResources_ = false;
 	onSpaceDataChanged(key, "", true);
+	applyingLayoutResources_ = applying;
 }
 
 //-------------------------------------------------------------------------------------
@@ -958,7 +1060,18 @@ PyObject* Space::__py_SetSpaceData(PyObject* self, PyObject* args)
 		return 0;
 	}
 
+	if (space->hasManagedCell() && (!space->canChangeSpaceResources() ||
+		std::strlen(key) > 256 || std::strlen(value) > SpaceLayout::MAX_VALUE_BYTES))
+	{
+		PyErr_SetString(PyExc_RuntimeError, "Space layout is not ready or the SpaceData entry exceeds its limits.");
+		return NULL;
+	}
 	space->setSpaceData(key, value);
+	if (space->hasManagedCell() && space->layoutState() == SpaceLayout::FAILED)
+	{
+		PyErr_SetString(PyExc_RuntimeError, space->layoutError().c_str());
+		return NULL;
+	}
 	S_Return;
 }
 
@@ -1080,7 +1193,17 @@ PyObject* Space::__py_DelSpaceData(PyObject* self, PyObject* args)
 		return 0;
 	}
 
+	if (space->hasManagedCell() && !space->canChangeSpaceResources())
+	{
+		PyErr_SetString(PyExc_RuntimeError, "Space layout is not ready.");
+		return NULL;
+	}
 	space->delSpaceData(key);
+	if (space->hasManagedCell() && space->layoutState() == SpaceLayout::FAILED)
+	{
+		PyErr_SetString(PyExc_RuntimeError, space->layoutError().c_str());
+		return NULL;
+	}
 	S_Return;
 }
 

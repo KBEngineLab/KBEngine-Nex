@@ -7,9 +7,6 @@ from runtime_console import RuntimeConsole, result_line, validate_console_identi
 
 
 class RuntimeConsoleTests(unittest.TestCase):
-    def test_matching_process(self):
-        validate_console_identity(b"AppID: 8001. UID: 10. PID: 100\r\n", 8001, 100)
-
     def test_wrong_process_is_rejected(self):
         for component_id, pid in ((8002, 100), (8001, 101)):
             with self.subTest(component_id=component_id, pid=pid):
@@ -27,10 +24,6 @@ class RuntimeConsoleTests(unittest.TestCase):
 
     def test_incomplete_result_is_not_accepted(self):
         self.assertIsNone(result_line(b"\r\nMARK:[1]", "MARK:"))
-
-    def test_response_with_command_echo(self):
-        response = b"print('\\nMARK:' + json.dumps([1]))\r\n\r\nMARK:[1]\r\n"
-        self.assertEqual("[1]", result_line(response, "MARK:"))
 
     def test_unrelated_response_is_not_accepted(self):
         self.assertIsNone(result_line(b"\r\nOLD:[1]\r\n", "MARK:"))

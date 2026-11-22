@@ -20,6 +20,9 @@ from performance.log_metrics import DEFAULT_PATTERNS
 from performance.run import resolve_management_admin_token, wait_for_cluster_ready_for_login
 from performance.topology import build_local_cluster_components, platform_executable_name
 from runtime_console import RuntimeConsole
+from space_layout_runtime import (
+    NO_NAVIGATION_MAPPING, verify_fixed_layout, verify_layout_removal, verify_rejected_layout_removal,
+)
 from test_server_cluster import ERROR_PATTERN, all_run_logs, read_text, run_cluster
 
 
@@ -161,11 +164,12 @@ def verify_demo(entries, run_root, environment, args, output, password):
     token = resolve_management_admin_token(environment)
     wait_for_cluster_ready_for_login(
         args.repository_root / "kbe/tools/server", [run_root / "logs"],
-        1, 2, 150, 5, None, token,
+        1, args.cellapp_count, 150, 5, None, token,
     )
+    cell_ids = tuple(range(8001, 8001 + args.cellapp_count))
     expected_mode = "true" if args.space_partitioning == "true" else "false"
     logs = all_run_logs(entries, run_root)
-    for cid in (8001, 8002):
+    for cid in cell_ids:
         require(
             f"confirmed CellApp({cid}), enabled={expected_mode}." in logs,
             f"CellApp {cid} 未完成预期的分割模式确认",
@@ -207,11 +211,11 @@ def verify_demo(entries, run_root, environment, args, output, password):
             infos = wait_until(
                 "本次组件控制台发现", discover,
                 lambda found: 10000 in found and all(
-                    cid in found and found[cid]["port"] > 0 for cid in (7001, 8001, 8002)
+                    cid in found and found[cid]["port"] > 0 for cid in (7001, *cell_ids)
                 ),
             )
             require(infos[10000]["pid"] == bots.pid, "发现结果中的 Bots 不属于本次测试")
-            for cid in (7001, 8001, 8002):
+            for cid in (7001, *cell_ids):
                 expected_pid = owned[cid]["process"].pid
                 require(infos[cid]["pid"] == expected_pid, "发现结果包含其他进程，停止检查")
                 console = RuntimeConsole(
@@ -221,7 +225,7 @@ def verify_demo(entries, run_root, environment, args, output, password):
                 consoles[cid] = console
                 print(f"DEMO_CONSOLE_READY component={cid} pid={expected_pid}", flush=True)
 
-            cells = {cid: consoles[cid] for cid in (8001, 8002)}
+            cells = {cid: consoles[cid] for cid in cell_ids}
 
             def snapshot():
                 return {
@@ -301,6 +305,39 @@ def verify_demo(entries, run_root, environment, args, output, password):
             )
             print(f"DEMO_TELEPORT_PASS entity={eid} source={source['cid']} target={target['cid']}",
                   flush=True)
+            layout_result = None
+            verify_after_logout = None
+            if args.fixed_space_layout:
+                original_space = next(
+                    entity for entity in initial[source["cid"]]
+                    if entity["type"] == "Space" and entity["space"] == source["space"]
+                )
+
+                def rejection_logged(cid, operation, space, version, revision, key):
+                    message = (f"Cellapp::spaceLayout: {operation} rejected, space={space}, "
+                               f"version={version}, revision={revision}, key={key}: ")
+                    # 服务启动后日志由 Logger 集中写入，按日志头中的组件编号区分提交方。
+                    for line in read_text(run_root / "logs/logger_cellapp.log").splitlines():
+                        header, _, body = line.partition(" - ")
+                        fields = header.split()
+                        if body.startswith(message) and len(fields) >= 4 and fields[3] == str(cid):
+                            return True
+                    return False
+
+                layout_result, verify_after_logout = verify_fixed_layout(
+                    cells, original_space, args.space_partitioning == "true", rejection_logged
+                )
+                if layout_result["enabled"]:
+                    mapping_log = (
+                        f"ClientObjectBase::addSpaceGeometryMapping: spaceID={original_space['space']}, "
+                        f"respath={NO_NAVIGATION_MAPPING}!"
+                    )
+                    wait_until(
+                        "Bots 收到无服务端导航的场景映射",
+                        lambda: mapping_log in read_text(output / "logs/bots.10000.log"),
+                        bool,
+                    )
+                    layout_result["client_received_mapping"] = True
 
             # 使用真实管理请求让 Bots 断开连接，不能用终止进程代替正常退出验证。
             require(bots.poll() is None and discover()[10000]["pid"] == bots.pid,
@@ -308,7 +345,7 @@ def verify_demo(entries, run_root, environment, args, output, password):
             machines.stopServer(Define.BOTS_TYPE, 10000, targetIP="127.0.0.1")
             bots_exit = bots.wait(timeout=30)
             require(bots_exit == 0, f"Bots 没有正常退出，退出码为 {bots_exit}")
-            for cid in (7001, 8001, 8002):
+            for cid in (7001, *cell_ids):
                 require(owned[cid]["process"].poll() is None, "客户端退出时服务端已结束")
             wait_until(
                 "Cell 清理退出角色", snapshot,
@@ -324,6 +361,15 @@ def verify_demo(entries, run_root, environment, args, output, password):
                 lambda ids: not ids,
             )
             print("DEMO_LOGOUT_PASS avatars=0 accounts=0", flush=True)
+            if verify_after_logout is not None:
+                layout_result.update(verify_after_logout())
+            if layout_result is not None and not args.keep_space_layout_on_shutdown:
+                verify_layout_removal(cells, layout_result, consoles[7001], target, output)
+                if layout_result["enabled"]:
+                    verify_rejected_layout_removal(cells, target)
+                    layout_result["rejected_layout_removed"] = True
+            elif layout_result is not None:
+                layout_result["active_at_shutdown"] = True
             require(not ERROR_PATTERN.search(all_run_logs(entries, run_root)),
                     "业务检查产生错误，请检查本次日志")
 
@@ -372,6 +418,7 @@ def verify_demo(entries, run_root, environment, args, output, password):
                 "avatars_after_logout": 0,
                 "normal_server_exits": len(entries) - len(INFRASTRUCTURE_COMPONENTS),
                 "infrastructure_cleanup": list(INFRASTRUCTURE_COMPONENTS),
+                "fixed_space_layout": layout_result,
             }
             (output / "result.json").write_text(
                 json.dumps(result, indent=2) + "\n", encoding="utf-8"
@@ -400,7 +447,15 @@ def main():
                         help="仅修改隔离运行配置；default 检查项目未填写新配置时的行为")
     parser.add_argument("--partition-rejection", choices=("mode", "coordinates", "axes", "invalid"),
                         help="启动真实额外 CellApp 检查拒绝行为，不运行正常业务流程")
+    parser.add_argument("--fixed-space-layout", action="store_true",
+                        help="验证固定区域、资源同步、空区域保留和逻辑 Space 删除")
+    parser.add_argument("--cellapp-count", type=int, choices=(2, 4), default=2)
+    parser.add_argument("--keep-space-layout-on-shutdown", action="store_true",
+                        help="保留已启用的区域直接正常关服，检查 Cell 资源不会阻止退出")
     args = parser.parse_args()
+    require(not args.keep_space_layout_on_shutdown or (
+        args.fixed_space_layout and args.space_partitioning == "true"
+    ), "保留布局关服检查要求启用固定空间分区")
     for name in ("repository_root", "assets_root", "binary_root", "config_overlay"):
         setattr(args, name, getattr(args, name).resolve())
     source = ET.parse(args.config_overlay / "server/kbengine.xml").getroot()
@@ -445,12 +500,17 @@ def main():
         set_xml_value(telnet, "password", password)
         set_xml_value(telnet, "default_layer", "python")
     runtime.write(config_path, encoding="utf-8", xml_declaration=True)
-    components, _ = build_local_cluster_components(args.repository_root / "kbe/bin/server", 1, 2)
+    if args.fixed_space_layout and args.space_partitioning == "true":
+        # 只在这次运行的资源目录中增加无导航映射，不改原 assets。
+        (config_path.parents[1] / NO_NAVIGATION_MAPPING).mkdir()
+    components, _ = build_local_cluster_components(
+        args.repository_root / "kbe/bin/server", 1, args.cellapp_count
+    )
     cluster_args = argparse.Namespace(
         repository_root=args.repository_root, assets_root=args.assets_root,
         config_overlay=config_path.parents[1], resource_overlay=[],
         binary_root=args.binary_root, run_root=output / "server",
-        components=components, expected_component_count=10,
+        components=components, expected_component_count=8 + args.cellapp_count,
         database_type=None, external_readiness=False,
         startup_timeout_seconds=150, hold_until_file=None,
     )

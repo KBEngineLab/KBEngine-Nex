@@ -28,6 +28,9 @@ int main()
 		{"local_disabled", disabled, PROTOCOL_VERSION, enabled, false},
 		{"remote_disabled", enabled, PROTOCOL_VERSION, disabled, false},
 		{"old_protocol", enabled, 0, enabled, false},
+		{"switch_only_protocol", enabled, 1, enabled, false},
+		{"previous_layout_protocol", enabled, 2, enabled, false},
+		{"disabled_previous_layout_protocol", disabled, 2, disabled, false},
 		{"new_protocol", enabled, PROTOCOL_VERSION + 1, enabled, false},
 		{"disabled_old_protocol", disabled, 0, disabled, false},
 		{"unknown_flags", enabled, PROTOCOL_VERSION, static_cast<uint8>(enabled | 8), false},
@@ -46,6 +49,6 @@ int main()
 		}
 	}
 
-	std::puts("SPACE_PARTITIONING_TEST_PASS cases=16");
+	std::printf("SPACE_PARTITIONING_TEST_PASS cases=%zu\n", sizeof(cases) / sizeof(cases[0]));
 	return 0;
 }

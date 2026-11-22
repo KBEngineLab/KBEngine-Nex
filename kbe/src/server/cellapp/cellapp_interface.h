@@ -232,6 +232,8 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
 									uint16,									protocolVersion,
 									uint8,									mode,
 									bool,									accepted)
+	// 布局启用和区域删除由 CellAppMgr 统一确认。
+	CELLAPP_MESSAGE_DECLARE_STREAM(onSpaceLayout, NETWORK_VARIABLE_MESSAGE)
 NETWORK_INTERFACE_DECLARE_END()
 
 #ifdef DEFINE_IN_INTERFACE

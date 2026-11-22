@@ -86,6 +86,15 @@ public:
 	bool confirmSpacePartitioningMode(Network::Channel* pChannel);
 	void onSpacePartitioningMode(Network::Channel* pChannel, COMPONENT_ID managerID,
 		uint16 protocolVersion, uint8 mode, bool accepted);
+	void onSpaceLayout(Network::Channel* pChannel, MemoryStream& stream);
+	bool sendSpaceLayout(const SpaceLayout::Packet& packet);
+	void requestSpaceLayoutShutdown(Space& space);
+	bool publishSpaceResources(const Space& space, SpaceLayout::Resources resources);
+	void publishSpaceData(Space& space, const std::string& key,
+		const std::string& value, bool deleted);
+	static PyObject* __py_setSpaceLayout(PyObject* self, PyObject* args);
+	static PyObject* __py_getSpaceLayout(PyObject* self, PyObject* args);
+	static PyObject* __py_cellForPosition(PyObject* self, PyObject* args);
 	uint64 staleClientInputEntityDrops() const { return staleClientInputEntityDrops_; }
 	uint64 staleControlledClientInputEntityDrops() const { return staleControlledClientInputEntityDrops_; }
 

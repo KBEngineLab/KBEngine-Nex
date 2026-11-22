@@ -50,7 +50,7 @@ class RuntimeConsole:
                 return bytes(data)
         raise TimeoutError("等待测试控制台响应超时")
 
-    def evaluate(self, expression: str):
+    def evaluate(self, expression: str, timeout: float = 5.0):
         # 每次结果都有独立标记；只接受单独一行的结果，不把回显的命令当作执行结果。
         marker = f"KBE_RUNTIME_{uuid.uuid4().hex}:"
         command = f"import json, KBEngine; print('\\n{marker}' + json.dumps({expression}))\r\n"
@@ -58,14 +58,17 @@ class RuntimeConsole:
         try:
             data = self._receive_until(
                 lambda current: result_line(current, marker) is not None
-                or b"Traceback (most recent call last):" in current
+                or b"Traceback (most recent call last):" in current,
+                timeout=timeout,
             )
         except TimeoutError as exc:
             # 只有无凭据的检查表达式会走此处；认证失败不输出收到的内容。
             raise TimeoutError(f"{exc}，响应末尾：{self.last_response[-2048:]!r}") from exc
         result = result_line(data, marker)
         if result is None:
-            raise RuntimeError("测试控制台执行失败，请检查对应组件日志")
+            raise RuntimeError(
+                "测试控制台执行失败，响应末尾：" + data[-2048:].decode("utf-8", errors="replace")
+            )
         return json.loads(result)
 
     def close(self):

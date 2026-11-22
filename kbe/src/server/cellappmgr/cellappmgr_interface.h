@@ -126,6 +126,9 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappmgrInterface)
 									uint16,									protocolVersion,
 									uint8,									mode)
 
+	// 固定布局、资源和生命周期消息仅接受已确认的 CellApp 内部连接。
+	CELLAPPMGR_MESSAGE_DECLARE_STREAM(onSpaceLayoutRequest, NETWORK_VARIABLE_MESSAGE)
+
 NETWORK_INTERFACE_DECLARE_END()
 
 #ifdef DEFINE_IN_INTERFACE

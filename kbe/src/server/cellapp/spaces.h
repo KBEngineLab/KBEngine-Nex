@@ -43,7 +43,8 @@ public:
 	/** 
 		创建一个新的space 
 	*/
-	static Space* createNewSpace(SPACE_ID spaceID, const std::string& scriptModuleName);
+	static Space* createNewSpace(SPACE_ID spaceID, const std::string& scriptModuleName,
+		bool reportToManager = true);
 	
 	/**
 		销毁一个space

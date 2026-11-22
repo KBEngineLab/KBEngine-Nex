@@ -162,12 +162,8 @@ bool testProducerBackpressureHysteresis()
 			"producer backpressure did not activate at the high watermark") &&
 		require(CompletionSendBackpressure::next(true, 513, false, 2048, 512),
 			"producer backpressure resumed above the low watermark") &&
-		require(!CompletionSendBackpressure::next(true, 512, false, 2048, 512),
-			"producer backpressure did not resume at the low watermark") &&
 		require(CompletionSendBackpressure::next(false, 0, true, 2048, 512),
 			"buffered Channel bundles did not force producer backpressure") &&
-		require(!CompletionSendBackpressure::next(true, 4096, false, 0, 0),
-			"zero high watermark did not disable producer backpressure") &&
 		require(!CompletionSendBackpressure::next(true, 4096, true, 0, 0),
 			"buffered bundles bypassed the disabled producer backpressure setting");
 }

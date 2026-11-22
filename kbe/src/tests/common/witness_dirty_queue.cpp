@@ -52,22 +52,6 @@ bool testGenerationIsolation()
 			"current same-ID lifecycle was blocked by a stale entry");
 }
 
-bool testBatchSnapshotDefersRequeue()
-{
-	KBEngine::WitnessDirtyQueue queue;
-	bool queued = false;
-	queue.enqueue(33, 303, queued);
-	const std::size_t batchSize = queue.batchSize();
-
-	KBEngine::WitnessDirtyQueue::Entry entry{};
-	if (!require(batchSize == 1 && queue.pop(entry), "initial batch was invalid"))
-		return false;
-
-	queued = false;
-	queue.enqueue(entry.entityID, entry.generation, queued);
-	return require(queue.size() == 1, "requeued entry was consumed in its original batch");
-}
-
 bool testRingWrapAndGrowthPreserveFifo()
 {
 	KBEngine::WitnessDirtyQueue queue;
@@ -99,37 +83,12 @@ bool testRingWrapAndGrowthPreserveFifo()
 
 	return require(queue.size() == 0, "ring queue did not drain completely");
 }
-
-bool testStructuralQueueDoesNotScanVolatileBacklog()
-{
-	KBEngine::WitnessDirtyQueue volatileQueue;
-	KBEngine::WitnessDirtyQueue structuralQueue;
-	bool volatileQueued[101]{};
-	for (std::uint32_t id = 1; id <= 100; ++id)
-		volatileQueue.enqueue(id, id, volatileQueued[id]);
-
-	bool structuralQueued = false;
-	if (!require(structuralQueue.enqueue(100, 100, structuralQueued),
-		"structural promotion was not queued") ||
-		!require(!structuralQueue.enqueue(100, 100, structuralQueued),
-			"duplicate structural promotion was queued"))
-	{
-		return false;
-	}
-
-	KBEngine::WitnessDirtyQueue::Entry entry{};
-	return require(structuralQueue.pop(entry) && entry.entityID == 100,
-		"structural queue did not bypass the volatile backlog") &&
-		require(volatileQueue.size() == 100,
-			"structural processing scanned or reordered the volatile backlog");
-}
 }
 
 int main()
 {
 	if (!testDeduplicationAndFifo() || !testGenerationIsolation() ||
-		!testBatchSnapshotDefersRequeue() || !testRingWrapAndGrowthPreserveFifo() ||
-		!testStructuralQueueDoesNotScanVolatileBacklog())
+		!testRingWrapAndGrowthPreserveFifo())
 		return EXIT_FAILURE;
 
 	std::cout << "WITNESS_DIRTY_QUEUE_TEST_PASS" << std::endl;

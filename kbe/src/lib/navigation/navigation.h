@@ -46,10 +46,14 @@ public:
 
 	bool removeNavigation(std::string resPath);
 
-	NavigationHandlePtr findNavigation(std::string resPath);
+	NavigationHandlePtr findNavigation(std::string resPath,
+		const std::map<int, std::string>& params = {});
 
 private:
-	KBEUnordered_map<std::string, NavigationHandlePtr> navhandles_;
+	// 同一路径的不同导航层配置不能共用句柄；相同配置仍可在本进程内复用。
+	typedef std::pair<std::string, std::map<int, std::string> > NavigationKey;
+	typedef std::map<NavigationKey, NavigationHandlePtr> NavigationHandles;
+	NavigationHandles navhandles_;
 	KBEngine::thread::ThreadMutex mutex_;
 };
 

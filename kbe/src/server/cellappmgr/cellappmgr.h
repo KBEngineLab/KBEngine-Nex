@@ -30,6 +30,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "server/serverapp.h"
 #include "server/idallocate.h"
 #include "server/serverconfig.h"
+#include "server/space_layout.h"
 #include "server/forward_messagebuffer.h"
 #include "common/timer.h"
 #include "network/endpoint.h"
@@ -112,6 +113,8 @@ public:
 	uint32 spacePartitioningConfirmedApps() const;
 	void reportSpacePartitioningMode(Network::Channel* pChannel, COMPONENT_ID cid,
 		uint16 protocolVersion, uint8 mode);
+	void onSpaceLayoutRequest(Network::Channel* pChannel, MemoryStream& stream);
+	uint64 managedSpaceCount() const { return spaceLayouts_.size(); }
 
 	void removeCellapp(COMPONENT_ID cid);
 	Cellapp& getCellapp(COMPONENT_ID cid);
@@ -161,6 +164,13 @@ public:
 
 protected:
 	bool spaceAssigned(SPACE_ID spaceID);
+	bool sendSpaceLayout(COMPONENT_ID cid, const SpaceLayout::Packet& packet);
+	void broadcastSpaceLayout(SPACE_ID spaceID, SpaceLayout::Transaction& transaction,
+		SpaceLayout::Operation operation);
+	void failSpaceLayout(SPACE_ID spaceID, SpaceLayout::Transaction& transaction,
+		const std::string& error, bool suspend);
+	void updateSpaceLayouts();
+	void onSpaceLayoutCellLost(COMPONENT_ID cid);
 
 	TimerHandle							gameTimer_;
 	ForwardAnywhere_MessageBuffer		forward_anywhere_cellapp_messagebuffer_;
@@ -173,6 +183,8 @@ protected:
 	uint8								spacePartitioningMode_;
 	// 尚无可用 CellApp 时仍需保留编号，避免重复恢复请求绕过单区域限制。
 	std::set<SPACE_ID>					queuedSpaceIDs_;
+	std::map<SPACE_ID, SpaceLayout::Transaction> spaceLayouts_;
+	uint64 nextSpaceLayoutCheck_ = 0;
 
 	// 通过工具查看space
 	SpaceViewers						spaceViewers_;
