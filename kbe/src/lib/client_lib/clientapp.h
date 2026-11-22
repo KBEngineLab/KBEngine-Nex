@@ -263,6 +263,9 @@ public:
 	static PyObject* __py_matchPath(PyObject* self, PyObject* args);
 
 protected:
+	// Bots 需要先通知脚本，再释放各客户端；共用资源释放不重复调用 onFinish。
+	void finaliseClientResources();
+
 	KBEngine::script::Script*								pScript_;
 	std::vector<PyTypeObject*>								scriptBaseTypes_;
 

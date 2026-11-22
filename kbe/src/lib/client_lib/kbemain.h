@@ -313,12 +313,13 @@ int kbeMainT(int argc, char * argv[], COMPONENT_TYPE componentType,
 	}
 	
 	INFO_MSG(fmt::format("---- {} is running ----\n", COMPONENT_NAME_EX(componentType)));
-	int ret = pApp->run();
+	const bool runSucceeded = pApp->run();
 	pApp->finalise();
 	Py_DECREF(pApp);
 	uninstallPyScript(script);
 	INFO_MSG(fmt::format("{} has shut down.\n", COMPONENT_NAME_EX(componentType)));
-	return ret;
+	// run() 返回是否成功，进程正常退出应返回零，不能直接把 true 转成退出码 1。
+	return runSucceeded ? 0 : 1;
 }
 
 #define KBENGINE_MAIN																									\

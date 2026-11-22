@@ -421,6 +421,12 @@ void ClientApp::finalise(void)
 		SCRIPT_ERROR_CHECK();
 	}
 
+	finaliseClientResources();
+}
+
+//-------------------------------------------------------------------------------------
+void ClientApp::finaliseClientResources()
+{
 	if(pServerChannel_ && pServerChannel_->pEndPoint())
 	{
 		pServerChannel_->stopSend();
@@ -437,7 +443,7 @@ void ClientApp::finalise(void)
 	ClientObjectBase::finalise();
 	Network::finalise();
 
-	uninstallPyModules();
+	// uninstallPyScript 会按实际宿主调用 uninstallPyModules，只执行一次类型和模块卸载。
 	uninstallPyScript();
 }
 

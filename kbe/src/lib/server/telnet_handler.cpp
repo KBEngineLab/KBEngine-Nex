@@ -889,7 +889,8 @@ void TelnetHandler::processPythonCommand(std::string command)
 	std::string::size_type pos = 0;
 	while ((pos = retbuf.find('\n', pos)) != std::string::npos)
 	{
-		if (retbuf[pos - 1] != '\r')
+		// Python 输出可以直接以换行开头，此时没有前一个字符，不能读取 pos - 1。
+		if (pos == 0 || retbuf[pos - 1] != '\r')
 		{
 			retbuf.insert(pos, "\r");
 			pos++;

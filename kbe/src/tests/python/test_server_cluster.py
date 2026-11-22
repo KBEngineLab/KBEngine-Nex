@@ -370,7 +370,7 @@ def hold_ready_cluster(entries, stop_file):
         time.sleep(0.25)
 
 
-def run_cluster(args):
+def run_cluster(args, on_ready=None):
     args.repository_root = normalized(args.repository_root)
     args.assets_root = normalized(args.assets_root)
     if args.config_overlay:
@@ -509,6 +509,9 @@ def run_cluster(args):
         database_result = f" database={args.database_type}" if args.database_type else ""
         print(f"SERVER_CLUSTER_PASS components={len(entries)}{database_result}", flush=True)
         write_component_manifest(entries, args.run_root)
+        if on_ready is not None:
+            # 回调复用本次进程对象，业务检查和退出检查不需要按历史 PID 查找或停止进程。
+            on_ready(entries, args.run_root, environment)
         if args.hold_until_file:
             print(f"SERVER_CLUSTER_READY stop_file={normalized(args.hold_until_file)}", flush=True)
             hold_ready_cluster(entries, args.hold_until_file)

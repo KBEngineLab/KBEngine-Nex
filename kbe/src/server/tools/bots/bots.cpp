@@ -579,7 +579,7 @@ void Bots::finalise()
 		SAFE_RELEASE(pTelnetServer_);
 	}
 
-	ClientApp::finalise();
+	finaliseClientResources();
 }
 
 //-------------------------------------------------------------------------------------
@@ -594,7 +594,8 @@ bool Bots::installEntityDef()
 //-------------------------------------------------------------------------------------
 bool Bots::uninstallPyScript()
 {
-	return ClientApp::uninstallPyScript();
+	// Bots 导出的是 bots 集合，没有注册单客户端的 entities 属性。
+	return uninstallPyModules() && EntityDef::uninstallScript();
 }
 
 //-------------------------------------------------------------------------------------

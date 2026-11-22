@@ -313,7 +313,7 @@ int kbeMainT(int argc, char * argv[], COMPONENT_TYPE componentType,
 	printf("[INFO]: %s", (fmt::format("---- {} is running ----\n", COMPONENT_NAME_EX(componentType))).c_str());
 #endif
 
-	int ret = app.run();
+	const bool runSucceeded = app.run();
 
 	Components::getSingleton().finalise();
 	app.finalise();
@@ -321,7 +321,8 @@ int kbeMainT(int argc, char * argv[], COMPONENT_TYPE componentType,
 
 	// 如果还有日志未同步完成， 这里会继续同步完成才结束
 	DebugHelper::getSingleton().finalise();
-	return ret;
+	// run() 的布尔结果与进程退出码含义相反，正常退出统一返回零。
+	return runSucceeded ? 0 : 1;
 }
 
 inline void parseMainCommandArgs(int argc, char* argv[])
