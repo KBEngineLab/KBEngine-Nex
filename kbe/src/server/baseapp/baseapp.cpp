@@ -815,6 +815,19 @@ void Baseapp::handleGameTick()
 
 	EntityApp<Entity>::handleGameTick();
 
+	if (!cellHandoffs_.empty() && timestamp() >= nextCellHandoffRetry_)
+	{
+		nextCellHandoffRetry_ = timestamp() + stampsPerSecond();
+		for (auto it = cellHandoffs_.begin(); it != cellHandoffs_.end();)
+		{
+			auto* entity = findEntity(*it);
+			if (entity && entity->retryCellHandoff())
+				++it;
+			else
+				it = cellHandoffs_.erase(it);
+		}
+	}
+
 	handleBackup();
 	handleArchive();
 }

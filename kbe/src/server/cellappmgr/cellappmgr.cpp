@@ -354,10 +354,18 @@ void Cellappmgr::handleGameTick()
 //-------------------------------------------------------------------------------------
 bool Cellappmgr::initializeBegin()
 {
+	const auto& config = g_serverConfig.getCellAppMgr();
 	spacePartitioningMode_ = SpacePartitioning::modeFlags(
-		g_serverConfig.getCellAppMgr().cellappmgr_space_partitioning_enabled,
+		config.cellappmgr_space_partitioning_enabled,
 		g_serverConfig.getCellApp().use_coordinate_system,
 		g_serverConfig.getCellApp().coordinateSystem_hasY);
+	const bool automatic = spacePartitioningEnabled() && config.cellappmgr_space_partitioning_auto_handoff;
+	if (!SpacePartitioning::validHandoffMargin(automatic,
+		config.cellappmgr_space_partitioning_handoff_margin, g_serverConfig.getCellApp().ghostDistance))
+	{
+		ERROR_MSG("Cellappmgr::initializeBegin: cellappmgr/spacePartitioning/handoffMargin must be smaller than cellapp/ghostDistance.\n");
+		return false;
+	}
 	INFO_MSG(fmt::format("Cellappmgr::initializeBegin: spacePartitioning.enabled={}.\n",
 		spacePartitioningEnabled()));
 	return true;
@@ -578,8 +586,11 @@ void Cellappmgr::reportSpacePartitioningMode(Network::Channel* pChannel,
 
 	Network::Bundle* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	bundle->newMessage(CellappInterface::onSpacePartitioningMode);
-	CellappInterface::onSpacePartitioningModeArgs3::staticAddToBundle(*bundle,
-		componentID_, spacePartitioningMode_, accepted);
+	const auto& config = g_serverConfig.getCellAppMgr();
+	CellappInterface::onSpacePartitioningModeArgs5::staticAddToBundle(*bundle,
+		componentID_, spacePartitioningMode_, accepted,
+		spacePartitioningEnabled() && config.cellappmgr_space_partitioning_auto_handoff,
+		config.cellappmgr_space_partitioning_handoff_margin);
 	pChannel->send(bundle);
 }
 

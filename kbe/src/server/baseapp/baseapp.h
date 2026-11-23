@@ -81,6 +81,7 @@ public:
 	*/
 	virtual void handleTimeout(TimerHandle handle, void * arg);
 	virtual void handleGameTick();
+	void trackCellHandoff(ENTITY_ID id) { cellHandoffs_.insert(id); }
 	void handleCheckStatusTick();
 	void evaluateClientVolatileBackpressure(Proxy* pProxy, Network::Channel* pClientChannel);
 	void refreshClientVolatileBackpressure();
@@ -556,6 +557,8 @@ public:
 	static PyObject* __py_getFlags(PyObject* self, PyObject* args);
 	
 protected:
+	std::set<ENTITY_ID> cellHandoffs_;
+	uint64 nextCellHandoffRetry_ = 0;
 	TimerHandle												loopCheckTimerHandle_;
 
 	// globalBases

@@ -250,10 +250,14 @@ void BoundaryGhosts::update(Space& space)
 	}
 	const auto& entities = space.entities();
 	const size_t count = std::min<size_t>(entities.size(), config.ghostingMaxPerCheck);
+	const bool autoHandoff = app.autoCellHandoffEnabled();
 	for (size_t checked = 0; checked < count && !entities.empty(); ++checked)
 	{
 		cursor_ %= entities.size();
-		refresh(space, *entities[cursor_++], targets.data(), neighbours_.size());
+		auto& entity = *entities[cursor_++];
+		if (autoHandoff)
+			app.considerAutoCellHandoff(space, entity);
+		refresh(space, entity, targets.data(), neighbours_.size());
 	}
 }
 
@@ -271,7 +275,7 @@ void BoundaryGhosts::clearIncoming(Space& space)
 	}
 }
 
-void BoundaryGhosts::remove(Space& space, Entity& entity)
+void BoundaryGhosts::remove(Space& space, Entity& entity, COMPONENT_ID keepTarget)
 {
 	if (entity.isBoundaryGhost())
 	{
@@ -286,12 +290,33 @@ void BoundaryGhosts::remove(Space& space, Entity& entity)
 		return;
 	for (const auto& copy : entry->second)
 	{
+		if (copy.first == keepTarget)
+			continue;
 		auto* channel = peerChannel(copy.first);
 		if (channel && channel->sessionEpoch() == copy.second.session)
 			send(*channel, space, entity.id(), copy.second.generation, REMOVE);
 	}
 	outgoing_.erase(entry);
 	entity.setBoundaryWitnessed(false);
+}
+
+bool BoundaryGhosts::forgetHandoffTarget(ENTITY_ID id, COMPONENT_ID source, uint64 session, uint64 generation)
+{
+	const auto entry = incoming_.find(id);
+	if (entry == incoming_.end() || entry->second.source != source ||
+		entry->second.session != session || entry->second.generation != generation)
+		return false;
+	incoming_.erase(entry);
+	return true;
+}
+
+uint64 BoundaryGhosts::handoffCopyGeneration(ENTITY_ID id, COMPONENT_ID target, uint64 session) const
+{
+	const auto entry = outgoing_.find(id);
+	if (entry == outgoing_.end())
+		return 0;
+	const auto copy = entry->second.find(target);
+	return copy != entry->second.end() && copy->second.session == session ? copy->second.generation : 0;
 }
 
 void BoundaryGhosts::witnessed(Space& space, const Entity& entity, bool observed)

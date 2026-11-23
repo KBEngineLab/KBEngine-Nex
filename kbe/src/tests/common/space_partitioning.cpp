@@ -1,6 +1,7 @@
 #include "server/space_partitioning.h"
 
 #include <cstdio>
+#include <limits>
 
 int main()
 {
@@ -42,6 +43,17 @@ int main()
 		}
 	}
 
-	std::printf("SPACE_PARTITIONING_TEST_PASS cases=%zu\n", sizeof(cases) / sizeof(cases[0]));
+	if (!validHandoffMargin(false, 2.f, 1.f) ||
+		validHandoffMargin(true, 2.f, 1.f) ||
+		!validHandoffMargin(true, 0.f, 1.f) || !validHandoffMargin(true, 2.f, 500.f) ||
+		validHandoffMargin(true, -1.f, 500.f) || validHandoffMargin(true, 500.f, 500.f) ||
+		validHandoffMargin(true, std::numeric_limits<float>::quiet_NaN(), 500.f) ||
+		validHandoffMargin(true, 2.f, std::numeric_limits<float>::infinity()))
+	{
+		std::fprintf(stderr, "SPACE_PARTITIONING_TEST_FAIL case=handoff_margin\n");
+		return 1;
+	}
+
+	std::printf("SPACE_PARTITIONING_TEST_PASS cases=%zu\n", sizeof(cases) / sizeof(cases[0]) + 1);
 	return 0;
 }

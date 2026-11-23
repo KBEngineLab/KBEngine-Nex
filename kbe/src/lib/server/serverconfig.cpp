@@ -27,6 +27,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "common/kbeversion.h"
 
 #include <cerrno>
+#include <cmath>
 
 #ifndef CODE_INLINE
 #include "serverconfig.inl"
@@ -1652,6 +1653,36 @@ bool ServerConfig::loadConfig(std::string fileName)
 				}
 
 				_cellAppMgrInfo.cellappmgr_space_partitioning_enabled = value == "true";
+			}
+			TiXmlNode* autoNode = xml->enterNode(node, "autoHandoff");
+			if (autoNode != NULL)
+			{
+				const std::string value = strutil::toLower(strutil::kbe_trim(xml->getValStr(autoNode)));
+				if (value != "true" && value != "false")
+				{
+					ERROR_MSG(fmt::format(
+						"ServerConfig::loadConfig: cellappmgr/spacePartitioning/autoHandoff '{}' is invalid, expected true or false, file={}.\n",
+						value, fileName));
+					return false;
+				}
+				_cellAppMgrInfo.cellappmgr_space_partitioning_auto_handoff = value == "true";
+			}
+			TiXmlNode* marginNode = xml->enterNode(node, "handoffMargin");
+			if (marginNode != NULL)
+			{
+				const std::string value = strutil::kbe_trim(xml->getValStr(marginNode));
+				const char* start = value.c_str();
+				char* end = nullptr;
+				errno = 0;
+				const float margin = std::strtof(start, &end);
+				if (end == start || *end != '\0' || errno == ERANGE || !std::isfinite(margin) || margin < 0.f)
+				{
+					ERROR_MSG(fmt::format(
+						"ServerConfig::loadConfig: cellappmgr/spacePartitioning/handoffMargin '{}' is invalid, expected a finite non-negative number, file={}.\n",
+						value, fileName));
+					return false;
+				}
+				_cellAppMgrInfo.cellappmgr_space_partitioning_handoff_margin = margin;
 			}
 		}
 	}

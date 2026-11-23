@@ -648,6 +648,13 @@ bool Entity::destroyCellEntity(void)
 		return false;																					
 	}
 
+	if (cellHandoffAction_ != CellHandoff::NONE)
+	{
+		// 等源端释放后再销毁目标，避免 BaseApp 提前丢掉本轮交接状态。
+		destroyCellAfterHandoff_ = true;
+		return true;
+	}
+
 	if(cellEntityCall_  == NULL || cellEntityCall_->getChannel() == NULL)
 	{
 		isArchiveing_ = false;
@@ -1162,7 +1169,9 @@ void Entity::onClientDeath()
 //-------------------------------------------------------------------------------------
 void Entity::onLoseCell(Network::Channel* pChannel, MemoryStream& s)
 {
-	if(pChannel->isExternal())
+	if (pChannel->isExternal() ||
+		(cellHandoffAction_ != CellHandoff::NONE && cellEntityCall() &&
+			pChannel->componentID() != cellEntityCall()->componentID()))
 		return;
 	
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
@@ -1172,6 +1181,10 @@ void Entity::onLoseCell(Network::Channel* pChannel, MemoryStream& s)
 
 	S_RELEASE(cellEntityCall_);
 
+	cellHandoffAction_ = CellHandoff::NONE;
+	cellHandoffRoute_ = {};
+	cellHandoffWarningAt_ = 0;
+	destroyCellAfterHandoff_ = false;
 	isArchiveing_ = false;
 	isGetingCellData_ = false;
 	createdSpace_ = false;
@@ -1691,10 +1704,152 @@ void Entity::onTeleportSuccess(SPACE_ID spaceID)
 	SCRIPT_OBJECT_CALL_ARGS0(this, const_cast<char*>("onTeleportSuccess"), false);
 }
 
+namespace
+{
+void sendCellHandoff(ENTITY_ID id, const CellHandoff::Route& route,
+	CellHandoff::Action action, COMPONENT_ID receiver, uint32 pid)
+{
+	auto* peer = Components::getSingleton().findComponent(CELLAPP_TYPE, receiver);
+	if (!peer || (pid && peer->pid && peer->pid != pid) || !peer->pChannel ||
+		peer->pChannel->isDestroyed() || peer->pChannel->condemn() != 0)
+		return;
+
+	auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	bundle->newMessage(CellappInterface::onCellHandoff);
+	(*bundle) << id << static_cast<uint8>(action);
+	route.write(*bundle);
+	peer->pChannel->send(bundle);
+}
+}
+
+//-------------------------------------------------------------------------------------
+bool Entity::retryCellHandoff()
+{
+	using namespace CellHandoff;
+	const auto& route = cellHandoffRoute_;
+	if (cellHandoffWarningAt_ && timestamp() >= cellHandoffWarningAt_)
+	{
+		cellHandoffWarningAt_ = 0;
+		if (cellHandoffAction_ == IDENTIFY_TARGET)
+			cellHandoffAction_ = RESTORE_SOURCE;
+		else
+			WARNING_MSG(fmt::format("Baseapp::cellHandoff: still pending, entity={}, epoch={}, source={}, target={}, action={}.\n",
+				id(), route.epoch, route.source, route.target, static_cast<int>(cellHandoffAction_)));
+	}
+
+	switch (cellHandoffAction_)
+	{
+	case IDENTIFY_TARGET:
+		sendCellHandoff(id(), route, IDENTIFY_TARGET, route.target, 0);
+		return true;
+	case CHECK_TARGET:
+		sendCellHandoff(id(), route, DISPATCH, route.source, route.sourcePid);
+		sendCellHandoff(id(), route, CHECK_TARGET, route.target, route.targetPid);
+		return true;
+	case RESTORE_SOURCE:
+	case RELEASE_SOURCE:
+		sendCellHandoff(id(), route, cellHandoffAction_, route.source, route.sourcePid);
+		return true;
+	case FINISH_TARGET:
+		sendCellHandoff(id(), route, FINISH_TARGET, route.target, route.targetPid);
+		return true;
+	default:
+		return false;
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Entity::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
+{
+	using namespace CellHandoff;
+	BoundedStreamReader reader(stream);
+	Route route;
+	uint8 action = NONE;
+	const bool parsed = reader.read(action) && route.read(reader) && reader.empty();
+	stream.done();
+	auto& components = Components::getSingleton();
+	if (!parsed || !channel || !cellEntityCall() || isDestroyed() ||
+		!components.isExpectedComponentChannel(CELLAPP_TYPE, channel))
+		return;
+	const auto* sender = components.findComponent(CELLAPP_TYPE, channel->componentID());
+	if (!sender)
+		return;
+	const bool fromSource = sender->cid == route.source && (!sender->pid || sender->pid == route.sourcePid);
+	const bool fromTarget = sender->cid == route.target && route.targetPid &&
+		(!sender->pid || sender->pid == route.targetPid);
+	if (action == START)
+	{
+		if (!fromSource || route.targetPid || cellHandoffRoute_.sameAttempt(route))
+			return;
+		if (cellEntityCall()->componentID() != route.source || route.epoch <= cellHandoffRoute_.epoch ||
+			cellHandoffAction_ != NONE || migrationCommitPending_ || pBufferedSendToClientMessages_ ||
+			hasFlags(ENTITY_FLAGS_TELEPORT_START) || hasFlags(ENTITY_FLAGS_TELEPORT_STOP))
+		{
+			// 未批准本轮交接，源端尚未向目标发送快照。
+			sendCellHandoff(id(), route, RESTORE_SOURCE, route.source, route.sourcePid);
+			return;
+		}
+		cellHandoffRoute_ = route;
+		cellHandoffAction_ = IDENTIFY_TARGET;
+		cellHandoffWarningAt_ = timestamp() + 5 * stampsPerSecond();
+		Baseapp::getSingleton().trackCellHandoff(id());
+		retryCellHandoff();
+		return;
+	}
+	if (cellHandoffAction_ == IDENTIFY_TARGET && action == TARGET_IDENTIFIED && fromTarget &&
+		cellHandoffRoute_.sameAttempt(route) && cellEntityCall()->componentID() == route.source)
+	{
+		cellHandoffRoute_.targetPid = route.targetPid;
+		cellHandoffAction_ = CHECK_TARGET;
+		cellHandoffWarningAt_ = timestamp() + 5 * stampsPerSecond();
+		retryCellHandoff();
+		return;
+	}
+	if (!(route == cellHandoffRoute_))
+		return;
+	const auto current = cellEntityCall()->componentID();
+	if (cellHandoffAction_ == CHECK_TARGET && current == route.source)
+	{
+		if (action == TARGET_INSTALLED && fromTarget)
+		{
+			sendCellHandoff(id(), route, CHECK_TARGET, route.target, route.targetPid);
+			return;
+		}
+		if (action == TARGET_READY && fromTarget)
+		{
+			// 切换路由后只重发释放和完成通知，不再恢复源实体。
+			cellEntityCall()->componentID(route.target);
+			cellHandoffAction_ = RELEASE_SOURCE;
+		}
+		else if ((action == TARGET_REJECTED && fromTarget) || (action == SOURCE_UNSENT && fromSource))
+			cellHandoffAction_ = RESTORE_SOURCE;
+		else
+			return;
+	}
+	else if (cellHandoffAction_ == RELEASE_SOURCE && current == route.target &&
+		action == SOURCE_RELEASED && fromSource)
+		cellHandoffAction_ = FINISH_TARGET;
+	else if ((cellHandoffAction_ == FINISH_TARGET && current == route.target &&
+		action == TARGET_FINISHED && fromTarget) ||
+		(cellHandoffAction_ == RESTORE_SOURCE && current == route.source &&
+			action == SOURCE_RESTORED && fromSource))
+		cellHandoffAction_ = NONE;
+	else
+		return;
+
+	cellHandoffWarningAt_ = cellHandoffAction_ == NONE ? 0 : timestamp() + 5 * stampsPerSecond();
+	if (cellHandoffAction_ == NONE && destroyCellAfterHandoff_)
+	{
+		destroyCellAfterHandoff_ = false;
+		destroyCellEntity();
+	}
+	retryCellHandoff();
+}
+
 //-------------------------------------------------------------------------------------
 void Entity::onMigrationCellappStart(Network::Channel* pChannel, COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID)
 {
-	if (pChannel && pChannel->isExternal())
+	if ((pChannel && pChannel->isExternal()) || cellHandoffAction_ != CellHandoff::NONE)
 		return;
 	
 	DEBUG_MSG(fmt::format("{}::onMigrationCellappStart: {}, sourceCellAppID={}, targetCellappID={}\n",
@@ -1801,7 +1956,7 @@ void Entity::onMigrationCellappStart(Network::Channel* pChannel, COMPONENT_ID so
 //-------------------------------------------------------------------------------------
 void Entity::onMigrationCellappEnd(Network::Channel* pChannel, COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID)
 {
-	if (pChannel && pChannel->isExternal())
+	if ((pChannel && pChannel->isExternal()) || cellHandoffAction_ != CellHandoff::NONE)
 		return;
 	
 	DEBUG_MSG(fmt::format("{}::onMigrationCellappEnd: {}, sourceCellAppID={}, targetCellappID={}\n",

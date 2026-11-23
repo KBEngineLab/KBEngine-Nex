@@ -16,7 +16,9 @@ class BoundaryGhosts
 {
 public:
 	void update(Space& space);
-	void remove(Space& space, Entity& entity);
+	void remove(Space& space, Entity& entity, COMPONENT_ID keepTarget = 0);
+	bool forgetHandoffTarget(ENTITY_ID id, COMPONENT_ID source, uint64 session, uint64 generation);
+	uint64 handoffCopyGeneration(ENTITY_ID id, COMPONENT_ID target, uint64 session) const;
 	void receive(Space& space, COMPONENT_ID source, Network::Channel& channel, MemoryStream& stream);
 	void property(Space& space, const Entity& entity, const MemoryStream& data);
 	void broadcast(Space& space, const Entity& entity, const MemoryStream& data);

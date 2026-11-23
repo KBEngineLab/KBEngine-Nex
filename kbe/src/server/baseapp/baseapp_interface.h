@@ -362,6 +362,8 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappInterface)
 								COMPONENT_ID,										targetCellAppID,
 								bool,											success)
 
+	ENTITY_MESSAGE_DECLARE_STREAM(onCellHandoff, NETWORK_VARIABLE_MESSAGE)
+
 	//--------------------------------------------Proxy---------------------------------------------------------
 	/**
 		远程呼叫entity方法

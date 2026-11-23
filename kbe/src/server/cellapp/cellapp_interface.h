@@ -227,13 +227,18 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
 									uint8,									enabled)
 
 	// 管理器明确接受运行模式后，才能执行组件就绪业务并上报初始化完成。
-	CELLAPP_MESSAGE_DECLARE_ARGS3(onSpacePartitioningMode,					NETWORK_FIXED_MESSAGE,
+	CELLAPP_MESSAGE_DECLARE_ARGS5(onSpacePartitioningMode,					NETWORK_FIXED_MESSAGE,
 									COMPONENT_ID,							managerID,
 									uint8,									mode,
-									bool,									accepted)
+									bool,									accepted,
+									bool,									autoHandoff,
+									float,									handoffMargin)
 	// 布局启用和区域删除由 CellAppMgr 统一确认。
 	CELLAPP_MESSAGE_DECLARE_STREAM(onSpaceLayout, NETWORK_VARIABLE_MESSAGE)
 	CELLAPP_MESSAGE_DECLARE_STREAM(onBoundaryGhost, NETWORK_VARIABLE_MESSAGE)
+	CELLAPP_MESSAGE_DECLARE_STREAM(onCellHandoff, NETWORK_VARIABLE_MESSAGE)
+	CELLAPP_MESSAGE_DECLARE_STREAM(reqCellHandoff, NETWORK_VARIABLE_MESSAGE)
+	CELLAPP_MESSAGE_DECLARE_STREAM(checkCellHandoffSnapshot, NETWORK_VARIABLE_MESSAGE)
 NETWORK_INTERFACE_DECLARE_END()
 
 #ifdef DEFINE_IN_INTERFACE

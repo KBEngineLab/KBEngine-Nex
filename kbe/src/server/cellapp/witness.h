@@ -69,8 +69,8 @@ public:
 		return 1;
 	}
 
-	void addToStream(KBEngine::MemoryStream& s);
-	void createFromStream(KBEngine::MemoryStream& s);
+	void addToStream(KBEngine::MemoryStream& s, bool handoff = false);
+	void createFromStream(KBEngine::MemoryStream& s, bool handoff = false);
 
 	typedef KBEShared_ptr< SmartPoolObject< Witness > > SmartPoolObjectPtr;
 	static SmartPoolObjectPtr createSmartPoolObj(const std::string& logPoint);

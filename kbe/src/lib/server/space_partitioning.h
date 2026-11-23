@@ -2,6 +2,7 @@
 #define KBE_SERVER_SPACE_PARTITIONING_H
 
 #include "common/common.h"
+#include <cmath>
 
 namespace KBEngine {
 namespace SpacePartitioning {
@@ -29,6 +30,13 @@ inline bool compatible(uint8 localMode, uint8 remoteMode)
 	// 关闭分割时不限制旧项目的坐标设置；开启后，各节点必须维护一致的空间坐标。
 	return (localMode & ENABLED) == 0 ||
 		((localMode & COORDINATE_SYSTEM) != 0 && localMode == remoteMode);
+}
+
+inline bool validHandoffMargin(bool automatic, float margin, float ghostDistance)
+{
+	// 缓冲只用于自动交接，不能限制只启用手动交接的项目。
+	return !automatic ||
+		(std::isfinite(margin) && std::isfinite(ghostDistance) && margin >= 0.f && margin < ghostDistance);
 }
 
 }

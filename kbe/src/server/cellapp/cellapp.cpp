@@ -522,6 +522,7 @@ bool Cellapp::installPyModules()
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(), setSpaceLayout, __py_setSpaceLayout, METH_VARARGS, 0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(), getSpaceLayout, __py_getSpaceLayout, METH_VARARGS, 0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(), cellForPosition, __py_cellForPosition, METH_VARARGS, 0);
+	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(), requestCellHandoff, __py_requestCellHandoff, METH_VARARGS, 0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		entitiesForSpace,				Spaces::__py_EntitiesForSpace,							METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		isShuttingDown,					__py_isShuttingDown,									METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		address,						__py_address,											METH_VARARGS,			0);
@@ -615,6 +616,10 @@ void Cellapp::handleGameTick()
 	Spaces::update();
 	if (!disconnectedCellPeers_.empty())
 		updateCellPeerConnections();
+	if (!pendingCellHandoffs_.empty() || !pendingAutoCellHandoffs_.empty())
+		processCellHandoffs();
+	if (!outgoingCellHandoffs_.empty() && timestamp() >= nextCellHandoffStartRetry_)
+		retryCellHandoffMessages();
 	// 等 Space 和坐标节点更新完成后再执行脚本，避免回调中销毁或再次传送。
 	if (pWitnessedTimeoutHandler_ && spacePartitioningEnabled())
 		pWitnessedTimeoutHandler_->dispatchPendingExits();
@@ -828,7 +833,7 @@ bool Cellapp::confirmSpacePartitioningMode(Network::Channel* pChannel)
 
 //-------------------------------------------------------------------------------------
 void Cellapp::onSpacePartitioningMode(Network::Channel* pChannel, COMPONENT_ID managerID,
-	uint8 mode, bool accepted)
+	uint8 mode, bool accepted, bool autoHandoff, float handoffMargin)
 {
 	Components& components = Components::getSingleton();
 	Components::ComponentInfos* source = components.findComponent(CELLAPPMGR_TYPE, managerID);
@@ -840,20 +845,24 @@ void Cellapp::onSpacePartitioningMode(Network::Channel* pChannel, COMPONENT_ID m
 		return;
 	}
 
-	if (!accepted || !SpacePartitioning::compatible(spacePartitioningMode_, mode))
+	const bool automatic = spacePartitioningEnabled() && autoHandoff;
+	if (!accepted || !SpacePartitioning::compatible(spacePartitioningMode_, mode) ||
+		!SpacePartitioning::validHandoffMargin(automatic, handoffMargin, g_serverConfig.getCellApp().ghostDistance))
 	{
 		ERROR_MSG(fmt::format(
-			"Cellapp::onSpacePartitioningMode: incompatible manager, localMode={}, remoteMode={}.\n",
-			spacePartitioningMode_, mode));
+			"Cellapp::onSpacePartitioningMode: incompatible manager, localMode={}, remoteMode={}, handoffMargin={}, ghostDistance={}.\n",
+			spacePartitioningMode_, mode, handoffMargin, g_serverConfig.getCellApp().ghostDistance));
 		spacePartitioningRejected_ = true;
 		spacePartitioningConfirmed_ = false;
 		dispatcher().breakProcessing();
 		return;
 	}
 
+	autoCellHandoffEnabled_ = automatic;
+	cellHandoffMargin_ = handoffMargin;
 	spacePartitioningConfirmed_ = true;
-	INFO_MSG(fmt::format("Cellapp::onSpacePartitioningMode: confirmed manager({}), enabled={}.\n",
-		managerID, spacePartitioningEnabled()));
+	INFO_MSG(fmt::format("Cellapp::onSpacePartitioningMode: confirmed manager({}), enabled={}, autoHandoff={}, handoffMargin={}.\n",
+		managerID, spacePartitioningEnabled(), autoCellHandoffEnabled_, cellHandoffMargin_));
 }
 
 //-------------------------------------------------------------------------------------
@@ -2924,6 +2933,442 @@ PyObject* Cellapp::__py_address(PyObject* self, PyObject* args)
 }
 
 //-------------------------------------------------------------------------------------
+PyObject* Cellapp::__py_requestCellHandoff(PyObject* self, PyObject* args)
+{
+	ENTITY_ID id = 0;
+	if (!PyArg_ParseTuple(args, "i:requestCellHandoff", &id))
+		return NULL;
+	auto& app = getSingleton();
+	if (!app.spacePartitioningEnabled() || !app.spacePartitioningConfirmed() || app.isShuttingdown())
+	{
+		PyErr_SetString(PyExc_RuntimeError, "Space partitioning is not available.");
+		return NULL;
+	}
+	auto* entity = id > 0 ? app.findEntity(id) : NULL;
+	if (!entity || entity->isDestroyed() || !entity->isReal() || entity->isSpace() ||
+		!entity->baseEntityCall() || entity->hasFlags(ENTITY_FLAGS_TELEPORT_START))
+	{
+		PyErr_SetString(PyExc_ValueError, "Cell handoff requires a local Real with a BaseApp.");
+		return NULL;
+	}
+	// 脚本可在 AOI 回调中请求交接，不能在坐标系统正在遍历节点时改动实体。
+	if (app.pendingCellHandoffs_.size() >= SpaceLayout::MAX_CELLS)
+	{
+		PyErr_SetString(PyExc_RuntimeError, "Too many Cell handoff requests for this tick.");
+		return NULL;
+	}
+	return PyBool_FromLong(app.pendingCellHandoffs_.insert(id).second);
+}
+
+namespace
+{
+bool canSendCellHandoff(Network::Channel* channel)
+{
+	return channel && !channel->isDestroyed() && channel->condemn() == 0;
+}
+
+void delayAutoCellHandoff(Entity& entity)
+{
+	entity.autoHandoffRetryAt(timestamp() + stampsPerSecond());
+}
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::processCellHandoffs()
+{
+	std::set<ENTITY_ID> batch;
+	batch.swap(pendingCellHandoffs_);
+	for (ENTITY_ID id : batch)
+	{
+		pendingAutoCellHandoffs_.erase(id);
+		if (!beginCellHandoff(id, false))
+			WARNING_MSG(fmt::format("Cellapp::beginCellHandoff: skipped entity={}.\n", id));
+	}
+
+	for (ENTITY_ID id : pendingAutoCellHandoffs_)
+	{
+		if (outgoingCellHandoffs_.size() >= SpaceLayout::MAX_CELLS)
+			break;
+		if (!beginCellHandoff(id, true))
+		{
+			// 候选条件可能在扫描后改变，失败的实体先让出后续 Tick 的名额。
+			if (auto* entity = findEntity(id))
+				delayAutoCellHandoff(*entity);
+		}
+	}
+	pendingAutoCellHandoffs_.clear();
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::considerAutoCellHandoff(Space& space, Entity& entity)
+{
+	// 快照和重试都需要占用资源，每个 Tick 只发起少量自动交接。
+	constexpr size_t maxStartsPerTick = 8;
+	if (pendingAutoCellHandoffs_.size() >= maxStartsPerTick ||
+		pendingAutoCellHandoffs_.size() + outgoingCellHandoffs_.size() >= SpaceLayout::MAX_CELLS ||
+		isShuttingdown() || !entity.isReal() || entity.isDestroyed() || entity.isSpace() ||
+		entity.spaceID() != space.id() ||
+		!entity.baseEntityCall() || entity.hasFlags(ENTITY_FLAGS_TELEPORT_START) ||
+		(entity.controlledBy() && entity.controlledBy()->id() != entity.id()))
+		return;
+
+	const auto& pos = entity.position();
+	if (!space.localCellBounds().crossedBy(pos.x, pos.z, cellHandoffMargin_) ||
+		(entity.autoHandoffRetryAt() != 0 && timestamp() < entity.autoHandoffRetryAt()))
+		return;
+
+	const auto* destination = space.layout().cellAt(pos.x, pos.z);
+	if (!destination || destination->cellappID == componentID_)
+		return;
+	auto* target = Components::getSingleton().findComponentChannel(CELLAPP_TYPE, destination->cellappID);
+	if (canSendCellHandoff(target) &&
+		space.boundaryGhosts().handoffCopyGeneration(entity.id(), destination->cellappID, target->sessionEpoch()) &&
+		canSendCellHandoff(entity.baseEntityCall()->getChannel()))
+		pendingAutoCellHandoffs_.insert(entity.id());
+}
+
+//-------------------------------------------------------------------------------------
+namespace
+{
+void sendCellHandoff(Network::Channel* base, ENTITY_ID id, CellHandoff::Action action,
+	const CellHandoff::Route& route)
+{
+	if (!canSendCellHandoff(base))
+		return;
+	auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	bundle->newMessage(BaseappInterface::onCellHandoff);
+	(*bundle) << id << static_cast<uint8>(action);
+	route.write(*bundle);
+	base->send(bundle);
+}
+}
+
+bool Cellapp::beginCellHandoff(ENTITY_ID id, bool automatic)
+{
+	auto* entity = findEntity(id);
+	if (isShuttingdown() || !entity || entity->isDestroyed() || !entity->isReal() ||
+		entity->isSpace() || entity->hasFlags(ENTITY_FLAGS_TELEPORT_START) ||
+		!entity->baseEntityCall() || (entity->controlledBy() && entity->controlledBy()->id() != id))
+		return false;
+	auto* space = Spaces::findSpace(entity->spaceID());
+	if (!space || !space->hasManagedCell() || !space->canAcceptEntities() ||
+		space->layoutState() != SpaceLayout::ACTIVE)
+		return false;
+	const Position3D pos = entity->position();
+	if (automatic && (!autoCellHandoffEnabled() ||
+		!space->localCellBounds().crossedBy(pos.x, pos.z, cellHandoffMargin_)))
+		return false;
+	const auto* destination = space->layout().cellAt(pos.x, pos.z);
+	if (!destination || destination->cellappID == componentID_ || outgoingCellHandoffs_.count(id))
+		return false;
+
+	auto* peer = Components::getSingleton().findComponent(CELLAPP_TYPE, destination->cellappID);
+	auto* target = peer ? peer->pChannel : NULL;
+	auto* base = entity->baseEntityCall()->getChannel();
+	if (!canSendCellHandoff(target) || !canSendCellHandoff(base) ||
+		!space->boundaryGhosts().handoffCopyGeneration(id, destination->cellappID, target->sessionEpoch()))
+		return false;
+
+	const uint64 epoch = entity->reserveCellHandoffEpoch();
+	if (!epoch)
+		return false;
+	auto pending = std::make_unique<OutgoingCellHandoff>();
+	pending->route = {componentID_, peer->cid, epoch, static_cast<uint32>(getProcessPID()), 0};
+	pending->base = entity->baseEntityCall()->componentID();
+	pending->space = space->id();
+	pending->layoutVersion = space->layoutVersion();
+	pending->session = target->sessionEpoch();
+	pending->automatic = automatic;
+	const auto route = pending->route;
+	outgoingCellHandoffs_.emplace(id, std::move(pending));
+	// BaseApp 记录本轮交接后再发送快照，等待期间源仍是 Real。
+	entity->addFlags(ENTITY_FLAGS_TELEPORT_START);
+	sendCellHandoff(base, id, CellHandoff::START, route);
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::retryCellHandoffMessages()
+{
+	nextCellHandoffStartRetry_ = timestamp() + stampsPerSecond();
+	for (auto it = outgoingCellHandoffs_.begin(); it != outgoingCellHandoffs_.end();)
+	{
+		auto* entity = findEntity(it->first);
+		if (!entity)
+		{
+			it = outgoingCellHandoffs_.erase(it);
+			continue;
+		}
+		const auto& pending = *it->second;
+		if (!pending.route.targetPid && entity->baseEntityCall())
+			sendCellHandoff(entity->baseEntityCall()->getChannel(), it->first, CellHandoff::START, pending.route);
+		else if (pending.dispatched && timestamp() >= pending.checkAt)
+		{
+			auto* peer = Components::getSingleton().findComponent(CELLAPP_TYPE, pending.route.target);
+			if (peer && (!peer->pid || peer->pid == pending.route.targetPid) && peer->pChannel &&
+				!peer->pChannel->isDestroyed() && peer->pChannel->condemn() == 0)
+			{
+				auto* check = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+				check->newMessage(CellappInterface::checkCellHandoffSnapshot);
+				(*check) << it->first << pending.base;
+				pending.route.write(*check);
+				peer->pChannel->send(check);
+			}
+		}
+		++it;
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
+{
+	using namespace CellHandoff;
+	BoundedStreamReader reader(stream);
+	ENTITY_ID id = 0;
+	uint8 action = NONE;
+	Route route;
+	const bool parsed = reader.read(id) && reader.read(action) && route.read(reader) && reader.empty();
+	stream.done();
+	if (!parsed || !spacePartitioningEnabled() ||
+		!Components::getSingleton().isExpectedComponentChannel(BASEAPP_TYPE, channel))
+		return;
+	auto* entity = findEntity(id);
+	const auto baseID = channel->componentID();
+	const auto localPid = static_cast<uint32>(getProcessPID());
+	const auto matchesBase = entity && !entity->isDestroyed() && entity->baseEntityCall() &&
+		entity->baseEntityCall()->componentID() == baseID;
+	if (route.target == componentID_ && action == IDENTIFY_TARGET && route.targetPid == 0)
+	{
+		// 直接注册的组件表可能没有 PID；由目标在已绑定的连接上确认。
+		route.targetPid = localPid;
+		sendCellHandoff(channel, id, TARGET_IDENTIFIED, route);
+		return;
+	}
+	if (route.target == componentID_ && route.targetPid == localPid)
+	{
+		if (!matchesBase || !entity->isReal() || entity->routingEpoch() != route.epoch ||
+			entity->migrationRelayCell() != route.source)
+			return;
+		auto* space = Spaces::findSpace(entity->spaceID());
+		if (action == CHECK_TARGET && entity->isCellHandoffTarget() && space && space->isGood())
+			sendCellHandoff(channel, id, TARGET_READY, route);
+		else if (action == FINISH_TARGET)
+		{
+			// 回调内可以排入下一轮，先让 BaseApp 收到本轮完成通知。
+			sendCellHandoff(channel, id, TARGET_FINISHED, route);
+			if (entity->isCellHandoffTarget())
+			{
+				admittedCellHandoffs_.erase(id);
+				EntityPtr held(entity);
+				entity->completeCellHandoff();
+			}
+		}
+		return;
+	}
+	if (route.source != componentID_ || route.sourcePid != localPid)
+		return;
+	auto entry = outgoingCellHandoffs_.find(id);
+	if (entry == outgoingCellHandoffs_.end())
+	{
+		// 释放或回退已经执行，但确认可能随连接丢失。只补发确认，不再修改实体。
+		if (action == RELEASE_SOURCE && (!entity ||
+			(entity->isBoundaryGhost() && entity->realCell() == route.target)))
+			sendCellHandoff(channel, id, SOURCE_RELEASED, route);
+		else if (action == RESTORE_SOURCE && matchesBase && entity->isReal() &&
+			entity->cellHandoffEpoch() == route.epoch)
+			sendCellHandoff(channel, id, SOURCE_RESTORED, route);
+		return;
+	}
+	auto& pending = *entry->second;
+	if (!matchesBase || pending.base != baseID || !pending.route.sameAttempt(route))
+		return;
+	if (action == DISPATCH && route.targetPid && !pending.route.targetPid)
+		pending.route.targetPid = route.targetPid;
+	if (!(pending.route == route))
+		return;
+
+	if (action == DISPATCH && !pending.dispatched)
+	{
+		auto* space = Spaces::findSpace(pending.space);
+		auto* peer = Components::getSingleton().findComponent(CELLAPP_TYPE, route.target);
+		auto* target = peer ? peer->pChannel : NULL;
+		const auto pos = entity->position();
+		const auto dir = entity->direction();
+		const auto* destination = space ? space->layout().cellAt(pos.x, pos.z) : NULL;
+		const uint64 generation = space ? space->boundaryGhosts().handoffCopyGeneration(id, route.target, pending.session) : 0;
+		pending.unsent = pending.unsent || isShuttingdown() || !entity->isReal() ||
+			entity->spaceID() != pending.space ||
+			(entity->controlledBy() && entity->controlledBy()->id() != id) ||
+			!space || !space->canAcceptEntities() || space->layoutState() != SpaceLayout::ACTIVE ||
+			space->layoutVersion() != pending.layoutVersion || !destination || destination->cellappID != route.target ||
+			(pending.automatic && !space->localCellBounds().crossedBy(pos.x, pos.z, cellHandoffMargin_)) ||
+			!target || (peer->pid && peer->pid != route.targetPid) ||
+			target->isDestroyed() || target->condemn() != 0 ||
+			target->sessionEpoch() != pending.session || !generation;
+		if (!pending.unsent)
+		{
+			Entity::bufferCallback(true);
+			try
+			{
+				entity->changeToGhost(route.target, pending.snapshot, route.epoch);
+			}
+			catch (const MemoryStreamWriteOverflow&)
+			{
+				pending.unsent = true;
+			}
+			if (!pending.unsent)
+			{
+				auto* request = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+				request->newMessage(CellappInterface::reqCellHandoff);
+				(*request) << id << pending.space << entity->pScriptModule()->getUType()
+					<< pos.x << pos.y << pos.z << dir.roll() << dir.pitch() << dir.yaw()
+					<< baseID << pending.layoutVersion << generation;
+				route.write(*request);
+				request->append(pending.snapshot);
+				pending.dispatched = true;
+				pending.checkAt = timestamp() + 2 * stampsPerSecond();
+				target->send(request);
+				DEBUG_MSG(fmt::format("Cellapp::cellHandoff: snapshot sent, entity={}, epoch={}.\n", id, route.epoch));
+			}
+			Entity::bufferCallback(false);
+		}
+		if (pending.unsent)
+			sendCellHandoff(channel, id, SOURCE_UNSENT, route);
+	}
+	else if (action == RELEASE_SOURCE && pending.dispatched &&
+		entity->isCellHandoffSource() && entity->realCell() == route.target &&
+		entity->routingEpoch() == route.epoch)
+	{
+		outgoingCellHandoffs_.erase(entry);
+		destroyEntity(id, false);
+		sendCellHandoff(channel, id, SOURCE_RELEASED, route);
+	}
+	else if (action == RESTORE_SOURCE &&
+		(!pending.dispatched || (entity->isCellHandoffSource() && entity->realCell() == route.target &&
+			entity->routingEpoch() == route.epoch)))
+	{
+		auto restored = std::move(entry->second);
+		outgoingCellHandoffs_.erase(entry);
+		// 目标仍不可用时不在下一次 Ghost 更新中立即发起相同交接。
+		if (restored->automatic)
+			delayAutoCellHandoff(*entity);
+		if (restored->dispatched)
+		{
+			EntityPtr held(entity);
+			Entity::bufferCallback(true);
+			entity->changeToReal(0, restored->snapshot, true);
+			entity->restoreProximitys();
+			entity->removeFlags(ENTITY_FLAGS_TELEPORT_START);
+			sendCellHandoff(channel, id, SOURCE_RESTORED, route);
+			Entity::bufferCallback(false);
+		}
+		else
+		{
+			entity->removeFlags(ENTITY_FLAGS_TELEPORT_START);
+			sendCellHandoff(channel, id, SOURCE_RESTORED, route);
+		}
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::reqCellHandoff(Network::Channel* channel, MemoryStream& stream)
+{
+	using namespace CellHandoff;
+	BoundedStreamReader header(stream);
+	ENTITY_ID id = 0;
+	SPACE_ID spaceID = 0;
+	ENTITY_SCRIPT_UID type = 0, snapshotType = 0;
+	Position3D pos;
+	Direction3D dir;
+	COMPONENT_ID baseID = 0, snapshotBase = 0;
+	uint64 version = 0, generation = 0, epoch = 0;
+	SPACE_ID snapshotSpace = 0;
+	bool destroyed = false;
+	Route route;
+	const auto* sender = findBoundCellappSource(channel);
+	if (!sender || sender->pChannel != channel ||
+		!header.read(id) || !header.read(spaceID) || !header.read(type) ||
+		!header.read(pos.x) || !header.read(pos.y) || !header.read(pos.z) ||
+		!header.read(dir.dir.x) || !header.read(dir.dir.y) || !header.read(dir.dir.z) ||
+		!header.read(baseID) || !header.read(version) || !header.read(generation) || !route.read(header) ||
+		sender->cid != route.source || (sender->pid && sender->pid != route.sourcePid) ||
+		componentID_ != route.target || static_cast<uint32>(getProcessPID()) != route.targetPid)
+	{
+		stream.done();
+		return;
+	}
+	const size_t snapshotPos = stream.rpos() + stream.length() - header.remaining();
+	auto* base = Components::getSingleton().findComponentChannel(BASEAPP_TYPE, baseID);
+	auto* space = Spaces::findSpace(spaceID);
+	auto* entity = findEntity(id);
+	if (admittedCellHandoffs_.count(id))
+	{
+		stream.done();
+		return;
+	}
+	const auto* destination = space && space->hasManagedCell() ? space->layout().cellAt(pos.x, pos.z) : NULL;
+	if (!spacePartitioningEnabled() || !spacePartitioningConfirmed() || isShuttingdown() ||
+		!space || !space->canAcceptEntities() || space->layoutState() != SpaceLayout::ACTIVE ||
+		!destination || destination->cellappID != componentID_ || !space->layout().cellForApp(route.source) ||
+		!base || base->isDestroyed() || base->condemn() != 0 || !entity || !entity->isBoundaryGhost() ||
+		entity->spaceID() != spaceID || entity->realCell() != route.source ||
+		entity->pScriptModule()->getUType() != type || version != space->layoutVersion() ||
+		!header.read(snapshotType) || snapshotType != type || !header.read(epoch) || epoch != route.epoch ||
+		!header.read(snapshotSpace) || snapshotSpace != spaceID || !header.read(destroyed) || destroyed ||
+		!header.skip(sizeof(bool) + sizeof(float) * 2 + sizeof(int8)) ||
+		!header.read(snapshotBase) || snapshotBase != baseID ||
+		// 同一连接上也会重建 Ghost，旧快照不能把新副本转为 Real。
+		!space->boundaryGhosts().forgetHandoffTarget(id, route.source, channel->sessionEpoch(), generation))
+	{
+		sendCellHandoff(base, id, TARGET_REJECTED, route);
+		WARNING_MSG(fmt::format("Cellapp::cellHandoff: target rejected, entity={}, epoch={}, space={}.\n", id, route.epoch, spaceID));
+		stream.done();
+		return;
+	}
+
+	// 即使目标随后被销毁，也不能把已经安装过的快照当成没有收到。
+	admittedCellHandoffs_.insert(id);
+	stream.rpos(snapshotPos);
+	EntityPtr held(entity);
+	Entity::bufferCallback(true);
+	entity->removeFlags(ENTITY_FLAGS_BOUNDARY_GHOST);
+	entity->addFlags(ENTITY_FLAGS_INITING);
+	entity->beginCellHandoffTarget(route.source);
+	entity->changeToReal(0, stream, true);
+	entity->migrationRelayCell(route.source);
+	entity->setPositionAndDirection(pos, dir);
+	entity->restoreProximitys();
+	Entity::bufferCallback(false);
+	sendCellHandoff(base, id, TARGET_INSTALLED, route);
+	stream.done();
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::checkCellHandoffSnapshot(Network::Channel* channel, MemoryStream& stream)
+{
+	using namespace CellHandoff;
+	BoundedStreamReader reader(stream);
+	ENTITY_ID id = 0;
+	COMPONENT_ID base = 0;
+	Route route;
+	const bool parsed = reader.read(id) && reader.read(base) && route.read(reader) && reader.empty();
+	stream.done();
+	const auto* sender = findBoundCellappSource(channel);
+	if (!parsed || !spacePartitioningEnabled() || !sender || sender->pChannel != channel ||
+		sender->cid != route.source || (sender->pid && sender->pid != route.sourcePid) ||
+		route.target != componentID_ || route.targetPid != static_cast<uint32>(getProcessPID()))
+		return;
+
+	// 快照只发送一次。同一连接按序处理；重连后旧连接不再是有效来源。
+	// 因而只有从未安装过快照，才可确认源端能够恢复。
+	if (!admittedCellHandoffs_.count(id))
+	{
+		auto* baseChannel = Components::getSingleton().findComponentChannel(BASEAPP_TYPE, base);
+		sendCellHandoff(baseChannel, id, TARGET_REJECTED, route);
+	}
+}
+
+//-------------------------------------------------------------------------------------
 void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 {
 	const size_t teleportHeaderSize = sizeof(ENTITY_ID) * 2 + sizeof(SPACE_ID) +
@@ -2968,10 +3413,7 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 		return;
 	}
 
-	bool success = false;
-
-	Entity* refEntity = Cellapp::getSingleton().findEntity(nearbyMBRefID);
-	if (refEntity == NULL || refEntity->isDestroyed() || refEntity->isBoundaryGhost())
+	const auto reject = [&]
 	{
 		s.rpos((int)rpos);
 
@@ -2979,35 +3421,31 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 		(*pBundle).newMessage(CellappInterface::reqTeleportToCellAppCB);
 		(*pBundle) << ghostCell << g_componentID << entityBaseappID;
 		(*pBundle) << teleportEntityID;
-		(*pBundle) << success;
+		(*pBundle) << false;
 		(*pBundle).append(&s);
 		pChannel->send(pBundle);
+		s.done();
+	};
 
+	Entity* refEntity = findEntity(nearbyMBRefID);
+	if (refEntity == NULL || refEntity->isDestroyed() || refEntity->isBoundaryGhost())
+	{
+		reject();
 		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellApp: refEntity({}) was destroyed before migration, spaceID({}), reqTeleportEntity({}).\n",
 			nearbyMBRefID, spaceID, teleportEntityID));
-
-		s.done();
 		return;
 	}
 
 	Space* space = Spaces::findSpace(refEntity->spaceID());
 	Entity* existing = findEntity(teleportEntityID);
+
+	bool success = false;
 	if (space == NULL || !space->canAcceptEntities() ||
 		(existing && (!existing->isBoundaryGhost() || existing->realCell() != ghostCell ||
 			existing->pScriptModule()->getUType() != entityType)))
 	{
-		s.rpos((int)rpos);
-
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-		(*pBundle).newMessage(CellappInterface::reqTeleportToCellAppCB);
-		(*pBundle) << ghostCell << g_componentID << entityBaseappID;
-		(*pBundle) << teleportEntityID;
-		(*pBundle) << success;
-		(*pBundle).append(&s);
-		pChannel->send(pBundle);
-
+		reject();
 		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellApp: target space({}) is not accepting new entities, reqTeleportEntity({}).\n", spaceID, teleportEntityID));
-		s.done();
 		return;
 	}
 
@@ -3175,6 +3613,13 @@ void Cellapp::reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s
 		return;
 	}
 
+	BoundedStreamReader payload(s);
+	ENTITY_ID payloadID = 0, referenceID = 0;
+	if (!payload.read(payloadID) || !payload.read(referenceID) || referenceID == 0)
+	{
+		s.done();
+		return;
+	}
 	// 实体可能没有base部分，那么不需要通知baseapp
 	if (entityBaseappID > 0)
 	{
@@ -3259,6 +3704,7 @@ void Cellapp::reqTeleportToCellAppPrepare(Network::Channel* pChannel, MemoryStre
 	Space* space = entity != NULL ? Spaces::findSpace(entity->spaceID()) : NULL;
 	const bool ready = targetCellAppID == g_componentID && sourceCellAppID != 0 &&
 		entity != NULL && !entity->isDestroyed() && entity->isReal() &&
+		!entity->isCellHandoffTarget() && outgoingCellHandoffs_.count(teleportEntityID) == 0 &&
 		entity->hasFlags(ENTITY_FLAGS_TELEPORT_START) &&
 		entity->migrationRelayCell() == sourceCellAppID &&
 		entity->baseEntityCall() != NULL &&
@@ -3326,6 +3772,11 @@ void Cellapp::reqTeleportToCellAppOver(Network::Channel* pChannel, MemoryStream&
 	{
 		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellAppOver: rejected unbound BaseApp entity={}, sourceBaseAppID={}.\n",
 			teleportEntityID, pChannel->componentID()));
+		s.done();
+		return;
+	}
+	if (entity->isCellHandoffTarget() || outgoingCellHandoffs_.count(teleportEntityID))
+	{
 		s.done();
 		return;
 	}

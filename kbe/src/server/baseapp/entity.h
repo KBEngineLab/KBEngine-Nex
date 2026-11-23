@@ -34,6 +34,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "entitydef/entity_macro.h"	
 #include "entitydef/entity_component.h"
 #include "server/script_timers.h"		
+#include "server/cell_handoff.h"
 	
 namespace KBEngine{
 
@@ -243,6 +244,8 @@ public:
 	void onMigrationCellappEnd(Network::Channel* pChannel, COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID);
 	void onMigrationCellappPrepared(Network::Channel* pChannel, COMPONENT_ID sourceCellAppID,
 		COMPONENT_ID targetCellAppID, bool success);
+	void onCellHandoff(Network::Channel* channel, MemoryStream& stream);
+	bool retryCellHandoff();
 	void onMigrationCellappOver(COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID);
 	void commitMigrationCellapp(COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID);
 	
@@ -343,6 +346,10 @@ protected:
 	bool									migrationCommitPending_;
 	COMPONENT_ID							migrationCommitSourceCellAppID_;
 	COMPONENT_ID							migrationCommitTargetCellAppID_;
+	CellHandoff::Route						cellHandoffRoute_;
+	CellHandoff::Action						cellHandoffAction_ = CellHandoff::NONE;
+	uint64									cellHandoffWarningAt_ = 0;
+	bool									destroyCellAfterHandoff_ = false;
 	
 	// 需要持久化的数据是否变脏（内存sha1），如果没有变脏不需要持久化
 	uint32									persistentDigest_[5];

@@ -46,6 +46,17 @@ struct Bounds
 	float minZ = -std::numeric_limits<float>::infinity();
 	float maxX = std::numeric_limits<float>::infinity();
 	float maxZ = std::numeric_limits<float>::infinity();
+
+	bool crossedBy(float x, float z, float margin) const
+	{
+		if (!std::isfinite(x) || !std::isfinite(z))
+			return false;
+		// 分界线归右侧或 Z 值较大的一侧，和 cellAt 的选择一致。
+		return (x < minX && static_cast<double>(minX) - x >= margin) ||
+			(x >= maxX && static_cast<double>(x) - maxX >= margin) ||
+			(z < minZ && static_cast<double>(minZ) - z >= margin) ||
+			(z >= maxZ && static_cast<double>(z) - maxZ >= margin);
+	}
 };
 
 struct Node

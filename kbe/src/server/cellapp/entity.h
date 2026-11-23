@@ -608,25 +608,33 @@ public:
 	/** 
 		转变为ghost, 自身必须为real
 	*/
-	void changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s);
+	void changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s, uint64 handoffEpoch = 0);
 	bool isMigrationSource() const { return migrationSource_; }
+	bool isCellHandoffSource() const { return handoffSource_; }
+	void beginCellHandoffTarget(COMPONENT_ID source);
+	void completeCellHandoff();
+	uint64 reserveCellHandoffEpoch();
+	uint64 cellHandoffEpoch() const { return cellHandoffEpoch_; }
+	uint64 autoHandoffRetryAt() const { return autoHandoffRetryAt_; }
+	void autoHandoffRetryAt(uint64 value) { autoHandoffRetryAt_ = value; }
+	bool isCellHandoffTarget() const { return handoffTarget_; }
 
 	/** 
 		转变为real, 自身必须为ghost
 	*/
-	void changeToReal(COMPONENT_ID ghostCell, KBEngine::MemoryStream& s);
+	void changeToReal(COMPONENT_ID ghostCell, KBEngine::MemoryStream& s, bool handoff = false);
 
-	void addToStream(KBEngine::MemoryStream& s);
-	void createFromStream(KBEngine::MemoryStream& s);
+	void addToStream(KBEngine::MemoryStream& s, uint64 handoffEpoch = 0);
+	void createFromStream(KBEngine::MemoryStream& s, bool handoff = false);
 
 	void addTimersToStream(KBEngine::MemoryStream& s);
 	void createTimersFromStream(KBEngine::MemoryStream& s);
 
-	void addControllersToStream(KBEngine::MemoryStream& s);
+	void addControllersToStream(KBEngine::MemoryStream& s, bool handoff = false);
 	void createControllersFromStream(KBEngine::MemoryStream& s);
 
-	void addWitnessToStream(KBEngine::MemoryStream& s);
-	void createWitnessFromStream(KBEngine::MemoryStream& s);
+	void addWitnessToStream(KBEngine::MemoryStream& s, bool handoff = false);
+	void createWitnessFromStream(KBEngine::MemoryStream& s, bool handoff = false);
 
 	void addMovementHandlerToStream(KBEngine::MemoryStream& s);
 	void createMovementHandlerFromStream(KBEngine::MemoryStream& s);
@@ -715,6 +723,10 @@ protected:
 	// 回环，但旧 Source 仍可能持有有序客户端 RPC，因此单独保存该授权关系。
 	COMPONENT_ID											migrationRelayCell_;
 	bool												migrationSource_ = false;
+	bool												handoffSource_ = false;
+	bool												handoffTarget_ = false;
+	uint64												cellHandoffEpoch_ = 0;
+	uint64												autoHandoffRetryAt_ = 0;
 
 	// entity的当前位置
 	Position3D												lastpos_;

@@ -95,9 +95,10 @@ SpaceLayout::Resources Space::layoutResources() const
 bool Space::prepareLayout(const SpaceLayout::Packet& packet, bool replica, std::string& error)
 {
 	using namespace SpaceLayout;
+	Bounds bounds;
 	if (packet.operation == PREPARE && packet.version == layoutVersion_)
 		layoutPreparedVersion_ = packet.version;
-	if (!isGood() || layoutRemovalPending_ || packet.layout.cellForApp(g_componentID) == NULL ||
+	if (!isGood() || layoutRemovalPending_ || !packet.layout.boundsForApp(g_componentID, bounds) ||
 		hasPendingMigrationEntities())
 	{
 		error = "local Space cannot prepare the requested Cell";
@@ -126,6 +127,7 @@ bool Space::prepareLayout(const SpaceLayout::Packet& packet, bool replica, std::
 		}
 	}
 	layout_ = packet.layout;
+	localCellBounds_ = bounds;
 	layoutVersion_ = packet.version;
 	layoutState_ = PREPARING;
 	layoutError_.clear();

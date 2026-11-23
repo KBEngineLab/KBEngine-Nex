@@ -87,6 +87,7 @@ public:
 	}
 
 	bool empty() const { return remaining_ == 0; }
+	size_t remaining() const { return remaining_; }
 
 private:
 	const uint8* data_;

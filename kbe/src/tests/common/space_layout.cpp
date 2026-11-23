@@ -38,6 +38,15 @@ int main()
 		bounds.minZ == 20.f && std::isinf(bounds.minX) && std::isinf(bounds.maxZ), "cell_bounds") ||
 		!check(!layout.boundsForApp(9999, bounds), "unknown_cell"))
 		return 1;
+	if (!check(layout.boundsForApp(8002, bounds), "handoff_bounds") ||
+		!check(!bounds.crossedBy(10.f, 20.f, 2.f), "inside_handoff_margin_x") ||
+		!check(!bounds.crossedBy(9.f, 19.f, 2.f), "inside_handoff_margin_z") ||
+		!check(bounds.crossedBy(12.f, 21.f, 2.f), "handoff_margin_x") ||
+		!check(bounds.crossedBy(9.f, 18.f, 2.f), "handoff_margin_z") ||
+		!check(bounds.crossedBy(10.f, 20.f, 0.f), "right_owns_x_boundary") ||
+		!check(!bounds.crossedBy(9.f, 20.f, 0.f), "upper_owns_z_boundary") ||
+		!check(!bounds.crossedBy(-std::numeric_limits<float>::infinity(), 20.f, 0.f), "non_finite_handoff_position"))
+		return 1;
 	Layout invalid = layout;
 	invalid.nodes[3].cellappID = 8001;
 	if (!check(!invalid.validate(), "one_cell_per_app"))

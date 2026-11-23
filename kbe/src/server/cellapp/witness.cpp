@@ -104,8 +104,17 @@ Witness::~Witness()
 }
 
 //-------------------------------------------------------------------------------------
-void Witness::addToStream(KBEngine::MemoryStream& s)
+void Witness::addToStream(KBEngine::MemoryStream& s, bool handoff)
 {
+	if (handoff)
+	{
+		// 客户端不换图，只迁移已发送的可见实体及其别名；未发送的进入项由目标重新判断。
+		s << viewRadius_ << viewHysteresisArea_ << clientViewSize_;
+		for (const auto* ref : viewEntities_)
+			if (ref->flags() & ENTITYREF_FLAG_NORMAL)
+				s << ref->id() << ref->aliasID() << ref->detailLevel();
+		return;
+	}
 	/**
 	 * @TODO(phw): 注释下面的原始代码，简单修正如下的问题：
 	 * 想象一下：A、B、C三个玩家互相能看见对方，那么它们的viewEntities_里面必须会互相记录着对方的entityID，
@@ -134,24 +143,43 @@ void Witness::addToStream(KBEngine::MemoryStream& s)
 }
 
 //-------------------------------------------------------------------------------------
-void Witness::createFromStream(KBEngine::MemoryStream& s)
+void Witness::createFromStream(KBEngine::MemoryStream& s, bool handoff)
 {
 	clearVolatileDirtyQueue();
 	fullScanRequired_ = true;
 	detailLevelScanRequired_ = false;
 	s >> viewRadius_ >> viewHysteresisArea_ >> clientViewSize_;
 
-	uint32 size;
-	s >> size;
+	uint32 size = clientViewSize_;
+	if (!handoff)
+		s >> size;
 	
 	for(uint32 i=0; i<size; ++i)
 	{
-		EntityRef* pEntityRef = EntityRef::createPoolObject(OBJECTPOOL_POINT);
-		pEntityRef->createFromStream(s);
+		EntityRef* pEntityRef = NULL;
+		if (handoff)
+		{
+			ENTITY_ID id;
+			int alias;
+			DETAIL_TYPE detail;
+			s >> id >> alias >> detail;
+			pEntityRef = EntityRef::createPoolObject(OBJECTPOOL_POINT);
+			pEntityRef->id(id);
+			pEntityRef->aliasID(alias);
+			pEntityRef->detailLevel(detail);
+			pEntityRef->flags(ENTITYREF_FLAG_NORMAL | ENTITYREF_FLAG_LEAVE_CLIENT_PENDING | ENTITYREF_FLAG_HANDOFF_PENDING);
+		}
+		else
+		{
+			pEntityRef = EntityRef::createPoolObject(OBJECTPOOL_POINT);
+			pEntityRef->createFromStream(s);
+			pEntityRef->aliasID(i);
+		}
 		initializeEntityRefLifecycle(pEntityRef);
 		viewEntities_.push_back(pEntityRef);
 		viewEntities_map_[pEntityRef->id()] = pEntityRef;
-		pEntityRef->aliasID(i);
+		if (handoff)
+			queueEntityRefVolatile(pEntityRef);
 	}
 	synchronizeViewEntityMetrics();
 
@@ -435,8 +463,10 @@ void Witness::setViewRadius(float radius, float hyst)
 //-------------------------------------------------------------------------------------
 void Witness::onEnterView(ViewTrigger* pViewTrigger, Entity* pEntity)
 {
-	// 如果进入的是Hysteresis区域，那么不产生作用
-	 if (pViewHysteresisAreaTrigger_ == pViewTrigger)
+	const auto ref = viewEntities_map_.find(pEntity->id());
+	const bool handoff = ref != viewEntities_map_.end() && (ref->second->flags() & ENTITYREF_FLAG_HANDOFF_PENDING);
+	// 普通实体要进入内圈，交接前已可见的实体仍按外圈保留。
+	if (pViewHysteresisAreaTrigger_ == pViewTrigger && !handoff)
 		return;
 
 	// 先增加一个引用，避免实体在回调中被销毁造成后续判断出错
@@ -447,10 +477,9 @@ void Witness::onEnterView(ViewTrigger* pViewTrigger, Entity* pEntity)
 	Entity* pSelfEntity = pEntity_;
 	Py_INCREF(pSelfEntity);
 
-	VIEW_ENTITIES_MAP::iterator iter = viewEntities_map_.find(pEntity->id());
-	if (iter != viewEntities_map_.end())
+	if (ref != viewEntities_map_.end())
 	{
-		EntityRef* pEntityRef = iter->second;
+		EntityRef* pEntityRef = ref->second;
 		if ((pEntityRef->flags() & ENTITYREF_FLAG_LEAVE_CLIENT_PENDING) > 0)
 		{
 			//DEBUG_MSG(fmt::format("Witness::onEnterView: {} entity={}\n", 
@@ -477,7 +506,8 @@ void Witness::onEnterView(ViewTrigger* pViewTrigger, Entity* pEntity)
 			queueEntityRefVolatile(pEntityRef);
 			g_witnessLoadMetrics.recordCancelledPendingLeave();
 			pEntity->addWitnessed(pEntity_);
-			pSelfEntity->onEnteredView(pEntity);
+			if (!handoff)
+				pSelfEntity->onEnteredView(pEntity);
 		}
 
 		Py_DECREF(pEntity);

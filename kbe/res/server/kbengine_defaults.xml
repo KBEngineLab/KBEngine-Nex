@@ -971,11 +971,13 @@
 		-->
 		<witnessPendingPressureWeight> 1.0 </witnessPendingPressureWeight>
 
-		<!-- 是否开启 Space 的分割和自动跨 Cell 迁移，3.x有效。
-			Whether to enable Space partitioning and automatic cross-Cell migration; effective in 3.x.
-		-->
+		<!-- Space 分割默认关闭，开启后可使用同 Space 手动交接。 -->
 		<spacePartitioning>
 			<enabled> false </enabled>
+			<!-- 自动交接需要同时开启 Space 分割。 -->
+			<autoHandoff> false </autoHandoff>
+			<!-- 超出当前 Cell 边界的距离，使用世界坐标单位。0 表示越界即尝试。 -->
+			<handoffMargin> 2.0 </handoffMargin>
 		</spacePartitioning>
 	</cellappmgr>
 	

@@ -99,14 +99,24 @@ bool Controllers::remove(uint32 id)
 }
 
 //-------------------------------------------------------------------------------------
-void Controllers::addToStream(KBEngine::MemoryStream& s)
+void Controllers::addToStream(KBEngine::MemoryStream& s, bool proximityOnly)
 {
 	uint32 size = (uint32)objects_.size();
+	if (proximityOnly)
+	{
+		// 移动和转向已由 Entity 单独写入；交接前不能停止它们来过滤这里的列表。
+		size = 0;
+		for (const auto& entry : objects_)
+			if (entry.second->type() == Controller::CONTROLLER_TYPE_PROXIMITY)
+				++size;
+	}
 	s << lastid_ << size;
 
 	CONTROLLERS_MAP::iterator iter = objects_.begin();
 	for(; iter != objects_.end(); ++iter)
 	{
+		if (proximityOnly && iter->second->type() != Controller::CONTROLLER_TYPE_PROXIMITY)
+			continue;
 		uint8 itype = (uint8)iter->second->type();
 		s << itype;
 		iter->second->addToStream(s);

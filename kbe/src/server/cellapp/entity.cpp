@@ -1508,7 +1508,8 @@ void Entity::onWriteToDB()
 bool Entity::bufferOrExeCallback(const char* funcName, PyObject* funcArgs,
 	bool notFoundIsOK, bool recordMigrationDispatchStages)
 {
-	if (isBoundaryGhost())
+	// 同 Space 交接后的源端只转发旧路由消息，不再执行拆除 AOI 或控制器产生的回调。
+	if (isBoundaryGhost() || isCellHandoffSource())
 	{
 		Py_XDECREF(funcArgs);
 		return false;
@@ -1913,14 +1914,15 @@ void Entity::restoreProximitys(bool recordMigrationStages)
 	}
 
 	const uint64 proximityRestoreStart = recordMigrationStages ? timestamp() : 0;
-	Controllers::CONTROLLERS_MAP& objects = pControllers_->objects();
-	Controllers::CONTROLLERS_MAP::iterator iter = objects.begin();
-	for(; iter != objects.end(); ++iter)
+	if (pControllers_)
 	{
-		if(iter->second->type() == Controller::CONTROLLER_TYPE_PROXIMITY)
+		for (const auto& entry : pControllers_->objects())
 		{
-			ProximityController* pProximityController = static_cast<ProximityController*>(iter->second.get());
-			pProximityController->reinstall(static_cast<CoordinateNode*>(this->pEntityCoordinateNode()));
+			if (entry.second->type() == Controller::CONTROLLER_TYPE_PROXIMITY)
+			{
+				auto* proximity = static_cast<ProximityController*>(entry.second.get());
+				proximity->reinstall(static_cast<CoordinateNode*>(pEntityCoordinateNode()));
+			}
 		}
 	}
 	if (recordMigrationStages)
@@ -4423,6 +4425,12 @@ void Entity::teleportLocal(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3
 //-------------------------------------------------------------------------------------
 void Entity::teleport(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& dir)
 {
+	// 当前目标仍在等 BaseApp 确认，不能先行离开本次交接的 Space。
+	if (isCellHandoffTarget())
+	{
+		onTeleportFailure();
+		return;
+	}
 	/*
 		1: 任何形式的teleport都被认为是瞬间移动的（可突破空间限制进入到任何空间）， 哪怕是在当前位置只移动了0.1米, 这就造成如果当前entity
 			刚好在某个trap中， teleport向前移动0.1米但是没有出trap， 因为这是瞬间移动的特性我们目前认为
@@ -4965,7 +4973,7 @@ void Entity::onUpdateGhostVolatileData(KBEngine::MemoryStream& s)
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s)
+void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s, uint64 handoffEpoch)
 {
 	// 一个entity要转变为ghost
 	// 首先需要设置自身的realCell
@@ -4975,18 +4983,28 @@ void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s)
 	KBE_ASSERT(isReal() == true && "Entity::changeToGhost(): not is real.\n");
 	KBE_ASSERT(realCell > 0 && realCell != g_componentID);
 
+	const bool handoff = handoffEpoch != 0;
+	const uint64 latestEpoch = std::max(routingEpoch_, cellHandoffEpoch_);
+	const uint64 nextEpoch = handoff ? handoffEpoch :
+		(latestEpoch == std::numeric_limits<uint64>::max() ? 1 : latestEpoch + 1);
+	// 同 Space 交接先写完快照；写入失败时源端仍可继续运行。
+	if (handoff)
+		addToStream(s, nextEpoch);
+
+	handoffSource_ = handoff;
+	if (handoff)
+		realCell_ = realCell;
 	if (Cellapp::getSingleton().spacePartitioningEnabled())
 	{
 		auto* space = Spaces::findSpace(spaceID());
 		if (space && space->hasManagedCell())
-			space->boundaryGhosts().remove(*space, *this);
+			space->boundaryGhosts().remove(*space, *this, handoff ? realCell : 0);
 	}
 
 	realCell_ = realCell;
 	ghostCell_ = 0;
 	migrationRelayCell_ = 0;
-	if (++routingEpoch_ == 0)
-		routingEpoch_ = 1;
+	routingEpoch_ = nextEpoch;
 	
 	GhostManager* gm = Cellapp::getSingleton().pGhostManager();
 	if(gm)
@@ -4998,11 +5016,19 @@ void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s)
 		scriptName(), id(), realCell_, spaceID_, position().x, position().y, position().z));
 	
 	// 必须放在前面
-	addToStream(s);
+	if (!handoff)
+		addToStream(s);
 	migrationSource_ = true;
 
 	//witnesses_.clear();
 	//witnesses_count_ = 0;
+
+	if (handoff)
+	{
+		boundaryWitnessed_ = false;
+		stopMove();
+		EntityEvents::clear(this);
+	}
 
 	if(pControllers_)
 	{
@@ -5022,7 +5048,7 @@ void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s)
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::changeToReal(COMPONENT_ID ghostCell, KBEngine::MemoryStream& s)
+void Entity::changeToReal(COMPONENT_ID ghostCell, KBEngine::MemoryStream& s, bool handoff)
 {
 	// 一个entity要转变为real
 	// 首先需要设置自身的ghostCell
@@ -5035,15 +5061,41 @@ void Entity::changeToReal(COMPONENT_ID ghostCell, KBEngine::MemoryStream& s)
 	realCell_ = 0;
 	migrationRelayCell_ = 0;
 	migrationSource_ = false;
+	handoffSource_ = false;
 
 	DEBUG_MSG(fmt::format("{}::changeToReal(): {}, ghostCell={}, spaceID={}, position=({},{},{}).\n",
 		scriptName(), id(), ghostCell_, spaceID_, position().x, position().y, position().z));
 
-	createFromStream(s);
+	createFromStream(s, handoff);
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::addToStream(KBEngine::MemoryStream& s)
+void Entity::beginCellHandoffTarget(COMPONENT_ID source)
+{
+	handoffTarget_ = true;
+	migrationRelayCell(source);
+	addFlags(ENTITY_FLAGS_TELEPORT_START);
+}
+
+//-------------------------------------------------------------------------------------
+void Entity::completeCellHandoff()
+{
+	handoffTarget_ = false;
+	removeFlags(ENTITY_FLAGS_TELEPORT_START);
+	onEnteredCell();
+}
+
+//-------------------------------------------------------------------------------------
+uint64 Entity::reserveCellHandoffEpoch()
+{
+	const uint64 previous = std::max(routingEpoch_, cellHandoffEpoch_);
+	if (previous == std::numeric_limits<uint64>::max())
+		return 0;
+	return cellHandoffEpoch_ = previous + 1;
+}
+
+//-------------------------------------------------------------------------------------
+void Entity::addToStream(KBEngine::MemoryStream& s, uint64 handoffEpoch)
 {
 	COMPONENT_ID baseEntityCallComponentID = 0;
 	if(baseEntityCall_)
@@ -5054,7 +5106,7 @@ void Entity::addToStream(KBEngine::MemoryStream& s)
 	bool hasCustomVolatileinfo = (pCustomVolatileinfo_ != NULL);
 	ENTITY_ID controlledByID = (controlledBy_ != NULL ? controlledBy_->id() : 0);
 		
-	s << pScriptModule_->getUType() << routingEpoch_ << spaceID_ << isDestroyed_ <<
+	s << pScriptModule_->getUType() << (handoffEpoch ? handoffEpoch : routingEpoch_) << spaceID_ << isDestroyed_ <<
 		isOnGround_ << topSpeed_ << topSpeedY_ << 
 		layer_ << baseEntityCallComponentID << hasCustomVolatileinfo << controlledByID;
 
@@ -5066,8 +5118,8 @@ void Entity::addToStream(KBEngine::MemoryStream& s)
 	addCellDataToStream(CELLAPP_TYPE, ENTITY_CELL_DATA_FLAGS, &s);
 	
 	addMovementHandlerToStream(s);
-	addControllersToStream(s);
-	addWitnessToStream(s);
+	addControllersToStream(s, handoffEpoch != 0);
+	addWitnessToStream(s, handoffEpoch != 0);
 	addTimersToStream(s);
 	EntityEvents::addToStream(this, s);
 
@@ -5075,7 +5127,7 @@ void Entity::addToStream(KBEngine::MemoryStream& s)
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::createFromStream(KBEngine::MemoryStream& s)
+void Entity::createFromStream(KBEngine::MemoryStream& s, bool handoff)
 {
 	ENTITY_SCRIPT_UID scriptUType;
 	COMPONENT_ID baseEntityCallComponentID;
@@ -5097,7 +5149,8 @@ void Entity::createFromStream(KBEngine::MemoryStream& s)
 
 	// 此时强制设置为不在地面，无法判定其是否在地面，角色需要客户端上报是否在地面
 	// 而服务端的NPC则与移动后是否在地面来判定。
-	isOnGround_ = false;
+	if (!handoff)
+		isOnGround_ = false;
 
 	this->pScriptModule_ = EntityDef::findScriptModule(scriptUType);
 
@@ -5136,7 +5189,7 @@ void Entity::createFromStream(KBEngine::MemoryStream& s)
 	
 	createMovementHandlerFromStream(s);
 	createControllersFromStream(s);
-	createWitnessFromStream(s);
+	createWitnessFromStream(s, handoff);
 	createTimersFromStream(s);
 	if (!EntityEvents::createFromStream(this, s))
 	{
@@ -5149,16 +5202,17 @@ void Entity::createFromStream(KBEngine::MemoryStream& s)
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::addControllersToStream(KBEngine::MemoryStream& s)
+void Entity::addControllersToStream(KBEngine::MemoryStream& s, bool handoff)
 {
 	if(pControllers_)
 	{
 		s << true;
 
 		// 必须先清理移动相关的Controllers
-		stopMove();
+		if (!handoff)
+			stopMove();
 
-		pControllers_->addToStream(s);
+		pControllers_->addToStream(s, handoff);
 	}
 	else
 	{
@@ -5182,22 +5236,22 @@ void Entity::createControllersFromStream(KBEngine::MemoryStream& s)
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::addWitnessToStream(KBEngine::MemoryStream& s)
+void Entity::addWitnessToStream(KBEngine::MemoryStream& s, bool handoff)
 {
 	KBE_ASSERT(witnesses_count_ <= static_cast<size_t>(std::numeric_limits<uint32>::max()));
-	const uint32 size = static_cast<uint32>(witnesses_count_);
+	const uint32 size = handoff ? 0 : static_cast<uint32>(witnesses_count_);
 	s << size;
 
-	WITNESS_IDS::iterator iter = witnesses_.begin();
-	for(; iter != witnesses_.end(); ++iter)
+	if (!handoff)
 	{
-		s << (*iter);
+		for (ENTITY_ID id : witnesses_)
+			s << id;
 	}
 
 	if(pWitness())
 	{
 		s << true;
-		pWitness()->addToStream(s);
+		pWitness()->addToStream(s, handoff);
 	}
 	else
 	{
@@ -5206,12 +5260,21 @@ void Entity::addWitnessToStream(KBEngine::MemoryStream& s)
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::createWitnessFromStream(KBEngine::MemoryStream& s)
+void Entity::createWitnessFromStream(KBEngine::MemoryStream& s, bool handoff)
 {
 	uint32 size;
 	s >> size;
 
-	if (witnesses_count_ > 0)
+	if (handoff)
+	{
+		// 被谁观察由本地坐标节点决定。目标 Ghost 上已有的观察关系不能用源端列表覆盖。
+		for (uint32 i = 0; i < size; ++i)
+		{
+			ENTITY_ID id;
+			s >> id;
+		}
+	}
+	else if (witnesses_count_ > 0)
 	{
 		WARNING_MSG(fmt::format("{}::createWitnessFromStream: witnesses_count({}/{}) != 0! entityID={}, isReal={}\n",
 			scriptName(), witnesses_.size(), witnesses_count_, id(), isReal()));
@@ -5290,7 +5353,7 @@ void Entity::createWitnessFromStream(KBEngine::MemoryStream& s)
 		// setWitness(Witness::createPoolObject());
 		pWitness_ = Witness::createPoolObject(OBJECTPOOL_POINT);
 		pWitness_->pEntity(this);
-		pWitness_->createFromStream(s);
+		pWitness_->createFromStream(s, handoff);
 	}
 }
 
@@ -5327,6 +5390,8 @@ void Entity::createMovementHandlerFromStream(KBEngine::MemoryStream& s)
 	if(hasMoveHandler)
 	{
 		stopMove();
+		if (!pControllers_)
+			pControllers_ = new Controllers(id());
 
 		pMoveController_ = KBEShared_ptr<Controller>(new MoveController(this));
 		pMoveController_->createFromStream(s);
@@ -5343,6 +5408,8 @@ void Entity::createMovementHandlerFromStream(KBEngine::MemoryStream& s)
 	{
 		if(!hasMoveHandler)
 			stopMove();
+		if (!pControllers_)
+			pControllers_ = new Controllers(id());
 		
 		pTurnController_ = KBEShared_ptr<Controller>(new TurnController(this));
 		pTurnController_->createFromStream(s);

@@ -36,6 +36,7 @@ class MemoryStream;
 #define ENTITYREF_FLAG_LEAVE_CLIENT_PENDING				0x00000002	// 离开客户端中标志
 #define ENTITYREF_FLAG_NORMAL							0x00000004	// 常规状态
 #define ENTITYREF_FLAG_CONTROL_REPLAY_PENDING			0x00000008	// 重建客户端视野后等待重放控制关系
+#define ENTITYREF_FLAG_HANDOFF_PENDING					0x00000010	// 已在客户端显示，等待目标 Cell 匹配本地实体
 
 class EntityRef : public PoolObject
 {
@@ -73,6 +74,7 @@ public:
 	void pEntity(Entity* e);
 
 	ENTITY_ID id() const { return id_; }
+	void id(ENTITY_ID value) { id_ = value; }
 
 	int aliasID() const { return aliasID_; }
 	void aliasID(int id) { aliasID_ = id; }

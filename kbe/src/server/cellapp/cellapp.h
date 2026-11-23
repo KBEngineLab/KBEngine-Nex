@@ -31,8 +31,10 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/endpoint.h"
 #include "server/entity_app.h"
 #include "server/forward_messagebuffer.h"
+#include "server/cell_handoff.h"
 
 #include <memory>
+#include <set>
 	
 namespace KBEngine{
 
@@ -89,7 +91,9 @@ public:
 	bool spacePartitioningConfirmed() const { return spacePartitioningConfirmed_; }
 	bool confirmSpacePartitioningMode(Network::Channel* pChannel);
 	void onSpacePartitioningMode(Network::Channel* pChannel, COMPONENT_ID managerID,
-		uint8 mode, bool accepted);
+		uint8 mode, bool accepted, bool autoHandoff, float handoffMargin);
+	bool autoCellHandoffEnabled() const { return autoCellHandoffEnabled_ && spacePartitioningConfirmed_; }
+	void considerAutoCellHandoff(Space& space, Entity& entity);
 	void onSpaceLayout(Network::Channel* pChannel, MemoryStream& stream);
 	void onBoundaryGhost(Network::Channel* pChannel, MemoryStream& stream);
 	bool sendSpaceLayout(const SpaceLayout::Packet& packet);
@@ -100,6 +104,10 @@ public:
 	static PyObject* __py_setSpaceLayout(PyObject* self, PyObject* args);
 	static PyObject* __py_getSpaceLayout(PyObject* self, PyObject* args);
 	static PyObject* __py_cellForPosition(PyObject* self, PyObject* args);
+	static PyObject* __py_requestCellHandoff(PyObject* self, PyObject* args);
+	void onCellHandoff(Network::Channel* channel, MemoryStream& stream);
+	void reqCellHandoff(Network::Channel* channel, MemoryStream& stream);
+	void checkCellHandoffSnapshot(Network::Channel* channel, MemoryStream& stream);
 	uint64 staleClientInputEntityDrops() const { return staleClientInputEntityDrops_; }
 	uint64 staleControlledClientInputEntityDrops() const { return staleControlledClientInputEntityDrops_; }
 
@@ -293,6 +301,29 @@ public:
 	static PyObject* __py_getFlags(PyObject* self, PyObject* args);
 
 protected:
+	void processCellHandoffs();
+	bool beginCellHandoff(ENTITY_ID id, bool automatic);
+	void retryCellHandoffMessages();
+	std::set<ENTITY_ID> pendingCellHandoffs_;
+	std::set<ENTITY_ID> pendingAutoCellHandoffs_;
+	bool autoCellHandoffEnabled_ = false;
+	float cellHandoffMargin_ = 0.f;
+	struct OutgoingCellHandoff
+	{
+		CellHandoff::Route route;
+		COMPONENT_ID base = 0;
+		SPACE_ID space = 0;
+		uint64 layoutVersion = 0;
+		uint64 session = 0;
+		uint64 checkAt = 0;
+		MemoryStream snapshot;
+		bool automatic = false;
+		bool dispatched = false;
+		bool unsent = false;
+	};
+	std::map<ENTITY_ID, std::unique_ptr<OutgoingCellHandoff>> outgoingCellHandoffs_;
+	std::set<ENTITY_ID> admittedCellHandoffs_;
+	uint64 nextCellHandoffStartRetry_ = 0;
 	void queueCellPeerReconnect(const Components::ComponentInfos& peer);
 	void updateCellPeerConnections();
 

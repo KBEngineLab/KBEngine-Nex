@@ -209,6 +209,8 @@ typedef struct EngineComponentInfo
 		cellappmgr_space_assignment_max_skew = 2;
 		cellappmgr_witness_pending_pressure_weight = 1.f;
 		cellappmgr_space_partitioning_enabled = false;
+		cellappmgr_space_partitioning_auto_handoff = false;
+		cellappmgr_space_partitioning_handoff_margin = 2.f;
 	}
 
 	~EngineComponentInfo()
@@ -256,6 +258,8 @@ typedef struct EngineComponentInfo
 	float cellappmgr_witness_pending_pressure_weight;
 	// 旧项目缺省时保持单个 Space 由一个 Cell 承载，不关闭已有显式传送。
 	bool cellappmgr_space_partitioning_enabled;
+	bool cellappmgr_space_partitioning_auto_handoff;
+	float cellappmgr_space_partitioning_handoff_margin;
 	uint16 entity_posdir_updates_type;						// 实体位置更新方式，0：非优化高精度同步, 1:优化同步, 2:智能选择模式
 	uint16 entity_posdir_updates_smart_threshold;			// 实体位置更新智能模式下的同屏人数阈值
 
