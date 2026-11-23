@@ -99,6 +99,12 @@ public:
 		判断自身是否是一个realEntity 
 	*/
 	INLINE bool isReal(void) const;
+	bool isBoundaryGhost() const { return hasFlags(ENTITY_FLAGS_BOUNDARY_GHOST); }
+	void setBoundaryGhost(COMPONENT_ID source) { realCell(source); addFlags(ENTITY_FLAGS_BOUNDARY_GHOST); }
+	bool writeBoundaryGhostProperties(MemoryStream& stream, size_t limit);
+	bool initBoundaryGhostProperties(MemoryStream& stream);
+	bool applyBoundaryGhostProperty(MemoryStream& stream, bool notify);
+	void setBoundaryGhostLayer(int8 layer) { layer_ = layer; }
 
 	// 标记实体是否拥有其所在空间，兼容普通 Entity 创建空间的 Nex 行为。
 	// Marks whether the entity owns its space, preserving Nex behavior for spaces created by regular Entity types.
@@ -130,7 +136,9 @@ public:
 		A def property changed; pEntityComponent identifies the parent for component properties.
 	*/
 	void onDefDataChanged(EntityComponent* pEntityComponent, const PropertyDescription* propertyDescription,
-			PyObject* pyData);
+		PyObject* pyData);
+	void onDefDataChangedImpl(EntityComponent* component, const PropertyDescription* property,
+		PyObject* value, bool fromBoundaryGhost);
 
 	/**
 		将指定详情级别范围内、可广播给其他客户端的当前属性写入更新流。
@@ -442,6 +450,7 @@ public:
 	*/
 	void delWitnessed(Entity* entity);
 	void onDelWitnessed();
+	void setBoundaryWitnessed(bool observed);
 
 	/** 某个观察关系加入或完成待发送位姿时维护聚合计数。 */
 	/** Maintains the aggregate count while observer relations queue or complete pose delivery. */
@@ -647,6 +656,7 @@ public:
 	static void bufferCallback(bool enable);
 
 private:
+	void onFirstWitnessed();
 	/** 
 		发送teleport结果到base端
 	*/
@@ -757,6 +767,7 @@ protected:
 	// Movement broadcasts traverse observers frequently; contiguous IDs avoid per-relation nodes and pointer chasing.
 	WITNESS_IDS										witnesses_;
 	size_t													witnesses_count_;
+	bool													boundaryWitnessed_ = false;
 
 	uint32											witnessesVolatilePendingCount_;
 

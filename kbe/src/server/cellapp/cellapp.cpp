@@ -67,6 +67,12 @@ namespace
 {
 const size_t ENTITY_TYPE_MAX_LENGTH = 128;
 
+bool canReconnectCellPeer(const Components::ComponentInfos* current, const Components::ComponentInfos& peer)
+{
+	return !current || (current->componentType == CELLAPP_TYPE && !current->pChannel &&
+		current->pIntAddr && *current->pIntAddr == *peer.pIntAddr);
+}
+
 bool validateSpaceCreationForward(const MemoryStream& stream)
 {
 	BoundedStreamReader reader(stream);
@@ -115,7 +121,7 @@ Components::ComponentInfos* findBoundCellappSource(Network::Channel* pChannel)
 
 bool isCurrentGhostPeer(Entity* entity, COMPONENT_ID sourceCellID)
 {
-	if (entity == NULL || sourceCellID == 0)
+	if (entity == NULL || entity->isBoundaryGhost() || sourceCellID == 0)
 		return false;
 
 	const COMPONENT_ID peerCellID = entity->isReal() ? entity->ghostCell() : entity->realCell();
@@ -607,6 +613,144 @@ void Cellapp::handleGameTick()
 	Witness::beginUpdateTick();
 	updatables_.update();
 	Spaces::update();
+	if (!disconnectedCellPeers_.empty())
+		updateCellPeerConnections();
+	// 等 Space 和坐标节点更新完成后再执行脚本，避免回调中销毁或再次传送。
+	if (pWitnessedTimeoutHandler_ && spacePartitioningEnabled())
+		pWitnessedTimeoutHandler_->dispatchPendingExits();
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::onRemoveComponent(const Components::ComponentInfos* component)
+{
+	EntityApp<Entity>::onRemoveComponent(component);
+
+	// 未激活的布局由 COMPLETE 检查连接。活动布局断线后，只让编号较小的一端重连。
+	if (!isShuttingdown() && spacePartitioningConfirmed_ && spacePartitioningEnabled() &&
+		component->componentType == CELLAPP_TYPE && component->cid > componentID_ &&
+		component->pChannel && component->pIntAddr && component->pExtAddr &&
+		Spaces::hasActiveCellPeer(component->cid))
+		queueCellPeerReconnect(*component);
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::queueCellPeerReconnect(const Components::ComponentInfos& component)
+{
+	if (disconnectedCellPeers_.empty())
+		nextCellPeerAttempt_ = timestamp() + stampsPerSecond();
+	auto& peer = disconnectedCellPeers_[component.cid];
+	peer = component;
+	peer.pChannel = NULL;
+	peer.username[MAX_NAME] = '\0';
+	peer.externalAddressEx[MAX_NAME] = '\0';
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::updateCellPeerConnections()
+{
+	if (isShuttingdown())
+	{
+		reconnectingEndpoint_.reset();
+		disconnectedCellPeers_.clear();
+		return;
+	}
+
+	auto& components = Components::getSingleton();
+	const uint64 now = timestamp();
+	if (!reconnectingEndpoint_)
+	{
+		if (now < nextCellPeerAttempt_)
+			return;
+
+		const auto nextPeer = disconnectedCellPeers_.upper_bound(reconnectingPeer_);
+		const auto next = nextPeer != disconnectedCellPeers_.end() ? nextPeer : disconnectedCellPeers_.begin();
+		reconnectingPeer_ = next->first;
+		if (!canReconnectCellPeer(components.findComponent(reconnectingPeer_), next->second) ||
+			!Spaces::hasActiveCellPeer(reconnectingPeer_))
+		{
+			disconnectedCellPeers_.erase(next);
+			return;
+		}
+
+		// 每个 CellApp 同时只尝试一条连接；连不上不能阻塞 Tick 或挤占其他节点的重试。
+		nextCellPeerAttempt_ = now + stampsPerSecond();
+		reconnectingEndpoint_.reset(Network::EndPoint::createPoolObject(OBJECTPOOL_POINT));
+		auto& endpoint = *reconnectingEndpoint_;
+		endpoint.socket(SOCK_STREAM);
+		if (!endpoint.good() || endpoint.setnonblocking(true) != 0)
+		{
+			reconnectingEndpoint_.reset();
+			return;
+		}
+		endpoint.addr(*next->second.pIntAddr);
+		endpoint.setnodelay(true);
+		if (endpoint.connect(false) != 0)
+		{
+			const int error = kbe_lasterror();
+#if KBE_PLATFORM == PLATFORM_WIN32
+			const bool pending = error == WSAEWOULDBLOCK || error == WSAEINPROGRESS;
+#else
+			const bool pending = error == EINPROGRESS || error == EINTR;
+#endif
+			if (!pending)
+			{
+				reconnectingEndpoint_.reset();
+				return;
+			}
+		}
+		reconnectDeadline_ = now + 2 * stampsPerSecond();
+	}
+
+	auto& endpoint = *reconnectingEndpoint_;
+	if (endpoint.getremoteaddress(NULL, NULL) != 0)
+	{
+		int error = 0;
+		socklen_t length = sizeof(error);
+		if (now >= reconnectDeadline_ ||
+			getsockopt(endpoint.socket(), SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&error), &length) != 0 ||
+			error != 0)
+			reconnectingEndpoint_.reset();
+		return;
+	}
+
+	const auto entry = disconnectedCellPeers_.find(reconnectingPeer_);
+	const auto& peer = entry->second;
+	auto* route = components.findComponent(reconnectingPeer_);
+	if (!canReconnectCellPeer(route, peer) || !Spaces::hasActiveCellPeer(reconnectingPeer_))
+	{
+		reconnectingEndpoint_.reset();
+		disconnectedCellPeers_.erase(entry);
+		return;
+	}
+	// 有新的 COMPLETE 更新地址时，不能把已经拨通的旧端点注册为新路由。
+	if (!(endpoint.addr() == *peer.pIntAddr))
+	{
+		reconnectingEndpoint_.reset();
+		return;
+	}
+
+	const bool newRoute = route == NULL;
+	if (newRoute)
+	{
+		std::string externalAddress(peer.externalAddressEx);
+		components.addComponent(peer.uid, peer.username, CELLAPP_TYPE, peer.cid, peer.globalOrderid,
+			peer.groupOrderid, peer.gus, peer.pIntAddr->ip, peer.pIntAddr->port, peer.pExtAddr->ip,
+			peer.pExtAddr->port, externalAddress, peer.pid, peer.cpu, peer.mem, peer.usedmem,
+			peer.extradata, peer.extradata1, peer.extradata2, peer.extradata3);
+		route = components.findComponent(CELLAPP_TYPE, peer.uid, peer.cid);
+	}
+	if (route && components.registerConnectedComponent(*route, reconnectingEndpoint_.release(),
+		reconnectingPeer_, false) == 0)
+	{
+		INFO_MSG(fmt::format("Cellapp::updateCellPeerConnections: reconnected CellApp {}.\n", reconnectingPeer_));
+		disconnectedCellPeers_.erase(entry);
+	}
+	else
+	{
+		reconnectingEndpoint_.reset();
+		if (newRoute && route)
+			components.delComponent(peer.uid, CELLAPP_TYPE, peer.cid, false, false);
+	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -616,8 +760,16 @@ bool Cellapp::initializeBegin()
 		g_serverConfig.getCellAppMgr().cellappmgr_space_partitioning_enabled,
 		g_serverConfig.getCellApp().use_coordinate_system,
 		g_serverConfig.getCellApp().coordinateSystem_hasY);
-	INFO_MSG(fmt::format("Cellapp::initializeBegin: spacePartitioning.enabled={}, protocol={}.\n",
-		spacePartitioningEnabled(), SpacePartitioning::PROTOCOL_VERSION));
+	const auto& config = g_serverConfig.getCellApp();
+	if (spacePartitioningEnabled() && (!std::isfinite(config.ghostDistance) ||
+		config.ghostDistance <= 0.f || config.ghostDistance < config.defaultViewRadius + config.defaultViewHysteresisArea ||
+		config.ghostUpdateHertz == 0 || config.ghostingMaxPerCheck == 0))
+	{
+		ERROR_MSG("Cellapp::initializeBegin: invalid boundary Ghost configuration.\n");
+		return false;
+	}
+	INFO_MSG(fmt::format("Cellapp::initializeBegin: spacePartitioning.enabled={}.\n",
+		spacePartitioningEnabled()));
 	return true;
 }
 
@@ -625,6 +777,25 @@ bool Cellapp::initializeBegin()
 bool Cellapp::spacePartitioningEnabled() const
 {
 	return (spacePartitioningMode_ & SpacePartitioning::ENABLED) != 0;
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::onBoundaryGhost(Network::Channel* pChannel, MemoryStream& stream)
+{
+	auto* source = spacePartitioningEnabled() ? findBoundCellappSource(pChannel) : NULL;
+	SPACE_ID id = 0;
+	BoundedStreamReader reader(stream);
+	if (source && reader.read(id))
+	{
+		auto* space = Spaces::findSpace(id);
+		if (space && space->canAcceptEntities() &&
+			(space->layoutState() == SpaceLayout::ACTIVE || space->layoutState() == SpaceLayout::COMMITTING))
+		{
+			stream.rpos(stream.rpos() + sizeof(id));
+			space->boundaryGhosts().receive(*space, source->cid, *pChannel, stream);
+		}
+	}
+	stream.done();
 }
 
 //-------------------------------------------------------------------------------------
@@ -640,8 +811,8 @@ bool Cellapp::confirmSpacePartitioningMode(Network::Channel* pChannel)
 		// 复用已注册的内部连接，不通过额外端口或发现消息确认运行模式。
 		Network::Bundle* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		bundle->newMessage(CellappmgrInterface::reportSpacePartitioningMode);
-		CellappmgrInterface::reportSpacePartitioningModeArgs3::staticAddToBundle(*bundle,
-			componentID_, SpacePartitioning::PROTOCOL_VERSION, spacePartitioningMode_);
+		CellappmgrInterface::reportSpacePartitioningModeArgs2::staticAddToBundle(*bundle,
+			componentID_, spacePartitioningMode_);
 		spacePartitioningRequestTime_ = timestamp();
 		pChannel->send(bundle);
 	}
@@ -657,7 +828,7 @@ bool Cellapp::confirmSpacePartitioningMode(Network::Channel* pChannel)
 
 //-------------------------------------------------------------------------------------
 void Cellapp::onSpacePartitioningMode(Network::Channel* pChannel, COMPONENT_ID managerID,
-	uint16 protocolVersion, uint8 mode, bool accepted)
+	uint8 mode, bool accepted)
 {
 	Components& components = Components::getSingleton();
 	Components::ComponentInfos* source = components.findComponent(CELLAPPMGR_TYPE, managerID);
@@ -669,11 +840,11 @@ void Cellapp::onSpacePartitioningMode(Network::Channel* pChannel, COMPONENT_ID m
 		return;
 	}
 
-	if (!accepted || !SpacePartitioning::compatible(spacePartitioningMode_, protocolVersion, mode))
+	if (!accepted || !SpacePartitioning::compatible(spacePartitioningMode_, mode))
 	{
 		ERROR_MSG(fmt::format(
-			"Cellapp::onSpacePartitioningMode: incompatible manager, localMode={}, remoteMode={}, localProtocol={}, remoteProtocol={}.\n",
-			spacePartitioningMode_, mode, SpacePartitioning::PROTOCOL_VERSION, protocolVersion));
+			"Cellapp::onSpacePartitioningMode: incompatible manager, localMode={}, remoteMode={}.\n",
+			spacePartitioningMode_, mode));
 		spacePartitioningRejected_ = true;
 		spacePartitioningConfirmed_ = false;
 		dispatcher().breakProcessing();
@@ -718,6 +889,8 @@ bool Cellapp::initializeEnd()
 //-------------------------------------------------------------------------------------
 void Cellapp::finalise()
 {
+	reconnectingEndpoint_.reset();
+	disconnectedCellPeers_.clear();
 	spaceViewers_.finalise();
 
 	SAFE_RELEASE(pGhostManager_);
@@ -2798,7 +2971,7 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 	bool success = false;
 
 	Entity* refEntity = Cellapp::getSingleton().findEntity(nearbyMBRefID);
-	if (refEntity == NULL || refEntity->isDestroyed())
+	if (refEntity == NULL || refEntity->isDestroyed() || refEntity->isBoundaryGhost())
 	{
 		s.rpos((int)rpos);
 
@@ -2818,7 +2991,10 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 	}
 
 	Space* space = Spaces::findSpace(refEntity->spaceID());
-	if (space == NULL || !space->canAcceptEntities())
+	Entity* existing = findEntity(teleportEntityID);
+	if (space == NULL || !space->canAcceptEntities() ||
+		(existing && (!existing->isBoundaryGhost() || existing->realCell() != ghostCell ||
+			existing->pScriptModule()->getUType() != entityType)))
 	{
 		s.rpos((int)rpos);
 
@@ -2840,6 +3016,9 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 	const uint64 deserializeCreateStart = scriptStageStartStamps();
 	// 创建entity
 	const uint64 entityConstructStart = scriptStageStartStamps();
+	// 显式传送仍创建完整的 Real。目标进程已有边界副本时先释放同一源端的副本。
+	if (existing)
+		destroyEntity(teleportEntityID, false);
 	Entity* e = createEntity(EntityDef::findScriptModule(entityType)->getName(), NULL, false, teleportEntityID, false);
 	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_ENTITY_CONSTRUCT,
 		scriptStageDurationNanos(entityConstructStart), true, "reqTeleportToCellApp");

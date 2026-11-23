@@ -32,17 +32,7 @@ namespace Network
 class Bundle;
 }
 
-class Entity;
-
-/*
-	* cell1: entity(1) is real, 则在GhostManager中存放于entityIDs_进行检查  (向其他ghost更新)
-
-	* cell2: entity(1) is ghost, 如果cell2被整体迁移走，则需要向ghost_route_临时设置一个路由地址， 路由在最后一次收包超过一定时间擦除。
-	                    如果期间有一些包被转发过来， 那么找不到entity就查询路由表，并继续转发到ghostEntity(例如real销毁了要求立即销毁ghost)。
-
-	* cell1: entity(1) is real, 如果被再迁移到cell3， 则需要向ghost_route_临时设置一个路由地址， 路由在最后一次收ghost请求包超过一定时间擦除。
-	                    如果期间有一些ghost请求包被转发过来， 那么找不到entity就查询路由表，并继续转发到realEntity。
-*/
+// 管理显式传送的临时路由和转发队列。各 Space 单独维护边界副本。
 class GhostManager : public TimerHandler
 {
 public:
@@ -72,7 +62,6 @@ private:
 
 private:
 	void syncMessages();
-	void syncGhosts();
 
 	void checkRoute();
 
@@ -89,9 +78,6 @@ private:
 	};
 
 private:
-	// 所有存在ghost的相关entity
-	std::map<ENTITY_ID, Entity*> 	realEntities_;
-	
 	// ghost路由， 分布式程序某些时候无法保证同步， 那么在本机上的某些entity被迁移走了的
 	// 时候可能会还会收到一些网络消息， 因为其他app可能还无法立即得到迁移地址， 此时我们
 	// 可以在当前app上将迁移走的entity指向缓存一下， 有网络消息过来我们可以继续转发到新的地址

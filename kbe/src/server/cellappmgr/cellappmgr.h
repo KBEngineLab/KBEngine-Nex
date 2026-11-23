@@ -111,8 +111,7 @@ public:
 	bool componentReady(COMPONENT_ID cid);
 	bool spacePartitioningEnabled() const;
 	uint32 spacePartitioningConfirmedApps() const;
-	void reportSpacePartitioningMode(Network::Channel* pChannel, COMPONENT_ID cid,
-		uint16 protocolVersion, uint8 mode);
+	void reportSpacePartitioningMode(Network::Channel* pChannel, COMPONENT_ID cid, uint8 mode);
 	void onSpaceLayoutRequest(Network::Channel* pChannel, MemoryStream& stream);
 	uint64 managedSpaceCount() const { return spaceLayouts_.size(); }
 

@@ -454,7 +454,25 @@ int Components::connectComponent(COMPONENT_TYPE componentType, int32 uid, COMPON
 		}
 	}
 
-	if(ret == 0)
+	if (ret == 0)
+		return registerConnectedComponent(*pComponentInfos, pEndpoint, componentID, printlog);
+
+	if (printlog)
+	{
+		ERROR_MSG(fmt::format("Components::connectComponent: connect({}) is failed! {}.\n",
+			pComponentInfos->pIntAddr->c_str(), kbe_strerror()));
+	}
+
+	Network::EndPoint::reclaimPoolObject(pEndpoint);
+	return -1;
+}
+
+//-------------------------------------------------------------------------------------
+int Components::registerConnectedComponent(ComponentInfos& component, Network::EndPoint* pEndpoint,
+	COMPONENT_ID componentID, bool printlog)
+{
+	auto* pComponentInfos = &component;
+	const COMPONENT_TYPE componentType = component.componentType;
 	{
 		Network::Channel* pChannel = Network::Channel::createPoolObject(OBJECTPOOL_POINT);
 		bool ret = pChannel->initialize(*_pNetworkInterface, pEndpoint, Network::Channel::INTERNAL);
@@ -560,19 +578,7 @@ int Components::connectComponent(COMPONENT_TYPE componentType, int32 uid, COMPON
 			pComponentInfos->pChannel->send(pBundle);
 		}
 	}
-	else
-	{
-		if (printlog)
-		{
-			ERROR_MSG(fmt::format("Components::connectComponent: connect({}) is failed! {}.\n",
-				pComponentInfos->pIntAddr->c_str(), kbe_strerror()));
-		}
-
-		Network::EndPoint::reclaimPoolObject(pEndpoint);
-		return -1;
-	}
-
-	return ret;
+	return 0;
 }
 
 //-------------------------------------------------------------------------------------		

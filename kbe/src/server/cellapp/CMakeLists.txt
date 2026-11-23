@@ -2,6 +2,7 @@ kbe_add_server_executable(cellapp KBE_CELLAPP
     SOURCES
         all_clients.cpp
         view_trigger.cpp
+        boundary_ghosts.cpp
         cell.cpp
         cellapp.cpp
         cellapp_interface.cpp

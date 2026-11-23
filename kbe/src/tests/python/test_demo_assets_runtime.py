@@ -7,6 +7,7 @@ from contextlib import ExitStack
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import time
@@ -21,7 +22,8 @@ from performance.run import resolve_management_admin_token, wait_for_cluster_rea
 from performance.topology import build_local_cluster_components, platform_executable_name
 from runtime_console import RuntimeConsole
 from space_layout_runtime import (
-    NO_NAVIGATION_MAPPING, verify_fixed_layout, verify_layout_removal, verify_rejected_layout_removal,
+    NO_NAVIGATION_MAPPING, verify_boundary_ghosts, verify_fixed_layout,
+    verify_layout_removal, verify_rejected_layout_removal,
 )
 from test_server_cluster import ERROR_PATTERN, all_run_logs, read_text, run_cluster
 
@@ -328,6 +330,20 @@ def verify_demo(entries, run_root, environment, args, output, password):
                     cells, original_space, args.space_partitioning == "true", rejection_logged
                 )
                 if layout_result["enabled"]:
+                    def read_bots_log():
+                        return read_text(output / "logs/bots.10000.log")
+
+                    port = wait_until(
+                        "Bots 控制台启动",
+                        lambda: re.search(r"TelnetServer server is running on port (\d+)", read_bots_log()),
+                        bool,
+                    )
+                    bots_console = RuntimeConsole("127.0.0.1", int(port.group(1)), password, 10000, bots.pid)
+                    resources.callback(bots_console.close)
+                    layout_result["boundary_ghosts"] = verify_boundary_ghosts(
+                        cells, layout_result, bots_console, read_bots_log,
+                        lambda: read_text(run_root / "logs/logger_cellapp.log"),
+                    )
                     mapping_log = (
                         f"ClientObjectBase::addSpaceGeometryMapping: spaceID={original_space['space']}, "
                         f"respath={NO_NAVIGATION_MAPPING}!"

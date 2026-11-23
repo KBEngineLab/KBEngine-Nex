@@ -24,7 +24,7 @@ namespace KBEngine{
 //-------------------------------------------------------------------------------------
 INLINE bool Entity::isWitnessed(void) const
 { 
-	return witnesses_count_ > 0; 
+	return witnesses_count_ > 0 || boundaryWitnessed_;
 }
 
 //-------------------------------------------------------------------------------------

@@ -55,6 +55,7 @@ public:
 		寻找一个指定space 
 	 */
 	static Space* findSpace(SPACE_ID spaceID);
+	static bool hasActiveCellPeer(COMPONENT_ID cid);
 
 	// 返回当前 CellApp 的空间拥有者实体集合，兼容普通 Entity 创建空间的场景。
 	// Returns space-owner entities in this CellApp, including spaces created by regular Entity types.

@@ -22,6 +22,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #define KBE_SPACE_H
 
 #include "coordinate_system.h"
+#include "boundary_ghosts.h"
 #include "cell.h"
 #include "helper/debug_helper.h"
 #include "common/common.h"
@@ -111,6 +112,7 @@ public:
 	bool isGeometryLoadCurrent(const std::string& resPath, uint64 loadGeneration);
 	bool isGeometryLoading() const { return isGeometryLoading_; }
 	const SpaceLayout::Layout& layout() const { return layout_; }
+	BoundaryGhosts& boundaryGhosts() { return boundaryGhosts_; }
 	uint64 layoutVersion() const { return layoutVersion_; }
 	uint64 resourceRevision() const { return resourceRevision_; }
 	SpaceLayout::State layoutState() const { return layoutState_; }
@@ -204,6 +206,7 @@ protected:
 	
 	uint64						destroyTime_;	
 	SpaceLayout::Layout			layout_;
+	BoundaryGhosts				boundaryGhosts_;
 	uint64						layoutVersion_ = 0;
 	uint64						layoutPreparedVersion_ = 0;
 	uint64						resourceRevision_ = 0;

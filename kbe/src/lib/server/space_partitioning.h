@@ -6,7 +6,6 @@
 namespace KBEngine {
 namespace SpacePartitioning {
 
-constexpr uint16 PROTOCOL_VERSION = 3;
 constexpr uint8 ENABLED = 1;
 constexpr uint8 COORDINATE_SYSTEM = 2;
 constexpr uint8 COORDINATE_SYSTEM_Y = 4;
@@ -19,9 +18,9 @@ inline uint8 modeFlags(bool enabled, bool coordinateSystem, bool hasY)
 		(hasY ? COORDINATE_SYSTEM_Y : 0));
 }
 
-inline bool compatible(uint8 localMode, uint16 remoteVersion, uint8 remoteMode)
+inline bool compatible(uint8 localMode, uint8 remoteMode)
 {
-	if (remoteVersion != PROTOCOL_VERSION || (remoteMode & ~KNOWN_FLAGS) != 0 ||
+	if ((remoteMode & ~KNOWN_FLAGS) != 0 ||
 		((localMode ^ remoteMode) & ENABLED) != 0)
 	{
 		return false;

@@ -15,34 +15,27 @@ int main()
 	{
 		const char* name;
 		uint8 local;
-		uint16 version;
 		uint8 remote;
 		bool accepted;
 	};
 	const Case cases[] = {
-		{"disabled", disabled, PROTOCOL_VERSION, disabled, true},
-		{"disabled_without_coordinates", disabled, PROTOCOL_VERSION, 0, true},
-		{"disabled_with_y", disabled, PROTOCOL_VERSION, modeFlags(false, true, true), true},
-		{"enabled", enabled, PROTOCOL_VERSION, enabled, true},
-		{"enabled_with_y", enabledY, PROTOCOL_VERSION, enabledY, true},
-		{"local_disabled", disabled, PROTOCOL_VERSION, enabled, false},
-		{"remote_disabled", enabled, PROTOCOL_VERSION, disabled, false},
-		{"old_protocol", enabled, 0, enabled, false},
-		{"switch_only_protocol", enabled, 1, enabled, false},
-		{"previous_layout_protocol", enabled, 2, enabled, false},
-		{"disabled_previous_layout_protocol", disabled, 2, disabled, false},
-		{"new_protocol", enabled, PROTOCOL_VERSION + 1, enabled, false},
-		{"disabled_old_protocol", disabled, 0, disabled, false},
-		{"unknown_flags", enabled, PROTOCOL_VERSION, static_cast<uint8>(enabled | 8), false},
-		{"disabled_unknown_flags", disabled, PROTOCOL_VERSION, static_cast<uint8>(disabled | 8), false},
-		{"local_without_coordinates", noCoordinates, PROTOCOL_VERSION, enabled, false},
-		{"remote_without_coordinates", enabled, PROTOCOL_VERSION, noCoordinates, false},
-		{"both_without_coordinates", noCoordinates, PROTOCOL_VERSION, noCoordinates, false},
-		{"different_y", enabled, PROTOCOL_VERSION, enabledY, false},
+		{"disabled", disabled, disabled, true},
+		{"disabled_without_coordinates", disabled, 0, true},
+		{"disabled_with_y", disabled, modeFlags(false, true, true), true},
+		{"enabled", enabled, enabled, true},
+		{"enabled_with_y", enabledY, enabledY, true},
+		{"local_disabled", disabled, enabled, false},
+		{"remote_disabled", enabled, disabled, false},
+		{"unknown_flags", enabled, static_cast<uint8>(enabled | 8), false},
+		{"disabled_unknown_flags", disabled, static_cast<uint8>(disabled | 8), false},
+		{"local_without_coordinates", noCoordinates, enabled, false},
+		{"remote_without_coordinates", enabled, noCoordinates, false},
+		{"both_without_coordinates", noCoordinates, noCoordinates, false},
+		{"different_y", enabled, enabledY, false},
 	};
 	for (const Case& test : cases)
 	{
-		if (compatible(test.local, test.version, test.remote) != test.accepted)
+		if (compatible(test.local, test.remote) != test.accepted)
 		{
 			std::fprintf(stderr, "SPACE_PARTITIONING_TEST_FAIL case=%s\n", test.name);
 			return 1;

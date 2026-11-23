@@ -24,6 +24,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 // common include
 #include "helper/debug_helper.h"
 #include "common/common.h"
+#include <set>
 // #define NDEBUG
 // windows include	
 #if KBE_PLATFORM == PLATFORM_WIN32
@@ -41,7 +42,8 @@ public:
 	~WitnessedTimeoutHandler();
 
 	void addWitnessed(Entity* pEntity);
-	void delWitnessed(Entity* pEntity);
+	bool delWitnessed(Entity* pEntity);
+	void dispatchPendingExits();
 
 private:
 	virtual void handleTimeout(TimerHandle handle, void * pUser);
@@ -51,6 +53,8 @@ private:
 	void cancel();
 
 	std::map<ENTITY_ID, uint16>		witnessedEntityIDs_;
+	std::set<ENTITY_ID> pendingExits_;
+	std::set<ENTITY_ID> dispatchingExits_;
 	TimerHandle* pTimerHandle_;
 };	
 

@@ -358,8 +358,8 @@ bool Cellappmgr::initializeBegin()
 		g_serverConfig.getCellAppMgr().cellappmgr_space_partitioning_enabled,
 		g_serverConfig.getCellApp().use_coordinate_system,
 		g_serverConfig.getCellApp().coordinateSystem_hasY);
-	INFO_MSG(fmt::format("Cellappmgr::initializeBegin: spacePartitioning.enabled={}, protocol={}.\n",
-		spacePartitioningEnabled(), SpacePartitioning::PROTOCOL_VERSION));
+	INFO_MSG(fmt::format("Cellappmgr::initializeBegin: spacePartitioning.enabled={}.\n",
+		spacePartitioningEnabled()));
 	return true;
 }
 
@@ -549,7 +549,7 @@ uint32 Cellappmgr::spacePartitioningConfirmedApps() const
 
 //-------------------------------------------------------------------------------------
 void Cellappmgr::reportSpacePartitioningMode(Network::Channel* pChannel,
-	COMPONENT_ID cid, uint16 protocolVersion, uint8 mode)
+	COMPONENT_ID cid, uint8 mode)
 {
 	Components::ComponentInfos* source = Components::getSingleton().findComponent(CELLAPP_TYPE, cid);
 	auto iter = cellapps_.find(cid);
@@ -561,13 +561,13 @@ void Cellappmgr::reportSpacePartitioningMode(Network::Channel* pChannel,
 		return;
 	}
 
-	const bool accepted = SpacePartitioning::compatible(spacePartitioningMode_, protocolVersion, mode);
+	const bool accepted = SpacePartitioning::compatible(spacePartitioningMode_, mode);
 	iter->second.spacePartitioningConfirmed(accepted);
 	if (!accepted)
 	{
 		ERROR_MSG(fmt::format(
-			"Cellappmgr::reportSpacePartitioningMode: incompatible CellApp({}), localMode={}, remoteMode={}, localProtocol={}, remoteProtocol={}.\n",
-			cid, spacePartitioningMode_, mode, SpacePartitioning::PROTOCOL_VERSION, protocolVersion));
+			"Cellappmgr::reportSpacePartitioningMode: incompatible CellApp({}), localMode={}, remoteMode={}.\n",
+			cid, spacePartitioningMode_, mode));
 		updateBestCellapp();
 	}
 	else
@@ -578,8 +578,8 @@ void Cellappmgr::reportSpacePartitioningMode(Network::Channel* pChannel,
 
 	Network::Bundle* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	bundle->newMessage(CellappInterface::onSpacePartitioningMode);
-	CellappInterface::onSpacePartitioningModeArgs4::staticAddToBundle(*bundle,
-		componentID_, SpacePartitioning::PROTOCOL_VERSION, spacePartitioningMode_, accepted);
+	CellappInterface::onSpacePartitioningModeArgs3::staticAddToBundle(*bundle,
+		componentID_, spacePartitioningMode_, accepted);
 	pChannel->send(bundle);
 }
 

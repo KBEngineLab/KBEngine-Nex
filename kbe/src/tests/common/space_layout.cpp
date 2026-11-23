@@ -119,6 +119,11 @@ int main()
 	Packet mismatched;
 	if (!check(!mismatched.read(inconsistent), "inconsistent_mapping"))
 		return 1;
+	CellPeerRoute peerRoute;
+	peerRoute.internalIP = 0x7f000001;
+	peerRoute.internalPort = 20013;
+	peerRoute.groupOrder = 2;
+	peerRoute.username = "cell";
 	for (uint8 operation = REQUEST; operation <= RESOURCES; ++operation)
 	{
 		Packet packet = request;
@@ -126,12 +131,48 @@ int main()
 		packet.error = "preparation failed";
 		packet.key = "weather";
 		packet.value = "rain";
+		if (operation == COMPLETE)
+			packet.cellPeerRoutes.emplace(8002, peerRoute);
 		MemoryStream stream;
 		packet.write(stream);
 		Packet result;
 		if (!check(result.read(stream) && result.operation == operation, "operation_roundtrip"))
 			return 1;
+		if (operation == COMPLETE)
+		{
+			const auto peer = result.cellPeerRoutes.find(8002);
+			if (!check(peer != result.cellPeerRoutes.end() &&
+				peer->second.internalIP == peerRoute.internalIP &&
+				peer->second.internalPort == peerRoute.internalPort &&
+				peer->second.groupOrder == peerRoute.groupOrder &&
+				peer->second.username == peerRoute.username, "complete_peer_route_roundtrip"))
+				return 1;
+			MemoryStream truncated;
+			truncated.append(stream.data(), stream.length() - 1);
+			Packet partial;
+			if (!check(!partial.read(truncated), "truncated_peer_route"))
+				return 1;
+		}
 	}
+	MemoryStream duplicatePeers;
+	duplicatePeers << COMPONENT_ID(8001) << uint8(COMPLETE) << SPACE_ID(100) << uint64(9)
+		<< uint64(1) << uint16(2);
+	for (int i = 0; i < 2; ++i)
+	{
+		duplicatePeers << COMPONENT_ID(8002);
+		peerRoute.write(duplicatePeers);
+	}
+	Packet invalidPeers;
+	if (!check(!invalidPeers.read(duplicatePeers), "duplicate_peer_route"))
+		return 1;
+	Packet invalidPeer = request;
+	invalidPeer.operation = COMPLETE;
+	peerRoute.internalPort = 0;
+	invalidPeer.cellPeerRoutes.emplace(8002, peerRoute);
+	MemoryStream zeroPort;
+	invalidPeer.write(zeroPort);
+	if (!check(!invalidPeers.read(zeroPort), "zero_peer_port"))
+		return 1;
 	for (uint8 operation : {SET_DATA, DELETE_DATA, RESOURCES})
 	{
 		Packet rejected;

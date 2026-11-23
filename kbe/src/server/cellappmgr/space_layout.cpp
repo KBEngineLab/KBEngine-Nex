@@ -3,6 +3,8 @@
 #include "../cellapp/cellapp_interface.h"
 #include "server/component_routing_guard.h"
 
+#include <algorithm>
+
 namespace KBEngine {
 
 bool Cellappmgr::sendSpaceLayout(COMPONENT_ID cid, const SpaceLayout::Packet& packet)
@@ -38,8 +40,37 @@ void Cellappmgr::broadcastSpaceLayout(SPACE_ID spaceID, SpaceLayout::Transaction
 	}
 	else if (operation == SpaceLayout::RESOURCES)
 		packet.resources = transaction.resources;
+	const auto participants = transaction.layout.participants();
+	if (operation == SpaceLayout::COMPLETE)
+	{
+		// CellApp 间的连接可能早于布局断开，激活时以管理器现有的注册地址为准。
+		auto& components = Components::getSingleton();
+		for (COMPONENT_ID cid : participants)
+		{
+			const auto* component = components.findComponent(CELLAPP_TYPE, cid);
+			if (!component || !component->pIntAddr || !component->pExtAddr ||
+				component->pIntAddr->ip == 0 || component->pIntAddr->port == 0)
+			{
+				failSpaceLayout(spaceID, transaction, "participant endpoint is unavailable", true);
+				return;
+			}
+			auto& route = packet.cellPeerRoutes[cid];
+			route.internalIP = component->pIntAddr->ip;
+			route.internalPort = component->pIntAddr->port;
+			route.externalIP = component->pExtAddr->ip;
+			route.externalPort = component->pExtAddr->port;
+			route.pid = component->pid;
+			route.globalOrder = component->globalOrderid;
+			route.groupOrder = component->groupOrderid;
+			route.gus = component->gus;
+			route.username.assign(component->username,
+				std::find(component->username, component->username + MAX_NAME, '\0'));
+			route.externalAddress.assign(component->externalAddressEx,
+				std::find(component->externalAddressEx, component->externalAddressEx + MAX_NAME, '\0'));
+		}
+	}
 	bool sent = true;
-	for (COMPONENT_ID cid : transaction.layout.participants())
+	for (COMPONENT_ID cid : participants)
 		sent = sendSpaceLayout(cid, packet) && sent;
 	if (!sent && (operation == SpaceLayout::PREPARE ||
 		operation == SpaceLayout::COMMIT || operation == SpaceLayout::COMPLETE))

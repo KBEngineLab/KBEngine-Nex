@@ -35,6 +35,7 @@ namespace Network
 {
 class Channel;
 class Address;
+class EndPoint;
 class NetworkInterface;
 }
 
@@ -166,6 +167,9 @@ public:
 	Components::ComponentInfos* findLocalComponent(uint32 pid);
 
 	int connectComponent(COMPONENT_TYPE componentType, int32 uid, COMPONENT_ID componentID, bool printlog = true);
+	// 已连接的 Endpoint 由组件连接接收，注册失败时也由这里释放。
+	int registerConnectedComponent(ComponentInfos& component, Network::EndPoint* endpoint,
+		COMPONENT_ID channelComponentID, bool printlog = true);
 
 	typedef std::map<int32/*uid*/, COMPONENT_ORDER/*lastorder*/> ORDER_LOG;
 	ORDER_LOG& getGlobalOrderLog(){ return _globalOrderLog; }

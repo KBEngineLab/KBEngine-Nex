@@ -63,13 +63,15 @@ void WitnessedTimeoutHandler::handleTimeout(TimerHandle, void * arg)
 		}
 		else
 		{
-			Entity* pEntity = Cellapp::getSingleton().findEntity(iter->first);
-			
-			witnessedEntityIDs_.erase(iter++);
+			const ENTITY_ID id = iter->first;
+			Entity* pEntity = Cellapp::getSingleton().findEntity(id);
+			witnessedEntityIDs_.erase(iter);
 
 			if(pEntity)
 				pEntity->onDelWitnessed();
 
+			// 脚本可能销毁其他实体，不能继续使用回调前保存的迭代器。
+			iter = witnessedEntityIDs_.upper_bound(id);
 		}
 	}
 
@@ -89,7 +91,10 @@ void WitnessedTimeoutHandler::addWitnessed(Entity* pEntity)
 	const uint16 witness_timeout_dec = ServerConfig::getSingleton().getCellApp().witness_timeout;
 	if(witness_timeout_dec == 0)
 	{
-		pEntity->onDelWitnessed();
+		if (Cellapp::getSingleton().spacePartitioningEnabled())
+			pendingExits_.insert(pEntity->id());
+		else
+			pEntity->onDelWitnessed();
 		return;
 	}
 
@@ -107,16 +112,26 @@ void WitnessedTimeoutHandler::addWitnessed(Entity* pEntity)
 }
 
 //-------------------------------------------------------------------------------------
-void WitnessedTimeoutHandler::delWitnessed(Entity* pEntity)
+bool WitnessedTimeoutHandler::delWitnessed(Entity* pEntity)
 {
-	if(witnessedEntityIDs_.size() == 0)
-		return;
+	const ENTITY_ID id = pEntity->id();
+	const auto pending = pendingExits_.erase(id);
+	const auto dispatching = dispatchingExits_.erase(id);
+	return witnessedEntityIDs_.erase(id) || pending || dispatching;
+}
 
-	std::map<ENTITY_ID, uint16>::iterator iter = witnessedEntityIDs_.find(pEntity->id());
-
-	if(iter != witnessedEntityIDs_.end())
+//-------------------------------------------------------------------------------------
+void WitnessedTimeoutHandler::dispatchPendingExits()
+{
+	// 脚本可能让其他实体重新被观察，也可能产生新的离开通知。新通知留到下一轮。
+	dispatchingExits_.swap(pendingExits_);
+	while (!dispatchingExits_.empty())
 	{
-		witnessedEntityIDs_.erase(iter);
+		const auto entry = dispatchingExits_.begin();
+		const ENTITY_ID id = *entry;
+		dispatchingExits_.erase(entry);
+		if (auto* entity = Cellapp::getSingleton().findEntity(id))
+			entity->onDelWitnessed();
 	}
 }
 

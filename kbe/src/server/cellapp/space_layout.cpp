@@ -3,6 +3,9 @@
 #include "../cellappmgr/cellappmgr_interface.h"
 #include "server/component_routing_guard.h"
 
+#include <algorithm>
+#include <cstring>
+
 namespace KBEngine {
 namespace {
 
@@ -325,7 +328,41 @@ void Cellapp::onSpaceLayout(Network::Channel* channel, MemoryStream& stream)
 	case COMPLETE:
 		if (space->layoutState() == COMMITTING || space->layoutState() == ACTIVE)
 		{
+			if (packet.cellPeerRoutes.size() != space->layout().participants().size() ||
+				!std::all_of(packet.cellPeerRoutes.begin(), packet.cellPeerRoutes.end(),
+					[&](const auto& entry) { return space->layout().cellForApp(entry.first) != NULL; }))
+			{
+				WARNING_MSG(fmt::format("Cellapp::spaceLayout: peer routes do not match space={}, version={}.\n",
+					space->id(), packet.version));
+				break;
+			}
 			space->setLayoutState(ACTIVE);
+			if (!isShuttingdown() && space->canAcceptEntities())
+			{
+				for (const auto& entry : packet.cellPeerRoutes)
+				{
+					if (entry.first <= componentID_)
+						continue;
+					const auto* current = components.findComponent(entry.first);
+					if (current && (current->componentType != CELLAPP_TYPE || current->pChannel))
+						continue;
+					const auto& address = entry.second;
+					Components::ComponentInfos peer;
+					peer.uid = getUserUID();
+					peer.cid = entry.first;
+					peer.componentType = CELLAPP_TYPE;
+					peer.pid = address.pid;
+					peer.globalOrderid = address.globalOrder;
+					peer.groupOrderid = address.groupOrder;
+					peer.gus = address.gus;
+					peer.extradata3 = 0;
+					peer.pIntAddr.reset(new Network::Address(address.internalIP, address.internalPort));
+					peer.pExtAddr.reset(new Network::Address(address.externalIP, address.externalPort));
+					std::memcpy(peer.username, address.username.c_str(), address.username.size() + 1);
+					std::memcpy(peer.externalAddressEx, address.externalAddress.c_str(), address.externalAddress.size() + 1);
+					queueCellPeerReconnect(peer);
+				}
+			}
 			Network::Channel* manager = Components::getSingleton().getCellappmgrChannel();
 			if (manager != NULL)
 			{

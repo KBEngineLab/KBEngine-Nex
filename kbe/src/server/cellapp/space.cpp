@@ -453,6 +453,8 @@ bool Space::update()
 	updateLayoutPreparation();
 	if (layoutRemovalPending_ && isGood())
 		destroy(0, false, DestroyMode::LayoutRemoval);
+	if (hasManagedCell())
+		boundaryGhosts_.update(*this);
 	if(destroyTime_ > 0 && timestamp() - destroyTime_ >= uint64( 3.f * stampsPerSecond() ))
 	{
 		if(entities_.size() == 0)
@@ -502,6 +504,8 @@ void Space::addEntity(Entity* pEntity, bool recordMigrationStages)
 	pEntity->spaceID(this->id_);
 	pEntity->spaceEntityIdx(entities_.size());
 	entities_.push_back(pEntity);
+	if (pEntity->isBoundaryGhost())
+		return;
 	if (recordMigrationStages)
 	{
 		scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_SPACE_REGISTER,
@@ -527,6 +531,8 @@ void Space::addEntityToNode(Entity* pEntity)
 void Space::removeEntity(Entity* pEntity)
 {
 	KBE_ASSERT(pEntity->spaceID() == id());
+	if (hasManagedCell())
+		boundaryGhosts_.remove(*this, *pEntity);
 
 	pEntity->spaceID(0);
 	
@@ -547,7 +553,8 @@ void Space::removeEntity(Entity* pEntity)
 
 	// 这句必须在onLeaveWorld之后， 因为可能rangeTrigger需要参考pEntityCoordinateNode
 	pEntity->uninstallCoordinateNodes(&coordinateSystem_);
-	pEntity->onLeaveSpace(this);
+	if (!pEntity->isBoundaryGhost())
+		pEntity->onLeaveSpace(this);
 
 	// 如果没有entity了则需要销毁space, 因为space最少存在一个entity
 	if(entities_.empty() && state_ == STATE_NORMAL && !hasManagedCell())

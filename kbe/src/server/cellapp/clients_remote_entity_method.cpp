@@ -20,6 +20,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "witness.h"
 #include "cellapp.h"
+#include "space.h"
 #include "entitydef/method.h"
 #include "entitydef/property.h"
 #include "entitydef/scriptdef_module.h"
@@ -80,7 +81,7 @@ PyObject* ClientsRemoteEntityMethod::callmethod(PyObject* args, PyObject* kwds)
 
 	Entity* pEntity = Cellapp::getSingleton().findEntity(id_);
 	if(pEntity == NULL || /*pEntity->pWitness() == NULL ||*/
-		pEntity->isDestroyed() /*|| pEntity->clientEntityCall() == NULL*/)
+		pEntity->isDestroyed() || pEntity->isBoundaryGhost() /*|| pEntity->clientEntityCall() == NULL*/)
 	{
 		//WARNING_MSG(fmt::format("EntityRemoteMethod::callClientMethod: not found entity({}).\n", 
 		//	entitycall->id()));
@@ -88,13 +89,10 @@ PyObject* ClientsRemoteEntityMethod::callmethod(PyObject* args, PyObject* kwds)
 		S_Return;
 	}
 	
-	const Entity::WITNESS_IDS& entities = pEntity->witnesses();
-
-	if(otherClients_)
-	{
-		if(pEntity->witnessesSize() == 0)
-			S_Return;
-	}
+	Space* space = Cellapp::getSingleton().spacePartitioningEnabled() ? Spaces::findSpace(pEntity->spaceID()) : NULL;
+	const bool remoteWitnesses = space && space->boundaryGhosts().hasCopies(pEntity->id());
+	if (otherClients_ && pEntity->witnessesSize() == 0 && !remoteWitnesses)
+		S_Return;
 	
 	// 先发给自己
 	if(methodDescription->checkArgs(args))
@@ -181,7 +179,24 @@ PyObject* ClientsRemoteEntityMethod::callmethod(PyObject* args, PyObject* kwds)
 			pEntity->pWitness()->sendToClient(ClientInterface::onRemoteMethodCall, pSendBundle);
 		}
 
-		// 广播给其他人
+		forwardToWitnesses(*pEntity, *mstream, methodDescription->getName());
+		if (remoteWitnesses)
+			space->boundaryGhosts().broadcast(*space, *pEntity, *mstream);
+
+		MemoryStream::reclaimPoolObject(mstream);
+	}
+
+	S_Return;
+}
+
+//-------------------------------------------------------------------------------------
+void ClientsRemoteEntityMethod::forwardToWitnesses(Entity& entity, MemoryStream& data, const char* methodName)
+{
+	Entity* pEntity = &entity;
+	const Entity::WITNESS_IDS& entities = pEntity->witnesses();
+	MemoryStream* mstream = &data;
+	const char* eventName = methodName ? methodName : "boundaryGhost";
+	{
 		Entity::WITNESS_IDS::const_iterator iter = entities.begin();
 		for(; iter != entities.end(); ++iter)
 		{
@@ -223,8 +238,8 @@ PyObject* ClientsRemoteEntityMethod::callmethod(PyObject* args, PyObject* kwds)
 				(*pSendBundle)  << pEntity->id();
 			}
 
-			if(mstream->wpos() > 0)
-				(*pSendBundle).append(mstream->data(), (int)mstream->wpos());
+			if(mstream->length() > 0)
+				pSendBundle->append(mstream->data() + mstream->rpos(), static_cast<int>(mstream->length()));
 
 			if(Network::g_trace_packet > 0)
 			{
@@ -232,7 +247,7 @@ PyObject* ClientsRemoteEntityMethod::callmethod(PyObject* args, PyObject* kwds)
 					DebugHelper::getSingleton().changeLogger("packetlogs");
 
 				DEBUG_MSG(fmt::format("ClientsRemoteEntityMethod::callmethod: pushUpdateData: ClientInterface::onRemoteOtherEntityMethodCall({}::{})\n", 
-					pViewEntity->scriptName(), methodDescription->getName()));
+					pViewEntity->scriptName(), eventName));
 
 				switch(Network::g_trace_packet)	
 				{
@@ -255,17 +270,14 @@ PyObject* ClientsRemoteEntityMethod::callmethod(PyObject* args, PyObject* kwds)
 
 			// 记录这个事件产生的数据量大小
 			g_publicClientEventHistoryStats.trackEvent(pViewEntity->scriptName(),
-				methodDescription->getName(), 
+				eventName,
 				pSendBundle->currMsgLength(), 
 				"::");
 
 			pViewEntity->pWitness()->sendToClient(ClientInterface::onRemoteMethodCallOptimized, pSendBundle);
 		}
 
-		MemoryStream::reclaimPoolObject(mstream);
 	}
-
-	S_Return;
 }
 
 //-------------------------------------------------------------------------------------

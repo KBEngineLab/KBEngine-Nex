@@ -28,8 +28,11 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "updatables.h"
 #include "ghost_manager.h"
 #include "witnessed_timeout_handler.h"
+#include "network/endpoint.h"
 #include "server/entity_app.h"
 #include "server/forward_messagebuffer.h"
+
+#include <memory>
 	
 namespace KBEngine{
 
@@ -66,6 +69,7 @@ public:
 	*/
 	virtual void handleTimeout(TimerHandle handle, void * arg);
 	virtual void handleGameTick();
+	void onRemoveComponent(const Components::ComponentInfos* component) override;
 
 	/**  
 		初始化相关接口 
@@ -85,8 +89,9 @@ public:
 	bool spacePartitioningConfirmed() const { return spacePartitioningConfirmed_; }
 	bool confirmSpacePartitioningMode(Network::Channel* pChannel);
 	void onSpacePartitioningMode(Network::Channel* pChannel, COMPONENT_ID managerID,
-		uint16 protocolVersion, uint8 mode, bool accepted);
+		uint8 mode, bool accepted);
 	void onSpaceLayout(Network::Channel* pChannel, MemoryStream& stream);
+	void onBoundaryGhost(Network::Channel* pChannel, MemoryStream& stream);
 	bool sendSpaceLayout(const SpaceLayout::Packet& packet);
 	void requestSpaceLayoutShutdown(Space& space);
 	bool publishSpaceResources(const Space& space, SpaceLayout::Resources resources);
@@ -288,6 +293,16 @@ public:
 	static PyObject* __py_getFlags(PyObject* self, PyObject* args);
 
 protected:
+	void queueCellPeerReconnect(const Components::ComponentInfos& peer);
+	void updateCellPeerConnections();
+
+	std::map<COMPONENT_ID, Components::ComponentInfos> disconnectedCellPeers_;
+	std::unique_ptr<Network::EndPoint, decltype(&Network::EndPoint::reclaimPoolObject)>
+		reconnectingEndpoint_{nullptr, &Network::EndPoint::reclaimPoolObject};
+	COMPONENT_ID reconnectingPeer_ = 0;
+	uint64 reconnectDeadline_ = 0;
+	uint64 nextCellPeerAttempt_ = 0;
+
 	// cellAppData
 	GlobalDataClient*					pCellAppData_;
 

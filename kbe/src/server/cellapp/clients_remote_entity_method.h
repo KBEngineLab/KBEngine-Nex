@@ -43,6 +43,7 @@ namespace KBEngine{
 
 class PropertyDescription;
 class ScriptDefModule;
+class Entity;
 
 class ClientsRemoteEntityMethod : public script::ScriptObject
 {
@@ -71,6 +72,7 @@ public:
 			PyObject* args, PyObject* kwds);
 
 	PyObject* callmethod(PyObject* args, PyObject* kwds);
+	static void forwardToWitnesses(Entity& entity, MemoryStream& data, const char* methodName);
 
 protected:	
 	PropertyDescription*	pComponentPropertyDescription_;

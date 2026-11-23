@@ -303,6 +303,8 @@ namespace KBEngine{
 #define ENTITY_FLAGS_TELEPORT_START					0x00000004
 #define ENTITY_FLAGS_TELEPORT_STOP					0x00000008
 #define ENTITY_FLAGS_DESTROY_AFTER_GETCELL			0x00000010
+#define ENTITY_FLAGS_BOUNDARY_GHOST					0x00000020
+#define ENTITY_FLAGS_APPLYING_GHOST_PROPERTY		0x00000040
 
 #define ENTITY_HEADER(CLASS)																				\
 protected:																									\
@@ -846,6 +848,12 @@ public:																										\
 				PropertyDescription* propertyDescription = iter->second;									\
 				DataType* dataType = propertyDescription->getDataType();									\
 																											\
+				if (hasFlags(ENTITY_FLAGS_BOUNDARY_GHOST) && !initing() &&									\
+					!hasFlags(ENTITY_FLAGS_APPLYING_GHOST_PROPERTY))											\
+				{																							\
+					PyErr_SetString(PyExc_AttributeError, "Cannot write a def property on a boundary Ghost");	\
+					return -1;																				\
+				}																							\
 				if(!hasFlags(ENTITY_FLAGS_DESTROYING) && isDestroyed_)										\
 				{																							\
 					PyErr_Format(PyExc_AssertionError, "can't set %s.%s to %s. entity is destroyed!",		\
@@ -1072,6 +1080,7 @@ public:																										\
 		{																									\
 			isDestroyed_ = true;																			\
 			addFlags(ENTITY_FLAGS_DESTROYING);																\
+			callScript = callScript && !hasFlags(ENTITY_FLAGS_BOUNDARY_GHOST);								\
 			/* 组件先执行 onDetached，但必须暂时保留 owner，保证实体 onDestroy 期间组件仍可访问所属实体。 */ \
 			/* Components run onDetached first while retaining owner access throughout the entity onDestroy callback. */ \
 			EntityComponent::onEntityDestroy(this, pScriptModule_, callScript, true); \
@@ -1138,6 +1147,11 @@ public:																										\
 																											\
 	PyObject* CLASS::pyAddTimer(float interval, float repeat, int32 userArg)								\
 	{																										\
+		if (hasFlags(ENTITY_FLAGS_BOUNDARY_GHOST))															\
+		{																									\
+			PyErr_SetString(PyExc_RuntimeError, "Cannot add a timer to a boundary Ghost");					\
+			return NULL;																					\
+		}																									\
 		EntityScriptTimerHandler* pHandler = new EntityScriptTimerHandler(this);							\
 		ScriptTimers * pTimers = &scriptTimers_;															\
 		int id = ScriptTimersUtil::addTimer(&pTimers,														\

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+import math
 import time
 
 NO_NAVIGATION_MAPPING = "space_layout_no_navigation"
@@ -167,8 +168,9 @@ def verify_fixed_layout(cells, source_space, enabled, rejection_logged):
         ) for console in cells.values()
     ]
     require(sum(owner_counts) == 1, "远端创建了重复的 Space 业务实体")
-    require(all(cells[cid].evaluate(f"len(KBEngine.entitiesForSpace({space_id}))") == 0
-                for cid in others), "新区域没有保持为空")
+    require(all(cells[cid].evaluate(
+        f"sum(e.isReal() for e in KBEngine.entitiesForSpace({space_id}).values())") == 0
+                for cid in others), "新区域不应自动创建 Real")
     for cid, console in cells.items():
         console.evaluate(f"KBEngine.setSpaceData({space_id}, 'layout_writer_{cid}', '{cid}')")
     # 先等管理器返回相应版本，再读取键，避免把合法的异步更新当作缺失数据。
@@ -266,7 +268,155 @@ def verify_fixed_layout(cells, source_space, enabled, rejection_logged):
             "cells": first["cells"], "resources_synchronized": True,
             "rejected_target_version": rejected_version,
             "ready_without_navigation": True, "invalid_navigation_rejected": True,
-            "navigation_parameters_synchronized": True}, verify_after_logout
+            "navigation_parameters_synchronized": True,
+            "split_x": split_x, "split_z": split_z}, verify_after_logout
+
+
+def verify_boundary_ghosts(cells, result, bots, read_client_log, read_cell_log):
+    space = result["space"]
+    owner = result["owner"]
+    source = cells[owner]
+    peers = [cid for cid in cells if cid != owner]
+    x, z = result["split_x"], result["split_z"]
+    position = (x + 2.0, 0.0, z + 2.0)
+    host = cells[source.evaluate(
+        f"KBEngine.cellForPosition({space}, {position[0]}, {position[2]})[1]"
+    )]
+    avatar, radius, hysteresis = source.evaluate(
+        f"next((e.id, e.getViewRadius(), e.getViewHystArea()) for e in KBEngine.entities.values() "
+        f"if type(e).__name__ == 'Avatar' and e.spaceID == {space} and e.hasWitness)"
+    )
+    ghost_id = host.evaluate(
+        f"KBEngine.createEntity('NPC', {space}, {position!r}, (0., 0., 0.), "
+        "{'name': 'boundary-visible', 'spawnID': 123456}).id"
+    )
+    # 不改变导航位置，让同一真实 Witness 的视野覆盖布局边界。
+    source.evaluate(f"KBEngine.entities[{avatar}].setViewRadius(480.0, 5.0)")
+
+    def replicas():
+        return {
+            cid: console.evaluate(
+                f"(lambda e: (e.isReal(), e.name, e.spawnID, tuple(e.position), "
+                f"tuple(e.direction), e.isWitnessed) if e else None)(KBEngine.entities.get({ghost_id}))"
+            ) for cid, console in cells.items() if console is not host
+        }
+
+    def move(target):
+        host.evaluate(f"setattr(KBEngine.entities[{ghost_id}], 'position', {target!r})")
+
+    def client_replica():
+        return bots.evaluate(
+            f"[(e.name, list(e.position)) for app in KBEngine.bots.values() "
+            f"if app.entities.get({avatar}) for e in (app.entities.get({ghost_id}),) if e]"
+        )
+
+    def set_view(view_radius, margin):
+        source.evaluate(f"KBEngine.entities[{avatar}].setViewRadius({view_radius}, {margin})")
+
+    def near(actual, expected, tolerance=0.01):
+        return all(math.isclose(a, b, abs_tol=tolerance) for a, b in zip(actual, expected, strict=True))
+
+    try:
+        wait_for("边界副本进入真实 Witness", replicas,
+                 lambda values: all(v and v[:3] == [False, "boundary-visible", 0]
+                                    for v in values.values()) and values[owner][5])
+        wait_for("客户端 Ghost 初始状态", client_replica,
+                 lambda values: any(name == "boundary-visible" for name, _ in values))
+        for expression in (
+            f"KBEngine.entities[{ghost_id}].addTimer(1.0, 0.0, 0)",
+            f"KBEngine.entities[{ghost_id}].destroy()",
+            f"setattr(KBEngine.entities[{ghost_id}], 'name', 'not-authoritative')",
+        ):
+            error = captured_error(source, expression)
+            require(error and "boundary Ghost" in error[1], f"Ghost 允许本地权威操作：{expression}")
+        nearby = (position[0] + 3., 1., position[2] + 2.)
+        move(nearby)
+        host.evaluate(f"setattr(KBEngine.entities[{ghost_id}], 'direction', (0.0, 0.0, 1.0))")
+        host.evaluate(f"setattr(KBEngine.entities[{ghost_id}], 'name', 'boundary-updated')")
+        wait_for("Ghost 位姿与公开属性同步", replicas,
+                 lambda values: all(v and v[1:3] == ["boundary-updated", 0] and
+                                    near(v[3], nearby) and
+                                    v[4] == [0, 0, 1] for v in values.values()))
+        wait_for("客户端收到 Ghost 属性与位置变化", client_replica,
+                 # 客户端沿用紧凑坐标协议，允许相对坐标编码产生的舍入误差。
+                 lambda values: any(name == "boundary-updated" and near(pos, nearby, 0.5)
+                                    for name, pos in values), timeout=12)
+        move((x + 1024., 0., z + 1024.))
+        wait_for("离开边界的副本清理", replicas, lambda values: not any(values.values()))
+        move(position)
+        wait_for("重新进入边界的完整副本", replicas,
+                 lambda values: all(v and v[1] == "boundary-updated" for v in values.values()))
+
+        monster = host.evaluate(
+            f"KBEngine.createEntity('Monster', {space}, {position!r}, (0., 0., 0.), "
+            f"{{'name': 'boundary-broadcast', 'spawnPos': {position!r}}}).id"
+        )
+
+        def real_observed():
+            return host.evaluate(f"KBEngine.entities[{monster}].isWitnessed")
+
+        def observation_callbacks():
+            prefix = f"Monster::onWitnessed: {monster} isWitnessed="
+            return [line.rsplit(prefix, 1)[1] for line in read_cell_log().splitlines()
+                    if prefix in line and line.endswith(("isWitnessed=0.", "isWitnessed=1."))]
+
+        try:
+            require(not host.evaluate(
+                f"any(e.isReal() and e.hasWitness and e.spaceID == {space} "
+                "for e in KBEngine.entities.values())"
+            ), "观察回调检查要求怪物所在 Cell 没有本地玩家")
+            wait_for("广播实体进入对侧 Witness", lambda: source.evaluate(
+                f"(lambda e: bool(e and not e.isReal() and e.isWitnessed))(KBEngine.entities.get({monster}))"
+            ), bool)
+            wait_for("Bots 创建跨 Cell 客户端实体", read_client_log,
+                     lambda log: f"ClientObjectBase::createEntity: new Monster ({monster})" in log)
+            wait_for("只有远端玩家时 Real 收到观察回调", observation_callbacks,
+                     lambda calls: calls == ["1."],
+                     timeout=5)
+            require(real_observed(), "远端玩家未计入 Real 的观察状态")
+            profile = (
+                "import sys\n"
+                "_boundary_calls = []\n"
+                "def _boundary_profile(frame, event, arg):\n"
+                "    if event == 'call' and frame.f_code.co_name == 'recvDamage':\n"
+                "        values = frame.f_locals\n"
+                f"        if values.get('attackerID') == {avatar} and values['self'].id == {monster}:\n"
+                "            _boundary_calls.append(values['damage'])\n"
+                "sys.setprofile(_boundary_profile)\n"
+            )
+            bots.evaluate(f"exec({profile!r})")
+            for clients, damage in (("allClients", 31), ("otherClients", 37)):
+                host.evaluate(f"KBEngine.entities[{monster}].{clients}.recvDamage({avatar}, 1, 1, {damage})")
+            wait_for("Bots 收到跨 Cell 广播", lambda: bots.evaluate("_boundary_calls"),
+                     lambda calls: calls == [31, 37], timeout=12)
+            time.sleep(0.3)
+            require(bots.evaluate("_boundary_calls") == [31, 37], "跨 Cell 广播重复发送")
+
+            set_view(1.0, 0.0)
+            wait_for("Real 收到远端离开状态", real_observed, lambda value: not value)
+            set_view(480.0, 5.0)
+            wait_for("Real 收到远端重新进入状态", real_observed, bool)
+            # 延时期间观察状态可以变化，不能重复触发启停 AI 的回调。
+            require(observation_callbacks() == ["1."], "延时内重入重复触发观察回调")
+
+            set_view(1.0, 0.0)
+            wait_for("最后一个远端观察者离开后的回调", observation_callbacks,
+                     lambda calls: calls == ["1.", "0."], timeout=22)
+            require(not real_observed(), "最后一个远端观察者离开后 Real 仍被标为已观察")
+            set_view(480.0, 5.0)
+            wait_for("延时结束后重新进入触发回调", observation_callbacks,
+                     lambda calls: calls == ["1.", "0.", "1."])
+        finally:
+            bots.evaluate("(__import__('sys').setprofile(None), None)[1]")
+            host.evaluate(f"KBEngine.entities[{monster}].destroy()")
+    finally:
+        host.evaluate(f"KBEngine.entities[{ghost_id}].destroy()")
+        set_view(radius, hysteresis)
+
+    wait_for("Real 销毁后的所有副本清理", replicas, lambda values: not any(values.values()))
+    print(f"BOUNDARY_GHOSTS_PASS space={space} replicas={len(peers)}", flush=True)
+    return {"replicas": len(peers), "aoi": True, "pose_and_public_property": True,
+            "client_broadcast": True, "remote_observation": True, "cleanup": True}
 
 
 def verify_resource_limits(cells, owner, space_id, version, revision, mapping,

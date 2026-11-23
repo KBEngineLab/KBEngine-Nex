@@ -41,7 +41,6 @@ const uint64 GHOST_ROUTE_IDLE_TIMEOUT_SECONDS = 10 * 60;
 
 //-------------------------------------------------------------------------------------
 GhostManager::GhostManager():
-realEntities_(),
 ghost_route_(),
 messages_(),
 pTimerHandle_(NULL),
@@ -201,40 +200,11 @@ void GhostManager::syncMessages()
 }
 
 //-------------------------------------------------------------------------------------
-void GhostManager::syncGhosts()
-{
-	std::map<ENTITY_ID, Entity*>::iterator iter = realEntities_.begin();
-	for(; iter != realEntities_.end(); )
-	{
-		COMPONENT_ID ghostCell = iter->second->ghostCell();
-		if(ghostCell > 0)
-		{
-			// 将位置等信息同步到ghost
-			Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(ghostCell);
-			if(cinfos == NULL || cinfos->pChannel == NULL)
-			{
-				ERROR_MSG(fmt::format("GhostManager::syncGhosts: not found cellapp({})!\n", iter->first));
-				++iter;
-				continue;
-			}
-
-			++iter;
-		}
-		else
-		{
-			realEntities_.erase(iter++);
-		}
-	}
-}
-
-//-------------------------------------------------------------------------------------
 void GhostManager::handleTimeout(TimerHandle, void * arg)
 {
 	if(timestamp() - checkTime_ > uint64( stampsPerSecond() * 0.1 ))
 	{
-		if(messages_.size() == 0 && 
-			ghost_route_.size() == 0 && 
-			realEntities_.size() == 0)
+		if(messages_.empty() && ghost_route_.empty())
 		{
 			cancel();
 			return;
@@ -245,7 +215,6 @@ void GhostManager::handleTimeout(TimerHandle, void * arg)
 	}
 
 	syncMessages();
-	syncGhosts();
 }
 
 //-------------------------------------------------------------------------------------

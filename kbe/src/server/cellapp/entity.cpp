@@ -354,6 +354,10 @@ void Entity::onDestroy(bool callScript)
 		witnesses_count_ = 0;
 	}
 
+	if (Cellapp::getSingleton().spacePartitioningEnabled())
+		if (auto* timeout = Cellapp::getSingleton().pWitnessedTimeoutHandler())
+			timeout->delWitnessed(this);
+
 	pPyPosition_->onLoseRef();
 	pPyDirection_->onLoseRef();
 
@@ -365,6 +369,12 @@ PyObject* Entity::__py_pyDestroyEntity(PyObject* self, PyObject* args, PyObject 
 {
 	Py_ssize_t currargsSize = PyTuple_Size(args);
 	Entity* pobj = static_cast<Entity*>(self);
+
+	if (pobj->isBoundaryGhost())
+	{
+		PyErr_SetString(PyExc_RuntimeError, "Cannot destroy a boundary Ghost from script.");
+		return NULL;
+	}
 
 	if(pobj->initing())
 	{
@@ -734,11 +744,18 @@ PyObject* Entity::onScriptGetAttribute(PyObject* attr)
 void Entity::onDefDataChanged(EntityComponent* pEntityComponent,
 	const PropertyDescription* propertyDescription, PyObject* pyData)
 {
+	onDefDataChangedImpl(pEntityComponent, propertyDescription, pyData, false);
+}
+
+//-------------------------------------------------------------------------------------
+void Entity::onDefDataChangedImpl(EntityComponent* pEntityComponent,
+	const PropertyDescription* propertyDescription, PyObject* pyData, bool fromBoundaryGhost)
+{
 	// 如果不是一个realEntity或者在初始化则不理会
-	if(!isReal() || initing())
+	if((!isReal() && !fromBoundaryGhost) || initing())
 		return;
 
-	if(propertyDescription->isPersistent())
+	if(!fromBoundaryGhost && propertyDescription->isPersistent())
 		setDirty();
 
 	ENTITY_PROPERTY_UID componentPropertyUID = 0;
@@ -760,6 +777,34 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent,
 	}
 
 	uint32 flags = propertyDescription->getFlags();
+	if (!fromBoundaryGhost && (flags & ENTITY_BROADCAST_CELL_FLAGS) != 0 &&
+		propertyDescription->getDataType()->type() != DATA_TYPE_ENTITY_COMPONENT &&
+		(pEntityComponent || pScriptModule_->findCellPropertyDescription(propertyDescription->getUType()) == propertyDescription) &&
+		Cellapp::getSingleton().spacePartitioningEnabled())
+	{
+		auto* space = Spaces::findSpace(spaceID());
+		if (space && space->boundaryGhosts().hasCopies(id()))
+		{
+			const auto previousContext = EntityDef::context();
+			EntityDef::context().currComponentType = CELLAPP_TYPE;
+			EntityDef::context().currEntityID = id();
+			try
+			{
+				MemoryStream state;
+				state << componentPropertyUID << propertyDescription->getUType();
+				propertyDescription->getDataType()->addToStream(&state, pyData);
+				space->boundaryGhosts().property(*space, *this, state);
+			}
+			catch (const MemoryStreamWriteOverflow&)
+			{
+				WARNING_MSG(fmt::format("Entity::onDefDataChanged: boundary Ghost property is too large, entity={}.\n", id()));
+			}
+			EntityDef::context() = previousContext;
+		}
+	}
+
+	if (fromBoundaryGhost && (flags & ENTITY_BROADCAST_OTHER_CLIENT_FLAGS) == 0)
+		return;
 
 	// 首先创建一个需要广播的模板流
 	MemoryStream* mstream = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
@@ -773,7 +818,7 @@ void Entity::onDefDataChanged(EntityComponent* pEntityComponent,
 
 	// 判断是否需要广播给其他的cellapp, 这还需一个前提是entity必须拥有ghost实体
 	// 只有在cell边界一定范围内的entity才拥有ghost实体, 或者在跳转space时也会短暂的置为ghost状态
-	if((flags & ENTITY_BROADCAST_CELL_FLAGS) > 0 && hasGhost())
+	if(!fromBoundaryGhost && (flags & ENTITY_BROADCAST_CELL_FLAGS) > 0 && hasGhost())
 	{
 		GhostManager* gm = Cellapp::getSingleton().pGhostManager();
 		if(gm)
@@ -1463,6 +1508,12 @@ void Entity::onWriteToDB()
 bool Entity::bufferOrExeCallback(const char* funcName, PyObject* funcArgs,
 	bool notFoundIsOK, bool recordMigrationDispatchStages)
 {
+	if (isBoundaryGhost())
+	{
+		Py_XDECREF(funcArgs);
+		return false;
+	}
+
 	bool canBuffer = _scriptCallbacksBufferCount > 0;
 
 	PyObject* pyCallable = PyObject_GetAttrString(this, const_cast<char*>(funcName));
@@ -1688,19 +1739,63 @@ PyObject* Entity::pyIsReal()
 //-------------------------------------------------------------------------------------
 void Entity::addWitnessed(Entity* entity)
 {
-	if(Cellapp::getSingleton().pWitnessedTimeoutHandler())
-		Cellapp::getSingleton().pWitnessedTimeoutHandler()->delWitnessed(this);
-
+	const bool alreadyWitnessed = isWitnessed();
 	witnesses_.push_back(entity->id());
 	++witnesses_count_;
 
-	if(witnesses_count_ == 1)
+	auto& app = Cellapp::getSingleton();
+	if (isBoundaryGhost())
 	{
-		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
-
-		bufferOrExeCallback(const_cast<char*>("onWitnessed"),
-			Py_BuildValue(const_cast<char*>("(O)"), PyBool_FromLong(1)));
+		if (!alreadyWitnessed)
+			if (auto* space = Spaces::findSpace(spaceID()))
+				space->boundaryGhosts().witnessed(*space, *this, true);
+		return;
 	}
+
+	if (app.spacePartitioningEnabled())
+	{
+		if (!alreadyWitnessed && isReal())
+			onFirstWitnessed();
+	}
+	else
+	{
+		if (auto* timeout = app.pWitnessedTimeoutHandler())
+			timeout->delWitnessed(this);
+		if (witnesses_count_ == 1)
+		{
+			SCOPED_PROFILE(SCRIPTCALL_PROFILE);
+			bufferOrExeCallback(const_cast<char*>("onWitnessed"),
+				Py_BuildValue(const_cast<char*>("(O)"), PyBool_FromLong(1)));
+		}
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Entity::onFirstWitnessed()
+{
+	// 延时结束前重新被观察，脚本还没收到 False，不再发送 True。
+	auto* timeout = Cellapp::getSingleton().pWitnessedTimeoutHandler();
+	if (timeout && timeout->delWitnessed(this))
+		return;
+
+	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
+	bufferOrExeCallback(const_cast<char*>("onWitnessed"),
+		Py_BuildValue(const_cast<char*>("(O)"), PyBool_FromLong(1)));
+}
+
+//-------------------------------------------------------------------------------------
+void Entity::setBoundaryWitnessed(bool observed)
+{
+	const bool alreadyWitnessed = isWitnessed();
+	boundaryWitnessed_ = observed;
+	if (alreadyWitnessed == isWitnessed() || isDestroyed() || !isReal() ||
+		hasFlags(ENTITY_FLAGS_TELEPORT_START))
+		return;
+
+	if (observed)
+		onFirstWitnessed();
+	else if (auto* timeout = Cellapp::getSingleton().pWitnessedTimeoutHandler())
+		timeout->addWitnessed(this);
 }
 
 //-------------------------------------------------------------------------------------
@@ -1740,11 +1835,18 @@ void Entity::delWitnessed(Entity* entity)
 			const_cast<char*>("i"), entity->id(), false);
 	}
 
-	// 延时执行
-	// onDelWitnessed();
+	if (isBoundaryGhost())
+	{
+		if (witnesses_count_ == 0)
+			if (auto* space = Spaces::findSpace(spaceID()))
+				space->boundaryGhosts().witnessed(*space, *this, false);
+		return;
+	}
 
-	if(Cellapp::getSingleton().pWitnessedTimeoutHandler())
-		Cellapp::getSingleton().pWitnessedTimeoutHandler()->addWitnessed(this);
+	auto& app = Cellapp::getSingleton();
+	if (!app.spacePartitioningEnabled() || (!isDestroyed() && isReal() && !isWitnessed()))
+		if (auto* timeout = app.pWitnessedTimeoutHandler())
+			timeout->addWitnessed(this);
 }
 
 //-------------------------------------------------------------------------------------
@@ -1763,7 +1865,8 @@ void Entity::onWitnessVolatileDequeued()
 //-------------------------------------------------------------------------------------
 void Entity::onDelWitnessed()
 {
-	if(witnesses_count_ == 0)
+	if (!isWitnessed() && !isBoundaryGhost() &&
+		(!Cellapp::getSingleton().spacePartitioningEnabled() || (isReal() && !isDestroyed())))
 	{
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
@@ -2041,6 +2144,12 @@ void Entity::onEnteredView(Entity* entity)
 //-------------------------------------------------------------------------------------
 int Entity::pySetPosition(PyObject *value)
 {
+	if (isBoundaryGhost())
+	{
+		PyErr_SetString(PyExc_AttributeError, "Cannot set the position of a boundary Ghost.");
+		return -1;
+	}
+
 	if(isDestroyed())	
 	{
 		PyErr_Format(PyExc_AssertionError, "%s: %d is destroyed!\n",		
@@ -2080,6 +2189,9 @@ int Entity::pySetPosition(PyObject *value)
 //-------------------------------------------------------------------------------------
 PyObject* Entity::pyGetPosition()
 {
+	if (isBoundaryGhost())
+		return new script::ScriptVector3(position());
+
 	Py_INCREF(pPyPosition_);
 	return pPyPosition_;
 }
@@ -2161,6 +2273,12 @@ void Entity::setPosition_XYZ_float(Network::Channel* pChannel, float x, float y,
 //-------------------------------------------------------------------------------------
 int Entity::pySetDirection(PyObject *value)
 {
+	if (isBoundaryGhost())
+	{
+		PyErr_SetString(PyExc_AttributeError, "Cannot set the direction of a boundary Ghost.");
+		return -1;
+	}
+
 	if(isDestroyed())	
 	{
 		PyErr_Format(PyExc_AssertionError, "%s: %d is destroyed!\n",		
@@ -2245,6 +2363,9 @@ int Entity::pySetDirection(PyObject *value)
 //-------------------------------------------------------------------------------------
 PyObject* Entity::pyGetDirection()
 {
+	if (isBoundaryGhost())
+		return new script::ScriptVector3(direction().dir);
+
 	Py_INCREF(pPyDirection_);
 	return pPyDirection_;
 }
@@ -2934,6 +3055,14 @@ PyObject* Entity::pySetViewRadius(float radius, float hyst)
 			scriptName(), id());
 		PyErr_PrintEx(0);
 		return 0;
+	}
+
+	if (Cellapp::getSingleton().spacePartitioningEnabled() &&
+		(!std::isfinite(radius) || !std::isfinite(hyst) || radius < 0.f || hyst < 0.f ||
+			radius + hyst > g_kbeSrvConfig.getCellApp().ghostDistance))
+	{
+		PyErr_SetString(PyExc_ValueError, "setViewRadius: radius and hysteresis must fit within cellapp/ghostDistance.");
+		return NULL;
 	}
 
 	return PyLong_FromLong(setViewRadius(radius, hyst));
@@ -4640,6 +4769,149 @@ void Entity::onUpdateGhostPropertys(KBEngine::MemoryStream& s)
 }
 
 //-------------------------------------------------------------------------------------
+bool Entity::writeBoundaryGhostProperties(MemoryStream& stream, size_t limit)
+{
+	const auto previousContext = EntityDef::context();
+	EntityDef::context().currComponentType = CELLAPP_TYPE;
+	EntityDef::context().currEntityID = id();
+
+	bool valid = true;
+	auto write = [&](PyObject* object, ENTITY_PROPERTY_UID parent, PropertyDescription& property)
+	{
+		if ((property.getFlags() & ENTITY_BROADCAST_CELL_FLAGS) == 0)
+			return true;
+		PyObject* value = PyObject_GetAttrString(object, property.getName());
+		if (!value)
+			return false;
+		PyObjectPtr retained(value, PyObjectPtr::STEAL_REF);
+		stream << parent << property.getUType();
+		property.addToStream(&stream, value);
+		return stream.length() <= limit && !PyErr_Occurred();
+	};
+
+	try
+	{
+		for (const auto& item : pScriptModule()->getCellPropertyDescriptions())
+		{
+			auto& property = *item.second;
+			if (property.getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)
+			{
+				PyObject* value = PyObject_GetAttrString(this, property.getName());
+				PyObjectPtr retained(value, PyObjectPtr::STEAL_REF);
+				if (!value || !PyObject_TypeCheck(value, EntityComponent::getScriptType()))
+				{
+					valid = false;
+					break;
+				}
+				auto* component = static_cast<EntityComponent*>(value);
+				for (const auto& child : component->pComponentScriptDefModuleDescrs()->getCellPropertyDescriptions())
+				{
+					if (!write(component, property.getUType(), *child.second))
+					{
+						valid = false;
+						break;
+					}
+				}
+			}
+			else
+				valid = write(this, 0, property);
+			if (!valid)
+				break;
+		}
+	}
+	catch (const MemoryStreamWriteOverflow&)
+	{
+		valid = false;
+	}
+
+	EntityDef::context() = previousContext;
+	if (PyErr_Occurred())
+	{
+		SCRIPT_ERROR_CHECK();
+		return false;
+	}
+	return valid;
+}
+
+//-------------------------------------------------------------------------------------
+bool Entity::initBoundaryGhostProperties(MemoryStream& stream)
+{
+	const auto previousContext = EntityDef::context();
+	EntityDef::context().currComponentType = CELLAPP_TYPE;
+	EntityDef::context().currEntityID = id();
+	initProperty();
+	EntityDef::context() = previousContext;
+	while (stream.length() > 0)
+		if (!applyBoundaryGhostProperty(stream, false))
+			return false;
+	removeFlags(ENTITY_FLAGS_INITING);
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
+bool Entity::applyBoundaryGhostProperty(MemoryStream& stream, bool notify)
+{
+	ENTITY_PROPERTY_UID parent = 0, uid = 0;
+	BoundedStreamReader header(stream);
+	if (!header.read(parent) || !header.read(uid))
+		return false;
+	stream.rpos(stream.rpos() + sizeof(parent) + sizeof(uid));
+
+	PyObject* object = this;
+	PyObjectPtr retained;
+	EntityComponent* component = NULL;
+	PropertyDescription* property = NULL;
+	if (parent == 0)
+		property = pScriptModule()->findCellPropertyDescription(uid);
+	else
+	{
+		const auto* definition = pScriptModule()->findCellPropertyDescription(parent);
+		if (!definition || definition->getDataType()->type() != DATA_TYPE_ENTITY_COMPONENT)
+			return false;
+		PyObject* value = PyObject_GetAttrString(this, definition->getName());
+		retained = PyObjectPtr(value, PyObjectPtr::STEAL_REF);
+		if (!value || !PyObject_TypeCheck(value, EntityComponent::getScriptType()))
+		{
+			PyErr_Clear();
+			return false;
+		}
+		object = value;
+		component = static_cast<EntityComponent*>(object);
+		property = component->getProperty(uid);
+	}
+
+	if (!property || !(property->getFlags() & ENTITY_BROADCAST_CELL_FLAGS) ||
+		property->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)
+		return false;
+
+	const auto previousContext = EntityDef::context();
+	EntityDef::context().currComponentType = CELLAPP_TYPE;
+	EntityDef::context().currEntityID = id();
+	bool applied = false;
+	addFlags(ENTITY_FLAGS_APPLYING_GHOST_PROPERTY);
+	try
+	{
+		PyObject* value = property->createFromStream(&stream);
+		PyObjectPtr retainedValue(value, PyObjectPtr::STEAL_REF);
+		if (value && (!notify || stream.length() == 0) &&
+			PyObject_SetAttrString(object, property->getName(), value) == 0)
+		{
+			applied = true;
+			if (notify)
+				onDefDataChangedImpl(component, property, value, true);
+		}
+	}
+	catch (const MemoryStreamException&)
+	{
+		applied = false;
+	}
+	removeFlags(ENTITY_FLAGS_APPLYING_GHOST_PROPERTY);
+	EntityDef::context() = previousContext;
+	SCRIPT_ERROR_CHECK();
+	return applied;
+}
+
+//-------------------------------------------------------------------------------------
 void Entity::onRemoteRealMethodCall(KBEngine::MemoryStream& s)
 {
 	ScriptStageMetrics& stageMetrics = scriptStageMetrics();
@@ -4702,6 +4974,13 @@ void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s)
 	// 卸载witness， 并且序列化
 	KBE_ASSERT(isReal() == true && "Entity::changeToGhost(): not is real.\n");
 	KBE_ASSERT(realCell > 0 && realCell != g_componentID);
+
+	if (Cellapp::getSingleton().spacePartitioningEnabled())
+	{
+		auto* space = Spaces::findSpace(spaceID());
+		if (space && space->hasManagedCell())
+			space->boundaryGhosts().remove(*space, *this);
+	}
 
 	realCell_ = realCell;
 	ghostCell_ = 0;

@@ -299,6 +299,33 @@ struct Resources
 	}
 };
 
+struct CellPeerRoute
+{
+	uint32 internalIP = 0, externalIP = 0, pid = 0;
+	uint16 internalPort = 0, externalPort = 0;
+	COMPONENT_ORDER globalOrder = 0, groupOrder = 0;
+	COMPONENT_GUS gus = 0;
+	std::string username, externalAddress;
+
+	void write(MemoryStream& stream) const
+	{
+		stream << internalIP << internalPort << externalIP << externalPort
+			<< pid << globalOrder << groupOrder << gus;
+		stream.appendBlob(username);
+		stream.appendBlob(externalAddress);
+	}
+
+	bool read(BoundedStreamReader& reader)
+	{
+		return reader.read(internalIP) && internalIP != 0 &&
+			reader.read(internalPort) && internalPort != 0 &&
+			reader.read(externalIP) && reader.read(externalPort) &&
+			reader.read(pid) && reader.read(globalOrder) && reader.read(groupOrder) && reader.read(gus) &&
+			reader.readBlob(username, MAX_NAME) && username.find('\0') == std::string::npos &&
+			reader.readBlob(externalAddress, MAX_NAME) && externalAddress.find('\0') == std::string::npos;
+	}
+};
+
 struct Packet
 {
 	COMPONENT_ID sender = 0;
@@ -309,6 +336,7 @@ struct Packet
 	uint64 revision = 0;
 	Layout layout;
 	Resources resources;
+	std::map<COMPONENT_ID, CellPeerRoute> cellPeerRoutes;
 	bool success = true;
 	std::string error, key, value;
 
@@ -320,6 +348,14 @@ struct Packet
 		case REQUEST: case PREPARE:
 			layout.write(stream);
 			resources.write(stream);
+			break;
+		case COMPLETE:
+			stream << static_cast<uint16>(cellPeerRoutes.size());
+			for (const auto& entry : cellPeerRoutes)
+			{
+				stream << entry.first;
+				entry.second.write(stream);
+			}
 			break;
 		case READY: case COMMITTED: case ABORT: case SUSPEND:
 			stream << static_cast<uint8>(success);
@@ -360,6 +396,22 @@ struct Packet
 			if (!layout.read(reader) || !resources.read(reader))
 				return false;
 			break;
+		case COMPLETE:
+		{
+			uint16 count = 0;
+			if (!reader.read(count) || count == 0 || count > MAX_CELLS)
+				return false;
+			cellPeerRoutes.clear();
+			for (uint16 index = 0; index < count; ++index)
+			{
+				COMPONENT_ID cid = 0;
+				CellPeerRoute route;
+				if (!reader.read(cid) || cid == 0 || !route.read(reader) ||
+					!cellPeerRoutes.emplace(cid, std::move(route)).second)
+					return false;
+			}
+			break;
+		}
 		case READY: case COMMITTED: case ABORT: case SUSPEND:
 			if (!reader.read(accepted) || accepted > 1 || !reader.readBlob(error, 1024))
 				return false;
@@ -387,7 +439,7 @@ struct Packet
 			if (!reader.readBlob(error, 1024) || error.empty())
 				return false;
 			break;
-		case COMMIT: case COMPLETE: case SHUTDOWN: case REMOVE: case REMOVED:
+		case COMMIT: case SHUTDOWN: case REMOVE: case REMOVED:
 			break;
 		default:
 			return false;
