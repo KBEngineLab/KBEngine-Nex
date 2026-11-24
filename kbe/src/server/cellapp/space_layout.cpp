@@ -1,5 +1,6 @@
 #include "cellapp.h"
 #include "cellapp_interface.h"
+#include "../baseapp/baseapp_interface.h"
 #include "../cellappmgr/cellappmgr_interface.h"
 #include "server/component_routing_guard.h"
 
@@ -95,8 +96,9 @@ SpaceLayout::Resources Space::layoutResources() const
 bool Space::prepareLayout(const SpaceLayout::Packet& packet, bool replica, std::string& error)
 {
 	using namespace SpaceLayout;
+	const bool managedPrepare = packet.operation == PREPARE || packet.operation == REPLACEMENT_PREPARE;
 	Bounds bounds;
-	if (packet.operation == PREPARE && packet.version == layoutVersion_)
+	if (managedPrepare && packet.version == layoutVersion_)
 		layoutPreparedVersion_ = packet.version;
 	if (!isGood() || layoutRemovalPending_ || !packet.layout.boundsForApp(g_componentID, bounds) ||
 		hasPendingMigrationEntities())
@@ -112,7 +114,7 @@ bool Space::prepareLayout(const SpaceLayout::Packet& packet, bool replica, std::
 			error = "local Space already has a layout";
 			return false;
 		}
-		layoutPrepareReceived_ = packet.operation == PREPARE;
+		layoutPrepareReceived_ = managedPrepare;
 		return true;
 	}
 	for (const EntityPtr& entity : entities_)
@@ -134,7 +136,7 @@ bool Space::prepareLayout(const SpaceLayout::Packet& packet, bool replica, std::
 	layoutPinned_ = true;
 	layoutReplica_ = replica;
 	layoutReadySent_ = false;
-	layoutPrepareReceived_ = packet.operation == PREPARE;
+	layoutPrepareReceived_ = managedPrepare;
 	if (layoutPrepareReceived_)
 		layoutPreparedVersion_ = packet.version;
 	layoutStarted_ = timestamp();
@@ -211,6 +213,24 @@ void Space::updateLayoutPreparation()
 	using namespace SpaceLayout;
 	if (!hasManagedCell())
 		return;
+	if (isPreparingReplacement())
+	{
+		auto* manager = replacementManagerChannel();
+		if (!manager)
+		{
+			// 管理器失联后临时区域不能留给下一次恢复使用。
+			removeLayoutSpace();
+			return;
+		}
+		if (layoutRemovalPending_ || layoutState_ != PREPARING || isGeometryLoading())
+			return;
+		auto& app = Cellapp::getSingleton();
+		auto ready = spacePacket(*this, REPLACEMENT_READY);
+		ready.replacementProcess = CellRecovery::recoveryProcessID();
+		if (app.sendSpaceLayout(ready, manager))
+			setLayoutState(PREPARED);
+		return;
+	}
 	if ((layoutState_ == PREPARING || layoutState_ == PREPARED || layoutState_ == COMMITTING) &&
 		timestamp() - layoutStarted_ > stampsPerSecond() * 45)
 	{
@@ -229,9 +249,91 @@ void Space::updateLayoutPreparation()
 	}
 }
 
+void Space::bindReplacementManager(const Network::Channel& channel, const SpaceLayout::Packet& packet)
+{
+	replacementTemporary_ = true;
+	replacementManagerAddress_ = channel.addr();
+	replacementManagerSession_ = channel.sessionEpoch();
+	layoutVersion_ = packet.version;
+	resourceRevision_ = packet.revision;
+	replacedCellApp_ = packet.replacedCellApp;
+	replacedLayoutVersion_ = packet.replacedLayoutVersion;
+}
+
+bool Space::canStageRecovery(const CellRecovery::StageKey& key) const
+{
+	return isGood() && !layoutShutdownRequested_ && !layoutRemovalPending_ &&
+		isPreparingReplacement() && layoutState_ == SpaceLayout::PREPARED &&
+		matchesRecovery(key) && replacementManagerChannel();
+}
+
+bool Space::matchesRecovery(const CellRecovery::StageKey& key) const
+{
+	return key.space == id_ && key.lost == replacedCellApp_ &&
+		key.originalVersion == replacedLayoutVersion_ && key.replacementVersion == layoutVersion_;
+}
+
+bool Space::checkReplacement(const SpaceLayout::Packet& packet)
+{
+	if (!isGood() || !hasManagedCell() || layoutShutdownRequested_ || layoutRemovalPending_ ||
+		layoutState_ != SpaceLayout::FAILED || layoutVersion_ != packet.replacedLayoutVersion ||
+		resourceRevision_ != packet.revision ||
+		!layout_.cellForApp(packet.replacedCellApp) || layout_.cellForApp(packet.replacementCellApp))
+		return false;
+	// 保留旧版直到在途迁移结束，同时拒绝新的迁入和实体创建。
+	replacementCheckVersion_ = packet.version;
+	return !hasPendingMigrationEntities(true);
+}
+
+bool Space::commitReplacement(const SpaceLayout::Packet& packet, Network::Channel* manager)
+{
+	using namespace SpaceLayout;
+	if (isPreparingReplacement())
+	{
+		if (replacementManagerChannel() != manager || layoutState_ != PREPARED ||
+			packet.version != layoutVersion_ || packet.replacedCellApp != replacedCellApp_ ||
+			packet.replacedLayoutVersion != replacedLayoutVersion_ || packet.replacementCellApp != g_componentID)
+			return false;
+		replacementTemporary_ = false;
+		replacementCheckVersion_ = packet.version;
+		layoutReplica_ = layout_.owner != g_componentID;
+		Cellapp::getSingleton().discardStagedRecoveryBackups(id_, layoutVersion_);
+	}
+	else
+	{
+		if (replacementCheckVersion_ != packet.version || layoutVersion_ != packet.replacedLayoutVersion ||
+			!layout_.replaceCellApp(packet.replacedCellApp, packet.replacementCellApp))
+			return false;
+		layoutVersion_ = packet.version;
+		layoutReplica_ = layout_.owner != g_componentID;
+	}
+	layoutStarted_ = timestamp();
+	setLayoutState(COMMITTING);
+	return true;
+}
+
+void Space::cancelReplacementCheck(uint64 version)
+{
+	if (replacementCheckVersion_ == version)
+		replacementCheckVersion_ = 0;
+}
+
+Network::Channel* Space::replacementManagerChannel() const
+{
+	if (!isRecoveryTarget())
+		return nullptr;
+	auto* channel = Cellapp::getSingleton().networkInterface().findChannel(replacementManagerAddress_);
+	return channel && !channel->isDestroyed() && channel->condemn() == 0 &&
+		channel->sessionEpoch() == replacementManagerSession_ ? channel : nullptr;
+}
+
 bool Cellapp::sendSpaceLayout(const SpaceLayout::Packet& packet)
 {
-	Network::Channel* channel = Components::getSingleton().getCellappmgrChannel();
+	return sendSpaceLayout(packet, Components::getSingleton().getCellappmgrChannel());
+}
+
+bool Cellapp::sendSpaceLayout(const SpaceLayout::Packet& packet, Network::Channel* channel)
+{
 	if (!spacePartitioningEnabled() || !spacePartitioningConfirmed() ||
 		channel == NULL || channel->isDestroyed() || channel->condemn() != 0)
 		return false;
@@ -277,6 +379,69 @@ void Cellapp::onSpaceLayout(Network::Channel* channel, MemoryStream& stream)
 	if (!parsed || packet.sender != sender)
 		return;
 	Space* space = Spaces::findSpace(packet.spaceID);
+	if (packet.operation == REPLACEMENT_PREPARE)
+	{
+		Packet response;
+		response.sender = componentID_;
+		response.operation = REPLACEMENT_READY;
+		response.spaceID = packet.spaceID;
+		response.version = packet.version;
+		response.revision = packet.revision;
+		response.success = false;
+		if (isShuttingdown() || space || !packet.layout.cellForApp(componentID_))
+			response.error = "CellApp cannot prepare this replacement Space";
+		else if ((space = Spaces::createNewSpace(packet.spaceID, packet.resources.scriptModule, false)))
+		{
+			// 几何和 SpaceData 在准备阶段只装入本地，不派发业务回调。
+			space->bindReplacementManager(*channel, packet);
+			if (space->prepareLayout(packet, true, response.error))
+			{
+				space->updateLayoutPreparation();
+				return;
+			}
+			space->removeLayoutSpace();
+		}
+		else
+			response.error = "could not create the replacement Space";
+		sendSpaceLayout(response, channel);
+		return;
+	}
+	if (packet.operation == REPLACEMENT_CANCEL)
+	{
+		if (space && !space->isPreparingReplacement())
+		{
+			if (space->layoutVersion() < packet.version)
+				space->cancelReplacementCheck(packet.version);
+			return;
+		}
+		if (space && space->isPreparingReplacement() && packet.version == space->layoutVersion())
+		{
+			if (space->replacementManagerChannel() == channel)
+				space->removeLayoutSpace();
+			return;
+		}
+		packet.sender = componentID_;
+		packet.operation = REMOVED;
+		sendSpaceLayout(packet, channel);
+		return;
+	}
+	if (packet.operation == REPLACEMENT_CHECK || packet.operation == REPLACEMENT_COMMIT)
+	{
+		if (!space || !space->isGood())
+			return;
+		if (packet.operation == REPLACEMENT_CHECK && space->checkReplacement(packet))
+		{
+			packet.sender = componentID_;
+			packet.operation = REPLACEMENT_CHECKED;
+			sendSpaceLayout(packet, channel);
+		}
+		else if (packet.operation == REPLACEMENT_COMMIT && space->commitReplacement(packet, channel))
+			sendSpaceLayout(spacePacket(*space, COMMITTED), channel);
+		return;
+	}
+	// 原布局的新旧确认都不能激活或删除临时区域。
+	if (space && space->isPreparingReplacement())
+		return;
 	if (packet.operation == PREPARE)
 	{
 		Packet response;
@@ -339,6 +504,7 @@ void Cellapp::onSpaceLayout(Network::Channel* channel, MemoryStream& stream)
 				break;
 			}
 			space->setLayoutState(ACTIVE);
+			space->cancelReplacementCheck(packet.version);
 			if (!isShuttingdown() && space->canAcceptEntities())
 			{
 				for (const auto& entry : packet.cellPeerRoutes)
@@ -408,6 +574,180 @@ void Cellapp::onSpaceLayout(Network::Channel* channel, MemoryStream& stream)
 	default:
 		break;
 	}
+}
+
+void Cellapp::reqStageRecoveryCellBackup(Network::Channel* channel, MemoryStream& stream)
+{
+	using CellRecovery::RestoreAction;
+	if (!spacePartitioningEnabled() || !spacePartitioningConfirmed() ||
+		!channel || channel->isExternal() || channel->isDestroyed() || channel->condemn() != 0)
+	{
+		stream.done();
+		return;
+	}
+	BoundedStreamReader reader(stream);
+	CellRecovery::StageKey key;
+	CellRecovery::RecoveryProcesses processes;
+	uint8 action = 0;
+	uint8 flags = 0;
+	auto& components = Components::getSingleton();
+	const auto* source = components.findComponent(channel);
+	if (!source && channel->componentID())
+		source = components.findComponent(BASEAPP_TYPE, channel->componentID());
+	if (!source || source->componentType != BASEAPP_TYPE ||
+		!Security::isBoundBidirectionalComponentSource(source->cid, source, channel, channel->componentID()) ||
+		!key.read(reader) || !processes.read(reader) ||
+		!reader.read(action) || action > static_cast<uint8>(RestoreAction::Discard) ||
+		!reader.read(flags) || flags > 1)
+	{
+		stream.done();
+		return;
+	}
+	bool accepted = false;
+	auto* space = Spaces::findSpace(key.space);
+	const auto operation = static_cast<RestoreAction>(action);
+	if ((operation != RestoreAction::Stage && processes.target != CellRecovery::recoveryProcessID()) ||
+		(operation == RestoreAction::Stage && processes.target))
+	{
+		stream.done();
+		return;
+	}
+	if (operation == RestoreAction::Stage || operation == RestoreAction::Install)
+	{
+		ENTITY_SCRIPT_UID type = 0;
+		uint64 routingEpoch = 0;
+		std::string data;
+		if (!reader.read(type) || !reader.read(routingEpoch) ||
+			!reader.readBlob(data, CellRecovery::MAX_STAGED_BACKUP_BYTES) || !reader.empty())
+		{
+			stream.done();
+			return;
+		}
+		const auto* module = EntityDef::findScriptModule(type);
+		if (space && space->matchesRecovery(key) && module && module->hasBase() && module->hasCell())
+		{
+			if (operation == RestoreAction::Install)
+			{
+				// Base 和管理器走不同连接，安装请求可能早于 COMPLETE 到达。
+				if (space->layoutState() == SpaceLayout::COMMITTING || space->layoutState() == SpaceLayout::PREPARED)
+				{
+					stream.done();
+					return;
+				}
+				const auto result = space->installRecoveryEntity(key, source->cid, processes.base,
+					type, routingEpoch, flags != 0, data);
+				// 安装名额会在激活或清理后释放。暂不回包，让 Base 按现有间隔重试。
+				if (result == Space::RecoveryInstallResult::Busy)
+				{
+					stream.done();
+					return;
+				}
+				accepted = result == Space::RecoveryInstallResult::Installed;
+			}
+			else if (!isShuttingdown() && space->canStageRecovery(key) && !findEntity(key.entity))
+				accepted = stagedRecoveryBackups_.stage(key, source->cid, type, std::move(data));
+		}
+	}
+	else if (!reader.empty())
+	{
+		stream.done();
+		return;
+	}
+	else if (space && space->matchesRecovery(key))
+		accepted = space->finishRecoveryEntity(key, source->cid, processes.base,
+			operation == RestoreAction::Activate, flags != 0);
+	else
+		accepted = operation == RestoreAction::Discard;
+	stream.done();
+	auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	bundle->newMessage(BaseappInterface::onStageRecoveryCellBackup);
+	key.write(*bundle);
+	processes.write(*bundle);
+	(*bundle) << action << static_cast<uint8>(accepted);
+	channel->send(bundle);
+}
+
+Space::RecoveryInstallResult Space::installRecoveryEntity(const CellRecovery::StageKey& key,
+	COMPONENT_ID base, uint64 baseProcess,
+	ENTITY_SCRIPT_UID type, uint64 routingEpoch, bool ownsSpace, const std::string& data)
+{
+	using Result = RecoveryInstallResult;
+	const auto existing = recoveryInstallations_.find(key.entity);
+	if (existing != recoveryInstallations_.end())
+		return existing->second.base == base && existing->second.baseProcess == baseProcess &&
+			(existing->second.entity || existing->second.activated) ? Result::Installed : Result::Rejected;
+	auto& app = Cellapp::getSingleton();
+	if (app.isShuttingdown() || !canAcceptEntities() || layoutState_ != SpaceLayout::ACTIVE ||
+		!replacementManagerChannel() || app.findEntity(key.entity) || data.empty())
+		return Result::Rejected;
+
+	auto* module = EntityDef::findScriptModule(type);
+	if (ownsSpace && (layout_.owner != g_componentID || scriptModuleName_ != module->getName()))
+		return Result::Rejected;
+	if (pendingRecoveryActivations_ >= 256)
+		return Result::Busy;
+	EntityDef::context().currEntityID = key.entity;
+	auto* object = module->createObject();
+	if (!object)
+		return Result::Rejected;
+	// 安装确认前只持有本地对象，避免实体出现在脚本查询、坐标系统和 AOI 中。
+	EntityPtr entity(app.onCreateEntity(object, module, key.entity), EntityPtr::STEAL_REF);
+	MemoryStream stream;
+	stream.append(reinterpret_cast<const uint8*>(data.data()), data.size());
+	PyObjectPtr attributes;
+	try
+	{
+		attributes = PyObjectPtr(entity->createCellDataFromStream(&stream, true), PyObjectPtr::STEAL_REF);
+	}
+	catch (const MemoryStreamException&)
+	{
+	}
+	if (!attributes)
+	{
+		SCRIPT_ERROR_CHECK();
+		return Result::Rejected;
+	}
+	entity->createNamespace(attributes.get(), true);
+	entity->routingEpoch(routingEpoch);
+	entity->isSpace(ownsSpace);
+	entity->baseEntityCall(new EntityCall(module, nullptr, base, key.entity, ENTITYCALL_TYPE_BASE));
+	recoveryInstallations_.emplace(key.entity, RecoveryInstallation{base, baseProcess, entity});
+	++pendingRecoveryActivations_;
+	return Result::Installed;
+}
+
+bool Space::finishRecoveryEntity(const CellRecovery::StageKey& key, COMPONENT_ID base, uint64 baseProcess,
+	bool activate, bool hasClient)
+{
+	const auto existing = recoveryInstallations_.find(key.entity);
+	if (existing == recoveryInstallations_.end())
+		return !activate;
+	auto& installation = existing->second;
+	if (installation.base != base || installation.baseProcess != baseProcess)
+		return false;
+	if (!installation.entity)
+		return installation.activated == activate;
+	auto& app = Cellapp::getSingleton();
+	EntityPtr entity(installation.entity);
+	installation.entity.clear();
+	--pendingRecoveryActivations_;
+	if (!activate || !isGood() || app.findEntity(key.entity))
+		// 保留处理结果，避免迟到的安装请求在清理后重新占用空间。
+		return !activate;
+
+	installation.activated = true;
+	app.pEntities()->add(key.entity, entity.get());
+	// 先完成坐标安装，再让脚本处理进场和恢复回调。
+	Entity::bufferCallback(true);
+	addEntity(entity.get());
+	if (!entity->isDestroyed())
+		entity->onRestore();
+	if (!entity->isDestroyed())
+		addEntityToNode(entity.get());
+	Entity::bufferCallback(false);
+	if (!entity->isDestroyed() && hasClient && entity->pScriptModule()->hasClient())
+		entity->onGetWitness(true);
+	return true;
 }
 
 void Cellapp::requestSpaceLayoutShutdown(Space& space)

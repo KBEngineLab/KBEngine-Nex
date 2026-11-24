@@ -38,6 +38,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "network/network_stats.h"
 #include "server/client_request_guard.h"
 #include "server/bounded_stream_reader.h"
+#include "server/cell_backup.h"
+#include "server/cell_process_watch.h"
 #include "server/component_routing_guard.h"
 #include "server/space_partitioning.h"
 #include "server/components.h"
@@ -450,6 +452,7 @@ bool Cellapp::initializeWatcher()
 	WATCH_OBJECT("witness/backpressure/resumeTransitions", &Witness::resumeTransitionCount);
 	WATCH_OBJECT("witness/backpressure/staleControlDrops", this, &Cellapp::staleWitnessVolatileControlDrops);
 	WATCH_OBJECT("network/clientInput/staleEntityDrops", this, &Cellapp::staleClientInputEntityDrops);
+	WATCH_OBJECT("cellRecovery/stagedBackups", this, &Cellapp::stagedRecoveryBackups);
 	WATCH_OBJECT("network/clientInput/staleControlledEntityDrops", this, &Cellapp::staleControlledClientInputEntityDrops);
 	WATCH_OBJECT("witness/backpressure/suppressedUpdateSkips", &Witness::suppressedUpdateSkipCount);
 	WATCH_OBJECT("witness/backpressure/suppressedVolatileRefreshes", &Witness::suppressedVolatileRefreshCount);
@@ -621,7 +624,8 @@ void Cellapp::handleGameTick()
 		processCellHandoffs();
 	if (!outgoingCellHandoffs_.empty() && timestamp() >= nextCellHandoffStartRetry_)
 		retryCellHandoffMessages();
-	if ((!outgoingTeleports_.empty() || !acceptedCellOnlyTeleports_.empty()) && timestamp() >= nextTeleportRetry_)
+	if ((!pendingTeleportDispatches_.empty() || !outgoingTeleports_.empty() ||
+		!acceptedCellOnlyTeleports_.empty()) && timestamp() >= nextTeleportRetry_)
 		retryTeleports();
 	// 等 Space 和坐标节点更新完成后再执行脚本，避免回调中销毁或再次传送。
 	if (pWitnessedTimeoutHandler_ && spacePartitioningEnabled())
@@ -632,6 +636,8 @@ void Cellapp::handleGameTick()
 void Cellapp::onRemoveComponent(const Components::ComponentInfos* component)
 {
 	EntityApp<Entity>::onRemoveComponent(component);
+	if (component->componentType == CELLAPP_TYPE)
+		teleportPeers_.erase(component->cid);
 
 	// 未激活的布局由 COMPLETE 检查连接。活动布局断线后，只让编号较小的一端重连。
 	if (!isShuttingdown() && spacePartitioningConfirmed_ && spacePartitioningEnabled() &&
@@ -819,8 +825,11 @@ bool Cellapp::confirmSpacePartitioningMode(Network::Channel* pChannel)
 		// 复用已注册的内部连接，不通过额外端口或发现消息确认运行模式。
 		Network::Bundle* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		bundle->newMessage(CellappmgrInterface::reportSpacePartitioningMode);
-		CellappmgrInterface::reportSpacePartitioningModeArgs2::staticAddToBundle(*bundle,
-			componentID_, spacePartitioningMode_);
+		const auto identity = spacePartitioningEnabled() ? CellRecovery::ProcessIdentity::current() :
+			CellRecovery::ProcessIdentity{};
+		CellappmgrInterface::reportSpacePartitioningModeArgs6::staticAddToBundle(*bundle,
+			componentID_, spacePartitioningMode_, identity.pid, identity.started, identity.pidNamespace,
+			spacePartitioningEnabled() ? CellRecovery::recoveryProcessID() : 0);
 		spacePartitioningRequestTime_ = timestamp();
 		pChannel->send(bundle);
 	}
@@ -1392,6 +1401,69 @@ void Cellapp::reqBackupEntityCellData(Network::Channel* pChannel, KBEngine::Memo
 	}
 
 	e->backupCellData();
+}
+
+void Cellapp::reqRecoveryCellBackup(Network::Channel* channel, MemoryStream& stream)
+{
+	BoundedStreamReader reader(stream);
+	ENTITY_ID id = 0;
+	CellRecovery::BackupStamp stamp;
+	CellRecovery::BackupDigest knownDigest{};
+	uint8 hasBackup = 0;
+	const bool parsed = reader.read(id) && id > 0 && stamp.read(reader) &&
+		reader.read(hasBackup) && hasBackup <= 1 &&
+		(!hasBackup || CellRecovery::readBackupDigest(reader, knownDigest)) && reader.empty();
+	stream.done();
+	if (!parsed || !spacePartitioningEnabled() || !channel || !channel->isInternal() ||
+		channel->isDestroyed() || channel->condemn() != 0)
+		return;
+
+	EntityPtr entity(findEntity(id));
+	if (!entity || !entity->baseEntityCall())
+		return;
+	const auto base = entity->baseEntityCall()->componentID();
+	auto* peer = Components::getSingleton().findComponent(BASEAPP_TYPE, base);
+	if (!Security::isBoundBidirectionalComponentSource(base, peer, channel, channel->componentID()))
+		return;
+
+	const auto current = [&]()
+	{
+		return !entity->isDestroyed() && entity->isReal() && entity->spaceID() == stamp.space &&
+			!entity->hasFlags(ENTITY_FLAGS_TELEPORT_START);
+	};
+	if (!current())
+		return;
+	const auto epoch = entity->routingEpoch();
+	auto data = MemoryStream::createSmartPoolObj(OBJECTPOOL_POINT);
+	try
+	{
+		entity->addCellDataToStream(BASEAPP_TYPE, ENTITY_CELL_DATA_FLAGS, data->get());
+	}
+	catch (const MemoryStreamWriteOverflow&)
+	{
+		return;
+	}
+	if (!current() || entity->routingEpoch() != epoch)
+		return;
+
+	// 和 Base 已收到的摘要比较；普通存档写过的摘要不代表 Base 持有同一份恢复数据。
+	CellRecovery::BackupDigest digest;
+	KBE_SHA1 sha;
+	sha.Input(data->get()->data(), data->get()->length());
+	sha.Result(digest.data());
+	const bool full = !hasBackup || digest != knownDigest;
+	auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	bundle->newMessage(BaseappInterface::onRecoveryCellBackup);
+	(*bundle) << id;
+	stamp.write(*bundle);
+	(*bundle) << static_cast<uint8>(full);
+	if (full)
+	{
+		CellRecovery::writeBackupDigest(*bundle, digest);
+		bundle->append(data->get());
+	}
+	// 回包沿原连接发送，Base 不会接受同编号的另一条连接送来的回包。
+	channel->send(bundle);
 }
 
 //-------------------------------------------------------------------------------------
@@ -3078,14 +3150,13 @@ bool Cellapp::beginCellHandoff(ENTITY_ID id, bool automatic)
 		!space->boundaryGhosts().handoffCopyGeneration(id, destination->cellappID, target->sessionEpoch()))
 		return false;
 
-	const uint64 epoch = entity->reserveCellHandoffEpoch();
+	const uint64 epoch = entity->reserveRoutingEpoch();
 	if (!epoch)
 		return false;
 	auto pending = std::make_unique<OutgoingCellHandoff>();
-	pending->route = {componentID_, peer->cid, epoch, static_cast<uint32>(getProcessPID()), 0};
+	pending->route = {componentID_, peer->cid, epoch, static_cast<uint32>(getProcessPID()), 0,
+		space->id(), space->layoutVersion()};
 	pending->base = entity->baseEntityCall()->componentID();
-	pending->space = space->id();
-	pending->layoutVersion = space->layoutVersion();
 	pending->session = target->sessionEpoch();
 	pending->automatic = automatic;
 	const auto route = pending->route;
@@ -3155,11 +3226,14 @@ void Cellapp::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
 	}
 	if (route.target == componentID_ && route.targetPid == localPid)
 	{
-		if (!matchesBase || !entity->isReal() || entity->routingEpoch() != route.epoch ||
+		if (!matchesBase || !entity->isReal() || entity->spaceID() != route.space ||
+			entity->routingEpoch() != route.epoch ||
 			entity->migrationRelayCell() != route.source)
 			return;
-		auto* space = Spaces::findSpace(entity->spaceID());
-		if (action == CHECK_TARGET && entity->isCellHandoffTarget() && space && space->isGood())
+		auto* space = Spaces::findSpace(route.space);
+		if (!space || space->layoutVersion() != route.layoutVersion)
+			return;
+		if (action == CHECK_TARGET && entity->isCellHandoffTarget() && space->isGood())
 			sendCellHandoff(channel, id, TARGET_READY, route);
 		else if (action == FINISH_TARGET)
 		{
@@ -3183,7 +3257,7 @@ void Cellapp::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
 		if (action == RELEASE_SOURCE && (!entity ||
 			(entity->isBoundaryGhost() && entity->realCell() == route.target)))
 			sendCellHandoff(channel, id, SOURCE_RELEASED, route);
-		else if (action == RESTORE_SOURCE && matchesBase && entity->isReal() &&
+		else if (action == RESTORE_SOURCE && matchesBase && entity->isReal() && entity->spaceID() == route.space &&
 			entity->cellHandoffEpoch() == route.epoch)
 			sendCellHandoff(channel, id, SOURCE_RESTORED, route);
 		return;
@@ -3191,14 +3265,15 @@ void Cellapp::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
 	auto& pending = *entry->second;
 	if (!matchesBase || pending.base != baseID || !pending.route.sameAttempt(route))
 		return;
-	if (action == DISPATCH && route.targetPid && !pending.route.targetPid)
+	// 目标可能在源收到 DISPATCH 前退出。这时源仍是 Real，可以直接结束这一轮。
+	if ((action == DISPATCH || action == RESTORE_SOURCE) && route.targetPid && !pending.route.targetPid)
 		pending.route.targetPid = route.targetPid;
 	if (!(pending.route == route))
 		return;
 
 	if (action == DISPATCH && !pending.dispatched)
 	{
-		auto* space = Spaces::findSpace(pending.space);
+		auto* space = Spaces::findSpace(route.space);
 		auto* peer = Components::getSingleton().findComponent(CELLAPP_TYPE, route.target);
 		auto* target = peer ? peer->pChannel : NULL;
 		const auto pos = entity->position();
@@ -3206,10 +3281,10 @@ void Cellapp::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
 		const auto* destination = space ? space->layout().cellAt(pos.x, pos.z) : NULL;
 		const uint64 generation = space ? space->boundaryGhosts().handoffCopyGeneration(id, route.target, pending.session) : 0;
 		pending.unsent = pending.unsent || isShuttingdown() || !entity->isReal() ||
-			entity->spaceID() != pending.space ||
+			entity->spaceID() != route.space ||
 			(entity->controlledBy() && entity->controlledBy()->id() != id) ||
 			!space || !space->canAcceptEntities() || space->layoutState() != SpaceLayout::ACTIVE ||
-			space->layoutVersion() != pending.layoutVersion || !destination || destination->cellappID != route.target ||
+			space->layoutVersion() != route.layoutVersion || !destination || destination->cellappID != route.target ||
 			(pending.automatic && !space->localCellBounds().crossedBy(pos.x, pos.z, cellHandoffMargin_)) ||
 			!target || (peer->pid && peer->pid != route.targetPid) ||
 			target->isDestroyed() || target->condemn() != 0 ||
@@ -3219,7 +3294,7 @@ void Cellapp::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
 			Entity::bufferCallback(true);
 			try
 			{
-				entity->changeToGhost(route.target, pending.snapshot, route.epoch);
+				entity->changeToGhost(route.target, pending.snapshot, route.epoch, true);
 			}
 			catch (const MemoryStreamWriteOverflow&)
 			{
@@ -3229,9 +3304,9 @@ void Cellapp::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
 			{
 				auto* request = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 				request->newMessage(CellappInterface::reqCellHandoff);
-				(*request) << id << pending.space << entity->pScriptModule()->getUType()
+				(*request) << id << entity->pScriptModule()->getUType()
 					<< pos.x << pos.y << pos.z << dir.roll() << dir.pitch() << dir.yaw()
-					<< baseID << pending.layoutVersion << generation;
+					<< baseID << generation;
 				route.write(*request);
 				request->append(pending.snapshot);
 				pending.dispatched = true;
@@ -3256,6 +3331,9 @@ void Cellapp::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
 		(!pending.dispatched || (entity->isCellHandoffSource() && entity->realCell() == route.target &&
 			entity->routingEpoch() == route.epoch)))
 	{
+		auto* space = Spaces::findSpace(route.space);
+		if (!space || entity->spaceID() != route.space || space->layoutVersion() != route.layoutVersion)
+			return;
 		auto restored = std::move(entry->second);
 		outgoingCellHandoffs_.erase(entry);
 		// 目标仍不可用时不在下一次 Ghost 更新中立即发起相同交接。
@@ -3285,21 +3363,20 @@ void Cellapp::reqCellHandoff(Network::Channel* channel, MemoryStream& stream)
 	using namespace CellHandoff;
 	BoundedStreamReader header(stream);
 	ENTITY_ID id = 0;
-	SPACE_ID spaceID = 0;
 	ENTITY_SCRIPT_UID type = 0, snapshotType = 0;
 	Position3D pos;
 	Direction3D dir;
 	COMPONENT_ID baseID = 0, snapshotBase = 0;
-	uint64 version = 0, generation = 0, epoch = 0;
+	uint64 generation = 0, epoch = 0;
 	SPACE_ID snapshotSpace = 0;
 	bool destroyed = false;
 	Route route;
 	const auto* sender = findBoundCellappSource(channel);
 	if (!sender || sender->pChannel != channel ||
-		!header.read(id) || !header.read(spaceID) || !header.read(type) ||
+		!header.read(id) || !header.read(type) ||
 		!header.read(pos.x) || !header.read(pos.y) || !header.read(pos.z) ||
 		!header.read(dir.dir.x) || !header.read(dir.dir.y) || !header.read(dir.dir.z) ||
-		!header.read(baseID) || !header.read(version) || !header.read(generation) || !route.read(header) ||
+		!header.read(baseID) || !header.read(generation) || !route.read(header) ||
 		sender->cid != route.source || (sender->pid && sender->pid != route.sourcePid) ||
 		componentID_ != route.target || static_cast<uint32>(getProcessPID()) != route.targetPid)
 	{
@@ -3308,7 +3385,7 @@ void Cellapp::reqCellHandoff(Network::Channel* channel, MemoryStream& stream)
 	}
 	const size_t snapshotPos = stream.rpos() + stream.length() - header.remaining();
 	auto* base = Components::getSingleton().findComponentChannel(BASEAPP_TYPE, baseID);
-	auto* space = Spaces::findSpace(spaceID);
+	auto* space = Spaces::findSpace(route.space);
 	auto* entity = findEntity(id);
 	if (admittedCellHandoffs_.count(id))
 	{
@@ -3320,17 +3397,17 @@ void Cellapp::reqCellHandoff(Network::Channel* channel, MemoryStream& stream)
 		!space || !space->canAcceptEntities() || space->layoutState() != SpaceLayout::ACTIVE ||
 		!destination || destination->cellappID != componentID_ || !space->layout().cellForApp(route.source) ||
 		!base || base->isDestroyed() || base->condemn() != 0 || !entity || !entity->isBoundaryGhost() ||
-		entity->spaceID() != spaceID || entity->realCell() != route.source ||
-		entity->pScriptModule()->getUType() != type || version != space->layoutVersion() ||
+		entity->spaceID() != route.space || entity->realCell() != route.source ||
+		entity->pScriptModule()->getUType() != type || route.layoutVersion != space->layoutVersion() ||
 		!header.read(snapshotType) || snapshotType != type || !header.read(epoch) || epoch != route.epoch ||
-		!header.read(snapshotSpace) || snapshotSpace != spaceID || !header.read(destroyed) || destroyed ||
+		!header.read(snapshotSpace) || snapshotSpace != route.space || !header.read(destroyed) || destroyed ||
 		!header.skip(sizeof(bool) + sizeof(float) * 2 + sizeof(int8)) ||
 		!header.read(snapshotBase) || snapshotBase != baseID ||
 		// 同一连接上也会重建 Ghost，旧快照不能把新副本转为 Real。
 		!space->boundaryGhosts().forgetHandoffTarget(id, route.source, channel->sessionEpoch(), generation))
 	{
 		sendCellHandoff(base, id, TARGET_REJECTED, route);
-		WARNING_MSG(fmt::format("Cellapp::cellHandoff: target rejected, entity={}, epoch={}, space={}.\n", id, route.epoch, spaceID));
+		WARNING_MSG(fmt::format("Cellapp::cellHandoff: target rejected, entity={}, epoch={}, space={}.\n", id, route.epoch, route.space));
 		stream.done();
 		return;
 	}
@@ -3429,6 +3506,149 @@ void sendTeleportStatus(Network::Channel* channel, ENTITY_ID id, COMPONENT_ID so
 	(*bundle) << id << source << g_componentID << epoch << static_cast<uint8>(status);
 	channel->send(bundle);
 }
+
+void sendTeleportReservation(Network::Channel& base, ENTITY_ID id, const TeleportStatus::Dispatch& route)
+{
+	auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	bundle->newMessage(BaseappInterface::onMigrationCellappReserve);
+	(*bundle) << id;
+	route.write(*bundle);
+	base.send(bundle);
+}
+}
+
+bool Cellapp::requestTeleportDispatch(Entity& entity, EntityCall& destination, const Position3D& pos,
+	const Direction3D& dir)
+{
+	auto* baseCall = entity.baseEntityCall();
+	auto* base = baseCall ? baseCall->getChannel() : nullptr;
+	auto* target = destination.getChannel();
+	const auto* space = Spaces::findSpace(entity.spaceID());
+	if (isShuttingdown() || !entity.isReal() || !canSendCellHandoff(base) || !canSendCellHandoff(target) ||
+		!space || space->isCheckingReplacement() ||
+		pendingTeleportDispatches_.count(entity.id()) || outgoingTeleports_.count(entity.id()))
+		return false;
+	const uint64 epoch = entity.reserveRoutingEpoch();
+	if (!epoch)
+		return false;
+	PendingTeleportDispatch pending;
+	pending.route = {destination.componentID(), entity.spaceID(), epoch};
+	pending.targetEntity = destination.id();
+	pending.base = baseCall->componentID();
+	pending.baseSession = base->sessionEpoch();
+	pending.targetSession = target->sessionEpoch();
+	pending.deadline = timestamp() + 5 * stampsPerSecond();
+	pending.pos = pos;
+	pending.dir = dir;
+	pendingTeleportDispatches_.emplace(entity.id(), pending);
+	// 等待确认期间原实体仍是 Real，但不能开始另一轮迁移。
+	entity.addFlags(ENTITY_FLAGS_TELEPORT_START);
+	sendPendingTeleportDispatch(entity.id(), pendingTeleportDispatches_.at(entity.id()));
+	return true;
+}
+
+void Cellapp::sendPendingTeleportDispatch(ENTITY_ID id, PendingTeleportDispatch& pending)
+{
+	auto& components = Components::getSingleton();
+	auto* base = components.findComponentChannel(BASEAPP_TYPE, pending.base);
+	auto* target = components.findComponentChannel(CELLAPP_TYPE, pending.route.target);
+	if (!canSendCellHandoff(base) || base->sessionEpoch() != pending.baseSession ||
+		!canSendCellHandoff(target) || target->sessionEpoch() != pending.targetSession)
+		return;
+
+	auto& peer = teleportPeers_[pending.route.target];
+	if (peer.session != pending.targetSession)
+		peer = {pending.targetSession};
+	if (peer.process)
+	{
+		pending.route.targetProcess = peer.process;
+		sendTeleportReservation(*base, id, pending.route);
+	}
+	else if (timestamp() >= peer.queryAt)
+	{
+		// 同一条连接只查询一次进程编号，后续传送复用。
+		peer.queryAt = timestamp() + stampsPerSecond();
+		auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		bundle->newMessage(CellappInterface::onTeleportPeerProcess);
+		(*bundle) << uint64(0);
+		target->send(bundle);
+	}
+}
+
+void Cellapp::onTeleportPeerProcess(Network::Channel* channel, uint64 process)
+{
+	if (!spacePartitioningEnabled() || !canSendCellHandoff(channel) ||
+		!Components::getSingleton().isExpectedComponentChannel(CELLAPP_TYPE, channel))
+		return;
+	if (!process)
+	{
+		auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		bundle->newMessage(CellappInterface::onTeleportPeerProcess);
+		(*bundle) << CellRecovery::recoveryProcessID();
+		channel->send(bundle);
+		return;
+	}
+	const auto peer = teleportPeers_.find(channel->componentID());
+	if (peer != teleportPeers_.end() && peer->second.session == channel->sessionEpoch() &&
+		!peer->second.process)
+		peer->second.process = process;
+}
+
+void Cellapp::onTeleportDispatchPermission(Network::Channel* channel, MemoryStream& stream)
+{
+	BoundedStreamReader reader(stream);
+	ENTITY_ID id = 0;
+	TeleportStatus::Dispatch route;
+	uint8 accepted = 0;
+	const bool parsed = reader.read(id) && route.read(reader) && reader.read(accepted) && accepted <= 1 && reader.empty();
+	stream.done();
+	auto& components = Components::getSingleton();
+	if (!parsed || !canSendCellHandoff(channel) ||
+		!components.isExpectedComponentChannel(BASEAPP_TYPE, channel))
+		return;
+	const auto it = pendingTeleportDispatches_.find(id);
+	if (it == pendingTeleportDispatches_.end())
+		return;
+	const auto pending = it->second;
+	if (pending.base != channel->componentID() || pending.baseSession != channel->sessionEpoch() ||
+		pending.route.epoch != route.epoch || pending.route.target != route.target ||
+		pending.route.origin != route.origin || pending.route.targetProcess != route.targetProcess)
+		return;
+	pendingTeleportDispatches_.erase(it);
+	auto* entity = findEntity(id);
+	if (!entity || entity->isDestroyed() || !entity->isReal() || entity->spaceID() != route.origin ||
+		!entity->baseEntityCall() || entity->baseEntityCall()->componentID() != pending.base)
+		return;
+	EntityPtr held(entity);
+	if (!accepted)
+	{
+		entity->removeFlags(ENTITY_FLAGS_TELEPORT_START);
+		entity->onTeleportFailure();
+		return;
+	}
+	auto* target = components.findComponentChannel(CELLAPP_TYPE, route.target);
+	if (!isShuttingdown() && timestamp() < pending.deadline && canSendCellHandoff(target) &&
+		target->sessionEpoch() == pending.targetSession &&
+		entity->dispatchTeleport(pending.targetEntity, route.target, pending.pos, pending.dir, route.epoch))
+		return;
+	if (!entity->isDestroyed())
+		cancelTeleportDispatch(*entity, pending);
+}
+
+void Cellapp::cancelTeleportDispatch(Entity& entity, const PendingTeleportDispatch& pending)
+{
+	// 未向目标发送快照，复用源端回滚确认，避免 Base 留着已经取消的迁移。
+	auto cancelled = std::make_unique<OutgoingTeleport>();
+	cancelled->target = pending.route.target;
+	cancelled->base = pending.base;
+	cancelled->epoch = pending.route.epoch;
+	cancelled->restored = true;
+	cancelled->checkAt = timestamp() + stampsPerSecond();
+	entity.routingEpoch(pending.route.epoch);
+	outgoingTeleports_.emplace(entity.id(), std::move(cancelled));
+	auto* base = Components::getSingleton().findComponentChannel(BASEAPP_TYPE, pending.base);
+	sendTeleportBase(base, BaseappInterface::onMigrationCellappEnd, entity.id(),
+		componentID_, componentID_, pending.route.epoch, entity.spaceID());
 }
 
 void Cellapp::trackTeleportSource(Entity& entity, COMPONENT_ID target, uint64 session, MemoryStream& snapshot)
@@ -3465,6 +3685,23 @@ void Cellapp::retryTeleports()
 	const uint64 now = timestamp();
 	nextTeleportRetry_ = now + stampsPerSecond();
 	auto& components = Components::getSingleton();
+	for (auto it = pendingTeleportDispatches_.begin(); it != pendingTeleportDispatches_.end();)
+	{
+		if (now < it->second.deadline)
+		{
+			sendPendingTeleportDispatch(it->first, it->second);
+			++it;
+			continue;
+		}
+		const auto id = it->first;
+		const auto pending = it->second;
+		it = pendingTeleportDispatches_.erase(it);
+		auto* entity = findEntity(id);
+		if (entity && !entity->isDestroyed() && entity->isReal() &&
+			entity->spaceID() == pending.route.origin && entity->baseEntityCall() &&
+			entity->baseEntityCall()->componentID() == pending.base)
+			cancelTeleportDispatch(*entity, pending);
+	}
 	for (auto& [attempt, retryAt] : acceptedCellOnlyTeleports_)
 	{
 		if (now < retryAt)

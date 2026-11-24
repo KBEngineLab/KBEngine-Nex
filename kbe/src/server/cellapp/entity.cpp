@@ -4285,18 +4285,27 @@ void Entity::teleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Dir
 		}
 	}
 
-	onTeleportRefEntityCall(nearbyMBRef, pos, dir);
+	auto& app = Cellapp::getSingleton();
+	const bool started = app.spacePartitioningEnabled() && baseEntityCall() ?
+		app.requestTeleportDispatch(*this, *nearbyMBRef, pos, dir) :
+		dispatchTeleport(nearbyMBRef->id(), nearbyMBRef->componentID(), pos, dir);
+	if (!started && !isDestroyed())
+		onTeleportFailure();
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Direction3D& dir)
+bool Entity::dispatchTeleport(ENTITY_ID targetEntity, COMPONENT_ID target, const Position3D& pos,
+	const Direction3D& dir, uint64 epoch)
 {
+	auto* channel = Components::getSingleton().findComponentChannel(CELLAPP_TYPE, target);
+	if (!channel || channel->isDestroyed() || channel->condemn() != 0)
+		return false;
+	const uint64 session = channel->sessionEpoch();
 	const uint64 serializeStart = scriptStageStartStamps();
-	// 我们需要将entity打包发往目的cellapp
 	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(CellappInterface::reqTeleportToCellApp);
 	(*pBundle) << id();
-	(*pBundle) << nearbyMBRef->id();
+	(*pBundle) << targetEntity;
 	(*pBundle) << spaceID();
 	(*pBundle) << pScriptModule()->getUType();
 	(*pBundle) << pos.x << pos.y << pos.z;
@@ -4311,11 +4320,11 @@ void Entity::onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, D
 
 	try
 	{
-		changeToGhost(nearbyMBRef->componentID(), *s);
+		changeToGhost(target, *s, epoch);
 	}
 	catch (MemoryStreamWriteOverflow & err)
 	{
-		ERROR_MSG(fmt::format("{}::onTeleportRefEntityCall({}): {}\n",
+		ERROR_MSG(fmt::format("{}::dispatchTeleport({}): {}\n",
 			scriptName(), id(), err.what()));
 
 		MemoryStream::reclaimPoolObject(s);
@@ -4323,8 +4332,7 @@ void Entity::onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, D
 		scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_SERIALIZE,
 			scriptStageDurationNanos(serializeStart), true, scriptName());
 		Entity::bufferCallback(false);
-		onTeleportFailure();
-		return;
+		return false;
 	}
 
 	(*pBundle).append(s);
@@ -4332,26 +4340,26 @@ void Entity::onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, D
 		scriptStageDurationNanos(serializeStart), true, scriptName());
 
 	const uint64 forwardStart = scriptStageStartStamps();
-	auto* channel = nearbyMBRef->getChannel();
-	const uint64 session = channel ? channel->sessionEpoch() : 0;
-	if (!channel || channel->isDestroyed() || channel->condemn() != 0)
+	channel = Components::getSingleton().findComponentChannel(CELLAPP_TYPE, target);
+	const bool sent = channel && !channel->isDestroyed() && channel->condemn() == 0 &&
+		channel->sessionEpoch() == session;
+	if (!sent)
 	{
 		Network::Bundle::reclaimPoolObject(pBundle);
 		changeToReal(0, *s);
 		restoreProximitys();
-		onTeleportFailure();
 	}
 	else
 	{
-		// 同一线程核对连接后入队，只有入队后才让 Base 等待传送结果。
 		channel->send(pBundle);
-		Cellapp::getSingleton().trackTeleportSource(*this, nearbyMBRef->componentID(), session, *s);
+		Cellapp::getSingleton().trackTeleportSource(*this, target, session, *s);
 	}
 	MemoryStream::reclaimPoolObject(s);
 	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_FORWARD,
 		scriptStageDurationNanos(forwardStart), true, scriptName());
 
 	Entity::bufferCallback(false);
+	return sent;
 }
 
 //-------------------------------------------------------------------------------------
@@ -4424,7 +4432,8 @@ void Entity::teleportLocal(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3
 void Entity::teleport(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& dir)
 {
 	// 当前目标仍在等 BaseApp 确认，不能先行离开本次交接的 Space。
-	if (isCellHandoffTarget())
+	if (isCellHandoffTarget() || (Cellapp::getSingleton().spacePartitioningEnabled() &&
+		hasFlags(ENTITY_FLAGS_TELEPORT_START)))
 	{
 		onTeleportFailure();
 		return;
@@ -4971,7 +4980,7 @@ void Entity::onUpdateGhostVolatileData(KBEngine::MemoryStream& s)
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s, uint64 handoffEpoch)
+void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s, uint64 epoch, bool handoff)
 {
 	// 一个entity要转变为ghost
 	// 首先需要设置自身的realCell
@@ -4981,9 +4990,8 @@ void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s, uin
 	KBE_ASSERT(isReal() == true && "Entity::changeToGhost(): not is real.\n");
 	KBE_ASSERT(realCell > 0 && realCell != g_componentID);
 
-	const bool handoff = handoffEpoch != 0;
 	const uint64 latestEpoch = std::max(routingEpoch_, cellHandoffEpoch_);
-	const uint64 nextEpoch = handoff ? handoffEpoch :
+	const uint64 nextEpoch = epoch ? epoch :
 		(latestEpoch == std::numeric_limits<uint64>::max() ? 1 : latestEpoch + 1);
 	// 快照完整后再停止源实体；写入失败不能改变路由或取消控制器。
 	addToStream(s, nextEpoch, handoff);
@@ -5080,7 +5088,7 @@ void Entity::completeCellHandoff()
 }
 
 //-------------------------------------------------------------------------------------
-uint64 Entity::reserveCellHandoffEpoch()
+uint64 Entity::reserveRoutingEpoch()
 {
 	const uint64 previous = std::max(routingEpoch_, cellHandoffEpoch_);
 	if (previous == std::numeric_limits<uint64>::max())

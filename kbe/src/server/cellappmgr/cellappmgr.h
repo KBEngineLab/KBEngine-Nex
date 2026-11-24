@@ -27,6 +27,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <set>
 #include "server/kbemain.h"
+#include "server/cell_process_watch.h"
 #include "server/serverapp.h"
 #include "server/idallocate.h"
 #include "server/serverconfig.h"
@@ -75,7 +76,7 @@ public:
 	void finalise();
 
 	/** 找出一个最空闲的cellapp */
-	COMPONENT_ID findFreeCellapp(void);
+	COMPONENT_ID findFreeCellapp(SPACE_ID spaceID = 0, const SpaceLayout::Transaction* replacement = nullptr);
 	void updateBestCellapp();
 
 	/** 网络接口
@@ -111,11 +112,12 @@ public:
 	bool componentReady(COMPONENT_ID cid);
 	bool spacePartitioningEnabled() const;
 	uint32 spacePartitioningConfirmedApps() const;
-	void reportSpacePartitioningMode(Network::Channel* pChannel, COMPONENT_ID cid, uint8 mode);
+	void reportSpacePartitioningMode(Network::Channel* pChannel, COMPONENT_ID cid, uint8 mode,
+		uint32 pid, uint64 processStart, uint64 pidNamespace, uint64 process);
 	void onSpaceLayoutRequest(Network::Channel* pChannel, MemoryStream& stream);
+	void reqCellRecoveryScope(Network::Channel* channel, MemoryStream& stream);
 	uint64 managedSpaceCount() const { return spaceLayouts_.size(); }
 
-	void removeCellapp(COMPONENT_ID cid);
 	Cellapp& getCellapp(COMPONENT_ID cid);
 	std::map< COMPONENT_ID, Cellapp >& cellapps();
 	uint32 readyForLoginApps();
@@ -169,7 +171,34 @@ protected:
 	void failSpaceLayout(SPACE_ID spaceID, SpaceLayout::Transaction& transaction,
 		const std::string& error, bool suspend);
 	void updateSpaceLayouts();
-	void onSpaceLayoutCellLost(COMPONENT_ID cid);
+	bool updateCellReplacement(SPACE_ID spaceID, SpaceLayout::Transaction& transaction, uint64 now);
+	void checkCellReplacement(SPACE_ID spaceID, SpaceLayout::Transaction& transaction, uint64 now);
+	void cancelCellReplacement(SPACE_ID spaceID, SpaceLayout::Transaction& transaction, const char* reason);
+	uint64 preparedCellReplacements() const;
+	void removeCellapp(COMPONENT_ID cid, uint64 session);
+	void onSpaceLayoutCellLost(COMPONENT_ID cid, uint64 session);
+	void watchPartitionCell(Network::Channel& channel, const Components::ComponentInfos& source,
+		const CellRecovery::ProcessIdentity& identity, uint64 process);
+	void notifyCellProcessExit(COMPONENT_ID cid, uint64 process);
+	void checkLostPartitionCells();
+	uint64 lostPartitionCellsWaiting() const;
+	uint64 lostPartitionCellsExited() const;
+
+	struct PartitionCellProcess
+	{
+		uint64 session = 0;
+		uint64 process = 0;
+		std::unique_ptr<CellRecovery::ProcessWatch> watch;
+	};
+
+	struct LostPartitionCell
+	{
+		uint64 session = 0;
+		uint64 process = 0;
+		std::map<SPACE_ID, uint64> layouts;
+		std::unique_ptr<CellRecovery::ProcessWatch> watch;
+		bool exited = false;
+	};
 
 	TimerHandle							gameTimer_;
 	ForwardAnywhere_MessageBuffer		forward_anywhere_cellapp_messagebuffer_;
@@ -183,7 +212,13 @@ protected:
 	// 尚无可用 CellApp 时仍需保留编号，避免重复恢复请求绕过单区域限制。
 	std::set<SPACE_ID>					queuedSpaceIDs_;
 	std::map<SPACE_ID, SpaceLayout::Transaction> spaceLayouts_;
+	// 只保留涉及 Cell 退出的已关闭 Space 编号，供稍后收到的 Base 查询使用。
+	std::set<SPACE_ID> closedSpacesWithCellLoss_;
+	std::map<COMPONENT_ID, PartitionCellProcess> partitionCellProcesses_;
+	std::map<COMPONENT_ID, LostPartitionCell> lostPartitionCells_;
+	std::map<std::pair<COMPONENT_ID, uint64>, std::unique_ptr<CellRecovery::ProcessWatch>> disconnectedCellProcesses_;
 	uint64 nextSpaceLayoutCheck_ = 0;
+	SPACE_ID lastReplacementSpaceChecked_ = 0;
 
 	// 通过工具查看space
 	SpaceViewers						spaceViewers_;

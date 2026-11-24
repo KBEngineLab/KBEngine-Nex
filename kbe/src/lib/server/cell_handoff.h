@@ -32,11 +32,13 @@ struct Route
 	uint64 epoch = 0;
 	uint32 sourcePid = 0;
 	uint32 targetPid = 0;
+	SPACE_ID space = 0;
+	uint64 layoutVersion = 0;
 
 	bool sameAttempt(const Route& other) const
 	{
 		return source == other.source && target == other.target && epoch == other.epoch &&
-			sourcePid == other.sourcePid;
+			sourcePid == other.sourcePid && space == other.space && layoutVersion == other.layoutVersion;
 	}
 
 	bool operator==(const Route& other) const
@@ -47,14 +49,15 @@ struct Route
 	template<class Stream>
 	void write(Stream& stream) const
 	{
-		stream << source << target << epoch << sourcePid << targetPid;
+		stream << source << target << epoch << sourcePid << targetPid << space << layoutVersion;
 	}
 
 	bool read(BoundedStreamReader& reader)
 	{
 		return reader.read(source) && reader.read(target) && reader.read(epoch) &&
-			reader.read(sourcePid) && reader.read(targetPid) &&
-			source != 0 && target != 0 && source != target && epoch != 0 && sourcePid != 0;
+			reader.read(sourcePid) && reader.read(targetPid) && reader.read(space) && reader.read(layoutVersion) &&
+			source != 0 && target != 0 && source != target && epoch != 0 && sourcePid != 0 &&
+			space != 0 && layoutVersion != 0;
 	}
 };
 }

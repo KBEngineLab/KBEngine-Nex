@@ -32,6 +32,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "server/entity_app.h"
 #include "server/forward_messagebuffer.h"
 #include "server/cell_handoff.h"
+#include "server/teleport_status.h"
 
 #include <memory>
 #include <set>
@@ -96,8 +97,11 @@ public:
 	bool autoCellHandoffEnabled() const { return autoCellHandoffEnabled_ && spacePartitioningConfirmed_; }
 	void considerAutoCellHandoff(Space& space, Entity& entity);
 	void onSpaceLayout(Network::Channel* pChannel, MemoryStream& stream);
+	void reqStageRecoveryCellBackup(Network::Channel* channel, MemoryStream& stream);
+	void discardStagedRecoveryBackups(SPACE_ID space, uint64 version) { stagedRecoveryBackups_.erase(space, version); }
 	void onBoundaryGhost(Network::Channel* pChannel, MemoryStream& stream);
 	bool sendSpaceLayout(const SpaceLayout::Packet& packet);
+	bool sendSpaceLayout(const SpaceLayout::Packet& packet, Network::Channel* channel);
 	void requestSpaceLayoutShutdown(Space& space);
 	bool publishSpaceResources(const Space& space, SpaceLayout::Resources resources);
 	void publishSpaceData(Space& space, const std::string& key,
@@ -221,6 +225,7 @@ public:
 		base请求获取celldata
 	*/
 	void reqBackupEntityCellData(Network::Channel* pChannel, KBEngine::MemoryStream& s);
+	void reqRecoveryCellBackup(Network::Channel* channel, MemoryStream& stream);
 
 	/** 网络接口
 		base请求获取WriteToDB
@@ -281,6 +286,10 @@ public:
 	void reqTeleportToCellAppCheck(Network::Channel* pChannel, MemoryStream& s);
 	void reqTeleportToCellAppPrepare(Network::Channel* pChannel, MemoryStream& s);
 	void reqTeleportToCellAppOver(Network::Channel* pChannel, MemoryStream& s);
+	void onTeleportDispatchPermission(Network::Channel* channel, MemoryStream& stream);
+	void onTeleportPeerProcess(Network::Channel* channel, uint64 process);
+	bool requestTeleportDispatch(Entity& entity, EntityCall& destination, const Position3D& pos,
+		const Direction3D& dir);
 	void trackTeleportSource(Entity& entity, COMPONENT_ID target, uint64 session, MemoryStream& snapshot);
 	bool deferTeleportWitness(Entity& entity, Network::Channel* base);
 
@@ -310,6 +319,27 @@ protected:
 	void retryCellHandoffMessages();
 	void retryTeleports();
 	void restoreTeleportSource(ENTITY_ID id, COMPONENT_ID target, uint64 epoch);
+	struct PendingTeleportDispatch
+	{
+		TeleportStatus::Dispatch route;
+		ENTITY_ID targetEntity = 0;
+		COMPONENT_ID base = 0;
+		uint64 baseSession = 0;
+		uint64 targetSession = 0;
+		uint64 deadline = 0;
+		Position3D pos;
+		Direction3D dir;
+	};
+	std::map<ENTITY_ID, PendingTeleportDispatch> pendingTeleportDispatches_;
+	struct TeleportPeer
+	{
+		uint64 session = 0;
+		uint64 process = 0;
+		uint64 queryAt = 0;
+	};
+	std::map<COMPONENT_ID, TeleportPeer> teleportPeers_;
+	void sendPendingTeleportDispatch(ENTITY_ID id, PendingTeleportDispatch& pending);
+	void cancelTeleportDispatch(Entity& entity, const PendingTeleportDispatch& pending);
 	struct OutgoingTeleport
 	{
 		COMPONENT_ID target = 0;
@@ -333,8 +363,6 @@ protected:
 	{
 		CellHandoff::Route route;
 		COMPONENT_ID base = 0;
-		SPACE_ID space = 0;
-		uint64 layoutVersion = 0;
 		uint64 session = 0;
 		uint64 checkAt = 0;
 		MemoryStream snapshot;
@@ -393,6 +421,8 @@ protected:
 	bool								spacePartitioningConfirmed_;
 	bool								spacePartitioningRejected_;
 	uint64								spacePartitioningRequestTime_;
+	CellRecovery::StagedBackups			stagedRecoveryBackups_;
+	uint64 stagedRecoveryBackups() const { return stagedRecoveryBackups_.size(); }
 };
 
 }

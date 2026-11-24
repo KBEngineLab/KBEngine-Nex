@@ -166,6 +166,21 @@ void Cellappmgr::onRegisterNewApp(Network::Channel* pChannel,
 	uint32 intaddr, uint16 intport, uint32 extaddr, uint16 extport,
 	std::string& extaddrEx)
 {
+	if (componentType == CELLAPP_TYPE && (lostPartitionCells_.count(componentID) ||
+		std::any_of(spaceLayouts_.begin(), spaceLayouts_.end(), [componentID](const auto& entry)
+		{
+			const auto& committed = entry.second.committedReplacement;
+			return committed && committed->lost == componentID;
+		})))
+	{
+		// 暂停的布局仍引用旧进程，不能让重用编号的新进程收到发给旧 Cell 的消息。
+		WARNING_MSG(fmt::format("Cellappmgr::onRegisterNewApp: CellApp({}) is still referenced by a suspended layout.\n",
+			componentID));
+		if (pChannel)
+			pChannel->condemn("registration reuses a suspended CellApp ID");
+		return;
+	}
+
 	if (!registerNewApp(pChannel, uid, username, componentType, componentID,
 		globalorderID, grouporderID, intaddr, intport, extaddr, extport, extaddrEx))
 	{
@@ -245,6 +260,9 @@ bool Cellappmgr::initializeWatcher()
 	WATCH_OBJECT("spacePartitioning/enabled", this, &Cellappmgr::spacePartitioningEnabled);
 	WATCH_OBJECT("spacePartitioning/confirmedApps", this, &Cellappmgr::spacePartitioningConfirmedApps);
 	WATCH_OBJECT("spacePartitioning/managedSpaces", this, &Cellappmgr::managedSpaceCount);
+	WATCH_OBJECT("cellRecovery/waitingForExit", this, &Cellappmgr::lostPartitionCellsWaiting);
+	WATCH_OBJECT("cellRecovery/confirmedExits", this, &Cellappmgr::lostPartitionCellsExited);
+	WATCH_OBJECT("cellRecovery/preparedReplacements", this, &Cellappmgr::preparedCellReplacements);
 	WATCH_OBJECT("allocation/confirmedSpaces", this, &Cellappmgr::confirmedSpaceCount);
 	WATCH_OBJECT("allocation/pendingSpaces", this, &Cellappmgr::pendingSpaceCount);
 	WATCH_OBJECT("allocation/minAssignedSpaces", this, &Cellappmgr::minAssignedSpaceCount);
@@ -258,9 +276,9 @@ bool Cellappmgr::initializeWatcher()
 }
 
 //-------------------------------------------------------------------------------------
-void Cellappmgr::removeCellapp(COMPONENT_ID cid)
+void Cellappmgr::removeCellapp(COMPONENT_ID cid, uint64 session)
 {
-	onSpaceLayoutCellLost(cid);
+	onSpaceLayoutCellLost(cid, session);
 	std::map< COMPONENT_ID, Cellapp >::iterator iter = cellapps_.find(cid);
 	if (iter != cellapps_.end())
 	{
@@ -319,14 +337,15 @@ void Cellappmgr::handleTimeout(TimerHandle handle, void * arg)
 //-------------------------------------------------------------------------------------
 void Cellappmgr::onChannelDeregister(Network::Channel * pChannel)
 {
-	// 如果是app死亡了
+	// 连接注销不代表进程已经退出。
 	if(pChannel->isInternal())
 	{
 		Components::ComponentInfos* cinfo = Components::getSingleton().findComponent(pChannel);
 		if(cinfo)
 		{
 			cinfo->state = COMPONENT_STATE_STOP;
-			removeCellapp(cinfo->cid);
+			if (cinfo->componentType == CELLAPP_TYPE)
+				removeCellapp(cinfo->cid, pChannel->sessionEpoch());
 		}
 	}
 
@@ -437,8 +456,23 @@ void Cellappmgr::forwardMessage(Network::Channel* pChannel, MemoryStream& s)
 }
 
 //-------------------------------------------------------------------------------------
-COMPONENT_ID Cellappmgr::findFreeCellapp(void)
+COMPONENT_ID Cellappmgr::findFreeCellapp(SPACE_ID spaceID, const SpaceLayout::Transaction* replacement)
 {
+	const auto eligible = [&](COMPONENT_ID id, Cellapp& app)
+	{
+		if ((app.flags() & APP_FLAGS_NOT_PARTCIPATING_LOAD_BALANCING) || app.isDestroyed() ||
+			!app.spacePartitioningConfirmed() || app.initProgress() <= 1.f)
+			return false;
+		if (!replacement)
+			return true;
+		if (replacement->layout.cellForApp(id) || app.hasAssignedSpace(spaceID) || !componentReady(id))
+			return false;
+		const auto rejected = replacement->rejectedReplacements.find(id);
+		if (rejected == replacement->rejectedReplacements.end())
+			return true;
+		const auto* channel = Components::getSingleton().findComponentChannel(CELLAPP_TYPE, id);
+		return channel && channel->sessionEpoch() != rejected->second;
+	};
 	std::map< COMPONENT_ID, Cellapp >::iterator iter;
 	COMPONENT_ID cid = 0;
 	std::size_t appCount = 0;
@@ -447,12 +481,8 @@ COMPONENT_ID Cellappmgr::findFreeCellapp(void)
 
 	for (iter = cellapps_.begin(); iter != cellapps_.end(); ++iter)
 	{
-		if ((iter->second.flags() & APP_FLAGS_NOT_PARTCIPATING_LOAD_BALANCING) > 0 ||
-			iter->second.isDestroyed() || !iter->second.spacePartitioningConfirmed() ||
-			iter->second.initProgress() <= 1.f)
-		{
+		if (!eligible(iter->first, iter->second))
 			continue;
-		}
 
 		++appCount;
 		totalAssignedSpaces += iter->second.assignedSpaces();
@@ -465,12 +495,7 @@ COMPONENT_ID Cellappmgr::findFreeCellapp(void)
 
 	for (iter = cellapps_.begin(); iter != cellapps_.end(); ++iter)
 	{
-		if ((iter->second.flags() & APP_FLAGS_NOT_PARTCIPATING_LOAD_BALANCING) > 0)
-			continue;
-		
-		// 首先进程必须活着且初始化完毕
-		if(!iter->second.isDestroyed() && iter->second.spacePartitioningConfirmed() &&
-			iter->second.initProgress() > 1.f)
+		if (eligible(iter->first, iter->second))
 		{
 			const std::size_t assignedSpaces = iter->second.assignedSpaces();
 			if (!cellappPlacementWithinSkew(
@@ -533,7 +558,7 @@ bool Cellappmgr::spacePartitioningEnabled() const
 //-------------------------------------------------------------------------------------
 bool Cellappmgr::spaceAssigned(SPACE_ID spaceID)
 {
-	if (queuedSpaceIDs_.find(spaceID) != queuedSpaceIDs_.end())
+	if (spaceLayouts_.count(spaceID) || queuedSpaceIDs_.find(spaceID) != queuedSpaceIDs_.end())
 		return true;
 	for (auto& entry : cellapps_)
 	{
@@ -557,7 +582,7 @@ uint32 Cellappmgr::spacePartitioningConfirmedApps() const
 
 //-------------------------------------------------------------------------------------
 void Cellappmgr::reportSpacePartitioningMode(Network::Channel* pChannel,
-	COMPONENT_ID cid, uint8 mode)
+	COMPONENT_ID cid, uint8 mode, uint32 pid, uint64 processStart, uint64 pidNamespace, uint64 process)
 {
 	Components::ComponentInfos* source = Components::getSingleton().findComponent(CELLAPP_TYPE, cid);
 	auto iter = cellapps_.find(cid);
@@ -580,6 +605,8 @@ void Cellappmgr::reportSpacePartitioningMode(Network::Channel* pChannel,
 	}
 	else
 	{
+		if (spacePartitioningEnabled())
+			watchPartitionCell(*pChannel, *source, {pid, processStart, pidNamespace}, process);
 		INFO_MSG(fmt::format("Cellappmgr::reportSpacePartitioningMode: confirmed CellApp({}), enabled={}.\n",
 			cid, spacePartitioningEnabled()));
 	}
@@ -868,6 +895,17 @@ void Cellappmgr::reqRestoreSpaceInCell(Network::Channel* pChannel, MemoryStream&
 			"Cellappmgr::reqRestoreSpaceInCell: spacePartitioning is disabled, Space({}) is already assigned.\n",
 			spaceID));
 		Network::Bundle* failure = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		failure->newMessage(BaseappInterface::onCreateCellFailure);
+		BaseappInterface::onCreateCellFailureArgs1::staticAddToBundle(*failure, id);
+		pChannel->send(failure);
+		s.done();
+		return;
+	}
+	if (spacePartitioningEnabled() && (spaceLayouts_.count(spaceID) || closedSpacesWithCellLoss_.count(spaceID)))
+	{
+		WARNING_MSG(fmt::format("Cellappmgr::reqRestoreSpaceInCell: refusing legacy restoration of managed Space({}).\n",
+			spaceID));
+		auto* failure = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		failure->newMessage(BaseappInterface::onCreateCellFailure);
 		BaseappInterface::onCreateCellFailureArgs1::staticAddToBundle(*failure, id);
 		pChannel->send(failure);

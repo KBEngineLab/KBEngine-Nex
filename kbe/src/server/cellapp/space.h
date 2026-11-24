@@ -29,6 +29,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "common/smartpointer.h"
 #include "pyscript/scriptobject.h"
 #include "navigation/navigation_handle.h"
+#include "network/address.h"
+#include "server/cell_recovery.h"
 #include "server/space_layout.h"
 
 namespace KBEngine{
@@ -120,6 +122,21 @@ public:
 	const std::string& layoutError() const { return layoutError_; }
 	bool hasManagedCell() const { return layoutPinned_; }
 	bool isLayoutReplica() const { return layoutReplica_; }
+	bool isPreparingReplacement() const { return replacementTemporary_; }
+	bool isRecoveryTarget() const { return replacedCellApp_ != 0; }
+	bool isCheckingReplacement() const { return replacementCheckVersion_ != 0; }
+	Network::Channel* replacementManagerChannel() const;
+	void bindReplacementManager(const Network::Channel& channel, const SpaceLayout::Packet& packet);
+	bool canStageRecovery(const CellRecovery::StageKey& key) const;
+	bool matchesRecovery(const CellRecovery::StageKey& key) const;
+	enum class RecoveryInstallResult { Rejected, Installed, Busy };
+	RecoveryInstallResult installRecoveryEntity(const CellRecovery::StageKey& key, COMPONENT_ID base, uint64 baseProcess,
+		ENTITY_SCRIPT_UID type, uint64 routingEpoch, bool ownsSpace, const std::string& data);
+	bool finishRecoveryEntity(const CellRecovery::StageKey& key, COMPONENT_ID base, uint64 baseProcess,
+		bool activate, bool hasClient);
+	bool checkReplacement(const SpaceLayout::Packet& packet);
+	bool commitReplacement(const SpaceLayout::Packet& packet, Network::Channel* manager);
+	void cancelReplacementCheck(uint64 version);
 	bool layoutShutdownRequested() const { return layoutShutdownRequested_; }
 	void markLayoutShutdownRequested() { layoutShutdownRequested_ = true; }
 	bool canChangeSpaceResources() const;
@@ -151,7 +168,11 @@ public:
 
 	bool isDestroyed() const{ return state_ == STATE_DESTROYED; }
 	bool isGood() const{ return state_ == STATE_NORMAL; }
-	bool canAcceptEntities() const { return isGood() && !layoutShutdownRequested_ && !layoutRemovalPending_; }
+	bool canAcceptEntities() const
+	{
+		return isGood() && !layoutShutdownRequested_ && !layoutRemovalPending_ &&
+			!isPreparingReplacement() && !replacementCheckVersion_;
+	}
 	// 未提交迁移实体持有 Space 生命周期租约，脚本清理必须等待 BaseApp 完成路由切换。
 	// Uncommitted migration Targets lease the Space lifetime until BaseApp completes the route switch.
 	bool hasPendingMigrationEntities(bool includeSources = false) const;
@@ -222,6 +243,21 @@ protected:
 	bool						layoutShutdownRequested_ = false;
 	bool						layoutRemovalPending_ = false;
 	uint64						layoutStarted_ = 0;
+	Network::Address			replacementManagerAddress_;
+	uint64						replacementManagerSession_ = 0;
+	COMPONENT_ID				replacedCellApp_ = 0;
+	uint64						replacedLayoutVersion_ = 0;
+	uint64						replacementCheckVersion_ = 0;
+	bool						replacementTemporary_ = false;
+	struct RecoveryInstallation
+	{
+		COMPONENT_ID base;
+		uint64 baseProcess;
+		EntityPtr entity;
+		bool activated = false;
+	};
+	std::map<ENTITY_ID, RecoveryInstallation> recoveryInstallations_;
+	size_t pendingRecoveryActivations_ = 0;
 	bool						geometryShouldLoad_ = false;
 	std::map<int, std::string>	geometryParams_;
 };

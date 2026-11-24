@@ -20,6 +20,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "baseapp.h"
 #include "entity.h"
+#include "server/cell_backup.h"
+#include "server/component_routing_guard.h"
 #include "server/teleport_status.h"
 #include "profile.h"
 #include "entity_messages_forward_handler.h"
@@ -41,6 +43,18 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "../../server/dbmgr/dbmgr_interface.h"
 
 namespace KBEngine{
+
+namespace
+{
+bool isCurrentCellChannel(Network::Channel* channel, const EntityCall* cell)
+{
+	if (!cell || !channel || !channel->isInternal() || channel->isDestroyed() || channel->condemn() != 0)
+		return false;
+	const auto id = cell->componentID();
+	auto* peer = Components::getSingleton().findComponent(CELLAPP_TYPE, id);
+	return Security::isBoundBidirectionalComponentSource(id, peer, channel, channel->componentID());
+}
+}
 
 ENTITY_METHOD_DECLARE_BEGIN(Baseapp, Entity)
 SCRIPT_METHOD_DECLARE("createCellEntity",				createCellEntity,				METH_VARARGS,			0)
@@ -646,7 +660,7 @@ bool Entity::destroyCellEntity(void)
 		return false;																					
 	}
 
-	if (cellHandoffAction_ != CellHandoff::NONE || migrationEpoch_)
+	if (cellHandoffAction_ != CellHandoff::NONE || migrationEpoch_ || partitionRestorePending_)
 	{
 		// 迁移结束后再销毁当前 Real，避免销毁请求发到旧路由。
 		destroyCellAfterHandoff_ = true;
@@ -1135,6 +1149,10 @@ void Entity::onGetCell(Network::Channel* pChannel, COMPONENT_ID componentID)
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
 	creatingCell_ = false;
+	lostPartitionReal_.reset();
+	// 在线 Proxy 可能已在客户端进场回调里建立 Cell 引用。
+	if (!cellEntityCall_ || !cellBackupGeneration_)
+		resetRecoveryCellBackup();
 
 	// 删除cellData属性
 	destroyCellData();
@@ -1171,17 +1189,25 @@ void Entity::onLoseCell(Network::Channel* pChannel, MemoryStream& s)
 		((cellHandoffAction_ != CellHandoff::NONE || migrationEpoch_) && cellEntityCall() &&
 			pChannel->componentID() != cellEntityCall()->componentID()))
 		return;
-	
+	loseCell();
+}
+
+void Entity::loseCell()
+{
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	// onLoseCell 可以在脚本中销毁自身；外层引用覆盖回调后的标志检查和自动销毁分支。
-	// onLoseCell may destroy itself in script; the outer reference covers the subsequent flag check and automatic-destroy branch.
 	Py_INCREF(this);
 
 	S_RELEASE(cellEntityCall_);
+	cancelPartitionRestore();
+	lostPartitionReal_.reset();
+	resetRecoveryCellBackup();
 
 	cellHandoffAction_ = CellHandoff::NONE;
 	cellHandoffRoute_ = {};
 	cellHandoffWarningAt_ = 0;
+	cellHandoffSourceExited_ = false;
+	cellHandoffTargetLoss_.reset();
 	destroyCellAfterHandoff_ = false;
 	resetTeleport();
 	completedMigrationEpoch_ = 0;
@@ -1222,6 +1248,12 @@ void Entity::onRestore()
 //-------------------------------------------------------------------------------------
 void Entity::reqBackupCellData()
 {
+	if (ServerConfig::getSingleton().getCellAppMgr().cellappmgr_space_partitioning_enabled)
+	{
+		requestRecoveryCellBackup();
+		return;
+	}
+
 	if(isGetingCellData_)
 		return;
 
@@ -1235,6 +1267,106 @@ void Entity::reqBackupCellData()
 	sendToCellapp(pBundle);
 
 	isGetingCellData_ = true;
+}
+
+void Entity::resetRecoveryCellBackup()
+{
+	++cellBackupGeneration_;
+	recoveryCellBackup_.reset();
+}
+
+void Entity::requestRecoveryCellBackup()
+{
+	if (!spaceID() || !cellBackupGeneration_ || !cellEntityCall() ||
+		hasPendingCellTransfer() || lostPartitionReal_)
+		return;
+
+	auto* channel = Components::getSingleton().findComponentChannel(CELLAPP_TYPE, cellEntityCall()->componentID());
+	if (!channel || channel->isDestroyed() || channel->condemn() != 0)
+		return;
+	const auto now = timestamp();
+	const auto cell = cellEntityCall()->componentID();
+	const auto session = channel->sessionEpoch();
+	if (!recoveryCellBackup_ || !recoveryCellBackup_->owns(cell, session, spaceID(), cellBackupGeneration_))
+	{
+		recoveryCellBackup_ = std::make_unique<CellRecovery::CellBackup>();
+		recoveryCellBackup_->cell = cell;
+		recoveryCellBackup_->session = session;
+		recoveryCellBackup_->space = spaceID();
+		recoveryCellBackup_->generation = cellBackupGeneration_;
+	}
+	auto& backup = *recoveryCellBackup_;
+	if (backup.request && now < backup.retryAt)
+		return;
+
+	// 请求编号不随 Entity 重建而重用；一次迟到的回包不能结束下一次等待。
+	static uint64 nextRequest = 0;
+	backup.request = ++nextRequest;
+	backup.retryAt = now + 5 * stampsPerSecond();
+	auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	bundle->newMessage(CellappInterface::reqRecoveryCellBackup);
+	(*bundle) << id();
+	backup.stamp().write(*bundle);
+	(*bundle) << static_cast<uint8>(!backup.data.empty());
+	if (!backup.data.empty())
+		CellRecovery::writeBackupDigest(*bundle, backup.digest);
+	channel->send(bundle);
+}
+
+void Entity::onRecoveryCellBackup(Network::Channel& channel, MemoryStream& stream)
+{
+	BoundedStreamReader reader(stream);
+	CellRecovery::BackupStamp stamp;
+	uint8 full = 0;
+	const auto matches = [&]()
+	{
+		const auto* cell = cellEntityCall();
+		return !isDestroyed() && cell && !lostPartitionReal_ && !hasPendingCellTransfer() &&
+			spaceID() == stamp.space && cellBackupGeneration_ == stamp.generation &&
+			&channel == Components::getSingleton().findComponentChannel(CELLAPP_TYPE, cell->componentID()) &&
+			recoveryCellBackup_ &&
+			recoveryCellBackup_->matches(cell->componentID(), channel.sessionEpoch(), stamp);
+	};
+	if (!stamp.read(reader) || !reader.read(full) || full > 1 || !matches())
+		return;
+	if (!full)
+	{
+		if (reader.empty() && !recoveryCellBackup_->data.empty())
+			recoveryCellBackup_->request = 0;
+		return;
+	}
+
+	CellRecovery::BackupDigest digest;
+	if (!CellRecovery::readBackupDigest(reader, digest) || reader.empty())
+		return;
+	stream.read_skip(stream.length() - reader.remaining());
+	const auto* data = stream.data() + stream.rpos();
+	const auto length = stream.length();
+	std::unique_ptr<PyObject, decltype(&Py_DecRef)> decoded(nullptr, Py_DecRef);
+	try
+	{
+		decoded.reset(createCellDataFromStream(&stream, true));
+	}
+	catch (const MemoryStreamException&)
+	{
+		// 截断的属性流不能覆盖上一次备份。
+	}
+	if (!decoded)
+	{
+		SCRIPT_ERROR_CHECK();
+		WARNING_MSG(fmt::format("{}::onRecoveryCellBackup: incomplete Cell data, entity={}.\n", scriptName(), id()));
+		return;
+	}
+	if (!matches())
+		return;
+
+	// 恢复副本不依赖脚本可修改的 cellData，也不随普通存档改写。
+	auto& backup = *recoveryCellBackup_;
+	backup.data.assign(data, data + length);
+	backup.digest = digest;
+	backup.request = 0;
+	installCellDataAttr(decoded.get());
+	setDirty();
 }
 
 //-------------------------------------------------------------------------------------
@@ -1546,6 +1678,7 @@ void Entity::onCellAppDeath()
 {
 	isArchiveing_ = false;
 	isGetingCellData_ = false;
+	resetRecoveryCellBackup();
 	resetTeleport();
 	completedMigrationEpoch_ = 0;
 	migrationWitnessPending_ = false;
@@ -1678,9 +1811,19 @@ void Entity::onTeleportCB(Network::Channel* pChannel, SPACE_ID spaceID, bool fro
 {
 	if(pChannel->isExternal())
 		return;
+	if (ServerConfig::getSingleton().getCellAppMgr().cellappmgr_space_partitioning_enabled)
+	{
+		if (!isCurrentCellChannel(pChannel, cellEntityCall()))
+			return;
+		// 换图通知可能先于提交确认；故障发生时 Space 必须仍和 Base 的旧路由对应。
+		if (fromCellTeleport && migrationEpoch_)
+			return;
+	}
 	
 	if(spaceID > 0)
 	{
+		if (spaceID != this->spaceID())
+			resetRecoveryCellBackup();
 		if(!fromCellTeleport)
 			onTeleportSuccess(spaceID);
 		else
@@ -1745,21 +1888,158 @@ bool Entity::retryCellHandoff()
 	switch (cellHandoffAction_)
 	{
 	case IDENTIFY_TARGET:
-		sendCellHandoff(id(), route, IDENTIFY_TARGET, route.target, 0);
+		if (!cellHandoffSourceExited_)
+			sendCellHandoff(id(), route, IDENTIFY_TARGET, route.target, 0);
 		return true;
 	case CHECK_TARGET:
-		sendCellHandoff(id(), route, DISPATCH, route.source, route.sourcePid);
+		if (!cellHandoffSourceExited_)
+			sendCellHandoff(id(), route, DISPATCH, route.source, route.sourcePid);
 		sendCellHandoff(id(), route, CHECK_TARGET, route.target, route.targetPid);
 		return true;
 	case RESTORE_SOURCE:
 	case RELEASE_SOURCE:
-		sendCellHandoff(id(), route, cellHandoffAction_, route.source, route.sourcePid);
+		if (!cellHandoffSourceExited_)
+			sendCellHandoff(id(), route, cellHandoffAction_, route.source, route.sourcePid);
 		return true;
 	case FINISH_TARGET:
 		sendCellHandoff(id(), route, FINISH_TARGET, route.target, route.targetPid);
 		return true;
 	default:
 		return retryTeleport();
+	}
+}
+
+void Entity::onPartitionCellExit(const CellRecovery::LostReal& loss)
+{
+	using namespace CellHandoff;
+	const auto& route = cellHandoffRoute_;
+	const auto cid = loss.cellapp;
+	if (isDestroyed() || !cellEntityCall() || !hasCellHandoffWith(cid) || spaceID() != loss.space ||
+		route.space != loss.space || route.layoutVersion != loss.layoutVersion)
+		return;
+
+	const auto current = cellEntityCall()->componentID();
+	if (cid == route.source)
+	{
+		if (cellHandoffSourceExited_)
+			return;
+		cellHandoffSourceExited_ = true;
+		// 目标已确认并接到路由时，不再等已退出的源回包。未切换时仍要等目标确认。
+		if (current == route.target && cellHandoffAction_ == RELEASE_SOURCE)
+			cellHandoffAction_ = FINISH_TARGET;
+	}
+	else if (current == route.source &&
+		(cellHandoffAction_ == IDENTIFY_TARGET || cellHandoffAction_ == CHECK_TARGET ||
+			cellHandoffAction_ == RESTORE_SOURCE))
+	{
+		// 目标进程已退出且从未接到路由，源可以从本轮快照回滚。
+		cellHandoffAction_ = RESTORE_SOURCE;
+	}
+	else if (current == route.target && cellHandoffAction_ == RELEASE_SOURCE)
+	{
+		// 保留退出确认，继续清理源 Ghost。路由已经切换，源快照不能再恢复为 Real。
+		if (!cellHandoffTargetLoss_)
+			cellHandoffTargetLoss_ = std::make_unique<CellRecovery::LostReal>(loss);
+	}
+	else if (current == route.target && cellHandoffAction_ == FINISH_TARGET)
+	{
+		// 源已清理，由 Base 按当前路由处理丢失的 Real。
+		cellHandoffAction_ = NONE;
+		cellHandoffWarningAt_ = 0;
+	}
+	else
+		return;
+
+	INFO_MSG(fmt::format("Baseapp::cellRecovery: reconciling handoff, entity={}, space={}, version={}, "
+		"epoch={}, exited={}, action={}.\n", id(), loss.space, loss.layoutVersion, route.epoch, cid,
+		static_cast<uint8>(cellHandoffAction_)));
+	if (cellHandoffAction_ == FINISH_TARGET && cellHandoffTargetLoss_)
+		finishCellHandoffSourceRelease();
+	else
+		retryCellHandoff();
+}
+
+void Entity::finishCellHandoffSourceRelease()
+{
+	if (auto loss = std::move(cellHandoffTargetLoss_))
+	{
+		cellHandoffAction_ = CellHandoff::NONE;
+		cellHandoffWarningAt_ = 0;
+		Baseapp::getSingleton().recoverPartitionReal(*this, *loss);
+		return;
+	}
+	cellHandoffAction_ = CellHandoff::FINISH_TARGET;
+	cellHandoffWarningAt_ = timestamp() + 5 * stampsPerSecond();
+	retryCellHandoff();
+}
+
+bool Entity::markPartitionRealLost(const CellRecovery::LostReal& loss)
+{
+	if (isDestroyed() || !cellEntityCall() || cellEntityCall()->componentID() != loss.cellapp ||
+		spaceID() != loss.space || hasPendingCellTransfer() || lostPartitionReal_)
+		return false;
+
+	// 此处只记录归属。没有核实备份前，不能清除引用，也不能创建替代实体。
+	lostPartitionReal_ = std::make_unique<CellRecovery::LostReal>(loss);
+	return true;
+}
+
+const std::vector<uint8>* Entity::partitionRecoveryCellData(const CellRecovery::LostReal& expected) const
+{
+	const auto* loss = lostPartitionReal_.get();
+	const auto* backup = recoveryCellBackup_.get();
+	const auto* cell = cellEntityCall();
+	// 备份回包能容纳的数据略多于恢复请求。超限时按无可用备份处理，避免留下旧路由。
+	if (isDestroyed() || !cell || cell->componentID() != expected.cellapp || spaceID() != expected.space ||
+		hasPendingCellTransfer() || !loss || !(*loss == expected) || !backup || backup->data.empty() ||
+		backup->data.size() > CellRecovery::MAX_STAGED_BACKUP_BYTES ||
+		!backup->owns(loss->cellapp, loss->cellSession, loss->space, cellBackupGeneration_))
+		return nullptr;
+	return &backup->data;
+}
+
+bool Entity::routeRecoveredCell(const CellRecovery::LostReal& expected, COMPONENT_ID target)
+{
+	if (!partitionRecoveryCellData(expected))
+		return false;
+	cellEntityCall()->componentID(target);
+	lostPartitionReal_.reset();
+	resetRecoveryCellBackup();
+	isGetingCellData_ = false;
+	isArchiveing_ = false;
+	inRestore_ = true;
+	partitionRestorePending_ = true;
+	return true;
+}
+
+void Entity::finishPartitionRestore()
+{
+	if (!partitionRestorePending_)
+		return;
+	partitionRestorePending_ = false;
+	onRestore();
+	if (isDestroyed() || !cellEntityCall())
+		return;
+	if (migrationWitnessPending_)
+	{
+		migrationWitnessPending_ = false;
+		if (clientEntityCall())
+			static_cast<Proxy*>(this)->onGetWitness();
+	}
+	if (destroyCellAfterHandoff_)
+	{
+		destroyCellAfterHandoff_ = false;
+		destroyCellEntity();
+	}
+}
+
+void Entity::cancelPartitionRestore()
+{
+	if (partitionRestorePending_)
+	{
+		partitionRestorePending_ = false;
+		inRestore_ = false;
+		migrationWitnessPending_ = false;
 	}
 }
 
@@ -1782,6 +2062,15 @@ bool Entity::retryTeleport()
 {
 	if (!migrationEpoch_ || !cellEntityCall() || cellEntityCall()->componentID() != migrationAttemptSource_)
 		return false;
+	if (!migrationRollbackPending_ && migrationTargetProcess_ &&
+		Baseapp::getSingleton().hasConfirmedCellProcessExit(migrationAttemptTarget_, migrationTargetProcess_))
+	{
+		// Base 仍指向源 Cell。目标的本轮进程已退出，可以用保存的快照恢复源端。
+		migrationRollbackPending_ = true;
+		migrationWitnessPending_ = true;
+		INFO_MSG(fmt::format("{}::retryTeleport: rolling back after target exit, entity={}, source={}, target={}, epoch={}.\n",
+			scriptName(), id(), migrationAttemptSource_, migrationAttemptTarget_, migrationEpoch_));
+	}
 	const uint64 now = timestamp();
 	if (!migrationWarningAt_)
 		migrationWarningAt_ = now + 5 * stampsPerSecond();
@@ -1831,7 +2120,8 @@ void Entity::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
 	{
 		if (!fromSource || route.targetPid || cellHandoffRoute_.sameAttempt(route))
 			return;
-		if (cellEntityCall()->componentID() != route.source || route.epoch <= cellHandoffRoute_.epoch ||
+		if (cellEntityCall()->componentID() != route.source || spaceID() != route.space ||
+			route.epoch <= cellHandoffRoute_.epoch ||
 			cellHandoffAction_ != NONE || migrationEpoch_ || pBufferedSendToClientMessages_ ||
 			hasFlags(ENTITY_FLAGS_TELEPORT_START) || hasFlags(ENTITY_FLAGS_TELEPORT_STOP))
 		{
@@ -1841,12 +2131,13 @@ void Entity::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
 		}
 		cellHandoffRoute_ = route;
 		cellHandoffAction_ = IDENTIFY_TARGET;
+		cellHandoffSourceExited_ = false;
 		cellHandoffWarningAt_ = timestamp() + 5 * stampsPerSecond();
 		Baseapp::getSingleton().trackCellHandoff(id());
 		retryCellHandoff();
 		return;
 	}
-	if (cellHandoffAction_ == IDENTIFY_TARGET && action == TARGET_IDENTIFIED && fromTarget &&
+	if (cellHandoffAction_ == IDENTIFY_TARGET && !cellHandoffSourceExited_ && action == TARGET_IDENTIFIED && fromTarget &&
 		cellHandoffRoute_.sameAttempt(route) && cellEntityCall()->componentID() == route.source)
 	{
 		cellHandoffRoute_.targetPid = route.targetPid;
@@ -1869,7 +2160,8 @@ void Entity::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
 		{
 			// 切换路由后只重发释放和完成通知，不再恢复源实体。
 			cellEntityCall()->componentID(route.target);
-			cellHandoffAction_ = RELEASE_SOURCE;
+			resetRecoveryCellBackup();
+			cellHandoffAction_ = cellHandoffSourceExited_ ? FINISH_TARGET : RELEASE_SOURCE;
 		}
 		else if ((action == TARGET_REJECTED && fromTarget) || (action == SOURCE_UNSENT && fromSource))
 			cellHandoffAction_ = RESTORE_SOURCE;
@@ -1878,12 +2170,19 @@ void Entity::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
 	}
 	else if (cellHandoffAction_ == RELEASE_SOURCE && current == route.target &&
 		action == SOURCE_RELEASED && fromSource)
-		cellHandoffAction_ = FINISH_TARGET;
+	{
+		finishCellHandoffSourceRelease();
+		return;
+	}
 	else if ((cellHandoffAction_ == FINISH_TARGET && current == route.target &&
 		action == TARGET_FINISHED && fromTarget) ||
 		(cellHandoffAction_ == RESTORE_SOURCE && current == route.source &&
 			action == SOURCE_RESTORED && fromSource))
+	{
+		if (cellHandoffAction_ == RESTORE_SOURCE && recoveryCellBackup_)
+			recoveryCellBackup_->request = 0;
 		cellHandoffAction_ = NONE;
+	}
 	else
 		return;
 
@@ -1894,6 +2193,49 @@ void Entity::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
 		destroyCellEntity();
 	}
 	retryCellHandoff();
+}
+
+void Entity::onMigrationCellappReserve(Network::Channel* channel, MemoryStream& stream)
+{
+	BoundedStreamReader reader(stream);
+	TeleportStatus::Dispatch route;
+	const bool parsed = route.read(reader) && reader.empty();
+	stream.done();
+	if (!parsed || !channel || channel->isExternal() || channel->isDestroyed() || channel->condemn() != 0 ||
+		!ServerConfig::getSingleton().getCellAppMgr().cellappmgr_space_partitioning_enabled ||
+		!Components::getSingleton().isExpectedComponentChannel(CELLAPP_TYPE, channel))
+		return;
+	const auto source = channel->componentID();
+	if (!source || source == route.target)
+		return;
+
+	const bool sameSource = !isDestroyed() && cellEntityCall() &&
+		cellEntityCall()->componentID() == source && spaceID() == route.origin;
+	const bool duplicate = migrationEpoch_ == route.epoch &&
+		migrationAttemptSource_ == source && migrationAttemptTarget_ == route.target &&
+		migrationTargetProcess_ == route.targetProcess;
+	const bool available = !migrationEpoch_ && cellHandoffAction_ == CellHandoff::NONE &&
+		!pBufferedSendToClientMessages_ && !hasFlags(ENTITY_FLAGS_TELEPORT_START) &&
+		!hasFlags(ENTITY_FLAGS_TELEPORT_STOP) && route.epoch > completedMigrationEpoch_ &&
+		route.epoch > cellHandoffRoute_.epoch &&
+		!Baseapp::getSingleton().hasConfirmedCellProcessExit(route.target, route.targetProcess);
+	const bool accepted = sameSource && (available || duplicate);
+	if (accepted && !duplicate)
+	{
+		// 先记录本轮迁出。源 Cell 收到回包后才会向目标发送快照。
+		migrationEpoch_ = route.epoch;
+		migrationAttemptSource_ = source;
+		migrationAttemptTarget_ = route.target;
+		migrationTargetProcess_ = route.targetProcess;
+		addFlags(ENTITY_FLAGS_TELEPORT_START);
+		Baseapp::getSingleton().trackCellHandoff(id());
+	}
+	auto* reply = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	reply->newMessage(CellappInterface::onTeleportDispatchPermission);
+	(*reply) << id();
+	route.write(*reply);
+	(*reply) << static_cast<uint8>(accepted);
+	channel->send(reply);
 }
 
 //-------------------------------------------------------------------------------------
@@ -1916,6 +2258,8 @@ void Entity::onMigrationCellappStart(Network::Channel* pChannel, COMPONENT_ID so
 		}
 		return;
 	}
+	if (!migrationEpoch_ && ServerConfig::getSingleton().getCellAppMgr().cellappmgr_space_partitioning_enabled)
+		return;
 	if (cellHandoffAction_ != CellHandoff::NONE || cellEntityCall()->componentID() != sourceCellAppID ||
 		(migrationEpoch_ && (epoch != migrationEpoch_ || migrationAttemptSource_ != sourceCellAppID ||
 			migrationAttemptTarget_ != targetCellAppID)))
@@ -2033,6 +2377,8 @@ void Entity::onMigrationCellappEnd(Network::Channel* pChannel, COMPONENT_ID sour
 		commitMigrationCellapp(sourceCellAppID, targetCellAppID);
 		return;
 	}
+	if (!migrationEpoch_ && ServerConfig::getSingleton().getCellAppMgr().cellappmgr_space_partitioning_enabled)
+		return;
 	if (migrationRollbackPending_ || (migrationEpoch_ && migrationAttemptTarget_ != targetCellAppID))
 		return;
 	migrationEpoch_ = epoch;
@@ -2166,6 +2512,13 @@ void Entity::onMigrationCellappPrepared(Network::Channel* pChannel,
 		return;
 	}
 
+	if (migrationTargetProcess_ &&
+		Baseapp::getSingleton().hasConfirmedCellProcessExit(targetCellAppID, migrationTargetProcess_))
+	{
+		retryTeleport();
+		return;
+	}
+
 	if (status == TeleportStatus::NOT_INSTALLED ||
 		(status == TeleportStatus::REJECTED && migrationCommitPending_ &&
 			pChannel->sessionEpoch() == migrationTargetSession_))
@@ -2184,6 +2537,10 @@ void Entity::commitMigrationCellapp(COMPONENT_ID sourceCellAppID, COMPONENT_ID t
 {
 	const uint64 epoch = migrationEpoch_;
 	completedMigrationEpoch_ = epoch;
+	if (sourceCellAppID != targetCellAppID || spaceID() != migrationSpace_)
+		resetRecoveryCellBackup();
+	else if (recoveryCellBackup_)
+		recoveryCellBackup_->request = 0;
 	spaceID(migrationSpace_);
 	resetTeleport();
 	// BaseApp 是客户端到 Cell RPC 的唯一权威路由点。Target 已完成提交时存活确认后，
@@ -2214,6 +2571,7 @@ void Entity::commitMigrationCellapp(COMPONENT_ID sourceCellAppID, COMPONENT_ID t
 void Entity::resetTeleport()
 {
 	migrationEpoch_ = migrationTargetSession_ = migrationWarningAt_ = 0;
+	migrationTargetProcess_ = 0;
 	migrationAttemptSource_ = migrationAttemptTarget_ = 0;
 	migrationCommitPending_ = migrationRollbackPending_ = false;
 	migrationSpace_ = 0;

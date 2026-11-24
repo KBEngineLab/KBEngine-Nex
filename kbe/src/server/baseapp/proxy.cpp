@@ -433,7 +433,7 @@ void Proxy::onGiveClientTo(Network::Channel* lpChannel, ENTITY_ID previousProxyI
 //-------------------------------------------------------------------------------------
 void Proxy::onGetWitness()
 {
-	if (migrationEpoch_)
+	if (migrationEpoch_ || partitionRestorePending())
 	{
 		migrationWitnessPending_ = true;
 		return;

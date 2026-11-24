@@ -121,7 +121,7 @@ public:
 	PyObject* createFromPersistentStream(ScriptDefModule* pScriptModule, MemoryStream* mstream);
 	PyObject* createCellData();
 	PyObject* createCellDataFromPersistentStream(MemoryStream* mstream);
-	PyObject* createCellDataFromStream(MemoryStream* mstream);
+	PyObject* createCellDataFromStream(MemoryStream* mstream, ENTITY_PROPERTY_UID parent = 0);
 
 	PyObject* parseDefaultStr(std::string defaultVal) override;
 	const char* getName(void) const override { return "ENTITY_COMPONENT"; }

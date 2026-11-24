@@ -9,6 +9,7 @@ kbe_add_server_executable(baseapp KBE_BASEAPP
         space.cpp
         baseapp.cpp
         baseapp_interface.cpp
+        cell_recovery.cpp
         data_download.cpp
         data_downloads.cpp
         entity_autoloader.cpp

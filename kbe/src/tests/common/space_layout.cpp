@@ -1,4 +1,8 @@
 #include "server/space_layout.h"
+#include "server/cell_handoff.h"
+#include "server/cell_recovery.h"
+#include "server/cell_backup.h"
+#include "server/teleport_status.h"
 
 #include <cstdio>
 #include <limits>
@@ -270,6 +274,176 @@ int main()
 	if (!check(next.validate() && next.data.at("_mapping") == "spaces/second" &&
 		next.data.at("weather") == request.resources.data.at("weather"), "mapping_update_keeps_spacedata"))
 		return 1;
+
+	MemoryStream recoveryScope;
+	recoveryScope << COMPONENT_ID(8002) << uint64(19) << uint16(2) << SPACE_ID(10) << SPACE_ID(20);
+	BoundedStreamReader scopeRequest(recoveryScope);
+	CellRecovery::Query query;
+	if (!check(query.read(scopeRequest) && query.lost == 8002 && query.session == 19 &&
+		query.spaces == std::vector<SPACE_ID>{10, 20}, "recovery_scope_query") ||
+		!check(!query.read(scopeRequest), "empty_recovery_scope_query"))
+		return 1;
+	MemoryStream repeatedSpace;
+	repeatedSpace << COMPONENT_ID(8002) << uint64(19) << uint16(2) << SPACE_ID(10) << SPACE_ID(10);
+	BoundedStreamReader repeatedScope(repeatedSpace);
+	MemoryStream tooManySpaces;
+	tooManySpaces << COMPONENT_ID(8002) << uint64(19) << uint16(CellRecovery::MAX_SPACES_PER_QUERY + 1);
+	BoundedStreamReader tooManyScopes(tooManySpaces);
+	if (!check(!query.read(repeatedScope), "duplicate_recovery_scope") ||
+		!check(!query.read(tooManyScopes), "oversized_recovery_scope_query"))
+		return 1;
+
+	MemoryStream scopedExit;
+	scopedExit << COMPONENT_ID(8002) << uint64(19) << uint16(1);
+	CellRecovery::ScopeResult{10, CellRecovery::Scope::CONFIRMED_EXIT, 7, 8005, 9}.write(scopedExit);
+	BoundedStreamReader scopedExitReader(scopedExit);
+	CellRecovery::Reply reply;
+	MemoryStream invalidExit;
+	invalidExit << COMPONENT_ID(8002) << uint64(19) << uint16(1);
+	CellRecovery::ScopeResult{10, CellRecovery::Scope::CONFIRMED_EXIT, 0}.write(invalidExit);
+	BoundedStreamReader invalidExitReader(invalidExit);
+	MemoryStream invalidReplacement;
+	invalidReplacement << COMPONENT_ID(8002) << uint64(19) << uint16(1);
+	CellRecovery::ScopeResult{10, CellRecovery::Scope::CONFIRMED_EXIT, 7, 8005, 7}.write(invalidReplacement);
+	BoundedStreamReader invalidReplacementReader(invalidReplacement);
+	MemoryStream committedScope;
+	CellRecovery::ScopeResult{10, CellRecovery::Scope::CONFIRMED_EXIT, 7, 8005, 9, true, 231}.write(committedScope);
+	BoundedStreamReader committedScopeReader(committedScope);
+	CellRecovery::ScopeResult committedResult;
+	MemoryStream targetExit;
+	CellRecovery::ScopeResult{10, CellRecovery::Scope::CONFIRMED_EXIT, 7, 0, 0, false, 0, true}.write(targetExit);
+	BoundedStreamReader targetExitReader(targetExit);
+	CellRecovery::ScopeResult targetExitResult;
+	const CellHandoff::Route route{8001, 8002, 2, 101, 102, 10, 7};
+	auto staleRoute = route;
+	--staleRoute.layoutVersion;
+	MemoryStream handoff;
+	route.write(handoff);
+	BoundedStreamReader handoffReader(handoff);
+	CellHandoff::Route restoredRoute;
+	if (!check(reply.read(scopedExitReader) && reply.scopes.front().layoutVersion == 7 &&
+		reply.scopes.front().replacement == 8005 && reply.scopes.front().replacementVersion == 9,
+		"versioned_cell_exit_with_ready_replacement") ||
+		!check(!reply.read(invalidExitReader), "reject_unversioned_cell_exit") ||
+		!check(!reply.read(invalidReplacementReader), "reject_nonadvancing_replacement_version") ||
+		!check(committedResult.read(committedScopeReader) && committedScopeReader.empty() &&
+			committedResult.committed && committedResult.replacementProcess == 231 &&
+			committedResult.replacementVersion == 9, "committed_recovery_scope") ||
+		!check(targetExitResult.read(targetExitReader) && targetExitReader.empty() &&
+			targetExitResult.replacementExited && !targetExitResult.replacement, "confirmed_replacement_exit") ||
+		!check(restoredRoute.read(handoffReader) && restoredRoute == route, "versioned_cell_handoff") ||
+		!check(!route.sameAttempt(staleRoute), "reject_stale_handoff_layout"))
+		return 1;
+
+	MemoryStream dispatchStream;
+	TeleportStatus::Dispatch{8002, 10, 4, 231}.write(dispatchStream);
+	BoundedStreamReader dispatchReader(dispatchStream);
+	TeleportStatus::Dispatch dispatch;
+	MemoryStream incompleteDispatch;
+	incompleteDispatch << COMPONENT_ID(8002) << SPACE_ID(10) << uint64(4);
+	BoundedStreamReader incompleteDispatchReader(incompleteDispatch);
+	MemoryStream unknownProcess;
+	TeleportStatus::Dispatch{8002, 10, 4, 0}.write(unknownProcess);
+	BoundedStreamReader unknownProcessReader(unknownProcess);
+	if (!check(dispatch.read(dispatchReader) && dispatchReader.empty() && dispatch.target == 8002 &&
+		dispatch.origin == 10 && dispatch.epoch == 4 && dispatch.targetProcess == 231, "teleport_dispatch_reservation") ||
+		!check(!dispatch.read(incompleteDispatchReader), "reject_truncated_teleport_reservation") ||
+		!check(!dispatch.read(unknownProcessReader), "reject_teleport_reservation_without_target_process"))
+		return 1;
+
+	CellRecovery::CellBackup backup;
+	backup.cell = 8002;
+	backup.session = 19;
+	backup.space = 10;
+	backup.generation = 4;
+	backup.request = 31;
+	MemoryStream backupStream;
+	backup.stamp().write(backupStream);
+	BoundedStreamReader backupReader(backupStream);
+	CellRecovery::BackupStamp backupReply;
+	if (!check(backupReply.read(backupReader) && backupReader.empty(), "cell_backup_stamp_roundtrip") ||
+		!check(backup.matches(8002, 19, backupReply), "current_cell_backup_reply") ||
+		!check(!backup.matches(8001, 19, backupReply), "wrong_backup_cell") ||
+		!check(!backup.matches(8002, 20, backupReply), "replaced_backup_connection") ||
+		!check(!backup.matches(8002, 19, {10, 3, 31}), "prior_backup_generation") ||
+		!check(!backup.matches(8002, 19, {20, 4, 31}), "wrong_backup_space") ||
+		!check(!backup.matches(8002, 19, {10, 4, 30}), "prior_backup_request"))
+		return 1;
+
+	auto replacementLayout = layout;
+	if (!check(!replacementLayout.replaceCellApp(8001, 8002), "replacement_cannot_share_a_space") ||
+		!check(!replacementLayout.replaceCellApp(8999, 8005), "replacement_requires_original_cell") ||
+		!check(replacementLayout.replaceCellApp(8001, 8005) && replacementLayout.validate() &&
+			replacementLayout.owner == 8005 && replacementLayout.cellAt(9.f, 19.f)->cellID == 1 &&
+			replacementLayout.cellAt(9.f, 19.f)->cellappID == 8005 &&
+			replacementLayout.cellAt(9.f, 20.f)->cellappID == 8002 &&
+			layout.owner == 8001, "replacement_preserves_boundaries_and_cell_ids"))
+		return 1;
+	auto staged = request;
+	staged.operation = REPLACEMENT_PREPARE;
+	staged.layout = replacementLayout;
+	staged.version = request.version + 1;
+	staged.replacedCellApp = 8001;
+	staged.replacedLayoutVersion = request.version;
+	MemoryStream prepareReplacement;
+	staged.write(prepareReplacement);
+	Packet receivedReplacement;
+	const Replacement replacement{8001, 8005, 19, staged.version, 100};
+	if (!check(receivedReplacement.read(prepareReplacement) && receivedReplacement.operation == REPLACEMENT_PREPARE &&
+		receivedReplacement.layout.owner == 8005 && receivedReplacement.resources.data == staged.resources.data &&
+		receivedReplacement.replacedCellApp == 8001 && receivedReplacement.replacedLayoutVersion == request.version,
+		"replacement_carries_committed_resources") ||
+		!check(replacement.matches(8005, 19, staged.version), "replacement_matches_attempt") ||
+		!check(!replacement.matches(8005, 20, staged.version) &&
+			!replacement.matches(8005, 19, request.version) && !replacement.matches(8001, 19, staged.version),
+			"replacement_rejects_wrong_session_version_and_source"))
+		return 1;
+
+	Packet commitReplacement;
+	commitReplacement.sender = request.sender;
+	commitReplacement.operation = REPLACEMENT_COMMIT;
+	commitReplacement.spaceID = request.spaceID;
+	commitReplacement.version = staged.version;
+	commitReplacement.revision = staged.revision;
+	commitReplacement.replacedCellApp = staged.replacedCellApp;
+	commitReplacement.replacedLayoutVersion = request.version;
+	commitReplacement.replacementCellApp = 8005;
+	MemoryStream commitMessage;
+	commitReplacement.write(commitMessage);
+	Packet decodedCommit;
+	if (!check(decodedCommit.read(commitMessage) && decodedCommit.operation == REPLACEMENT_COMMIT &&
+		decodedCommit.replacedLayoutVersion == request.version && decodedCommit.replacedCellApp == 8001 &&
+		decodedCommit.replacementCellApp == 8005 && decodedCommit.version == staged.version,
+		"replacement_commit_roundtrip"))
+		return 1;
+	commitMessage.clear(false);
+	commitReplacement.replacementCellApp = commitReplacement.replacedCellApp;
+	commitReplacement.write(commitMessage);
+	if (!check(!decodedCommit.read(commitMessage), "replacement_commit_rejects_lost_target"))
+		return 1;
+
+	const CellRecovery::StageKey key{8001, 10, 7, 9, 123};
+	MemoryStream stageMessage;
+	key.write(stageMessage);
+	BoundedStreamReader stageReader(stageMessage);
+	CellRecovery::StageKey decodedStageKey;
+	CellRecovery::StagedBackups backups;
+	if (!check(decodedStageKey.read(stageReader) && stageReader.empty() && decodedStageKey.lost == 8001 &&
+		decodedStageKey.space == 10 && decodedStageKey.originalVersion == 7 &&
+		decodedStageKey.replacementVersion == 9 && decodedStageKey.entity == 123,
+		"stage_key_roundtrip") ||
+		!check(backups.stage(key, 7001, 2, "backup") && backups.stage(key, 7001, 2, "backup") &&
+			backups.size() == 1, "duplicate_stage_is_idempotent") ||
+		!check(!backups.stage(key, 7002, 2, "backup") && !backups.stage(key, 7001, 2, "altered") &&
+			backups.size() == 1, "different_stage_cannot_replace_existing_backup"))
+		return 1;
+	backups.erase(10, 8);
+	if (!check(backups.size() == 1, "stale_cancellation_keeps_stage"))
+		return 1;
+	backups.erase(10, 9);
+	if (!check(backups.size() == 0, "cancellation_releases_stage"))
+		return 1;
+
 	std::printf("SPACE_LAYOUT_TEST_PASS checks=%u\n", checks);
 	return 0;
 }

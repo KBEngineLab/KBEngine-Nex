@@ -32,6 +32,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "pyscript/copy.h"
 #include "pyscript/py_memorystream.h"
 
+#include <memory>
+
 #ifndef CODE_INLINE
 #include "datatype.inl"
 #endif
@@ -2865,7 +2867,7 @@ PyObject* EntityComponentType::createCellData()
 }
 
 //-------------------------------------------------------------------------------------
-PyObject* EntityComponentType::createCellDataFromStream(MemoryStream* mstream)
+PyObject* EntityComponentType::createCellDataFromStream(MemoryStream* mstream, ENTITY_PROPERTY_UID parent)
 {
 	COMPONENT_TYPE componentType;
 	ENTITY_SCRIPT_UID ComponentDescrsType;
@@ -2874,24 +2876,33 @@ PyObject* EntityComponentType::createCellDataFromStream(MemoryStream* mstream)
 
 	(*mstream) >> componentType >> ownerID >> ComponentDescrsType >> count;
 
-	PyObject* cellDataDict = PyDict_New();
-
 	ScriptDefModule::PROPERTYDESCRIPTION_MAP& propertyDescrs = pScriptDefModule_->getCellPropertyDescriptions();
+	if (parent && (componentType != CELLAPP_TYPE || ownerID != EntityDef::context().currEntityID ||
+		ComponentDescrsType != pScriptDefModule_->getUType() || count != propertyDescrs.size()))
+		return nullptr;
+
+	std::unique_ptr<PyObject, decltype(&Py_DecRef)> cellDataDict(PyDict_New(), Py_DecRef);
+	if (!cellDataDict)
+		return nullptr;
 	ScriptDefModule::PROPERTYDESCRIPTION_MAP::const_iterator iter = propertyDescrs.begin();
 
 	for (; iter != propertyDescrs.end(); ++iter)
 	{
 		PropertyDescription* propertyDescription = iter->second;
 
-		ENTITY_PROPERTY_UID uid;
-		(*mstream) >> uid >> uid;
+		ENTITY_PROPERTY_UID parentUID, uid;
+		(*mstream) >> parentUID >> uid;
 
+		if (parent && (parentUID != parent || uid != propertyDescription->getUType()))
+			return nullptr;
 		KBE_ASSERT(propertyDescription->getUType() == uid);
 
 		PyObject* pyobj = propertyDescription->createFromStream(mstream);
 
 		if (pyobj == NULL)
 		{
+			if (parent)
+				return nullptr;
 			SCRIPT_ERROR_CHECK();
 
 			ERROR_MSG(fmt::format("EntityComponentType::createCellDataFromStream: property({}) error, use default values! name={}, utype={}.\n",
@@ -2900,11 +2911,13 @@ PyObject* EntityComponentType::createCellDataFromStream(MemoryStream* mstream)
 			pyobj = propertyDescription->newDefaultVal();
 		}
 
-		PyDict_SetItemString(cellDataDict, propertyDescription->getName(), pyobj);
+		const int result = PyDict_SetItemString(cellDataDict.get(), propertyDescription->getName(), pyobj);
 		Py_DECREF(pyobj);
+		if (parent && result != 0)
+			return nullptr;
 	}
 
-	return cellDataDict;
+	return cellDataDict.release();
 }
 
 //-------------------------------------------------------------------------------------

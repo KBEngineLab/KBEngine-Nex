@@ -121,12 +121,17 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappmgrInterface)
 	CELLAPPMGR_MESSAGE_DECLARE_STREAM(setSpaceViewer,						NETWORK_VARIABLE_MESSAGE)
 
 	// 完成运行模式确认后，CellApp 才能进入初始化完成和空间分配流程。
-	CELLAPPMGR_MESSAGE_DECLARE_ARGS2(reportSpacePartitioningMode,			NETWORK_FIXED_MESSAGE,
+	CELLAPPMGR_MESSAGE_DECLARE_ARGS6(reportSpacePartitioningMode,			NETWORK_FIXED_MESSAGE,
 									COMPONENT_ID,							cid,
-									uint8,									mode)
+									uint8,									mode,
+									uint32,									pid,
+									uint64,									processStart,
+									uint64,									pidNamespace,
+									uint64,									process)
 
 	// 固定布局、资源和生命周期消息仅接受已确认的 CellApp 内部连接。
 	CELLAPPMGR_MESSAGE_DECLARE_STREAM(onSpaceLayoutRequest, NETWORK_VARIABLE_MESSAGE)
+	CELLAPPMGR_MESSAGE_DECLARE_STREAM(reqCellRecoveryScope, NETWORK_VARIABLE_MESSAGE)
 
 NETWORK_INTERFACE_DECLARE_END()
 

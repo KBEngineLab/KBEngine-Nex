@@ -1,5 +1,6 @@
 add_library(server STATIC
     asyncio_helper.cpp
+    cell_process_watch.cpp
     common.cpp
     component_active_report_handler.cpp
     components.cpp

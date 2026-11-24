@@ -3,6 +3,8 @@
 
 #include "server/bounded_stream_reader.h"
 
+#include <optional>
+
 #include <cmath>
 #include <limits>
 #include <set>
@@ -22,7 +24,9 @@ enum State : uint8 { NONE = 0, PREPARING, PREPARED, COMMITTING, ACTIVE, FAILED, 
 enum Operation : uint8
 {
 	REQUEST = 1, PREPARE, READY, COMMIT, COMMITTED, COMPLETE,
-	ABORT, SHUTDOWN, REMOVE, REMOVED, SUSPEND, SET_DATA, DELETE_DATA, RESOURCES, UPDATE_REJECTED
+	ABORT, SHUTDOWN, REMOVE, REMOVED, SUSPEND, SET_DATA, DELETE_DATA, RESOURCES, UPDATE_REJECTED,
+	REPLACEMENT_PREPARE, REPLACEMENT_READY, REPLACEMENT_CANCEL,
+	REPLACEMENT_CHECK, REPLACEMENT_CHECKED, REPLACEMENT_COMMIT
 };
 
 inline const char* stateName(State state)
@@ -91,6 +95,23 @@ struct Layout
 			if (node.axis == LEAF && node.cellappID == cid)
 				return &node;
 		return NULL;
+	}
+
+	bool replaceCellApp(COMPONENT_ID lost, COMPONENT_ID target)
+	{
+		if (!lost || !target || cellForApp(target))
+			return false;
+		for (Node& node : nodes)
+		{
+			if (node.axis != LEAF || node.cellappID != lost)
+				continue;
+			node.cellappID = target;
+			if (owner == lost)
+				owner = target;
+			// 分区边界和 Cell 编号不变，存活节点仍按原编号核对迁移。
+			return true;
+		}
+		return false;
 	}
 
 	const Node* cellAt(float x, float z) const
@@ -345,6 +366,10 @@ struct Packet
 	SPACE_ID spaceID = 0;
 	uint64 version = 0;
 	uint64 revision = 0;
+	COMPONENT_ID replacedCellApp = 0;
+	uint64 replacedLayoutVersion = 0;
+	COMPONENT_ID replacementCellApp = 0;
+	uint64 replacementProcess = 0;
 	Layout layout;
 	Resources resources;
 	std::map<COMPONENT_ID, CellPeerRoute> cellPeerRoutes;
@@ -356,6 +381,12 @@ struct Packet
 		stream << sender << operation << spaceID << version << revision;
 		switch (operation)
 		{
+		case REPLACEMENT_CHECK: case REPLACEMENT_CHECKED: case REPLACEMENT_COMMIT:
+			stream << replacedCellApp << replacedLayoutVersion << replacementCellApp;
+			break;
+		case REPLACEMENT_PREPARE:
+			stream << replacedCellApp << replacedLayoutVersion;
+			[[fallthrough]];
 		case REQUEST: case PREPARE:
 			layout.write(stream);
 			resources.write(stream);
@@ -368,6 +399,9 @@ struct Packet
 				entry.second.write(stream);
 			}
 			break;
+		case REPLACEMENT_READY:
+			stream << replacementProcess;
+			[[fallthrough]];
 		case READY: case COMMITTED: case ABORT: case SUSPEND:
 			stream << static_cast<uint8>(success);
 			stream.appendBlob(error);
@@ -403,8 +437,21 @@ struct Packet
 		uint8 accepted = 0;
 		switch (operation)
 		{
+		case REPLACEMENT_CHECK: case REPLACEMENT_CHECKED: case REPLACEMENT_COMMIT:
+			if (!reader.read(replacedCellApp) || !replacedCellApp ||
+				!reader.read(replacedLayoutVersion) || !replacedLayoutVersion || replacedLayoutVersion >= version ||
+				!reader.read(replacementCellApp) || !replacementCellApp || replacementCellApp == replacedCellApp)
+				return false;
+			break;
+		case REPLACEMENT_PREPARE:
+			if (!reader.read(replacedCellApp) || !replacedCellApp ||
+				!reader.read(replacedLayoutVersion) || !replacedLayoutVersion || replacedLayoutVersion >= version)
+				return false;
+			[[fallthrough]];
 		case REQUEST: case PREPARE:
 			if (!layout.read(reader) || !resources.read(reader))
+				return false;
+			if (operation == REPLACEMENT_PREPARE && layout.cellForApp(replacedCellApp))
 				return false;
 			break;
 		case COMPLETE:
@@ -423,10 +470,16 @@ struct Packet
 			}
 			break;
 		}
+		case REPLACEMENT_READY:
+			if (!reader.read(replacementProcess))
+				return false;
+			[[fallthrough]];
 		case READY: case COMMITTED: case ABORT: case SUSPEND:
 			if (!reader.read(accepted) || accepted > 1 || !reader.readBlob(error, 1024))
 				return false;
 			success = accepted != 0;
+			if (operation == REPLACEMENT_READY && success && !replacementProcess)
+				return false;
 			break;
 		case SET_DATA: case DELETE_DATA:
 			if (!reader.readBlob(key, 256) || key.empty() || key == "_mapping" ||
@@ -450,12 +503,31 @@ struct Packet
 			if (!reader.readBlob(error, 1024) || error.empty())
 				return false;
 			break;
-		case COMMIT: case SHUTDOWN: case REMOVE: case REMOVED:
+		case COMMIT: case SHUTDOWN: case REMOVE: case REMOVED: case REPLACEMENT_CANCEL:
 			break;
 		default:
 			return false;
 		}
 		return reader.empty();
+	}
+};
+
+struct Replacement
+{
+	enum Stage { Preparing, Ready, Checking, Cancelling };
+
+	COMPONENT_ID lost = 0;
+	COMPONENT_ID target = 0;
+	uint64 targetSession = 0;
+	uint64 version = 0;
+	uint64 started = 0;
+	Stage stage = Preparing;
+	std::set<COMPONENT_ID> checked;
+	uint64 process = 0;
+
+	bool matches(COMPONENT_ID cid, uint64 session, uint64 attempt) const
+	{
+		return cid == target && session == targetSession && attempt == version;
 	}
 };
 
@@ -471,8 +543,23 @@ struct Transaction
 	uint64 started = 0;
 	State state = PREPARING;
 	bool suspended = false;
+	bool shutdownRequested = false;
+	bool activated = false;
 	std::string error;
 	std::set<COMPONENT_ID> acknowledged;
+	std::optional<Replacement> replacement;
+	struct CommittedReplacement
+	{
+		COMPONENT_ID lost;
+		uint64 originalVersion;
+		COMPONENT_ID target;
+		uint64 targetSession;
+		uint64 process;
+	};
+	std::optional<CommittedReplacement> committedReplacement;
+	uint64 lastReplacementVersion = 0;
+	uint64 replacementRetryAt = 0;
+	std::map<COMPONENT_ID, uint64> rejectedReplacements;
 
 	bool confirm(COMPONENT_ID cid, uint64 confirmedVersion, State expected)
 	{

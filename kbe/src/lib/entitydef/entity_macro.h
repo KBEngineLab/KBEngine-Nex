@@ -25,6 +25,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "common/common.h"
 #include "server/asyncio_helper.h"
 #include "server/callbackmgr.h"		
+#include <memory>
 
 namespace KBEngine{
 
@@ -560,14 +561,17 @@ public:																										\
 																											\
 	void addCellDataToStream(COMPONENT_TYPE sendTo, uint32 flags, MemoryStream* mstream, bool useAliasID = false);\
 																											\
-	PyObject* createCellDataFromStream(MemoryStream* mstream)												\
+	PyObject* createCellDataFromStream(MemoryStream* mstream, bool requireComplete = false)					\
 	{																										\
 		/* 组件默认值解析依赖当前实体和 Cell 域，必须在读取任何属性前建立上下文。 */						\
 		/* Component default parsing depends on the current entity and Cell domain, so bind the context before reading properties. */\
 		EntityDef::context().currComponentType = CELLAPP_TYPE;												\
 		EntityDef::context().currEntityID = id();															\
 																															\
-		PyObject* cellData = PyDict_New();																	\
+		std::unique_ptr<PyObject, decltype(&Py_DecRef)> dict(PyDict_New(), Py_DecRef);							\
+		if (!dict)																							\
+			return nullptr;																					\
+		PyObject* cellData = dict.get();																		\
 		ENTITY_PROPERTY_UID uid;																			\
 		Vector3 pos, dir;																					\
 		STREAM_TO_POS_DIR(*mstream, pos, dir);																\
@@ -587,7 +591,7 @@ public:																										\
 				if (iter->second->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)						\
 				{																										\
 					EntityComponentType* pEntityComponentType = (EntityComponentType*)iter->second->getDataType();\
-					if (pEntityComponentType->pScriptDefModule()->getCellPropertyDescriptions().size() == 0)\
+					if (pEntityComponentType->pScriptDefModule()->getCellPropertyDescriptions().empty())		\
 					{																								\
 						--count;																				\
 					}																							\
@@ -595,12 +599,17 @@ public:																										\
 			}																									\
 		}																										\
 																															\
-		while(mstream->length() > 0 && count-- > 0)													\
+		while(mstream->length() > 0 && count > 0)															\
 		{																									\
+			--count;																						\
 			/* 创建流为每项写入父 UID 和实际属性 UID；当前层只按后者查找属性。 */					\
 			/* Each creation-stream item contains a parent UID and an effective property UID; this level resolves the latter. */\
-			(*mstream) >> uid >> uid;																	\
+			ENTITY_PROPERTY_UID parent;																		\
+			(*mstream) >> parent >> uid;																		\
 			ScriptDefModule::PROPERTYDESCRIPTION_UIDMAP::iterator iter = propertyDescrs.find(uid);			\
+			if (requireComplete && (parent || iter == propertyDescrs.end() ||								\
+				PyDict_GetItemString(cellData, iter->second->getName())))										\
+				return nullptr;																				\
 			if(iter == propertyDescrs.end())																\
 			{																								\
 				ERROR_MSG(fmt::format("{}::createCellDataFromStream: not found uid({})! entityID={}\n", scriptName(), uid, id()));	\
@@ -610,7 +619,8 @@ public:																										\
 			PyObject* pyobj = NULL;																			\
 			if (iter->second->getDataType()->type() == DATA_TYPE_ENTITY_COMPONENT)						\
 			{																											\
-				pyobj = ((EntityComponentType*)iter->second->getDataType())->createCellDataFromStream(mstream);\
+				pyobj = ((EntityComponentType*)iter->second->getDataType())->createCellDataFromStream(		\
+					mstream, requireComplete ? uid : 0);														\
 			}																									\
 			else																								\
 			{																											\
@@ -619,6 +629,8 @@ public:																										\
 																											\
 			if(pyobj == NULL)																				\
 			{																								\
+				if (requireComplete)																		\
+					return nullptr;																			\
 				SCRIPT_ERROR_CHECK();																		\
 				pyobj = iter->second->parseDefaultStr("");													\
 				PyDict_SetItemString(cellData, iter->second->getName(), pyobj);								\
@@ -626,13 +638,15 @@ public:																										\
 			}																								\
 			else																							\
 			{																								\
-				PyDict_SetItemString(cellData, iter->second->getName(), pyobj);								\
+				const int result = PyDict_SetItemString(cellData, iter->second->getName(), pyobj);				\
 				Py_DECREF(pyobj);																			\
+				if (requireComplete && result != 0)															\
+					return nullptr;																			\
 			}																								\
 																											\
 		}																									\
 																											\
-		return cellData;																					\
+		return requireComplete && (count || mstream->length() || PyErr_Occurred()) ? nullptr : dict.release();	\
 	}																										\
 																											\
 	void addCellDataToStreamByDetailLevel(int8 detailLevel, MemoryStream* mstream, bool useAliasID = false)	\

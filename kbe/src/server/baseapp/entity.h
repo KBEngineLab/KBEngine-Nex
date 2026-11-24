@@ -35,6 +35,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "entitydef/entity_component.h"
 #include "server/script_timers.h"		
 #include "server/cell_handoff.h"
+#include "server/cell_recovery.h"
 	
 namespace KBEngine{
 
@@ -234,6 +235,7 @@ public:
 		传送回调
 	*/
 	void onTeleportCB(Network::Channel* pChannel, SPACE_ID spaceID, bool fromCellTeleport);  
+	void onMigrationCellappReserve(Network::Channel* channel, MemoryStream& stream);
 	void onTeleportFailure();  
 	void onTeleportSuccess(SPACE_ID spaceID);
 
@@ -269,6 +271,25 @@ public:
 		cellapp宕了
 	*/
 	void onCellAppDeath();
+	bool hasPendingCellTransfer() const
+	{
+		return cellHandoffAction_ != CellHandoff::NONE || migrationEpoch_ != 0;
+	}
+	bool hasCellHandoffWith(COMPONENT_ID cid) const
+	{
+		return cellHandoffAction_ != CellHandoff::NONE &&
+			(cellHandoffRoute_.source == cid || cellHandoffRoute_.target == cid);
+	}
+	void onPartitionCellExit(const CellRecovery::LostReal& loss);
+	bool markPartitionRealLost(const CellRecovery::LostReal& loss);
+	void loseCell();
+	const std::vector<uint8>* partitionRecoveryCellData(const CellRecovery::LostReal& expected) const;
+	bool routeRecoveredCell(const CellRecovery::LostReal& expected, COMPONENT_ID target);
+	bool partitionRestorePending() const { return partitionRestorePending_; }
+	void finishPartitionRestore();
+	void cancelPartitionRestore();
+	uint64 recoveryRoutingEpoch() const { return std::max(completedMigrationEpoch_, cellHandoffRoute_.epoch); }
+	void onRecoveryCellBackup(Network::Channel& channel, MemoryStream& stream);
 
 	/** 
 		转发消息完成 
@@ -329,6 +350,7 @@ protected:
 
 	// 是否正在恢复
 	bool									inRestore_;
+	bool									partitionRestorePending_ = false;
 	
 	// 如果此时实体还没有被设置为ENTITY_FLAGS_TELEPORT_START,  说明onMigrationCellappArrived包优先于
 	// onMigrationCellappStart到达(某些压力所致的情况下会导致实体跨进程跳转时（由cell1跳转到cell2），
@@ -351,15 +373,24 @@ protected:
 	COMPONENT_ID							migrationAttemptTarget_ = 0;
 	SPACE_ID								migrationSpace_ = 0;
 	uint64									migrationTargetSession_ = 0;
+	uint64									migrationTargetProcess_ = 0;
 	uint64									migrationWarningAt_ = 0;
 	bool									migrationRollbackPending_ = false;
 	bool									migrationWitnessPending_ = false;
 	bool									retryTeleport();
 	void									resetTeleport();
 	void									refreshTeleportWitness();
+	void									requestRecoveryCellBackup();
+	void									resetRecoveryCellBackup();
+	std::unique_ptr<CellRecovery::CellBackup>	recoveryCellBackup_;
+	uint64									cellBackupGeneration_ = 0;
 	CellHandoff::Route						cellHandoffRoute_;
 	CellHandoff::Action						cellHandoffAction_ = CellHandoff::NONE;
 	uint64									cellHandoffWarningAt_ = 0;
+	bool									cellHandoffSourceExited_ = false;
+	std::unique_ptr<CellRecovery::LostReal>	cellHandoffTargetLoss_;
+	void									finishCellHandoffSourceRelease();
+	std::unique_ptr<CellRecovery::LostReal>	lostPartitionReal_;
 	bool									destroyCellAfterHandoff_ = false;
 	
 	// 需要持久化的数据是否变脏（内存sha1），如果没有变脏不需要持久化

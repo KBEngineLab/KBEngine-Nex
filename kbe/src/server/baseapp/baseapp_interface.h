@@ -368,6 +368,12 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappInterface)
 								uint8,											status)
 
 	ENTITY_MESSAGE_DECLARE_STREAM(onCellHandoff, NETWORK_VARIABLE_MESSAGE)
+	ENTITY_MESSAGE_DECLARE_STREAM(onMigrationCellappReserve, NETWORK_VARIABLE_MESSAGE)
+
+	BASEAPP_MESSAGE_DECLARE_STREAM(onCellRecoveryScope, NETWORK_VARIABLE_MESSAGE)
+	BASEAPP_MESSAGE_DECLARE_ARGS2(onCellProcessExit, NETWORK_FIXED_MESSAGE, COMPONENT_ID, cid, uint64, process)
+	BASEAPP_MESSAGE_DECLARE_STREAM(onRecoveryCellBackup, NETWORK_VARIABLE_MESSAGE)
+	BASEAPP_MESSAGE_DECLARE_STREAM(onStageRecoveryCellBackup, NETWORK_VARIABLE_MESSAGE)
 
 	//--------------------------------------------Proxy---------------------------------------------------------
 	/**

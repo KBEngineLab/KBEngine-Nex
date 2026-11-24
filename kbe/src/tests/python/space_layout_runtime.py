@@ -515,22 +515,22 @@ def verify_layout_removal(cells, result, base, origin_space, output):
     require(origin is not destination, "迁移期间销毁检查需要两个不同的 CellApp")
     mapping = destination.evaluate(f"KBEngine.getSpaceGeometryMapping({space_id})")
 
-    # 用实际有 Base 的业务实体走迁移协议，不销毁在线角色，也不替换引擎方法。
+    # 用有 Base 的实体验证在途提交，再用无 Base 的实体检查关闭期间拒绝迁入。
     route_key = f"space_layout_test_{space_id}"
     publish_route = f"KBEngine.globalData[{route_key!r}] = KBEngine.entities[{result['owner_entity']}].cell"
     base.evaluate(f"exec({publish_route!r})")
-    migrants = base.evaluate(
-        "[KBEngine.createEntityLocally('SpawnPoint', "
+    first = base.evaluate(
+        "KBEngine.createEntityLocally('SpawnPoint', "
         f"{{'createToCell': KBEngine.entities[{origin_space['id']}].cell, "
-        "'spawnEntityNO': 40001003, 'position': (0, 0, 0)}).id "
-        "for _ in range(2)]"
+        "'spawnEntityNO': 40001003, 'position': (0, 0, 0)}).id"
     )
-    first, second = migrants
+    second = origin.evaluate(f"KBEngine.createEntity('NPC', {origin_space['space']}, (1., 1., 12000.), "
+                             "(0., 0., 0.), {'uid': 1001}).id")
     wait_for(
         "源端迁移实体及目标引用准备",
         lambda: origin.evaluate(
             f"({route_key!r} in KBEngine.globalData, "
-            f"all(KBEngine.entities.get(eid) and KBEngine.entities[eid].isReal() for eid in {migrants!r}))"
+            f"all(KBEngine.entities.get(eid) and KBEngine.entities[eid].isReal() for eid in {(first, second)!r}))"
         ),
         lambda state: all(state),
     )
@@ -547,9 +547,27 @@ def verify_layout_removal(cells, result, base, origin_space, output):
             f"(0, 0, 0), (0, 0, 0)), KBEngine.entities[{eid}].isReal())[1]"
         )
 
-    # 控制器放行前，BaseApp 不处理路由切换；超时也必须退出等待，避免影响关服。
+    # 目标安装后暂缓发出迁移结束消息，等控制器暂停 BaseApp；开始登记不会被这次暂停拦住。
+    installed = output / "space-layout-target-installed"
     paused = output / "space-layout-base-paused"
     release = output / "space-layout-base-release"
+    hook = f"""
+import pathlib, time
+from SpawnPoint import SpawnPoint
+_layout_previous = SpawnPoint.__dict__.get('onTeleportSuccess')
+_layout_installed = pathlib.Path({str(installed)!r})
+_layout_paused = pathlib.Path({str(paused)!r})
+def _layout_on_teleport(self, nearby):
+    if self.id == {first}:
+        _layout_installed.touch()
+        deadline = time.monotonic() + 12
+        while not _layout_paused.exists() and time.monotonic() < deadline:
+            time.sleep(0.02)
+    if _layout_previous:
+        _layout_previous(self, nearby)
+SpawnPoint.onTeleportSuccess = _layout_on_teleport
+"""
+    destination.evaluate(f"exec({hook!r})")
     hold = (
         "import pathlib, time\n"
         f"pathlib.Path({str(paused)!r}).touch()\n"
@@ -559,36 +577,43 @@ def verify_layout_removal(cells, result, base, origin_space, output):
         "    time.sleep(0.02)\n"
         "_layout_released = _layout_release.exists()\n"
     )
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        held = executor.submit(base.evaluate, f"(exec({hold!r}), _layout_released)[1]", 25)
-        try:
-            wait_for("BaseApp 暂停处理迁移确认", paused.exists, bool, timeout=5)
-            require(not teleport(first), "第一次传送未发往远端")
-            wait_for("目标已收到未提交的迁移",
-                     lambda: entity_is_real(destination, first, space_id), bool, timeout=5)
-            error = captured_error(
-                destination, f"(KBEngine.entities[{result['owner_entity']}].destroySpace(), "
-                f"KBEngine.addSpaceGeometryMapping({space_id}, None, {mapping!r}, True))"
-            )
-            require(error and error[0] == "RuntimeError", "删除请求后仍接受新的导航更新")
-            wait_for("已收到 REMOVE 但未销毁",
-                     lambda: destination.evaluate(f"KBEngine.getSpaceLayout({space_id})"),
-                     lambda value: value and value["state"] == "releasing", timeout=5)
-            require(not destination.evaluate(f"KBEngine.getSpaceLayout({space_id})['acceptsEntities']"),
-                    "等待迁移完成时未公布 Space 已停止接收实体")
-            error = captured_error(
-                destination, f"KBEngine.createEntity('SpawnPoint', {space_id}, "
-                "(0.0, 0.0, 0.0), (0.0, 0.0, 0.0), {'spawnEntityNO': 40001003})"
-            )
-            require(error and error[0] == "RuntimeError", "等待迁移完成时仍允许脚本创建 Real")
-            require(not teleport(second), "第二次传送未发往远端")
-            wait_for("删除中的 Space 拒绝新迁入并恢复源实体",
-                     lambda: entity_is_real(origin, second, origin_space["space"]), bool, timeout=5)
-            require(entity_is_real(destination, first, space_id),
-                    "迁移尚未提交时目标实体已被运行期删除")
-        finally:
-            release.touch()
-        require(held.result(), "BaseApp 在测试放行前已结束等待")
+    try:
+        teleport(first)
+        wait_for("目标已安装第一轮快照", installed.exists, bool, timeout=8)
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            held = executor.submit(base.evaluate, f"(exec({hold!r}), _layout_released)[1]", 25)
+            try:
+                wait_for("BaseApp 暂停处理迁移确认", paused.exists, bool, timeout=5)
+                require(entity_is_real(destination, first, space_id), "目标没有已安装的迁移实体")
+                error = captured_error(
+                    destination, f"(KBEngine.entities[{result['owner_entity']}].destroySpace(), "
+                    f"KBEngine.addSpaceGeometryMapping({space_id}, None, {mapping!r}, True))"
+                )
+                require(error and error[0] == "RuntimeError", "删除请求后仍接受新的导航更新")
+                wait_for("已收到 REMOVE 但未销毁",
+                         lambda: destination.evaluate(f"KBEngine.getSpaceLayout({space_id})"),
+                         lambda value: value and value["state"] == "releasing", timeout=5)
+                require(not destination.evaluate(f"KBEngine.getSpaceLayout({space_id})['acceptsEntities']"),
+                        "等待迁移完成时未公布 Space 已停止接收实体")
+                error = captured_error(
+                    destination, f"KBEngine.createEntity('SpawnPoint', {space_id}, "
+                    "(0.0, 0.0, 0.0), (0.0, 0.0, 0.0), {'spawnEntityNO': 40001003})"
+                )
+                require(error and error[0] == "RuntimeError", "等待迁移完成时仍允许脚本创建 Real")
+                require(not teleport(second), "第二次传送未发往远端")
+                wait_for("删除中的 Space 拒绝新迁入并恢复源实体",
+                         lambda: entity_is_real(origin, second, origin_space["space"]), bool, timeout=5)
+                require(entity_is_real(destination, first, space_id),
+                        "迁移尚未提交时目标实体已被运行期删除")
+            finally:
+                release.touch()
+            require(held.result(), "BaseApp 在测试放行前已结束等待")
+    finally:
+        paused.touch(exist_ok=True)
+        destination.evaluate(
+            "(delattr(SpawnPoint, 'onTeleportSuccess') if _layout_previous is None else "
+            "setattr(SpawnPoint, 'onTeleportSuccess', _layout_previous))"
+        )
 
     wait_for(
         "整个逻辑 Space 删除",
@@ -599,6 +624,7 @@ def verify_layout_removal(cells, result, base, origin_space, output):
     require(origin.evaluate(f"KBEngine.entities.get({first}) is None"),
             "已有迁移没有提交并清理源端")
     require(entity_is_real(origin, second, origin_space["space"]), "被拒绝的迁移未保留源端 Real")
+    origin.evaluate(f"KBEngine.entities[{second}].destroy()")
     remove_route = f"del KBEngine.globalData[{route_key!r}]"
     base.evaluate(f"exec({remove_route!r})")
     result["logical_space_removed"] = True

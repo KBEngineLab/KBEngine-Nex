@@ -82,6 +82,7 @@ public:
 	virtual void handleTimeout(TimerHandle handle, void * arg);
 	virtual void handleGameTick();
 	void trackCellHandoff(ENTITY_ID id) { cellHandoffs_.insert(id); }
+	bool recoverPartitionReal(Entity& entity, const CellRecovery::LostReal& loss);
 	void handleCheckStatusTick();
 	void evaluateClientVolatileBackpressure(Proxy* pProxy, Network::Channel* pClientChannel);
 	void refreshClientVolatileBackpressure();
@@ -458,6 +459,11 @@ public:
 		请求在其他APP灾难恢复返回结果
 	*/
 	void onRequestRestoreCB(Network::Channel* pChannel, KBEngine::MemoryStream& s);
+	void onCellRecoveryScope(Network::Channel* channel, MemoryStream& stream);
+	void onCellProcessExit(Network::Channel* channel, COMPONENT_ID cid, uint64 process);
+	bool hasConfirmedCellProcessExit(COMPONENT_ID cid, uint64 process) const;
+	void onRecoveryCellBackup(Network::Channel* channel, MemoryStream& stream);
+	void onStageRecoveryCellBackup(Network::Channel* channel, MemoryStream& stream);
 
 	/**
 		一个cell的entity都恢复完毕
@@ -578,6 +584,103 @@ protected:
 	TelnetServer*											pTelnetServer_;
 
 	std::vector< KBEShared_ptr< RestoreEntityHandler > >	pRestoreEntityHandlers_;
+	struct CellLossSpace
+	{
+		std::vector<ENTITY_ID> routed;
+		std::vector<ENTITY_ID> handoffs;
+		bool managed = false;
+	};
+	struct CellLoss
+	{
+		uint64 session = 0;
+		uint64 managerSession = 0;
+		SPACE_ID lastQueried = 0;
+		std::map<SPACE_ID, CellLossSpace> pending;
+		std::vector<std::pair<SPACE_ID, ENTITY_ID>> legacy;
+	};
+	struct ConfirmedCellLoss
+	{
+		COMPONENT_ID lost;
+		uint64 session;
+		uint64 managerSession;
+		SPACE_ID space;
+		uint64 version;
+		std::vector<ENTITY_ID> handoffs;
+		std::vector<ENTITY_ID> routed;
+		size_t lostReals = 0;
+	};
+	std::map<COMPONENT_ID, CellLoss> cellLosses_;
+	std::map<std::pair<COMPONENT_ID, uint64>, uint64> recentCellProcessExits_;
+	std::deque<ConfirmedCellLoss> confirmedCellLosses_;
+	struct CellRecoveryStaging
+	{
+		CellRecovery::LostReal loss;
+		std::vector<ENTITY_ID> entities;
+		COMPONENT_ID target = 0;
+		uint64 version = 0;
+		uint64 targetProcess = 0;
+		uint64 targetSession = 0;
+		uint64 nextQuery = 0;
+		size_t nextEntity = 0;
+		bool committed = false;
+		bool mayInstall = false;
+		bool retired = false;
+		struct Pending
+		{
+			uint64 retryAt;
+			bool discarding = false;
+		};
+		std::map<ENTITY_ID, Pending> awaiting;
+
+		void resetProgress(uint64 session)
+		{
+			targetSession = session;
+			nextEntity = 0;
+			awaiting.clear();
+		}
+	};
+	using CellRecoveryGroup = std::pair<COMPONENT_ID, SPACE_ID>;
+	std::map<CellRecoveryGroup, CellRecoveryStaging> cellRecoveryStaging_;
+	CellRecoveryGroup lastStagingGroup_{};
+	struct RecoveryActivation
+	{
+		CellRecovery::StageKey key;
+		COMPONENT_ID target;
+		uint64 targetProcess;
+		uint64 session;
+		uint64 managerSession;
+		uint64 retryAt;
+		bool discarding = false;
+	};
+	std::map<ENTITY_ID, RecoveryActivation> recoveryActivations_;
+	ENTITY_ID lastRecoveryActivation_ = 0;
+	std::map<COMPONENT_ID, Components::ComponentInfos> recoveryPeers_;
+	std::unique_ptr<Network::EndPoint, void(*)(Network::EndPoint*)> recoveryEndpoint_{
+		nullptr, Network::EndPoint::reclaimPoolObject};
+	COMPONENT_ID recoveryPeer_ = 0;
+	uint64 nextRecoveryConnect_ = 0;
+	uint64 recoveryConnectDeadline_ = 0;
+	COMPONENT_ID lastQueriedCellLoss_ = 0;
+	uint64 nextCellLossQuery_ = 0;
+	uint64 heldCellRecoveryScopes_ = 0;
+	uint64 confirmedRealLosses_ = 0;
+	uint64 confirmedLossesWithBackup_ = 0;
+	uint64 stagedCellRecoveryReceipts_ = 0;
+	uint64 heldCellRecoveryScopes() const { return heldCellRecoveryScopes_; }
+	uint64 confirmedRealLosses() const { return confirmedRealLosses_; }
+	uint64 confirmedLossesWithBackup() const { return confirmedLossesWithBackup_; }
+	uint64 pendingCellRecoveryPeers() const { return cellLosses_.size(); }
+	uint64 stagedCellRecoveryReceipts() const { return stagedCellRecoveryReceipts_; }
+	uint64 pendingRecoveryActivations() const { return recoveryActivations_.size(); }
+	void queryCellRecoveryScopes();
+	void processConfirmedCellLosses();
+	void processCellRecoveryStaging();
+	void processRecoveryActivations();
+	void reconnectRecoveryPeer();
+	void forgetRecoveryPeer(COMPONENT_ID cid);
+	void deferCellLoss(Network::Channel& channel);
+	void notifyCellAppDeath(const Network::Address& address);
+	void restoreLegacyCellEntities(COMPONENT_ID cid, const std::vector<ENTITY_ID>& ids, bool excludeTransfers);
 
 	TimerHandle												pResmgrTimerHandle_;
 

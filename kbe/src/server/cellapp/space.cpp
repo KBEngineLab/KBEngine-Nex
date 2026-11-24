@@ -357,7 +357,9 @@ void Space::loadSpaceGeometry(const std::map< int, std::string >& params)
 	KBE_ASSERT(pNavHandle_ == NULL);
 	KBE_ASSERT(!isGeometryLoading_);
 	isGeometryLoading_ = true;
-	const uint64 loadGeneration = ++geometryLoadGeneration_;
+	// 替代区域可能取消后复用同一个 Space 编号，旧任务也不能命中新对象。
+	static uint64 nextGeometryLoadGeneration = 0;
+	const uint64 loadGeneration = geometryLoadGeneration_ = ++nextGeometryLoadGeneration;
 	Cellapp::getSingleton().threadPool().addTask(new LoadNavmeshTask(
 		getGeometryPath(), this->id(), loadGeneration, params));
 }
@@ -375,6 +377,8 @@ void Space::unLoadSpaceGeometry()
 	geometryParams_.clear();
 	delSpaceData("_mapping");
 
+	if (isPreparingReplacement())
+		return;
 	Network::Channel* pChannel = Components::getSingleton().getCellappmgrChannel();
 	if (pChannel != NULL)
 	{
@@ -402,6 +406,8 @@ void Space::onLoadedSpaceGeometryMapping(const std::string& resPath, uint64 load
 	INFO_MSG(fmt::format("KBEngine::onLoadedSpaceGeometryMapping: spaceID={}, respath={}!\n",
 			id(), getGeometryPath()));
 
+	if (isPreparingReplacement())
+		return;
 	// 通知脚本
 	if (!isLayoutReplica())
 	{
@@ -665,6 +671,8 @@ bool Space::destroy(ENTITY_ID entityID, bool ignoreGhost, DestroyMode mode)
 		}
 	}
 	const bool layoutRemoval = mode == DestroyMode::LayoutRemoval;
+	if (mode != DestroyMode::Shutdown && pendingRecoveryActivations_)
+		return false;
 	if (mode != DestroyMode::Shutdown && (layoutRemoval || entityID != 0) &&
 		hasPendingMigrationEntities(layoutRemoval))
 	{
@@ -733,10 +741,28 @@ bool Space::destroy(ENTITY_ID entityID, bool ignoreGhost, DestroyMode mode)
 //-------------------------------------------------------------------------------------
 void Space::finalise(bool notifyCellappmgr)
 {
+	recoveryInstallations_.clear();
+	pendingRecoveryActivations_ = 0;
+	if (isRecoveryTarget())
+		Cellapp::getSingleton().discardStagedRecoveryBackups(id_, layoutVersion_);
 	_clearGhosts();
 	if (!notifyCellappmgr)
 		return;
 
+	if (isPreparingReplacement())
+	{
+		if (auto* manager = replacementManagerChannel())
+		{
+			SpaceLayout::Packet removed;
+			removed.sender = g_componentID;
+			removed.operation = SpaceLayout::REMOVED;
+			removed.spaceID = id_;
+			removed.version = layoutVersion_;
+			removed.revision = resourceRevision_;
+			Cellapp::getSingleton().sendSpaceLayout(removed, manager);
+		}
+		return;
+	}
 	if (layoutVersion_ != 0)
 	{
 		SpaceLayout::Packet removed;
@@ -927,6 +953,8 @@ void Space::delSpaceData(const std::string& key)
 //-------------------------------------------------------------------------------------
 void Space::onSpaceDataChanged(const std::string& key, const std::string& value, bool isdel)
 {
+	if (isPreparingReplacement())
+		return;
 	// 通知脚本
 	if(!isdel)
 	{

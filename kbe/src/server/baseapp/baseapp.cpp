@@ -416,6 +416,8 @@ void Baseapp::onShutdownBegin()
 		const_cast<char*>("i"), 0, false);
 
 	pRestoreEntityHandlers_.clear();
+	cellLosses_.clear();
+	confirmedCellLosses_.clear();
 }
 
 //-------------------------------------------------------------------------------------	
@@ -513,6 +515,12 @@ bool Baseapp::initializeWatcher()
 
 	WATCH_OBJECT("numProxices", this, &Baseapp::numProxices);
 	WATCH_OBJECT("numClients", this, &Baseapp::numClients);
+	WATCH_OBJECT("cellRecovery/heldScopes", this, &Baseapp::heldCellRecoveryScopes);
+	WATCH_OBJECT("cellRecovery/confirmedRealLosses", this, &Baseapp::confirmedRealLosses);
+	WATCH_OBJECT("cellRecovery/confirmedLossesWithBackup", this, &Baseapp::confirmedLossesWithBackup);
+	WATCH_OBJECT("cellRecovery/stagedBackupReceipts", this, &Baseapp::stagedCellRecoveryReceipts);
+	WATCH_OBJECT("cellRecovery/pendingActivations", this, &Baseapp::pendingRecoveryActivations);
+	WATCH_OBJECT("cellRecovery/pendingPeers", this, &Baseapp::pendingCellRecoveryPeers);
 	WATCH_OBJECT("load", this, &Baseapp::_getLoad);
 	WATCH_OBJECT("network/clientVolatileBackpressure/activeClients", this, &Baseapp::volatileBackpressuredClients);
 	WATCH_OBJECT("network/clientVolatileBackpressure/suppressions", this, &Baseapp::volatileBackpressureSuppressions);
@@ -828,6 +836,17 @@ void Baseapp::handleGameTick()
 		}
 	}
 
+	if (!cellLosses_.empty() && timestamp() >= nextCellLossQuery_ && !isShuttingdown())
+		queryCellRecoveryScopes();
+	if (!confirmedCellLosses_.empty() && !isShuttingdown())
+		processConfirmedCellLosses();
+	if (!cellRecoveryStaging_.empty())
+		processCellRecoveryStaging();
+	if (!recoveryActivations_.empty())
+		processRecoveryActivations();
+	if (!recoveryPeers_.empty())
+		reconnectRecoveryPeer();
+
 	handleBackup();
 	handleArchive();
 }
@@ -920,6 +939,8 @@ void Baseapp::finalise()
 	}
 
 	pRestoreEntityHandlers_.clear();
+	cellLosses_.clear();
+	confirmedCellLosses_.clear();
 	loopCheckTimerHandle_.cancel();
 	pResmgrTimerHandle_.cancel();
 	forward_messagebuffer_.clear();
@@ -936,19 +957,34 @@ void Baseapp::finalise()
 //-------------------------------------------------------------------------------------
 void Baseapp::onCellAppDeath(Network::Channel * pChannel)
 {
-	if(pChannel && pChannel->isExternal())
+	if (!pChannel || pChannel->isExternal() || shuttingdown_ != SHUTDOWN_STATE_STOP)
 		return;
-	
-	if(shuttingdown_ != SHUTDOWN_STATE_STOP)
+
+	if (g_serverConfig.getCellAppMgr().cellappmgr_space_partitioning_enabled)
 	{
+		deferCellLoss(*pChannel);
 		return;
 	}
-	
+
+	notifyCellAppDeath(pChannel->addr());
+	const COMPONENT_ID cid = pChannel->componentID();
+	std::vector<ENTITY_ID> ids;
+	for (const auto& entry : pEntities_->getEntities())
+	{
+		auto* entity = static_cast<Entity*>(entry.second.get());
+		if (entity->cellEntityCall() && entity->cellEntityCall()->componentID() == cid)
+			ids.push_back(entity->id());
+	}
+	restoreLegacyCellEntities(cid, ids, false);
+}
+
+//-------------------------------------------------------------------------------------
+void Baseapp::notifyCellAppDeath(const Network::Address& addr)
+{
 	PyObject* pyarg = PyTuple_New(1);
 
 	PyObject* pyobj = PyTuple_New(2);
 
-	const Network::Address& addr = pChannel->pEndPoint()->addr();
 	PyTuple_SetItem(pyobj, 0, PyLong_FromUnsignedLong(addr.ip));
 	PyTuple_SetItem(pyobj, 1, PyLong_FromUnsignedLong(addr.port));
 	PyTuple_SetItem(pyarg, 0, pyobj);
@@ -972,28 +1008,6 @@ void Baseapp::onCellAppDeath(Network::Channel * pChannel)
 		else
 			SCRIPT_ERROR_CHECK();
 	}
-
-	RestoreEntityHandler* pRestoreEntityHandler = new RestoreEntityHandler(pChannel->componentID(), this->networkInterface());
-	Entities<Entity>::ENTITYS_MAP& entitiesMap = pEntities_->getEntities();
-	Entities<Entity>::ENTITYS_MAP::const_iterator iter = entitiesMap.begin();
-	while (iter != entitiesMap.end())
-	{
-		Entity* pEntity = static_cast<Entity*>(iter->second.get());
-		
-		EntityCall* cell = pEntity->cellEntityCall();
-		if(cell && cell->componentID() == pChannel->componentID())
-		{
-			S_RELEASE(cell);
-			pEntity->cellEntityCall(NULL);
-			pEntity->installCellDataAttr(pEntity->getCellData());
-			pEntity->onCellAppDeath();
-			pRestoreEntityHandler->pushEntity(pEntity->id());
-		}
-
-		iter++;
-	}
-
-	pRestoreEntityHandlers_.push_back(KBEShared_ptr< RestoreEntityHandler >(pRestoreEntityHandler));
 }
 
 //-------------------------------------------------------------------------------------

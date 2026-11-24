@@ -128,6 +128,7 @@ public:
 	INLINE COMPONENT_ID ghostCell(void) const;
 	INLINE void ghostCell(COMPONENT_ID cellID);
 	INLINE uint64 routingEpoch(void) const;
+	void routingEpoch(uint64 epoch) { routingEpoch_ = epoch; }
 	INLINE COMPONENT_ID migrationRelayCell(void) const;
 	INLINE void migrationRelayCell(COMPONENT_ID cellID);
 
@@ -260,7 +261,8 @@ public:
 	void teleportLocal(PyObject_ptr nearbyMBRef, Position3D& pos, Direction3D& dir);
 	void teleportRefEntity(Entity* entity, Position3D& pos, Direction3D& dir);
 	void teleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Direction3D& dir);
-	void onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Direction3D& dir);
+	bool dispatchTeleport(ENTITY_ID targetEntity, COMPONENT_ID target, const Position3D& pos,
+		const Direction3D& dir, uint64 epoch = 0);
 
 	/**
 		传送前置决策以及成功、失败回调；onTeleport返回false时拒绝传送。
@@ -608,12 +610,12 @@ public:
 	/** 
 		转变为ghost, 自身必须为real
 	*/
-	void changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s, uint64 handoffEpoch = 0);
+	void changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s, uint64 epoch = 0, bool handoff = false);
 	bool isMigrationSource() const { return migrationSource_; }
 	bool isCellHandoffSource() const { return handoffSource_; }
 	void beginCellHandoffTarget(COMPONENT_ID source);
 	void completeCellHandoff();
-	uint64 reserveCellHandoffEpoch();
+	uint64 reserveRoutingEpoch();
 	uint64 cellHandoffEpoch() const { return cellHandoffEpoch_; }
 	uint64 autoHandoffRetryAt() const { return autoHandoffRetryAt_; }
 	void autoHandoffRetryAt(uint64 value) { autoHandoffRetryAt_ = value; }
