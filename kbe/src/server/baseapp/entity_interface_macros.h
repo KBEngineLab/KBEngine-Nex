@@ -476,7 +476,7 @@ namespace KBEngine{
 			ARG_TYPE1 ARG_NAME1;												\
 			ARG_TYPE2 ARG_NAME2;												\
 			ARG_TYPE3 ARG_NAME3;												\
-			ARG_TYPE3 ARG_NAME4;												\
+			ARG_TYPE4 ARG_NAME4;												\
 			s >> ARG_NAME1 >> ARG_NAME2 >> ARG_NAME3 >> ARG_NAME4;				\
 			if(e)																\
 			{																	\

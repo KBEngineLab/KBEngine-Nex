@@ -346,21 +346,26 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappInterface)
 								DBID,												dbid)
 
 	// entity请求迁移到另一个cellapp上的space过程开始
-	ENTITY_MESSAGE_DECLARE_ARGS2(onMigrationCellappStart,							NETWORK_FIXED_MESSAGE,
+	ENTITY_MESSAGE_DECLARE_ARGS4(onMigrationCellappStart,							NETWORK_FIXED_MESSAGE,
 								COMPONENT_ID,										sourceCellAppID,
-								COMPONENT_ID,										targetCellAppID)
+								COMPONENT_ID,										targetCellAppID,
+								uint64,											epoch,
+								uint8,											refreshWitness)
 		
 	// entity请求迁移到另一个cellapp上的space过程结束
-	ENTITY_MESSAGE_DECLARE_ARGS2(onMigrationCellappEnd,								NETWORK_FIXED_MESSAGE,
+	ENTITY_MESSAGE_DECLARE_ARGS4(onMigrationCellappEnd,								NETWORK_FIXED_MESSAGE,
 								COMPONENT_ID,										sourceCellAppID,
-								COMPONENT_ID,										targetCellAppID)
+								COMPONENT_ID,										targetCellAppID,
+								uint64,											epoch,
+								SPACE_ID,											spaceID)
 
 	// Target 在提交点再次确认迁移实体仍然存活，BaseApp 收到成功确认后才切路由并释放 Source。
 	// The Target revalidates the migrating Entity at commit time; BaseApp switches routing and releases Source only after success.
-	ENTITY_MESSAGE_DECLARE_ARGS3(onMigrationCellappPrepared,						NETWORK_FIXED_MESSAGE,
+	ENTITY_MESSAGE_DECLARE_ARGS4(onMigrationCellappPrepared,						NETWORK_FIXED_MESSAGE,
 								COMPONENT_ID,										sourceCellAppID,
 								COMPONENT_ID,										targetCellAppID,
-								bool,											success)
+								uint64,											epoch,
+								uint8,											status)
 
 	ENTITY_MESSAGE_DECLARE_STREAM(onCellHandoff, NETWORK_VARIABLE_MESSAGE)
 

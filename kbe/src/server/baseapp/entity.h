@@ -240,10 +240,12 @@ public:
 	/** 网络接口
 		entity请求迁移到另一个cellapp上的过程开始和结束。
 	*/
-	void onMigrationCellappStart(Network::Channel* pChannel, COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID);
-	void onMigrationCellappEnd(Network::Channel* pChannel, COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID);
+	void onMigrationCellappStart(Network::Channel* pChannel, COMPONENT_ID sourceCellAppID,
+		COMPONENT_ID targetCellAppID, uint64 epoch, uint8 refreshWitness);
+	void onMigrationCellappEnd(Network::Channel* pChannel, COMPONENT_ID sourceCellAppID,
+		COMPONENT_ID targetCellAppID, uint64 epoch, SPACE_ID spaceID);
 	void onMigrationCellappPrepared(Network::Channel* pChannel, COMPONENT_ID sourceCellAppID,
-		COMPONENT_ID targetCellAppID, bool success);
+		COMPONENT_ID targetCellAppID, uint64 epoch, uint8 status);
 	void onCellHandoff(Network::Channel* channel, MemoryStream& stream);
 	bool retryCellHandoff();
 	void onMigrationCellappOver(COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID);
@@ -333,9 +335,6 @@ protected:
 	// 跳转前所产生的包会比cell2的enterSpace包慢到达)，因此发生这种情况时需要将cell2的包先缓存
 	// 等cell1的包到达后执行完毕再执行cell2的包
 	BaseMessagesForwardClientHandler*		pBufferedSendToClientMessages_;
-	bool									pendingMigrationEnd_;
-	COMPONENT_ID							pendingMigrationSourceCellAppID_;
-	COMPONENT_ID							pendingMigrationTargetCellAppID_;
 	// End may arrive from Target before Start drains from Source's channel. Keep the
 	// authoritative End route after the forwarding task times out so a late Start can
 	// be consumed idempotently instead of dereferencing a released task. / Target 的 End
@@ -346,6 +345,18 @@ protected:
 	bool									migrationCommitPending_;
 	COMPONENT_ID							migrationCommitSourceCellAppID_;
 	COMPONENT_ID							migrationCommitTargetCellAppID_;
+	uint64									migrationEpoch_ = 0;
+	uint64									completedMigrationEpoch_ = 0;
+	COMPONENT_ID							migrationAttemptSource_ = 0;
+	COMPONENT_ID							migrationAttemptTarget_ = 0;
+	SPACE_ID								migrationSpace_ = 0;
+	uint64									migrationTargetSession_ = 0;
+	uint64									migrationWarningAt_ = 0;
+	bool									migrationRollbackPending_ = false;
+	bool									migrationWitnessPending_ = false;
+	bool									retryTeleport();
+	void									resetTeleport();
+	void									refreshTeleportWitness();
 	CellHandoff::Route						cellHandoffRoute_;
 	CellHandoff::Action						cellHandoffAction_ = CellHandoff::NONE;
 	uint64									cellHandoffWarningAt_ = 0;

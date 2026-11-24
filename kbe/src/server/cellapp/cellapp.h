@@ -35,6 +35,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <memory>
 #include <set>
+#include <tuple>
 	
 namespace KBEngine{
 
@@ -277,8 +278,11 @@ public:
 	*/
 	void reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s);
 	void reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s);
+	void reqTeleportToCellAppCheck(Network::Channel* pChannel, MemoryStream& s);
 	void reqTeleportToCellAppPrepare(Network::Channel* pChannel, MemoryStream& s);
 	void reqTeleportToCellAppOver(Network::Channel* pChannel, MemoryStream& s);
+	void trackTeleportSource(Entity& entity, COMPONENT_ID target, uint64 session, MemoryStream& snapshot);
+	bool deferTeleportWitness(Entity& entity, Network::Channel* base);
 
 	/**
 		获取和设置ghost管理器
@@ -304,6 +308,23 @@ protected:
 	void processCellHandoffs();
 	bool beginCellHandoff(ENTITY_ID id, bool automatic);
 	void retryCellHandoffMessages();
+	void retryTeleports();
+	void restoreTeleportSource(ENTITY_ID id, COMPONENT_ID target, uint64 epoch);
+	struct OutgoingTeleport
+	{
+		COMPONENT_ID target = 0;
+		COMPONENT_ID base = 0;
+		uint64 epoch = 0;
+		uint64 session = 0;
+		uint64 checkAt = 0;
+		MemoryStream snapshot;
+		bool restored = false;
+	};
+	std::map<ENTITY_ID, std::unique_ptr<OutgoingTeleport>> outgoingTeleports_;
+	// 源 Cell 确认前，即使目标实体已离开，也要能答复本轮传送结果。
+	using CellOnlyTeleport = std::tuple<COMPONENT_ID, ENTITY_ID, uint64>;
+	std::map<CellOnlyTeleport, uint64> acceptedCellOnlyTeleports_;
+	uint64 nextTeleportRetry_ = 0;
 	std::set<ENTITY_ID> pendingCellHandoffs_;
 	std::set<ENTITY_ID> pendingAutoCellHandoffs_;
 	bool autoCellHandoffEnabled_ = false;

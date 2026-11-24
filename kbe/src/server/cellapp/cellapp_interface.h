@@ -164,6 +164,7 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
 
 	// entity传送到目的cellapp上的space之后， 返回给之前cellapp的回调
 	CELLAPP_MESSAGE_DECLARE_STREAM(reqTeleportToCellAppCB,							NETWORK_VARIABLE_MESSAGE)
+	CELLAPP_MESSAGE_DECLARE_STREAM(reqTeleportToCellAppCheck,						NETWORK_VARIABLE_MESSAGE)
 
 	// BaseApp 提交迁移前要求 Target 再次确认实体、Space 和来源关系仍然有效。
 	// Before committing a migration, BaseApp asks Target to revalidate Entity, Space, and predecessor identity.

@@ -574,12 +574,13 @@ def verify_layout_removal(cells, result, base, origin_space, output):
             wait_for("已收到 REMOVE 但未销毁",
                      lambda: destination.evaluate(f"KBEngine.getSpaceLayout({space_id})"),
                      lambda value: value and value["state"] == "releasing", timeout=5)
-            local_entity, local_real = destination.evaluate(
-                f"(lambda e: (e.id, e.isReal()))(KBEngine.createEntity('SpawnPoint', {space_id}, "
-                "(0.0, 0.0, 0.0), (0.0, 0.0, 0.0), {'spawnEntityNO': 40001003}))"
+            require(not destination.evaluate(f"KBEngine.getSpaceLayout({space_id})['acceptsEntities']"),
+                    "等待迁移完成时未公布 Space 已停止接收实体")
+            error = captured_error(
+                destination, f"KBEngine.createEntity('SpawnPoint', {space_id}, "
+                "(0.0, 0.0, 0.0), (0.0, 0.0, 0.0), {'spawnEntityNO': 40001003})"
             )
-            require(local_real and entity_is_real(destination, local_entity, space_id),
-                    "等待迁移完成时不再允许本地业务创建 Real")
+            require(error and error[0] == "RuntimeError", "等待迁移完成时仍允许脚本创建 Real")
             require(not teleport(second), "第二次传送未发往远端")
             wait_for("删除中的 Space 拒绝新迁入并恢复源实体",
                      lambda: entity_is_real(origin, second, origin_space["space"]), bool, timeout=5)
@@ -597,12 +598,10 @@ def verify_layout_removal(cells, result, base, origin_space, output):
     )
     require(origin.evaluate(f"KBEngine.entities.get({first}) is None"),
             "已有迁移没有提交并清理源端")
-    require(destination.evaluate(f"KBEngine.entities.get({local_entity}) is None"),
-            "等待期间创建的本地实体未随 Space 一起销毁")
     require(entity_is_real(origin, second, origin_space["space"]), "被拒绝的迁移未保留源端 Real")
     remove_route = f"del KBEngine.globalData[{route_key!r}]"
     base.evaluate(f"exec({remove_route!r})")
     result["logical_space_removed"] = True
     result["pending_migration_protected"] = True
-    result["local_creation_while_releasing"] = True
+    result["local_creation_rejected_while_releasing"] = True
     print(f"SPACE_LAYOUT_REMOVAL_PASS space={space_id}", flush=True)

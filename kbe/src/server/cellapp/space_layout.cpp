@@ -530,12 +530,13 @@ PyObject* Cellapp::__py_getSpaceLayout(PyObject*, PyObject* args)
 		PyList_Append(cells, cell);
 		Py_DECREF(cell);
 	}
-	return Py_BuildValue("{s:K,s:s,s:s,s:K,s:K,s:I,s:O,s:O,s:N}",
+	return Py_BuildValue("{s:K,s:s,s:s,s:K,s:K,s:I,s:O,s:O,s:O,s:N}",
 		"version", static_cast<unsigned long long>(space->layoutVersion()),
 		"state", SpaceLayout::stateName(space->layoutState()), "error", space->layoutError().c_str(),
 		"resourceRevision", static_cast<unsigned long long>(space->resourceRevision()),
 		"ownerCellAppID", static_cast<unsigned long long>(space->layout().owner),
 		"localCellID", space->pCell() == NULL ? 0u : space->pCell()->id(),
+		"acceptsEntities", space->canAcceptEntities() ? Py_True : Py_False,
 		"resourcesReady", space->isGeometryLoading() ? Py_False : Py_True,
 		"hasNavigation", space->pNavHandle() == NULL ? Py_False : Py_True,
 		"cells", cells);

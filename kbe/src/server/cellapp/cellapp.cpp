@@ -44,6 +44,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "server/telnet_server.h"
 #include "server/py_file_descriptor.h"
 #include "server/script_stage_timing.h"
+#include "server/teleport_status.h"
 #include "dbmgr/dbmgr_interface.h"
 #include "navigation/navigation.h"
 #include "client_lib/client_interface.h"
@@ -620,6 +621,8 @@ void Cellapp::handleGameTick()
 		processCellHandoffs();
 	if (!outgoingCellHandoffs_.empty() && timestamp() >= nextCellHandoffStartRetry_)
 		retryCellHandoffMessages();
+	if ((!outgoingTeleports_.empty() || !acceptedCellOnlyTeleports_.empty()) && timestamp() >= nextTeleportRetry_)
+		retryTeleports();
 	// 等 Space 和坐标节点更新完成后再执行脚本，避免回调中销毁或再次传送。
 	if (pWitnessedTimeoutHandler_ && spacePartitioningEnabled())
 		pWitnessedTimeoutHandler_->dispatchPendingExits();
@@ -1092,6 +1095,12 @@ PyObject* Cellapp::__py_createEntity(PyObject* self, PyObject* args)
 	if(space == NULL || !space->isGood())
 	{
 		PyErr_Format(PyExc_ValueError, "KBEngine.createEntity: spaceID %u was not found", spaceID);
+		return NULL;
+	}
+
+	if (!space->canAcceptEntities())
+	{
+		PyErr_Format(PyExc_RuntimeError, "KBEngine.createEntity: spaceID %u is closing", spaceID);
 		return NULL;
 	}
 	
@@ -3369,6 +3378,164 @@ void Cellapp::checkCellHandoffSnapshot(Network::Channel* channel, MemoryStream& 
 }
 
 //-------------------------------------------------------------------------------------
+namespace
+{
+enum class TeleportCheck : uint8
+{
+	QUERY,
+	ORDERED_QUERY,
+	ACKNOWLEDGE
+};
+
+void sendTeleportCheck(Network::Channel* channel, ENTITY_ID id, COMPONENT_ID base, uint64 epoch, TeleportCheck check)
+{
+	if (!canSendCellHandoff(channel))
+		return;
+	auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	bundle->newMessage(CellappInterface::reqTeleportToCellAppCheck);
+	(*bundle) << id << base << epoch << static_cast<uint8>(check);
+	channel->send(bundle);
+}
+
+template<typename... Details>
+void sendTeleportBase(Network::Channel* channel, const Network::MessageHandler& handler,
+	ENTITY_ID id, COMPONENT_ID source, COMPONENT_ID target, uint64 epoch, Details... details)
+{
+	if (!canSendCellHandoff(channel))
+		return;
+	auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	bundle->newMessage(handler);
+	(*bundle) << id << source << target << epoch;
+	((*bundle) << ... << details);
+	channel->send(bundle);
+}
+
+void sendTeleportReply(Network::Channel* channel, ENTITY_ID id, COMPONENT_ID source,
+	COMPONENT_ID base, uint64 epoch, bool success)
+{
+	auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	bundle->newMessage(CellappInterface::reqTeleportToCellAppCB);
+	(*bundle) << source << g_componentID << base << id << success << epoch;
+	channel->send(bundle);
+}
+
+void sendTeleportStatus(Network::Channel* channel, ENTITY_ID id, COMPONENT_ID source,
+	uint64 epoch, TeleportStatus::Value status)
+{
+	if (!canSendCellHandoff(channel))
+		return;
+	auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	bundle->newMessage(BaseappInterface::onMigrationCellappPrepared);
+	(*bundle) << id << source << g_componentID << epoch << static_cast<uint8>(status);
+	channel->send(bundle);
+}
+}
+
+void Cellapp::trackTeleportSource(Entity& entity, COMPONENT_ID target, uint64 session, MemoryStream& snapshot)
+{
+	auto pending = std::make_unique<OutgoingTeleport>();
+	pending->target = target;
+	pending->base = entity.baseEntityCall() ? entity.baseEntityCall()->componentID() : 0;
+	pending->epoch = entity.routingEpoch();
+	pending->session = session;
+	pending->checkAt = timestamp() + 2 * stampsPerSecond();
+	pending->snapshot.swap(snapshot);
+	auto* base = Components::getSingleton().findComponentChannel(BASEAPP_TYPE, pending->base);
+	sendTeleportBase(base, BaseappInterface::onMigrationCellappStart, entity.id(),
+		componentID_, target, pending->epoch, uint8(0));
+	outgoingTeleports_[entity.id()] = std::move(pending);
+}
+
+bool Cellapp::deferTeleportWitness(Entity& entity, Network::Channel* base)
+{
+	auto it = outgoingTeleports_.find(entity.id());
+	if (it == outgoingTeleports_.end() || it->second->restored || it->second->epoch != entity.routingEpoch() ||
+		!base || base->componentID() != it->second->base ||
+		!Components::getSingleton().isExpectedComponentChannel(BASEAPP_TYPE, base))
+		return false;
+
+	// 重登可能赶在 Base 收到 Start 之前。把这次绑定交回 Base，在路由确定后重发。
+	sendTeleportBase(base, BaseappInterface::onMigrationCellappStart, entity.id(),
+		componentID_, it->second->target, it->second->epoch, uint8(1));
+	return true;
+}
+
+void Cellapp::retryTeleports()
+{
+	const uint64 now = timestamp();
+	nextTeleportRetry_ = now + stampsPerSecond();
+	auto& components = Components::getSingleton();
+	for (auto& [attempt, retryAt] : acceptedCellOnlyTeleports_)
+	{
+		if (now < retryAt)
+			continue;
+		const auto& [source, id, epoch] = attempt;
+		auto* channel = components.findComponentChannel(CELLAPP_TYPE, source);
+		if (canSendCellHandoff(channel))
+			sendTeleportReply(channel, id, source, 0, epoch, true);
+	}
+	for (auto it = outgoingTeleports_.begin(); it != outgoingTeleports_.end();)
+	{
+		const auto& pending = *it->second;
+		auto* entity = findEntity(it->first);
+		if (!entity || entity->routingEpoch() != pending.epoch)
+		{
+			it = outgoingTeleports_.erase(it);
+			continue;
+		}
+		const ENTITY_ID id = it++->first;
+		if (now < pending.checkAt)
+			continue;
+
+		auto* base = components.findComponentChannel(BASEAPP_TYPE, pending.base);
+		if (pending.restored)
+		{
+			sendTeleportBase(base, BaseappInterface::onMigrationCellappEnd, id,
+				componentID_, componentID_, pending.epoch, entity->spaceID());
+			continue;
+		}
+		sendTeleportBase(base, BaseappInterface::onMigrationCellappStart, id,
+			componentID_, pending.target, pending.epoch, uint8(0));
+		auto* target = components.findComponentChannel(CELLAPP_TYPE, pending.target);
+		if (canSendCellHandoff(target))
+			sendTeleportCheck(target, id, pending.base, pending.epoch,
+				target->sessionEpoch() == pending.session ? TeleportCheck::ORDERED_QUERY : TeleportCheck::QUERY);
+	}
+}
+
+void Cellapp::restoreTeleportSource(ENTITY_ID id, COMPONENT_ID target, uint64 epoch)
+{
+	auto it = outgoingTeleports_.find(id);
+	auto* entity = findEntity(id);
+	if (it == outgoingTeleports_.end() || !entity || entity->isDestroyed())
+		return;
+	auto& pending = *it->second;
+	if (pending.target != target || pending.epoch != epoch || entity->routingEpoch() != epoch)
+		return;
+	if (!pending.restored)
+	{
+		if (!entity->isMigrationSource() || entity->isReal() || entity->realCell() != target)
+			return;
+		EntityPtr held(entity);
+		Entity::bufferCallback(true);
+		entity->changeToReal(0, pending.snapshot);
+		entity->restoreProximitys();
+		pending.restored = true;
+		// Base 确认前不允许下一次迁移覆盖本轮编号。
+		if (pending.base)
+			entity->addFlags(ENTITY_FLAGS_TELEPORT_START);
+		auto* base = Components::getSingleton().findComponentChannel(BASEAPP_TYPE, pending.base);
+		sendTeleportBase(base, BaseappInterface::onMigrationCellappEnd, id,
+			componentID_, componentID_, epoch, entity->spaceID());
+		if (!pending.base)
+		{
+			outgoingTeleports_.erase(it);
+			entity->onTeleportFailure();
+		}
+		Entity::bufferCallback(false);
+	}
+}
+
 void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 {
 	const size_t teleportHeaderSize = sizeof(ENTITY_ID) * 2 + sizeof(SPACE_ID) +
@@ -3387,8 +3554,6 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 		s.done();
 		return;
 	}
-
-	size_t rpos = s.rpos();
 
 	ENTITY_ID nearbyMBRefID = 0, teleportEntityID = 0;
 	Position3D pos;
@@ -3413,20 +3578,34 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 		return;
 	}
 
+	BoundedStreamReader snapshot(s);
+	ENTITY_SCRIPT_UID snapshotType = 0;
+	uint64 epoch = 0;
+	if (!snapshot.read(snapshotType) || !snapshot.read(epoch) || !epoch)
+	{
+		s.done();
+		return;
+	}
+	const CellOnlyTeleport attempt{ghostCell, teleportEntityID, epoch};
+	if (!entityBaseappID && acceptedCellOnlyTeleports_.count(attempt))
+	{
+		sendTeleportReply(pChannel, teleportEntityID, ghostCell, 0, epoch, true);
+		s.done();
+		return;
+	}
 	const auto reject = [&]
 	{
-		s.rpos((int)rpos);
-
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-		(*pBundle).newMessage(CellappInterface::reqTeleportToCellAppCB);
-		(*pBundle) << ghostCell << g_componentID << entityBaseappID;
-		(*pBundle) << teleportEntityID;
-		(*pBundle) << false;
-		(*pBundle).append(&s);
-		pChannel->send(pBundle);
+		sendTeleportReply(pChannel, teleportEntityID, ghostCell, entityBaseappID, epoch, false);
 		s.done();
 	};
 
+	Entity* existing = findEntity(teleportEntityID);
+	if (existing && !existing->isDestroyed() && existing->isReal())
+	{
+		// 目标已有 Real 时不能回滚源端；同一轮由状态查询重新确认。
+		s.done();
+		return;
+	}
 	Entity* refEntity = findEntity(nearbyMBRefID);
 	if (refEntity == NULL || refEntity->isDestroyed() || refEntity->isBoundaryGhost())
 	{
@@ -3437,10 +3616,8 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 	}
 
 	Space* space = Spaces::findSpace(refEntity->spaceID());
-	Entity* existing = findEntity(teleportEntityID);
-
-	bool success = false;
-	if (space == NULL || !space->canAcceptEntities() ||
+	auto* module = EntityDef::findScriptModule(entityType);
+	if (space == NULL || !space->canAcceptEntities() || !module || snapshotType != entityType ||
 		(existing && (!existing->isBoundaryGhost() || existing->realCell() != ghostCell ||
 			existing->pScriptModule()->getUType() != entityType)))
 	{
@@ -3457,20 +3634,12 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 	// 显式传送仍创建完整的 Real。目标进程已有边界副本时先释放同一源端的副本。
 	if (existing)
 		destroyEntity(teleportEntityID, false);
-	Entity* e = createEntity(EntityDef::findScriptModule(entityType)->getName(), NULL, false, teleportEntityID, false);
+	Entity* e = createEntity(module->getName(), NULL, false, teleportEntityID, false);
 	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_ENTITY_CONSTRUCT,
 		scriptStageDurationNanos(entityConstructStart), true, "reqTeleportToCellApp");
 	if (e == NULL)
 	{
-		s.rpos((int)rpos);
-
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-		(*pBundle).newMessage(CellappInterface::reqTeleportToCellAppCB);
-		(*pBundle) << ghostCell << g_componentID << entityBaseappID;
-		(*pBundle) << teleportEntityID;
-		(*pBundle) << success;
-		(*pBundle).append(&s);
-		pChannel->send(pBundle);
+		reject();
 
 		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellApp: create reqTeleportEntity({}) failed during migration.\n", teleportEntityID));
 		scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_DESERIALIZE_CREATE,
@@ -3509,6 +3678,11 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 		// 如果是有base的实体，需要将baseappID填入，以便在reqTeleportToCellAppCB中回调给baseapp传输结束状态
 		entityBaseappID = e->baseEntityCall()->componentID();
 	}
+	else if (!entityBaseappID)
+	{
+		// 进入 Space 的脚本可以销毁或再次传送实体，回包不能只依赖目标仍有 Real。
+		acceptedCellOnlyTeleports_.emplace(attempt, timestamp() + 2 * stampsPerSecond());
+	}
 
 	// 进入新space之前必须通知客户端leaveSpace
 	if (e->clientEntityCall())
@@ -3539,20 +3713,11 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(BaseappInterface::onMigrationCellappEnd);
 		(*pBundle) << e->id();
-		(*pBundle) << ghostCell << g_componentID;
+		(*pBundle) << ghostCell << g_componentID << epoch << e->spaceID();
 		e->baseEntityCall()->sendCall(pBundle);
 	}
 
-	success = true;
-
-	{
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-		(*pBundle).newMessage(CellappInterface::reqTeleportToCellAppCB);
-		(*pBundle) << ghostCell << g_componentID << entityBaseappID;
-		(*pBundle) << teleportEntityID;
-		(*pBundle) << success;
-		pChannel->send(pBundle);
-	}
+	sendTeleportReply(pChannel, teleportEntityID, ghostCell, entityBaseappID, epoch, true);
 	
 	Py_DECREF(e);
 }
@@ -3580,9 +3745,8 @@ void Cellapp::reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s
 
 	s >> sourceCellappID >> targetCellappID >> entityBaseappID >> teleportEntityID >> success;
 
-	Components::ComponentInfos* targetCellapp =
-		Components::getSingleton().findComponent(CELLAPP_TYPE, targetCellappID);
-	if (!Security::isBoundComponentSource(targetCellappID, targetCellapp, pChannel))
+	const auto* targetCellapp = findBoundCellappSource(pChannel);
+	if (!targetCellapp || targetCellapp->cid != targetCellappID)
 	{
 		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellAppCB: rejected unbound targetCellappID={}, addr={}.\n",
 			targetCellappID, pChannel->c_str()));
@@ -3601,87 +3765,88 @@ void Cellapp::reqTeleportToCellAppCB(Network::Channel* pChannel, MemoryStream& s
 		return;
 	}
 
-	// 无 Base 的实体没有权威路由切换点，可以在目标成功后立即释放 Source。
-	// Entities without a Base have no authoritative routing switch and can release Source immediately.
-	if(success)
-	{
-		if (entityBaseappID == 0)
-			destroyEntity(teleportEntityID, false);
-
-		scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_CALLBACK,
-			scriptStageDurationNanos(callbackStart), true, "reqTeleportToCellAppCB");
-		return;
-	}
-
 	BoundedStreamReader payload(s);
-	ENTITY_ID payloadID = 0, referenceID = 0;
-	if (!payload.read(payloadID) || !payload.read(referenceID) || referenceID == 0)
-	{
-		s.done();
+	uint64 epoch = 0;
+	const bool parsed = payload.read(epoch) && payload.empty() && teleportEntityID > 0 && epoch;
+	s.done();
+	if (!parsed)
 		return;
-	}
-	// 实体可能没有base部分，那么不需要通知baseapp
-	if (entityBaseappID > 0)
+	const auto it = outgoingTeleports_.find(teleportEntityID);
+	if (it != outgoingTeleports_.end() && it->second->base == entityBaseappID &&
+		it->second->target == targetCellappID && it->second->epoch == epoch)
 	{
-		Components::ComponentInfos* pInfos = Components::getSingleton().findComponent(BASEAPP_TYPE, entityBaseappID);
-		if (pInfos && pInfos->pChannel)
+		if (!success)
+			restoreTeleportSource(teleportEntityID, targetCellappID, epoch);
+		else if (!entityBaseappID)
 		{
-			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-			(*pBundle).newMessage(BaseappInterface::onMigrationCellappEnd);
-			(*pBundle) << teleportEntityID;
-			(*pBundle) << sourceCellappID << sourceCellappID;
-			pInfos->pChannel->send(pBundle);
-		}
-		else
-		{
-			ERROR_MSG(fmt::format("Cellapp::reqTeleportToCellAppCB: not found baseapp({}), entity({})!\n",
-				entityBaseappID, teleportEntityID));
+			outgoingTeleports_.erase(it);
+			auto* entity = findEntity(teleportEntityID);
+			if (entity && entity->isMigrationSource() && entity->realCell() == targetCellappID &&
+				entity->routingEpoch() == epoch)
+				destroyEntity(teleportEntityID, false);
 		}
 	}
-
-	// 某些情况下实体可能此时找不到了，例如：副本销毁了
-	Entity* entity = Cellapp::getSingleton().findEntity(teleportEntityID);
-	if(entity == NULL)
-	{
-		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellAppCB: source entity({}) was destroyed before the failure callback; treating it as a late lifecycle race.\n",
-			teleportEntityID));
-
-		s.done();
-		return;
-	}
-
-	// 传送失败了，我们需要重恢复entity
-	ENTITY_ID nearbyMBRefID = 0;
-	Position3D pos;
-	Direction3D dir;
-	ENTITY_SCRIPT_UID entityType;
-	SPACE_ID lastSpaceID = 0;
-	COMPONENT_ID sourceBaseappID = 0;
-	COMPONENT_ID sourceCellappIDFromPayload = 0;
-
-	s >> teleportEntityID >> nearbyMBRefID >> lastSpaceID;
-	s >> entityType;
-	s >> pos.x >> pos.y >> pos.z;
-	s >> dir.dir.x >> dir.dir.y >> dir.dir.z;
-	// The failure callback appends the original request verbatim. Consume both
-	// ownership fields added to the fixed header before restoring the entity stream.
-	// 失败回调会原样附加请求；恢复实体流前必须同时跳过固定头中的 BaseApp 和 CellApp 所有者字段。
-	s >> sourceBaseappID >> sourceCellappIDFromPayload;
-
-	Py_INCREF(entity);
-	entity->changeToReal(0, s);
-	entity->onTeleportFailure();
-	Py_DECREF(entity);
+	// 源副本已经清掉时也要确认，避免确认包丢失后目标一直保留记录。
+	if (success && !entityBaseappID)
+		sendTeleportCheck(pChannel, teleportEntityID, 0, epoch, TeleportCheck::ACKNOWLEDGE);
 	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_CALLBACK,
 		scriptStageDurationNanos(callbackStart), true, "reqTeleportToCellAppCB");
-	
-	s.done();
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::reqTeleportToCellAppCheck(Network::Channel* channel, MemoryStream& stream)
+{
+	auto* source = findBoundCellappSource(channel);
+	BoundedStreamReader reader(stream);
+	ENTITY_ID id = 0;
+	COMPONENT_ID baseID = 0;
+	uint64 epoch = 0;
+	uint8 action = 0;
+	const bool parsed = reader.read(id) && reader.read(baseID) && reader.read(epoch) &&
+		reader.read(action) && reader.empty() && id > 0 && epoch &&
+		action <= static_cast<uint8>(TeleportCheck::ACKNOWLEDGE);
+	stream.done();
+	if (!source || !parsed)
+		return;
+	const auto check = static_cast<TeleportCheck>(action);
+	const CellOnlyTeleport attempt{source->cid, id, epoch};
+	if (check == TeleportCheck::ACKNOWLEDGE)
+	{
+		if (!baseID)
+			acceptedCellOnlyTeleports_.erase(attempt);
+		return;
+	}
+	if (!baseID && acceptedCellOnlyTeleports_.count(attempt))
+	{
+		sendTeleportReply(channel, id, source->cid, 0, epoch, true);
+		return;
+	}
+	auto* entity = findEntity(id);
+	auto* base = Components::getSingleton().findComponentChannel(BASEAPP_TYPE, baseID);
+	if (entity && !entity->isDestroyed() && entity->isReal() && entity->routingEpoch() == epoch &&
+		entity->migrationRelayCell() == source->cid &&
+		(baseID ? (entity->baseEntityCall() && entity->baseEntityCall()->componentID() == baseID) : !entity->baseEntityCall()))
+	{
+		if (baseID)
+			sendTeleportBase(base, BaseappInterface::onMigrationCellappEnd, id,
+				source->cid, componentID_, epoch, entity->spaceID());
+		else
+			sendTeleportReply(channel, id, source->cid, 0, epoch, true);
+	}
+	else if (check == TeleportCheck::ORDERED_QUERY && (!entity || entity->isDestroyed() || !entity->isReal()))
+	{
+		// 只有原 TCP 连接上的查询才排在快照之后。新连接只能确认已经安装，不能据此回滚。
+		if (baseID)
+			sendTeleportStatus(base, id, source->cid, epoch, TeleportStatus::NOT_INSTALLED);
+		else
+			sendTeleportReply(channel, id, source->cid, 0, epoch, false);
+	}
 }
 
 //-------------------------------------------------------------------------------------
 void Cellapp::reqTeleportToCellAppPrepare(Network::Channel* pChannel, MemoryStream& s)
 {
-	const size_t prepareHeaderSize = sizeof(ENTITY_ID) + sizeof(COMPONENT_ID) * 2;
+	const size_t prepareHeaderSize = sizeof(ENTITY_ID) + sizeof(COMPONENT_ID) * 2 + sizeof(uint64);
 	if (s.length() < prepareHeaderSize)
 	{
 		WARNING_MSG("Cellapp::reqTeleportToCellAppPrepare: rejected incomplete fixed header.\n");
@@ -3698,12 +3863,18 @@ void Cellapp::reqTeleportToCellAppPrepare(Network::Channel* pChannel, MemoryStre
 	ENTITY_ID teleportEntityID = 0;
 	COMPONENT_ID sourceCellAppID = 0;
 	COMPONENT_ID targetCellAppID = 0;
-	s >> teleportEntityID >> sourceCellAppID >> targetCellAppID;
+	uint64 epoch = 0;
+	s >> teleportEntityID >> sourceCellAppID >> targetCellAppID >> epoch;
+	if (targetCellAppID != componentID_ || !sourceCellAppID || !epoch)
+	{
+		s.done();
+		return;
+	}
 
 	Entity* entity = Cellapp::getSingleton().findEntity(teleportEntityID);
 	Space* space = entity != NULL ? Spaces::findSpace(entity->spaceID()) : NULL;
-	const bool ready = targetCellAppID == g_componentID && sourceCellAppID != 0 &&
-		entity != NULL && !entity->isDestroyed() && entity->isReal() &&
+	const bool live = entity != NULL && !entity->isDestroyed() && entity->isReal();
+	const bool ready = live && entity->routingEpoch() == epoch &&
 		!entity->isCellHandoffTarget() && outgoingCellHandoffs_.count(teleportEntityID) == 0 &&
 		entity->hasFlags(ENTITY_FLAGS_TELEPORT_START) &&
 		entity->migrationRelayCell() == sourceCellAppID &&
@@ -3711,24 +3882,15 @@ void Cellapp::reqTeleportToCellAppPrepare(Network::Channel* pChannel, MemoryStre
 		entity->baseEntityCall()->componentID() == pChannel->componentID() &&
 		space != NULL && space->isGood();
 
-	if (!ready)
-	{
-		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellAppPrepare: Target validation failed, "
-			"entity={}, sourceCellAppID={}, targetCellAppID={}, localCellAppID={}.\n",
-			teleportEntityID, sourceCellAppID, targetCellAppID, g_componentID));
-	}
-
-	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-	(*pBundle).newMessage(BaseappInterface::onMigrationCellappPrepared);
-	(*pBundle) << teleportEntityID << sourceCellAppID << targetCellAppID << ready;
-	pChannel->send(pBundle);
+	sendTeleportStatus(pChannel, teleportEntityID, sourceCellAppID, epoch,
+		ready ? TeleportStatus::READY : (live ? TeleportStatus::WAIT : TeleportStatus::REJECTED));
 	s.done();
 }
 
 //-------------------------------------------------------------------------------------
 void Cellapp::reqTeleportToCellAppOver(Network::Channel* pChannel, MemoryStream& s)
 {
-	const size_t completionHeaderSize = sizeof(ENTITY_ID) + sizeof(COMPONENT_ID) * 2;
+	const size_t completionHeaderSize = sizeof(ENTITY_ID) + sizeof(COMPONENT_ID) * 2 + sizeof(uint64) + sizeof(uint8);
 	if (s.length() < completionHeaderSize)
 	{
 		WARNING_MSG("Cellapp::reqTeleportToCellAppOver: rejected incomplete fixed header.\n");
@@ -3746,8 +3908,10 @@ void Cellapp::reqTeleportToCellAppOver(Network::Channel* pChannel, MemoryStream&
 	COMPONENT_ID sourceCellAppID = 0;
 	COMPONENT_ID targetCellAppID = 0;
 
-	s >> teleportEntityID >> sourceCellAppID >> targetCellAppID;
-	if (sourceCellAppID == 0 || targetCellAppID == 0 ||
+	uint64 epoch = 0;
+	uint8 abort = 0;
+	s >> teleportEntityID >> sourceCellAppID >> targetCellAppID >> epoch >> abort;
+	if (sourceCellAppID == 0 || targetCellAppID == 0 || !epoch || abort > 1 ||
 		(g_componentID != sourceCellAppID && g_componentID != targetCellAppID))
 	{
 		WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellAppOver: rejected invalid route, "
@@ -3780,24 +3944,35 @@ void Cellapp::reqTeleportToCellAppOver(Network::Channel* pChannel, MemoryStream&
 		s.done();
 		return;
 	}
+	if (entity->routingEpoch() != epoch)
+	{
+		s.done();
+		return;
+	}
+	if (abort)
+	{
+		if (g_componentID == sourceCellAppID && sourceCellAppID != targetCellAppID)
+			restoreTeleportSource(teleportEntityID, targetCellAppID, epoch);
+		s.done();
+		return;
+	}
 
 	if (sourceCellAppID == targetCellAppID)
 	{
-		// Failed migration restores the Source as real and keeps BaseApp routing on
-		// the same Cell. This is a one-sided completion, not a Source/Target release.
-		// 迁移失败会把 Source 恢复为 real，BaseApp 路由也保持不变；这是单端完成，
-		// 不能按跨 Cell 的 Source/Target 释放流程处理。
-		if (!entity->isReal())
+		const auto it = outgoingTeleports_.find(teleportEntityID);
+		if (!entity->isReal() || it == outgoingTeleports_.end() ||
+			it->second->epoch != epoch || !it->second->restored)
 		{
-			WARNING_MSG(fmt::format("Cellapp::reqTeleportToCellAppOver: ignored stale rollback completion, "
-				"entity={}, realCell={}, cellAppID={}.\n",
-				teleportEntityID, entity->realCell(), sourceCellAppID));
 			s.done();
 			return;
 		}
 
+		// 脚本可以在失败回调里立即重试，先解除本轮限制并清掉原快照。
+		EntityPtr held(entity);
 		entity->removeFlags(ENTITY_FLAGS_TELEPORT_START);
+		outgoingTeleports_.erase(teleportEntityID);
 		s.done();
+		entity->onTeleportFailure();
 		return;
 	}
 
@@ -3812,6 +3987,7 @@ void Cellapp::reqTeleportToCellAppOver(Network::Channel* pChannel, MemoryStream&
 			return;
 		}
 
+		outgoingTeleports_.erase(teleportEntityID);
 		destroyEntity(teleportEntityID, false);
 	}
 	else

@@ -20,6 +20,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "baseapp.h"
 #include "entity.h"
+#include "server/teleport_status.h"
 #include "profile.h"
 #include "entity_messages_forward_handler.h"
 #include "pyscript/py_gc.h"
@@ -78,9 +79,6 @@ creatingCell_(false),
 createdSpace_(false),
 	inRestore_(false),
 	pBufferedSendToClientMessages_(NULL),
-	pendingMigrationEnd_(false),
-	pendingMigrationSourceCellAppID_(0),
-	pendingMigrationTargetCellAppID_(0),
 	deferredMigrationSourceCellAppID_(0),
 	deferredMigrationTargetCellAppID_(0),
 	migrationCommitPending_(false),
@@ -648,9 +646,9 @@ bool Entity::destroyCellEntity(void)
 		return false;																					
 	}
 
-	if (cellHandoffAction_ != CellHandoff::NONE)
+	if (cellHandoffAction_ != CellHandoff::NONE || migrationEpoch_)
 	{
-		// 等源端释放后再销毁目标，避免 BaseApp 提前丢掉本轮交接状态。
+		// 迁移结束后再销毁当前 Real，避免销毁请求发到旧路由。
 		destroyCellAfterHandoff_ = true;
 		return true;
 	}
@@ -1170,7 +1168,7 @@ void Entity::onClientDeath()
 void Entity::onLoseCell(Network::Channel* pChannel, MemoryStream& s)
 {
 	if (pChannel->isExternal() ||
-		(cellHandoffAction_ != CellHandoff::NONE && cellEntityCall() &&
+		((cellHandoffAction_ != CellHandoff::NONE || migrationEpoch_) && cellEntityCall() &&
 			pChannel->componentID() != cellEntityCall()->componentID()))
 		return;
 	
@@ -1185,6 +1183,9 @@ void Entity::onLoseCell(Network::Channel* pChannel, MemoryStream& s)
 	cellHandoffRoute_ = {};
 	cellHandoffWarningAt_ = 0;
 	destroyCellAfterHandoff_ = false;
+	resetTeleport();
+	completedMigrationEpoch_ = 0;
+	migrationWitnessPending_ = false;
 	isArchiveing_ = false;
 	isGetingCellData_ = false;
 	createdSpace_ = false;
@@ -1545,6 +1546,10 @@ void Entity::onCellAppDeath()
 {
 	isArchiveing_ = false;
 	isGetingCellData_ = false;
+	resetTeleport();
+	completedMigrationEpoch_ = 0;
+	migrationWitnessPending_ = false;
+	destroyCellAfterHandoff_ = false;
 }
 
 //-------------------------------------------------------------------------------------
@@ -1754,8 +1759,53 @@ bool Entity::retryCellHandoff()
 		sendCellHandoff(id(), route, FINISH_TARGET, route.target, route.targetPid);
 		return true;
 	default:
-		return false;
+		return retryTeleport();
 	}
+}
+
+namespace
+{
+void sendTeleportCompletion(ENTITY_ID id, COMPONENT_ID source, COMPONENT_ID target,
+	COMPONENT_ID receiver, uint64 epoch, bool abort)
+{
+	auto* channel = Components::getSingleton().findComponentChannel(CELLAPP_TYPE, receiver);
+	if (!channel || channel->isDestroyed() || channel->condemn() != 0)
+		return;
+	auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	bundle->newMessage(CellappInterface::reqTeleportToCellAppOver);
+	(*bundle) << id << source << target << epoch << static_cast<uint8>(abort);
+	channel->send(bundle);
+}
+}
+
+bool Entity::retryTeleport()
+{
+	if (!migrationEpoch_ || !cellEntityCall() || cellEntityCall()->componentID() != migrationAttemptSource_)
+		return false;
+	const uint64 now = timestamp();
+	if (!migrationWarningAt_)
+		migrationWarningAt_ = now + 5 * stampsPerSecond();
+	else if (now >= migrationWarningAt_)
+	{
+		WARNING_MSG(fmt::format("{}::retryTeleport: waiting for CellApp, entity={}, source={}, target={}, epoch={}, rollback={}.\n",
+			scriptName(), id(), migrationAttemptSource_, migrationAttemptTarget_, migrationEpoch_, migrationRollbackPending_));
+		migrationWarningAt_ = now + 30 * stampsPerSecond();
+	}
+	if (migrationRollbackPending_)
+		sendTeleportCompletion(id(), migrationAttemptSource_, migrationAttemptTarget_,
+			migrationAttemptSource_, migrationEpoch_, true);
+	else if (migrationCommitPending_)
+	{
+		auto* channel = Components::getSingleton().findComponentChannel(CELLAPP_TYPE, migrationCommitTargetCellAppID_);
+		if (channel && !channel->isDestroyed() && channel->condemn() == 0)
+		{
+			auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+			bundle->newMessage(CellappInterface::reqTeleportToCellAppPrepare);
+			(*bundle) << id() << migrationCommitSourceCellAppID_ << migrationCommitTargetCellAppID_ << migrationEpoch_;
+			channel->send(bundle);
+		}
+	}
+	return true;
 }
 
 //-------------------------------------------------------------------------------------
@@ -1782,7 +1832,7 @@ void Entity::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
 		if (!fromSource || route.targetPid || cellHandoffRoute_.sameAttempt(route))
 			return;
 		if (cellEntityCall()->componentID() != route.source || route.epoch <= cellHandoffRoute_.epoch ||
-			cellHandoffAction_ != NONE || migrationCommitPending_ || pBufferedSendToClientMessages_ ||
+			cellHandoffAction_ != NONE || migrationEpoch_ || pBufferedSendToClientMessages_ ||
 			hasFlags(ENTITY_FLAGS_TELEPORT_START) || hasFlags(ENTITY_FLAGS_TELEPORT_STOP))
 		{
 			// 未批准本轮交接，源端尚未向目标发送快照。
@@ -1847,21 +1897,39 @@ void Entity::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::onMigrationCellappStart(Network::Channel* pChannel, COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID)
+void Entity::onMigrationCellappStart(Network::Channel* pChannel, COMPONENT_ID sourceCellAppID,
+	COMPONENT_ID targetCellAppID, uint64 epoch, uint8 refreshWitness)
 {
-	if ((pChannel && pChannel->isExternal()) || cellHandoffAction_ != CellHandoff::NONE)
+	if (!pChannel || pChannel->componentID() != sourceCellAppID ||
+		!Components::getSingleton().isExpectedComponentChannel(CELLAPP_TYPE, pChannel) ||
+		!cellEntityCall() || !epoch || !sourceCellAppID || !targetCellAppID ||
+		sourceCellAppID == targetCellAppID || refreshWitness > 1)
 		return;
-	
-	DEBUG_MSG(fmt::format("{}::onMigrationCellappStart: {}, sourceCellAppID={}, targetCellappID={}\n",
-		scriptName(), id(), sourceCellAppID, targetCellAppID));
-
-	if (sourceCellAppID == 0 || targetCellAppID == 0)
+	if (epoch <= completedMigrationEpoch_)
 	{
-		WARNING_MSG(fmt::format("{}::onMigrationCellappStart: rejected invalid migration route, "
-			"entity={}, sourceCellAppID={}, targetCellAppID={}.\n",
-			scriptName(), id(), sourceCellAppID, targetCellAppID));
+		// 源端未收到释放通知会重报 Start；源端仍按本轮编号和 Ghost 状态校验。
+		sendTeleportCompletion(id(), sourceCellAppID, targetCellAppID, sourceCellAppID, epoch, false);
+		if (refreshWitness && epoch == completedMigrationEpoch_)
+		{
+			migrationWitnessPending_ = true;
+			refreshTeleportWitness();
+		}
 		return;
 	}
+	if (cellHandoffAction_ != CellHandoff::NONE || cellEntityCall()->componentID() != sourceCellAppID ||
+		(migrationEpoch_ && (epoch != migrationEpoch_ || migrationAttemptSource_ != sourceCellAppID ||
+			migrationAttemptTarget_ != targetCellAppID)))
+		return;
+
+	migrationWitnessPending_ |= refreshWitness != 0;
+	if (migrationRollbackPending_ || migrationCommitPending_ || hasFlags(ENTITY_FLAGS_TELEPORT_START))
+		return;
+	DEBUG_MSG(fmt::format("{}::onMigrationCellappStart: {}, sourceCellAppID={}, targetCellappID={}\n",
+		scriptName(), id(), sourceCellAppID, targetCellAppID));
+	migrationEpoch_ = epoch;
+	migrationAttemptSource_ = sourceCellAppID;
+	migrationAttemptTarget_ = targetCellAppID;
+	Baseapp::getSingleton().trackCellHandoff(id());
 
 	if (hasFlags(ENTITY_FLAGS_TELEPORT_STOP))
 	{
@@ -1920,44 +1988,27 @@ void Entity::onMigrationCellappStart(Network::Channel* pChannel, COMPONENT_ID so
 		return;
 	}
 
-	const bool sameCommitPending = migrationCommitPending_ &&
-		migrationCommitSourceCellAppID_ == sourceCellAppID &&
-		migrationCommitTargetCellAppID_ == targetCellAppID;
-	EntityCall* pCellEntityCall = cellEntityCall();
-	const COMPONENT_ID currentCellAppID = pCellEntityCall != NULL ?
-		pCellEntityCall->componentID() : 0;
-	if (sameCommitPending || (sourceCellAppID != targetCellAppID && currentCellAppID == targetCellAppID))
-	{
-		WARNING_MSG(fmt::format("{}::onMigrationCellappStart: ignored duplicate Start, "
-			"entity={}, sourceCellAppID={}, targetCellAppID={}, currentCellAppID={}.\n",
-			scriptName(), id(), sourceCellAppID, targetCellAppID, currentCellAppID));
-		return;
-	}
-
-	if (currentCellAppID != sourceCellAppID)
-	{
-		WARNING_MSG(fmt::format("{}::onMigrationCellappStart: rejected stale source route, "
-			"entity={}, sourceCellAppID={}, targetCellAppID={}, currentCellAppID={}.\n",
-			scriptName(), id(), sourceCellAppID, targetCellAppID, currentCellAppID));
-		return;
-	}
-
-	if (hasFlags(ENTITY_FLAGS_TELEPORT_START))
-	{
-		WARNING_MSG(fmt::format("{}::onMigrationCellappStart: ignored repeated in-progress Start, "
-			"entity={}, sourceCellAppID={}, targetCellAppID={}.\n",
-			scriptName(), id(), sourceCellAppID, targetCellAppID));
-		return;
-	}
-
 	addFlags(ENTITY_FLAGS_TELEPORT_START);
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::onMigrationCellappEnd(Network::Channel* pChannel, COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID)
+void Entity::onMigrationCellappEnd(Network::Channel* pChannel, COMPONENT_ID sourceCellAppID,
+	COMPONENT_ID targetCellAppID, uint64 epoch, SPACE_ID spaceID)
 {
-	if ((pChannel && pChannel->isExternal()) || cellHandoffAction_ != CellHandoff::NONE)
+	if (!pChannel || pChannel->componentID() != targetCellAppID ||
+		!Components::getSingleton().isExpectedComponentChannel(CELLAPP_TYPE, pChannel) ||
+		cellHandoffAction_ != CellHandoff::NONE || !cellEntityCall() || !epoch || !spaceID)
 		return;
+	if (epoch <= completedMigrationEpoch_)
+	{
+		if (epoch == completedMigrationEpoch_ && cellEntityCall()->componentID() == targetCellAppID && !migrationEpoch_)
+		{
+			sendTeleportCompletion(id(), sourceCellAppID, targetCellAppID, targetCellAppID, epoch, false);
+			if (sourceCellAppID != targetCellAppID)
+				sendTeleportCompletion(id(), sourceCellAppID, targetCellAppID, sourceCellAppID, epoch, false);
+		}
+		return;
+	}
 	
 	DEBUG_MSG(fmt::format("{}::onMigrationCellappEnd: {}, sourceCellAppID={}, targetCellappID={}\n",
 		scriptName(), id(), sourceCellAppID, targetCellAppID));
@@ -1969,6 +2020,28 @@ void Entity::onMigrationCellappEnd(Network::Channel* pChannel, COMPONENT_ID sour
 			scriptName(), id(), sourceCellAppID, targetCellAppID));
 		return;
 	}
+	if (cellEntityCall()->componentID() != sourceCellAppID ||
+		(migrationEpoch_ && (migrationEpoch_ != epoch || migrationAttemptSource_ != sourceCellAppID)))
+		return;
+	if (sourceCellAppID == targetCellAppID)
+	{
+		// 源端已恢复，不再等待目标校验或重放目标端的客户端消息。
+		// 目标如果已进入 Space，客户端可能已经换场景，回滚后补发源端视野。
+		migrationWitnessPending_ |= migrationTargetSession_ != 0;
+		migrationEpoch_ = epoch;
+		migrationSpace_ = spaceID;
+		commitMigrationCellapp(sourceCellAppID, targetCellAppID);
+		return;
+	}
+	if (migrationRollbackPending_ || (migrationEpoch_ && migrationAttemptTarget_ != targetCellAppID))
+		return;
+	migrationEpoch_ = epoch;
+	migrationAttemptSource_ = sourceCellAppID;
+	migrationAttemptTarget_ = targetCellAppID;
+	migrationSpace_ = spaceID;
+	if (!migrationTargetSession_)
+		migrationTargetSession_ = pChannel->sessionEpoch();
+	Baseapp::getSingleton().trackCellHandoff(id());
 
 	if (migrationCommitPending_ &&
 		migrationCommitSourceCellAppID_ == sourceCellAppID &&
@@ -1976,16 +2049,6 @@ void Entity::onMigrationCellappEnd(Network::Channel* pChannel, COMPONENT_ID sour
 	{
 		// Target 已经进入提交确认阶段；重复 End 不能重新创建转发缓冲或改变迁移状态。
 		// Target is already in commit validation; a duplicate End must not recreate forwarding state.
-		return;
-	}
-
-	EntityCall* pCellEntityCall = cellEntityCall();
-	if (sourceCellAppID != targetCellAppID && pCellEntityCall != NULL &&
-		pCellEntityCall->componentID() == targetCellAppID)
-	{
-		WARNING_MSG(fmt::format("{}::onMigrationCellappEnd: ignored completion for an already "
-			"committed route, entity={}, sourceCellAppID={}, targetCellAppID={}.\n",
-			scriptName(), id(), sourceCellAppID, targetCellAppID));
 		return;
 	}
 
@@ -2011,24 +2074,7 @@ void Entity::onMigrationCellappEnd(Network::Channel* pChannel, COMPONENT_ID sour
 	}
 
 	if (pBufferedSendToClientMessages_)
-	{
-		// 旧迁移的客户端消息仍在按序重放时，延后处理下一次 End，不能中止进程或丢弃缓冲。
-		// Defer the next End while the previous migration replays client messages in order; never abort or drop the buffer.
-		if (targetCellAppID == pBufferedSendToClientMessages_->cellappID())
-			return;
-
-		if (pendingMigrationEnd_)
-		{
-			ERROR_MSG(fmt::format("{}::onMigrationCellappEnd: pending migration already exists, entity={}, pendingTarget={}, target={}.\n",
-				scriptName(), id(), pendingMigrationTargetCellAppID_, targetCellAppID));
-			return;
-		}
-
-		pendingMigrationEnd_ = true;
-		pendingMigrationSourceCellAppID_ = sourceCellAppID;
-		pendingMigrationTargetCellAppID_ = targetCellAppID;
 		return;
-	}
 	
 	// 某些极端情况下可能onMigrationCellappStart会慢于onMigrationCellappEnd触发，此时必须设置标记
 	// 等待onMigrationCellappEnd触发后做清理
@@ -2087,16 +2133,6 @@ void Entity::onMigrationCellappOver(COMPONENT_ID sourceCellAppID, COMPONENT_ID t
 		return;
 	}
 
-	Components::ComponentInfos* pTargetInfos =
-		Components::getSingleton().findComponent(targetCellAppID);
-	if (pTargetInfos == NULL || pTargetInfos->pChannel == NULL)
-	{
-		ERROR_MSG(fmt::format("{}::onMigrationCellappOver: unavailable Target CellApp {}, "
-			"entity={}, sourceCellAppID={}.\n",
-			scriptName(), targetCellAppID, id(), sourceCellAppID));
-		return;
-	}
-
 	// End 只表示 Target 曾完成初始化。真正提交前必须沿 BaseApp->Target 独立往返再次
 	// 验证实体和 Space 仍存活；在成功响应前不切路由，也绝不释放 Source。
 	// End only proves that Target finished initialization at an earlier instant. Before commit,
@@ -2106,15 +2142,12 @@ void Entity::onMigrationCellappOver(COMPONENT_ID sourceCellAppID, COMPONENT_ID t
 	migrationCommitSourceCellAppID_ = sourceCellAppID;
 	migrationCommitTargetCellAppID_ = targetCellAppID;
 
-	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-	(*pBundle).newMessage(CellappInterface::reqTeleportToCellAppPrepare);
-	(*pBundle) << id() << sourceCellAppID << targetCellAppID;
-	pTargetInfos->pChannel->send(pBundle);
+	retryTeleport();
 }
 
 //-------------------------------------------------------------------------------------
 void Entity::onMigrationCellappPrepared(Network::Channel* pChannel,
-	COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID, bool success)
+	COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID, uint64 epoch, uint8 status)
 {
 	if (pChannel == NULL || pChannel->isExternal() ||
 		!Components::getSingleton().isExpectedComponentChannel(CELLAPP_TYPE, pChannel) ||
@@ -2126,37 +2159,33 @@ void Entity::onMigrationCellappPrepared(Network::Channel* pChannel,
 		return;
 	}
 
-	if (!migrationCommitPending_ ||
-		migrationCommitSourceCellAppID_ != sourceCellAppID ||
-		migrationCommitTargetCellAppID_ != targetCellAppID)
+	if (!epoch || epoch != migrationEpoch_ || migrationAttemptSource_ != sourceCellAppID ||
+		migrationAttemptTarget_ != targetCellAppID || !cellEntityCall() ||
+		cellEntityCall()->componentID() != sourceCellAppID || migrationRollbackPending_)
 	{
-		WARNING_MSG(fmt::format("{}::onMigrationCellappPrepared: ignored stale validation, "
-			"entity={}, sourceCellAppID={}, targetCellAppID={}, pendingSource={}, pendingTarget={}.\n",
-			scriptName(), id(), sourceCellAppID, targetCellAppID,
-			migrationCommitSourceCellAppID_, migrationCommitTargetCellAppID_));
 		return;
 	}
 
-	migrationCommitPending_ = false;
-	migrationCommitSourceCellAppID_ = 0;
-	migrationCommitTargetCellAppID_ = 0;
-
-	if (!success)
+	if (status == TeleportStatus::NOT_INSTALLED ||
+		(status == TeleportStatus::REJECTED && migrationCommitPending_ &&
+			pChannel->sessionEpoch() == migrationTargetSession_))
 	{
-		// Target 验证失败时保留 Source Ghost，禁止形成“路由已切换且两端都不存在”的状态。
-		// Preserve Source Ghost when Target validation fails; never create a switched route with neither peer alive.
-		ERROR_MSG(fmt::format("{}::onMigrationCellappPrepared: Target validation failed; "
-			"Source is retained, entity={}, sourceCellAppID={}, targetCellAppID={}.\n",
-			scriptName(), id(), sourceCellAppID, targetCellAppID));
+		// 是否恢复由 Base 决定；切到目标后，即使原目标已不存在也不能回滚。
+		migrationRollbackPending_ = true;
+		retryTeleport();
 		return;
 	}
-
-	commitMigrationCellapp(sourceCellAppID, targetCellAppID);
+	if (status == TeleportStatus::READY && migrationCommitPending_)
+		commitMigrationCellapp(sourceCellAppID, targetCellAppID);
 }
 
 //-------------------------------------------------------------------------------------
 void Entity::commitMigrationCellapp(COMPONENT_ID sourceCellAppID, COMPONENT_ID targetCellAppID)
 {
+	const uint64 epoch = migrationEpoch_;
+	completedMigrationEpoch_ = epoch;
+	spaceID(migrationSpace_);
+	resetTeleport();
 	// BaseApp 是客户端到 Cell RPC 的唯一权威路由点。Target 已完成提交时存活确认后，
 	// 必须先切换路由，再确认两端完成，保证 Source Ghost 覆盖旧 Channel 的尾部 RPC。
 	// BaseApp is the authoritative client-to-Cell routing point. After Target's commit-time
@@ -2165,31 +2194,44 @@ void Entity::commitMigrationCellapp(COMPONENT_ID sourceCellAppID, COMPONENT_ID t
 	if(this->cellEntityCall())
 		this->cellEntityCall()->componentID(targetCellAppID);
 
-	const COMPONENT_ID completionCellappIDs[] = { targetCellAppID, sourceCellAppID };
 	// A failed migration reports source==target after restoring the Source real Entity.
 	// Confirm it once; sending the same completion twice races lifecycle callbacks and
 	// can duplicate script-visible Cell-loss handling. / 迁移失败恢复 Source real Entity
 	// 后会报告 source==target；此时只确认一次，避免重复完成与生命周期回调竞态。
-	const size_t completionCount = targetCellAppID == sourceCellAppID ? 1 :
-		sizeof(completionCellappIDs) / sizeof(completionCellappIDs[0]);
-	for (size_t i = 0; i < completionCount; ++i)
+	sendTeleportCompletion(id(), sourceCellAppID, targetCellAppID, targetCellAppID, epoch, false);
+	if (sourceCellAppID != targetCellAppID)
+		sendTeleportCompletion(id(), sourceCellAppID, targetCellAppID, sourceCellAppID, epoch, false);
+	if (destroyCellAfterHandoff_)
 	{
-		const COMPONENT_ID cellappID = completionCellappIDs[i];
-		Components::ComponentInfos* pInfos = Components::getSingleton().findComponent(cellappID);
-		if (pInfos && pInfos->pChannel)
-		{
-			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-			(*pBundle).newMessage(CellappInterface::reqTeleportToCellAppOver);
-			(*pBundle) << id() << sourceCellAppID << targetCellAppID;
-			pInfos->pChannel->send(pBundle);
-		}
-		else
-		{
-			ERROR_MSG(fmt::format("{}::commitMigrationCellapp: unavailable CellApp {}, "
-				"entity={}, sourceCellAppID={}, targetCellAppID={}.\n",
-				scriptName(), cellappID, id(), sourceCellAppID, targetCellAppID));
-		}
+		destroyCellAfterHandoff_ = false;
+		migrationWitnessPending_ = false;
+		destroyCellEntity();
 	}
+	else
+		refreshTeleportWitness();
+}
+
+void Entity::resetTeleport()
+{
+	migrationEpoch_ = migrationTargetSession_ = migrationWarningAt_ = 0;
+	migrationAttemptSource_ = migrationAttemptTarget_ = 0;
+	migrationCommitPending_ = migrationRollbackPending_ = false;
+	migrationSpace_ = 0;
+	migrationCommitSourceCellAppID_ = migrationCommitTargetCellAppID_ = 0;
+	deferredMigrationSourceCellAppID_ = deferredMigrationTargetCellAppID_ = 0;
+	removeFlags(ENTITY_FLAGS_TELEPORT_START | ENTITY_FLAGS_TELEPORT_STOP);
+	SAFE_RELEASE(pBufferedSendToClientMessages_);
+}
+
+void Entity::refreshTeleportWitness()
+{
+	if (!migrationWitnessPending_ || migrationEpoch_ || cellHandoffAction_ != CellHandoff::NONE)
+		return;
+	migrationWitnessPending_ = false;
+	auto* client = clientEntityCall();
+	auto* channel = client ? client->getChannel() : nullptr;
+	if (channel && !channel->isDestroyed() && channel->condemn() == 0 && channel->proxyID() == id())
+		static_cast<Proxy*>(this)->onGetWitness();
 }
 
 //-------------------------------------------------------------------------------------
@@ -2200,19 +2242,10 @@ void Entity::onBufferedForwardToCellappMessagesOver()
 //-------------------------------------------------------------------------------------
 void Entity::onBufferedForwardToClientMessagesOver()
 {
-	onMigrationCellappOver(pBufferedSendToClientMessages_->sourceCellappID(),
-		pBufferedSendToClientMessages_->cellappID());
+	const auto source = pBufferedSendToClientMessages_->sourceCellappID();
+	const auto target = pBufferedSendToClientMessages_->cellappID();
 	SAFE_RELEASE(pBufferedSendToClientMessages_);
-
-	if (pendingMigrationEnd_)
-	{
-		const COMPONENT_ID sourceCellAppID = pendingMigrationSourceCellAppID_;
-		const COMPONENT_ID targetCellAppID = pendingMigrationTargetCellAppID_;
-		pendingMigrationEnd_ = false;
-		pendingMigrationSourceCellAppID_ = 0;
-		pendingMigrationTargetCellAppID_ = 0;
-		onMigrationCellappEnd(NULL, sourceCellAppID, targetCellAppID);
-	}
+	onMigrationCellappOver(source, target);
 }
 
 //-------------------------------------------------------------------------------------

@@ -2522,6 +2522,9 @@ void Entity::setWitness(Witness* pWitness)
 //-------------------------------------------------------------------------------------
 void Entity::onGetWitnessFromBase(Network::Channel* pChannel)
 {
+	if (Cellapp::getSingleton().deferTeleportWitness(*this, pChannel))
+		return;
+
 	if (!isReal())
 	{
 		// 需要做中转
@@ -4262,36 +4265,21 @@ void Entity::teleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, Dir
 		return;
 	}
 
-	// 如果这个entity有base部分， 假如是本进程级别的传送，那么相关操作按照正常的执行
-	// 如果是跨cellapp的传送， 那么我们可以先设置entity为ghost并立即序列化entity发往目的cellapp
-	// 如果期间有base的消息发送过来， entity的ghost机制能够转到real上去， 因此传送之前不需要对base
-	// 做一些设置，传送成功后先设置base的关系base在被改变关系后仍然有0.1秒的时间收到包继续发往ghost，
-	// 如果一直有包则一直刷新时间直到没有任何包需要广播并且超时0.1秒之后的包才会直接发往real）, 这样做的好处是传送并不需要非常谨慎的与base耦合
-	// 传送过程中有任何错误也不会影响到base部分，base部分的包也能够按照秩序送往real。
-	if(this->baseEntityCall() != NULL)
+	auto* target = nearbyMBRef->getChannel();
+	if (!target || target->isDestroyed() || target->condemn() != 0)
 	{
-		// 如果有base部分, 我们还需要调用一下备份功能。
-		// 由于ghost功能会addCellDataToStream一次数据流，并且在传送失败时能重用该实体
-		// 因此这里不需要进行备份
-		// this->backupCellData();
-		
-		Network::Channel* pBaseChannel = baseEntityCall()->getChannel();
-		if(pBaseChannel)
+		WARNING_MSG(fmt::format("{}::teleport: target CellApp {} is not connected, entity={}.\n",
+			scriptName(), nearbyMBRef->componentID(), id()));
+		onTeleportFailure();
+		return;
+	}
+	if (auto* base = baseEntityCall())
+	{
+		auto* channel = base->getChannel();
+		if (!channel || channel->isDestroyed() || channel->condemn() != 0)
 		{
-			// 同时需要通知base暂存发往cellapp的消息，因为后面如果跳转成功需要切换cellEntityCall映射关系到新的cellapp
-			// 为了避免在切换的一瞬间消息次序发生混乱(旧的cellapp消息也会转到新的cellapp上)， 因此需要在传送前进行
-			// 暂存， 传送成功后通知旧的cellapp销毁entity之后同时通知baseapp改变映射关系。
-			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-			(*pBundle).newMessage(BaseappInterface::onMigrationCellappStart);
-			(*pBundle) << id();
-			(*pBundle) << g_componentID;
-			(*pBundle) << nearbyMBRef->componentID();
-			pBaseChannel->send(pBundle);
-		}
-		else
-		{
-			PyErr_Format(PyExc_Exception, "%s::teleport: %d, nearbyRef error, not found baseapp!\n", scriptName(), id());
-			PyErr_PrintEx(0);
+			WARNING_MSG(fmt::format("{}::teleport: BaseApp {} is not connected, entity={}.\n",
+				scriptName(), base->componentID(), id()));
 			onTeleportFailure();
 			return;
 		}
@@ -4313,13 +4301,13 @@ void Entity::onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, D
 	(*pBundle) << pScriptModule()->getUType();
 	(*pBundle) << pos.x << pos.y << pos.z;
 	(*pBundle) << dir.roll() << dir.pitch() << dir.yaw();
-	// Carry the BaseApp owner in the fixed migration header so early target-side
-	// failures can always release BaseApp's migration buffer. / 将 BaseApp 所有者
-	// 放入迁移固定头，确保目标端早期失败也能释放 BaseApp 的迁移缓冲。
+	// 即使目标未创建实体，也能按 BaseApp 和本轮编号返回失败。
 	(*pBundle) << (baseEntityCall() != NULL ? baseEntityCall()->componentID() : COMPONENT_ID(0));
 	(*pBundle) << g_componentID;
 
 	MemoryStream* s = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
+	EntityPtr held(this);
+	Entity::bufferCallback(true);
 
 	try
 	{
@@ -4334,26 +4322,36 @@ void Entity::onTeleportRefEntityCall(EntityCall* nearbyMBRef, Position3D& pos, D
 		Network::Bundle::reclaimPoolObject(pBundle);
 		scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_SERIALIZE,
 			scriptStageDurationNanos(serializeStart), true, scriptName());
+		Entity::bufferCallback(false);
+		onTeleportFailure();
 		return;
 	}
 
 	(*pBundle).append(s);
-	MemoryStream::reclaimPoolObject(s);
 	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_SERIALIZE,
 		scriptStageDurationNanos(serializeStart), true, scriptName());
 
-	// 暂时不销毁这个entity, 等那边成功创建之后再回来销毁
-	// 此期间的消息可以通过ghost转发给real
-	// 如果未能正确传输过去则可以从当前cell继续恢复entity.
-	// Cellapp::getSingleton().destroyEntity(id(), false);
-
 	const uint64 forwardStart = scriptStageStartStamps();
-	nearbyMBRef->sendCall(pBundle);
+	auto* channel = nearbyMBRef->getChannel();
+	const uint64 session = channel ? channel->sessionEpoch() : 0;
+	if (!channel || channel->isDestroyed() || channel->condemn() != 0)
+	{
+		Network::Bundle::reclaimPoolObject(pBundle);
+		changeToReal(0, *s);
+		restoreProximitys();
+		onTeleportFailure();
+	}
+	else
+	{
+		// 同一线程核对连接后入队，只有入队后才让 Base 等待传送结果。
+		channel->send(pBundle);
+		Cellapp::getSingleton().trackTeleportSource(*this, nearbyMBRef->componentID(), session, *s);
+	}
+	MemoryStream::reclaimPoolObject(s);
 	scriptStageMetrics().record(SCRIPT_STAGE_MIGRATION_FORWARD,
 		scriptStageDurationNanos(forwardStart), true, scriptName());
 
-	// 序列化后将entity先停止移动， 如果传送失败了则可以根据序列化的内容进行恢复
-	stopMove();
+	Entity::bufferCallback(false);
 }
 
 //-------------------------------------------------------------------------------------
@@ -4987,9 +4985,8 @@ void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s, uin
 	const uint64 latestEpoch = std::max(routingEpoch_, cellHandoffEpoch_);
 	const uint64 nextEpoch = handoff ? handoffEpoch :
 		(latestEpoch == std::numeric_limits<uint64>::max() ? 1 : latestEpoch + 1);
-	// 同 Space 交接先写完快照；写入失败时源端仍可继续运行。
-	if (handoff)
-		addToStream(s, nextEpoch);
+	// 快照完整后再停止源实体；写入失败不能改变路由或取消控制器。
+	addToStream(s, nextEpoch, handoff);
 
 	handoffSource_ = handoff;
 	if (handoff)
@@ -5015,10 +5012,8 @@ void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s, uin
 	DEBUG_MSG(fmt::format("{}::changeToGhost(): {}, realCell={}, spaceID={}, position=({},{},{}).\n", 
 		scriptName(), id(), realCell_, spaceID_, position().x, position().y, position().z));
 	
-	// 必须放在前面
-	if (!handoff)
-		addToStream(s);
 	migrationSource_ = true;
+	stopMove();
 
 	//witnesses_.clear();
 	//witnesses_count_ = 0;
@@ -5026,7 +5021,6 @@ void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s, uin
 	if (handoff)
 	{
 		boundaryWitnessed_ = false;
-		stopMove();
 		EntityEvents::clear(this);
 	}
 
@@ -5095,7 +5089,7 @@ uint64 Entity::reserveCellHandoffEpoch()
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::addToStream(KBEngine::MemoryStream& s, uint64 handoffEpoch)
+void Entity::addToStream(KBEngine::MemoryStream& s, uint64 epoch, bool handoff)
 {
 	COMPONENT_ID baseEntityCallComponentID = 0;
 	if(baseEntityCall_)
@@ -5106,7 +5100,7 @@ void Entity::addToStream(KBEngine::MemoryStream& s, uint64 handoffEpoch)
 	bool hasCustomVolatileinfo = (pCustomVolatileinfo_ != NULL);
 	ENTITY_ID controlledByID = (controlledBy_ != NULL ? controlledBy_->id() : 0);
 		
-	s << pScriptModule_->getUType() << (handoffEpoch ? handoffEpoch : routingEpoch_) << spaceID_ << isDestroyed_ <<
+	s << pScriptModule_->getUType() << epoch << spaceID_ << isDestroyed_ <<
 		isOnGround_ << topSpeed_ << topSpeedY_ << 
 		layer_ << baseEntityCallComponentID << hasCustomVolatileinfo << controlledByID;
 
@@ -5118,8 +5112,8 @@ void Entity::addToStream(KBEngine::MemoryStream& s, uint64 handoffEpoch)
 	addCellDataToStream(CELLAPP_TYPE, ENTITY_CELL_DATA_FLAGS, &s);
 	
 	addMovementHandlerToStream(s);
-	addControllersToStream(s, handoffEpoch != 0);
-	addWitnessToStream(s, handoffEpoch != 0);
+	addControllersToStream(s);
+	addWitnessToStream(s, handoff);
 	addTimersToStream(s);
 	EntityEvents::addToStream(this, s);
 
@@ -5202,17 +5196,14 @@ void Entity::createFromStream(KBEngine::MemoryStream& s, bool handoff)
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::addControllersToStream(KBEngine::MemoryStream& s, bool handoff)
+void Entity::addControllersToStream(KBEngine::MemoryStream& s)
 {
 	if(pControllers_)
 	{
 		s << true;
 
-		// 必须先清理移动相关的Controllers
-		if (!handoff)
-			stopMove();
-
-		pControllers_->addToStream(s, handoff);
+		// 移动和转向已单独写入，序列化时不取消正在运行的控制器。
+		pControllers_->addToStream(s, true);
 	}
 	else
 	{

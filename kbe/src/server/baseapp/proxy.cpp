@@ -433,6 +433,12 @@ void Proxy::onGiveClientTo(Network::Channel* lpChannel, ENTITY_ID previousProxyI
 //-------------------------------------------------------------------------------------
 void Proxy::onGetWitness()
 {
+	if (migrationEpoch_)
+	{
+		migrationWitnessPending_ = true;
+		return;
+	}
+
 	if(cellEntityCall())
 	{
 		// 通知cell获得客户端

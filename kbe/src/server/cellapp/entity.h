@@ -624,13 +624,13 @@ public:
 	*/
 	void changeToReal(COMPONENT_ID ghostCell, KBEngine::MemoryStream& s, bool handoff = false);
 
-	void addToStream(KBEngine::MemoryStream& s, uint64 handoffEpoch = 0);
+	void addToStream(KBEngine::MemoryStream& s, uint64 epoch, bool handoff);
 	void createFromStream(KBEngine::MemoryStream& s, bool handoff = false);
 
 	void addTimersToStream(KBEngine::MemoryStream& s);
 	void createTimersFromStream(KBEngine::MemoryStream& s);
 
-	void addControllersToStream(KBEngine::MemoryStream& s, bool handoff = false);
+	void addControllersToStream(KBEngine::MemoryStream& s);
 	void createControllersFromStream(KBEngine::MemoryStream& s);
 
 	void addWitnessToStream(KBEngine::MemoryStream& s, bool handoff = false);
