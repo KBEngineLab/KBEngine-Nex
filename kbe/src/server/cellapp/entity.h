@@ -662,10 +662,12 @@ public:
 		调用实体的回调函数，有可能被缓存
 	*/
 	bool bufferOrExeCallback(const char * funcName, PyObject * funcArgs,
-		bool notFoundIsOK = true, bool recordMigrationDispatchStages = false);
+		bool notFoundIsOK = true, bool recordMigrationDispatchStages = false,
+		bool destroyAfterCallback = false);
 	static void bufferCallback(bool enable);
 
 private:
+	void finishCellHandoffDestroy();
 	void onFirstWitnessed();
 	/** 
 		发送teleport结果到base端
@@ -690,6 +692,7 @@ private:
 		// 迁移回调可能延迟到缓冲回放时执行，标记必须随调用保存才能记录真实耗时。
 		// Migration callbacks may execute during replay, so retain the flag to measure actual dispatch time.
 		bool			recordMigrationDispatchStages;
+		bool			destroyAfterCallback;
 	};
 
 	typedef std::list<BufferedScriptCall*>					BufferedScriptCallArray;
@@ -727,6 +730,7 @@ protected:
 	bool												migrationSource_ = false;
 	bool												handoffSource_ = false;
 	bool												handoffTarget_ = false;
+	bool												destroyAfterCellHandoff_ = false;
 	uint64												cellHandoffEpoch_ = 0;
 	uint64												autoHandoffRetryAt_ = 0;
 

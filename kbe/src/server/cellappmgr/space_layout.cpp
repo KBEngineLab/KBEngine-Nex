@@ -630,16 +630,21 @@ void Cellappmgr::onSpaceLayoutCellLost(COMPONENT_ID cid, uint64 session)
 
 void Cellappmgr::notifyCellProcessExit(COMPONENT_ID cid, uint64 process)
 {
-	for (const auto& peer : Components::getSingleton().getComponents(BASEAPP_TYPE))
+	auto notify = [&](COMPONENT_TYPE type, const Network::MessageHandler& message)
 	{
-		auto* channel = peer.pChannel;
-		if (!channel || channel->isDestroyed() || channel->condemn() != 0)
-			continue;
-		auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-		bundle->newMessage(BaseappInterface::onCellProcessExit);
-		(*bundle) << cid << process;
-		channel->send(bundle);
-	}
+		for (const auto& peer : Components::getSingleton().getComponents(type))
+		{
+			auto* channel = peer.pChannel;
+			if (!channel || channel->isDestroyed() || channel->condemn() != 0)
+				continue;
+			auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+			bundle->newMessage(message);
+			(*bundle) << cid << process;
+			channel->send(bundle);
+		}
+	};
+	notify(BASEAPP_TYPE, BaseappInterface::onCellProcessExit);
+	notify(CELLAPP_TYPE, CellappInterface::onCellProcessExit);
 }
 
 void Cellappmgr::checkLostPartitionCells()

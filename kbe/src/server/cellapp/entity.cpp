@@ -404,10 +404,13 @@ PyObject* Entity::__py_pyDestroyEntity(PyObject* self, PyObject* args, PyObject 
 	if ((pobj->isReal() && pobj->hasFlags(ENTITY_FLAGS_TELEPORT_START)) ||
 		(pobj->isSpace() && pSpace != NULL && pSpace->hasPendingMigrationEntities()))
 	{
-		// 迁移 Target 及其 Space 在 BaseApp 提交前必须保持存活。脚本定时清理会在下一次
-		// 检查时自然重试；这里返回成功，避免把正常的生命周期租约暴露为 Python 异常。
-		// Migration Target and owning Space stay alive until BaseApp commits. Script timers
-		// naturally retry later; return success so the lifecycle lease is not exposed as a Python error.
+		if (pobj->destroyAfterCellHandoff_)
+			S_Return;
+
+		// 交接完成前目标必须存活，一次性定时器不会重试，由目标保留本轮销毁请求。
+		if (pobj->isReal() && pobj->isCellHandoffTarget())
+			pobj->destroyAfterCellHandoff_ = true;
+
 		WARNING_MSG(fmt::format("{}::destroy: deferred entity {} while migration commit is pending.\n",
 			pobj->scriptName(), pobj->id()));
 		S_Return;
@@ -1506,7 +1509,7 @@ void Entity::onWriteToDB()
 
 //-------------------------------------------------------------------------------------
 bool Entity::bufferOrExeCallback(const char* funcName, PyObject* funcArgs,
-	bool notFoundIsOK, bool recordMigrationDispatchStages)
+	bool notFoundIsOK, bool recordMigrationDispatchStages, bool destroyAfterCallback)
 {
 	// 同 Space 交接后的源端只转发旧路由消息，不再执行拆除 AOI 或控制器产生的回调。
 	if (isBoundaryGhost() || isCellHandoffSource())
@@ -1539,6 +1542,7 @@ bool Entity::bufferOrExeCallback(const char* funcName, PyObject* funcArgs,
 		pBufferedScriptCall->pyCallable = pyCallable;
 		pBufferedScriptCall->funcName = funcName;
 		pBufferedScriptCall->recordMigrationDispatchStages = recordMigrationDispatchStages;
+		pBufferedScriptCall->destroyAfterCallback = destroyAfterCallback;
 		_scriptCallbacksBuffer.push_back(pBufferedScriptCall);
 		++_scriptCallbacksBufferNum;
 		return hasEntityCallable;
@@ -1619,6 +1623,9 @@ bool Entity::bufferOrExeCallback(const char* funcName, PyObject* funcArgs,
 
 	if (funcArgs)
 		Py_DECREF(funcArgs);
+
+	if (destroyAfterCallback)
+		finishCellHandoffDestroy();
 
 	Py_DECREF(this);
 
@@ -1720,6 +1727,9 @@ void Entity::bufferCallback(bool enable)
 				Py_XDECREF(pBufferedScriptCall->pyCallable);
 				if (pBufferedScriptCall->pyFuncArgs)
 					Py_DECREF(pBufferedScriptCall->pyFuncArgs);
+
+				if (pBufferedScriptCall->destroyAfterCallback)
+					pBufferedScriptCall->entityPtr->finishCellHandoffDestroy();
 
 				delete pBufferedScriptCall;
 			}
@@ -4675,7 +4685,7 @@ void Entity::onEnteredCell()
 {
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-	bufferOrExeCallback(const_cast<char*>("onEnteredCell"), NULL);
+	bufferOrExeCallback("onEnteredCell", NULL, true, false, destroyAfterCellHandoff_);
 }
 
 //-------------------------------------------------------------------------------------
@@ -5075,6 +5085,7 @@ void Entity::changeToReal(COMPONENT_ID ghostCell, KBEngine::MemoryStream& s, boo
 void Entity::beginCellHandoffTarget(COMPONENT_ID source)
 {
 	handoffTarget_ = true;
+	destroyAfterCellHandoff_ = false;
 	migrationRelayCell(source);
 	addFlags(ENTITY_FLAGS_TELEPORT_START);
 }
@@ -5083,8 +5094,19 @@ void Entity::beginCellHandoffTarget(COMPONENT_ID source)
 void Entity::completeCellHandoff()
 {
 	handoffTarget_ = false;
-	removeFlags(ENTITY_FLAGS_TELEPORT_START);
+	// 有待执行的销毁时，先执行进入回调，但禁止回调发起下一轮迁移。
+	if (!destroyAfterCellHandoff_)
+		removeFlags(ENTITY_FLAGS_TELEPORT_START);
 	onEnteredCell();
+}
+
+//-------------------------------------------------------------------------------------
+void Entity::finishCellHandoffDestroy()
+{
+	destroyAfterCellHandoff_ = false;
+	removeFlags(ENTITY_FLAGS_TELEPORT_START);
+	if (!isDestroyed())
+		destroyEntity();
 }
 
 //-------------------------------------------------------------------------------------

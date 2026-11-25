@@ -113,6 +113,8 @@ public:
 	void onCellHandoff(Network::Channel* channel, MemoryStream& stream);
 	void reqCellHandoff(Network::Channel* channel, MemoryStream& stream);
 	void checkCellHandoffSnapshot(Network::Channel* channel, MemoryStream& stream);
+	void onCellProcessExit(Network::Channel* channel, COMPONENT_ID cid, uint64 process);
+	void resolvePeerCellHandoffsAfterExit(COMPONENT_ID lost, uint64 process, SPACE_ID space = 0, uint64 version = 0);
 	uint64 staleClientInputEntityDrops() const { return staleClientInputEntityDrops_; }
 	uint64 staleControlledClientInputEntityDrops() const { return staleControlledClientInputEntityDrops_; }
 
@@ -314,9 +316,17 @@ public:
 	static PyObject* __py_getFlags(PyObject* self, PyObject* args);
 
 protected:
+	struct OutgoingCellHandoff;
 	void processCellHandoffs();
 	bool beginCellHandoff(ENTITY_ID id, bool automatic);
+	void dispatchCellHandoff(Entity& entity, OutgoingCellHandoff& pending);
+	void restoreCellHandoffSource(Entity& entity, OutgoingCellHandoff& pending);
 	void retryCellHandoffMessages();
+	void onPeerCellHandoff(Network::Channel& channel, ENTITY_ID id, uint8 action,
+		const CellHandoff::Route& route, const CellHandoff::PeerProcesses& processes);
+	void finishPeerCellHandoff(ENTITY_ID id, const CellHandoff::Route& route);
+	bool hasPendingPeerCellHandoff(COMPONENT_ID peer) const;
+	uint64 queryCellPeerProcess(Network::Channel& channel);
 	void retryTeleports();
 	void restoreTeleportSource(ENTITY_ID id, COMPONENT_ID target, uint64 epoch);
 	struct PendingTeleportDispatch
@@ -362,6 +372,7 @@ protected:
 	struct OutgoingCellHandoff
 	{
 		CellHandoff::Route route;
+		CellHandoff::PeerProcesses processes;
 		COMPONENT_ID base = 0;
 		uint64 session = 0;
 		uint64 checkAt = 0;
@@ -369,9 +380,16 @@ protected:
 		bool automatic = false;
 		bool dispatched = false;
 		bool unsent = false;
+		bool released = false;
+	};
+	struct IncomingPeerCellHandoff
+	{
+		CellHandoff::Route route;
+		CellHandoff::PeerProcesses processes;
 	};
 	std::map<ENTITY_ID, std::unique_ptr<OutgoingCellHandoff>> outgoingCellHandoffs_;
 	std::set<ENTITY_ID> admittedCellHandoffs_;
+	std::map<ENTITY_ID, IncomingPeerCellHandoff> incomingPeerCellHandoffs_;
 	uint64 nextCellHandoffStartRetry_ = 0;
 	void queueCellPeerReconnect(const Components::ComponentInfos& peer);
 	void updateCellPeerConnections();

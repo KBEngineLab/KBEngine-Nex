@@ -643,7 +643,7 @@ void Cellapp::onRemoveComponent(const Components::ComponentInfos* component)
 	if (!isShuttingdown() && spacePartitioningConfirmed_ && spacePartitioningEnabled() &&
 		component->componentType == CELLAPP_TYPE && component->cid > componentID_ &&
 		component->pChannel && component->pIntAddr && component->pExtAddr &&
-		Spaces::hasActiveCellPeer(component->cid))
+		(Spaces::hasActiveCellPeer(component->cid) || hasPendingPeerCellHandoff(component->cid)))
 		queueCellPeerReconnect(*component);
 }
 
@@ -680,7 +680,7 @@ void Cellapp::updateCellPeerConnections()
 		const auto next = nextPeer != disconnectedCellPeers_.end() ? nextPeer : disconnectedCellPeers_.begin();
 		reconnectingPeer_ = next->first;
 		if (!canReconnectCellPeer(components.findComponent(reconnectingPeer_), next->second) ||
-			!Spaces::hasActiveCellPeer(reconnectingPeer_))
+			(!Spaces::hasActiveCellPeer(reconnectingPeer_) && !hasPendingPeerCellHandoff(reconnectingPeer_)))
 		{
 			disconnectedCellPeers_.erase(next);
 			return;
@@ -730,7 +730,8 @@ void Cellapp::updateCellPeerConnections()
 	const auto entry = disconnectedCellPeers_.find(reconnectingPeer_);
 	const auto& peer = entry->second;
 	auto* route = components.findComponent(reconnectingPeer_);
-	if (!canReconnectCellPeer(route, peer) || !Spaces::hasActiveCellPeer(reconnectingPeer_))
+	if (!canReconnectCellPeer(route, peer) ||
+		(!Spaces::hasActiveCellPeer(reconnectingPeer_) && !hasPendingPeerCellHandoff(reconnectingPeer_)))
 	{
 		reconnectingEndpoint_.reset();
 		disconnectedCellPeers_.erase(entry);
@@ -3089,12 +3090,13 @@ void Cellapp::considerAutoCellHandoff(Space& space, Entity& entity)
 		pendingAutoCellHandoffs_.size() + outgoingCellHandoffs_.size() >= SpaceLayout::MAX_CELLS ||
 		isShuttingdown() || !entity.isReal() || entity.isDestroyed() || entity.isSpace() ||
 		entity.spaceID() != space.id() ||
-		!entity.baseEntityCall() || entity.hasFlags(ENTITY_FLAGS_TELEPORT_START) ||
+		entity.hasFlags(ENTITY_FLAGS_TELEPORT_START) ||
 		(entity.controlledBy() && entity.controlledBy()->id() != entity.id()))
 		return;
 
 	const auto& pos = entity.position();
 	if (!space.localCellBounds().crossedBy(pos.x, pos.z, cellHandoffMargin_) ||
+		outgoingCellHandoffs_.count(entity.id()) ||
 		(entity.autoHandoffRetryAt() != 0 && timestamp() < entity.autoHandoffRetryAt()))
 		return;
 
@@ -3102,9 +3104,10 @@ void Cellapp::considerAutoCellHandoff(Space& space, Entity& entity)
 	if (!destination || destination->cellappID == componentID_)
 		return;
 	auto* target = Components::getSingleton().findComponentChannel(CELLAPP_TYPE, destination->cellappID);
+	auto* baseCall = entity.baseEntityCall();
 	if (canSendCellHandoff(target) &&
 		space.boundaryGhosts().handoffCopyGeneration(entity.id(), destination->cellappID, target->sessionEpoch()) &&
-		canSendCellHandoff(entity.baseEntityCall()->getChannel()))
+		(baseCall ? canSendCellHandoff(baseCall->getChannel()) : queryCellPeerProcess(*target) != 0))
 		pendingAutoCellHandoffs_.insert(entity.id());
 }
 
@@ -3122,6 +3125,17 @@ void sendCellHandoff(Network::Channel* base, ENTITY_ID id, CellHandoff::Action a
 	route.write(*bundle);
 	base->send(bundle);
 }
+
+void sendPeerCellHandoff(Network::Channel& peer, ENTITY_ID id, CellHandoff::Action action,
+	const CellHandoff::Route& route, const CellHandoff::PeerProcesses& processes)
+{
+	auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	bundle->newMessage(CellappInterface::onCellHandoff);
+	(*bundle) << id << static_cast<uint8>(action);
+	route.write(*bundle);
+	processes.write(*bundle);
+	peer.send(bundle);
+}
 }
 
 bool Cellapp::beginCellHandoff(ENTITY_ID id, bool automatic)
@@ -3129,7 +3143,7 @@ bool Cellapp::beginCellHandoff(ENTITY_ID id, bool automatic)
 	auto* entity = findEntity(id);
 	if (isShuttingdown() || !entity || entity->isDestroyed() || !entity->isReal() ||
 		entity->isSpace() || entity->hasFlags(ENTITY_FLAGS_TELEPORT_START) ||
-		!entity->baseEntityCall() || (entity->controlledBy() && entity->controlledBy()->id() != id))
+		(!automatic && !entity->baseEntityCall()) || (entity->controlledBy() && entity->controlledBy()->id() != id))
 		return false;
 	auto* space = Spaces::findSpace(entity->spaceID());
 	if (!space || !space->hasManagedCell() || !space->canAcceptEntities() ||
@@ -3145,9 +3159,13 @@ bool Cellapp::beginCellHandoff(ENTITY_ID id, bool automatic)
 
 	auto* peer = Components::getSingleton().findComponent(CELLAPP_TYPE, destination->cellappID);
 	auto* target = peer ? peer->pChannel : NULL;
-	auto* base = entity->baseEntityCall()->getChannel();
-	if (!canSendCellHandoff(target) || !canSendCellHandoff(base) ||
+	auto* baseCall = entity->baseEntityCall();
+	auto* base = baseCall ? baseCall->getChannel() : NULL;
+	if (!canSendCellHandoff(target) || (baseCall && !canSendCellHandoff(base)) ||
 		!space->boundaryGhosts().handoffCopyGeneration(id, destination->cellappID, target->sessionEpoch()))
+		return false;
+	const uint64 targetProcess = baseCall ? 0 : queryCellPeerProcess(*target);
+	if (!baseCall && !targetProcess)
 		return false;
 
 	const uint64 epoch = entity->reserveRoutingEpoch();
@@ -3156,15 +3174,91 @@ bool Cellapp::beginCellHandoff(ENTITY_ID id, bool automatic)
 	auto pending = std::make_unique<OutgoingCellHandoff>();
 	pending->route = {componentID_, peer->cid, epoch, static_cast<uint32>(getProcessPID()), 0,
 		space->id(), space->layoutVersion()};
-	pending->base = entity->baseEntityCall()->componentID();
+	pending->base = baseCall ? baseCall->componentID() : 0;
+	if (!baseCall)
+		pending->processes = {CellRecovery::recoveryProcessID(), targetProcess};
 	pending->session = target->sessionEpoch();
 	pending->automatic = automatic;
-	const auto route = pending->route;
-	outgoingCellHandoffs_.emplace(id, std::move(pending));
-	// BaseApp 记录本轮交接后再发送快照，等待期间源仍是 Real。
+	auto& entry = *outgoingCellHandoffs_.emplace(id, std::move(pending)).first->second;
 	entity->addFlags(ENTITY_FLAGS_TELEPORT_START);
-	sendCellHandoff(base, id, CellHandoff::START, route);
+	if (baseCall)
+	{
+		// BaseApp 记录本轮交接后再发送快照，等待期间源仍是 Real。
+		sendCellHandoff(base, id, CellHandoff::START, entry.route);
+	}
+	else
+	{
+		EntityPtr held(entity);
+		Entity::bufferCallback(true);
+		dispatchCellHandoff(*entity, entry);
+		if (entry.unsent)
+		{
+			outgoingCellHandoffs_.erase(id);
+			entity->removeFlags(ENTITY_FLAGS_TELEPORT_START);
+			delayAutoCellHandoff(*entity);
+		}
+		Entity::bufferCallback(false);
+	}
 	return true;
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::dispatchCellHandoff(Entity& entity, OutgoingCellHandoff& pending)
+{
+	const auto& route = pending.route;
+	auto* space = Spaces::findSpace(route.space);
+	auto* peer = Components::getSingleton().findComponent(CELLAPP_TYPE, route.target);
+	auto* target = peer ? peer->pChannel : NULL;
+	const auto pos = entity.position();
+	const auto dir = entity.direction();
+	const auto* destination = space ? space->layout().cellAt(pos.x, pos.z) : NULL;
+	const uint64 generation = space ? space->boundaryGhosts().handoffCopyGeneration(entity.id(), route.target, pending.session) : 0;
+	pending.unsent = pending.unsent || isShuttingdown() || !entity.isReal() ||
+		entity.spaceID() != route.space ||
+		(entity.controlledBy() && entity.controlledBy()->id() != entity.id()) ||
+		!space || !space->canAcceptEntities() || space->layoutState() != SpaceLayout::ACTIVE ||
+		space->layoutVersion() != route.layoutVersion || !destination || destination->cellappID != route.target ||
+		(pending.automatic && !space->localCellBounds().crossedBy(pos.x, pos.z, cellHandoffMargin_)) ||
+		!canSendCellHandoff(target) || (route.targetPid && peer->pid && peer->pid != route.targetPid) ||
+		target->sessionEpoch() != pending.session || !generation;
+	if (pending.unsent)
+		return;
+
+	try
+	{
+		entity.changeToGhost(route.target, pending.snapshot, route.epoch, true);
+	}
+	catch (const MemoryStreamWriteOverflow&)
+	{
+		pending.unsent = true;
+		return;
+	}
+	auto* request = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	request->newMessage(CellappInterface::reqCellHandoff);
+	(*request) << entity.id() << entity.pScriptModule()->getUType()
+		<< pos.x << pos.y << pos.z << dir.roll() << dir.pitch() << dir.yaw()
+		<< pending.base << generation;
+	route.write(*request);
+	if (!pending.base)
+		pending.processes.write(*request);
+	request->append(pending.snapshot);
+	pending.dispatched = true;
+	pending.checkAt = timestamp() + 2 * stampsPerSecond();
+	target->send(request);
+	DEBUG_MSG(fmt::format("Cellapp::cellHandoff: snapshot sent, entity={}, epoch={}.\n", entity.id(), route.epoch));
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::restoreCellHandoffSource(Entity& entity, OutgoingCellHandoff& pending)
+{
+	if (pending.automatic)
+		delayAutoCellHandoff(entity);
+	if (pending.dispatched)
+	{
+		entity.changeToReal(0, pending.snapshot, true);
+		entity.restoreProximitys();
+	}
+	entity.removeFlags(ENTITY_FLAGS_TELEPORT_START);
 }
 
 //-------------------------------------------------------------------------------------
@@ -3173,13 +3267,25 @@ void Cellapp::retryCellHandoffMessages()
 	nextCellHandoffStartRetry_ = timestamp() + stampsPerSecond();
 	for (auto it = outgoingCellHandoffs_.begin(); it != outgoingCellHandoffs_.end();)
 	{
+		const auto& pending = *it->second;
+		if (!pending.base)
+		{
+			auto* peer = Components::getSingleton().findComponentChannel(CELLAPP_TYPE, pending.route.target);
+			if (timestamp() >= pending.checkAt && canSendCellHandoff(peer) &&
+				queryCellPeerProcess(*peer) == pending.processes.target)
+			{
+				sendPeerCellHandoff(*peer, it->first, pending.released ? CellHandoff::SOURCE_RELEASED :
+					CellHandoff::CHECK_TARGET, pending.route, pending.processes);
+			}
+			++it;
+			continue;
+		}
 		auto* entity = findEntity(it->first);
 		if (!entity)
 		{
 			it = outgoingCellHandoffs_.erase(it);
 			continue;
 		}
-		const auto& pending = *it->second;
 		if (!pending.route.targetPid && entity->baseEntityCall())
 			sendCellHandoff(entity->baseEntityCall()->getChannel(), it->first, CellHandoff::START, pending.route);
 		else if (pending.dispatched && timestamp() >= pending.checkAt)
@@ -3207,10 +3313,19 @@ void Cellapp::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
 	ENTITY_ID id = 0;
 	uint8 action = NONE;
 	Route route;
-	const bool parsed = reader.read(id) && reader.read(action) && route.read(reader) && reader.empty();
+	const bool peer = findBoundCellappSource(channel) != NULL;
+	PeerProcesses processes;
+	const bool parsed = reader.read(id) && id > 0 && reader.read(action) && route.read(reader) &&
+		(!peer || processes.read(reader)) && reader.empty();
 	stream.done();
-	if (!parsed || !spacePartitioningEnabled() ||
-		!Components::getSingleton().isExpectedComponentChannel(BASEAPP_TYPE, channel))
+	if (!parsed || !spacePartitioningEnabled())
+		return;
+	if (peer)
+	{
+		onPeerCellHandoff(*channel, id, action, route, processes);
+		return;
+	}
+	if (!Components::getSingleton().isExpectedComponentChannel(BASEAPP_TYPE, channel))
 		return;
 	auto* entity = findEntity(id);
 	const auto baseID = channel->componentID();
@@ -3273,51 +3388,12 @@ void Cellapp::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
 
 	if (action == DISPATCH && !pending.dispatched)
 	{
-		auto* space = Spaces::findSpace(route.space);
-		auto* peer = Components::getSingleton().findComponent(CELLAPP_TYPE, route.target);
-		auto* target = peer ? peer->pChannel : NULL;
-		const auto pos = entity->position();
-		const auto dir = entity->direction();
-		const auto* destination = space ? space->layout().cellAt(pos.x, pos.z) : NULL;
-		const uint64 generation = space ? space->boundaryGhosts().handoffCopyGeneration(id, route.target, pending.session) : 0;
-		pending.unsent = pending.unsent || isShuttingdown() || !entity->isReal() ||
-			entity->spaceID() != route.space ||
-			(entity->controlledBy() && entity->controlledBy()->id() != id) ||
-			!space || !space->canAcceptEntities() || space->layoutState() != SpaceLayout::ACTIVE ||
-			space->layoutVersion() != route.layoutVersion || !destination || destination->cellappID != route.target ||
-			(pending.automatic && !space->localCellBounds().crossedBy(pos.x, pos.z, cellHandoffMargin_)) ||
-			!target || (peer->pid && peer->pid != route.targetPid) ||
-			target->isDestroyed() || target->condemn() != 0 ||
-			target->sessionEpoch() != pending.session || !generation;
-		if (!pending.unsent)
-		{
-			Entity::bufferCallback(true);
-			try
-			{
-				entity->changeToGhost(route.target, pending.snapshot, route.epoch, true);
-			}
-			catch (const MemoryStreamWriteOverflow&)
-			{
-				pending.unsent = true;
-			}
-			if (!pending.unsent)
-			{
-				auto* request = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-				request->newMessage(CellappInterface::reqCellHandoff);
-				(*request) << id << entity->pScriptModule()->getUType()
-					<< pos.x << pos.y << pos.z << dir.roll() << dir.pitch() << dir.yaw()
-					<< baseID << generation;
-				route.write(*request);
-				request->append(pending.snapshot);
-				pending.dispatched = true;
-				pending.checkAt = timestamp() + 2 * stampsPerSecond();
-				target->send(request);
-				DEBUG_MSG(fmt::format("Cellapp::cellHandoff: snapshot sent, entity={}, epoch={}.\n", id, route.epoch));
-			}
-			Entity::bufferCallback(false);
-		}
+		EntityPtr held(entity);
+		Entity::bufferCallback(true);
+		dispatchCellHandoff(*entity, pending);
 		if (pending.unsent)
 			sendCellHandoff(channel, id, SOURCE_UNSENT, route);
+		Entity::bufferCallback(false);
 	}
 	else if (action == RELEASE_SOURCE && pending.dispatched &&
 		entity->isCellHandoffSource() && entity->realCell() == route.target &&
@@ -3336,25 +3412,169 @@ void Cellapp::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
 			return;
 		auto restored = std::move(entry->second);
 		outgoingCellHandoffs_.erase(entry);
-		// 目标仍不可用时不在下一次 Ghost 更新中立即发起相同交接。
-		if (restored->automatic)
-			delayAutoCellHandoff(*entity);
-		if (restored->dispatched)
+		EntityPtr held(entity);
+		Entity::bufferCallback(true);
+		restoreCellHandoffSource(*entity, *restored);
+		sendCellHandoff(channel, id, SOURCE_RESTORED, route);
+		Entity::bufferCallback(false);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::onPeerCellHandoff(Network::Channel& channel, ENTITY_ID id, uint8 action,
+	const CellHandoff::Route& route, const CellHandoff::PeerProcesses& processes)
+{
+	using namespace CellHandoff;
+	const auto* peer = findBoundCellappSource(&channel);
+	if (!peer || peer->pChannel != &channel || route.targetPid != 0)
+		return;
+
+	const auto localProcess = CellRecovery::recoveryProcessID();
+	if (route.target == componentID_ && route.source == peer->cid && processes.target == localProcess &&
+		(!peer->pid || peer->pid == route.sourcePid))
+	{
+		const auto entry = incomingPeerCellHandoffs_.find(id);
+		const bool matches = entry != incomingPeerCellHandoffs_.end() &&
+			entry->second.route == route && entry->second.processes == processes;
+		if (action == CHECK_TARGET)
+		{
+			if (matches)
+				sendPeerCellHandoff(channel, id, TARGET_INSTALLED, route, processes);
+			else
+			{
+				// 原连接按序处理。换连接后旧通道不能安装快照，同一进程仍保留已安装记录。
+				auto* entity = findEntity(id);
+				if (!entity || !entity->isReal())
+					sendPeerCellHandoff(channel, id, TARGET_REJECTED, route, processes);
+			}
+		}
+		else if (action == SOURCE_RELEASED)
+		{
+			sendPeerCellHandoff(channel, id, TARGET_FINISHED, route, processes);
+			if (matches)
+			{
+				incomingPeerCellHandoffs_.erase(entry);
+				finishPeerCellHandoff(id, route);
+			}
+		}
+		return;
+	}
+
+	if (route.source != componentID_ || route.sourcePid != static_cast<uint32>(getProcessPID()) ||
+		route.target != peer->cid || processes.source != localProcess)
+		return;
+	auto entry = outgoingCellHandoffs_.find(id);
+	if (entry == outgoingCellHandoffs_.end())
+		return;
+	auto& pending = *entry->second;
+	if (pending.base || !pending.dispatched || !(pending.route == route) || !(pending.processes == processes))
+		return;
+
+	auto* entity = findEntity(id);
+	const bool ownsSource = entity && !entity->isDestroyed() && entity->isCellHandoffSource() &&
+		entity->spaceID() == route.space && entity->realCell() == route.target && entity->routingEpoch() == route.epoch;
+	if (action == TARGET_INSTALLED)
+	{
+		// 先记下已释放，之后的拒绝或迟到回包都不能再把源副本恢复成 Real。
+		Entity::bufferCallback(true);
+		if (!pending.released)
+		{
+			pending.released = true;
+			MemoryStream empty(0);
+			pending.snapshot.swap(empty);
+			if (ownsSource)
+				destroyEntity(id, false);
+		}
+		sendPeerCellHandoff(channel, id, SOURCE_RELEASED, route, processes);
+		Entity::bufferCallback(false);
+	}
+	else if (action == TARGET_REJECTED && !pending.released)
+	{
+		auto restored = std::move(entry->second);
+		outgoingCellHandoffs_.erase(entry);
+		if (ownsSource)
 		{
 			EntityPtr held(entity);
 			Entity::bufferCallback(true);
-			entity->changeToReal(0, restored->snapshot, true);
-			entity->restoreProximitys();
-			entity->removeFlags(ENTITY_FLAGS_TELEPORT_START);
-			sendCellHandoff(channel, id, SOURCE_RESTORED, route);
+			restoreCellHandoffSource(*entity, *restored);
 			Entity::bufferCallback(false);
 		}
-		else
-		{
-			entity->removeFlags(ENTITY_FLAGS_TELEPORT_START);
-			sendCellHandoff(channel, id, SOURCE_RESTORED, route);
-		}
 	}
+	else if (action == TARGET_FINISHED && pending.released)
+		outgoingCellHandoffs_.erase(entry);
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::finishPeerCellHandoff(ENTITY_ID id, const CellHandoff::Route& route)
+{
+	auto* entity = findEntity(id);
+	if (entity && !entity->isDestroyed() && entity->isReal() && entity->isCellHandoffTarget() &&
+		!entity->baseEntityCall() && entity->spaceID() == route.space && entity->routingEpoch() == route.epoch &&
+		entity->migrationRelayCell() == route.source)
+	{
+		EntityPtr held(entity);
+		entity->completeCellHandoff();
+	}
+}
+
+//-------------------------------------------------------------------------------------
+bool Cellapp::hasPendingPeerCellHandoff(COMPONENT_ID peer) const
+{
+	return std::any_of(outgoingCellHandoffs_.begin(), outgoingCellHandoffs_.end(),
+		[peer](const auto& entry) { return !entry.second->base && entry.second->route.target == peer; }) ||
+		std::any_of(incomingPeerCellHandoffs_.begin(), incomingPeerCellHandoffs_.end(),
+		[peer](const auto& entry) { return entry.second.route.source == peer; });
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::onCellProcessExit(Network::Channel* channel, COMPONENT_ID cid, uint64 process)
+{
+	if (!spacePartitioningEnabled() || isShuttingdown() || !cid || !process ||
+		!canSendCellHandoff(channel) || channel->isExternal() ||
+		channel != Components::getSingleton().getCellappmgrChannel())
+		return;
+	resolvePeerCellHandoffsAfterExit(cid, process);
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::resolvePeerCellHandoffsAfterExit(COMPONENT_ID lost, uint64 process, SPACE_ID space, uint64 version)
+{
+	const auto matches = [&](const CellHandoff::Route& route, uint64 peerProcess)
+	{
+		// 进程退出通知按进程编号处理；漏收通知时，接管检查可清理旧布局的记录。
+		return process ? peerProcess == process : route.space == space && route.layoutVersion <= version;
+	};
+	// 管理器已确认进程退出。没有可用备份时，源不能恢复可能已在目标执行过的快照。
+	Entity::bufferCallback(true);
+	for (auto it = outgoingCellHandoffs_.begin(); it != outgoingCellHandoffs_.end();)
+	{
+		const auto& pending = *it->second;
+		if (pending.base || pending.route.target != lost || !matches(pending.route, pending.processes.target))
+		{
+			++it;
+			continue;
+		}
+		const auto id = it->first;
+		const auto route = pending.route;
+		it = outgoingCellHandoffs_.erase(it);
+		auto* entity = findEntity(id);
+		if (entity && entity->isCellHandoffSource() && entity->spaceID() == route.space &&
+			entity->routingEpoch() == route.epoch && entity->realCell() == lost)
+			destroyEntity(id, false);
+	}
+	for (auto it = incomingPeerCellHandoffs_.begin(); it != incomingPeerCellHandoffs_.end();)
+	{
+		const auto route = it->second.route;
+		if (route.source != lost || !matches(route, it->second.processes.source))
+		{
+			++it;
+			continue;
+		}
+		const auto id = it->first;
+		it = incomingPeerCellHandoffs_.erase(it);
+		finishPeerCellHandoff(id, route);
+	}
+	Entity::bufferCallback(false);
 }
 
 //-------------------------------------------------------------------------------------
@@ -3371,6 +3591,7 @@ void Cellapp::reqCellHandoff(Network::Channel* channel, MemoryStream& stream)
 	SPACE_ID snapshotSpace = 0;
 	bool destroyed = false;
 	Route route;
+	PeerProcesses processes;
 	const auto* sender = findBoundCellappSource(channel);
 	if (!sender || sender->pChannel != channel ||
 		!header.read(id) || !header.read(type) ||
@@ -3378,7 +3599,9 @@ void Cellapp::reqCellHandoff(Network::Channel* channel, MemoryStream& stream)
 		!header.read(dir.dir.x) || !header.read(dir.dir.y) || !header.read(dir.dir.z) ||
 		!header.read(baseID) || !header.read(generation) || !route.read(header) ||
 		sender->cid != route.source || (sender->pid && sender->pid != route.sourcePid) ||
-		componentID_ != route.target || static_cast<uint32>(getProcessPID()) != route.targetPid)
+		componentID_ != route.target ||
+		(baseID ? static_cast<uint32>(getProcessPID()) != route.targetPid :
+			(route.targetPid != 0 || !processes.read(header) || processes.target != CellRecovery::recoveryProcessID())))
 	{
 		stream.done();
 		return;
@@ -3387,6 +3610,18 @@ void Cellapp::reqCellHandoff(Network::Channel* channel, MemoryStream& stream)
 	auto* base = Components::getSingleton().findComponentChannel(BASEAPP_TYPE, baseID);
 	auto* space = Spaces::findSpace(route.space);
 	auto* entity = findEntity(id);
+	if (!baseID)
+	{
+		const auto entry = incomingPeerCellHandoffs_.find(id);
+		if (entry != incomingPeerCellHandoffs_.end() || (entity && entity->isReal()))
+		{
+			if (entry != incomingPeerCellHandoffs_.end() && entry->second.route == route &&
+				entry->second.processes == processes)
+				sendPeerCellHandoff(*channel, id, TARGET_INSTALLED, route, processes);
+			stream.done();
+			return;
+		}
+	}
 	if (admittedCellHandoffs_.count(id))
 	{
 		stream.done();
@@ -3396,7 +3631,9 @@ void Cellapp::reqCellHandoff(Network::Channel* channel, MemoryStream& stream)
 	if (!spacePartitioningEnabled() || !spacePartitioningConfirmed() || isShuttingdown() ||
 		!space || !space->canAcceptEntities() || space->layoutState() != SpaceLayout::ACTIVE ||
 		!destination || destination->cellappID != componentID_ || !space->layout().cellForApp(route.source) ||
-		!base || base->isDestroyed() || base->condemn() != 0 || !entity || !entity->isBoundaryGhost() ||
+		(baseID ? !canSendCellHandoff(base) :
+			(!autoCellHandoffEnabled() || incomingPeerCellHandoffs_.size() >= SpaceLayout::MAX_CELLS)) ||
+		!entity || !entity->isBoundaryGhost() ||
 		entity->spaceID() != route.space || entity->realCell() != route.source ||
 		entity->pScriptModule()->getUType() != type || route.layoutVersion != space->layoutVersion() ||
 		!header.read(snapshotType) || snapshotType != type || !header.read(epoch) || epoch != route.epoch ||
@@ -3406,14 +3643,20 @@ void Cellapp::reqCellHandoff(Network::Channel* channel, MemoryStream& stream)
 		// 同一连接上也会重建 Ghost，旧快照不能把新副本转为 Real。
 		!space->boundaryGhosts().forgetHandoffTarget(id, route.source, channel->sessionEpoch(), generation))
 	{
-		sendCellHandoff(base, id, TARGET_REJECTED, route);
+		if (baseID)
+			sendCellHandoff(base, id, TARGET_REJECTED, route);
+		else
+			sendPeerCellHandoff(*channel, id, TARGET_REJECTED, route, processes);
 		WARNING_MSG(fmt::format("Cellapp::cellHandoff: target rejected, entity={}, epoch={}, space={}.\n", id, route.epoch, route.space));
 		stream.done();
 		return;
 	}
 
 	// 即使目标随后被销毁，也不能把已经安装过的快照当成没有收到。
-	admittedCellHandoffs_.insert(id);
+	if (baseID)
+		admittedCellHandoffs_.insert(id);
+	else
+		incomingPeerCellHandoffs_.emplace(id, IncomingPeerCellHandoff{route, processes});
 	stream.rpos(snapshotPos);
 	EntityPtr held(entity);
 	Entity::bufferCallback(true);
@@ -3424,8 +3667,11 @@ void Cellapp::reqCellHandoff(Network::Channel* channel, MemoryStream& stream)
 	entity->migrationRelayCell(route.source);
 	entity->setPositionAndDirection(pos, dir);
 	entity->restoreProximitys();
+	if (!baseID)
+		sendPeerCellHandoff(*channel, id, TARGET_INSTALLED, route, processes);
 	Entity::bufferCallback(false);
-	sendCellHandoff(base, id, TARGET_INSTALLED, route);
+	if (baseID)
+		sendCellHandoff(base, id, TARGET_INSTALLED, route);
 	stream.done();
 }
 
@@ -3556,23 +3802,29 @@ void Cellapp::sendPendingTeleportDispatch(ENTITY_ID id, PendingTeleportDispatch&
 		!canSendCellHandoff(target) || target->sessionEpoch() != pending.targetSession)
 		return;
 
-	auto& peer = teleportPeers_[pending.route.target];
-	if (peer.session != pending.targetSession)
-		peer = {pending.targetSession};
-	if (peer.process)
+	const uint64 process = queryCellPeerProcess(*target);
+	if (process)
 	{
-		pending.route.targetProcess = peer.process;
+		pending.route.targetProcess = process;
 		sendTeleportReservation(*base, id, pending.route);
 	}
-	else if (timestamp() >= peer.queryAt)
+}
+
+uint64 Cellapp::queryCellPeerProcess(Network::Channel& channel)
+{
+	auto& peer = teleportPeers_[channel.componentID()];
+	if (peer.session != channel.sessionEpoch())
+		peer = {channel.sessionEpoch()};
+	if (!peer.process && timestamp() >= peer.queryAt)
 	{
-		// 同一条连接只查询一次进程编号，后续传送复用。
+		// 传送和交接共用同一条连接上确认的进程编号。
 		peer.queryAt = timestamp() + stampsPerSecond();
 		auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		bundle->newMessage(CellappInterface::onTeleportPeerProcess);
 		(*bundle) << uint64(0);
-		target->send(bundle);
+		channel.send(bundle);
 	}
+	return peer.process;
 }
 
 void Cellapp::onTeleportPeerProcess(Network::Channel* channel, uint64 process)

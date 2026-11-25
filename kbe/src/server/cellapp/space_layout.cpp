@@ -282,6 +282,7 @@ bool Space::checkReplacement(const SpaceLayout::Packet& packet)
 		return false;
 	// 保留旧版直到在途迁移结束，同时拒绝新的迁入和实体创建。
 	replacementCheckVersion_ = packet.version;
+	Cellapp::getSingleton().resolvePeerCellHandoffsAfterExit(packet.replacedCellApp, 0, id_, layoutVersion_);
 	return !hasPendingMigrationEntities(true);
 }
 

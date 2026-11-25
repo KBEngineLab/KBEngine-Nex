@@ -60,6 +60,25 @@ struct Route
 			space != 0 && layoutVersion != 0;
 	}
 };
+
+struct PeerProcesses
+{
+	uint64 source = 0;
+	uint64 target = 0;
+
+	bool operator==(const PeerProcesses& other) const
+	{
+		return source == other.source && target == other.target;
+	}
+
+	template<class Stream>
+	void write(Stream& stream) const { stream << source << target; }
+
+	bool read(BoundedStreamReader& reader)
+	{
+		return reader.read(source) && source && reader.read(target) && target;
+	}
+};
 }
 
 #endif

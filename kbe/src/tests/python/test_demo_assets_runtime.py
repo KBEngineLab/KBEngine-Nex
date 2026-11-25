@@ -16,6 +16,7 @@ import xml.etree.ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from cell_handoff_runtime import verify_handoff_destroy_timer
 from performance.assets import build_environment, create_config_overlay, find_server_config, set_xml_value
 from performance.log_metrics import DEFAULT_PATTERNS
 from performance.run import resolve_management_admin_token, wait_for_cluster_ready_for_login
@@ -329,7 +330,11 @@ def verify_demo(entries, run_root, environment, args, output, password):
                 layout_result, verify_after_logout = verify_fixed_layout(
                     cells, original_space, args.space_partitioning == "true", rejection_logged
                 )
-                if layout_result["enabled"]:
+                if args.handoff_destroy_timer:
+                    layout_result["handoff_destroy_timer"] = verify_handoff_destroy_timer(
+                        cells, layout_result, output
+                    )
+                elif layout_result["enabled"]:
                     def read_bots_log():
                         return read_text(output / "logs/bots.10000.log")
 
@@ -465,6 +470,8 @@ def main():
                         help="启动真实额外 CellApp 检查拒绝行为，不运行正常业务流程")
     parser.add_argument("--fixed-space-layout", action="store_true",
                         help="验证固定区域、资源同步、空区域保留和逻辑 Space 删除")
+    parser.add_argument("--handoff-destroy-timer", action="store_true",
+                        help="验证一次性定时器在自动交接期间请求销毁")
     parser.add_argument("--cellapp-count", type=int, choices=(2, 4), default=2)
     parser.add_argument("--keep-space-layout-on-shutdown", action="store_true",
                         help="保留已启用的区域直接正常关服，检查 Cell 资源不会阻止退出")
@@ -472,6 +479,10 @@ def main():
     require(not args.keep_space_layout_on_shutdown or (
         args.fixed_space_layout and args.space_partitioning == "true"
     ), "保留布局关服检查要求启用固定空间分区")
+    require(not args.handoff_destroy_timer or (
+        args.fixed_space_layout and args.space_partitioning == "true" and args.cellapp_count == 2
+        and not args.partition_rejection
+    ), "销毁定时器检查要求启用双 Cell 固定空间分区")
     for name in ("repository_root", "assets_root", "binary_root", "config_overlay"):
         setattr(args, name, getattr(args, name).resolve())
     source = ET.parse(args.config_overlay / "server/kbengine.xml").getroot()
@@ -505,6 +516,9 @@ def main():
         if partitioning is None:
             partitioning = ET.SubElement(manager, "spacePartitioning")
         set_xml_value(partitioning, "enabled", args.space_partitioning)
+        if args.handoff_destroy_timer:
+            set_xml_value(partitioning, "autoHandoff", "true")
+            set_xml_value(partitioning, "handoffMargin", "2")
     password = uuid.uuid4().hex
     for component in ("baseapp", "cellapp", "bots"):
         parent = runtime.getroot().find(component)
