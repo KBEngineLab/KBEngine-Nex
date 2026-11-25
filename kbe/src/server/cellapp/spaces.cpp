@@ -204,8 +204,8 @@ bool Spaces::hasActiveCellPeer(COMPONENT_ID cid)
 	for (const auto& entry : spaces())
 	{
 		const auto& space = *entry.second;
-		if (space.hasManagedCell() && space.layoutState() == SpaceLayout::ACTIVE &&
-			space.canAcceptEntities() && space.layout().cellForApp(cid))
+		if (space.needsSplitPeer(cid) || (space.hasManagedCell() && space.layoutState() == SpaceLayout::ACTIVE &&
+			space.canAcceptEntities() && space.layout().cellForApp(cid)))
 			return true;
 	}
 	return false;

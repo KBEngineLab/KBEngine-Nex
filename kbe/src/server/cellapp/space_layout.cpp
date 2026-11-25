@@ -205,6 +205,7 @@ bool Space::applyBoundaryMove(const SpaceLayout::Packet& packet)
 	// 参与节点不变，只重新计算区域；正在交接的实体仍按原布局版本收尾。
 	layout_.boundsForApp(g_componentID, localCellBounds_);
 	boundaryRevision_ = packet.revision;
+	splitMigration_.reset();
 	return true;
 }
 
@@ -217,8 +218,192 @@ void Space::finishBoundaryMove(uint64 revision, const std::string& error)
 	}
 }
 
+bool Space::beginCellSplit(const SpaceLayout::Packet& packet, const Network::Channel& manager, bool candidate)
+{
+	using namespace SpaceLayout;
+	if (split_ || !isGood() || layoutShutdownRequested_ || layoutRemovalPending_)
+		return false;
+	const auto* next = packet.layout.cellForApp(g_componentID);
+	if (!next || candidate != (g_componentID == packet.splitTarget))
+		return false;
+	if (!candidate && (!hasManagedCell() || layoutState_ != ACTIVE || layoutVersion_ != packet.version ||
+		layout_.owner != packet.layout.owner || !pCell() || pCell()->id() != next->cellID ||
+		resourceRevision_ != packet.revision || layout_.cellForApp(packet.splitTarget)))
+		return false;
+	split_ = SplitPreparation{packet.layout, manager.addr(), manager.sessionEpoch(),
+		packet.splitAttempt, packet.splitSource, packet.splitTarget, 0, candidate};
+	if (candidate)
+		layoutVersion_ = packet.version;
+	return true;
+}
+
+bool Space::isPendingSplitPeer(COMPONENT_ID cid) const
+{
+	return split_ && split_->applied && (split_->candidate || split_->target == cid);
+}
+
+bool Space::needsSplitPeer(COMPONENT_ID cid) const
+{
+	return split_ && cid != g_componentID &&
+		(split_->candidate ? (split_->applied ? layout_ : split_->layout).cellForApp(cid) != nullptr :
+			split_->target == cid);
+}
+
+void Space::updateCellSplitPreparation()
+{
+	auto& app = Cellapp::getSingleton();
+	auto* manager = app.networkInterface().findChannel(split_->manager);
+	if (!manager || manager->isDestroyed() || manager->condemn() != 0 ||
+		manager->sessionEpoch() != split_->managerSession)
+	{
+		if (isStagedSplitCell())
+			removeLayoutSpace();
+		else
+		{
+			if (split_->candidate)
+				setLayoutState(SpaceLayout::FAILED, "split manager connection was lost");
+			split_.reset();
+		}
+		return;
+	}
+	if (split_->applied || layoutRemovalPending_ || isGeometryLoading() ||
+		(split_->readyRevision && (!split_->candidate || split_->readyRevision == resourceRevision_)))
+		return;
+	auto& components = Components::getSingleton();
+	for (const auto& node : split_->layout.nodes)
+	{
+		if (node.axis != SpaceLayout::LEAF || !needsSplitPeer(node.cellappID))
+			continue;
+		const auto* channel = components.findComponentChannel(CELLAPP_TYPE, node.cellappID);
+		if (!channel || channel->isDestroyed() || channel->condemn() != 0)
+			return;
+	}
+	auto ready = spacePacket(*this, SpaceLayout::SPLIT_READY);
+	ready.splitAttempt = split_->attempt;
+	if (app.sendSpaceLayout(ready, manager))
+	{
+		split_->readyRevision = resourceRevision_;
+		if (split_->candidate)
+			setLayoutState(SpaceLayout::PREPARED);
+	}
+}
+
+bool Space::applyCellSplit(const SpaceLayout::Packet& packet, const Network::Channel& manager)
+{
+	using namespace SpaceLayout;
+	if (!split_ || split_->managerSession != manager.sessionEpoch() || split_->attempt != packet.splitAttempt ||
+		split_->applied || !split_->readyRevision ||
+		(split_->candidate ? layoutState_ != PREPARED :
+			(layoutState_ != ACTIVE || packet.revision != boundaryRevision_ + 1)))
+		return false;
+	// 扩容不替换已存在的 Cell，也不改变 Ghost 和在途交接使用的 Layout 版本。
+	layout_ = std::move(split_->layout);
+	layout_.boundsForApp(g_componentID, localCellBounds_);
+	boundaryRevision_ = packet.revision;
+	split_->applied = true;
+	splitMigration_.reset();
+	if (split_->candidate)
+	{
+		layoutPreparedVersion_ = layoutVersion_;
+		setLayoutState(COMMITTING);
+	}
+	return true;
+}
+
+bool Space::finishCellSplit(const SpaceLayout::Packet& packet, const Network::Channel& manager, bool cancel)
+{
+	if (!split_ || split_->managerSession != manager.sessionEpoch() || split_->attempt != packet.splitAttempt ||
+		split_->applied == cancel || (!cancel && packet.revision != boundaryRevision_))
+		return false;
+	if (isStagedSplitCell())
+		removeLayoutSpace();
+	else
+	{
+		if (!cancel && split_->source == g_componentID)
+			splitMigration_ = SplitMigrationScan{split_->attempt, split_->target, SplitMigrationScan::CheckingSource};
+		else if (!cancel && split_->candidate)
+			splitMigration_ = SplitMigrationScan{split_->attempt, split_->source, SplitMigrationScan::WaitingForSource};
+		split_.reset();
+	}
+	return true;
+}
+
+void Space::checkSplitMigrationTarget(const SpaceLayout::Packet& packet)
+{
+	if (splitMigration_ && splitMigration_->stage == SplitMigrationScan::WaitingForSource &&
+		layoutState_ == SpaceLayout::ACTIVE && packet.version == layoutVersion_ &&
+		packet.revision == boundaryRevision_ && packet.splitAttempt == splitMigration_->attempt)
+		splitMigration_->stage = SplitMigrationScan::CheckingTarget;
+}
+
+bool Space::hasSplitSourceEntityToMigrate(Entity& entity, COMPONENT_ID target) const
+{
+	if (entity.isDestroyed() || entity.isSpace())
+		return false;
+	if (entity.isCellHandoffSource())
+		return entity.realCell() == target;
+	const auto& pos = entity.position();
+	if (!entity.isReal() || !localCellBounds_.crossedBy(pos.x, pos.z, Cellapp::getSingleton().cellHandoffMargin()))
+		return false;
+	const auto* destination = layout_.cellAt(pos.x, pos.z);
+	return destination && destination->cellappID == target;
+}
+
+void Space::updateCellSplitMigration()
+{
+	if (!splitMigration_ || layoutState_ != SpaceLayout::ACTIVE || !canAcceptEntities() ||
+		splitMigration_->stage == SplitMigrationScan::WaitingForSource ||
+		timestamp() < splitMigration_->nextCheck)
+		return;
+	auto& scan = *splitMigration_;
+	auto& app = Cellapp::getSingleton();
+	const auto retry = [&]()
+	{
+		scan.cursor = 0;
+		scan.nextCheck = timestamp() + stampsPerSecond();
+	};
+	if (scan.stage == SplitMigrationScan::CheckingSource)
+	{
+		const auto end = std::min(entities_.size(), scan.cursor + 128);
+		for (; scan.cursor < end; ++scan.cursor)
+		{
+			if (hasSplitSourceEntityToMigrate(*entities_[scan.cursor], scan.peer))
+			{
+				retry();
+				return;
+			}
+		}
+		if (scan.cursor < entities_.size())
+			return;
+		// 分批扫描期间可能刚发起交接，等目标安装或源端回退后才能请求目标检查。
+		if (app.hasUnreleasedCellHandoff(id_, layoutVersion_, scan.peer))
+		{
+			retry();
+			return;
+		}
+	}
+	else if (app.hasUnfinishedIncomingCellHandoff(id_, layoutVersion_, scan.peer))
+	{
+		retry();
+		return;
+	}
+	auto result = spacePacket(*this, SpaceLayout::SPLIT_DRAINED);
+	result.revision = boundaryRevision_;
+	result.splitAttempt = scan.attempt;
+	if (app.sendSpaceLayout(result))
+		splitMigration_.reset();
+}
+
 void Space::setLayoutState(SpaceLayout::State state, const std::string& error)
 {
+	if (state == SpaceLayout::FAILED || state == SpaceLayout::RELEASING)
+	{
+		splitMigration_.reset();
+		if (isStagedSplitCell())
+			removeLayoutSpace();
+		else
+			split_.reset();
+	}
 	layoutState_ = state;
 	layoutError_ = error;
 }
@@ -241,6 +426,10 @@ void Space::abortLayout(const std::string& error)
 void Space::updateLayoutPreparation()
 {
 	using namespace SpaceLayout;
+	if (split_)
+		updateCellSplitPreparation();
+	if (split_ && split_->candidate)
+		return;
 	if (!hasManagedCell())
 		return;
 	if (isPreparingReplacement())
@@ -386,6 +575,46 @@ bool Cellapp::sendSpaceLayout(const SpaceLayout::Packet& packet, Network::Channe
 	return true;
 }
 
+void Cellapp::queueLayoutPeerConnections(const SpaceLayout::Packet& packet, COMPONENT_ID only)
+{
+	auto& components = Components::getSingleton();
+	for (const auto& entry : packet.cellPeerRoutes)
+	{
+		if (entry.first <= componentID_ || (only && entry.first != only))
+			continue;
+		const auto* current = components.findComponent(entry.first);
+		if (current && (current->componentType != CELLAPP_TYPE ||
+			(current->pChannel && !current->pChannel->isDestroyed() && current->pChannel->condemn() == 0)))
+			continue;
+		const auto& address = entry.second;
+		Components::ComponentInfos peer;
+		peer.uid = getUserUID();
+		peer.cid = entry.first;
+		peer.componentType = CELLAPP_TYPE;
+		peer.pid = address.pid;
+		peer.globalOrderid = address.globalOrder;
+		peer.groupOrderid = address.groupOrder;
+		peer.gus = address.gus;
+		peer.extradata3 = 0;
+		peer.pIntAddr.reset(new Network::Address(address.internalIP, address.internalPort));
+		peer.pExtAddr.reset(new Network::Address(address.externalIP, address.externalPort));
+		std::memcpy(peer.username, address.username.c_str(), address.username.size() + 1);
+		std::memcpy(peer.externalAddressEx, address.externalAddress.c_str(), address.externalAddress.size() + 1);
+		queueCellPeerReconnect(peer);
+	}
+}
+
+void Cellapp::reportLayoutPresence(Space& space)
+{
+	auto* manager = Components::getSingleton().getCellappmgrChannel();
+	if (!manager)
+		return;
+	auto* presence = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	presence->newMessage(CellappmgrInterface::updateSpaceData);
+	(*presence) << componentID_ << space.id() << space.getScriptModuleName() << false << space.getGeometryPath();
+	manager->send(presence);
+}
+
 void Cellapp::onSpaceLayout(Network::Channel* channel, MemoryStream& stream)
 {
 	using namespace SpaceLayout;
@@ -413,6 +642,73 @@ void Cellapp::onSpaceLayout(Network::Channel* channel, MemoryStream& stream)
 	if (!parsed || packet.sender != sender)
 		return;
 	Space* space = Spaces::findSpace(packet.spaceID);
+	if (packet.operation == SPLIT_CHECK_TARGET)
+	{
+		if (space)
+			space->checkSplitMigrationTarget(packet);
+		return;
+	}
+	if (packet.operation == SPLIT_CANCEL)
+	{
+		const bool removing = space && space->layoutVersion() == packet.version &&
+			space->finishCellSplit(packet, *channel, true);
+		if (packet.splitTarget == componentID_ && !removing)
+		{
+			// 候选未创建临时 Space 时不必等待下一次 Tick。
+			packet.sender = componentID_;
+			packet.operation = SPLIT_DISCARDED;
+			sendSpaceLayout(packet, channel);
+		}
+		return;
+	}
+	if (packet.operation == SPLIT_PREPARE || packet.operation == SPLIT_STAGE)
+	{
+		const bool candidate = packet.operation == SPLIT_PREPARE;
+		bool created = false;
+		if (!isShuttingdown() && candidate && !space && packet.splitTarget == componentID_)
+		{
+			space = Spaces::createNewSpace(packet.spaceID, packet.resources.scriptModule, false);
+			created = space != nullptr;
+		}
+		std::string error;
+		if (!isShuttingdown() && space && (!candidate || created) &&
+			space->beginCellSplit(packet, *channel, candidate))
+		{
+			if (!candidate || space->prepareLayout(packet, true, error))
+			{
+				queueLayoutPeerConnections(packet, candidate ? 0 : packet.splitTarget);
+				space->updateLayoutPreparation();
+				return;
+			}
+		}
+		if (created)
+			space->removeLayoutSpace();
+		packet.sender = componentID_;
+		packet.operation = SPLIT_READY;
+		packet.success = false;
+		packet.error = error.empty() ? "CellApp cannot prepare the requested split" : error;
+		sendSpaceLayout(packet, channel);
+		return;
+	}
+	if (packet.operation == SPLIT_APPLY || packet.operation == SPLIT_COMPLETE)
+	{
+		if (!space || space->layoutVersion() != packet.version)
+			return;
+		if (packet.operation == SPLIT_APPLY && space->applyCellSplit(packet, *channel))
+		{
+			if (space->canReceiveSplitGhosts())
+				reportLayoutPresence(*space);
+			packet.sender = componentID_;
+			packet.operation = SPLIT_APPLIED;
+			sendSpaceLayout(packet, channel);
+		}
+		else if (packet.operation == SPLIT_COMPLETE && space->finishCellSplit(packet, *channel, false) &&
+			space->layoutState() == COMMITTING)
+		{
+			space->setLayoutState(ACTIVE);
+		}
+		return;
+	}
 	if (packet.operation == REPLACEMENT_PREPARE)
 	{
 		Packet response;
@@ -555,40 +851,8 @@ void Cellapp::onSpaceLayout(Network::Channel* channel, MemoryStream& stream)
 			space->setLayoutState(ACTIVE);
 			space->cancelReplacementCheck(packet.version);
 			if (!isShuttingdown() && space->canAcceptEntities())
-			{
-				for (const auto& entry : packet.cellPeerRoutes)
-				{
-					if (entry.first <= componentID_)
-						continue;
-					const auto* current = components.findComponent(entry.first);
-					if (current && (current->componentType != CELLAPP_TYPE || current->pChannel))
-						continue;
-					const auto& address = entry.second;
-					Components::ComponentInfos peer;
-					peer.uid = getUserUID();
-					peer.cid = entry.first;
-					peer.componentType = CELLAPP_TYPE;
-					peer.pid = address.pid;
-					peer.globalOrderid = address.globalOrder;
-					peer.groupOrderid = address.groupOrder;
-					peer.gus = address.gus;
-					peer.extradata3 = 0;
-					peer.pIntAddr.reset(new Network::Address(address.internalIP, address.internalPort));
-					peer.pExtAddr.reset(new Network::Address(address.externalIP, address.externalPort));
-					std::memcpy(peer.username, address.username.c_str(), address.username.size() + 1);
-					std::memcpy(peer.externalAddressEx, address.externalAddress.c_str(), address.externalAddress.size() + 1);
-					queueCellPeerReconnect(peer);
-				}
-			}
-			Network::Channel* manager = Components::getSingleton().getCellappmgrChannel();
-			if (manager != NULL)
-			{
-				Network::Bundle* presence = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
-				presence->newMessage(CellappmgrInterface::updateSpaceData);
-				(*presence) << componentID_ << space->id() << space->getScriptModuleName()
-					<< false << space->getGeometryPath();
-				manager->send(presence);
-			}
+				queueLayoutPeerConnections(packet);
+			reportLayoutPresence(*space);
 			INFO_MSG(fmt::format("Cellapp::spaceLayout: active space={}, version={}, cell={}.\n",
 				space->id(), packet.version, space->pCell()->id()));
 		}
@@ -605,11 +869,12 @@ void Cellapp::onSpaceLayout(Network::Channel* channel, MemoryStream& stream)
 		space->removeLayoutSpace();
 		break;
 	case SET_DATA: case DELETE_DATA:
-		if (space->layoutState() == ACTIVE)
+		if (space->layoutState() == ACTIVE || space->isStagedSplitCell() || space->canReceiveSplitGhosts())
 			space->applyLayoutData(packet.key, packet.value, packet.operation == DELETE_DATA, packet.revision);
 		break;
 	case RESOURCES:
-		if (space->layoutState() == ACTIVE && packet.revision > space->resourceRevision())
+		if ((space->layoutState() == ACTIVE || space->isStagedSplitCell() || space->canReceiveSplitGhosts()) &&
+			packet.revision > space->resourceRevision())
 			space->applyLayoutResources(packet.resources, packet.revision, true);
 		break;
 	case UPDATE_REJECTED:

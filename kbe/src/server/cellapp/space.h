@@ -124,6 +124,18 @@ public:
 	void beginBoundaryMove(uint64 revision);
 	bool applyBoundaryMove(const SpaceLayout::Packet& packet);
 	void finishBoundaryMove(uint64 revision, const std::string& error);
+	bool beginCellSplit(const SpaceLayout::Packet& packet, const Network::Channel& manager, bool candidate);
+	bool applyCellSplit(const SpaceLayout::Packet& packet, const Network::Channel& manager);
+	bool finishCellSplit(const SpaceLayout::Packet& packet, const Network::Channel& manager, bool cancel);
+	void checkSplitMigrationTarget(const SpaceLayout::Packet& packet);
+	bool isPendingSplitPeer(COMPONENT_ID cid) const;
+	bool needsSplitPeer(COMPONENT_ID cid) const;
+	bool isStagedSplitCell() const { return split_ && split_->candidate && !split_->applied; }
+	bool canReceiveSplitGhosts() const
+	{
+		return split_ && split_->candidate && split_->applied &&
+			layoutState_ == SpaceLayout::COMMITTING && isGood() && !layoutRemovalPending_;
+	}
 	SpaceLayout::State layoutState() const { return layoutState_; }
 	const std::string& layoutError() const { return layoutError_; }
 	bool hasManagedCell() const { return layoutPinned_; }
@@ -177,7 +189,7 @@ public:
 	bool canAcceptEntities() const
 	{
 		return isGood() && !layoutShutdownRequested_ && !layoutRemovalPending_ &&
-			!isPreparingReplacement() && !replacementCheckVersion_;
+			!isPreparingReplacement() && !replacementCheckVersion_ && !(split_ && split_->candidate);
 	}
 	// 未提交迁移实体持有 Space 生命周期租约，脚本清理必须等待 BaseApp 完成路由切换。
 	// Uncommitted migration Targets lease the Space lifetime until BaseApp completes the route switch.
@@ -185,6 +197,9 @@ public:
 
 protected:
 	void _addSpaceDatasToEntityClient(const Entity* pEntity);
+	void updateCellSplitPreparation();
+	void updateCellSplitMigration();
+	bool hasSplitSourceEntityToMigrate(Entity& entity, COMPONENT_ID target) const;
 
 	void _clearGhosts();
 	
@@ -242,6 +257,29 @@ protected:
 	uint64						boundaryRevision_ = 0;
 	uint64						pendingBoundaryRevision_ = 0;
 	std::string					boundaryMoveError_;
+	struct SplitPreparation
+	{
+		SpaceLayout::Layout layout;
+		Network::Address manager;
+		uint64 managerSession;
+		uint64 attempt;
+		COMPONENT_ID source;
+		COMPONENT_ID target;
+		uint64 readyRevision = 0;
+		bool candidate = false;
+		bool applied = false;
+	};
+	std::optional<SplitPreparation> split_;
+	struct SplitMigrationScan
+	{
+		enum Stage { CheckingSource, WaitingForSource, CheckingTarget };
+		uint64 attempt;
+		COMPONENT_ID peer;
+		Stage stage;
+		size_t cursor = 0;
+		uint64 nextCheck = 0;
+	};
+	std::optional<SplitMigrationScan> splitMigration_;
 	SpaceLayout::State			layoutState_ = SpaceLayout::NONE;
 	std::string					layoutError_;
 	bool						layoutPinned_ = false;

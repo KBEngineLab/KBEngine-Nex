@@ -176,6 +176,8 @@ Bots::~Bots()
 //-------------------------------------------------------------------------------------
 bool Bots::initialize()
 {
+	g_kbeSrvConfig.warnAboutManagementAdminToken();
+
 	// --dev 是 IDE 集中日志的显式开关。默认不连接 Logger，确保正式
 	// Bots 与压测只承担本地日志 IO。
 	// --dev explicitly enables centralized IDE logging. Normal Bots and load
@@ -2111,21 +2113,16 @@ void Bots::queryWatcher(Network::Channel* pChannel, MemoryStream& s)
 	std::string path;
 	s >> path;
 
-	const std::string& expectedToken = ServerConfig::getSingleton().managementAdminToken();
-	if (!expectedToken.empty())
-	{
-		std::string actualToken;
-		if (s.length() > 0)
-			s >> actualToken;
+	std::string actualToken;
+	if (s.length() > 0)
+		s >> actualToken;
 
-		if (actualToken != expectedToken)
-		{
-			// 认证失败不得输出 Token 明文，避免诊断入口把共享密钥写入日志。
-			// Authentication failures must not log token contents or leak the shared secret through diagnostics.
-			WARNING_MSG(fmt::format("Bots::queryWatcher: reject unauthorized request from {}.\n",
-				pChannel->c_str()));
-			return;
-		}
+	if (!g_kbeSrvConfig.matchesManagementAdminToken(actualToken))
+	{
+		// 认证失败时只记录请求来源，避免泄露 Token。
+		WARNING_MSG(fmt::format("Bots::queryWatcher: reject unauthorized request from {}.\n",
+			pChannel->c_str()));
+		return;
 	}
 
 	MemoryStream::SmartPoolObjectPtr readStreamPtr = MemoryStream::createSmartPoolObj(OBJECTPOOL_POINT);

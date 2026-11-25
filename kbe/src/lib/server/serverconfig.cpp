@@ -38,6 +38,10 @@ KBE_SINGLETON_INIT(ServerConfig);
 
 static bool g_dbmgr_addDefaultAddress = true;
 
+// 与 kbengine_defaults.xml 中的公开调试值一致，用于检查启动后的实际配置。
+static constexpr char EXAMPLE_MANAGEMENT_ADMIN_TOKEN[] =
+	"8be0f32909da7702f7cf2424af6e9422b4881f70bd5991f973424fed24004e5e";
+
 static void loadRawDatabaseCommandBlacklist(XML* xml, TiXmlNode* rootNode, const char* dbType,
 	std::map<std::string, std::vector<std::string> >& blacklist)
 {
@@ -63,7 +67,7 @@ ServerConfig::ServerConfig():
 	gameUpdateHertz_(10),
 	asyncioRepeatOffset_(0.f),
 	performanceProbesEnabled_(false),
-	managementAdminToken_("8be0f32909da7702f7cf2424af6e9422b4881f70bd5991f973424fed24004e5e"),
+	managementAdminToken_(EXAMPLE_MANAGEMENT_ADMIN_TOKEN),
 	tick_max_buffered_logs_(4096),
 	tick_max_sync_logs_(32),
 	channelCommon_(),
@@ -90,6 +94,21 @@ ServerConfig::ServerConfig():
 //-------------------------------------------------------------------------------------
 ServerConfig::~ServerConfig()
 {
+}
+
+//-------------------------------------------------------------------------------------
+void ServerConfig::warnAboutManagementAdminToken() const
+{
+	if (managementAdminToken_.empty())
+		WARNING_MSG("management/adminToken is empty. Requests requiring this token will be rejected.\n");
+	else if (managementAdminToken_ == EXAMPLE_MANAGEMENT_ADMIN_TOKEN)
+		WARNING_MSG("management/adminToken uses the public example value. Set a project-specific value before deployment.\n");
+}
+
+//-------------------------------------------------------------------------------------
+bool ServerConfig::matchesManagementAdminToken(const std::string& token) const
+{
+	return !managementAdminToken_.empty() && token == managementAdminToken_;
 }
 
 //-------------------------------------------------------------------------------------
@@ -130,10 +149,9 @@ bool ServerConfig::loadConfig(std::string fileName)
 	if (rootNode != NULL)
 	{
 		TiXmlNode* childnode = xml->enterNode(rootNode, "adminToken");
-		if (childnode != NULL)
-		{
-			managementAdminToken_ = strutil::kbe_trim(xml->getValStr(childnode));
-		}
+		// 空标签没有文本节点，但仍是显式配置，不能沿用默认值。
+		if (childnode != NULL || xml->hasNode(rootNode, "adminToken"))
+			managementAdminToken_ = childnode != NULL ? xml->getValStr(childnode) : "";
 	}
 
 	std::string email_service_config;

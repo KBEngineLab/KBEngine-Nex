@@ -171,7 +171,7 @@ void BoundaryGhosts::refresh(Space& space, Entity& entity, SendTarget* targets, 
 
 void BoundaryGhosts::update(Space& space)
 {
-	if (space.canAcceptEntities() && space.layoutState() == SpaceLayout::COMMITTING)
+	if ((space.canAcceptEntities() || space.canReceiveSplitGhosts()) && space.layoutState() == SpaceLayout::COMMITTING)
 		return;
 
 	const bool active = space.canAcceptEntities() && space.layoutState() == SpaceLayout::ACTIVE;
@@ -244,7 +244,8 @@ void BoundaryGhosts::update(Space& space)
 	std::array<SendTarget, SpaceLayout::MAX_CELLS> targets;
 	for (size_t i = 0; i < neighbours_.size(); ++i)
 	{
-		auto* channel = peerChannel(neighbours_[i].component);
+		auto* channel = space.isPendingSplitPeer(neighbours_[i].component) ? nullptr :
+			peerChannel(neighbours_[i].component);
 		const int32 queued = channel ? channel->bundlesLength() : MAX_PENDING_BYTES;
 		targets[i] = {&neighbours_[i], channel,
 			static_cast<size_t>(std::max(0, MAX_PENDING_BYTES - queued))};

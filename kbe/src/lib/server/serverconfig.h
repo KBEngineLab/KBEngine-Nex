@@ -368,6 +368,8 @@ public:
 	~ServerConfig();
 	
 	bool loadConfig(std::string fileName);
+	void warnAboutManagementAdminToken() const;
+	bool matchesManagementAdminToken(const std::string& token) const;
 	
 	INLINE ENGINE_COMPONENT_INFO& getCellApp(void);
 	INLINE ENGINE_COMPONENT_INFO& getBaseApp(void);

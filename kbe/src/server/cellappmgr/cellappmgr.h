@@ -115,6 +115,7 @@ public:
 	void reportSpacePartitioningMode(Network::Channel* pChannel, COMPONENT_ID cid, uint8 mode,
 		uint32 pid, uint64 processStart, uint64 pidNamespace, uint64 process);
 	void onSpaceLayoutRequest(Network::Channel* pChannel, MemoryStream& stream);
+	void manageSpaceLayout(Network::Channel* channel, MemoryStream& stream);
 	void reqCellRecoveryScope(Network::Channel* channel, MemoryStream& stream);
 	uint64 managedSpaceCount() const { return spaceLayouts_.size(); }
 
@@ -166,6 +167,7 @@ public:
 protected:
 	bool spaceAssigned(SPACE_ID spaceID);
 	bool sendSpaceLayout(COMPONENT_ID cid, const SpaceLayout::Packet& packet);
+	bool collectCellPeerRoutes(const SpaceLayout::Layout& layout, SpaceLayout::Packet& packet);
 	void broadcastSpaceLayout(SPACE_ID spaceID, SpaceLayout::Transaction& transaction,
 		SpaceLayout::Operation operation);
 	void failSpaceLayout(SPACE_ID spaceID, SpaceLayout::Transaction& transaction,
@@ -173,6 +175,12 @@ protected:
 	void requestBoundaryMove(SpaceLayout::Packet& packet, SpaceLayout::Transaction* transaction);
 	void reportBoundaryMove(SPACE_ID spaceID, COMPONENT_ID owner, uint64 version, uint64 revision, const char* error);
 	void finishBoundaryMove(SPACE_ID spaceID, SpaceLayout::Transaction& transaction, const char* error);
+	const char* requestSpaceSplit(SPACE_ID spaceID, SpaceLayout::Transaction& transaction,
+		uint64 version, uint64 boundaryRevision, CELL_ID cell, uint8 axis, float position);
+	void handleSpaceSplitAck(const SpaceLayout::Packet& packet, SpaceLayout::Transaction& transaction,
+		Network::Channel* channel);
+	void stopSpaceSplit(SPACE_ID spaceID, SpaceLayout::Transaction& transaction, const char* reason);
+	void sendSplitResource(const SpaceLayout::Packet& packet, SpaceLayout::Transaction& transaction);
 	void updateSpaceLayouts();
 	bool updateCellReplacement(SPACE_ID spaceID, SpaceLayout::Transaction& transaction, uint64 now);
 	void checkCellReplacement(SPACE_ID spaceID, SpaceLayout::Transaction& transaction, uint64 now);
@@ -215,6 +223,11 @@ protected:
 	// 尚无可用 CellApp 时仍需保留编号，避免重复恢复请求绕过单区域限制。
 	std::set<SPACE_ID>					queuedSpaceIDs_;
 	std::map<SPACE_ID, SpaceLayout::Transaction> spaceLayouts_;
+	struct CancelledSplit
+	{
+		uint64 session, version, attempt;
+	};
+	std::map<COMPONENT_ID, std::map<SPACE_ID, CancelledSplit>> cancelledSplits_;
 	// 只保留涉及 Cell 退出的已关闭 Space 编号，供稍后收到的 Base 查询使用。
 	std::set<SPACE_ID> closedSpacesWithCellLoss_;
 	std::map<COMPONENT_ID, PartitionCellProcess> partitionCellProcesses_;

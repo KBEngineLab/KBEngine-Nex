@@ -3,6 +3,7 @@
 
 #include "server/bounded_stream_reader.h"
 
+#include <algorithm>
 #include <optional>
 
 #include <cmath>
@@ -27,7 +28,9 @@ enum Operation : uint8
 	ABORT, SHUTDOWN, REMOVE, REMOVED, SUSPEND, SET_DATA, DELETE_DATA, RESOURCES, UPDATE_REJECTED,
 	REPLACEMENT_PREPARE, REPLACEMENT_READY, REPLACEMENT_CANCEL,
 	REPLACEMENT_CHECK, REPLACEMENT_CHECKED, REPLACEMENT_COMMIT,
-	BOUNDARY_REQUEST, BOUNDARY_APPLY, BOUNDARY_APPLIED, BOUNDARY_RESULT
+	BOUNDARY_REQUEST, BOUNDARY_APPLY, BOUNDARY_APPLIED, BOUNDARY_RESULT,
+	SPLIT_PREPARE, SPLIT_STAGE, SPLIT_READY, SPLIT_APPLY, SPLIT_APPLIED, SPLIT_COMPLETE, SPLIT_CANCEL, SPLIT_DRAINED,
+	SPLIT_DISCARDED, SPLIT_CHECK_TARGET
 };
 
 inline const char* stateName(State state)
@@ -123,6 +126,31 @@ struct Layout
 		// 移动上层边界也可能使下层分区无效，必须检查整棵树。
 		Layout next = *this;
 		next.nodes[index].position = position;
+		if (!next.validate())
+			return false;
+		*this = std::move(next);
+		return true;
+	}
+
+	bool splitCell(CELL_ID source, uint8 axis, float position, COMPONENT_ID target)
+	{
+		if ((axis != X && axis != Z) || !std::isfinite(position) || !target ||
+			nodes.size() + 2 > MAX_NODES || cellForApp(target))
+			return false;
+		const auto leaf = std::find_if(nodes.begin(), nodes.end(),
+			[source](const Node& node) { return node.axis == LEAF && node.cellID == source; });
+		if (leaf == nodes.end())
+			return false;
+		CELL_ID last = 0;
+		for (const auto& node : nodes)
+			last = std::max(last, node.cellID);
+		if (last == std::numeric_limits<CELL_ID>::max())
+			return false;
+		Layout next = *this;
+		const auto index = leaf - nodes.begin();
+		// 原 Cell 保留编号和坐标较小的一侧，新 Cell 使用尚未分配的编号。
+		next.nodes[index] = Node{axis, position};
+		next.nodes.insert(next.nodes.begin() + index + 1, {*leaf, Node{LEAF, 0.f, last + 1, target}});
 		if (!next.validate())
 			return false;
 		*this = std::move(next);
@@ -384,6 +412,9 @@ struct Packet
 	uint64 revision = 0;
 	uint16 boundaryIndex = 0;
 	float boundaryPosition = 0.f;
+	uint64 splitAttempt = 0;
+	COMPONENT_ID splitSource = 0;
+	COMPONENT_ID splitTarget = 0;
 	COMPONENT_ID replacedCellApp = 0;
 	uint64 replacedLayoutVersion = 0;
 	COMPONENT_ID replacementCellApp = 0;
@@ -409,6 +440,12 @@ struct Packet
 			layout.write(stream);
 			resources.write(stream);
 			break;
+		case SPLIT_PREPARE: case SPLIT_STAGE:
+			stream << splitAttempt << splitSource << splitTarget;
+			layout.write(stream);
+			if (operation == SPLIT_PREPARE)
+				resources.write(stream);
+			[[fallthrough]];
 		case COMPLETE:
 			stream << static_cast<uint16>(cellPeerRoutes.size());
 			for (const auto& entry : cellPeerRoutes)
@@ -420,12 +457,23 @@ struct Packet
 		case REPLACEMENT_READY:
 			stream << replacementProcess;
 			[[fallthrough]];
+		case SPLIT_READY:
+			if (operation == SPLIT_READY)
+				stream << splitAttempt;
+			[[fallthrough]];
 		case READY: case COMMITTED: case ABORT: case SUSPEND: case BOUNDARY_RESULT:
 			stream << static_cast<uint8>(success);
 			stream.appendBlob(error);
 			break;
 		case BOUNDARY_REQUEST: case BOUNDARY_APPLY:
 			stream << boundaryIndex << boundaryPosition;
+			break;
+		case SPLIT_CANCEL:
+			stream << splitTarget;
+			[[fallthrough]];
+		case SPLIT_APPLY: case SPLIT_APPLIED: case SPLIT_COMPLETE: case SPLIT_DRAINED: case SPLIT_DISCARDED:
+		case SPLIT_CHECK_TARGET:
+			stream << splitAttempt;
 			break;
 		case SET_DATA: case DELETE_DATA:
 			stream.appendBlob(key);
@@ -475,6 +523,13 @@ struct Packet
 			if (operation == REPLACEMENT_PREPARE && layout.cellForApp(replacedCellApp))
 				return false;
 			break;
+		case SPLIT_PREPARE: case SPLIT_STAGE:
+			if (!reader.read(splitAttempt) || !splitAttempt || !reader.read(splitSource) || !reader.read(splitTarget) ||
+				splitSource == splitTarget || !layout.read(reader) || !layout.cellForApp(splitSource) ||
+				!layout.cellForApp(splitTarget) || splitTarget == layout.owner ||
+				(operation == SPLIT_PREPARE && !resources.read(reader)))
+				return false;
+			[[fallthrough]];
 		case COMPLETE:
 		{
 			uint16 count = 0;
@@ -489,10 +544,19 @@ struct Packet
 					!cellPeerRoutes.emplace(cid, std::move(route)).second)
 					return false;
 			}
+			if (operation != COMPLETE &&
+				(cellPeerRoutes.size() != layout.participants().size() ||
+				 !std::all_of(cellPeerRoutes.begin(), cellPeerRoutes.end(),
+					 [&](const auto& route) { return layout.cellForApp(route.first); })))
+				return false;
 			break;
 		}
 		case REPLACEMENT_READY:
 			if (!reader.read(replacementProcess))
+				return false;
+			[[fallthrough]];
+		case SPLIT_READY:
+			if (operation == SPLIT_READY && (!reader.read(splitAttempt) || !splitAttempt))
 				return false;
 			[[fallthrough]];
 		case READY: case COMMITTED: case ABORT: case SUSPEND: case BOUNDARY_RESULT:
@@ -513,6 +577,15 @@ struct Packet
 			break;
 		case BOUNDARY_APPLIED:
 			if (!revision)
+				return false;
+			break;
+		case SPLIT_CANCEL:
+			if (!reader.read(splitTarget) || !splitTarget)
+				return false;
+			[[fallthrough]];
+		case SPLIT_APPLY: case SPLIT_APPLIED: case SPLIT_COMPLETE: case SPLIT_DRAINED: case SPLIT_DISCARDED:
+		case SPLIT_CHECK_TARGET:
+			if (!reader.read(splitAttempt) || !splitAttempt)
 				return false;
 			break;
 		case SET_DATA: case DELETE_DATA:
@@ -581,6 +654,24 @@ struct Transaction
 		std::set<COMPONENT_ID> acknowledged;
 	};
 	std::optional<BoundaryConfirmation> boundaryConfirmation;
+	struct Split
+	{
+		Layout layout;
+		COMPONENT_ID source;
+		COMPONENT_ID target;
+		uint64 targetSession;
+		uint64 started;
+		uint64 readyResourceRevision = 0;
+		bool published = false;
+		std::set<COMPONENT_ID> confirmed;
+	};
+	std::optional<Split> split;
+	uint64 splitAttempt = 0;
+	std::string splitError;
+	enum class SplitMigration { None, CheckingSource, CheckingTarget, Complete, Interrupted };
+	SplitMigration splitMigration = SplitMigration::None;
+	COMPONENT_ID splitMigrationSource = 0;
+	COMPONENT_ID splitMigrationTarget = 0;
 	uint64 started = 0;
 	State state = PREPARING;
 	bool suspended = false;
@@ -601,6 +692,26 @@ struct Transaction
 	uint64 lastReplacementVersion = 0;
 	uint64 replacementRetryAt = 0;
 	std::map<COMPONENT_ID, uint64> rejectedReplacements;
+
+	bool isSplitMigrating() const
+	{
+		return splitMigration == SplitMigration::CheckingSource || splitMigration == SplitMigration::CheckingTarget;
+	}
+
+	void interruptSplitMigration()
+	{
+		if (isSplitMigrating())
+			splitMigration = SplitMigration::Interrupted;
+	}
+
+	bool canConfirmSplitMigration(const Packet& packet) const
+	{
+		if (state != ACTIVE || split || version != packet.version ||
+			boundaryRevision != packet.revision || splitAttempt != packet.splitAttempt)
+			return false;
+		return (splitMigration == SplitMigration::CheckingSource && splitMigrationSource == packet.sender) ||
+			(splitMigration == SplitMigration::CheckingTarget && splitMigrationTarget == packet.sender);
+	}
 
 	bool confirmBoundary(COMPONENT_ID cid, uint64 layoutVersion, uint64 confirmedRevision)
 	{

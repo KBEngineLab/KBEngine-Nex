@@ -872,19 +872,13 @@ void ServerApp::startProfile(Network::Channel* pChannel, KBEngine::MemoryStream&
 //-------------------------------------------------------------------------------------
 bool ServerApp::validateManagementAdminToken(Network::Channel* pChannel, MemoryStream& s, const char* operationName) const
 {
-	const std::string& expectedToken = ServerConfig::getSingleton().managementAdminToken();
-	if (expectedToken.empty())
-	{
-		return true;
-	}
-
 	std::string actualToken;
 	if (s.length() > 0)
 	{
 		s >> actualToken;
 	}
 
-	if (actualToken == expectedToken)
+	if (g_kbeSrvConfig.matchesManagementAdminToken(actualToken))
 	{
 		return true;
 	}

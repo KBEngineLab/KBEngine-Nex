@@ -4,6 +4,7 @@
 #include "../baseapp/baseapp_interface.h"
 #include "server/cell_recovery.h"
 #include "server/component_routing_guard.h"
+#include "helper/console_helper.h"
 
 #include <algorithm>
 
@@ -17,10 +18,38 @@ bool Cellappmgr::sendSpaceLayout(COMPONENT_ID cid, const SpaceLayout::Packet& pa
 		return false;
 	MemoryStream stream;
 	packet.write(stream);
+	if (stream.length() > SpaceLayout::MAX_PACKET_BYTES)
+		return false;
 	Network::Bundle* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	bundle->newMessage(CellappInterface::onSpaceLayout);
 	bundle->append(&stream);
 	target->pChannel->send(bundle);
+	return true;
+}
+
+bool Cellappmgr::collectCellPeerRoutes(const SpaceLayout::Layout& layout, SpaceLayout::Packet& packet)
+{
+	auto& components = Components::getSingleton();
+	for (COMPONENT_ID cid : layout.participants())
+	{
+		const auto* component = components.findComponent(CELLAPP_TYPE, cid);
+		if (!component || !component->pIntAddr || !component->pExtAddr ||
+			component->pIntAddr->ip == 0 || component->pIntAddr->port == 0)
+			return false;
+		auto& route = packet.cellPeerRoutes[cid];
+		route.internalIP = component->pIntAddr->ip;
+		route.internalPort = component->pIntAddr->port;
+		route.externalIP = component->pExtAddr->ip;
+		route.externalPort = component->pExtAddr->port;
+		route.pid = component->pid;
+		route.globalOrder = component->globalOrderid;
+		route.groupOrder = component->groupOrderid;
+		route.gus = component->gus;
+		route.username.assign(component->username,
+			std::find(component->username, component->username + MAX_NAME, '\0'));
+		route.externalAddress.assign(component->externalAddressEx,
+			std::find(component->externalAddressEx, component->externalAddressEx + MAX_NAME, '\0'));
+	}
 	return true;
 }
 
@@ -43,37 +72,17 @@ void Cellappmgr::broadcastSpaceLayout(SPACE_ID spaceID, SpaceLayout::Transaction
 	else if (operation == SpaceLayout::RESOURCES)
 		packet.resources = transaction.resources;
 	const auto participants = transaction.layout.participants();
-	if (operation == SpaceLayout::COMPLETE)
+	// 激活时以管理器当前的注册地址为准，不能依赖 CellApp 上可能已经丢失的地址。
+	if (operation == SpaceLayout::COMPLETE && !collectCellPeerRoutes(transaction.layout, packet))
 	{
-		// CellApp 间的连接可能早于布局断开，激活时以管理器现有的注册地址为准。
-		auto& components = Components::getSingleton();
-		for (COMPONENT_ID cid : participants)
-		{
-			const auto* component = components.findComponent(CELLAPP_TYPE, cid);
-			if (!component || !component->pIntAddr || !component->pExtAddr ||
-				component->pIntAddr->ip == 0 || component->pIntAddr->port == 0)
-			{
-				failSpaceLayout(spaceID, transaction, "participant endpoint is unavailable", true);
-				return;
-			}
-			auto& route = packet.cellPeerRoutes[cid];
-			route.internalIP = component->pIntAddr->ip;
-			route.internalPort = component->pIntAddr->port;
-			route.externalIP = component->pExtAddr->ip;
-			route.externalPort = component->pExtAddr->port;
-			route.pid = component->pid;
-			route.globalOrder = component->globalOrderid;
-			route.groupOrder = component->groupOrderid;
-			route.gus = component->gus;
-			route.username.assign(component->username,
-				std::find(component->username, component->username + MAX_NAME, '\0'));
-			route.externalAddress.assign(component->externalAddressEx,
-				std::find(component->externalAddressEx, component->externalAddressEx + MAX_NAME, '\0'));
-		}
+		failSpaceLayout(spaceID, transaction, "participant endpoint is unavailable", true);
+		return;
 	}
 	bool sent = true;
 	for (COMPONENT_ID cid : participants)
 		sent = sendSpaceLayout(cid, packet) && sent;
+	if (operation == SpaceLayout::RESOURCES)
+		sendSplitResource(packet, transaction);
 	if (!sent && (operation == SpaceLayout::PREPARE ||
 		operation == SpaceLayout::COMMIT || operation == SpaceLayout::COMPLETE))
 	{
@@ -85,6 +94,8 @@ void Cellappmgr::broadcastSpaceLayout(SPACE_ID spaceID, SpaceLayout::Transaction
 void Cellappmgr::failSpaceLayout(SPACE_ID spaceID, SpaceLayout::Transaction& transaction,
 	const std::string& error, bool suspend)
 {
+	stopSpaceSplit(spaceID, transaction, error.c_str());
+	transaction.interruptSplitMigration();
 	transaction.advance(SpaceLayout::FAILED, timestamp());
 	transaction.suspended = suspend;
 	transaction.error = error;
@@ -131,6 +142,8 @@ void Cellappmgr::requestBoundaryMove(SpaceLayout::Packet& packet, SpaceLayout::T
 		error = "Space layout version or boundary revision is not current";
 	else if (transaction->boundaryConfirmation)
 		error = "the previous boundary move is still awaiting confirmation";
+	else if (transaction->split)
+		error = "another layout adjustment is in progress";
 	else
 	{
 		participants = transaction->layout.participants();
@@ -146,6 +159,7 @@ void Cellappmgr::requestBoundaryMove(SpaceLayout::Packet& packet, SpaceLayout::T
 	}
 
 	// 各 Cell 在管理器连接上按序收到边界与关闭消息；边界发布后不因确认迟到而回退。
+	transaction->interruptSplitMigration();
 	transaction->boundaryConfirmation = Transaction::BoundaryConfirmation{timestamp(), {}};
 	packet.sender = componentID_;
 	packet.operation = BOUNDARY_APPLY;
@@ -158,6 +172,223 @@ void Cellappmgr::requestBoundaryMove(SpaceLayout::Packet& packet, SpaceLayout::T
 	INFO_MSG(fmt::format("Cellappmgr::spaceLayout: boundary moved, space={}, version={}, revision={}, "
 		"index={}, position={}.\n", packet.spaceID, packet.version, packet.revision,
 		packet.boundaryIndex, packet.boundaryPosition));
+}
+
+void Cellappmgr::manageSpaceLayout(Network::Channel* channel, MemoryStream& stream)
+{
+	using namespace SpaceLayout;
+	if (!channel || channel->isExternal() || channel->isDestroyed() || channel->condemn() != 0)
+	{
+		stream.done();
+		return;
+	}
+	BoundedStreamReader auth(stream);
+	if (!auth.skipString(512, false) || !validateManagementAdminToken(channel, stream, "manageSpaceLayout"))
+	{
+		stream.done();
+		return;
+	}
+	BoundedStreamReader request(stream);
+	uint8 action = 0, axis = LEAF;
+	SPACE_ID spaceID = 0;
+	CELL_ID cell = 0;
+	uint64 version = 0, revision = 0;
+	float position = 0;
+	const bool valid = request.read(action) && request.read(spaceID) && spaceID &&
+		(action == 0 || (action == 1 && request.read(version) && request.read(revision) &&
+			request.read(cell) && request.read(axis) && request.read(position))) && request.empty();
+	stream.done();
+	auto found = spaceLayouts_.find(spaceID);
+	const char* error = nullptr;
+	if (!valid)
+		error = "invalid Space management request";
+	else if (!spacePartitioningEnabled())
+		error = "Space partitioning is disabled";
+	else if (found == spaceLayouts_.end())
+		error = "Space has no managed layout";
+	else if (action == 1)
+		error = requestSpaceSplit(spaceID, found->second, version, revision, cell, axis, position);
+
+	static ConsoleInterface::ConsoleQuerySpacesHandler handler;
+	auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	bundle->newMessage(handler);
+	(*bundle) << static_cast<uint8>(!error) << (error ? error : "");
+	if (!error)
+	{
+		const auto& transaction = found->second;
+		const auto& split = transaction.split;
+		const char* status = split ? (split->published ? "publishing" : "preparing") :
+			(!transaction.splitError.empty() ? "failed" : transaction.splitAttempt ? "active" : "none");
+		using Migration = Transaction::SplitMigration;
+		const auto migration = transaction.splitMigration;
+		const char* migrationStatus = transaction.isSplitMigrating() ? "migrating" :
+			migration == Migration::Complete ? "complete" : migration == Migration::Interrupted ? "interrupted" : "none";
+		(*bundle) << transaction.version << transaction.boundaryRevision << stateName(transaction.state)
+			<< transaction.splitAttempt << status << transaction.splitError << migrationStatus
+			<< static_cast<uint16>(transaction.layout.nodes.size());
+		for (const auto& node : transaction.layout.nodes)
+			(*bundle) << node.axis << node.position << node.cellID << node.cellappID;
+	}
+	channel->send(bundle);
+}
+
+const char* Cellappmgr::requestSpaceSplit(SPACE_ID spaceID, SpaceLayout::Transaction& transaction,
+	uint64 version, uint64 boundaryRevision, CELL_ID cell, uint8 axis, float position)
+{
+	using namespace SpaceLayout;
+	if (isShuttingdown() || !g_kbeSrvConfig.getCellAppMgr().cellappmgr_space_partitioning_auto_handoff ||
+		transaction.state != ACTIVE || transaction.shutdownRequested)
+		return "Space must be active with automatic Cell handoff enabled";
+	if (transaction.version != version || transaction.boundaryRevision != boundaryRevision)
+		return "Space layout changed; run space show again";
+	if (transaction.boundaryConfirmation || transaction.split)
+		return "another layout adjustment is in progress";
+	if (boundaryRevision == std::numeric_limits<uint64>::max() ||
+		transaction.splitAttempt == std::numeric_limits<uint64>::max())
+		return "Space layout has no remaining adjustment numbers";
+	const auto participants = transaction.layout.participants();
+	if (!std::all_of(participants.begin(), participants.end(), [&](COMPONENT_ID cid) { return componentReady(cid); }))
+		return "a participating CellApp is unavailable";
+	const auto target = findFreeCellapp(spaceID, &transaction);
+	const auto* channel = Components::getSingleton().findComponentChannel(CELLAPP_TYPE, target);
+	if (!channel || channel->isDestroyed() || channel->condemn() != 0)
+		return "no ready CellApp is available for this Space";
+
+	Packet packet;
+	packet.sender = componentID_;
+	packet.spaceID = spaceID;
+	packet.version = version;
+	packet.revision = transaction.revision;
+	packet.splitAttempt = transaction.splitAttempt + 1;
+	packet.splitTarget = target;
+	packet.layout = transaction.layout;
+	for (const auto& node : packet.layout.nodes)
+		if (node.axis == LEAF && node.cellID == cell)
+			packet.splitSource = node.cellappID;
+	if (!packet.layout.splitCell(cell, axis, position, target))
+		return "invalid Cell, cut position, or layout limit";
+	if (!collectCellPeerRoutes(packet.layout, packet))
+		return "a participating CellApp has no registered address";
+	transaction.split = Transaction::Split{packet.layout, packet.splitSource, target, channel->sessionEpoch(), timestamp()};
+	transaction.splitAttempt = packet.splitAttempt;
+	transaction.splitError.clear();
+	transaction.splitMigration = Transaction::SplitMigration::None;
+	transaction.splitMigrationSource = 0;
+	transaction.splitMigrationTarget = 0;
+	cellapps_.at(target).reserveSpaceCreation(spaceID);
+	packet.operation = SPLIT_PREPARE;
+	packet.resources = transaction.resources;
+	bool sent = sendSpaceLayout(target, packet);
+	packet.operation = SPLIT_STAGE;
+	for (const auto cid : participants)
+		sent = sendSpaceLayout(cid, packet) && sent;
+	if (!sent)
+	{
+		stopSpaceSplit(spaceID, transaction, "could not send split preparation to all participants");
+		return "could not send split preparation to all participants";
+	}
+	INFO_MSG(fmt::format("Cellappmgr::spaceLayout: preparing split, space={}, attempt={}, cell={}, target={}.\n",
+		spaceID, packet.splitAttempt, cell, target));
+	return nullptr;
+}
+
+void Cellappmgr::handleSpaceSplitAck(const SpaceLayout::Packet& packet, SpaceLayout::Transaction& transaction,
+	Network::Channel* channel)
+{
+	using namespace SpaceLayout;
+	auto& split = transaction.split;
+	if (!split || transaction.state != ACTIVE || packet.version != transaction.version ||
+		packet.splitAttempt != transaction.splitAttempt || !split->layout.cellForApp(packet.sender) ||
+		(packet.sender == split->target && channel->sessionEpoch() != split->targetSession))
+		return;
+	const auto participants = split->layout.participants();
+	bool publishing = false;
+	if (packet.operation == SPLIT_READY && !split->published)
+	{
+		if (!packet.success)
+		{
+			stopSpaceSplit(packet.spaceID, transaction, packet.error.c_str());
+			return;
+		}
+		if (packet.sender == split->target)
+			split->readyResourceRevision = packet.revision;
+		split->confirmed.insert(packet.sender);
+		if (split->confirmed.size() != participants.size() || split->readyResourceRevision != transaction.revision)
+			return;
+		// 编号和实体归属协议不变，只递增 boundaryRevision。发布后不能因确认迟到撤回新分区。
+		transaction.layout = split->layout;
+		++transaction.boundaryRevision;
+		transaction.splitMigration = Transaction::SplitMigration::CheckingSource;
+		transaction.splitMigrationSource = split->source;
+		transaction.splitMigrationTarget = split->target;
+		split->published = publishing = true;
+		split->started = timestamp();
+		split->confirmed.clear();
+	}
+	else if (packet.operation == SPLIT_APPLIED && split->published)
+	{
+		if (packet.revision != transaction.boundaryRevision)
+			return;
+		split->confirmed.insert(packet.sender);
+		if (split->confirmed.size() != participants.size())
+			return;
+	}
+	else
+		return;
+
+	Packet update;
+	update.sender = componentID_;
+	update.operation = publishing ? SPLIT_APPLY : SPLIT_COMPLETE;
+	update.spaceID = packet.spaceID;
+	update.version = transaction.version;
+	update.revision = transaction.boundaryRevision;
+	update.splitAttempt = transaction.splitAttempt;
+	// 先通知新 Cell；其他节点在收到 COMPLETE 后才开始向它复制和迁移。
+	bool sent = sendSpaceLayout(split->target, update);
+	for (const auto cid : participants)
+		if (cid != split->target)
+			sent = sendSpaceLayout(cid, update) && sent;
+	if (!sent)
+		failSpaceLayout(packet.spaceID, transaction, "split participant connection is unavailable", true);
+	else if (!publishing)
+	{
+		INFO_MSG(fmt::format("Cellappmgr::spaceLayout: split active, space={}, attempt={}, cells={}.\n",
+			packet.spaceID, transaction.splitAttempt, participants.size()));
+		split.reset();
+	}
+}
+
+void Cellappmgr::stopSpaceSplit(SPACE_ID spaceID, SpaceLayout::Transaction& transaction, const char* reason)
+{
+	using namespace SpaceLayout;
+	if (!transaction.split)
+		return;
+	const auto& split = *transaction.split;
+	if (!split.published)
+	{
+		Packet cancel;
+		cancel.sender = componentID_;
+		cancel.operation = SPLIT_CANCEL;
+		cancel.spaceID = spaceID;
+		cancel.version = transaction.version;
+		cancel.splitAttempt = transaction.splitAttempt;
+		cancel.splitTarget = split.target;
+		// 临时 Space 删除前，不能再次把同一个 Space 分配给这个 CellApp。
+		cancelledSplits_[split.target].insert_or_assign(spaceID,
+			CancelledSplit{split.targetSession, cancel.version, cancel.splitAttempt});
+		for (const auto cid : split.layout.participants())
+			sendSpaceLayout(cid, cancel);
+	}
+	transaction.splitError = reason;
+	transaction.split.reset();
+	WARNING_MSG(fmt::format("Cellappmgr::spaceLayout: split stopped, space={}, attempt={}: {}.\n",
+		spaceID, transaction.splitAttempt, reason));
+}
+
+void Cellappmgr::sendSplitResource(const SpaceLayout::Packet& packet, SpaceLayout::Transaction& transaction)
+{
+	if (transaction.split && !transaction.split->published && !sendSpaceLayout(transaction.split->target, packet))
+		stopSpaceSplit(packet.spaceID, transaction, "split target could not receive a resource update");
 }
 
 void Cellappmgr::onSpaceLayoutRequest(Network::Channel* channel, MemoryStream& stream)
@@ -294,6 +525,48 @@ void Cellappmgr::onSpaceLayoutRequest(Network::Channel* channel, MemoryStream& s
 		requestBoundaryMove(packet, found == spaceLayouts_.end() ? nullptr : &found->second);
 		return;
 	}
+	if (packet.operation == SPLIT_READY || packet.operation == SPLIT_APPLIED)
+	{
+		if (found != spaceLayouts_.end() && source->pChannel == channel)
+			handleSpaceSplitAck(packet, found->second, channel);
+		return;
+	}
+	if (packet.operation == SPLIT_DISCARDED)
+	{
+		auto app = cancelledSplits_.find(sender);
+		if (app == cancelledSplits_.end() || source->pChannel != channel)
+			return;
+		auto pending = app->second.find(packet.spaceID);
+		if (pending != app->second.end() && pending->second.session == channel->sessionEpoch() &&
+			pending->second.version == packet.version && pending->second.attempt == packet.splitAttempt)
+		{
+			sourceApp->second.confirmSpaceCreation(packet.spaceID);
+			app->second.erase(pending);
+			if (app->second.empty())
+				cancelledSplits_.erase(app);
+		}
+		return;
+	}
+	if (packet.operation == SPLIT_DRAINED)
+	{
+		if (found == spaceLayouts_.end() || source->pChannel != channel)
+			return;
+		auto& transaction = found->second;
+		if (!transaction.canConfirmSplitMigration(packet))
+			return;
+		using Migration = Transaction::SplitMigration;
+		if (transaction.splitMigration == Migration::CheckingSource)
+		{
+			// 此时早于源端确认的交接均已安装或回退，目标只需等待已安装的交接收尾。
+			packet.sender = componentID_;
+			packet.operation = SPLIT_CHECK_TARGET;
+			transaction.splitMigration = sendSpaceLayout(transaction.splitMigrationTarget, packet) ?
+				Migration::CheckingTarget : Migration::Interrupted;
+		}
+		else
+			transaction.splitMigration = Migration::Complete;
+		return;
+	}
 	if (found == spaceLayouts_.end() || found->second.layout.cellForApp(packet.sender) == NULL)
 		return;
 	Transaction& transaction = found->second;
@@ -350,6 +623,8 @@ void Cellappmgr::onSpaceLayoutRequest(Network::Channel* channel, MemoryStream& s
 		if (packet.sender != transaction.layout.owner || transaction.state == RELEASING)
 			return;
 		transaction.shutdownRequested = true;
+		stopSpaceSplit(packet.spaceID, transaction, "Space is closing");
+		transaction.interruptSplitMigration();
 		if (transaction.committedReplacement)
 			closedSpacesWithCellLoss_.insert(packet.spaceID);
 		finishBoundaryMove(packet.spaceID, transaction, "Space closed before all boundary confirmations");
@@ -397,6 +672,7 @@ void Cellappmgr::onSpaceLayoutRequest(Network::Channel* channel, MemoryStream& s
 		Packet response = std::move(packet);
 		response.sender = componentID_;
 		response.revision = ++transaction.revision;
+		sendSplitResource(response, transaction);
 		for (COMPONENT_ID cid : transaction.layout.participants())
 			if (!sendSpaceLayout(cid, response))
 			{
@@ -454,6 +730,18 @@ void Cellappmgr::updateSpaceLayouts()
 		}
 		if (transaction.replacement)
 			updateCellReplacement(entry.first, transaction, now);
+		if (auto& split = transaction.split; split && split->started &&
+			now - split->started > 30 * stampsPerSecond())
+		{
+			if (!split->published)
+				stopSpaceSplit(entry.first, transaction, "split preparation timed out");
+			else
+			{
+				WARNING_MSG(fmt::format("Cellappmgr::spaceLayout: waiting for split confirmations, "
+					"space={}, attempt={}, confirmed={}.\n", entry.first, transaction.splitAttempt, split->confirmed.size()));
+				split->started = 0;
+			}
+		}
 	}
 	if (lostPartitionCells_.empty())
 		return;
@@ -683,6 +971,8 @@ void Cellappmgr::onSpaceLayoutCellLost(COMPONENT_ID cid, uint64 session)
 	for (auto& entry : spaceLayouts_)
 	{
 		SpaceLayout::Transaction& transaction = entry.second;
+		if (transaction.split && !transaction.split->published && transaction.split->layout.cellForApp(cid))
+			stopSpaceSplit(entry.first, transaction, "a split participant disconnected");
 		if (!transaction.layout.cellForApp(cid))
 			continue;
 		if (transaction.replacement && transaction.replacement->lost != cid)
@@ -697,6 +987,7 @@ void Cellappmgr::onSpaceLayoutCellLost(COMPONENT_ID cid, uint64 session)
 		if ((releasing || transaction.suspended) && !isShuttingdown())
 			lost.layouts.emplace(entry.first, transaction.version);
 	}
+	cancelledSplits_.erase(cid);
 	const auto process = partitionCellProcesses_.find(cid);
 	if (process != partitionCellProcesses_.end() && process->second.session == session)
 	{

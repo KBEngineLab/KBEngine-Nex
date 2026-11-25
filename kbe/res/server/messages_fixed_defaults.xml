@@ -561,4 +561,5 @@
 	<Bots::lookApp><id>55307</id></Bots::lookApp>
 	<Interfaces::lookApp><id>55308</id></Interfaces::lookApp>
 	<Machine::lookApp><id>55309</id></Machine::lookApp>
+	<Cellappmgr::manageSpaceLayout><id>55400</id></Cellappmgr::manageSpaceLayout>
 </root>

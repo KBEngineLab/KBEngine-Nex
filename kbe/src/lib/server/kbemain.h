@@ -242,6 +242,8 @@ int kbeMainT(int argc, char * argv[], COMPONENT_TYPE componentType,
 #endif
 	DebugHelper::initialize(componentType);
 
+	g_kbeSrvConfig.warnAboutManagementAdminToken();
+
 	INFO_MSG( "-----------------------------------------------------------------------------------------\n\n\n");
 
 	std::string publicKeyPath = Resmgr::getSingleton().getPyUserResPath() + "key/" + "kbengine_public.key";

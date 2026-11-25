@@ -23,6 +23,7 @@ from performance.run import resolve_management_admin_token, wait_for_cluster_rea
 from performance.topology import build_local_cluster_components, platform_executable_name
 from runtime_console import RuntimeConsole
 from space_boundary_runtime import verify_boundary_move
+from space_split_runtime import verify_space_split
 from space_layout_runtime import (
     NO_NAVIGATION_MAPPING, verify_boundary_ghosts, verify_fixed_layout,
     verify_layout_removal, verify_rejected_layout_removal,
@@ -205,7 +206,7 @@ def verify_demo(entries, run_root, environment, args, output, password):
                 return {
                     info.componentID: {
                         "pid": info.pid, "host": info.intaddr,
-                        "port": info.consolePort, "type": info.componentType,
+                        "port": info.consolePort, "internal_port": info.intport, "type": info.componentType,
                     }
                     for infos in machines.interfaces.values()
                     for info in infos
@@ -328,10 +329,24 @@ def verify_demo(entries, run_root, environment, args, output, password):
                             return True
                     return False
 
+                fixed_cells = cells
+                if args.split_space:
+                    owner = original_space["cid"]
+                    peer = next(cid for cid in cells if cid != owner)
+                    fixed_cells = {cid: cells[cid] for cid in (owner, peer)}
                 layout_result, verify_after_logout = verify_fixed_layout(
-                    cells, original_space, args.space_partitioning == "true", rejection_logged
+                    fixed_cells, original_space, args.space_partitioning == "true", rejection_logged
                 )
-                if args.handoff_destroy_timer:
+                if args.split_space:
+                    manager = infos[6000]
+                    require(manager["pid"] == owned[6000]["process"].pid,
+                            "发现的 CellAppMgr 不属于本次测试")
+                    layout_result["split"] = verify_space_split(
+                        cells, layout_result, consoles[7001], args.repository_root,
+                        f"{manager['host']}:{manager['internal_port']}", environment, output,
+                    )
+                    verify_after_logout = None
+                elif args.handoff_destroy_timer:
                     layout_result["handoff_destroy_timer"] = verify_handoff_destroy_timer(
                         cells, layout_result, output
                     )
@@ -480,6 +495,8 @@ def main():
                         help="验证一次性定时器在自动交接期间请求销毁")
     parser.add_argument("--move-space-boundary", action="store_true",
                         help="验证双 Cell 边界移动、静止实体迁移和在途交接")
+    parser.add_argument("--split-space", action="store_true",
+                        help="验证运维新增 Cell、准备期间的资源更新和实体迁移")
     parser.add_argument("--cellapp-count", type=int, choices=(2, 4), default=2)
     parser.add_argument("--keep-space-layout-on-shutdown", action="store_true",
                         help="保留已启用的区域直接正常关服，检查 Cell 资源不会阻止退出")
@@ -495,6 +512,10 @@ def main():
         args.fixed_space_layout and args.space_partitioning == "true" and args.cellapp_count == 2
         and not args.partition_rejection and not args.handoff_destroy_timer
     ), "调界检查要求单独启用双 Cell 固定空间分区")
+    require(not args.split_space or (
+        args.fixed_space_layout and args.space_partitioning == "true" and args.cellapp_count == 4
+        and not (args.partition_rejection or args.move_space_boundary or args.handoff_destroy_timer)
+    ), "扩容检查要求启动四个 CellApp，先启用双 Cell 固定布局")
     for name in ("repository_root", "assets_root", "binary_root", "config_overlay"):
         setattr(args, name, getattr(args, name).resolve())
     source = ET.parse(args.config_overlay / "server/kbengine.xml").getroot()
@@ -517,6 +538,11 @@ def main():
         bots_transport="tcp", bots_allow_tcp_fallback=False,
     )
     runtime = ET.parse(config_path)
+    if args.split_space:
+        management = runtime.getroot().find("management")
+        if management is None:
+            management = ET.SubElement(runtime.getroot(), "management")
+        set_xml_value(management, "adminToken", uuid.uuid4().hex + uuid.uuid4().hex)
     manager = runtime.getroot().find("cellappmgr")
     if manager is None:
         manager = ET.SubElement(runtime.getroot(), "cellappmgr")
@@ -528,7 +554,7 @@ def main():
         if partitioning is None:
             partitioning = ET.SubElement(manager, "spacePartitioning")
         set_xml_value(partitioning, "enabled", args.space_partitioning)
-        if args.handoff_destroy_timer or args.move_space_boundary:
+        if args.handoff_destroy_timer or args.move_space_boundary or args.split_space:
             set_xml_value(partitioning, "autoHandoff", "true")
             set_xml_value(partitioning, "handoffMargin", "2")
     password = uuid.uuid4().hex

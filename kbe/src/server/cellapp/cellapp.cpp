@@ -804,7 +804,7 @@ void Cellapp::onBoundaryGhost(Network::Channel* pChannel, MemoryStream& stream)
 	if (source && reader.read(id))
 	{
 		auto* space = Spaces::findSpace(id);
-		if (space && space->canAcceptEntities() &&
+		if (space && (space->canAcceptEntities() || space->canReceiveSplitGhosts()) &&
 			(space->layoutState() == SpaceLayout::ACTIVE || space->layoutState() == SpaceLayout::COMMITTING))
 		{
 			stream.rpos(stream.rpos() + sizeof(id));
@@ -3516,6 +3516,36 @@ void Cellapp::finishPeerCellHandoff(ENTITY_ID id, const CellHandoff::Route& rout
 		EntityPtr held(entity);
 		entity->completeCellHandoff();
 	}
+}
+
+//-------------------------------------------------------------------------------------
+bool Cellapp::hasUnreleasedCellHandoff(SPACE_ID space, uint64 layoutVersion, COMPONENT_ID target) const
+{
+	return std::any_of(outgoingCellHandoffs_.begin(), outgoingCellHandoffs_.end(), [&](const auto& entry)
+	{
+		const auto& pending = *entry.second;
+		return !pending.released && pending.route.space == space &&
+			pending.route.layoutVersion == layoutVersion && pending.route.target == target;
+	});
+}
+
+//-------------------------------------------------------------------------------------
+bool Cellapp::hasUnfinishedIncomingCellHandoff(SPACE_ID space, uint64 layoutVersion, COMPONENT_ID source)
+{
+	const auto isWaiting = [&](ENTITY_ID id)
+	{
+		const auto* entity = findEntity(id);
+		return entity && !entity->isDestroyed() && entity->isCellHandoffTarget() &&
+			entity->spaceID() == space && entity->migrationRelayCell() == source;
+	};
+	// 接收记录可能比实体存活得久，不能仅凭记录判断目标仍在等待交接。
+	return std::any_of(admittedCellHandoffs_.begin(), admittedCellHandoffs_.end(), isWaiting) ||
+		std::any_of(incomingPeerCellHandoffs_.begin(), incomingPeerCellHandoffs_.end(), [&](const auto& entry)
+		{
+			const auto& route = entry.second.route;
+			return route.space == space && route.layoutVersion == layoutVersion && route.source == source &&
+				isWaiting(entry.first);
+		});
 }
 
 //-------------------------------------------------------------------------------------

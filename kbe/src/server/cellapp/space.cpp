@@ -377,7 +377,7 @@ void Space::unLoadSpaceGeometry()
 	geometryParams_.clear();
 	delSpaceData("_mapping");
 
-	if (isPreparingReplacement())
+	if (isPreparingReplacement() || isStagedSplitCell())
 		return;
 	Network::Channel* pChannel = Components::getSingleton().getCellappmgrChannel();
 	if (pChannel != NULL)
@@ -406,7 +406,7 @@ void Space::onLoadedSpaceGeometryMapping(const std::string& resPath, uint64 load
 	INFO_MSG(fmt::format("KBEngine::onLoadedSpaceGeometryMapping: spaceID={}, respath={}!\n",
 			id(), getGeometryPath()));
 
-	if (isPreparingReplacement())
+	if (isPreparingReplacement() || isStagedSplitCell())
 		return;
 	// 通知脚本
 	if (!isLayoutReplica())
@@ -461,6 +461,8 @@ bool Space::update()
 		destroy(0, false, DestroyMode::LayoutRemoval);
 	if (hasManagedCell())
 		boundaryGhosts_.update(*this);
+	if (splitMigration_)
+		updateCellSplitMigration();
 	if(destroyTime_ > 0 && timestamp() - destroyTime_ >= uint64( 3.f * stampsPerSecond() ))
 	{
 		if(entities_.size() == 0)
@@ -550,6 +552,16 @@ void Space::removeEntity(Entity* pEntity)
 
 	// 如果有2个或以上的entity则将最后一个entity移至删除的这个entity所在位置
 	Entity* pBack = entities_.back().get();
+	if (splitMigration_ && splitMigration_->stage == SplitMigrationScan::CheckingSource)
+	{
+		auto& scan = *splitMigration_;
+		const auto last = entities_.size() - 1;
+		// 未检查的末尾实体换入已检查的位置时，只为仍需迁移的实体回退。
+		if (idx < scan.cursor && scan.cursor <= last && hasSplitSourceEntityToMigrate(*pBack, scan.peer))
+			scan.cursor = idx;
+		else
+			scan.cursor = std::min(scan.cursor, last);
+	}
 	pBack->spaceEntityIdx(idx);
 	entities_[idx] = pBack;
 	pEntity->spaceEntityIdx(SPACE_ENTITIES::size_type(-1));
@@ -748,6 +760,23 @@ void Space::finalise(bool notifyCellappmgr)
 	_clearGhosts();
 	if (!notifyCellappmgr)
 		return;
+
+	if (isStagedSplitCell())
+	{
+		auto& app = Cellapp::getSingleton();
+		auto* manager = app.networkInterface().findChannel(split_->manager);
+		if (manager && manager->sessionEpoch() == split_->managerSession)
+		{
+			SpaceLayout::Packet discarded;
+			discarded.sender = g_componentID;
+			discarded.operation = SpaceLayout::SPLIT_DISCARDED;
+			discarded.spaceID = id_;
+			discarded.version = layoutVersion_;
+			discarded.splitAttempt = split_->attempt;
+			app.sendSpaceLayout(discarded, manager);
+		}
+		return;
+	}
 
 	if (isPreparingReplacement())
 	{
@@ -953,7 +982,7 @@ void Space::delSpaceData(const std::string& key)
 //-------------------------------------------------------------------------------------
 void Space::onSpaceDataChanged(const std::string& key, const std::string& value, bool isdel)
 {
-	if (isPreparingReplacement())
+	if (isPreparingReplacement() || isStagedSplitCell())
 		return;
 	// 通知脚本
 	if(!isdel)

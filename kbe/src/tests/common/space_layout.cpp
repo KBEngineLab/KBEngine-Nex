@@ -99,6 +99,15 @@ int main()
 	if (!check(nested.validate() && !nested.moveBoundary(0, 5.f) && !nested.moveBoundary(1, 11.f) &&
 		nested.cellAt(6.f, 0.f)->cellID == 2, "reject_crossing_child_boundary"))
 		return 1;
+	Layout split = layout;
+	if (!check(!split.splitCell(1, X, 10.f, 8005) && !split.splitCell(1, Z, 20.f, 8005) &&
+		!split.splitCell(1, X, 5.f, 8003) && !split.splitCell(9, X, 5.f, 8005) &&
+		split.cellAt(5.f, 19.f)->cellID == 1, "reject_split_without_changing_tree") ||
+		!check(split.splitCell(1, X, 5.f, 8005) &&
+			split.owner == 8001 && split.cellAt(4.f, 19.f)->cellID == 1 &&
+			split.cellAt(5.f, 19.f)->cellID == 5 && split.cellAt(5.f, 20.f)->cellID == 2 &&
+			split.cellAt(10.f, 19.f)->cellID == 3, "split_nested_cell_preserves_other_regions"))
+		return 1;
 
 	Packet request;
 	request.sender = 8001;
@@ -189,6 +198,37 @@ int main()
 	peerRoute.internalPort = 20013;
 	peerRoute.groupOrder = 2;
 	peerRoute.username = "cell";
+	for (uint8 operation : {SPLIT_PREPARE, SPLIT_STAGE, SPLIT_READY, SPLIT_APPLY, SPLIT_APPLIED,
+		SPLIT_COMPLETE, SPLIT_CANCEL, SPLIT_DRAINED, SPLIT_DISCARDED, SPLIT_CHECK_TARGET})
+	{
+		Packet update = request;
+		update.operation = operation;
+		update.splitAttempt = 5;
+		update.splitSource = 8001;
+		update.splitTarget = 8005;
+		update.layout = split;
+		for (const auto cid : update.layout.participants())
+			update.cellPeerRoutes.emplace(cid, peerRoute);
+		MemoryStream stream;
+		update.write(stream);
+		Packet received;
+		if (!check(received.read(stream) && received.operation == operation &&
+			received.splitAttempt == update.splitAttempt && received.revision == update.revision &&
+			(operation != SPLIT_CANCEL || received.splitTarget == update.splitTarget), "split_packet_roundtrip"))
+			return 1;
+		MemoryStream truncated;
+		truncated.append(stream.data(), stream.length() - 1);
+		if (!check(!received.read(truncated), "truncated_split_packet"))
+			return 1;
+	}
+	Packet invalidSplitCheck = request;
+	invalidSplitCheck.operation = SPLIT_CHECK_TARGET;
+	invalidSplitCheck.splitAttempt = 0;
+	MemoryStream missingAttempt;
+	invalidSplitCheck.write(missingAttempt);
+	Packet invalidSplitPacket;
+	if (!check(!invalidSplitPacket.read(missingAttempt), "split_check_requires_attempt"))
+		return 1;
 	for (uint8 operation = REQUEST; operation <= RESOURCES; ++operation)
 	{
 		Packet packet = request;
@@ -297,6 +337,45 @@ int main()
 	using Removal = Transaction::Removal;
 	transaction.advance(ACTIVE, 101);
 	transaction.boundaryRevision = 2;
+	using Migration = Transaction::SplitMigration;
+	transaction.splitAttempt = 3;
+	transaction.splitMigrationSource = 8001;
+	transaction.splitMigrationTarget = 8002;
+	transaction.splitMigration = Migration::CheckingSource;
+	Packet drained = request;
+	drained.operation = SPLIT_DRAINED;
+	drained.sender = 8001;
+	drained.version = 9;
+	drained.revision = 2;
+	drained.splitAttempt = 3;
+	if (!check(transaction.canConfirmSplitMigration(drained), "split_accept_source"))
+		return 1;
+	drained.sender = 8002;
+	if (!check(!transaction.canConfirmSplitMigration(drained), "split_ignore_target_before_source"))
+		return 1;
+	transaction.splitMigration = Migration::CheckingTarget;
+	Packet staleDrained = drained;
+	--staleDrained.splitAttempt;
+	if (!check(!transaction.canConfirmSplitMigration(staleDrained), "split_ignore_old_attempt"))
+		return 1;
+	staleDrained = drained;
+	--staleDrained.revision;
+	if (!check(!transaction.canConfirmSplitMigration(staleDrained), "split_ignore_old_revision"))
+		return 1;
+	staleDrained = drained;
+	--staleDrained.version;
+	if (!check(!transaction.canConfirmSplitMigration(staleDrained), "split_ignore_old_layout"))
+		return 1;
+	staleDrained = drained;
+	staleDrained.sender = 8001;
+	if (!check(!transaction.canConfirmSplitMigration(staleDrained) &&
+		transaction.canConfirmSplitMigration(drained), "split_accept_only_target_after_source"))
+		return 1;
+	transaction.interruptSplitMigration();
+	if (!check(transaction.splitMigration == Migration::Interrupted &&
+		!transaction.canConfirmSplitMigration(drained), "split_ignore_drained_after_interruption"))
+		return 1;
+
 	transaction.boundaryConfirmation = Transaction::BoundaryConfirmation{101, {}};
 	if (!check(!transaction.confirmBoundary(8001, 8, 2) &&
 		!transaction.confirmBoundary(8001, 9, 1) &&

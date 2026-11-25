@@ -28,10 +28,8 @@
 	</performanceProbes>
 
 	<!-- GUIConsole、PyCluster 等远程管理协议共享的 Token，所有管理端必须配置相同值。
-		空值会关闭认证，仅可用于隔离环境中的临时本机调试；项目必须覆盖默认示例值。
-		Shared token for remote management clients such as GUIConsole and PyCluster. Every management
-		client must use the same value. Empty disables authentication and is only suitable for temporary,
-		isolated local debugging; projects must override this example value.
+		使用此 Token 认证的命令要求服务端配置非空，且请求携带相同的 Token。配置为空时拒绝请求。
+		使用公开示例值时，服务端启动会告警。正式部署请配置项目专用值。
 	-->
 	<management>
 		<adminToken> 8be0f32909da7702f7cf2424af6e9422b4881f70bd5991f973424fed24004e5e </adminToken>

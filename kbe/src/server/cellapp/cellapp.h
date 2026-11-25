@@ -95,7 +95,10 @@ public:
 	void onSpacePartitioningMode(Network::Channel* pChannel, COMPONENT_ID managerID,
 		uint8 mode, bool accepted, bool autoHandoff, float handoffMargin);
 	bool autoCellHandoffEnabled() const { return autoCellHandoffEnabled_ && spacePartitioningConfirmed_; }
+	float cellHandoffMargin() const { return cellHandoffMargin_; }
 	void considerAutoCellHandoff(Space& space, Entity& entity);
+	bool hasUnreleasedCellHandoff(SPACE_ID space, uint64 layoutVersion, COMPONENT_ID target) const;
+	bool hasUnfinishedIncomingCellHandoff(SPACE_ID space, uint64 layoutVersion, COMPONENT_ID source);
 	void onSpaceLayout(Network::Channel* pChannel, MemoryStream& stream);
 	void reqStageRecoveryCellBackup(Network::Channel* channel, MemoryStream& stream);
 	void discardStagedRecoveryBackups(SPACE_ID space, uint64 version) { stagedRecoveryBackups_.erase(space, version); }
@@ -393,6 +396,8 @@ protected:
 	std::map<ENTITY_ID, IncomingPeerCellHandoff> incomingPeerCellHandoffs_;
 	uint64 nextCellHandoffStartRetry_ = 0;
 	void queueCellPeerReconnect(const Components::ComponentInfos& peer);
+	void queueLayoutPeerConnections(const SpaceLayout::Packet& packet, COMPONENT_ID only = 0);
+	void reportLayoutPresence(Space& space);
 	void updateCellPeerConnections();
 
 	std::map<COMPONENT_ID, Components::ComponentInfos> disconnectedCellPeers_;
