@@ -131,6 +131,9 @@ bool Space::prepareLayout(const SpaceLayout::Packet& packet, bool replica, std::
 	layout_ = packet.layout;
 	localCellBounds_ = bounds;
 	layoutVersion_ = packet.version;
+	boundaryRevision_ = 0;
+	pendingBoundaryRevision_ = 0;
+	boundaryMoveError_.clear();
 	layoutState_ = PREPARING;
 	layoutError_.clear();
 	layoutPinned_ = true;
@@ -185,6 +188,33 @@ void Space::applyLayoutData(const std::string& key, const std::string& value,
 		setSpaceData(key, value);
 	resourceRevision_ = revision;
 	applyingLayoutResources_ = false;
+}
+
+void Space::beginBoundaryMove(uint64 revision)
+{
+	pendingBoundaryRevision_ = revision;
+	boundaryMoveError_.clear();
+}
+
+bool Space::applyBoundaryMove(const SpaceLayout::Packet& packet)
+{
+	if (!hasManagedCell() || layoutState_ != SpaceLayout::ACTIVE ||
+		packet.revision != boundaryRevision_ + 1 ||
+		!layout_.moveBoundary(packet.boundaryIndex, packet.boundaryPosition))
+		return false;
+	// 参与节点不变，只重新计算区域；正在交接的实体仍按原布局版本收尾。
+	layout_.boundsForApp(g_componentID, localCellBounds_);
+	boundaryRevision_ = packet.revision;
+	return true;
+}
+
+void Space::finishBoundaryMove(uint64 revision, const std::string& error)
+{
+	if (revision == pendingBoundaryRevision_)
+	{
+		pendingBoundaryRevision_ = 0;
+		boundaryMoveError_ = error;
+	}
 }
 
 void Space::setLayoutState(SpaceLayout::State state, const std::string& error)
@@ -308,6 +338,9 @@ bool Space::commitReplacement(const SpaceLayout::Packet& packet, Network::Channe
 		layoutVersion_ = packet.version;
 		layoutReplica_ = layout_.owner != g_componentID;
 	}
+	boundaryRevision_ = 0;
+	pendingBoundaryRevision_ = 0;
+	boundaryMoveError_.clear();
 	layoutStarted_ = timestamp();
 	setLayoutState(COMMITTING);
 	return true;
@@ -485,6 +518,21 @@ void Cellapp::onSpaceLayout(Network::Channel* channel, MemoryStream& stream)
 	}
 	switch (packet.operation)
 	{
+	case BOUNDARY_APPLY:
+		if (space->applyBoundaryMove(packet))
+		{
+			packet.sender = componentID_;
+			packet.operation = BOUNDARY_APPLIED;
+			sendSpaceLayout(packet, channel);
+		}
+		else
+			WARNING_MSG(fmt::format("Cellapp::spaceLayout: boundary update not applied, space={}, "
+				"version={}, revision={}, localRevision={}.\n", space->id(), packet.version,
+				packet.revision, space->boundaryRevision()));
+		break;
+	case BOUNDARY_RESULT:
+		space->finishBoundaryMove(packet.revision, packet.error);
+		break;
 	case COMMIT:
 		if (space->layoutState() == PREPARED || space->layoutState() == COMMITTING)
 		{
@@ -850,6 +898,61 @@ PyObject* Cellapp::__py_setSpaceLayout(PyObject*, PyObject* args)
 	return PyLong_FromUnsignedLongLong(packet.version);
 }
 
+PyObject* Cellapp::__py_moveSpaceBoundary(PyObject*, PyObject* args)
+{
+	using namespace SpaceLayout;
+	SPACE_ID spaceID = 0;
+	PyObject *versionArg = NULL, *revisionArg = NULL, *indexArg = NULL;
+	float position = 0.f;
+	if (!PyArg_ParseTuple(args, "IOOOf:moveSpaceBoundary", &spaceID, &versionArg, &revisionArg, &indexArg, &position))
+		return NULL;
+	const uint64 version = PyLong_AsUnsignedLongLong(versionArg);
+	if (PyErr_Occurred())
+		return NULL;
+	const uint64 revision = PyLong_AsUnsignedLongLong(revisionArg);
+	if (PyErr_Occurred())
+		return NULL;
+	const auto index = PyLong_AsUnsignedLong(indexArg);
+	if (PyErr_Occurred())
+		return NULL;
+	Cellapp& app = Cellapp::getSingleton();
+	if (!app.spacePartitioningEnabled() || !app.autoCellHandoffEnabled())
+	{
+		PyErr_SetString(PyExc_RuntimeError, "Space partitioning and automatic Cell handoff must both be enabled.");
+		return NULL;
+	}
+	Space* space = Spaces::findSpace(spaceID);
+	if (app.isShuttingdown() || !space || !space->canAcceptEntities() || space->layoutState() != ACTIVE ||
+		space->layout().owner != app.componentID() || space->boundaryMovePending())
+	{
+		PyErr_SetString(PyExc_RuntimeError, "Space must be active on its owner CellApp and have no pending boundary move.");
+		return NULL;
+	}
+	if (version != space->layoutVersion() || revision != space->boundaryRevision() ||
+		revision == std::numeric_limits<uint64>::max())
+	{
+		PyErr_SetString(PyExc_ValueError, "Space layout version or boundary revision is not current.");
+		return NULL;
+	}
+	Layout next = space->layout();
+	if (index >= MAX_NODES || !next.moveBoundary(static_cast<uint16>(index), position))
+	{
+		PyErr_SetString(PyExc_ValueError, "Boundary index or new position does not define a valid change.");
+		return NULL;
+	}
+	Packet packet = spacePacket(*space, BOUNDARY_REQUEST);
+	packet.revision = revision;
+	packet.boundaryIndex = static_cast<uint16>(index);
+	packet.boundaryPosition = position;
+	if (!app.sendSpaceLayout(packet))
+	{
+		PyErr_SetString(PyExc_RuntimeError, "Manager connection is unavailable.");
+		return NULL;
+	}
+	space->beginBoundaryMove(revision + 1);
+	return PyLong_FromUnsignedLongLong(revision + 1);
+}
+
 PyObject* Cellapp::__py_getSpaceLayout(PyObject*, PyObject* args)
 {
 	SPACE_ID spaceID = 0;
@@ -858,20 +961,31 @@ PyObject* Cellapp::__py_getSpaceLayout(PyObject*, PyObject* args)
 	Space* space = Spaces::findSpace(spaceID);
 	if (space == NULL)
 		Py_RETURN_NONE;
-	PyObject* cells = PyList_New(0);
-	for (const SpaceLayout::Node& node : space->layout().nodes)
+	PyObjectPtr cells(PyList_New(0), PyObjectPtr::STEAL_REF);
+	PyObjectPtr boundaries(PyList_New(0), PyObjectPtr::STEAL_REF);
+	if (!cells.get() || !boundaries.get())
+		return NULL;
+	const auto& nodes = space->layout().nodes;
+	for (size_t index = 0; index < nodes.size(); ++index)
 	{
+		const auto& node = nodes[index];
 		if (node.axis != SpaceLayout::LEAF)
+		{
+			PyObjectPtr boundary(Py_BuildValue("(Isf)", static_cast<unsigned int>(index),
+				node.axis == SpaceLayout::X ? "X" : "Z", node.position), PyObjectPtr::STEAL_REF);
+			if (!boundary.get() || PyList_Append(boundaries.get(), boundary.get()) < 0)
+				return NULL;
 			continue;
+		}
 		SpaceLayout::Bounds bounds;
 		space->layout().boundsForApp(node.cellappID, bounds);
-		PyObject* cell = Py_BuildValue("{s:I,s:K,s:(ffff)}",
+		PyObjectPtr cell(Py_BuildValue("{s:I,s:K,s:(ffff)}",
 			"cellID", node.cellID, "cellappID", static_cast<unsigned long long>(node.cellappID),
-			"bounds", bounds.minX, bounds.minZ, bounds.maxX, bounds.maxZ);
-		PyList_Append(cells, cell);
-		Py_DECREF(cell);
+			"bounds", bounds.minX, bounds.minZ, bounds.maxX, bounds.maxZ), PyObjectPtr::STEAL_REF);
+		if (!cell.get() || PyList_Append(cells.get(), cell.get()) < 0)
+			return NULL;
 	}
-	return Py_BuildValue("{s:K,s:s,s:s,s:K,s:K,s:I,s:O,s:O,s:O,s:N}",
+	return Py_BuildValue("{s:K,s:s,s:s,s:K,s:K,s:I,s:O,s:O,s:O,s:O,s:K,s:O,s:s,s:O}",
 		"version", static_cast<unsigned long long>(space->layoutVersion()),
 		"state", SpaceLayout::stateName(space->layoutState()), "error", space->layoutError().c_str(),
 		"resourceRevision", static_cast<unsigned long long>(space->resourceRevision()),
@@ -880,7 +994,11 @@ PyObject* Cellapp::__py_getSpaceLayout(PyObject*, PyObject* args)
 		"acceptsEntities", space->canAcceptEntities() ? Py_True : Py_False,
 		"resourcesReady", space->isGeometryLoading() ? Py_False : Py_True,
 		"hasNavigation", space->pNavHandle() == NULL ? Py_False : Py_True,
-		"cells", cells);
+		"cells", cells.get(),
+		"boundaryRevision", static_cast<unsigned long long>(space->boundaryRevision()),
+		"boundaryMovePending", space->boundaryMovePending() ? Py_True : Py_False,
+		"boundaryMoveError", space->boundaryMoveError().c_str(),
+		"boundaries", boundaries.get());
 }
 
 PyObject* Cellapp::__py_cellForPosition(PyObject*, PyObject* args)

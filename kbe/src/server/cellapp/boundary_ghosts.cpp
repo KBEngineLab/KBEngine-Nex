@@ -202,7 +202,7 @@ void BoundaryGhosts::update(Space& space)
 			return;
 	}
 
-	if (version_ != space.layoutVersion())
+	if (version_ != space.layoutVersion() || boundaryRevision_ != space.boundaryRevision())
 	{
 		neighbours_.clear();
 		for (const auto& node : space.layout().nodes)
@@ -213,6 +213,7 @@ void BoundaryGhosts::update(Space& space)
 				neighbours_.push_back({node.cellappID, bounds});
 		}
 		version_ = space.layoutVersion();
+		boundaryRevision_ = space.boundaryRevision();
 	}
 	if (neighbours_.empty() || timestamp() < nextCheck_)
 		return;

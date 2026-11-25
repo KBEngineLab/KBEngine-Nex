@@ -107,6 +107,7 @@ public:
 	void publishSpaceData(Space& space, const std::string& key,
 		const std::string& value, bool deleted);
 	static PyObject* __py_setSpaceLayout(PyObject* self, PyObject* args);
+	static PyObject* __py_moveSpaceBoundary(PyObject* self, PyObject* args);
 	static PyObject* __py_getSpaceLayout(PyObject* self, PyObject* args);
 	static PyObject* __py_cellForPosition(PyObject* self, PyObject* args);
 	static PyObject* __py_requestCellHandoff(PyObject* self, PyObject* args);

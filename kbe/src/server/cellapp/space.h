@@ -118,6 +118,12 @@ public:
 	BoundaryGhosts& boundaryGhosts() { return boundaryGhosts_; }
 	uint64 layoutVersion() const { return layoutVersion_; }
 	uint64 resourceRevision() const { return resourceRevision_; }
+	uint64 boundaryRevision() const { return boundaryRevision_; }
+	bool boundaryMovePending() const { return pendingBoundaryRevision_ != 0; }
+	const std::string& boundaryMoveError() const { return boundaryMoveError_; }
+	void beginBoundaryMove(uint64 revision);
+	bool applyBoundaryMove(const SpaceLayout::Packet& packet);
+	void finishBoundaryMove(uint64 revision, const std::string& error);
 	SpaceLayout::State layoutState() const { return layoutState_; }
 	const std::string& layoutError() const { return layoutError_; }
 	bool hasManagedCell() const { return layoutPinned_; }
@@ -233,6 +239,9 @@ protected:
 	uint64						layoutVersion_ = 0;
 	uint64						layoutPreparedVersion_ = 0;
 	uint64						resourceRevision_ = 0;
+	uint64						boundaryRevision_ = 0;
+	uint64						pendingBoundaryRevision_ = 0;
+	std::string					boundaryMoveError_;
 	SpaceLayout::State			layoutState_ = SpaceLayout::NONE;
 	std::string					layoutError_;
 	bool						layoutPinned_ = false;

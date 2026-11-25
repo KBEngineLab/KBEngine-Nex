@@ -22,6 +22,7 @@ from performance.log_metrics import DEFAULT_PATTERNS
 from performance.run import resolve_management_admin_token, wait_for_cluster_ready_for_login
 from performance.topology import build_local_cluster_components, platform_executable_name
 from runtime_console import RuntimeConsole
+from space_boundary_runtime import verify_boundary_move
 from space_layout_runtime import (
     NO_NAVIGATION_MAPPING, verify_boundary_ghosts, verify_fixed_layout,
     verify_layout_removal, verify_rejected_layout_removal,
@@ -345,10 +346,15 @@ def verify_demo(entries, run_root, environment, args, output, password):
                     )
                     bots_console = RuntimeConsole("127.0.0.1", int(port.group(1)), password, 10000, bots.pid)
                     resources.callback(bots_console.close)
-                    layout_result["boundary_ghosts"] = verify_boundary_ghosts(
-                        cells, layout_result, bots_console, read_bots_log,
-                        lambda: read_text(run_root / "logs/logger_cellapp.log"),
-                    )
+                    if args.move_space_boundary:
+                        layout_result["boundary_move"] = verify_boundary_move(
+                            cells, layout_result, consoles[7001], bots_console, output
+                        )
+                    else:
+                        layout_result["boundary_ghosts"] = verify_boundary_ghosts(
+                            cells, layout_result, bots_console, read_bots_log,
+                            lambda: read_text(run_root / "logs/logger_cellapp.log"),
+                        )
                     mapping_log = (
                         f"ClientObjectBase::addSpaceGeometryMapping: spaceID={original_space['space']}, "
                         f"respath={NO_NAVIGATION_MAPPING}!"
@@ -472,6 +478,8 @@ def main():
                         help="验证固定区域、资源同步、空区域保留和逻辑 Space 删除")
     parser.add_argument("--handoff-destroy-timer", action="store_true",
                         help="验证一次性定时器在自动交接期间请求销毁")
+    parser.add_argument("--move-space-boundary", action="store_true",
+                        help="验证双 Cell 边界移动、静止实体迁移和在途交接")
     parser.add_argument("--cellapp-count", type=int, choices=(2, 4), default=2)
     parser.add_argument("--keep-space-layout-on-shutdown", action="store_true",
                         help="保留已启用的区域直接正常关服，检查 Cell 资源不会阻止退出")
@@ -483,6 +491,10 @@ def main():
         args.fixed_space_layout and args.space_partitioning == "true" and args.cellapp_count == 2
         and not args.partition_rejection
     ), "销毁定时器检查要求启用双 Cell 固定空间分区")
+    require(not args.move_space_boundary or (
+        args.fixed_space_layout and args.space_partitioning == "true" and args.cellapp_count == 2
+        and not args.partition_rejection and not args.handoff_destroy_timer
+    ), "调界检查要求单独启用双 Cell 固定空间分区")
     for name in ("repository_root", "assets_root", "binary_root", "config_overlay"):
         setattr(args, name, getattr(args, name).resolve())
     source = ET.parse(args.config_overlay / "server/kbengine.xml").getroot()
@@ -516,7 +528,7 @@ def main():
         if partitioning is None:
             partitioning = ET.SubElement(manager, "spacePartitioning")
         set_xml_value(partitioning, "enabled", args.space_partitioning)
-        if args.handoff_destroy_timer:
+        if args.handoff_destroy_timer or args.move_space_boundary:
             set_xml_value(partitioning, "autoHandoff", "true")
             set_xml_value(partitioning, "handoffMargin", "2")
     password = uuid.uuid4().hex

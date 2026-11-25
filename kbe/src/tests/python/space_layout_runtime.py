@@ -60,6 +60,9 @@ def verify_fixed_layout(cells, source_space, enabled, rejection_logged):
         error = captured_error(source, f"KBEngine.setSpaceLayout({space_id}, {specification!r})")
         require(error and error[0] == "RuntimeError" and "disabled" in error[1],
                 "关闭分割时固定布局接口没有明确拒绝")
+        error = captured_error(source, f"KBEngine.moveSpaceBoundary({space_id}, 1, 0, 0, {split_x!r})")
+        require(error and error[0] == "RuntimeError" and "must both be enabled" in error[1],
+                "关闭分割时边界调整没有明确拒绝")
         require(all(cells[cid].evaluate(f"KBEngine.getSpaceLayout({space_id})") is None
                     for cid in others), "关闭分割时创建了远端区域")
         print("SPACE_LAYOUT_DISABLED_PASS", flush=True)

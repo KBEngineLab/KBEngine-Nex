@@ -91,6 +91,7 @@ private:
 	std::map<COMPONENT_ID, Source> sources_;
 	std::vector<Neighbour> neighbours_;
 	uint64 version_ = 0;
+	uint64 boundaryRevision_ = 0;
 	uint64 generation_ = 0;
 	uint64 nextCheck_ = 0;
 	size_t cursor_ = 0;

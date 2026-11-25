@@ -524,6 +524,7 @@ bool Cellapp::installPyModules()
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		delSpaceData,					Space::__py_DelSpaceData,								METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		spaces,						Spaces::__py_Spaces,									METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(), setSpaceLayout, __py_setSpaceLayout, METH_VARARGS, 0);
+	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(), moveSpaceBoundary, __py_moveSpaceBoundary, METH_VARARGS, 0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(), getSpaceLayout, __py_getSpaceLayout, METH_VARARGS, 0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(), cellForPosition, __py_cellForPosition, METH_VARARGS, 0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(), requestCellHandoff, __py_requestCellHandoff, METH_VARARGS, 0);

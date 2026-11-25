@@ -84,6 +84,21 @@ int main()
 		if (!check(!invalid.validate(), "non_finite_boundary"))
 			return 1;
 	}
+	Layout moved = layout;
+	if (!check(moved.moveBoundary(0, 12.f), "move_root_boundary") ||
+		!check(moved.cellAt(11.f, 19.f)->cellID == 1 && moved.cellAt(12.f, 20.f)->cellID == 4 &&
+			moved.owner == layout.owner && moved.participants() == layout.participants(), "move_preserves_cells") ||
+		!check(moved.boundsForApp(8002, bounds) && bounds.maxX == 12.f, "updated_cell_bounds") ||
+		!check(!moved.moveBoundary(2, 30.f) && !moved.moveBoundary(7, 30.f) &&
+			!moved.moveBoundary(0, 12.f) && !moved.moveBoundary(0, std::numeric_limits<float>::infinity()),
+			"reject_invalid_boundary_move"))
+		return 1;
+	Layout nested = layout;
+	nested.nodes[1].axis = X;
+	nested.nodes[1].position = 5.f;
+	if (!check(nested.validate() && !nested.moveBoundary(0, 5.f) && !nested.moveBoundary(1, 11.f) &&
+		nested.cellAt(6.f, 0.f)->cellID == 2, "reject_crossing_child_boundary"))
+		return 1;
 
 	Packet request;
 	request.sender = 8001;
@@ -98,6 +113,43 @@ int main()
 	request.resources.geometryParams[0] = "world.navmesh";
 	request.resources.data["_mapping"] = request.resources.geometryPath;
 	request.resources.data["weather"] = "\xe9\x9b\xa8";
+	for (uint8 operation : {BOUNDARY_REQUEST, BOUNDARY_APPLY, BOUNDARY_APPLIED, BOUNDARY_RESULT})
+	{
+		Packet update;
+		update.sender = request.sender;
+		update.operation = operation;
+		update.spaceID = request.spaceID;
+		update.version = request.version;
+		update.revision = operation == BOUNDARY_REQUEST ? 0 : 1;
+		update.boundaryIndex = 4;
+		update.boundaryPosition = -12.f;
+		if (operation == BOUNDARY_RESULT)
+		{
+			update.success = false;
+			update.error = "Space is closing";
+		}
+		MemoryStream stream;
+		update.write(stream);
+		Packet received;
+		if (!check(received.read(stream) && received.operation == operation &&
+			received.version == update.version && received.revision == update.revision &&
+			received.success == update.success && received.error == update.error &&
+			((operation != BOUNDARY_REQUEST && operation != BOUNDARY_APPLY) ||
+				(received.boundaryIndex == update.boundaryIndex && received.boundaryPosition == update.boundaryPosition)),
+			"boundary_packet_roundtrip"))
+			return 1;
+		stream << uint8(0);
+		if (!check(!received.read(stream), "boundary_packet_trailing"))
+			return 1;
+	}
+	Packet badMove = request;
+	badMove.operation = BOUNDARY_APPLY;
+	badMove.boundaryIndex = static_cast<uint16>(MAX_NODES);
+	MemoryStream invalidIndex;
+	badMove.write(invalidIndex);
+	Packet badResult;
+	if (!check(!badResult.read(invalidIndex), "boundary_packet_invalid_index"))
+		return 1;
 	MemoryStream encoded;
 	request.write(encoded);
 	Packet decoded;
@@ -244,6 +296,18 @@ int main()
 
 	using Removal = Transaction::Removal;
 	transaction.advance(ACTIVE, 101);
+	transaction.boundaryRevision = 2;
+	transaction.boundaryConfirmation = Transaction::BoundaryConfirmation{101, {}};
+	if (!check(!transaction.confirmBoundary(8001, 8, 2) &&
+		!transaction.confirmBoundary(8001, 9, 1) &&
+		!transaction.confirmBoundary(9999, 9, 2) &&
+		transaction.boundaryConfirmation->acknowledged.empty(), "ignore_stale_boundary_confirmations") ||
+		!check(!transaction.confirmBoundary(8001, 9, 2) &&
+			!transaction.confirmBoundary(8001, 9, 2) &&
+			!transaction.confirmBoundary(8002, 9, 2) &&
+			!transaction.confirmBoundary(8003, 9, 2) &&
+			transaction.confirmBoundary(8004, 9, 2), "confirm_boundary_on_all_cells"))
+		return 1;
 	if (!check(transaction.recordRemoval(8002, 8) == Removal::Ignore, "old_replica_removal") ||
 		!check(transaction.recordRemoval(9999, 9) == Removal::Ignore, "nonparticipant_removal") ||
 		!check(transaction.recordRemoval(8002, 9) == Removal::Fail, "active_participant_removal"))

@@ -26,7 +26,8 @@ enum Operation : uint8
 	REQUEST = 1, PREPARE, READY, COMMIT, COMMITTED, COMPLETE,
 	ABORT, SHUTDOWN, REMOVE, REMOVED, SUSPEND, SET_DATA, DELETE_DATA, RESOURCES, UPDATE_REJECTED,
 	REPLACEMENT_PREPARE, REPLACEMENT_READY, REPLACEMENT_CANCEL,
-	REPLACEMENT_CHECK, REPLACEMENT_CHECKED, REPLACEMENT_COMMIT
+	REPLACEMENT_CHECK, REPLACEMENT_CHECKED, REPLACEMENT_COMMIT,
+	BOUNDARY_REQUEST, BOUNDARY_APPLY, BOUNDARY_APPLIED, BOUNDARY_RESULT
 };
 
 inline const char* stateName(State state)
@@ -112,6 +113,20 @@ struct Layout
 			return true;
 		}
 		return false;
+	}
+
+	bool moveBoundary(uint16 index, float position)
+	{
+		if (index >= nodes.size() || nodes[index].axis == LEAF ||
+			!std::isfinite(position) || nodes[index].position == position)
+			return false;
+		// 移动上层边界也可能使下层分区无效，必须检查整棵树。
+		Layout next = *this;
+		next.nodes[index].position = position;
+		if (!next.validate())
+			return false;
+		*this = std::move(next);
+		return true;
 	}
 
 	const Node* cellAt(float x, float z) const
@@ -365,7 +380,10 @@ struct Packet
 	uint8 rejectedOperation = 0;
 	SPACE_ID spaceID = 0;
 	uint64 version = 0;
+	// 调整边界的消息使用边界修订号，其余消息仍使用资源修订号。
 	uint64 revision = 0;
+	uint16 boundaryIndex = 0;
+	float boundaryPosition = 0.f;
 	COMPONENT_ID replacedCellApp = 0;
 	uint64 replacedLayoutVersion = 0;
 	COMPONENT_ID replacementCellApp = 0;
@@ -402,9 +420,12 @@ struct Packet
 		case REPLACEMENT_READY:
 			stream << replacementProcess;
 			[[fallthrough]];
-		case READY: case COMMITTED: case ABORT: case SUSPEND:
+		case READY: case COMMITTED: case ABORT: case SUSPEND: case BOUNDARY_RESULT:
 			stream << static_cast<uint8>(success);
 			stream.appendBlob(error);
+			break;
+		case BOUNDARY_REQUEST: case BOUNDARY_APPLY:
+			stream << boundaryIndex << boundaryPosition;
 			break;
 		case SET_DATA: case DELETE_DATA:
 			stream.appendBlob(key);
@@ -474,11 +495,24 @@ struct Packet
 			if (!reader.read(replacementProcess))
 				return false;
 			[[fallthrough]];
-		case READY: case COMMITTED: case ABORT: case SUSPEND:
+		case READY: case COMMITTED: case ABORT: case SUSPEND: case BOUNDARY_RESULT:
 			if (!reader.read(accepted) || accepted > 1 || !reader.readBlob(error, 1024))
 				return false;
 			success = accepted != 0;
 			if (operation == REPLACEMENT_READY && success && !replacementProcess)
+				return false;
+			if (operation == BOUNDARY_RESULT && (!revision || success != error.empty()))
+				return false;
+			break;
+		case BOUNDARY_REQUEST: case BOUNDARY_APPLY:
+			if ((operation == BOUNDARY_APPLY && !revision) ||
+				(operation == BOUNDARY_REQUEST && revision == std::numeric_limits<uint64>::max()) ||
+				!reader.read(boundaryIndex) || boundaryIndex >= MAX_NODES ||
+				!reader.read(boundaryPosition) || !std::isfinite(boundaryPosition))
+				return false;
+			break;
+		case BOUNDARY_APPLIED:
+			if (!revision)
 				return false;
 			break;
 		case SET_DATA: case DELETE_DATA:
@@ -540,6 +574,13 @@ struct Transaction
 	Resources resources;
 	uint64 version = 0;
 	uint64 revision = 1;
+	uint64 boundaryRevision = 0;
+	struct BoundaryConfirmation
+	{
+		uint64 started;
+		std::set<COMPONENT_ID> acknowledged;
+	};
+	std::optional<BoundaryConfirmation> boundaryConfirmation;
 	uint64 started = 0;
 	State state = PREPARING;
 	bool suspended = false;
@@ -560,6 +601,16 @@ struct Transaction
 	uint64 lastReplacementVersion = 0;
 	uint64 replacementRetryAt = 0;
 	std::map<COMPONENT_ID, uint64> rejectedReplacements;
+
+	bool confirmBoundary(COMPONENT_ID cid, uint64 layoutVersion, uint64 confirmedRevision)
+	{
+		if (state != ACTIVE || !boundaryConfirmation || version != layoutVersion ||
+			boundaryRevision != confirmedRevision || !layout.cellForApp(cid))
+			return false;
+		auto& confirmed = boundaryConfirmation->acknowledged;
+		confirmed.insert(cid);
+		return confirmed.size() == layout.participants().size();
+	}
 
 	bool confirm(COMPONENT_ID cid, uint64 confirmedVersion, State expected)
 	{

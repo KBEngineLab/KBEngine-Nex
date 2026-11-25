@@ -89,8 +89,75 @@ void Cellappmgr::failSpaceLayout(SPACE_ID spaceID, SpaceLayout::Transaction& tra
 	transaction.suspended = suspend;
 	transaction.error = error;
 	broadcastSpaceLayout(spaceID, transaction, suspend ? SpaceLayout::SUSPEND : SpaceLayout::ABORT);
+	finishBoundaryMove(spaceID, transaction, "boundary committed, but layout stopped before all confirmations");
 	WARNING_MSG(fmt::format("Cellappmgr::spaceLayout: space={}, version={}, failed={}.\n",
 		spaceID, transaction.version, error));
+}
+
+void Cellappmgr::reportBoundaryMove(SPACE_ID spaceID, COMPONENT_ID owner, uint64 version, uint64 revision,
+	const char* error)
+{
+	SpaceLayout::Packet result;
+	result.sender = componentID_;
+	result.operation = SpaceLayout::BOUNDARY_RESULT;
+	result.spaceID = spaceID;
+	result.version = version;
+	result.revision = revision;
+	result.success = !error;
+	if (error)
+		result.error = error;
+	sendSpaceLayout(owner, result);
+}
+
+void Cellappmgr::finishBoundaryMove(SPACE_ID spaceID, SpaceLayout::Transaction& transaction, const char* error)
+{
+	if (!transaction.boundaryConfirmation)
+		return;
+	transaction.boundaryConfirmation.reset();
+	reportBoundaryMove(spaceID, transaction.layout.owner, transaction.version, transaction.boundaryRevision, error);
+}
+
+void Cellappmgr::requestBoundaryMove(SpaceLayout::Packet& packet, SpaceLayout::Transaction* transaction)
+{
+	using namespace SpaceLayout;
+	const char* error = nullptr;
+	std::set<COMPONENT_ID> participants;
+	if (!transaction || transaction->layout.owner != packet.sender)
+		error = "only the current Space owner can move a boundary";
+	else if (isShuttingdown() || !g_kbeSrvConfig.getCellAppMgr().cellappmgr_space_partitioning_auto_handoff ||
+		transaction->state != ACTIVE || transaction->shutdownRequested)
+		error = "Space must be active with automatic Cell handoff enabled";
+	else if (transaction->version != packet.version || transaction->boundaryRevision != packet.revision)
+		error = "Space layout version or boundary revision is not current";
+	else if (transaction->boundaryConfirmation)
+		error = "the previous boundary move is still awaiting confirmation";
+	else
+	{
+		participants = transaction->layout.participants();
+		if (!std::all_of(participants.begin(), participants.end(), [&](COMPONENT_ID cid) { return componentReady(cid); }))
+			error = "a participating CellApp is unavailable";
+		else if (!transaction->layout.moveBoundary(packet.boundaryIndex, packet.boundaryPosition))
+			error = "boundary index or new position does not define a valid change";
+	}
+	if (error)
+	{
+		reportBoundaryMove(packet.spaceID, packet.sender, packet.version, packet.revision + 1, error);
+		return;
+	}
+
+	// 各 Cell 在管理器连接上按序收到边界与关闭消息；边界发布后不因确认迟到而回退。
+	transaction->boundaryConfirmation = Transaction::BoundaryConfirmation{timestamp(), {}};
+	packet.sender = componentID_;
+	packet.operation = BOUNDARY_APPLY;
+	packet.revision = ++transaction->boundaryRevision;
+	bool sent = true;
+	for (const auto cid : participants)
+		sent = sendSpaceLayout(cid, packet) && sent;
+	if (!sent)
+		failSpaceLayout(packet.spaceID, *transaction, "boundary update participant is unavailable", true);
+	INFO_MSG(fmt::format("Cellappmgr::spaceLayout: boundary moved, space={}, version={}, revision={}, "
+		"index={}, position={}.\n", packet.spaceID, packet.version, packet.revision,
+		packet.boundaryIndex, packet.boundaryPosition));
 }
 
 void Cellappmgr::onSpaceLayoutRequest(Network::Channel* channel, MemoryStream& stream)
@@ -222,6 +289,11 @@ void Cellappmgr::onSpaceLayoutRequest(Network::Channel* channel, MemoryStream& s
 		return;
 	}
 
+	if (packet.operation == BOUNDARY_REQUEST)
+	{
+		requestBoundaryMove(packet, found == spaceLayouts_.end() ? nullptr : &found->second);
+		return;
+	}
 	if (found == spaceLayouts_.end() || found->second.layout.cellForApp(packet.sender) == NULL)
 		return;
 	Transaction& transaction = found->second;
@@ -247,6 +319,10 @@ void Cellappmgr::onSpaceLayoutRequest(Network::Channel* channel, MemoryStream& s
 	};
 	switch (packet.operation)
 	{
+	case BOUNDARY_APPLIED:
+		if (source->pChannel == channel && transaction.confirmBoundary(sender, packet.version, packet.revision))
+			finishBoundaryMove(packet.spaceID, transaction, nullptr);
+		break;
 	case READY: case COMMITTED:
 	{
 		const State expected = packet.operation == READY ? PREPARING : COMMITTING;
@@ -276,6 +352,7 @@ void Cellappmgr::onSpaceLayoutRequest(Network::Channel* channel, MemoryStream& s
 		transaction.shutdownRequested = true;
 		if (transaction.committedReplacement)
 			closedSpacesWithCellLoss_.insert(packet.spaceID);
+		finishBoundaryMove(packet.spaceID, transaction, "Space closed before all boundary confirmations");
 		cancelCellReplacement(packet.spaceID, transaction, "Space is closing");
 		transaction.advance(RELEASING, timestamp());
 		for (const auto cid : transaction.layout.participants())
@@ -367,6 +444,14 @@ void Cellappmgr::updateSpaceLayouts()
 			now - transaction.started > stampsPerSecond() * 30)
 			failSpaceLayout(entry.first, transaction, "Cell preparation or confirmation timed out",
 				transaction.state == SpaceLayout::COMMITTING);
+		if (auto& move = transaction.boundaryConfirmation; move &&
+			move->started && now - move->started > 30 * stampsPerSecond())
+		{
+			WARNING_MSG(fmt::format("Cellappmgr::spaceLayout: waiting for boundary confirmations, "
+				"space={}, version={}, revision={}, confirmed={}.\n", entry.first, transaction.version,
+				transaction.boundaryRevision, move->acknowledged.size()));
+			move->started = 0;
+		}
 		if (transaction.replacement)
 			updateCellReplacement(entry.first, transaction, now);
 	}
@@ -520,6 +605,7 @@ void Cellappmgr::checkCellReplacement(SPACE_ID spaceID, SpaceLayout::Transaction
 		transaction.version, replacement.target, replacement.targetSession, replacement.process};
 	transaction.layout = std::move(layout);
 	transaction.version = replacement.version;
+	transaction.boundaryRevision = 0;
 	transaction.replacement.reset();
 	transaction.advance(COMMITTING, now);
 	transaction.suspended = false;

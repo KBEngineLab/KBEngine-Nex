@@ -170,6 +170,9 @@ protected:
 		SpaceLayout::Operation operation);
 	void failSpaceLayout(SPACE_ID spaceID, SpaceLayout::Transaction& transaction,
 		const std::string& error, bool suspend);
+	void requestBoundaryMove(SpaceLayout::Packet& packet, SpaceLayout::Transaction* transaction);
+	void reportBoundaryMove(SPACE_ID spaceID, COMPONENT_ID owner, uint64 version, uint64 revision, const char* error);
+	void finishBoundaryMove(SPACE_ID spaceID, SpaceLayout::Transaction& transaction, const char* error);
 	void updateSpaceLayouts();
 	bool updateCellReplacement(SPACE_ID spaceID, SpaceLayout::Transaction& transaction, uint64 now);
 	void checkCellReplacement(SPACE_ID spaceID, SpaceLayout::Transaction& transaction, uint64 now);
