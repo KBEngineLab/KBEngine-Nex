@@ -275,7 +275,7 @@ def verify_fixed_layout(cells, source_space, enabled, rejection_logged):
             "split_x": split_x, "split_z": split_z}, verify_after_logout
 
 
-def verify_boundary_ghosts(cells, result, bots, read_client_log, read_cell_log):
+def verify_boundary_ghosts(cells, result, bots, read_client_log, read_cell_log, has_y):
     space = result["space"]
     owner = result["owner"]
     source = cells[owner]
@@ -344,6 +344,19 @@ def verify_boundary_ghosts(cells, result, bots, read_client_log, read_cell_log):
                  # 客户端沿用紧凑坐标协议，允许相对坐标编码产生的舍入误差。
                  lambda values: any(name == "boundary-updated" and near(pos, nearby, 0.5)
                                     for name, pos in values), timeout=12)
+        # X/Z 不动，Ghost 仍需保留。只有三维 AOI 才应因高度变化而退出视野。
+        raised = (nearby[0], nearby[1] + 1024., nearby[2])
+        move(raised)
+        wait_for("观察者所在 Cell 收到纯 Y 轴移动", replicas,
+                 lambda values: values[owner] and near(values[owner][3], raised))
+        visible = (f"any(e.id == {ghost_id} for e in "
+                   f"KBEngine.entities[{avatar}].entitiesInView(True))")
+        wait_for("纯 Y 轴移动后的 AOI", lambda: source.evaluate(visible),
+                 lambda value: value == (not has_y))
+        move(nearby)
+        wait_for("恢复高度后客户端仍可见", client_replica,
+                 lambda values: any(name == "boundary-updated" and near(pos, nearby, 0.5)
+                                    for name, pos in values), timeout=12)
         move((x + 1024., 0., z + 1024.))
         wait_for("离开边界的副本清理", replicas, lambda values: not any(values.values()))
         move(position)
@@ -354,6 +367,13 @@ def verify_boundary_ghosts(cells, result, bots, read_client_log, read_cell_log):
             f"KBEngine.createEntity('Monster', {space}, {position!r}, (0., 0., 0.), "
             f"{{'name': 'boundary-broadcast', 'spawnPos': {position!r}}}).id"
         )
+        # 四区交点可能不在导航网格上。保留观察回调，只暂停测试怪物的随机走动。
+        next_move = int(time.time()) + 3600
+        monster_expr = f"KBEngine.entities[{monster}]"
+        paused_until = host.evaluate(
+            f"(setattr({monster_expr}, 'nextMoveTime', {next_move}), {monster_expr}.nextMoveTime)[1]"
+        )
+        require(paused_until == next_move, "测试怪物的随机走动未暂停")
 
         def real_observed():
             return host.evaluate(f"KBEngine.entities[{monster}].isWitnessed")
@@ -420,6 +440,314 @@ def verify_boundary_ghosts(cells, result, bots, read_client_log, read_cell_log):
     print(f"BOUNDARY_GHOSTS_PASS space={space} replicas={len(peers)}", flush=True)
     return {"replicas": len(peers), "aoi": True, "pose_and_public_property": True,
             "client_broadcast": True, "remote_observation": True, "cleanup": True}
+
+
+def verify_ghost_source_change(cells, layout, bots, output, has_y):
+    space = layout["space"]
+    observer = cells[layout["owner"]]
+    x, z = layout["split_x"], layout["split_z"]
+    left, right = (x - 4., 0., z + 4.), (x + 4., 0., z + 4.)
+    source_id, target_id, peer_id = [
+        observer.evaluate(f"KBEngine.cellForPosition({space}, {px!r}, {pz!r})[1]")
+        for px, pz in ((left[0], left[2]), (right[0], right[2]), (x + 4., z - 4.))
+    ]
+    source, target, peer = (cells[cid] for cid in (source_id, target_id, peer_id))
+    require(len({source, target, peer, observer}) == 4, "Ghost 换源检查需要四个不同的 Cell")
+
+    avatar, radius, hysteresis = observer.evaluate(
+        f"next((e.id, e.getViewRadius(), e.getViewHystArea()) for e in KBEngine.entities.values() "
+        f"if type(e).__name__ == 'Avatar' and e.spaceID == {space} and e.hasWitness)"
+    )
+    # Monster 自带 recvDamage，但旧 demo 的怪物陷阱不适用于三维 AOI；三维继续用 NPC。
+    entity_type = "NPC" if has_y else "Monster"
+    initial_host, initial_pos = (source, left) if has_y else (target, right)
+    entity = initial_host.evaluate(
+        f"KBEngine.createEntity({entity_type!r}, {space}, {initial_pos!r}, (0., 0., 0.), "
+        f"{{'name': 'before-handoff', 'spawnPos': {initial_pos!r}}}).id"
+    )
+    lookup = f"KBEngine.entities.get({entity})"
+    ghost_name = f"(lambda e: e.name if e and not e.isReal() else None)({lookup})"
+    client_entity = (
+        f"next(app.entities.get({entity}) for app in KBEngine.bots.values() "
+        f"if app.entities.get({avatar}))"
+    )
+    avatar_expr = f"KBEngine.entities.get({avatar})"
+    visible = f"any(e.id == {entity} for e in {avatar_expr}.entitiesInView(True))"
+    client_state = (
+        f"(lambda e: (e is _ghost_client_entity, getattr(e, 'name', None)))({client_entity})"
+    )
+
+    def set_view(view_radius, margin):
+        observer.evaluate(f"{avatar_expr}.setViewRadius({view_radius}, {margin})")
+
+    def setup(name):
+        return f"""
+from {entity_type} import {entity_type} as _ghost_class
+_ghost_previous_enter = _ghost_class.__dict__.get('onEnteredCell')
+_ghost_inherited_enter = getattr(_ghost_class, 'onEnteredCell', None)
+def _ghost_enter(self):
+    if self.id == {entity}:
+        self.name = {name!r}
+    if _ghost_inherited_enter is not None:
+        _ghost_inherited_enter(self)
+_ghost_class.onEnteredCell = _ghost_enter
+"""
+    restore = """
+if _ghost_previous_enter is None:
+    del _ghost_class.onEnteredCell
+else:
+    _ghost_class.onEnteredCell = _ghost_previous_enter
+"""
+    profile = f"""
+import sys
+_ghost_rpc_calls = []
+_ghost_scale_calls = []
+def _ghost_profile(frame, event, arg):
+    method = frame.f_code.co_name
+    if event != 'call' or method not in ('recvDamage', 'set_modelScale'):
+        return
+    values = frame.f_locals
+    receiver = values['self']
+    if receiver.id != {entity}:
+        return
+    same_object = receiver is _ghost_client_entity
+    if method == 'recvDamage' and values['attackerID'] == {avatar}:
+        _ghost_rpc_calls.append((values['damage'], same_object, receiver.name))
+    elif method == 'set_modelScale':
+        _ghost_scale_calls.append((values['oldValue'], receiver.modelScale, same_object, receiver.name))
+sys.setprofile(_ghost_profile)
+"""
+
+    def change_source(old_host, new_host, position, old_name, new_name, messages=None, marker=None):
+        paused = output / f"ghost-observer-paused-{new_name}"
+        release = output / f"ghost-observer-release-{new_name}"
+        pause = f"""
+from pathlib import Path
+from time import monotonic, sleep
+Path({str(paused)!r}).touch()
+deadline = monotonic() + 12
+while not Path({str(release)!r}).exists() and monotonic() < deadline:
+    sleep(0.01)
+"""
+        wait_for("迁移目标已收到待提升的 Ghost", lambda: new_host.evaluate(ghost_name),
+                 lambda name: name == old_name)
+        new_host.evaluate(f"exec({setup(new_name)!r})")
+        try:
+            # 暂停观察者，避免旧 Leave 先发出，也让新快照和随后发出的消息一起排队。
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                held = executor.submit(observer.evaluate, f"exec({pause!r})", 14)
+                try:
+                    wait_for("观察者暂停处理消息", paused.exists, bool, timeout=5)
+                    old_host.evaluate(f"setattr({lookup}, 'position', {position!r})")
+                    wait_for("第四个 Cell 收到新 Real 的 Ghost 快照", lambda: peer.evaluate(ghost_name),
+                             lambda name: name == new_name, timeout=8)
+                    if messages is not None:
+                        new_host.evaluate(f"({messages}, setattr({lookup}, 'uid', {marker}))")
+                        wait_for("第四个 Cell 收到新来源的同步标记", lambda: peer.evaluate(f"{lookup}.uid"),
+                                 lambda uid: uid == marker, timeout=2)
+                        require(bots.evaluate(client_state) == [True, old_name],
+                                "恢复观察者处理前客户端没有保留旧快照")
+                finally:
+                    release.touch()
+                held.result()
+
+            wait_for("观察者使用新 Ghost 快照", lambda: observer.evaluate(ghost_name),
+                     lambda name: name == new_name, timeout=8)
+            wait_for("外圈换源后客户端保留原对象并收到新属性", lambda: bots.evaluate(client_state),
+                     lambda state: state == [True, new_name], timeout=8)
+            require(observer.evaluate(visible), "换源后 Witness 丢失了外圈的实体")
+        finally:
+            new_host.evaluate(f"exec({restore!r})")
+
+    try:
+        if not has_y:
+            initial_host.evaluate(f"setattr({lookup}, 'nextMoveTime', {int(time.time()) + 3600})")
+        observer.evaluate(f"setattr({avatar_expr}, 'controlledBy', None)")
+        set_view(32., 10.)
+        observer.evaluate(f"setattr({avatar_expr}, 'position', {(x - 4., 0., z - 26.)!r})")
+        wait_for("迁移前观察者收到旧 Ghost", lambda: observer.evaluate(ghost_name),
+                 lambda name: name == "before-handoff")
+        wait_for("客户端收到实体初始属性",
+                 lambda: bots.evaluate(f"getattr(({client_entity}), 'name', None)"),
+                 lambda name: name == "before-handoff")
+        bots.evaluate(f"exec('_ghost_client_entity = {client_entity}')")
+        try:
+            if not has_y:
+                bots.evaluate(f"exec({profile!r})")
+            # 实体先进入内圈，再留在外圈。换源前后 Z 距离都为 40，不能重新从内圈进入。
+            observer.evaluate(f"setattr({avatar_expr}, 'position', {(x - 4., 0., z - 36.)!r})")
+            require(observer.evaluate(visible) and bots.evaluate(client_state) == [True, "before-handoff"],
+                    "换源前滞回外圈没有保留已可见的实体")
+            if not has_y:
+                change_source(target, source, left, "before-handoff", "rpc-handoff",
+                              f"[{lookup}.otherClients.recvDamage({avatar}, 1, 1, damage) "
+                              "for damage in (41, 43)]", marker=739)
+                calls = wait_for("客户端执行 Ghost 换源广播", lambda: bots.evaluate("_ghost_rpc_calls"),
+                                 lambda calls: len(calls) >= 2, timeout=8)
+                require(calls == [[41, True, "rpc-handoff"], [43, True, "rpc-handoff"]],
+                        f"Ghost 换源 RPC 未按顺序在原客户端对象上读到新快照：{calls!r}")
+
+                # 单独测试属性先到，避免 RPC 先发出快照后掩盖增量路径的问题。
+                bots.evaluate("_ghost_scale_calls.clear()")
+                change_source(source, target, right, "rpc-handoff", "after-handoff",
+                              f"setattr({lookup}, 'modelScale', 37)", marker=743)
+                # 再发一次常规增量；收到它时，之前同一连接上的回调应该已经全部执行。
+                target.evaluate(f"setattr({lookup}, 'modelScale', 39)")
+                calls = wait_for("客户端执行 Ghost 属性回调", lambda: bots.evaluate("_ghost_scale_calls"),
+                                 lambda calls: any(current == 39 for _, current, _, _ in calls), timeout=8)
+                require(calls == [[30, 37, True, "after-handoff"], [37, 39, True, "after-handoff"]],
+                        f"Ghost 换源属性回调重复或发生在快照前：{calls!r}")
+            else:
+                change_source(source, target, right, "before-handoff", "after-handoff")
+
+            destination = (x + 4., 0., z - 4.)
+            verify_observer_ghost_refresh(observer, peer, avatar, ghost_name, bots, client_entity, destination,
+                                          output, (target, lookup) if not has_y else None)
+
+            # 保留边界 Ghost，只让它真正离开外圈；重新到达外圈不能代替进入内圈。
+            peer.evaluate(f"(setattr({avatar_expr}, 'controlledBy', None), "
+                          f"setattr({avatar_expr}, 'position', {destination!r}))")
+            remote_position = f"(lambda e: tuple(e.position) if e else None)({lookup})"
+            for distance, description in ((54., "越过外圈"), (40., "只回到外圈")):
+                position = (right[0], right[1], destination[2] + distance)
+                target.evaluate(f"setattr({lookup}, 'position', {position!r})")
+                wait_for(f"目标观察者所在 Cell 收到实体{description}的位置",
+                         lambda: peer.evaluate(remote_position),
+                         lambda value: value is not None and math.dist(value, position) < 0.01, timeout=8)
+                require(not peer.evaluate(visible), f"实体{description}后仍在 Witness 视野内")
+                wait_for(f"实体{description}后不在客户端视野", lambda: bots.evaluate(client_state),
+                         lambda state: state == [False, None], timeout=8)
+        finally:
+            if not has_y:
+                bots.evaluate("(__import__('sys').setprofile(None), None)[1]")
+            bots.evaluate("exec('del _ghost_client_entity')")
+    finally:
+        for console in (source, target):
+            console.evaluate(f"(lambda e: e.destroy() if e and e.isReal() else None)({lookup})")
+        for console in (observer, peer):
+            console.evaluate(f"(lambda e: (setattr(e, 'controlledBy', e.base), "
+                             f"e.setViewRadius({radius}, {hysteresis})) if e and e.isReal() "
+                             f"else None)({avatar_expr})")
+    print(f"GHOST_SOURCE_CHANGE_PASS space={space} entity={entity}", flush=True)
+    return {"entity": entity, "same_client_entity": True, "snapshot_property": "after-handoff",
+            "retained_in_hysteresis": True, "outer_exit_and_reentry": True,
+            "observer_handoff_refreshed": True, "snapshot_before_rpc": True if not has_y else None,
+            "snapshot_before_property_callback": True if not has_y else None,
+            "observer_handoff_property_once": True if not has_y else None}
+
+
+def verify_observer_ghost_refresh(source, target, avatar, ghost_name, bots, client_entity, destination,
+                                  output, ghost_real):
+    require(target.evaluate(ghost_name) == "after-handoff", "玩家目标 Cell 缺少最新 Ghost")
+    avatar_expr = f"KBEngine.entities.get({avatar})"
+    player_with_witness = f"(lambda e: bool(e and e.isReal() and e.hasWitness))({avatar_expr})"
+    client_state = (
+        f"(lambda e: (e is _ghost_client_entity, getattr(e, 'name', None)))({client_entity})"
+    )
+    # 只让 Bot 缓存停在旧值，模拟源 Witness 没来得及发出刷新；迁移和补发仍由真实集群完成。
+    bots.evaluate("setattr(_ghost_client_entity, 'name', 'before-handoff')")
+    require(bots.evaluate(client_state) == [True, "before-handoff"], "迁移前客户端没有保留旧属性")
+    source.evaluate(f"setattr({avatar_expr}, 'controlledBy', None)")
+    try:
+        move = f"setattr({avatar_expr}, 'position', {destination!r})"
+        if ghost_real is None:
+            source.evaluate(move)
+        else:
+            verify_observer_handoff_messages(source, target, avatar, move, player_with_witness,
+                                             bots, output, *ghost_real)
+        wait_for("玩家迁入目标 Cell 并恢复 Witness", lambda: target.evaluate(player_with_witness), bool)
+        require(not source.evaluate(player_with_witness), "源 Cell 仍保留玩家 Real 和 Witness")
+        wait_for("观察者迁移后保留客户端对象并刷新 Ghost 属性", lambda: bots.evaluate(client_state),
+                 lambda state: state == [True, "after-handoff"], timeout=8)
+    finally:
+        for console in (source, target):
+            console.evaluate(f"(lambda e: setattr(e, 'controlledBy', e.base) if e and e.isReal() "
+                             f"else None)({avatar_expr})")
+    print(f"OBSERVER_GHOST_REFRESH_PASS player={avatar}", flush=True)
+
+
+def verify_observer_handoff_messages(source, target, avatar, move, player_with_witness, bots, output, real, lookup):
+    target_entered = output / "observer-handoff-target-entered"
+    target_resume = output / "observer-handoff-target-resume"
+    source_paused = output / "observer-handoff-source-paused"
+    source_resume = output / "observer-handoff-source-resume"
+    finished = output / "observer-handoff-finished"
+    hook = f"""
+from pathlib import Path
+from time import monotonic, sleep
+from Avatar import Avatar as _observer_avatar_class
+_observer_saved_slot = _observer_avatar_class.__dict__.get('__setattr__')
+_observer_setattr = _observer_avatar_class.__setattr__
+_observer_saved_enter = _observer_avatar_class.__dict__.get('onEnteredCell')
+_observer_enter = getattr(_observer_avatar_class, 'onEnteredCell', None)
+def _observer_hold(self, key, value):
+    entered = Path({str(target_entered)!r})
+    if self.id == {avatar} and self.isReal() and not entered.exists():
+        entered.touch()
+        deadline = monotonic() + 12
+        while not Path({str(target_resume)!r}).exists() and monotonic() < deadline:
+            sleep(0.01)
+    return _observer_setattr(self, key, value)
+def _observer_finished(self):
+    if _observer_enter is not None:
+        _observer_enter(self)
+    if self.id == {avatar}:
+        Path({str(finished)!r}).touch()
+_observer_avatar_class.__setattr__ = _observer_hold
+_observer_avatar_class.onEnteredCell = _observer_finished
+"""
+    restore = """
+for name, callback in (('__setattr__', _observer_saved_slot), ('onEnteredCell', _observer_saved_enter)):
+    if callback is None:
+        delattr(_observer_avatar_class, name)
+    else:
+        setattr(_observer_avatar_class, name, callback)
+"""
+    hold_source = f"""
+from pathlib import Path
+from time import monotonic, sleep
+Path({str(source_paused)!r}).touch()
+deadline = monotonic() + 12
+while not Path({str(source_resume)!r}).exists() and monotonic() < deadline:
+    sleep(0.01)
+_observer_released = Path({str(source_resume)!r}).exists()
+"""
+    send_rpc = f"{lookup}.otherClients.recvDamage({avatar}, 1, 1, {{}})"
+    bots.evaluate("(_ghost_scale_calls.clear(), _ghost_rpc_calls.clear())")
+    target.evaluate(f"exec({hook!r})")
+    try:
+        source.evaluate(move)
+        wait_for("目标开始安装玩家快照", target_entered.exists, bool, timeout=8)
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            held = executor.submit(source.evaluate, f"(exec({hold_source!r}), _observer_released)[1]", 14)
+            try:
+                # 先让源端停在释放请求之前，再恢复目标；保持 BaseApp 和 Bot 正常运行。
+                wait_for("源 Cell 暂停释放", source_paused.exists, bool, timeout=5)
+                target_resume.touch()
+                wait_for("目标 Witness 已安装", lambda: target.evaluate(player_with_witness), bool, timeout=8)
+                require(not finished.exists(), "测试未进入已安装但未释放的交接窗口")
+                real.evaluate(f"(setattr({lookup}, 'modelScale', 47), {send_rpc.format(47)}, "
+                              f"setattr({lookup}, 'uid', 747))")
+                wait_for("目标 Ghost 已应用属性增量和 RPC 后的标记",
+                         lambda: target.evaluate(f"({lookup}.modelScale, {lookup}.uid)"),
+                         lambda state: state == [47, 747], timeout=5)
+                early = bots.evaluate("(_ghost_scale_calls, _ghost_rpc_calls)")
+            finally:
+                source_resume.touch()
+            require(held.result(), "源 Cell 在测试放行前已结束等待")
+        wait_for("源端释放后目标完成交接", finished.exists, bool, timeout=8)
+        # 最后一条 RPC 是同一可靠流上的标记，收到后之前的回调都已执行。
+        real.evaluate(send_rpc.format(53))
+        calls = wait_for("客户端执行交接窗口内和交接后的 Ghost RPC",
+                         lambda: bots.evaluate("(_ghost_scale_calls, _ghost_rpc_calls)"),
+                         lambda calls: any(damage == 53 for damage, _, _ in calls[1]), timeout=8)
+        require(calls == [[[39, 47, True, "after-handoff"]],
+                          [[47, True, "after-handoff"], [53, True, "after-handoff"]]],
+                f"观察者跨 Cell 的 Ghost 回调重复、丢失或使用旧属性：{calls!r}")
+        require(early == [[], []], f"源端释放前客户端已执行目标 Cell 的回调：{early!r}")
+    finally:
+        target_resume.touch(exist_ok=True)
+        target.evaluate(f"exec({restore!r})")
 
 
 def verify_resource_limits(cells, owner, space_id, version, revision, mapping,

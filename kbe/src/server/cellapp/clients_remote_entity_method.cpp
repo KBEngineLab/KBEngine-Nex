@@ -196,6 +196,7 @@ void ClientsRemoteEntityMethod::forwardToWitnesses(Entity& entity, MemoryStream&
 	const Entity::WITNESS_IDS& entities = pEntity->witnesses();
 	MemoryStream* mstream = &data;
 	const char* eventName = methodName ? methodName : "boundaryGhost";
+	const bool boundaryGhost = pEntity->isBoundaryGhost();
 	{
 		Entity::WITNESS_IDS::const_iterator iter = entities.begin();
 		for(; iter != entities.end(); ++iter)
@@ -212,17 +213,25 @@ void ClientsRemoteEntityMethod::forwardToWitnesses(Entity& entity, MemoryStream&
 			if(pChannel == NULL)
 				continue;
 
-			// 这个可能性是存在的，例如数据来源于createWitnessFromStream()
-			// 又如自己的entity还未在目标客户端上创建
-			if (!pViewEntity->pWitness()->entityInView(pEntity->id()))
+			// 只对已经在客户端创建、且仍绑定到当前实体的关系转发。
+			Witness* pWitness = pViewEntity->pWitness();
+			EntityRef* pEntityRef = pWitness->getViewEntityRef(pEntity->id());
+			if (!pEntityRef || pEntityRef->pEntity() != pEntity ||
+				pEntityRef->flags() != ENTITYREF_FLAG_NORMAL)
 				continue;
 			
 			Network::Bundle* pSendBundle = pChannel->createSendBundle();
 			NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pViewEntity->id(), (*pSendBundle));
+
+			const auto forwardHeaderLength = pSendBundle->currMsgLength();
+			// 换源后 RPC 不能越过 Witness 队列中尚未发送的快照。在同一转发消息内先写属性。
+			if (boundaryGhost)
+				pWitness->appendPendingBoundaryGhostSnapshot(pSendBundle, *pEntityRef);
+			const auto snapshotLength = pSendBundle->currMsgLength() - forwardHeaderLength;
 			
 			int ialiasID = -1;
 			const Network::MessageHandler& msgHandler = 
-			pViewEntity->pWitness()->getViewEntityMessageHandler(ClientInterface::onRemoteMethodCall,
+			pWitness->getViewEntityMessageHandler(ClientInterface::onRemoteMethodCall,
 					ClientInterface::onRemoteMethodCallOptimized, pEntity->id(), ialiasID);
 
 			ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, msgHandler, viewEntityMessage);
@@ -271,10 +280,10 @@ void ClientsRemoteEntityMethod::forwardToWitnesses(Entity& entity, MemoryStream&
 			// 记录这个事件产生的数据量大小
 			g_publicClientEventHistoryStats.trackEvent(pViewEntity->scriptName(),
 				eventName,
-				pSendBundle->currMsgLength(), 
+				pSendBundle->currMsgLength() - snapshotLength,
 				"::");
 
-			pViewEntity->pWitness()->sendToClient(ClientInterface::onRemoteMethodCallOptimized, pSendBundle);
+			pWitness->sendToClient(ClientInterface::onRemoteMethodCallOptimized, pSendBundle);
 		}
 
 	}

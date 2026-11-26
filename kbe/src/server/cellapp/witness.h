@@ -49,6 +49,7 @@ namespace Network
 
 class Entity;
 class MemoryStream;
+class PropertyDescription;
 class ViewTrigger;
 class Space;
 
@@ -152,6 +153,10 @@ public:
 	*/
 	bool sendToClient(const Network::MessageHandler& msgHandler, Network::Bundle* pBundle);
 	Network::Channel* pChannel();
+	bool appendPendingBoundaryGhostSnapshot(Network::Bundle* pSendBundle, EntityRef& entityRef,
+		const PropertyDescription* pLastProperty = NULL, ENTITY_PROPERTY_UID lastPropertyParentUID = 0);
+	bool sendPendingBoundaryGhostSnapshotForProperty(EntityRef& entityRef,
+		const PropertyDescription& property, ENTITY_PROPERTY_UID parentUID);
 		
 	INLINE VIEW_ENTITIES_MAP& viewEntitiesMap();
 	INLINE VIEW_ENTITIES& viewEntities();
@@ -279,8 +284,10 @@ private:
 	void synchronizeViewEntityMetrics();
 	void initializeEntityRefLifecycle(EntityRef* pEntityRef);
 	DETAIL_TYPE resolveEntityRefDetailLevel(EntityRef* pEntityRef) const;
+	static bool hasPendingBoundaryGhostSnapshot(const EntityRef& entityRef);
 	uint32 appendEntityRefDetailLevelProperties(Network::Bundle* pSendBundle,
-		EntityRef* pEntityRef, DETAIL_TYPE minimumDetailLevel, DETAIL_TYPE maximumDetailLevel);
+		EntityRef* pEntityRef, DETAIL_TYPE minimumDetailLevel, DETAIL_TYPE maximumDetailLevel,
+		const PropertyDescription* pLastProperty = NULL, ENTITY_PROPERTY_UID lastPropertyParentUID = 0);
 	void updateEntityRefDetailLevel(Network::Bundle* pSendBundle, EntityRef* pEntityRef);
 	void processDetailLevelScan(Network::Bundle* pSendBundle);
 	bool queueEntityRefVolatile(EntityRef* pEntityRef, bool requeue = false);

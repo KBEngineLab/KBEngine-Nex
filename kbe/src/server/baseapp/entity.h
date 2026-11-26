@@ -280,6 +280,8 @@ public:
 		return cellHandoffAction_ != CellHandoff::NONE &&
 			(cellHandoffRoute_.source == cid || cellHandoffRoute_.target == cid);
 	}
+	bool deferCellHandoffClientMessage(Network::Channel* sender, Network::Channel* client,
+		const MemoryStream& stream);
 	void onPartitionCellExit(const CellRecovery::LostReal& loss);
 	bool markPartitionRealLost(const CellRecovery::LostReal& loss);
 	void loseCell();
@@ -389,6 +391,12 @@ protected:
 	uint64									cellHandoffWarningAt_ = 0;
 	bool									cellHandoffSourceExited_ = false;
 	std::unique_ptr<CellRecovery::LostReal>	cellHandoffTargetLoss_;
+	struct CellHandoffClientMessages
+	{
+		uint64 session = 0;
+		std::vector<uint8> data;
+	};
+	std::unique_ptr<CellHandoffClientMessages> cellHandoffClientMessages_;
 	void									finishCellHandoffSourceRelease();
 	std::unique_ptr<CellRecovery::LostReal>	lostPartitionReal_;
 	bool									destroyCellAfterHandoff_ = false;

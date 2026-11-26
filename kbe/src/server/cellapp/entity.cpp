@@ -876,15 +876,17 @@ void Entity::onDefDataChangedImpl(EntityComponent* pEntityComponent,
 			if(pChannel == NULL)
 				continue;
 
-			// 这个可能性是存在的，例如数据来源于createWitnessFromStream()
-			// 又如自己的entity还未在目标客户端上创建
 			Witness* pTargetWitness = pEntity->pWitness();
-			if(!pTargetWitness->entityInView(id()))
+			EntityRef* pEntityRef = pTargetWitness->getViewEntityRef(id());
+			if (!pEntityRef || pEntityRef->pEntity() != this || pEntityRef->flags() != ENTITYREF_FLAG_NORMAL)
 				continue;
 
-			EntityRef* pEntityRef = pTargetWitness->getViewEntityRef(id());
-			if(pEntityRef != NULL && pScriptModule_->getDetailLevel().isVisible(
-				propertyDetailLevel, pEntityRef->detailLevel()))
+			// Ghost 已应用增量；如果还欠一次完整补发，就用包含新值的快照代替这条增量。
+			if (fromBoundaryGhost && pTargetWitness->sendPendingBoundaryGhostSnapshotForProperty(
+				*pEntityRef, *propertyDescription, componentPropertyUID))
+				continue;
+
+			if(pScriptModule_->getDetailLevel().isVisible(propertyDetailLevel, pEntityRef->detailLevel()))
 			{
 				Network::Bundle* pSendBundle = pChannel->createSendBundle();
 				NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pEntity->id(), (*pSendBundle));
@@ -978,7 +980,8 @@ void Entity::onDefDataChangedImpl(EntityComponent* pEntityComponent,
 
 //-------------------------------------------------------------------------------------
 uint32 Entity::addOtherClientDataToStreamByDetailRange(MemoryStream* pStream,
-	DETAIL_TYPE minimumDetailLevel, DETAIL_TYPE maximumDetailLevel)
+	DETAIL_TYPE minimumDetailLevel, DETAIL_TYPE maximumDetailLevel,
+	const PropertyDescription* pLastProperty, ENTITY_PROPERTY_UID lastPropertyParentUID)
 {
 	if(pStream == NULL || minimumDetailLevel > maximumDetailLevel ||
 		maximumDetailLevel >= DETAIL_LEVEL_COUNT)
@@ -1017,6 +1020,8 @@ uint32 Entity::addOtherClientDataToStreamByDetailRange(MemoryStream* pStream,
 	};
 
 	uint32 propertyCount = 0;
+	PyObjectPtr lastValue;
+	const PropertyDescription* pLastPropertyParent = NULL;
 	ScriptDefModule::PROPERTYDESCRIPTION_MAP& propertyDescrs =
 		pScriptModule_->getClientPropertyDescriptions();
 	for(ScriptDefModule::PROPERTYDESCRIPTION_MAP::const_iterator iter = propertyDescrs.begin();
@@ -1035,6 +1040,12 @@ uint32 Entity::addOtherClientDataToStreamByDetailRange(MemoryStream* pStream,
 			const DETAIL_TYPE detailLevel = pProperty->getDetailLevel();
 			if(detailLevel < minimumDetailLevel || detailLevel > maximumDetailLevel)
 				continue;
+
+			if (pProperty == pLastProperty && lastPropertyParentUID == 0)
+			{
+				lastValue = PyObjectPtr(pyValue);
+				continue;
+			}
 
 			writePropertyHeader(NULL, pProperty);
 			pProperty->getDataType()->addToStream(pStream, pyValue);
@@ -1068,12 +1079,27 @@ uint32 Entity::addOtherClientDataToStreamByDetailRange(MemoryStream* pStream,
 					continue;
 				}
 
+				if (pChildProperty == pLastProperty && pProperty->getUType() == lastPropertyParentUID)
+				{
+					pLastPropertyParent = pProperty;
+					lastValue = PyObjectPtr(pyChildValue, PyObjectPtr::STEAL_REF);
+					continue;
+				}
+
 				writePropertyHeader(pProperty, pChildProperty);
 				pChildProperty->getDataType()->addToStream(pStream, pyChildValue);
 				Py_DECREF(pyChildValue);
 				++propertyCount;
 			}
 		}
+	}
+
+	// 客户端逐字段应用并立即执行回调。让触发补发的属性最后生效，回调才能读到其余可见属性的新值。
+	if (lastValue.get())
+	{
+		writePropertyHeader(pLastPropertyParent, pLastProperty);
+		pLastProperty->getDataType()->addToStream(pStream, lastValue.get());
+		++propertyCount;
 	}
 
 	Py_DECREF(pydict);

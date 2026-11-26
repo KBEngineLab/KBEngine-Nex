@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -23,12 +24,14 @@ from performance.run import resolve_management_admin_token, wait_for_cluster_rea
 from performance.topology import build_local_cluster_components, platform_executable_name
 from runtime_console import RuntimeConsole
 from space_boundary_runtime import verify_boundary_move
+from space_partition_load import stop_demo_bot_actions, verify_partition_load
 from space_split_runtime import verify_space_merge, verify_space_split
 from space_layout_runtime import (
-    NO_NAVIGATION_MAPPING, verify_boundary_ghosts, verify_fixed_layout,
+    NO_NAVIGATION_MAPPING, verify_boundary_ghosts, verify_fixed_layout, verify_ghost_source_change,
     verify_layout_removal, verify_rejected_layout_removal,
 )
 from test_server_cluster import ERROR_PATTERN, all_run_logs, read_text, run_cluster
+from test_server_cluster import select_interfaces_port as select_tcp_port
 
 
 SHUTDOWN_GROUPS = (
@@ -184,21 +187,45 @@ def verify_demo(entries, run_root, environment, args, output, password):
         return
     machines = Machines.Machines(adminToken=token)
     consoles = {}
-    bots = None
+    bots_processes = {}
+    bots_logs = []
+    bots_ids = tuple(range(10000, 10000 + args.partition_bot_processes))
     with ExitStack() as resources:
         resources.callback(machines.stopListen)
         try:
-            bots_environment = build_environment(args.repository_root, args.assets_root, output)
-            bots_environment["KBE_TEST_MODE"] = "1"
             bots_exe = args.repository_root / "kbe/bin/server" / platform_executable_name("bots")
-            stdout = resources.enter_context((output / "bots.stdout.log").open("wb"))
-            stderr = resources.enter_context((output / "bots.stderr.log").open("wb"))
-            bots = subprocess.Popen(
-                [str(bots_exe), "--cid=10000", "--gus=40", "--hide=1",
-                 "--publish-component", "--bots-transport=tcp", "--bots-allow-tcp-fallback=false"],
-                cwd=output, env=bots_environment, stdout=stdout, stderr=stderr,
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
-            )
+            for index, cid in enumerate(bots_ids):
+                bots_environment = build_environment(args.repository_root, args.assets_root, output)
+                bots_environment["KBE_TEST_MODE"] = "1"
+                prefix = "bots"
+                if len(bots_ids) > 1:
+                    prefix = f"bots.{cid}"
+                    base_config = output / "config-overlay/res/server"
+                    config = ET.parse(base_config / "kbengine.xml")
+                    bot_config = config.getroot().find("./bots")
+                    set_xml_value(bot_config.find("telnet_service"), "port", args.bots_console_ports[cid])
+                    # 显式传送会移出一名玩家，采样人数仍与参数一致。
+                    count = args.partition_load_bots // len(bots_ids) + (index == 0)
+                    set_xml_value(bot_config.find("defaultAddBots"), "totalCount", count)
+                    override = output / prefix / "res"
+                    config_dir = override / "server"
+                    config_dir.mkdir(parents=True)
+                    config.write(config_dir / "kbengine.xml", encoding="utf-8", xml_declaration=True)
+                    # 引擎从当前 XML 所在目录读取日志配置，不能依赖下一层资源目录。
+                    log_config = Path("log4cxx_properties/bots.properties")
+                    (config_dir / log_config.parent).mkdir()
+                    shutil.copyfile(base_config / log_config, config_dir / log_config)
+                    bots_environment["KBE_RES_PATH"] = str(override) + os.pathsep + bots_environment["KBE_RES_PATH"]
+                stdout_path, stderr_path = output / f"{prefix}.stdout.log", output / f"{prefix}.stderr.log"
+                bots_logs.extend((stdout_path, stderr_path))
+                bots_processes[cid] = subprocess.Popen(
+                    [str(bots_exe), f"--cid={cid}", f"--gus={40 + index}", "--hide=1",
+                     "--publish-component", "--bots-transport=tcp", "--bots-allow-tcp-fallback=false"],
+                    cwd=output, env=bots_environment,
+                    stdout=resources.enter_context(stdout_path.open("wb")),
+                    stderr=resources.enter_context(stderr_path.open("wb")),
+                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                )
             owned = {entry["spec"]["component_id"]: entry for entry in entries}
 
             def discover():
@@ -210,16 +237,17 @@ def verify_demo(entries, run_root, environment, args, output, password):
                     }
                     for infos in machines.interfaces.values()
                     for info in infos
-                    if info.componentID in {*owned, 10000}
+                    if info.componentID in {*owned, *bots_ids}
                 }
 
             infos = wait_until(
                 "本次组件控制台发现", discover,
-                lambda found: 10000 in found and all(
+                lambda found: all(cid in found for cid in bots_ids) and all(
                     cid in found and found[cid]["port"] > 0 for cid in (7001, *cell_ids)
                 ),
             )
-            require(infos[10000]["pid"] == bots.pid, "发现结果中的 Bots 不属于本次测试")
+            require(all(infos[cid]["pid"] == process.pid for cid, process in bots_processes.items()),
+                    "发现结果中的 Bots 不属于本次测试")
             for cid in (7001, *cell_ids):
                 expected_pid = owned[cid]["process"].pid
                 require(infos[cid]["pid"] == expected_pid, "发现结果包含其他进程，停止检查")
@@ -232,18 +260,41 @@ def verify_demo(entries, run_root, environment, args, output, password):
 
             cells = {cid: consoles[cid] for cid in cell_ids}
 
+            def connect_bots_console(cid=10000):
+                port = args.bots_console_ports.get(cid)
+                if port is None:
+                    marker = wait_until(
+                        "Bots 控制台启动",
+                        lambda: re.search(r"TelnetServer server is running on port (\d+)", read_bots_log()),
+                        bool,
+                    )
+                    port = int(marker.group(1))
+                console = RuntimeConsole("127.0.0.1", port, password, cid, bots_processes[cid].pid)
+                resources.callback(console.close)
+                return console
+
+            def read_bots_log():
+                return read_text(output / "logs/bots.10000.log")
+
             def snapshot():
                 return {
                     cid: [dict(entity, cid=cid) for entity in cell_entities(console)]
                     for cid, console in cells.items()
                 }
 
+            avatar_count = args.partition_load_bots + 1 if args.partition_load_bots else 2
             initial = wait_until(
-                "两个角色进入场景", snapshot,
+                "本轮角色进入场景", snapshot,
                 lambda state: sum(e["type"] == "Avatar" and e["real"]
-                                  for entities in state.values() for e in entities) == 2,
+                                  for entities in state.values() for e in entities) == avatar_count,
                 timeout=90,
             )
+            load_bots_consoles = []
+            if args.partition_load_bots:
+                for cid in bots_ids:
+                    console = connect_bots_console(cid)
+                    stop_demo_bot_actions(console)
+                    load_bots_consoles.append(console)
             avatars = [e for entities in initial.values() for e in entities
                        if e["type"] == "Avatar" and e["real"]]
             source = avatars[0]
@@ -305,14 +356,28 @@ def verify_demo(entries, run_root, environment, args, output, password):
                     "传送改变了客户端连接或角色数据库 ID")
             require(
                 sum(e["type"] == "Avatar" and e["real"]
-                    for entities in final.values() for e in entities) == 2,
-                "传送后 Real 角色数量不等于两个",
+                    for entities in final.values() for e in entities) == avatar_count,
+                "传送后 Real 角色数量改变",
             )
             print(f"DEMO_TELEPORT_PASS entity={eid} source={source['cid']} target={target['cid']}",
                   flush=True)
             layout_result = None
             verify_after_logout = None
-            if args.fixed_space_layout:
+            load_result = None
+            load_passed = True
+            if args.partition_load_bots:
+                players = {row["id"] for rows in final.values() for row in rows
+                           if row["type"] == "Avatar" and row["real"] and row["space"] == source["space"]}
+                require(len(players) == args.partition_load_bots, "性能场景的玩家未进入同一 Space")
+                processes = {f"{entry['spec']['name']}#{cid}": entry["process"].pid
+                             for cid, entry in owned.items()}
+                processes.update({f"bots#{cid}": process.pid for cid, process in bots_processes.items()})
+                processes["controller"] = os.getpid()
+                load_result, load_passed = verify_partition_load(
+                    cells, consoles[7001], load_bots_consoles, infos, processes, source, players, args, token, output,
+                    base_info=infos[7001],
+                )
+            elif args.fixed_space_layout:
                 original_space = next(
                     entity for entity in initial[source["cid"]]
                     if entity["type"] == "Space" and entity["space"] == source["space"]
@@ -356,16 +421,7 @@ def verify_demo(entries, run_root, environment, args, output, password):
                         cells, layout_result, output
                     )
                 elif layout_result["enabled"]:
-                    def read_bots_log():
-                        return read_text(output / "logs/bots.10000.log")
-
-                    port = wait_until(
-                        "Bots 控制台启动",
-                        lambda: re.search(r"TelnetServer server is running on port (\d+)", read_bots_log()),
-                        bool,
-                    )
-                    bots_console = RuntimeConsole("127.0.0.1", int(port.group(1)), password, 10000, bots.pid)
-                    resources.callback(bots_console.close)
+                    bots_console = connect_bots_console()
                     if args.move_space_boundary:
                         layout_result["boundary_move"] = verify_boundary_move(
                             cells, layout_result, consoles[7001], bots_console, output
@@ -374,7 +430,12 @@ def verify_demo(entries, run_root, environment, args, output, password):
                         layout_result["boundary_ghosts"] = verify_boundary_ghosts(
                             cells, layout_result, bots_console, read_bots_log,
                             lambda: read_text(run_root / "logs/logger_cellapp.log"),
+                            args.coordinate_has_y,
                         )
+                        if len(cells) == 4:
+                            layout_result["ghost_source_change"] = verify_ghost_source_change(
+                                cells, layout_result, bots_console, output, args.coordinate_has_y,
+                            )
                     mapping_log = (
                         f"ClientObjectBase::addSpaceGeometryMapping: spaceID={original_space['space']}, "
                         f"respath={NO_NAVIGATION_MAPPING}!"
@@ -387,11 +448,14 @@ def verify_demo(entries, run_root, environment, args, output, password):
                     layout_result["client_received_mapping"] = True
 
             # 使用真实管理请求让 Bots 断开连接，不能用终止进程代替正常退出验证。
-            require(bots.poll() is None and discover()[10000]["pid"] == bots.pid,
-                    "退出前 Bots 进程身份已改变")
-            machines.stopServer(Define.BOTS_TYPE, 10000, targetIP="127.0.0.1")
-            bots_exit = bots.wait(timeout=30)
-            require(bots_exit == 0, f"Bots 没有正常退出，退出码为 {bots_exit}")
+            current_infos = discover()
+            for cid, process in bots_processes.items():
+                require(process.poll() is None and current_infos.get(cid, {}).get("pid") == process.pid,
+                        "退出前 Bots 进程身份已改变")
+                machines.stopServer(Define.BOTS_TYPE, cid, targetIP="127.0.0.1")
+            for cid, process in bots_processes.items():
+                bots_exit = process.wait(timeout=30)
+                require(bots_exit == 0, f"Bots {cid} 没有正常退出，退出码为 {bots_exit}")
             for cid in (7001, *cell_ids):
                 require(owned[cid]["process"].poll() is None, "客户端退出时服务端已结束")
             wait_until(
@@ -446,7 +510,7 @@ def verify_demo(entries, run_root, environment, args, output, password):
                     require(exit_code == 0, f"{name} 没有正常退出，退出码为 {exit_code}")
                     print(f"DEMO_COMPONENT_EXIT name={name} code={exit_code}", flush=True)
             logs = all_run_logs(entries, run_root)
-            logs += read_text(output / "bots.stdout.log") + read_text(output / "bots.stderr.log")
+            logs += "".join(read_text(path) for path in bots_logs)
             logs += "".join(read_text(path) for path in (output / "logs").glob("*.log"))
             require(not ERROR_PATTERN.search(logs) and not DEFAULT_PATTERNS["error"].search(logs),
                     "运行或退出过程中产生错误，请检查本次日志")
@@ -456,7 +520,7 @@ def verify_demo(entries, run_root, environment, args, output, password):
                 "辅助组件在测试控制器清理前已经退出",
             )
             result = {
-                "status": "PASS", "entity": eid, "source_cellapp": source["cid"],
+                "status": "PASS" if load_passed else "FAIL", "entity": eid, "source_cellapp": source["cid"],
                 "space_partitioning_configuration": args.space_partitioning,
                 "space_partitioning_enabled": args.space_partitioning == "true",
                 "target_cellapp": target["cid"], "target_space": target["space"],
@@ -467,19 +531,25 @@ def verify_demo(entries, run_root, environment, args, output, password):
                 "infrastructure_cleanup": list(INFRASTRUCTURE_COMPONENTS),
                 "fixed_space_layout": layout_result,
             }
+            if load_result is not None:
+                result["partition_load"] = load_result
             (output / "result.json").write_text(
                 json.dumps(result, indent=2) + "\n", encoding="utf-8"
             )
+            if not load_passed:
+                raise RuntimeError(f"客户端玩家 AOI 或 TCP 队列检查未通过，详见 {output / load_result}")
             print(f"DEMO_ASSETS_RUNTIME_PASS result={output / 'result.json'}", flush=True)
         finally:
             # 失败时仍只处理本次持有的子进程；清理不计入正常退出的通过结果。
-            if bots is not None and bots.poll() is None:
-                bots.terminate()
+            for process in bots_processes.values():
+                if process.poll() is not None:
+                    continue
+                process.terminate()
                 try:
-                    bots.wait(timeout=5)
+                    process.wait(timeout=5)
                 except subprocess.TimeoutExpired:
-                    bots.kill()
-                    bots.wait(timeout=5)
+                    process.kill()
+                    process.wait(timeout=5)
 
 
 def main():
@@ -496,6 +566,8 @@ def main():
                         help="启动真实额外 CellApp 检查拒绝行为，不运行正常业务流程")
     parser.add_argument("--fixed-space-layout", action="store_true",
                         help="验证固定区域、资源同步、空区域保留和逻辑 Space 删除")
+    parser.add_argument("--coordinate-y", choices=("true", "false"),
+                        help="覆盖本轮 CellApp 的 AOI 坐标轴配置")
     parser.add_argument("--handoff-destroy-timer", action="store_true",
                         help="验证一次性定时器在自动交接期间请求销毁")
     parser.add_argument("--move-space-boundary", action="store_true",
@@ -504,10 +576,28 @@ def main():
                         help="验证运维新增 Cell、准备期间的资源更新和实体迁移")
     parser.add_argument("--merge-space", action="store_true",
                         help="扩容后验证合并、排空和再次扩容")
+    parser.add_argument("--partition-load-bots", type=int, default=0,
+                        help="使用指定数量的真实 TCP Bots 采样均匀和热点分布")
+    parser.add_argument("--partition-bot-processes", type=int, choices=(1, 2, 4), default=1,
+                        help="压测客户端分配到几个 Bots 进程")
+    parser.add_argument("--partition-load-seconds", type=int, default=30,
+                        help="每种分布预热结束后的采样秒数")
+    parser.add_argument("--partition-crossings", type=int, default=0,
+                        help="采样后重复跨越四区交汇处的垂直切分线")
     parser.add_argument("--cellapp-count", type=int, choices=(2, 4), default=2)
     parser.add_argument("--keep-space-layout-on-shutdown", action="store_true",
                         help="保留已启用的区域直接正常关服，检查 Cell 资源不会阻止退出")
     args = parser.parse_args()
+    require(args.partition_load_bots == 0 or (
+        4 <= args.partition_load_bots <= 128 and args.partition_load_bots % 4 == 0
+        and args.cellapp_count == 4 and args.space_partitioning in ("true", "false")
+        and args.partition_load_seconds >= 10 and not (args.fixed_space_layout or args.partition_rejection)
+    ), "性能采样需要四个 CellApp、明确的分割模式、四的倍数个玩家（4 至 128）及至少 10 秒的采样")
+    require(args.partition_crossings == 0 or (
+        args.partition_load_bots and args.space_partitioning == "true" and args.partition_crossings > 0
+    ), "连续越界需要在启用分割的性能场景中执行")
+    require(args.partition_bot_processes == 1 or args.partition_load_bots > 0,
+            "多个 Bots 进程仅用于性能场景")
     require(not args.keep_space_layout_on_shutdown or (
         args.fixed_space_layout and args.space_partitioning == "true"
     ), "保留布局关服检查要求启用固定空间分区")
@@ -536,17 +626,43 @@ def main():
     output = args.binary_root / "Testing" / f"demo-assets-runtime-{uuid.uuid4().hex[:12]}"
     output.mkdir(parents=True, exist_ok=False)
     config_path = create_config_overlay(
-        args.assets_root, output, 2,
+        args.assets_root, output, args.partition_load_bots + 1 if args.partition_load_bots else 2,
         database_host=database.findtext("host", "").strip(),
         database_port=int(database.findtext("port", "3306")),
         database_name=database_name,
         database_username=database.findtext("./auth/username", "").strip(),
         database_password=database.findtext("./auth/password", "").strip(),
-        runtime_log_level="info", server_runtime_log_level="info",
+        runtime_log_level="warn" if args.partition_load_bots else "info", server_runtime_log_level="info",
+        performance_probes_enabled=bool(args.partition_load_bots),
         bots_transport="tcp", bots_allow_tcp_fallback=False,
     )
     runtime = ET.parse(config_path)
-    if args.split_space:
+    if args.coordinate_y is not None:
+        cell = runtime.getroot().find("cellapp")
+        if cell is None:
+            cell = ET.SubElement(runtime.getroot(), "cellapp")
+        coordinates = cell.find("coordinate_system")
+        if coordinates is None:
+            coordinates = ET.SubElement(cell, "coordinate_system")
+        set_xml_value(coordinates, "rangemgr_y", args.coordinate_y)
+    axes_path = "./cellapp/coordinate_system/rangemgr_y"
+    axes = runtime.getroot().findtext(axes_path)
+    if axes is None:
+        defaults = ET.parse(args.repository_root / "kbe/res/server/kbengine_defaults.xml")
+        axes = defaults.getroot().findtext(axes_path)
+    args.coordinate_has_y = axes.strip().lower() == "true"
+    if (args.fixed_space_layout and args.space_partitioning == "true" and args.cellapp_count == 4
+            and not (args.coordinate_has_y or args.split_space or args.partition_rejection)):
+        # 暂停脚本会耗尽 completion 的时间预算；本用例保留数量上限，
+        # 但允许恢复后在 Witness Tick 前消费一起排队的快照和增量。
+        channel_common = runtime.getroot().find("channelCommon")
+        if channel_common is None:
+            channel_common = ET.SubElement(runtime.getroot(), "channelCommon")
+        completion_budget = channel_common.find("completionBudget")
+        if completion_budget is None:
+            completion_budget = ET.SubElement(channel_common, "completionBudget")
+        set_xml_value(completion_budget, "maxProcessingTimeMS", 0)
+    if args.split_space or args.partition_load_bots:
         management = runtime.getroot().find("management")
         if management is None:
             management = ET.SubElement(runtime.getroot(), "management")
@@ -562,10 +678,22 @@ def main():
         if partitioning is None:
             partitioning = ET.SubElement(manager, "spacePartitioning")
         set_xml_value(partitioning, "enabled", args.space_partitioning)
-        if args.handoff_destroy_timer or args.move_space_boundary or args.split_space:
+        if (
+            args.handoff_destroy_timer or args.move_space_boundary or args.split_space
+            or (args.fixed_space_layout and args.cellapp_count == 4)
+            or (args.partition_load_bots and args.space_partitioning == "true")
+        ):
             set_xml_value(partitioning, "autoHandoff", "true")
             set_xml_value(partitioning, "handoffMargin", "2")
     password = uuid.uuid4().hex
+    # 压测过滤实体创建日志，直接使用本轮配置的 Bots 控制台端口。
+    args.bots_console_ports = {}
+    if args.partition_load_bots:
+        for cid in range(10000, 10000 + args.partition_bot_processes):
+            port = select_tcp_port()
+            while port in args.bots_console_ports.values():
+                port = select_tcp_port()
+            args.bots_console_ports[cid] = port
     for component in ("baseapp", "cellapp", "bots"):
         parent = runtime.getroot().find(component)
         if parent is None:
@@ -575,6 +703,8 @@ def main():
             telnet = ET.SubElement(parent, "telnet_service")
         set_xml_value(telnet, "password", password)
         set_xml_value(telnet, "default_layer", "python")
+        if component == "bots" and args.bots_console_ports:
+            set_xml_value(telnet, "port", args.bots_console_ports[10000])
     runtime.write(config_path, encoding="utf-8", xml_declaration=True)
     if args.fixed_space_layout and args.space_partitioning == "true":
         # 只在这次运行的资源目录中增加无导航映射，不改原 assets。

@@ -99,6 +99,7 @@ private:
 	uint64 version_ = 0;
 	uint64 boundaryRevision_ = 0;
 	uint64 generation_ = 0;
+	uint64 nextIncomingSnapshot_ = 0;
 	uint64 nextCheck_ = 0;
 	size_t cursor_ = 0;
 };

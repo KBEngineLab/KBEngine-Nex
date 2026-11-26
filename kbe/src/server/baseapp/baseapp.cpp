@@ -5054,6 +5054,11 @@ void Baseapp::forwardMessageToClientFromCellapp(Network::Channel* pChannel,
 	BaseMessagesForwardClientHandler* pBufferedSendToClientMessages = pEntity->pBufferedSendToClientMessages();
 
 	Network::Channel* pClientChannel = entitycall->getChannel();
+	if (pEntity->deferCellHandoffClientMessage(pChannel, pClientChannel, s))
+	{
+		s.done();
+		return;
+	}
 	Proxy* pProxy = static_cast<Proxy*>(pEntity);
 	const bool volatileUpdatesSuppressed =
 		volatileBackpressuredProxies_.find(pProxy->id()) != volatileBackpressuredProxies_.end();

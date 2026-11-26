@@ -105,6 +105,8 @@ public:
 	bool initBoundaryGhostProperties(MemoryStream& stream);
 	bool applyBoundaryGhostProperty(MemoryStream& stream, bool notify);
 	void setBoundaryGhostLayer(int8 layer) { layer_ = layer; }
+	uint64 boundaryGhostSnapshot() const { return boundaryGhostSnapshot_; }
+	void boundaryGhostSnapshot(uint64 value) { boundaryGhostSnapshot_ = value; }
 
 	// 标记实体是否拥有其所在空间，兼容普通 Entity 创建空间的 Nex 行为。
 	// Marks whether the entity owns its space, preserving Nex behavior for spaces created by regular Entity types.
@@ -146,7 +148,8 @@ public:
 		Writes current OTHER_CLIENT property values in the requested detail-level range.
 	*/
 	uint32 addOtherClientDataToStreamByDetailRange(MemoryStream* pStream,
-		DETAIL_TYPE minimumDetailLevel, DETAIL_TYPE maximumDetailLevel);
+		DETAIL_TYPE minimumDetailLevel, DETAIL_TYPE maximumDetailLevel,
+		const PropertyDescription* pLastProperty = NULL, ENTITY_PROPERTY_UID lastPropertyParentUID = 0);
 	
 	/** 
 		该entity通信通道
@@ -721,6 +724,7 @@ protected:
 	COMPONENT_ID											ghostCell_;	
 
 	uint64 routingEpoch_;
+	uint64 boundaryGhostSnapshot_ = 0;
 
 	// Teleport clears ghostCell_ to prevent property-sync loops, but the previous
 	// Source may still own ordered client RPC bytes. Keep that authorization edge

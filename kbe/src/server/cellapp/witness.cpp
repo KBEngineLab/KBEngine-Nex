@@ -166,6 +166,8 @@ void Witness::createFromStream(KBEngine::MemoryStream& s, bool handoff)
 			pEntityRef = EntityRef::createPoolObject(OBJECTPOOL_POINT);
 			pEntityRef->id(id);
 			pEntityRef->aliasID(alias);
+			initializeEntityRefLifecycle(pEntityRef);
+			// 此时还没绑定本地实体，不能用初始化时得到的 LOD 覆盖客户端的等级。
 			pEntityRef->detailLevel(detail);
 			pEntityRef->flags(ENTITYREF_FLAG_NORMAL | ENTITYREF_FLAG_LEAVE_CLIENT_PENDING | ENTITYREF_FLAG_HANDOFF_PENDING);
 		}
@@ -174,8 +176,8 @@ void Witness::createFromStream(KBEngine::MemoryStream& s, bool handoff)
 			pEntityRef = EntityRef::createPoolObject(OBJECTPOOL_POINT);
 			pEntityRef->createFromStream(s);
 			pEntityRef->aliasID(i);
+			initializeEntityRefLifecycle(pEntityRef);
 		}
-		initializeEntityRefLifecycle(pEntityRef);
 		viewEntities_.push_back(pEntityRef);
 		viewEntities_map_[pEntityRef->id()] = pEntityRef;
 		if (handoff)
@@ -464,10 +466,16 @@ void Witness::setViewRadius(float radius, float hyst)
 void Witness::onEnterView(ViewTrigger* pViewTrigger, Entity* pEntity)
 {
 	const auto ref = viewEntities_map_.find(pEntity->id());
-	const bool handoff = ref != viewEntities_map_.end() && (ref->second->flags() & ENTITYREF_FLAG_HANDOFF_PENDING);
-	// 普通实体要进入内圈，交接前已可见的实体仍按外圈保留。
+	const uint32 flags = ref != viewEntities_map_.end() ? ref->second->flags() : ENTITYREF_FLAG_UNKONWN;
+	const bool handoff = (flags & ENTITYREF_FLAG_HANDOFF_PENDING) != 0;
 	if (pViewHysteresisAreaTrigger_ == pViewTrigger && !handoff)
-		return;
+	{
+		// 外圈不能接纳新实体；只允许仍在客户端可见的旧 Ghost 被同 ID 的新 Ghost 替换。
+		const uint32 rebindFlags = ENTITYREF_FLAG_NORMAL | ENTITYREF_FLAG_LEAVE_CLIENT_PENDING |
+			ENTITYREF_FLAG_GHOST_REBIND_PENDING;
+		if ((flags & rebindFlags) != rebindFlags || !pEntity->isBoundaryGhost() || pEntity->isDestroyed())
+			return;
+	}
 
 	// 先增加一个引用，避免实体在回调中被销毁造成后续判断出错
 	Py_INCREF(pEntity);
@@ -503,6 +511,13 @@ void Witness::onEnterView(ViewTrigger* pViewTrigger, Entity* pEntity)
 			pEntityRef->flags((wasVisibleToClient ?
 				ENTITYREF_FLAG_NORMAL : ENTITYREF_FLAG_ENTER_CLIENT_PENDING) | controlReplayFlag);
 			pEntityRef->pEntity(pEntity);
+			// 交接只保留客户端别名与 LOD，不能认定目标 Ghost 快照已经发过。
+			// Real 沿用原来的 LOD 补发；Ghost 由下面的队列按新快照补发。
+			if (handoff && !pEntity->isBoundaryGhost())
+			{
+				pEntityRef->detailLevel(DETAIL_LEVEL_NONE);
+				pEntityRef->boundaryGhostSnapshot(pEntity->boundaryGhostSnapshot());
+			}
 			queueEntityRefVolatile(pEntityRef);
 			g_witnessLoadMetrics.recordCancelledPendingLeave();
 			pEntity->addWitnessed(pEntity_);
@@ -546,7 +561,8 @@ void Witness::onLeaveView(ViewTrigger* pViewTrigger, Entity* pEntity)
 		return;
 
 	VIEW_ENTITIES_MAP::iterator iter = viewEntities_map_.find(pEntity->id());
-	if (iter == viewEntities_map_.end())
+	// 旧坐标节点的离开通知不能解除同 ID 新 Ghost 已恢复的观察关系。
+	if (iter == viewEntities_map_.end() || iter->second->pEntity() != pEntity)
 		return;
 
 	_onLeaveView(iter->second);
@@ -567,6 +583,10 @@ void Witness::_onLeaveView(EntityRef* pEntityRef)
 
 	if(pEntityRef->pEntity())
 	{
+		if ((pEntityRef->flags() & ENTITYREF_FLAG_NORMAL) && pEntityRef->pEntity()->isBoundaryGhost() &&
+			pEntityRef->pEntity()->isDestroyed())
+			pEntityRef->flags(pEntityRef->flags() | ENTITYREF_FLAG_GHOST_REBIND_PENDING);
+
 		if (pEntityRef->producerPending())
 		{
 			pEntityRef->pEntity()->onWitnessVolatileDequeued();
@@ -943,7 +963,8 @@ DETAIL_TYPE Witness::resolveEntityRefDetailLevel(EntityRef* pEntityRef) const
 
 //-------------------------------------------------------------------------------------
 uint32 Witness::appendEntityRefDetailLevelProperties(Network::Bundle* pSendBundle,
-	EntityRef* pEntityRef, DETAIL_TYPE minimumDetailLevel, DETAIL_TYPE maximumDetailLevel)
+	EntityRef* pEntityRef, DETAIL_TYPE minimumDetailLevel, DETAIL_TYPE maximumDetailLevel,
+	const PropertyDescription* pLastProperty, ENTITY_PROPERTY_UID lastPropertyParentUID)
 {
 	if(pSendBundle == NULL || pEntityRef == NULL || pEntityRef->pEntity() == NULL ||
 		minimumDetailLevel > maximumDetailLevel || maximumDetailLevel >= DETAIL_LEVEL_COUNT)
@@ -954,7 +975,7 @@ uint32 Witness::appendEntityRefDetailLevelProperties(Network::Bundle* pSendBundl
 	MemoryStream* pStream = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 	Entity* pOtherEntity = pEntityRef->pEntity();
 	const uint32 propertyCount = pOtherEntity->addOtherClientDataToStreamByDetailRange(
-		pStream, minimumDetailLevel, maximumDetailLevel);
+		pStream, minimumDetailLevel, maximumDetailLevel, pLastProperty, lastPropertyParentUID);
 	if(propertyCount > 0)
 	{
 		ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pSendBundle, ClientInterface::onUpdatePropertys, updatePropertys);
@@ -965,6 +986,58 @@ uint32 Witness::appendEntityRefDetailLevelProperties(Network::Bundle* pSendBundl
 
 	MemoryStream::reclaimPoolObject(pStream);
 	return propertyCount;
+}
+
+//-------------------------------------------------------------------------------------
+bool Witness::hasPendingBoundaryGhostSnapshot(const EntityRef& entityRef)
+{
+	const Entity* pEntity = entityRef.pEntity();
+	const uint64 snapshot = pEntity ? pEntity->boundaryGhostSnapshot() : 0;
+	return snapshot != 0 && snapshot != entityRef.boundaryGhostSnapshot();
+}
+
+//-------------------------------------------------------------------------------------
+bool Witness::appendPendingBoundaryGhostSnapshot(Network::Bundle* pSendBundle, EntityRef& entityRef,
+	const PropertyDescription* pLastProperty, ENTITY_PROPERTY_UID lastPropertyParentUID)
+{
+	KBE_ASSERT(entityRef.flags() == ENTITYREF_FLAG_NORMAL && entityRef.pEntity());
+	const uint64 snapshot = entityRef.pEntity()->boundaryGhostSnapshot();
+	if (snapshot == entityRef.boundaryGhostSnapshot())
+		return false;
+	if (snapshot == 0)
+	{
+		entityRef.boundaryGhostSnapshot(0);
+		return false;
+	}
+
+	// 客户端仍使用原对象；只补发当前 LOD 可见的属性，不重建组件或分配 alias。
+	const DETAIL_TYPE detailLevel = resolveEntityRefDetailLevel(&entityRef);
+	appendEntityRefDetailLevelProperties(pSendBundle, &entityRef, detailLevel, DETAIL_LEVEL_FAR,
+		pLastProperty, lastPropertyParentUID);
+
+	// 观察者也在交接时，BaseApp 会等源端释放再按序放行目标端消息。
+	entityRef.detailLevel(detailLevel);
+	entityRef.boundaryGhostSnapshot(snapshot);
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
+bool Witness::sendPendingBoundaryGhostSnapshotForProperty(EntityRef& entityRef,
+	const PropertyDescription& property, ENTITY_PROPERTY_UID parentUID)
+{
+	if (!hasPendingBoundaryGhostSnapshot(entityRef))
+		return false;
+
+	// 详情等级可能没有可补发的属性；独立 Bundle 为空时可直接回收，不碰 Channel 的队尾。
+	Network::Bundle* pSendBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	NETWORK_ENTITY_MESSAGE_FORWARD_CLIENT_BEGIN(pEntity_->id(), (*pSendBundle));
+	const auto headerLength = pSendBundle->currMsgLength();
+	appendPendingBoundaryGhostSnapshot(pSendBundle, entityRef, &property, parentUID);
+	if (pSendBundle->currMsgLength() > headerLength)
+		sendToClient(ClientInterface::onUpdatePropertys, pSendBundle);
+	else
+		Network::Bundle::reclaimPoolObject(pSendBundle);
+	return true;
 }
 
 //-------------------------------------------------------------------------------------
@@ -997,7 +1070,8 @@ void Witness::processDetailLevelScan(Network::Bundle* pSendBundle)
 	for(VIEW_ENTITIES::iterator iter = viewEntities_.begin(); iter != viewEntities_.end(); ++iter)
 	{
 		EntityRef* pEntityRef = *iter;
-		if((pEntityRef->flags() & ENTITYREF_FLAG_NORMAL) > 0)
+		// 同一份快照负责当前 LOD 的全部可见属性，不能先从独立的 LOD 扫描发出其中一部分。
+		if ((pEntityRef->flags() & ENTITYREF_FLAG_NORMAL) > 0 && !hasPendingBoundaryGhostSnapshot(*pEntityRef))
 			updateEntityRefDetailLevel(pSendBundle, pEntityRef);
 	}
 }
@@ -1246,6 +1320,7 @@ bool Witness::processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pE
 
 		pEntityRef->flags(ENTITYREF_FLAG_NORMAL);
 		pEntityRef->detailLevel(resolveEntityRefDetailLevel(pEntityRef));
+		pEntityRef->boundaryGhostSnapshot(pOtherEntity->boundaryGhostSnapshot());
 		// EnterWorld 在客户端按尾插建立别名；这里必须使用发送前的客户端可见数量。
 		// EnterWorld appends to the client alias table, so use the visible count before incrementing it.
 		pEntityRef->aliasID(static_cast<int>(clientViewSize_));
@@ -1287,8 +1362,8 @@ bool Witness::processEntityRefUpdate(Network::Bundle* pSendBundle, EntityRef* pE
 		return false;
 	}
 
-	KBE_ASSERT(pEntityRef->flags() == ENTITYREF_FLAG_NORMAL);
-	updateEntityRefDetailLevel(pSendBundle, pEntityRef);
+	if (!appendPendingBoundaryGhostSnapshot(pSendBundle, *pEntityRef))
+		updateEntityRefDetailLevel(pSendBundle, pEntityRef);
 	const uint32 flags = getEntityVolatileDataUpdateFlags(pOtherEntity);
 	addUpdateToStream(pSendBundle, flags, pEntityRef);
 	if (flags != UPDATE_FLAG_NULL)
@@ -1738,6 +1813,11 @@ bool Witness::update()
 {
 	SCOPED_PROFILE(CLIENT_UPDATE_PROFILE);
 
+	// BaseApp 收到源端的释放确认后，才通知目标完成交接。确认与源端已排队的
+	// Enter/Leave 共用一条 TCP 连接，目标提前发送会让源端的 Leave 删掉刚进入的实体。
+	if (!pEntity_ || !pEntity_->clientEntityCall() || pEntity_->isCellHandoffTarget())
+		return true;
+
 	// schedulerPending_ already includes a non-empty full scan. An empty Witness may keep
 	// fullScanRequired_ set for future AOI entries, but must not consume a pending slot.
 	// schedulerPending_ 已包含非空全量扫描；空视野保留 fullScanRequired_ 仅供后续 AOI 进入使用，
@@ -1748,9 +1828,6 @@ bool Witness::update()
 	if (hasPendingWork)
 		g_witnessLoadMetrics.recordPendingAdmission(globallyAdmitted);
 	if (!globallyAdmitted)
-		return true;
-
-	if(pEntity_ == NULL || !pEntity_->clientEntityCall())
 		return true;
 
 	Network::Channel* pChannel = pEntity_->clientEntityCall()->getChannel();

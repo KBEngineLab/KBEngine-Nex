@@ -37,6 +37,7 @@ class MemoryStream;
 #define ENTITYREF_FLAG_NORMAL							0x00000004	// 常规状态
 #define ENTITYREF_FLAG_CONTROL_REPLAY_PENDING			0x00000008	// 重建客户端视野后等待重放控制关系
 #define ENTITYREF_FLAG_HANDOFF_PENDING					0x00000010	// 已在客户端显示，等待目标 Cell 匹配本地实体
+#define ENTITYREF_FLAG_GHOST_REBIND_PENDING				0x00000020	// 旧 Ghost 已销毁，客户端尚未收到 Leave
 
 class EntityRef : public PoolObject
 {
@@ -61,7 +62,7 @@ public:
 			+ sizeof(aliasID_) + sizeof(pEntity_)
 			+ sizeof(flags_) + sizeof(generation_)
 			+ sizeof(volatileQueued_) + sizeof(structuralQueued_)
-			+ sizeof(producerPending_) + sizeof(detailLevel_);
+			+ sizeof(producerPending_) + sizeof(detailLevel_) + sizeof(boundaryGhostSnapshot_);
 
 		return bytes;
 	}
@@ -91,6 +92,8 @@ public:
 	void producerPending(bool value) { producerPending_ = value; }
 	DETAIL_TYPE detailLevel() const { return detailLevel_; }
 	void detailLevel(DETAIL_TYPE value) { detailLevel_ = value; }
+	uint64 boundaryGhostSnapshot() const { return boundaryGhostSnapshot_; }
+	void boundaryGhostSnapshot(uint64 value) { boundaryGhostSnapshot_ = value; }
 
 	void addToStream(KBEngine::MemoryStream& s);
 	void createFromStream(KBEngine::MemoryStream& s);
@@ -105,6 +108,7 @@ private:
 	bool structuralQueued_;
 	bool producerPending_;
 	DETAIL_TYPE detailLevel_;
+	uint64 boundaryGhostSnapshot_ = 0;
 };
 
 }

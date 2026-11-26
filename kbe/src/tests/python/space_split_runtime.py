@@ -5,6 +5,7 @@ from contextlib import contextmanager
 import json
 import subprocess
 import sys
+import time
 
 from space_layout_runtime import captured_error, require, wait_for
 
@@ -25,6 +26,53 @@ def space_command(repository, endpoint, environment, space):
         return json.loads(result.stdout)
 
     return command
+
+
+def verify_split_boundary_move(cells, space, owner, target, state, current, cut, base, route, client, avatar, npc):
+    participants = {row["cellappID"]: row["cellID"] for row in current["cells"]}
+    split_index, = (index for index, axis, at in current["boundaries"] if axis == "X" and at == cut)
+    positions = cells[target].evaluate(
+        f"[list(KBEngine.entities[i].position) for i in {(avatar, npc)!r}]"
+    )
+    reals = (
+        f"[(e.id, list(e.position), e.hasWitness) for i in {(avatar, npc)!r} "
+        f"for e in (KBEngine.entities.get(i),) if e and e.spaceID == {space} and e.isReal()]"
+    )
+    version, revision = current["version"], current["boundaryRevision"]
+    moves = []
+    for at, host in ((cut + 10.0, owner), (cut, target)):
+        started = time.monotonic()
+        request = f"KBEngine.moveSpaceBoundary({space}, {version}, {revision}, {split_index}, {at!r})"
+        revision += 1
+        require(cells[owner].evaluate(request) == revision, "扩容后的调界未开始")
+        views = wait_for(
+            "扩容后的全部 Cell 确认调界",
+            lambda: [cells[cid].evaluate(state) for cid in participants],
+            lambda layouts: all(row and row["boundaryRevision"] == revision and not row["boundaryMovePending"]
+                                for row in layouts),
+        )
+        bounds = [[index, axis, at if index == split_index else position]
+                  for index, axis, position in current["boundaries"]]
+        for row in views:
+            require(row["state"] == "active" and row["version"] == version and
+                    not row["boundaryMoveError"] and row["boundaries"] == bounds and
+                    row["resourceRevision"] == current["resourceRevision"] and
+                    row["hasNavigation"] == current["hasNavigation"] and
+                    {cell["cellappID"]: cell["cellID"] for cell in row["cells"]} == participants,
+                    "扩容后的调界改变了其他切分坐标、Cell 编号或资源")
+        expected = {cid: [] for cid in cells}
+        expected[host] = [[avatar, positions[0], True], [npc, positions[1], False]]
+        wait_for(
+            "静止实体按新切分坐标交接",
+            lambda: {cid: console.evaluate(reals) for cid, console in cells.items()},
+            lambda rows: rows == expected,
+        )
+        routed = wait_for("调界后 Base 路由切换", lambda: base.evaluate(route),
+                          lambda row: f"cellapp[{host}]" in row[0])
+        require(routed[1] == client, "调界更换了在线玩家客户端连接")
+        moves.append({"revision": revision, "at": at, "target": host,
+                      "elapsed_seconds": round(time.monotonic() - started, 3)})
+    return moves
 
 
 def verify_space_split(cells, layout, base, repository, endpoint, environment, output):
@@ -129,11 +177,14 @@ def verify_space_split(cells, layout, base, repository, endpoint, environment, o
     wait_for("源端和目标均完成迁移", lambda: command("show"), lambda row: row["migrationState"] == "complete")
     require(source.evaluate(f"not any(KBEngine.entities.get(i) and KBEngine.entities[i].isReal() "
                             f"for i in {(avatar, npc)!r})"), "源端留下重复 Real")
+    moves = verify_split_boundary_move(
+        cells, space, owner, target_id, state, current, cut, base, route_query, client, avatar, npc,
+    )
     target.evaluate(f"KBEngine.entities[{npc}].destroy()")
     print(f"SPACE_SPLIT_RUNTIME_PASS space={space} target={target_id}", flush=True)
     return dict(attempt=after["splitAttempt"], cell=cell_apps[target_id], target=target_id,
                 original_layout_served=True, preparation_timeout_retried=True,
-                resources_current=True, migration_complete=True)
+                resources_current=True, migration_complete=True, boundary_moves=moves)
 
 
 def verify_space_merge(cells, layout, split, base, repository, endpoint, environment, output):
@@ -216,6 +267,8 @@ NPC.onEnteredCell = _merge_enter
     merged = wait_merge_done(before["boundaryRevision"] + 1, 2)
     require({item["cellapp"]: item["cell"] for item in merged["cells"]} == original and source.evaluate(state) is None,
             "旧 Cell 未真正回收，或其他 Cell 编号被改变")
+    require(not source.evaluate(f"any(e.spaceID == {space} for e in KBEngine.entities.values())"),
+            "退役 Cell 留下了本次 Space 的实体副本")
     require(has_real(target, npc) and has_real(target, avatar) and target.evaluate("_merge_enter_count") == 1,
             "迁出没有保留 Real，或重复派发进入回调")
     routed = base.evaluate(route)

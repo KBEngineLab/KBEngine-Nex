@@ -86,7 +86,7 @@ bool BoundaryGhosts::isWitnessed(const Copies& copies)
 
 const char* BoundaryGhosts::writeSnapshot(Entity& entity, const Pose& pose, MemoryStream& snapshot)
 {
-	snapshot << entity.pScriptModule()->getUType();
+	snapshot << entity.pScriptModule()->getUType() << entity.routingEpoch();
 	pose.write(snapshot);
 	if (entity.writeBoundaryGhostProperties(snapshot, MAX_STATE_BYTES))
 		return nullptr;
@@ -477,15 +477,22 @@ void BoundaryGhosts::receive(Space& space, COMPONENT_ID source, Network::Channel
 				return;
 
 			ENTITY_SCRIPT_UID type = 0;
+			uint64 routingEpoch = 0;
 			Pose pose;
-			stream >> type;
+			stream >> type >> routingEpoch;
 			auto* module = EntityDef::findScriptModule(type);
-			if (!module || !module->hasCell() || !pose.read(stream))
+			if (!module || !module->hasCell() || routingEpoch == 0 || !pose.read(stream))
 				return;
 
 			if (entity)
 			{
-				if (!entity->isBoundaryGhost() || current == incoming_.end() || current->second.source != source)
+				if (!entity->isBoundaryGhost() || current == incoming_.end() || entity->spaceID() != space.id())
+					return;
+				// 新旧 Real 通过不同连接发送消息。新副本先到时，以路由代次确认归属，
+				// 旧 Real 随后到达的 REMOVE 仍须匹配副本来源和创建代次。
+				const auto currentEpoch = entity->routingEpoch();
+				if (routingEpoch < currentEpoch ||
+					(routingEpoch == currentEpoch && current->second.source != source))
 					return;
 				app.destroyEntity(id, false);
 			}
@@ -495,6 +502,7 @@ void BoundaryGhosts::receive(Space& space, COMPONENT_ID source, Network::Channel
 				return;
 
 			entity->setBoundaryGhost(source);
+			entity->routingEpoch(routingEpoch);
 			space.addEntity(entity);
 			if (!entity->initBoundaryGhostProperties(stream))
 			{
@@ -503,6 +511,7 @@ void BoundaryGhosts::receive(Space& space, COMPONENT_ID source, Network::Channel
 			}
 			last = {channel.sessionEpoch(), version, generation};
 			incoming_.emplace(id, Incoming{source, channel.addr(), channel.sessionEpoch(), generation, sourceCell});
+			entity->boundaryGhostSnapshot(++nextIncomingSnapshot_);
 			pose.apply(*entity, true);
 			Entity::bufferCallback(true);
 			space.addEntityToNode(entity);

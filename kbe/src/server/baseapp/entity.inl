@@ -42,6 +42,8 @@ INLINE EntityCall* Entity::clientEntityCall() const
 //-------------------------------------------------------------------------------------
 INLINE void Entity::clientEntityCall(EntityCall* entitycall)
 { 
+	if (clientEntityCall_ != entitycall)
+		cellHandoffClientMessages_.reset();
 	clientEntityCall_ = entitycall; 
 }
 

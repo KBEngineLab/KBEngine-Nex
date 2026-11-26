@@ -1208,6 +1208,7 @@ void Entity::loseCell()
 	cellHandoffWarningAt_ = 0;
 	cellHandoffSourceExited_ = false;
 	cellHandoffTargetLoss_.reset();
+	cellHandoffClientMessages_.reset();
 	destroyCellAfterHandoff_ = false;
 	resetTeleport();
 	completedMigrationEpoch_ = 0;
@@ -1933,6 +1934,7 @@ void Entity::onPartitionCellExit(const CellRecovery::LostReal& loss)
 			cellHandoffAction_ == RESTORE_SOURCE))
 	{
 		// 目标进程已退出且从未接到路由，源可以从本轮快照回滚。
+		cellHandoffClientMessages_.reset();
 		cellHandoffAction_ = RESTORE_SOURCE;
 	}
 	else if (current == route.target && cellHandoffAction_ == RELEASE_SOURCE)
@@ -1940,6 +1942,7 @@ void Entity::onPartitionCellExit(const CellRecovery::LostReal& loss)
 		// 保留退出确认，继续清理源 Ghost。路由已经切换，源快照不能再恢复为 Real。
 		if (!cellHandoffTargetLoss_)
 			cellHandoffTargetLoss_ = std::make_unique<CellRecovery::LostReal>(loss);
+		cellHandoffClientMessages_.reset();
 	}
 	else if (current == route.target && cellHandoffAction_ == FINISH_TARGET)
 	{
@@ -1953,14 +1956,56 @@ void Entity::onPartitionCellExit(const CellRecovery::LostReal& loss)
 	INFO_MSG(fmt::format("Baseapp::cellRecovery: reconciling handoff, entity={}, space={}, version={}, "
 		"epoch={}, exited={}, action={}.\n", id(), loss.space, loss.layoutVersion, route.epoch, cid,
 		static_cast<uint8>(cellHandoffAction_)));
-	if (cellHandoffAction_ == FINISH_TARGET && cellHandoffTargetLoss_)
+	if (cellHandoffAction_ == FINISH_TARGET)
 		finishCellHandoffSourceRelease();
 	else
 		retryCellHandoff();
 }
 
+bool Entity::deferCellHandoffClientMessage(Network::Channel* sender, Network::Channel* client,
+	const MemoryStream& stream)
+{
+	using namespace CellHandoff;
+	if (cellHandoffAction_ == NONE || cellHandoffAction_ == FINISH_TARGET ||
+		sender->componentID() != cellHandoffRoute_.target)
+		return false;
+	if ((cellHandoffAction_ != CHECK_TARGET && cellHandoffAction_ != RELEASE_SOURCE) ||
+		cellHandoffTargetLoss_ || !client || client->isDestroyed() || client->condemn() != 0)
+		return true;
+	const auto* target = Components::getSingleton().findComponent(CELLAPP_TYPE, cellHandoffRoute_.target);
+	if (!Security::isExpectedComponentSource(CELLAPP_TYPE, target, sender) ||
+		(target->pid && target->pid != cellHandoffRoute_.targetPid))
+		return true;
+
+	// 两个 Cell 的 TCP 流没有相对顺序。只暂存目标流，源流照常投递直到收到释放确认。
+	const auto session = client->sessionEpoch();
+	const bool sameSession = cellHandoffClientMessages_ && cellHandoffClientMessages_->session == session;
+	const size_t queuedBytes = sameSession ? cellHandoffClientMessages_->data.size() : 0;
+	const size_t maxBytes = Network::g_extSendWindowBytesOverflow ?
+		Network::g_extSendWindowBytesOverflow : 1024 * 1024;
+	if (queuedBytes >= maxBytes || stream.length() >= maxBytes - queuedBytes)
+	{
+		// 可靠消息不能跳过。交接阻塞导致积压超限时，沿用发送窗口的断线行为。
+		WARNING_MSG(fmt::format("Baseapp::cellHandoff: client send window overflow, entity={}, "
+			"epoch={}, queued={}, incoming={}, limit={}.\n",
+			id(), cellHandoffRoute_.epoch, queuedBytes, stream.length(), maxBytes));
+		client->condemn("Cell handoff client send window overflow");
+		cellHandoffClientMessages_.reset();
+		return true;
+	}
+	if (!sameSession)
+	{
+		cellHandoffClientMessages_ = std::make_unique<CellHandoffClientMessages>();
+		cellHandoffClientMessages_->session = session;
+	}
+	auto& data = cellHandoffClientMessages_->data;
+	data.insert(data.end(), stream.data() + stream.rpos(), stream.data() + stream.wpos());
+	return true;
+}
+
 void Entity::finishCellHandoffSourceRelease()
 {
+	auto messages = std::move(cellHandoffClientMessages_);
 	if (auto loss = std::move(cellHandoffTargetLoss_))
 	{
 		cellHandoffAction_ = CellHandoff::NONE;
@@ -1970,6 +2015,18 @@ void Entity::finishCellHandoffSourceRelease()
 	}
 	cellHandoffAction_ = CellHandoff::FINISH_TARGET;
 	cellHandoffWarningAt_ = timestamp() + 5 * stampsPerSecond();
+	if (messages && clientEntityCall())
+	{
+		auto* client = clientEntityCall()->getChannel();
+		if (client && client->sessionEpoch() == messages->session && !client->isDestroyed() && client->condemn() == 0)
+		{
+			auto* bundle = client->createSendBundle();
+			bundle->append(messages->data.data(), messages->data.size());
+			auto* proxy = static_cast<Proxy*>(this);
+			proxy->sendToClient(bundle, true);
+			Baseapp::getSingleton().evaluateClientVolatileBackpressure(proxy, client);
+		}
+	}
 	retryCellHandoff();
 }
 
@@ -2161,10 +2218,18 @@ void Entity::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
 			// 切换路由后只重发释放和完成通知，不再恢复源实体。
 			cellEntityCall()->componentID(route.target);
 			resetRecoveryCellBackup();
-			cellHandoffAction_ = cellHandoffSourceExited_ ? FINISH_TARGET : RELEASE_SOURCE;
+			if (cellHandoffSourceExited_)
+			{
+				finishCellHandoffSourceRelease();
+				return;
+			}
+			cellHandoffAction_ = RELEASE_SOURCE;
 		}
 		else if ((action == TARGET_REJECTED && fromTarget) || (action == SOURCE_UNSENT && fromSource))
+		{
+			cellHandoffClientMessages_.reset();
 			cellHandoffAction_ = RESTORE_SOURCE;
+		}
 		else
 			return;
 	}

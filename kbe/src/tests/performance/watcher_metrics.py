@@ -519,14 +519,18 @@ class WatcherCollector:
                 if hasattr(watcher, "clearWatchData"):
                     watcher.clearWatchData()
                 watcher.requireQueryWatcher(target.path, self.admin_token)
-                while time.monotonic() < deadline and not watcher.watchData:
+                while time.monotonic() < deadline:
+                    # 复用连接时，上一轮的目录回包可能晚于本轮请求到达。
+                    response = next((row for row in watcher.watchData if row["type"] == 0), None)
+                    if response is not None:
+                        break
                     watcher.processOne(min(0.25, max(deadline - time.monotonic(), 0.01)))
-                if not watcher.watchData:
+                else:
                     raise TimeoutError(f"watcher query timed out: {target.path}")
-                values = flatten_values(watcher.watchData[0].get("values", {}))
+                values = flatten_values(response["values"])
                 self._last_stats[key] = WatcherQueryStats(
                     len(values),
-                    estimate_response_bytes(watcher.watchData[0]),
+                    estimate_response_bytes(response),
                     connection_reused,
                 )
                 return values

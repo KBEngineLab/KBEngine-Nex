@@ -104,6 +104,7 @@ void EntityRef::onReclaimObject()
 	structuralQueued_ = false;
 	producerPending_ = false;
 	detailLevel_ = DETAIL_LEVEL_NONE;
+	boundaryGhostSnapshot_ = 0;
 }
 
 //-------------------------------------------------------------------------------------
