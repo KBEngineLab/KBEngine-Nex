@@ -15,12 +15,13 @@ MANAGE_SPACE_LAYOUT = 55400
 SPACE_LAYOUT_REPLY = 65503
 
 
-def request_layout(endpoint, token, space, split=None):
+def request_layout(endpoint, token, space, *, split=None, merge=None):
     if not token or len(token) > 512 or "\0" in token or not token.isascii():
         raise ValueError("请在运行配置中设置有效的 management/adminToken")
     message = MessageStream.MessageStreamWriter(MANAGE_SPACE_LAYOUT)
     message.writeString(token)
-    message.writeUint8(0 if split is None else 1)
+    action = 1 if split is not None else 2 if merge is not None else 3
+    message.writeUint8(action)
     message.writeUint32(space)
     if split is not None:
         version, revision, cell, axis, position = split
@@ -29,6 +30,12 @@ def request_layout(endpoint, token, space, split=None):
         message.writeUint32(cell)
         message.writeUint8(axis)
         message.writeFloat(position)
+    elif merge is not None:
+        version, revision, retiring, keeping = merge
+        message.writeUint64(version)
+        message.writeUint64(revision)
+        message.writeUint32(retiring)
+        message.writeUint32(keeping)
 
     with socket.create_connection(endpoint, timeout=5) as sock, sock.makefile("rb") as reply:
         sock.sendall(message.build())
@@ -59,7 +66,7 @@ def request_layout(endpoint, token, space, split=None):
     }
     count = stream.readUint16()
     if not 1 <= count <= 127:
-        raise ValueError("Space 布局回执中的节点数无效")
+        raise ValueError("Space Layout 回执中的节点数无效")
 
     def read_node(bounds):
         axis = stream.readUint8()
@@ -74,13 +81,21 @@ def request_layout(endpoint, token, space, split=None):
             read_node(low)
             read_node(high)
         else:
-            raise ValueError("Space 布局回执中的节点无效")
+            raise ValueError("Space Layout 回执中的节点无效")
 
-    if stream.length() != count * struct.calcsize("=BfIQ"):
-        raise ValueError("Space 布局回执长度与节点数不一致")
+    node_size = struct.calcsize("=BfIQ")
+    if stream.length() < count * node_size:
+        raise ValueError("Space Layout 回执长度与节点数不一致")
+    nodes_end = stream.length() - count * node_size
     read_node([None] * 4)
+    if stream.length() != nodes_end:
+        raise ValueError("Space Layout 回执中的节点数不匹配")
+    if action != 1:
+        result["mergeAttempt"] = stream.readUint64()
+        result["mergeState"] = stream.readString()
+        result["mergeError"] = stream.readString()
     if not stream.EOF():
-        raise ValueError("Space 布局回执包含多余的节点")
+        raise ValueError("Space Layout 回执包含多余的数据")
     return result
 
 
@@ -114,7 +129,7 @@ def uint32(value):
 def main(argv, default_machine):
     parser = argparse.ArgumentParser(prog="cluster_controller.py space")
     commands = parser.add_subparsers(dest="action", required=True)
-    for action in ("show", "split"):
+    for action in ("show", "split", "merge"):
         command = commands.add_parser(action)
         command.add_argument("--space", type=uint32, required=True)
         command.add_argument("--manager", type=manager_address)
@@ -124,6 +139,9 @@ def main(argv, default_machine):
             command.add_argument("--cell", type=uint32, required=True)
             command.add_argument("--axis", type=str.lower, choices=("x", "z"), required=True)
             command.add_argument("--at", type=float, required=True)
+        elif action == "merge":
+            command.add_argument("--retire", type=uint32, required=True)
+            command.add_argument("--keep", type=uint32, required=True)
     args = parser.parse_args(argv)
     try:
         token = resolve_admin_token()
@@ -132,8 +150,12 @@ def main(argv, default_machine):
         if args.action == "split":
             if not math.isfinite(args.at):
                 raise ValueError("切分坐标必须是有限数值")
-            state = request_layout(endpoint, token, args.space, (
+            state = request_layout(endpoint, token, args.space, split=(
                 state["version"], state["boundaryRevision"], args.cell, 1 if args.axis == "x" else 2, args.at,
+            ))
+        elif args.action == "merge":
+            state = request_layout(endpoint, token, args.space, merge=(
+                state["version"], state["boundaryRevision"], args.retire, args.keep,
             ))
         print(json.dumps(state, indent=2))
     except (OSError, ValueError, OverflowError, struct.error) as exc:

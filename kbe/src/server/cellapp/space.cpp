@@ -463,6 +463,8 @@ bool Space::update()
 		boundaryGhosts_.update(*this);
 	if (splitMigration_)
 		updateCellSplitMigration();
+	if (merge_)
+		updateCellMerge();
 	if(destroyTime_ > 0 && timestamp() - destroyTime_ >= uint64( 3.f * stampsPerSecond() ))
 	{
 		if(entities_.size() == 0)
@@ -561,6 +563,16 @@ void Space::removeEntity(Entity* pEntity)
 			scan.cursor = idx;
 		else
 			scan.cursor = std::min(scan.cursor, last);
+	}
+	if (merge_ && (merge_->stage == CellMerge::Draining || merge_->stage == CellMerge::Checking ||
+		(merge_->sourceLocal && merge_->stage == CellMerge::Preparing)))
+	{
+		auto& cursor = merge_->cursor;
+		const auto last = entities_.size() - 1;
+		if (idx < cursor && cursor <= last && hasMergePendingEntity(*pBack))
+			cursor = idx;
+		else
+			cursor = std::min(cursor, last);
 	}
 	pBack->spaceEntityIdx(idx);
 	entities_[idx] = pBack;
@@ -792,7 +804,8 @@ void Space::finalise(bool notifyCellappmgr)
 		}
 		return;
 	}
-	if (layoutVersion_ != 0)
+	const bool merged = merge_ && merge_->stage == CellMerge::Removing;
+	if (layoutVersion_ != 0 && !merged)
 	{
 		SpaceLayout::Packet removed;
 		removed.sender = g_componentID;
@@ -823,6 +836,17 @@ void Space::finalise(bool notifyCellappmgr)
 		(*pBundle) << "";
 
 		pChannel->send(pBundle);
+		if (merged && pChannel->sessionEpoch() == merge_->managerSession)
+		{
+			SpaceLayout::Packet removed;
+			removed.sender = g_componentID;
+			removed.operation = SpaceLayout::MERGE_REMOVED;
+			removed.spaceID = id_;
+			removed.version = layoutVersion_;
+			removed.revision = boundaryRevision_;
+			removed.mergeAttempt = merge_->attempt;
+			Cellapp::getSingleton().sendSpaceLayout(removed, pChannel);
+		}
 	}
 }
 

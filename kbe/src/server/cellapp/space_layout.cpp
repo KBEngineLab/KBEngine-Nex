@@ -394,6 +394,244 @@ void Space::updateCellSplitMigration()
 		splitMigration_.reset();
 }
 
+bool Space::isDrainingCell() const
+{
+	return merge_ && merge_->sourceLocal && merge_->stage >= CellMerge::Draining;
+}
+
+bool Space::isCellMergeHandoffStopped() const
+{
+	return isDrainingCell() && (merge_->stage >= CellMerge::Drained || !merge_->error.empty());
+}
+
+void Space::reportCellMergeBlock(ENTITY_ID entity, const char* error)
+{
+	if (merge_ && merge_->sourceLocal && merge_->error.empty())
+		merge_->error = fmt::format("entity {}: {}", entity, error);
+}
+
+const SpaceLayout::Node* Space::handoffDestination(float x, float z, COMPONENT_ID source) const
+{
+	// 其他 Cell 在发布前继续按原 Layout 工作；只为退役 Cell 的迁出计算新归属。
+	if (merge_ && source == merge_->source && (!merge_->sourceLocal || isDrainingCell()))
+		return merge_->nextLayout.cellAt(x, z);
+	const auto* destination = layout_.cellAt(x, z);
+	if (merge_ && !merge_->sourceLocal && merge_->stage >= CellMerge::Receiving &&
+		destination && destination->cellappID == merge_->source)
+		return nullptr;
+	return destination;
+}
+
+void Space::handleCellMerge(SpaceLayout::Packet& packet, Network::Channel& manager)
+{
+	using namespace SpaceLayout;
+	auto& app = Cellapp::getSingleton();
+	if (packet.operation == MERGE_PREPARE)
+	{
+		auto next = layout_;
+		COMPONENT_ID source = 0;
+		if (!app.isShuttingdown() && isGood() && hasManagedCell() && layoutState_ == ACTIVE &&
+			canAcceptEntities() && !split_ && !merge_ && !pendingRecoveryActivations_ &&
+			packet.revision == boundaryRevision_ && next.mergeCells(packet.mergeRetiring, packet.mergeKeeping, source))
+		{
+			merge_ = CellMerge{std::move(next), source, manager.sessionEpoch(), packet.mergeAttempt,
+				CellMerge::Preparing, source == g_componentID};
+			updateCellMerge();
+			return;
+		}
+		packet.sender = g_componentID;
+		packet.operation = MERGE_READY;
+		packet.success = false;
+		app.sendSpaceLayout(packet, &manager);
+		return;
+	}
+	if (!merge_ || merge_->attempt != packet.mergeAttempt || merge_->managerSession != manager.sessionEpoch() ||
+		packet.revision != boundaryRevision_ + (packet.operation == MERGE_APPLY ? 1 : 0))
+		return;
+	auto& merge = *merge_;
+	switch (packet.operation)
+	{
+	case MERGE_CANCEL:
+		if (merge.stage == CellMerge::Preparing || merge.stage == CellMerge::Ready)
+			merge_.reset();
+		else if (merge.stage == CellMerge::Draining || merge.stage == CellMerge::Receiving ||
+			merge.stage == CellMerge::Checking || merge.stage == CellMerge::Drained)
+			merge.stage = CellMerge::Cancelling;
+		break;
+	case MERGE_RESUME:
+		if (merge.sourceLocal && merge.stage == CellMerge::Stopped)
+		{
+			merge_.reset();
+			packet.sender = g_componentID;
+			packet.operation = MERGE_CANCELLED;
+			app.sendSpaceLayout(packet, &manager);
+		}
+		break;
+	case MERGE_DRAIN:
+		if (merge.stage == CellMerge::Ready)
+		{
+			merge.stage = merge.sourceLocal ? CellMerge::Draining : CellMerge::Receiving;
+			merge.cursor = 0;
+		}
+		break;
+	case MERGE_CHECK:
+		if (!merge.sourceLocal && merge.stage == CellMerge::Receiving)
+			merge.stage = CellMerge::Checking;
+		break;
+	case MERGE_APPLY:
+		if (merge.stage != CellMerge::Drained || layoutState_ != ACTIVE || !isGood())
+			break;
+		boundaryRevision_ = packet.revision;
+		splitMigration_.reset();
+		if (merge.sourceLocal)
+		{
+			merge.stage = CellMerge::Removing;
+			setLayoutState(RELEASING);
+			removeLayoutSpace();
+		}
+		else
+		{
+			const auto source = merge.source;
+			layout_ = std::move(merge.nextLayout);
+			layout_.boundsForApp(g_componentID, localCellBounds_);
+			merge_.reset();
+			boundaryGhosts_.forgetPeer(*this, source);
+			packet.sender = g_componentID;
+			packet.operation = MERGE_APPLIED;
+			app.sendSpaceLayout(packet, &manager);
+		}
+		break;
+	default:
+		break;
+	}
+}
+
+bool Space::hasMergePendingEntity(const Entity& entity) const
+{
+	if (entity.isDestroyed())
+		return false;
+	if (merge_->sourceLocal)
+		return entity.isReal() || entity.isMigrationSource();
+	return entity.isReal() && entity.hasFlags(ENTITY_FLAGS_TELEPORT_START) &&
+		entity.migrationRelayCell() == merge_->source;
+}
+
+void Space::updateCellMerge()
+{
+	using namespace SpaceLayout;
+	if (!isGood() || layoutState_ != ACTIVE || layoutShutdownRequested_ || layoutRemovalPending_)
+		return;
+	auto& merge = *merge_;
+	if (merge.stage != CellMerge::Preparing && merge.stage != CellMerge::Draining &&
+		merge.stage != CellMerge::Checking && merge.stage != CellMerge::Cancelling)
+		return;
+	auto& app = Cellapp::getSingleton();
+	auto& components = Components::getSingleton();
+	auto* manager = components.getCellappmgrChannel();
+	if (!manager || manager->sessionEpoch() != merge.managerSession)
+		return;
+	auto send = [&](Operation operation)
+	{
+		auto packet = spacePacket(*this, operation);
+		packet.revision = boundaryRevision_;
+		packet.mergeAttempt = merge.attempt;
+		if (operation == MERGE_BLOCKED)
+			packet.error = merge.error;
+		return app.sendSpaceLayout(packet, manager);
+	};
+	if (merge.stage == CellMerge::Cancelling)
+	{
+		// 源端先确认不会再发快照，接收端才能检查已有的交接是否结束。
+		if (merge.sourceLocal ? app.hasUnreleasedCellHandoff(id_, layoutVersion_) :
+			app.hasUnfinishedIncomingCellHandoff(id_, layoutVersion_, merge.source))
+			return;
+		if (send(MERGE_CANCELLED))
+		{
+			if (merge.sourceLocal)
+				merge.stage = CellMerge::Stopped;
+			else
+				merge_.reset();
+		}
+		return;
+	}
+	if (!merge.error.empty())
+	{
+		if (!merge.errorSent)
+			merge.errorSent = send(MERGE_BLOCKED);
+		return;
+	}
+	const bool preparing = merge.stage == CellMerge::Preparing;
+	if (preparing)
+	{
+		if (isGeometryLoading())
+			return;
+		for (const auto& node : layout_.nodes)
+		{
+			if (node.axis != SpaceLayout::LEAF || node.cellappID == g_componentID ||
+				(!merge.sourceLocal && node.cellappID != merge.source))
+				continue;
+			const auto* channel = components.findComponentChannel(CELLAPP_TYPE, node.cellappID);
+			if (!channel || channel->isDestroyed() || channel->condemn() != 0)
+				return;
+		}
+		if (merge.sourceLocal)
+		{
+			// 只检查缺少目标 Ghost 的 Real，每 Tick 限制实体数和序列化量。
+			const auto end = std::min(entities_.size(), merge.cursor + 128);
+			size_t bytes = 0;
+			MemoryStream snapshot(0);
+			for (; merge.cursor < end && bytes < 512 * 1024; ++merge.cursor)
+			{
+				auto& entity = *entities_[merge.cursor];
+				if (!entity.isReal() || entity.isDestroyed() || entity.isSpace() ||
+					entity.hasFlags(ENTITY_FLAGS_TELEPORT_START))
+					continue;
+				const auto& pos = entity.position();
+				const auto* destination = merge.nextLayout.cellAt(pos.x, pos.z);
+				if (!destination)
+					continue;
+				snapshot.clear(true);
+				if (const auto* error = boundaryGhosts_.checkHandoffSnapshot(entity, destination->cellappID, snapshot))
+				{
+					reportCellMergeBlock(entity.id(), error);
+					merge.errorSent = send(MERGE_BLOCKED);
+					return;
+				}
+				bytes += snapshot.length();
+			}
+			if (merge.cursor < entities_.size())
+				return;
+		}
+	}
+	else
+	{
+		if (timestamp() < merge.nextCheck || (merge.sourceLocal && pendingRecoveryActivations_))
+			return;
+		const auto end = std::min(entities_.size(), merge.cursor + 128);
+		for (; merge.cursor < end; ++merge.cursor)
+		{
+			if (hasMergePendingEntity(*entities_[merge.cursor]))
+			{
+				const auto& entity = *entities_[merge.cursor];
+				if (merge.sourceLocal && !merge.warnedAboutController && entity.isReal() &&
+					entity.controlledBy() && entity.controlledBy()->id() != entity.id())
+				{
+					merge.warnedAboutController = true;
+					WARNING_MSG(fmt::format("Space::cellMerge: waiting for external entity control to end, "
+						"space={}, attempt={}, entity={}.\n", id_, merge.attempt, entity.id()));
+				}
+				merge.cursor = 0;
+				merge.nextCheck = timestamp() + stampsPerSecond();
+				return;
+			}
+		}
+		if (merge.cursor < entities_.size())
+			return;
+	}
+	if (send(preparing ? MERGE_READY : MERGE_DRAINED))
+		merge.stage = preparing ? CellMerge::Ready : CellMerge::Drained;
+}
+
 void Space::setLayoutState(SpaceLayout::State state, const std::string& error)
 {
 	if (state == SpaceLayout::FAILED || state == SpaceLayout::RELEASING)
@@ -403,6 +641,8 @@ void Space::setLayoutState(SpaceLayout::State state, const std::string& error)
 			removeLayoutSpace();
 		else
 			split_.reset();
+		if (merge_ && merge_->stage != CellMerge::Removing)
+			merge_.reset();
 	}
 	layoutState_ = state;
 	layoutError_ = error;
@@ -642,6 +882,21 @@ void Cellapp::onSpaceLayout(Network::Channel* channel, MemoryStream& stream)
 	if (!parsed || packet.sender != sender)
 		return;
 	Space* space = Spaces::findSpace(packet.spaceID);
+	if (packet.operation == MERGE_PREPARE || packet.operation == MERGE_DRAIN ||
+		packet.operation == MERGE_CHECK || packet.operation == MERGE_APPLY || packet.operation == MERGE_CANCEL ||
+		packet.operation == MERGE_RESUME)
+	{
+		if (space && space->layoutVersion() == packet.version)
+			space->handleCellMerge(packet, *channel);
+		else if (packet.operation == MERGE_PREPARE)
+		{
+			packet.sender = componentID_;
+			packet.operation = MERGE_READY;
+			packet.success = false;
+			sendSpaceLayout(packet, channel);
+		}
+		return;
+	}
 	if (packet.operation == SPLIT_CHECK_TARGET)
 	{
 		if (space)
@@ -991,7 +1246,7 @@ Space::RecoveryInstallResult Space::installRecoveryEntity(const CellRecovery::St
 		return existing->second.base == base && existing->second.baseProcess == baseProcess &&
 			(existing->second.entity || existing->second.activated) ? Result::Installed : Result::Rejected;
 	auto& app = Cellapp::getSingleton();
-	if (app.isShuttingdown() || !canAcceptEntities() || layoutState_ != SpaceLayout::ACTIVE ||
+	if (app.isShuttingdown() || !canAcceptNewEntities() || layoutState_ != SpaceLayout::ACTIVE ||
 		!replacementManagerChannel() || app.findEntity(key.entity) || data.empty())
 		return Result::Rejected;
 
@@ -1256,7 +1511,7 @@ PyObject* Cellapp::__py_getSpaceLayout(PyObject*, PyObject* args)
 		"resourceRevision", static_cast<unsigned long long>(space->resourceRevision()),
 		"ownerCellAppID", static_cast<unsigned long long>(space->layout().owner),
 		"localCellID", space->pCell() == NULL ? 0u : space->pCell()->id(),
-		"acceptsEntities", space->canAcceptEntities() ? Py_True : Py_False,
+		"acceptsEntities", space->canAcceptNewEntities() ? Py_True : Py_False,
 		"resourcesReady", space->isGeometryLoading() ? Py_False : Py_True,
 		"hasNavigation", space->pNavHandle() == NULL ? Py_False : Py_True,
 		"cells", cells.get(),

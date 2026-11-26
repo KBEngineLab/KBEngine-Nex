@@ -1109,9 +1109,10 @@ PyObject* Cellapp::__py_createEntity(PyObject* self, PyObject* args)
 		return NULL;
 	}
 
-	if (!space->canAcceptEntities())
+	if (!space->canAcceptNewEntities())
 	{
-		PyErr_Format(PyExc_RuntimeError, "KBEngine.createEntity: spaceID %u is closing", spaceID);
+		PyErr_Format(PyExc_RuntimeError, "KBEngine.createEntity: spaceID %u is %s", spaceID,
+			space->isDrainingCell() ? "retiring" : "closing");
 		return NULL;
 	}
 	
@@ -1959,7 +1960,7 @@ void Cellapp::_onCreateCellEntityFromBaseapp(std::string& entityType, ENTITY_ID 
 	//	spaceID, entityType.c_str(), entityID, componentID);
 
 	Space* space = Spaces::findSpace(spaceID);
-	if(space != NULL && space->canAcceptEntities())
+	if(space != NULL && space->canAcceptNewEntities())
 	{
 		// 解包cellData信息.
 		PyObject* cellData = NULL;
@@ -3089,19 +3090,19 @@ void Cellapp::considerAutoCellHandoff(Space& space, Entity& entity)
 	constexpr size_t maxStartsPerTick = 8;
 	if (pendingAutoCellHandoffs_.size() >= maxStartsPerTick ||
 		pendingAutoCellHandoffs_.size() + outgoingCellHandoffs_.size() >= SpaceLayout::MAX_CELLS ||
-		isShuttingdown() || !entity.isReal() || entity.isDestroyed() || entity.isSpace() ||
+		isShuttingdown() || space.isCellMergeHandoffStopped() || !entity.isReal() || entity.isDestroyed() || entity.isSpace() ||
 		entity.spaceID() != space.id() ||
 		entity.hasFlags(ENTITY_FLAGS_TELEPORT_START) ||
 		(entity.controlledBy() && entity.controlledBy()->id() != entity.id()))
 		return;
 
 	const auto& pos = entity.position();
-	if (!space.localCellBounds().crossedBy(pos.x, pos.z, cellHandoffMargin_) ||
+	if ((!space.isDrainingCell() && !space.localCellBounds().crossedBy(pos.x, pos.z, cellHandoffMargin_)) ||
 		outgoingCellHandoffs_.count(entity.id()) ||
 		(entity.autoHandoffRetryAt() != 0 && timestamp() < entity.autoHandoffRetryAt()))
 		return;
 
-	const auto* destination = space.layout().cellAt(pos.x, pos.z);
+	const auto* destination = space.handoffDestination(pos.x, pos.z, componentID_);
 	if (!destination || destination->cellappID == componentID_)
 		return;
 	auto* target = Components::getSingleton().findComponentChannel(CELLAPP_TYPE, destination->cellappID);
@@ -3147,14 +3148,14 @@ bool Cellapp::beginCellHandoff(ENTITY_ID id, bool automatic)
 		(!automatic && !entity->baseEntityCall()) || (entity->controlledBy() && entity->controlledBy()->id() != id))
 		return false;
 	auto* space = Spaces::findSpace(entity->spaceID());
-	if (!space || !space->hasManagedCell() || !space->canAcceptEntities() ||
+	if (!space || !space->hasManagedCell() || !space->canAcceptEntities() || space->isCellMergeHandoffStopped() ||
 		space->layoutState() != SpaceLayout::ACTIVE)
 		return false;
 	const Position3D pos = entity->position();
 	if (automatic && (!autoCellHandoffEnabled() ||
-		!space->localCellBounds().crossedBy(pos.x, pos.z, cellHandoffMargin_)))
+		(!space->isDrainingCell() && !space->localCellBounds().crossedBy(pos.x, pos.z, cellHandoffMargin_))))
 		return false;
-	const auto* destination = space->layout().cellAt(pos.x, pos.z);
+	const auto* destination = space->handoffDestination(pos.x, pos.z, componentID_);
 	if (!destination || destination->cellappID == componentID_ || outgoingCellHandoffs_.count(id))
 		return false;
 
@@ -3212,14 +3213,14 @@ void Cellapp::dispatchCellHandoff(Entity& entity, OutgoingCellHandoff& pending)
 	auto* target = peer ? peer->pChannel : NULL;
 	const auto pos = entity.position();
 	const auto dir = entity.direction();
-	const auto* destination = space ? space->layout().cellAt(pos.x, pos.z) : NULL;
+	const auto* destination = space ? space->handoffDestination(pos.x, pos.z, componentID_) : NULL;
 	const uint64 generation = space ? space->boundaryGhosts().handoffCopyGeneration(entity.id(), route.target, pending.session) : 0;
 	pending.unsent = pending.unsent || isShuttingdown() || !entity.isReal() ||
 		entity.spaceID() != route.space ||
 		(entity.controlledBy() && entity.controlledBy()->id() != entity.id()) ||
 		!space || !space->canAcceptEntities() || space->layoutState() != SpaceLayout::ACTIVE ||
 		space->layoutVersion() != route.layoutVersion || !destination || destination->cellappID != route.target ||
-		(pending.automatic && !space->localCellBounds().crossedBy(pos.x, pos.z, cellHandoffMargin_)) ||
+		(pending.automatic && !space->isDrainingCell() && !space->localCellBounds().crossedBy(pos.x, pos.z, cellHandoffMargin_)) ||
 		!canSendCellHandoff(target) || (route.targetPid && peer->pid && peer->pid != route.targetPid) ||
 		target->sessionEpoch() != pending.session || !generation;
 	if (pending.unsent)
@@ -3525,7 +3526,7 @@ bool Cellapp::hasUnreleasedCellHandoff(SPACE_ID space, uint64 layoutVersion, COM
 	{
 		const auto& pending = *entry.second;
 		return !pending.released && pending.route.space == space &&
-			pending.route.layoutVersion == layoutVersion && pending.route.target == target;
+			pending.route.layoutVersion == layoutVersion && (!target || pending.route.target == target);
 	});
 }
 
@@ -3658,9 +3659,10 @@ void Cellapp::reqCellHandoff(Network::Channel* channel, MemoryStream& stream)
 		stream.done();
 		return;
 	}
-	const auto* destination = space && space->hasManagedCell() ? space->layout().cellAt(pos.x, pos.z) : NULL;
+	const auto* destination = space && space->hasManagedCell() ?
+		space->handoffDestination(pos.x, pos.z, route.source) : NULL;
 	if (!spacePartitioningEnabled() || !spacePartitioningConfirmed() || isShuttingdown() ||
-		!space || !space->canAcceptEntities() || space->layoutState() != SpaceLayout::ACTIVE ||
+		!space || !space->canAcceptNewEntities() || space->layoutState() != SpaceLayout::ACTIVE ||
 		!destination || destination->cellappID != componentID_ || !space->layout().cellForApp(route.source) ||
 		(baseID ? !canSendCellHandoff(base) :
 			(!autoCellHandoffEnabled() || incomingPeerCellHandoffs_.size() >= SpaceLayout::MAX_CELLS)) ||
@@ -4137,7 +4139,7 @@ void Cellapp::reqTeleportToCellApp(Network::Channel* pChannel, MemoryStream& s)
 
 	Space* space = Spaces::findSpace(refEntity->spaceID());
 	auto* module = EntityDef::findScriptModule(entityType);
-	if (space == NULL || !space->canAcceptEntities() || !module || snapshotType != entityType ||
+	if (space == NULL || !space->canAcceptNewEntities() || !module || snapshotType != entityType ||
 		(existing && (!existing->isBoundaryGhost() || existing->realCell() != ghostCell ||
 			existing->pScriptModule()->getUType() != entityType)))
 	{

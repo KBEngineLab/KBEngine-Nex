@@ -30,7 +30,9 @@ enum Operation : uint8
 	REPLACEMENT_CHECK, REPLACEMENT_CHECKED, REPLACEMENT_COMMIT,
 	BOUNDARY_REQUEST, BOUNDARY_APPLY, BOUNDARY_APPLIED, BOUNDARY_RESULT,
 	SPLIT_PREPARE, SPLIT_STAGE, SPLIT_READY, SPLIT_APPLY, SPLIT_APPLIED, SPLIT_COMPLETE, SPLIT_CANCEL, SPLIT_DRAINED,
-	SPLIT_DISCARDED, SPLIT_CHECK_TARGET
+	SPLIT_DISCARDED, SPLIT_CHECK_TARGET,
+	MERGE_PREPARE, MERGE_READY, MERGE_DRAIN, MERGE_DRAINED, MERGE_CHECK,
+	MERGE_APPLY, MERGE_APPLIED, MERGE_REMOVED, MERGE_CANCEL, MERGE_BLOCKED, MERGE_CANCELLED, MERGE_RESUME
 };
 
 inline const char* stateName(State state)
@@ -132,7 +134,7 @@ struct Layout
 		return true;
 	}
 
-	bool splitCell(CELL_ID source, uint8 axis, float position, COMPONENT_ID target)
+	bool splitCell(CELL_ID source, uint8 axis, float position, COMPONENT_ID target, CELL_ID last = 0)
 	{
 		if ((axis != X && axis != Z) || !std::isfinite(position) || !target ||
 			nodes.size() + 2 > MAX_NODES || cellForApp(target))
@@ -141,7 +143,6 @@ struct Layout
 			[source](const Node& node) { return node.axis == LEAF && node.cellID == source; });
 		if (leaf == nodes.end())
 			return false;
-		CELL_ID last = 0;
 		for (const auto& node : nodes)
 			last = std::max(last, node.cellID);
 		if (last == std::numeric_limits<CELL_ID>::max())
@@ -155,6 +156,33 @@ struct Layout
 			return false;
 		*this = std::move(next);
 		return true;
+	}
+
+	bool mergeCells(CELL_ID retiring, CELL_ID keeping, COMPONENT_ID& source)
+	{
+		if (!retiring || !keeping || retiring == keeping)
+			return false;
+		for (size_t i = 0; i + 2 < nodes.size(); ++i)
+		{
+			// 前序中，同一父节点的两个叶子紧跟在父节点后。
+			const auto& left = nodes[i + 1];
+			const auto& right = nodes[i + 2];
+			if (nodes[i].axis == LEAF || left.axis != LEAF || right.axis != LEAF)
+				continue;
+			const auto& from = left.cellID == retiring ? left : right;
+			const auto& to = left.cellID == keeping ? left : right;
+			if (from.cellID != retiring || to.cellID != keeping || from.cellappID == owner)
+				continue;
+			auto next = *this;
+			next.nodes[i] = to;
+			next.nodes.erase(next.nodes.begin() + i + 1, next.nodes.begin() + i + 3);
+			if (!next.validate())
+				return false;
+			source = from.cellappID;
+			*this = std::move(next);
+			return true;
+		}
+		return false;
 	}
 
 	const Node* cellAt(float x, float z) const
@@ -415,6 +443,9 @@ struct Packet
 	uint64 splitAttempt = 0;
 	COMPONENT_ID splitSource = 0;
 	COMPONENT_ID splitTarget = 0;
+	uint64 mergeAttempt = 0;
+	CELL_ID mergeRetiring = 0;
+	CELL_ID mergeKeeping = 0;
 	COMPONENT_ID replacedCellApp = 0;
 	uint64 replacedLayoutVersion = 0;
 	COMPONENT_ID replacementCellApp = 0;
@@ -474,6 +505,20 @@ struct Packet
 		case SPLIT_APPLY: case SPLIT_APPLIED: case SPLIT_COMPLETE: case SPLIT_DRAINED: case SPLIT_DISCARDED:
 		case SPLIT_CHECK_TARGET:
 			stream << splitAttempt;
+			break;
+		case MERGE_PREPARE:
+			stream << mergeRetiring << mergeKeeping;
+			[[fallthrough]];
+		case MERGE_DRAIN: case MERGE_DRAINED: case MERGE_CHECK: case MERGE_APPLY:
+		case MERGE_APPLIED: case MERGE_REMOVED: case MERGE_CANCEL: case MERGE_CANCELLED: case MERGE_RESUME:
+			stream << mergeAttempt;
+			break;
+		case MERGE_BLOCKED:
+			stream << mergeAttempt;
+			stream.appendBlob(error);
+			break;
+		case MERGE_READY:
+			stream << mergeAttempt << static_cast<uint8>(success);
 			break;
 		case SET_DATA: case DELETE_DATA:
 			stream.appendBlob(key);
@@ -588,6 +633,25 @@ struct Packet
 			if (!reader.read(splitAttempt) || !splitAttempt)
 				return false;
 			break;
+		case MERGE_PREPARE:
+			if (!reader.read(mergeRetiring) || !mergeRetiring || !reader.read(mergeKeeping) ||
+				!mergeKeeping || mergeRetiring == mergeKeeping)
+				return false;
+			[[fallthrough]];
+		case MERGE_DRAIN: case MERGE_DRAINED: case MERGE_CHECK: case MERGE_APPLY:
+		case MERGE_APPLIED: case MERGE_REMOVED: case MERGE_CANCEL: case MERGE_CANCELLED: case MERGE_RESUME:
+			if (!reader.read(mergeAttempt) || !mergeAttempt)
+				return false;
+			break;
+		case MERGE_BLOCKED:
+			if (!reader.read(mergeAttempt) || !mergeAttempt || !reader.readBlob(error, 1024) || error.empty())
+				return false;
+			break;
+		case MERGE_READY:
+			if (!reader.read(mergeAttempt) || !mergeAttempt || !reader.read(accepted) || accepted > 1)
+				return false;
+			success = accepted != 0;
+			break;
 		case SET_DATA: case DELETE_DATA:
 			if (!reader.readBlob(key, 256) || key.empty() || key == "_mapping" ||
 				(operation == SET_DATA && !reader.readBlob(value, MAX_VALUE_BYTES)))
@@ -672,6 +736,20 @@ struct Transaction
 	SplitMigration splitMigration = SplitMigration::None;
 	COMPONENT_ID splitMigrationSource = 0;
 	COMPONENT_ID splitMigrationTarget = 0;
+	struct Merge
+	{
+		enum Stage { Preparing, Draining, Checking, Publishing, Cancelling, Resuming };
+		Layout nextLayout;
+		COMPONENT_ID source;
+		uint64 started;
+		Stage stage = Preparing;
+		std::set<COMPONENT_ID> confirmed;
+		bool sourceRemoved = false;
+	};
+	std::optional<Merge> merge;
+	uint64 mergeAttempt = 0;
+	std::string mergeError;
+	CELL_ID lastRetiredCellID = 0;
 	uint64 started = 0;
 	State state = PREPARING;
 	bool suspended = false;

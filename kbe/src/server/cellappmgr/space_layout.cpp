@@ -95,6 +95,7 @@ void Cellappmgr::failSpaceLayout(SPACE_ID spaceID, SpaceLayout::Transaction& tra
 	const std::string& error, bool suspend)
 {
 	stopSpaceSplit(spaceID, transaction, error.c_str());
+	stopSpaceMerge(spaceID, transaction, error.c_str());
 	transaction.interruptSplitMigration();
 	transaction.advance(SpaceLayout::FAILED, timestamp());
 	transaction.suspended = suspend;
@@ -142,7 +143,7 @@ void Cellappmgr::requestBoundaryMove(SpaceLayout::Packet& packet, SpaceLayout::T
 		error = "Space layout version or boundary revision is not current";
 	else if (transaction->boundaryConfirmation)
 		error = "the previous boundary move is still awaiting confirmation";
-	else if (transaction->split)
+	else if (transaction->split || transaction->merge)
 		error = "another layout adjustment is in progress";
 	else
 	{
@@ -191,12 +192,13 @@ void Cellappmgr::manageSpaceLayout(Network::Channel* channel, MemoryStream& stre
 	BoundedStreamReader request(stream);
 	uint8 action = 0, axis = LEAF;
 	SPACE_ID spaceID = 0;
-	CELL_ID cell = 0;
+	CELL_ID cell = 0, keeping = 0;
 	uint64 version = 0, revision = 0;
 	float position = 0;
 	const bool valid = request.read(action) && request.read(spaceID) && spaceID &&
-		(action == 0 || (action == 1 && request.read(version) && request.read(revision) &&
-			request.read(cell) && request.read(axis) && request.read(position))) && request.empty();
+		(action == 0 || action == 3 ||
+		 ((action == 1 || action == 2) && request.read(version) && request.read(revision) && request.read(cell) &&
+			(action == 1 ? request.read(axis) && request.read(position) : request.read(keeping)))) && request.empty();
 	stream.done();
 	auto found = spaceLayouts_.find(spaceID);
 	const char* error = nullptr;
@@ -208,6 +210,8 @@ void Cellappmgr::manageSpaceLayout(Network::Channel* channel, MemoryStream& stre
 		error = "Space has no managed layout";
 	else if (action == 1)
 		error = requestSpaceSplit(spaceID, found->second, version, revision, cell, axis, position);
+	else if (action == 2)
+		error = requestSpaceMerge(spaceID, found->second, version, revision, cell, keeping);
 
 	static ConsoleInterface::ConsoleQuerySpacesHandler handler;
 	auto* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
@@ -228,6 +232,17 @@ void Cellappmgr::manageSpaceLayout(Network::Channel* channel, MemoryStream& stre
 			<< static_cast<uint16>(transaction.layout.nodes.size());
 		for (const auto& node : transaction.layout.nodes)
 			(*bundle) << node.axis << node.position << node.cellID << node.cellappID;
+		// 保留原查询和切分回执，旧版运维工具仍可读取。
+		if (action == 2 || action == 3)
+		{
+			using Merge = Transaction::Merge;
+			const auto& merge = transaction.merge;
+			const char* mergeStatus = merge ? (merge->stage == Merge::Preparing ? "preparing" :
+				merge->stage == Merge::Publishing ? "publishing" :
+				(merge->stage == Merge::Cancelling || merge->stage == Merge::Resuming) ? "cancelling" : "draining") :
+				(!transaction.mergeError.empty() ? "failed" : transaction.mergeAttempt ? "complete" : "none");
+			(*bundle) << transaction.mergeAttempt << mergeStatus << transaction.mergeError;
+		}
 	}
 	channel->send(bundle);
 }
@@ -241,7 +256,7 @@ const char* Cellappmgr::requestSpaceSplit(SPACE_ID spaceID, SpaceLayout::Transac
 		return "Space must be active with automatic Cell handoff enabled";
 	if (transaction.version != version || transaction.boundaryRevision != boundaryRevision)
 		return "Space layout changed; run space show again";
-	if (transaction.boundaryConfirmation || transaction.split)
+	if (transaction.boundaryConfirmation || transaction.split || transaction.merge)
 		return "another layout adjustment is in progress";
 	if (boundaryRevision == std::numeric_limits<uint64>::max() ||
 		transaction.splitAttempt == std::numeric_limits<uint64>::max())
@@ -265,7 +280,7 @@ const char* Cellappmgr::requestSpaceSplit(SPACE_ID spaceID, SpaceLayout::Transac
 	for (const auto& node : packet.layout.nodes)
 		if (node.axis == LEAF && node.cellID == cell)
 			packet.splitSource = node.cellappID;
-	if (!packet.layout.splitCell(cell, axis, position, target))
+	if (!packet.layout.splitCell(cell, axis, position, target, transaction.lastRetiredCellID))
 		return "invalid Cell, cut position, or layout limit";
 	if (!collectCellPeerRoutes(packet.layout, packet))
 		return "a participating CellApp has no registered address";
@@ -389,6 +404,232 @@ void Cellappmgr::sendSplitResource(const SpaceLayout::Packet& packet, SpaceLayou
 {
 	if (transaction.split && !transaction.split->published && !sendSpaceLayout(transaction.split->target, packet))
 		stopSpaceSplit(packet.spaceID, transaction, "split target could not receive a resource update");
+}
+
+const char* Cellappmgr::requestSpaceMerge(SPACE_ID spaceID, SpaceLayout::Transaction& transaction,
+	uint64 version, uint64 revision, CELL_ID retiring, CELL_ID keeping)
+{
+	using namespace SpaceLayout;
+	if (isShuttingdown() || !g_kbeSrvConfig.getCellAppMgr().cellappmgr_space_partitioning_auto_handoff ||
+		transaction.state != ACTIVE || transaction.shutdownRequested)
+		return "Space must be active with automatic Cell handoff enabled";
+	if (transaction.version != version || transaction.boundaryRevision != revision)
+		return "Space layout changed; run space show again";
+	if (transaction.boundaryConfirmation || transaction.split || transaction.isSplitMigrating() || transaction.merge)
+		return "another layout adjustment is in progress";
+	if (revision == std::numeric_limits<uint64>::max() ||
+		transaction.mergeAttempt == std::numeric_limits<uint64>::max())
+		return "Space layout has no remaining adjustment numbers";
+	auto next = transaction.layout;
+	COMPONENT_ID source = 0;
+	if (!next.mergeCells(retiring, keeping, source))
+		return "merge requires sibling leaf Cells and must keep the Space owner";
+	// BaseApp 可能仍在向已接管的 Cell 补发恢复数据，当前没有恢复任务全部完成的确认。
+	if (transaction.committedReplacement && transaction.committedReplacement->target == source)
+		return "a Cell that took over a failed partition cannot be retired";
+	const auto participants = transaction.layout.participants();
+	if (!std::all_of(participants.begin(), participants.end(), [&](COMPONENT_ID cid) { return componentReady(cid); }))
+		return "a participating CellApp is unavailable";
+
+	using Merge = Transaction::Merge;
+	transaction.merge = Merge{std::move(next), source, timestamp()};
+	transaction.mergeError.clear();
+	Packet packet;
+	packet.sender = componentID_;
+	packet.operation = MERGE_PREPARE;
+	packet.spaceID = spaceID;
+	packet.version = version;
+	packet.revision = revision;
+	packet.mergeAttempt = ++transaction.mergeAttempt;
+	packet.mergeRetiring = retiring;
+	packet.mergeKeeping = keeping;
+	bool sent = true;
+	for (auto cid : participants)
+		sent = sendSpaceLayout(cid, packet) && sent;
+	if (!sent)
+	{
+		stopSpaceMerge(spaceID, transaction, "could not send merge preparation to all participants");
+		return "could not send merge preparation to all participants";
+	}
+	INFO_MSG(fmt::format("Cellappmgr::spaceLayout: preparing merge, space={}, attempt={}, retiring={}, keeping={}.\n",
+		spaceID, packet.mergeAttempt, retiring, keeping));
+	return nullptr;
+}
+
+void Cellappmgr::handleSpaceMergeAck(SpaceLayout::Packet& packet, SpaceLayout::Transaction& transaction)
+{
+	using namespace SpaceLayout;
+	using Merge = Transaction::Merge;
+	auto& merge = transaction.merge;
+	if (!merge || transaction.state != ACTIVE || transaction.version != packet.version ||
+		transaction.boundaryRevision != packet.revision || transaction.mergeAttempt != packet.mergeAttempt)
+		return;
+	const auto sender = packet.sender;
+	const auto participants = transaction.layout.participants();
+	const bool member = participants.count(sender) != 0;
+	packet.sender = componentID_;
+	if (packet.operation == MERGE_BLOCKED)
+	{
+		if (sender != merge->source)
+			return;
+		if (merge->stage == Merge::Preparing)
+			stopSpaceMerge(packet.spaceID, transaction, packet.error.c_str());
+		else if (merge->stage == Merge::Draining)
+		{
+			transaction.mergeError = packet.error;
+			merge->stage = Merge::Cancelling;
+			merge->started = timestamp();
+			merge->confirmed.clear();
+			packet.operation = MERGE_CANCEL;
+			WARNING_MSG(fmt::format("Cellappmgr::spaceLayout: cancelling merge, space={}, attempt={}: {}.\n",
+				packet.spaceID, packet.mergeAttempt, packet.error));
+			if (!sendSpaceLayout(merge->source, packet))
+				failSpaceLayout(packet.spaceID, transaction, "merge source connection is unavailable", true);
+		}
+		return;
+	}
+	switch (merge->stage)
+	{
+	case Merge::Preparing:
+		if (packet.operation != MERGE_READY || !member)
+			return;
+		if (!packet.success)
+		{
+			stopSpaceMerge(packet.spaceID, transaction, "a CellApp rejected merge preparation");
+			return;
+		}
+		merge->confirmed.insert(sender);
+		DEBUG_MSG(fmt::format("Cellappmgr::spaceLayout: merge ready, space={}, attempt={}, cellapp={}.\n",
+			packet.spaceID, packet.mergeAttempt, sender));
+		if (merge->confirmed.size() != participants.size())
+			return;
+		merge->stage = Merge::Draining;
+		merge->started = timestamp();
+		merge->confirmed.clear();
+		packet.operation = MERGE_DRAIN;
+		for (auto cid : participants)
+			if (cid != merge->source && !sendSpaceLayout(cid, packet))
+			{
+				failSpaceLayout(packet.spaceID, transaction, "merge participant connection is unavailable", true);
+				return;
+			}
+		if (!sendSpaceLayout(merge->source, packet))
+			failSpaceLayout(packet.spaceID, transaction, "merge source connection is unavailable", true);
+		break;
+	case Merge::Draining:
+		if (packet.operation != MERGE_DRAINED || sender != merge->source)
+			return;
+		merge->stage = Merge::Checking;
+		merge->started = timestamp();
+		packet.operation = MERGE_CHECK;
+		for (auto cid : participants)
+			if (cid != sender && !sendSpaceLayout(cid, packet))
+			{
+				failSpaceLayout(packet.spaceID, transaction, "merge participant connection is unavailable", true);
+				return;
+			}
+		break;
+	case Merge::Checking:
+		if (packet.operation != MERGE_DRAINED || !member || sender == merge->source)
+			return;
+		merge->confirmed.insert(sender);
+		if (merge->confirmed.size() + 1 != participants.size())
+			return;
+		// 迁出和目标收尾均已确认；在此之前故障恢复始终使用原 Layout。
+		transaction.lastRetiredCellID = std::max(transaction.lastRetiredCellID,
+			transaction.layout.cellForApp(merge->source)->cellID);
+		transaction.layout = std::move(merge->nextLayout);
+		merge->stage = Merge::Publishing;
+		merge->started = timestamp();
+		merge->confirmed.clear();
+		packet.operation = MERGE_APPLY;
+		packet.revision = ++transaction.boundaryRevision;
+		{
+			bool sent = true;
+			for (auto cid : participants)
+			{
+				const bool delivered = sendSpaceLayout(cid, packet);
+				// 退役 Cell 已无实体；它退出只影响回收确认，不影响存活 Cell 的归属。
+				if (cid != merge->source)
+					sent = delivered && sent;
+			}
+			if (!sent)
+				failSpaceLayout(packet.spaceID, transaction, "could not publish the merged layout to all CellApps", true);
+		}
+		break;
+	case Merge::Publishing:
+		if (packet.operation == MERGE_APPLIED && member)
+			merge->confirmed.insert(sender);
+		else if (packet.operation == MERGE_REMOVED && sender == merge->source)
+			merge->sourceRemoved = true;
+		else
+			return;
+		finishSpaceMerge(packet.spaceID, transaction);
+		break;
+	case Merge::Cancelling:
+		if (packet.operation != MERGE_CANCELLED || !member)
+			return;
+		if (sender == merge->source)
+		{
+			if (!merge->confirmed.insert(sender).second)
+				return;
+			// 退役 Cell 已停止发送快照，其他 Cell 仍按本次合并路由处理在途交接。
+			packet.operation = MERGE_CANCEL;
+			for (auto cid : participants)
+				if (cid != sender && !sendSpaceLayout(cid, packet))
+				{
+					failSpaceLayout(packet.spaceID, transaction, "merge participant connection is unavailable", true);
+					return;
+				}
+		}
+		else if (merge->confirmed.count(merge->source))
+			merge->confirmed.insert(sender);
+		if (merge->confirmed.size() != participants.size())
+			return;
+		merge->stage = Merge::Resuming;
+		packet.operation = MERGE_RESUME;
+		if (!sendSpaceLayout(merge->source, packet))
+			failSpaceLayout(packet.spaceID, transaction, "merge source connection is unavailable", true);
+		break;
+	case Merge::Resuming:
+		if (packet.operation == MERGE_CANCELLED && sender == merge->source)
+			transaction.merge.reset();
+		break;
+	}
+}
+
+void Cellappmgr::stopSpaceMerge(SPACE_ID spaceID, SpaceLayout::Transaction& transaction, const char* reason)
+{
+	using namespace SpaceLayout;
+	if (!transaction.merge)
+		return;
+	// Space 故障或关闭时由 SUSPEND 或 REMOVE 清理排空状态。
+	if (transaction.merge->stage == Transaction::Merge::Preparing)
+	{
+		Packet packet;
+		packet.sender = componentID_;
+		packet.operation = MERGE_CANCEL;
+		packet.spaceID = spaceID;
+		packet.version = transaction.version;
+		packet.revision = transaction.boundaryRevision;
+		packet.mergeAttempt = transaction.mergeAttempt;
+		for (auto cid : transaction.layout.participants())
+			sendSpaceLayout(cid, packet);
+	}
+	transaction.merge.reset();
+	transaction.mergeError = reason;
+	WARNING_MSG(fmt::format("Cellappmgr::spaceLayout: merge stopped, space={}, attempt={}: {}.\n",
+		spaceID, transaction.mergeAttempt, reason));
+}
+
+void Cellappmgr::finishSpaceMerge(SPACE_ID spaceID, SpaceLayout::Transaction& transaction)
+{
+	if (!transaction.merge->sourceRemoved ||
+		transaction.merge->confirmed.size() != transaction.layout.participants().size())
+		return;
+	transaction.merge.reset();
+	INFO_MSG(fmt::format("Cellappmgr::spaceLayout: merge complete, space={}, attempt={}.\n",
+		spaceID, transaction.mergeAttempt));
 }
 
 void Cellappmgr::onSpaceLayoutRequest(Network::Channel* channel, MemoryStream& stream)
@@ -567,6 +808,14 @@ void Cellappmgr::onSpaceLayoutRequest(Network::Channel* channel, MemoryStream& s
 			transaction.splitMigration = Migration::Complete;
 		return;
 	}
+	if (packet.operation == MERGE_READY || packet.operation == MERGE_DRAINED ||
+		packet.operation == MERGE_APPLIED || packet.operation == MERGE_REMOVED ||
+		packet.operation == MERGE_BLOCKED || packet.operation == MERGE_CANCELLED)
+	{
+		if (found != spaceLayouts_.end() && source->pChannel == channel)
+			handleSpaceMergeAck(packet, found->second);
+		return;
+	}
 	if (found == spaceLayouts_.end() || found->second.layout.cellForApp(packet.sender) == NULL)
 		return;
 	Transaction& transaction = found->second;
@@ -624,6 +873,7 @@ void Cellappmgr::onSpaceLayoutRequest(Network::Channel* channel, MemoryStream& s
 			return;
 		transaction.shutdownRequested = true;
 		stopSpaceSplit(packet.spaceID, transaction, "Space is closing");
+		stopSpaceMerge(packet.spaceID, transaction, "Space is closing");
 		transaction.interruptSplitMigration();
 		if (transaction.committedReplacement)
 			closedSpacesWithCellLoss_.insert(packet.spaceID);
@@ -740,6 +990,19 @@ void Cellappmgr::updateSpaceLayouts()
 				WARNING_MSG(fmt::format("Cellappmgr::spaceLayout: waiting for split confirmations, "
 					"space={}, attempt={}, confirmed={}.\n", entry.first, transaction.splitAttempt, split->confirmed.size()));
 				split->started = 0;
+			}
+		}
+		if (auto& merge = transaction.merge; merge && merge->started &&
+			now - merge->started > 30 * stampsPerSecond())
+		{
+			if (merge->stage == SpaceLayout::Transaction::Merge::Preparing)
+				stopSpaceMerge(entry.first, transaction, "merge preparation timed out");
+			else
+			{
+				WARNING_MSG(fmt::format("Cellappmgr::spaceLayout: waiting for merge confirmations, "
+					"space={}, attempt={}, stage={}, confirmed={}.\n", entry.first, transaction.mergeAttempt,
+					static_cast<int>(merge->stage), merge->confirmed.size()));
+				merge->started = 0;
 			}
 		}
 	}
@@ -974,7 +1237,12 @@ void Cellappmgr::onSpaceLayoutCellLost(COMPONENT_ID cid, uint64 session)
 		if (transaction.split && !transaction.split->published && transaction.split->layout.cellForApp(cid))
 			stopSpaceSplit(entry.first, transaction, "a split participant disconnected");
 		if (!transaction.layout.cellForApp(cid))
+		{
+			if (transaction.merge && transaction.merge->stage == SpaceLayout::Transaction::Merge::Publishing &&
+				transaction.merge->source == cid && !transaction.merge->sourceRemoved && !isShuttingdown())
+				lost.layouts.emplace(entry.first, transaction.version);
 			continue;
+		}
 		if (transaction.replacement && transaction.replacement->lost != cid)
 			cancelCellReplacement(entry.first, transaction, "another layout participant disconnected");
 		const bool releasing = transaction.state == SpaceLayout::RELEASING;
@@ -1043,7 +1311,9 @@ void Cellappmgr::checkLostPartitionCells()
 		for (auto space = lost.layouts.begin(); space != lost.layouts.end();)
 		{
 			const auto current = spaceLayouts_.find(space->first);
-			if (current == spaceLayouts_.end() || current->second.version != space->second)
+			if (current == spaceLayouts_.end() || current->second.version != space->second ||
+				(!current->second.layout.cellForApp(it->first) &&
+				 (!current->second.merge || current->second.merge->source != it->first)))
 				space = lost.layouts.erase(space);
 			else
 				++space;
@@ -1065,6 +1335,17 @@ void Cellappmgr::checkLostPartitionCells()
 			for (const auto& [space, version] : lost.layouts)
 			{
 				const auto layout = spaceLayouts_.find(space);
+				if (layout != spaceLayouts_.end())
+				{
+					auto& transaction = layout->second;
+					if (transaction.version == version && transaction.merge &&
+						transaction.merge->stage == SpaceLayout::Transaction::Merge::Publishing &&
+						transaction.merge->source == it->first)
+					{
+						transaction.merge->sourceRemoved = true;
+						finishSpaceMerge(space, transaction);
+					}
+				}
 				if (layout != spaceLayouts_.end() && layout->second.state == SpaceLayout::RELEASING &&
 					layout->second.recordRemoval(it->first, version) == SpaceLayout::Transaction::Removal::Erase)
 				{

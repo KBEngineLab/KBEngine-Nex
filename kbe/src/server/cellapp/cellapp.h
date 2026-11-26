@@ -97,7 +97,7 @@ public:
 	bool autoCellHandoffEnabled() const { return autoCellHandoffEnabled_ && spacePartitioningConfirmed_; }
 	float cellHandoffMargin() const { return cellHandoffMargin_; }
 	void considerAutoCellHandoff(Space& space, Entity& entity);
-	bool hasUnreleasedCellHandoff(SPACE_ID space, uint64 layoutVersion, COMPONENT_ID target) const;
+	bool hasUnreleasedCellHandoff(SPACE_ID space, uint64 layoutVersion, COMPONENT_ID target = 0) const;
 	bool hasUnfinishedIncomingCellHandoff(SPACE_ID space, uint64 layoutVersion, COMPONENT_ID source);
 	void onSpaceLayout(Network::Channel* pChannel, MemoryStream& stream);
 	void reqStageRecoveryCellBackup(Network::Channel* channel, MemoryStream& stream);

@@ -130,6 +130,11 @@ public:
 	void checkSplitMigrationTarget(const SpaceLayout::Packet& packet);
 	bool isPendingSplitPeer(COMPONENT_ID cid) const;
 	bool needsSplitPeer(COMPONENT_ID cid) const;
+	void handleCellMerge(SpaceLayout::Packet& packet, Network::Channel& manager);
+	bool isDrainingCell() const;
+	bool isCellMergeHandoffStopped() const;
+	void reportCellMergeBlock(ENTITY_ID entity, const char* error);
+	const SpaceLayout::Node* handoffDestination(float x, float z, COMPONENT_ID source) const;
 	bool isStagedSplitCell() const { return split_ && split_->candidate && !split_->applied; }
 	bool canReceiveSplitGhosts() const
 	{
@@ -191,6 +196,7 @@ public:
 		return isGood() && !layoutShutdownRequested_ && !layoutRemovalPending_ &&
 			!isPreparingReplacement() && !replacementCheckVersion_ && !(split_ && split_->candidate);
 	}
+	bool canAcceptNewEntities() const { return canAcceptEntities() && !isDrainingCell(); }
 	// 未提交迁移实体持有 Space 生命周期租约，脚本清理必须等待 BaseApp 完成路由切换。
 	// Uncommitted migration Targets lease the Space lifetime until BaseApp completes the route switch.
 	bool hasPendingMigrationEntities(bool includeSources = false) const;
@@ -200,6 +206,8 @@ protected:
 	void updateCellSplitPreparation();
 	void updateCellSplitMigration();
 	bool hasSplitSourceEntityToMigrate(Entity& entity, COMPONENT_ID target) const;
+	void updateCellMerge();
+	bool hasMergePendingEntity(const Entity& entity) const;
 
 	void _clearGhosts();
 	
@@ -280,6 +288,22 @@ protected:
 		uint64 nextCheck = 0;
 	};
 	std::optional<SplitMigrationScan> splitMigration_;
+	struct CellMerge
+	{
+		enum Stage { Preparing, Ready, Draining, Receiving, Checking, Drained, Cancelling, Stopped, Removing };
+		SpaceLayout::Layout nextLayout;
+		COMPONENT_ID source;
+		uint64 managerSession;
+		uint64 attempt;
+		Stage stage = Preparing;
+		bool sourceLocal = false;
+		bool warnedAboutController = false;
+		size_t cursor = 0;
+		uint64 nextCheck = 0;
+		std::string error;
+		bool errorSent = false;
+	};
+	std::optional<CellMerge> merge_;
 	SpaceLayout::State			layoutState_ = SpaceLayout::NONE;
 	std::string					layoutError_;
 	bool						layoutPinned_ = false;

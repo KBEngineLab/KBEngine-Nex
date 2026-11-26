@@ -6,17 +6,10 @@ import json
 import subprocess
 import sys
 
-from space_layout_runtime import require, wait_for
+from space_layout_runtime import captured_error, require, wait_for
 
 
-def verify_space_split(cells, layout, base, repository, endpoint, environment, output):
-    space, owner, version = layout["space"], layout["owner"], layout["version"]
-    old = {cell["cellappID"]: cell["cellID"] for cell in layout["cells"]}
-    spares = set(cells) - old.keys()
-    source = cells[owner]
-    state = f"KBEngine.getSpaceLayout({space})"
-    boundary = layout["split_x"]
-    cut = boundary - 16.0
+def space_command(repository, endpoint, environment, space):
     tool = repository / "kbe/tools/server/pycluster/cluster_controller.py"
 
     def command(action, *options, error=None):
@@ -30,6 +23,19 @@ def verify_space_split(cells, layout, base, repository, endpoint, environment, o
             return None
         require(result.returncode == 0, f"管理命令失败：{result.stderr}")
         return json.loads(result.stdout)
+
+    return command
+
+
+def verify_space_split(cells, layout, base, repository, endpoint, environment, output):
+    space, owner, version = layout["space"], layout["owner"], layout["version"]
+    old = {cell["cellappID"]: cell["cellID"] for cell in layout["cells"]}
+    spares = set(cells) - old.keys()
+    source = cells[owner]
+    state = f"KBEngine.getSpaceLayout({space})"
+    boundary = layout["split_x"]
+    cut = boundary - 16.0
+    command = space_command(repository, endpoint, environment, space)
 
     options = ("--cell", str(old[owner]), "--axis", "x", "--at")
     command("split", *options, str(boundary), error="invalid Cell")
@@ -128,3 +134,195 @@ def verify_space_split(cells, layout, base, repository, endpoint, environment, o
     return dict(attempt=after["splitAttempt"], cell=cell_apps[target_id], target=target_id,
                 original_layout_served=True, preparation_timeout_retried=True,
                 resources_current=True, migration_complete=True)
+
+
+def verify_space_merge(cells, layout, split, base, repository, endpoint, environment, output):
+    space, owner = layout["space"], layout["owner"]
+    state = f"KBEngine.getSpaceLayout({space})"
+    command = space_command(repository, endpoint, environment, space)
+    before = command("show")
+    original = {cell["cellappID"]: cell["cellID"] for cell in layout["cells"]}
+    peer, = original.keys() - {owner}
+    source_id, retiring = split["target"], split["cell"]
+    source, target = cells[source_id], cells[owner]
+    keeping = original[owner]
+    cut = next(row["bounds"][0] for row in before["cells"] if row["cell"] == retiring)
+    avatar, y, z = source.evaluate(
+        f"next((e.id, e.position.y, e.position.z) for e in KBEngine.entities.values() "
+        f"if type(e).__name__ == 'Avatar' and e.spaceID == {space} and e.isReal())"
+    )
+    route = f"(lambda e: (str(e.cell), str(e.client)))(KBEngine.entities[{avatar}])"
+    _, client = base.evaluate(route)
+
+    def create_at(x):
+        return f"KBEngine.createEntity('NPC', {space}, {(x, y, z)!r}, (0., 0., 0.), {{}}).id"
+
+    def has_real(console, entity):
+        return console.evaluate(f"bool(KBEngine.entities.get({entity}) and KBEngine.entities[{entity}].isReal())")
+
+    def merge(retire, keep, error=None):
+        return command("merge", "--retire", str(retire), "--keep", str(keep), error=error)
+
+    merge(keeping, retiring, error="must keep the Space owner")
+    merge(retiring, original[peer], error="sibling leaf Cells")
+    require(command("show") == before, "非法合并改变了原 Layout")
+    npc = source.evaluate(create_at(cut + 1.0))
+    entered = output / "merge-target-entered"
+    proceed = output / "merge-target-proceed"
+    setup = f"""
+from pathlib import Path
+from time import monotonic, sleep
+from NPC import NPC
+
+_merge_previous_enter = NPC.__dict__.get('onEnteredCell')
+_merge_enter_count = 0
+def _merge_enter(self, *args):
+    global _merge_enter_count
+    if self.id == {npc}:
+        _merge_enter_count += 1
+        Path({str(entered)!r}).touch()
+        deadline = monotonic() + 20
+        while not Path({str(proceed)!r}).exists() and monotonic() < deadline:
+            sleep(.02)
+    if _merge_previous_enter:
+        _merge_previous_enter(self, *args)
+
+NPC.onEnteredCell = _merge_enter
+"""
+    target.evaluate(f"exec({setup!r})")
+    try:
+        request = merge(retiring, keeping)
+        require(request["mergeState"] == "preparing" and request["cells"] == before["cells"],
+                "准备合并时提前发布了新 Layout")
+        wait_for("目标派发迁入回调前已释放源端", entered.exists, bool, timeout=20)
+        wait_for("退役 Cell 已释放原 NPC", lambda: has_real(source, npc), lambda real: not real)
+        draining = command("show")
+        require(draining["mergeState"] == "draining" and draining["boundaryRevision"] == before["boundaryRevision"]
+                and len(draining["cells"]) == 3 and source.evaluate(state) is not None,
+                "目标仍在处理交接时提前发布了新 Layout")
+        error = captured_error(source, create_at(cut + 1.0))
+        require(error and error[0] == "RuntimeError", "退役 Cell 仍在接收新建实体")
+        merge(retiring, keeping, error="another layout adjustment")
+    finally:
+        proceed.touch()
+
+    def wait_merge_done(revision, count):
+        result = wait_for("等待 Cell 合并及回收结束", lambda: command("show"),
+                          lambda row: row["mergeState"] == "complete")
+        require(result["version"] == before["version"] and result["boundaryRevision"] == revision and
+                len(result["cells"]) == count, "合并修改了 Space 版本或留下多余 Cell")
+        return result
+
+    merged = wait_merge_done(before["boundaryRevision"] + 1, 2)
+    require({item["cellapp"]: item["cell"] for item in merged["cells"]} == original and source.evaluate(state) is None,
+            "旧 Cell 未真正回收，或其他 Cell 编号被改变")
+    require(has_real(target, npc) and has_real(target, avatar) and target.evaluate("_merge_enter_count") == 1,
+            "迁出没有保留 Real，或重复派发进入回调")
+    routed = base.evaluate(route)
+    require(f"cellapp[{owner}]" in routed[0] and routed[1] == client, "合并修改了玩家连接或没有切换路由")
+    target.evaluate(f"KBEngine.entities[{npc}].destroy()")
+    target.evaluate("exec('if _merge_previous_enter is None:\\n    del NPC.onEnteredCell\\n"
+                    "else:\\n    NPC.onEnteredCell = _merge_previous_enter')")
+
+    # 原右侧范围没有上界；这个 NPC 超出保留 Cell 原来的 Ghost 距离。
+    far_x = layout["split_x"] + 10000
+    far_source = cells[peer]
+    far_npc = far_source.evaluate(create_at(far_x))
+    require(not target.evaluate(f"{far_npc} in KBEngine.entities"), "远处 NPC 已有 Ghost，无法验证退役复制")
+
+    def set_far_name(value):
+        far_source.evaluate(f"setattr(KBEngine.entities[{far_npc}], 'name', {value})")
+
+    def wait_merge_failed(request):
+        failed = wait_for("超限 Ghost 取消合并", lambda: command("show"),
+                          lambda row: row["mergeState"] == "failed")
+        require(failed["state"] == "active" and failed["version"] == merged["version"] and
+                failed["boundaryRevision"] == merged["boundaryRevision"] and failed["cells"] == merged["cells"] and
+                failed["mergeAttempt"] == request["mergeAttempt"] and
+                f"entity {far_npc}: target Ghost snapshot exceeds 256 KiB" in failed["mergeError"],
+                "拒绝超限 Ghost 后修改了原 Layout，或没有报告实体和上限")
+        require(has_real(far_source, far_npc) and not has_real(target, far_npc), "合并失败后实体归属错误")
+        created = far_source.evaluate(create_at(far_x))
+        far_source.evaluate(f"KBEngine.entities[{created}].destroy()")
+
+    set_far_name("'N' * (270 * 1024)")
+    wait_merge_failed(merge(original[peer], keeping))
+    set_far_name("'merge-probe'")
+
+    boundary = next(row["bounds"][0] for row in merged["cells"] if row["cellapp"] == peer)
+    target.evaluate(f"setattr(KBEngine.entities[{avatar}], 'controlledBy', None)")
+    target.evaluate(f"setattr(KBEngine.entities[{avatar}], 'position', {(boundary + 8, y, z)!r})")
+    wait_for("玩家迁入待退役 Cell", lambda: base.evaluate(route), lambda row: f"cellapp[{peer}]" in row[0])
+    wait_for("玩家交接完成且原 Cell 已有 Ghost",
+             lambda: (has_real(far_source, avatar), target.evaluate(
+                 f"bool(KBEngine.entities.get({avatar}) and not KBEngine.entities[{avatar}].isReal())")),
+             all)
+
+    @contextmanager
+    def pause(console, label):
+        held = output / f"merge-oversize-{label}-held"
+        release = output / f"merge-oversize-{label}-release"
+        hold = f"""
+from pathlib import Path
+from time import monotonic, sleep
+Path({str(held)!r}).touch()
+_merge_wait_until = monotonic() + 20
+while not Path({str(release)!r}).exists() and monotonic() < _merge_wait_until:
+    sleep(.02)
+"""
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            waiting = executor.submit(console.evaluate, f"exec({hold!r})", 25)
+            try:
+                wait_for("等待进程暂停处理消息", held.exists, bool)
+                yield
+            finally:
+                release.touch()
+            waiting.result()
+
+    manager_log = output / "server/logs/logger_cellappmgr.log"
+
+    def manager_logged(text):
+        return text in manager_log.read_text(encoding="utf-8", errors="replace")
+
+    with pause(base, "base"):
+        # 等退役端已检查远处 NPC，再增大属性，并在 BaseApp 暂停期间发起玩家越界。
+        with pause(target, "peer"):
+            request = merge(original[peer], keeping)
+            ready_line = f"merge ready, space={space}, attempt={request['mergeAttempt']}, cellapp={peer}."
+            wait_for("退役端完成快照检查", lambda: manager_logged(ready_line), bool, timeout=8)
+            far_source.evaluate(f"setattr(KBEngine.entities[{avatar}], 'position', {(boundary - 8, y, z)!r})")
+            set_far_name("'N' * (270 * 1024)")
+            require(command("show")["mergeState"] == "preparing", "保留端暂停时意外开始排空")
+        cancelling = wait_for("排空取消等待在途玩家交接", lambda: command("show"),
+                              lambda row: row["mergeState"] == "cancelling", timeout=8)
+        require(cancelling["boundaryRevision"] == merged["boundaryRevision"] and has_real(far_source, avatar),
+                "交接确认前改变了 Layout 或丢失了玩家 Real")
+        error = captured_error(far_source, create_at(far_x))
+        require(error and error[0] == "RuntimeError" and command("show")["mergeState"] == "cancelling",
+                "在途交接结束前恢复了退役 Cell 创建或报告了失败")
+    wait_merge_failed(request)
+    routed = base.evaluate(route)
+    require(f"cellapp[{owner}]" in routed[0] and routed[1] == client and has_real(target, avatar) and
+            not has_real(far_source, avatar), "取消合并时没有正确完成在途玩家交接")
+    target.evaluate(f"(lambda e: setattr(e, 'controlledBy', e.base))(KBEngine.entities[{avatar}])")
+
+    set_far_name("'merge-probe'")
+    merge(original[peer], keeping)
+    single = wait_merge_done(before["boundaryRevision"] + 2, 1)
+    require(single["cells"] == [{"cell": keeping, "cellapp": owner, "bounds": [None] * 4}] and
+            has_real(target, far_npc) and cells[peer].evaluate(state) is None,
+            "最后两个 Cell 合并后没有保留全部范围或远处实体")
+    target.evaluate(f"KBEngine.entities[{far_npc}].destroy()")
+
+    # 再切分原区域，确认回收后的编号不会被重新分配。
+    command("split", "--cell", str(keeping), "--axis", "x", "--at", str(layout["split_x"] + 1))
+    added = wait_for("缩容后再次扩容", lambda: command("show"),
+                     lambda row: row["splitState"] == "active" and row["migrationState"] == "complete")
+    new_cell, = (item["cell"] for item in added["cells"] if item["cell"] != keeping)
+    require(new_cell > retiring, "缩容后扩容复用了已退役的 Cell 编号")
+    print(f"SPACE_MERGE_RUNTIME_PASS space={space} retired={retiring} new={new_cell}", flush=True)
+    return {"retired": retiring, "kept": keeping, "reexpanded": new_cell, "target_callback_once": True,
+            "refused_creation_during_drain": True, "moved_npc_outside_ghost_distance": True,
+            "oversized_ghost_rejected_before_drain": True, "oversized_ghost_cancelled_during_drain": True,
+            "inflight_player_handoff_completed_during_cancellation": True,
+            "creation_and_merge_restored_after_cancellation": True}

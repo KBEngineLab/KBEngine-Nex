@@ -181,6 +181,11 @@ protected:
 		Network::Channel* channel);
 	void stopSpaceSplit(SPACE_ID spaceID, SpaceLayout::Transaction& transaction, const char* reason);
 	void sendSplitResource(const SpaceLayout::Packet& packet, SpaceLayout::Transaction& transaction);
+	const char* requestSpaceMerge(SPACE_ID spaceID, SpaceLayout::Transaction& transaction,
+		uint64 version, uint64 revision, CELL_ID retiring, CELL_ID keeping);
+	void handleSpaceMergeAck(SpaceLayout::Packet& packet, SpaceLayout::Transaction& transaction);
+	void stopSpaceMerge(SPACE_ID spaceID, SpaceLayout::Transaction& transaction, const char* reason);
+	void finishSpaceMerge(SPACE_ID spaceID, SpaceLayout::Transaction& transaction);
 	void updateSpaceLayouts();
 	bool updateCellReplacement(SPACE_ID spaceID, SpaceLayout::Transaction& transaction, uint64 now);
 	void checkCellReplacement(SPACE_ID spaceID, SpaceLayout::Transaction& transaction, uint64 now);

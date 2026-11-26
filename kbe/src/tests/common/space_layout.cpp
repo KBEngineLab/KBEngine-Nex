@@ -108,6 +108,26 @@ int main()
 			split.cellAt(5.f, 19.f)->cellID == 5 && split.cellAt(5.f, 20.f)->cellID == 2 &&
 			split.cellAt(10.f, 19.f)->cellID == 3, "split_nested_cell_preserves_other_regions"))
 		return 1;
+	Layout merged = split;
+	COMPONENT_ID retiring = 0;
+	if (!check(!merged.mergeCells(1, 5, retiring) && !merged.mergeCells(5, 2, retiring) &&
+		!merged.mergeCells(5, 5, retiring) && !merged.mergeCells(9, 1, retiring) &&
+		!retiring && merged.participants() == split.participants(), "reject_invalid_merge_without_changing_tree") ||
+		!check(merged.mergeCells(5, 1, retiring) && retiring == 8005 && merged.owner == 8001 &&
+			merged.cellAt(9.f, 19.f)->cellID == 1 && merged.cellAt(5.f, 20.f)->cellID == 2 &&
+			merged.cellAt(10.f, 19.f)->cellID == 3 && merged.participants() == layout.participants(),
+			"merge_siblings_preserves_owner_and_remaining_cells") ||
+		!check(merged.mergeCells(3, 4, retiring) && retiring == 8003 &&
+			merged.cellAt(10.f, 19.f)->cellID == 4, "merge_can_keep_right_cell") ||
+		!check(merged.splitCell(1, X, 5.f, 8005, 5) && merged.cellAt(5.f, 19.f)->cellID == 6,
+			"split_does_not_reuse_retired_cell_number"))
+		return 1;
+	Layout two;
+	two.owner = 8001;
+	two.nodes = {{X, 0.f, 0, 0}, {LEAF, 0.f, 1, 8001}, {LEAF, 0.f, 2, 8002}};
+	if (!check(two.validate() && two.mergeCells(2, 1, retiring) && retiring == 8002 &&
+		two.nodes.size() == 1 && two.cellAt(500.f, 800.f)->cellID == 1, "merge_root_keeps_space"))
+		return 1;
 
 	Packet request;
 	request.sender = 8001;
@@ -229,6 +249,31 @@ int main()
 	Packet invalidSplitPacket;
 	if (!check(!invalidSplitPacket.read(missingAttempt), "split_check_requires_attempt"))
 		return 1;
+	for (uint8 operation : {MERGE_PREPARE, MERGE_READY, MERGE_DRAIN, MERGE_DRAINED, MERGE_CHECK,
+		MERGE_APPLY, MERGE_APPLIED, MERGE_REMOVED, MERGE_CANCEL, MERGE_BLOCKED, MERGE_CANCELLED, MERGE_RESUME})
+	{
+		Packet update = request;
+		update.operation = operation;
+		update.mergeAttempt = 7;
+		update.mergeRetiring = 5;
+		update.mergeKeeping = 1;
+		update.success = operation != MERGE_READY;
+		if (operation == MERGE_BLOCKED)
+			update.error = "entity 42: target Ghost snapshot exceeds 256 KiB";
+		MemoryStream stream;
+		update.write(stream);
+		Packet received;
+		if (!check(received.read(stream) && received.mergeAttempt == update.mergeAttempt &&
+			received.operation == update.operation && received.revision == update.revision &&
+			received.success == update.success && received.error == update.error && (operation != MERGE_PREPARE ||
+				(received.mergeRetiring == 5 && received.mergeKeeping == 1)), "merge_packet_roundtrip"))
+			return 1;
+		MemoryStream truncated;
+		truncated.append(stream.data(), stream.length() - 1);
+		stream << uint8(0);
+		if (!check(!received.read(truncated) && !received.read(stream), "reject_invalid_merge_packet"))
+			return 1;
+	}
 	for (uint8 operation = REQUEST; operation <= RESOURCES; ++operation)
 	{
 		Packet packet = request;

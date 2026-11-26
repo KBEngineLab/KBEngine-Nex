@@ -16,9 +16,11 @@ class BoundaryGhosts
 {
 public:
 	void update(Space& space);
+	void forgetPeer(Space& space, COMPONENT_ID peer);
 	void remove(Space& space, Entity& entity, COMPONENT_ID keepTarget = 0);
 	bool forgetHandoffTarget(ENTITY_ID id, COMPONENT_ID source, uint64 session, uint64 generation);
 	uint64 handoffCopyGeneration(ENTITY_ID id, COMPONENT_ID target, uint64 session) const;
+	const char* checkHandoffSnapshot(Entity& entity, COMPONENT_ID target, MemoryStream& snapshot) const;
 	void receive(Space& space, COMPONENT_ID source, Network::Channel& channel, MemoryStream& stream);
 	void property(Space& space, const Entity& entity, const MemoryStream& data);
 	void broadcast(Space& space, const Entity& entity, const MemoryStream& data);
@@ -46,6 +48,7 @@ private:
 		uint64 session = 0;
 		uint64 generation = 0;
 		Pose pose;
+		CELL_ID cell = 0;
 		bool witnessed = false;
 	};
 
@@ -55,6 +58,7 @@ private:
 		Network::Address address;
 		uint64 session;
 		uint64 generation;
+		CELL_ID cell;
 	};
 
 	struct Source
@@ -68,6 +72,7 @@ private:
 	{
 		COMPONENT_ID component;
 		SpaceLayout::Bounds bounds;
+		CELL_ID cell;
 	};
 
 	struct SendTarget
@@ -80,10 +85,11 @@ private:
 	using Copies = std::map<COMPONENT_ID, Copy>;
 
 	static bool isWitnessed(const Copies& copies);
+	static const char* writeSnapshot(Entity& entity, const Pose& pose, MemoryStream& snapshot);
 	void refresh(Space& space, Entity& entity, SendTarget* targets, size_t count);
 	void sendToCopies(Space& space, const Entity& entity, Operation operation, const MemoryStream& data);
 	void clearIncoming(Space& space);
-	static void send(Network::Channel& channel, const Space& space, ENTITY_ID id,
+	static void send(Network::Channel& channel, const Space& space, CELL_ID target, ENTITY_ID id,
 		uint64 generation, Operation operation, const MemoryStream* data = NULL);
 
 	std::map<ENTITY_ID, Copies> outgoing_;
