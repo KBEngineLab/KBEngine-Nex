@@ -29,6 +29,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "client_lib/clientobjectbase.h"
 #include "network/encryption_filter.h"
 #include "pyscript/pyobject_pointer.h"
+#include <map>
 
 namespace KBEngine { 
 
@@ -77,6 +78,7 @@ public:
 	bool initLoginBaseapp();
 
 	void gameTick();
+	void updatePlayerToServer() override;
 
 	ClientObject::C_ERROR lasterror() { return error_; }
 
@@ -90,6 +92,11 @@ public:
 	static bool parseKcpHelloAck(const char* data, size_t length, uint32& channelID);
 	void destroy() { state_ = C_STATE_DESTROYED; }
 	void onNetworkError(const std::string& err);
+
+	DECLARE_PY_MOTHOD_ARG3(pySendMeasuredPosition, float, float, float);
+	DECLARE_PY_MOTHOD_ARG3(pyStageMeasuredPosition, float, float, float);
+	DECLARE_PY_MOTHOD_ARG3(pyWatchMeasuredPosition, ENTITY_ID, float, float);
+	DECLARE_PY_MOTHOD_ARG0(pyReadMeasuredPositions);
 
 	virtual void onHelloCB_(Network::Channel* pChannel, const std::string& verInfo,
 		const std::string& scriptVerInfo, const std::string& protocolMD5, 
@@ -126,6 +133,22 @@ public:
 	virtual void onLogin(Network::Bundle* pBundle);
 
 protected:
+	struct PositionSamples : EventHandle
+	{
+		struct Sample
+		{
+			float x;
+			float z;
+			uint64 received;
+		};
+
+		void kbengine_onEvent(const EventData* event) override;
+		std::map<ENTITY_ID, Sample> expected;
+	};
+
+	PositionSamples positionSamples_;
+	bool measuredMovementOnly_ = false;
+
 	bool startKcpHandshake();
 	void processKcpHandshake();
 	bool completeKcpHandshake(uint32 channelID);

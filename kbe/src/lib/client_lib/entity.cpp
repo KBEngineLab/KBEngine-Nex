@@ -513,7 +513,7 @@ PyObject* Entity::pyGetPosition()
 //-------------------------------------------------------------------------------------
 void Entity::onPositionChanged()
 {
-	if(pyIsPlayer())
+	if(isPlayer())
 		return;
 
 	EventData_PositionChanged eventdata;

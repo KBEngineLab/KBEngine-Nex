@@ -32,6 +32,8 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "client_lib/client_interface.h"
 #include "common/kbeversion.h"
 
+#include <chrono>
+#include <cmath>
 #include <cstring>
 
 #include "baseapp/baseapp_interface.h"
@@ -108,6 +110,10 @@ bool ClientObject::parseKcpHelloAck(const char* data, size_t length, uint32& cha
 }
 
 SCRIPT_METHOD_DECLARE_BEGIN(ClientObject)
+SCRIPT_METHOD_DECLARE("stageMeasuredPosition", pyStageMeasuredPosition, METH_VARARGS, 0)
+SCRIPT_METHOD_DECLARE("sendMeasuredPosition", pySendMeasuredPosition, METH_VARARGS, 0)
+SCRIPT_METHOD_DECLARE("watchMeasuredPosition", pyWatchMeasuredPosition, METH_VARARGS, 0)
+SCRIPT_METHOD_DECLARE("readMeasuredPositions", pyReadMeasuredPositions, METH_VARARGS, 0)
 SCRIPT_METHOD_DECLARE_END()
 
 SCRIPT_MEMBER_DECLARE_BEGIN(ClientObject)
@@ -154,6 +160,12 @@ void ClientObject::finalise(void)
 //-------------------------------------------------------------------------------------		
 void ClientObject::reset(void)
 {
+	measuredMovementOnly_ = false;
+	if (!positionSamples_.expected.empty())
+	{
+		deregisterEventHandle(&positionSamples_);
+		positionSamples_.expected.clear();
+	}
 	clearStates();
 
 	std::string name = name_;
@@ -166,6 +178,117 @@ void ClientObject::reset(void)
 	state_ = C_STATE_INIT;
 	connectedBaseapp_ = false;
 	kcpTransportSetupAttempts_ = 0;
+}
+
+namespace
+{
+uint64 positionSampleTime()
+{
+	return std::chrono::duration_cast<std::chrono::nanoseconds>(
+		std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+}
+
+void ClientObject::updatePlayerToServer()
+{
+	if (!measuredMovementOnly_)
+		ClientObjectBase::updatePlayerToServer();
+}
+
+PyObject* ClientObject::pyStageMeasuredPosition(float x, float y, float z)
+{
+	auto* player = pEntities_->find(entityID_);
+	if (!isTcpTransport() || !player || !std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z))
+	{
+		PyErr_SetString(PyExc_ValueError, "Measured setup needs a TCP player and a finite position");
+		return nullptr;
+	}
+
+	// 布点后的坐标由服务端确认，禁止日常 Bots Tick 抢先发出预测位置。
+	measuredMovementOnly_ = true;
+	const Position3D position(x, y, z);
+	player->position(position);
+	player->clientPos(position);
+	Py_RETURN_NONE;
+}
+
+PyObject* ClientObject::pySendMeasuredPosition(float x, float y, float z)
+{
+	client::Entity* player = pEntities_->find(entityID_);
+	if (!measuredMovementOnly_ || !isTcpTransport() || !pServerChannel_ || !pServerChannel_->pEndPoint() ||
+		!spaceID_ || !connectedBaseapp_ || !player || !player->cellEntityCall() || player->isControlled() ||
+		!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z) ||
+		Position3D(x, y, z) == player->clientPos())
+	{
+		PyErr_SetString(PyExc_ValueError, "Measured move needs an attached TCP player and a new finite position");
+		return nullptr;
+	}
+
+	// 直接发布同一种客户端移动消息，避免日常 Bots 同步先覆写坐标再序列化。
+	const Position3D position(x, y, z);
+	const Direction3D direction = player->direction();
+	player->position(position);
+	player->clientPos(position);
+	player->clientDir(direction);
+	Network::Bundle* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	bundle->newMessage(BaseappInterface::onUpdateDataFromClient);
+	(*bundle) << x << y << z << direction.roll() << direction.pitch() << direction.yaw();
+	(*bundle) << player->isOnGround() << spaceID_;
+	const uint64 sent = positionSampleTime();
+	pServerChannel_->send(bundle);
+	return PyLong_FromUnsignedLongLong(sent);
+}
+
+PyObject* ClientObject::pyWatchMeasuredPosition(ENTITY_ID target, float x, float z)
+{
+	if (target == entityID_ || !pEntities_->find(target) || !std::isfinite(x) || !std::isfinite(z) ||
+		(positionSamples_.expected.size() >= 128 && !positionSamples_.expected.count(target)))
+	{
+		PyErr_SetString(PyExc_ValueError, "Measured position needs a visible remote entity");
+		return nullptr;
+	}
+
+	if (positionSamples_.expected.empty())
+		registerEventHandle(&positionSamples_);
+	positionSamples_.expected[target] = {x, z, 0};
+	Py_RETURN_NONE;
+}
+
+PyObject* ClientObject::pyReadMeasuredPositions()
+{
+	PyObject* rows = PyList_New(0);
+	if (!rows)
+		return nullptr;
+
+	for (const auto& entry : positionSamples_.expected)
+	{
+		PyObject* row = Py_BuildValue("(iK)", entry.first, entry.second.received);
+		const int result = row ? PyList_Append(rows, row) : -1;
+		Py_XDECREF(row);
+		if (result < 0)
+		{
+			Py_DECREF(rows);
+			return nullptr;
+		}
+	}
+	return rows;
+}
+
+void ClientObject::PositionSamples::kbengine_onEvent(const EventData* event)
+{
+	if (event->id != CLIENT_EVENT_POSITION_CHANGED)
+		return;
+
+	const auto* position = static_cast<const EventData_PositionChanged*>(event);
+	auto it = expected.find(position->entityID);
+	if (it == expected.end())
+		return;
+
+	auto& sample = it->second;
+	// 易变坐标可能使用相对坐标压缩，容差须小于布点之间的一单位间隔。
+	if (!sample.received && std::abs(position->x - sample.x) < 0.5f &&
+		std::abs(position->z - sample.z) < 0.5f)
+		sample.received = positionSampleTime();
 }
 
 //-------------------------------------------------------------------------------------

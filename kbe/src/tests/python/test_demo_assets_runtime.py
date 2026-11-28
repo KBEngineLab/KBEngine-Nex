@@ -25,6 +25,7 @@ from performance.topology import build_local_cluster_components, platform_execut
 from runtime_console import RuntimeConsole
 from space_boundary_runtime import verify_boundary_move
 from space_partition_load import stop_demo_bot_actions, verify_partition_load
+from space_boundary_compare import verify_boundary_compare
 from space_split_runtime import LiveSpaceAdjustment, verify_space_merge, verify_space_split
 from space_layout_runtime import (
     NO_NAVIGATION_MAPPING, verify_boundary_ghosts, verify_fixed_layout, verify_ghost_source_change,
@@ -166,10 +167,65 @@ def verify_partitioning_rejection(entries, run_root, environment, args, output):
 
 
 def demo_bot_count(args):
+    if args.boundary_compare_window_ms is not None:
+        return args.partition_load_bots
     if args.check_adjustment_aoi:
         # 显式传送移走一名玩家，调区的同一 Space 仍需要两名 Bot 互相观察。
         return 3
     return args.partition_load_bots + 1 if args.partition_load_bots else 2
+
+
+def verify_demo_teleport(base, snapshot, initial, source, original_route, avatar_count):
+    eid = source["id"]
+    original_space_ids = {
+        e["id"] for entities in initial.values() for e in entities if e["type"] == "Space"
+    }
+    # 通过原游戏的分配器建立另一 CellApp 上的 Space，不用同进程移动代替传送。
+    created = base.evaluate(
+        f"[e.getSpaceAllocs()[{source['utype']}].createSpace(0, {{}}) "
+        "for e in tuple(KBEngine.entities.values()) if type(e).__name__ == 'Spaces']"
+    )
+    require(created == [None], "业务 Space 分配器不是唯一实例")
+    target_state = wait_until(
+        "第二个 Space 实例创建", snapshot,
+        lambda state: any(
+            e["type"] == "Space" and e["real"] and e["id"] not in original_space_ids
+            for entities in state.values() for e in entities
+        ),
+    )
+    target = next(
+        e for entities in target_state.values() for e in entities
+        if e["type"] == "Space" and e["real"] and e["id"] not in original_space_ids
+    )
+    require(target["cid"] != source["cid"], "新 Space 未分配到另一 CellApp，不执行同进程替代测试")
+    base.evaluate(
+        f"KBEngine.entities[{target['id']}].teleportSpace(KBEngine.entities[{eid}], "
+        f"{tuple(source['position'])!r}, {tuple(source['direction'])!r}, {{}})"
+    )
+
+    def migrated(state):
+        reals = [e for entities in state.values() for e in entities if e["id"] == eid and e["real"]]
+        return len(reals) == 1 and reals[0]["cid"] == target["cid"] and reals[0]["space"] == target["space"]
+
+    final = wait_until("角色跨 Cell 传送", snapshot, migrated)
+    route = wait_until(
+        "Base 更新角色路由",
+        lambda: base.evaluate(
+            f"{{'cell': str(KBEngine.entities[{eid}].cell), "
+            f"'client': str(KBEngine.entities[{eid}].client), "
+            f"'connected': KBEngine.entities[{eid}].client is not None, "
+            f"'dbid': KBEngine.entities[{eid}].databaseID}}"
+        ),
+        lambda value: f"cellapp[{target['cid']}]" in value["cell"],
+    )
+    require(route["connected"] and route["client"] == original_route["client"] and
+            route["dbid"] == original_route["dbid"], "传送改变了客户端连接或角色数据库 ID")
+    require(
+        sum(e["type"] == "Avatar" and e["real"] for entities in final.values() for e in entities) == avatar_count,
+        "传送后 Real 角色数量改变",
+    )
+    print(f"DEMO_TELEPORT_PASS entity={eid} source={source['cid']} target={target['cid']}", flush=True)
+    return final, target, route
 
 
 def verify_demo(entries, run_root, environment, args, output, password):
@@ -326,61 +382,13 @@ def verify_demo(entries, run_root, environment, args, output, password):
             )
             require(original_route["connected"] and original_route["dbid"] > 0,
                     "传送前角色缺少客户端连接或有效数据库 ID")
-            original_space_ids = {
-                e["id"] for entities in initial.values() for e in entities if e["type"] == "Space"
-            }
-            # 指定 assets 只配置一个地图；通过其现有分配器建立第二个真实实例，
-            # 不替换业务脚本，也不把一个 Space 内的本地移动当作跨 Cell 传送。
-            created = consoles[7001].evaluate(
-                f"[e.getSpaceAllocs()[{source['utype']}].createSpace(0, {{}}) "
-                "for e in tuple(KBEngine.entities.values()) if type(e).__name__ == 'Spaces']"
-            )
-            require(created == [None], "业务 Space 分配器不是唯一实例")
-            target_state = wait_until(
-                "第二个 Space 实例创建", snapshot,
-                lambda state: any(
-                    e["type"] == "Space" and e["real"] and e["id"] not in original_space_ids
-                    for entities in state.values() for e in entities
-                ),
-            )
-            target = next(
-                e for entities in target_state.values() for e in entities
-                if e["type"] == "Space" and e["real"] and e["id"] not in original_space_ids
-            )
-            require(target["cid"] != source["cid"],
-                    "新 Space 未分配到另一 CellApp，不执行同进程替代测试")
-            consoles[7001].evaluate(
-                f"KBEngine.entities[{target['id']}].teleportSpace(KBEngine.entities[{eid}], "
-                f"{tuple(source['position'])!r}, {tuple(source['direction'])!r}, {{}})"
-            )
-
-            def migrated(state):
-                reals = [e for entities in state.values() for e in entities
-                         if e["id"] == eid and e["real"]]
-                return len(reals) == 1 and reals[0]["cid"] == target["cid"] and \
-                    reals[0]["space"] == target["space"]
-
-            final = wait_until("角色跨 Cell 传送", snapshot, migrated)
-            route = wait_until(
-                "Base 更新角色路由",
-                lambda: consoles[7001].evaluate(
-                    f"{{'cell': str(KBEngine.entities[{eid}].cell), "
-                    f"'client': str(KBEngine.entities[{eid}].client), "
-                    f"'connected': KBEngine.entities[{eid}].client is not None, "
-                    f"'dbid': KBEngine.entities[{eid}].databaseID}}"
-                ),
-                lambda value: f"cellapp[{target['cid']}]" in value["cell"],
-            )
-            require(route["connected"] and route["client"] == original_route["client"] and
-                    route["dbid"] == original_route["dbid"],
-                    "传送改变了客户端连接或角色数据库 ID")
-            require(
-                sum(e["type"] == "Avatar" and e["real"]
-                    for entities in final.values() for e in entities) == avatar_count,
-                "传送后 Real 角色数量改变",
-            )
-            print(f"DEMO_TELEPORT_PASS entity={eid} source={source['cid']} target={target['cid']}",
-                  flush=True)
+            if args.boundary_compare_window_ms is None:
+                final, target, route = verify_demo_teleport(
+                    consoles[7001], snapshot, initial, source, original_route, avatar_count,
+                )
+            else:
+                # 不引入第 97 个客户端，也不提前通过显式传送复用跨 Cell 连接。
+                final, target, route = initial, None, None
             layout_result = None
             verify_after_logout = None
             load_result = None
@@ -394,10 +402,16 @@ def verify_demo(entries, run_root, environment, args, output, password):
                              for cid, entry in owned.items()}
                 processes.update({f"bots#{cid}": process.pid for cid, process in bots_processes.items()})
                 processes["controller"] = os.getpid()
-                load_result, load_passed = verify_partition_load(
-                    cells, consoles[7001], load_bots_consoles, infos, processes, source, players, args, token, output,
-                    base_info=infos[7001],
-                )
+                if args.boundary_compare_window_ms is not None:
+                    load_result, load_passed = verify_boundary_compare(
+                        cells, consoles[7001], load_bots_consoles[0], source, players,
+                        args.boundary_compare_window_ms, output,
+                    )
+                else:
+                    load_result, load_passed = verify_partition_load(
+                        cells, consoles[7001], load_bots_consoles, infos, processes, source, players, args, token, output,
+                        base_info=infos[7001],
+                    )
             elif args.fixed_space_layout:
                 original_space = next(
                     entity for entity in initial[source["cid"]]
@@ -554,14 +568,17 @@ def verify_demo(entries, run_root, environment, args, output, password):
                 "entity": eid, "source_cellapp": source["cid"],
                 "space_partitioning_configuration": args.space_partitioning,
                 "space_partitioning_enabled": args.space_partitioning == "true",
-                "target_cellapp": target["cid"], "target_space": target["space"],
-                "client_preserved": route["client"] == original_route["client"],
-                "database_id_preserved": route["dbid"] == original_route["dbid"],
                 "avatars_after_logout": 0,
                 "normal_server_exits": len(entries) - len(INFRASTRUCTURE_COMPONENTS),
                 "infrastructure_cleanup": list(INFRASTRUCTURE_COMPONENTS),
                 "fixed_space_layout": layout_result,
             }
+            if target is not None:
+                result.update(
+                    target_cellapp=target["cid"], target_space=target["space"],
+                    client_preserved=route["client"] == original_route["client"],
+                    database_id_preserved=route["dbid"] == original_route["dbid"],
+                )
             if load_result is not None:
                 result["partition_load"] = load_result
             (output / "result.json").write_text(
@@ -619,15 +636,23 @@ def main():
                         help="每种分布预热结束后的采样秒数")
     parser.add_argument("--partition-crossings", type=int, default=0,
                         help="采样后重复跨越四区交汇处的垂直切分线")
+    parser.add_argument("--boundary-compare-window-ms", type=int, choices=(0, 1000),
+                        help="96 个真实 TCP 客户端、两 Cell 的旁观者位置延迟对照")
     parser.add_argument("--cellapp-count", type=int, choices=(2, 4), default=2)
     parser.add_argument("--keep-space-layout-on-shutdown", action="store_true",
                         help="保留已启用的区域直接正常关服，检查 Cell 资源不会阻止退出")
     args = parser.parse_args()
-    require(args.partition_load_bots == 0 or (
-        4 <= args.partition_load_bots <= 128 and args.partition_load_bots % 4 == 0
-        and args.cellapp_count == 4 and args.space_partitioning in ("true", "false")
-        and args.partition_load_seconds >= 10 and not (args.fixed_space_layout or args.partition_rejection)
-    ), "性能采样需要四个 CellApp、明确的分割模式、四的倍数个玩家（4 至 128）及至少 10 秒的采样")
+    if args.boundary_compare_window_ms is not None:
+        require(args.partition_load_bots == 96 and args.cellapp_count == 2 and args.coordinate_y == "false"
+                and args.partition_bot_processes == 1 and args.space_partitioning == "true"
+                and not (args.fixed_space_layout or args.partition_rejection or args.partition_crossings),
+                "跨引擎对照需要 96 个 Bots、单 Bots 进程、两 Cell 和二维分割")
+    else:
+        require(args.partition_load_bots == 0 or (
+            4 <= args.partition_load_bots <= 128 and args.partition_load_bots % 4 == 0
+            and args.cellapp_count == 4 and args.space_partitioning in ("true", "false")
+            and args.partition_load_seconds >= 10 and not (args.fixed_space_layout or args.partition_rejection)
+        ), "性能采样需要四个 CellApp、明确的分割模式、四的倍数个玩家（4 至 128）及至少 10 秒的采样")
     require(args.partition_crossings == 0 or (
         args.partition_load_bots and args.space_partitioning == "true" and args.partition_crossings > 0
     ), "连续越界需要在启用分割的性能场景中执行")
@@ -669,10 +694,12 @@ def main():
         database_username=database.findtext("./auth/username", "").strip(),
         database_password=database.findtext("./auth/password", "").strip(),
         runtime_log_level="warn" if args.partition_load_bots else "info", server_runtime_log_level="info",
-        performance_probes_enabled=bool(args.partition_load_bots),
+        performance_probes_enabled=bool(args.partition_load_bots and args.boundary_compare_window_ms is None),
         bots_transport="tcp", bots_allow_tcp_fallback=False,
     )
     runtime = ET.parse(config_path)
+    if args.boundary_compare_window_ms is not None:
+        set_xml_value(runtime.getroot(), "asyncioRepeatOffset", 0.01)
     if args.check_adjustment_aoi or args.coordinate_y is not None:
         cell = runtime.getroot().find("cellapp")
         if cell is None:
