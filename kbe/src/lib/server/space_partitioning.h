@@ -10,11 +10,12 @@ namespace SpacePartitioning {
 constexpr uint8 ENABLED = 1;
 constexpr uint8 COORDINATE_SYSTEM = 2;
 constexpr uint8 COORDINATE_SYSTEM_Y = 4;
-constexpr uint8 KNOWN_FLAGS = ENABLED | COORDINATE_SYSTEM | COORDINATE_SYSTEM_Y;
+constexpr uint8 HANDOFF_COPY_PEERS = 8;
+constexpr uint8 KNOWN_FLAGS = ENABLED | COORDINATE_SYSTEM | COORDINATE_SYSTEM_Y | HANDOFF_COPY_PEERS;
 
 inline uint8 modeFlags(bool enabled, bool coordinateSystem, bool hasY)
 {
-	return static_cast<uint8>((enabled ? ENABLED : 0) |
+	return static_cast<uint8>((enabled ? ENABLED | HANDOFF_COPY_PEERS : 0) |
 		(coordinateSystem ? COORDINATE_SYSTEM : 0) |
 		(hasY ? COORDINATE_SYSTEM_Y : 0));
 }

@@ -39,9 +39,11 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "server/client_request_guard.h"
 #include "server/bounded_stream_reader.h"
 #include "server/cell_backup.h"
+#include "cell_handoff_snapshot.h"
 #include "server/cell_process_watch.h"
 #include "server/component_routing_guard.h"
 #include "server/space_partitioning.h"
+#include "network/event_poller.h"
 #include "server/components.h"
 #include "server/telnet_server.h"
 #include "server/py_file_descriptor.h"
@@ -3195,9 +3197,9 @@ bool Cellapp::beginCellHandoff(ENTITY_ID id, bool automatic)
 		dispatchCellHandoff(*entity, entry);
 		if (entry.unsent)
 		{
+			auto restored = std::move(outgoingCellHandoffs_.at(id));
 			outgoingCellHandoffs_.erase(id);
-			entity->removeFlags(ENTITY_FLAGS_TELEPORT_START);
-			delayAutoCellHandoff(*entity);
+			restoreCellHandoffSource(*entity, *restored);
 		}
 		Entity::bufferCallback(false);
 	}
@@ -3226,28 +3228,47 @@ void Cellapp::dispatchCellHandoff(Entity& entity, OutgoingCellHandoff& pending)
 	if (pending.unsent)
 		return;
 
+	auto& body = pending.snapshot;
+	size_t snapshotOffset;
 	try
 	{
-		entity.changeToGhost(route.target, pending.snapshot, route.epoch, true);
+		const auto peers = space->boundaryGhosts().handoffPeers(entity.id(), route.target);
+		snapshotOffset = CellHandoff::writeSnapshotBody(body, entity.id(), entity.pScriptModule()->getUType(),
+			pos, dir, pending.base, generation, route, pending.processes, peers,
+			[&](MemoryStream& stream) { entity.changeToGhost(route.target, stream, route.epoch, true); });
 	}
 	catch (const MemoryStreamWriteOverflow&)
 	{
 		pending.unsent = true;
+		MemoryStream empty(0);
+		pending.snapshot.swap(empty);
+		// 完整交接比 Ghost 快照多出私有属性和运行状态；退役端必须报告失败，
+		// 让管理器按原顺序收尾在途交接并恢复接收，而不是反复尝试同一快照。
+		if (space->isDrainingCell())
+			space->reportCellMergeBlock(entity.id(), "full handoff snapshot exceeds MemoryStream size limit");
 		return;
 	}
 	auto* request = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	request->newMessage(CellappInterface::reqCellHandoff);
-	(*request) << entity.id() << entity.pScriptModule()->getUType()
-		<< pos.x << pos.y << pos.z << dir.roll() << dir.pitch() << dir.yaw()
-		<< pending.base << generation;
-	route.write(*request);
-	if (!pending.base)
-		pending.processes.write(*request);
-	request->append(pending.snapshot);
+	request->append(body);
+	// 回退只读取实体快照，复用发送缓冲，避免再复制整份状态。
+	body.rpos(snapshotOffset);
 	pending.dispatched = true;
 	pending.checkAt = timestamp() + 2 * stampsPerSecond();
 	target->send(request);
 	DEBUG_MSG(fmt::format("Cellapp::cellHandoff: snapshot sent, entity={}, epoch={}.\n", entity.id(), route.epoch));
+}
+
+//-------------------------------------------------------------------------------------
+void Cellapp::releaseCellHandoffSource(Entity& entity, const CellHandoff::Route& route, uint64 session)
+{
+	auto* space = Spaces::findSpace(route.space);
+	if (space && entity.spaceID() == route.space && space->layoutVersion() == route.layoutVersion)
+		space->boundaryGhosts().remove(*space, entity, route.target);
+	if (!space || entity.spaceID() != route.space || space->layoutVersion() != route.layoutVersion ||
+		!space->canAcceptEntities() || space->layoutState() != SpaceLayout::ACTIVE ||
+		!space->boundaryGhosts().retainHandoffSource(*space, entity, session))
+		destroyEntity(entity.id(), false);
 }
 
 //-------------------------------------------------------------------------------------
@@ -3257,10 +3278,13 @@ void Cellapp::restoreCellHandoffSource(Entity& entity, OutgoingCellHandoff& pend
 		delayAutoCellHandoff(entity);
 	if (pending.dispatched)
 	{
+		if (auto* space = Spaces::findSpace(pending.route.space))
+			space->noteCellMergeRollback(entity.id());
 		entity.changeToReal(0, pending.snapshot, true);
 		entity.restoreProximitys();
 	}
 	entity.removeFlags(ENTITY_FLAGS_TELEPORT_START);
+	entity.reconcileCellHandoffWitness();
 }
 
 //-------------------------------------------------------------------------------------
@@ -3401,8 +3425,9 @@ void Cellapp::onCellHandoff(Network::Channel* channel, MemoryStream& stream)
 		entity->isCellHandoffSource() && entity->realCell() == route.target &&
 		entity->routingEpoch() == route.epoch)
 	{
+		const auto session = pending.session;
 		outgoingCellHandoffs_.erase(entry);
-		destroyEntity(id, false);
+		releaseCellHandoffSource(*entity, route, session);
 		sendCellHandoff(channel, id, SOURCE_RELEASED, route);
 	}
 	else if (action == RESTORE_SOURCE &&
@@ -3485,7 +3510,7 @@ void Cellapp::onPeerCellHandoff(Network::Channel& channel, ENTITY_ID id, uint8 a
 			MemoryStream empty(0);
 			pending.snapshot.swap(empty);
 			if (ownsSource)
-				destroyEntity(id, false);
+				releaseCellHandoffSource(*entity, route, pending.session);
 		}
 		sendPeerCellHandoff(channel, id, SOURCE_RELEASED, route, processes);
 		Entity::bufferCallback(false);
@@ -3638,6 +3663,8 @@ void Cellapp::reqCellHandoff(Network::Channel* channel, MemoryStream& stream)
 		stream.done();
 		return;
 	}
+	CopyPeers copies;
+	const bool validCopies = readCopyPeers(header, route, copies);
 	const size_t snapshotPos = stream.rpos() + stream.length() - header.remaining();
 	auto* base = Components::getSingleton().findComponentChannel(BASEAPP_TYPE, baseID);
 	auto* space = Spaces::findSpace(route.space);
@@ -3661,7 +3688,26 @@ void Cellapp::reqCellHandoff(Network::Channel* channel, MemoryStream& stream)
 	}
 	const auto* destination = space && space->hasManagedCell() ?
 		space->handoffDestination(pos.x, pos.z, route.source) : NULL;
-	if (!spacePartitioningEnabled() || !spacePartitioningConfirmed() || isShuttingdown() ||
+	std::unique_ptr<CopyReservation> reservation;
+	auto reserveCopies = [&]()
+	{
+		copies.emplace_back(route.source, space->layout().cellForApp(route.source)->cellID);
+		reservation = handoffCopyBudget_.tryReserve(std::move(copies), [](COMPONENT_ID app) -> uint64
+		{
+			auto* channel = Components::getSingleton().findComponentChannel(CELLAPP_TYPE, app);
+			if (!canSendCellHandoff(channel))
+				return 0;
+			const auto* endpoint = channel->pEndPoint();
+			auto* poller = channel->networkInterface().dispatcher().pPoller();
+			return static_cast<uint64>(channel->bundlesLength()) +
+				(endpoint && poller ? poller->tcpSendPendingBytes(*endpoint) : 0);
+		});
+		if (!reservation)
+			WARNING_MSG(fmt::format("Cellapp::cellHandoff: copy budget exhausted, entity={}, epoch={}, space={}.\n",
+				id, route.epoch, route.space));
+		return reservation != nullptr;
+	};
+	if (!validCopies || !spacePartitioningEnabled() || !spacePartitioningConfirmed() || isShuttingdown() ||
 		!space || !space->canAcceptNewEntities() || space->layoutState() != SpaceLayout::ACTIVE ||
 		!destination || destination->cellappID != componentID_ || !space->layout().cellForApp(route.source) ||
 		(baseID ? !canSendCellHandoff(base) :
@@ -3672,7 +3718,7 @@ void Cellapp::reqCellHandoff(Network::Channel* channel, MemoryStream& stream)
 		!header.read(snapshotType) || snapshotType != type || !header.read(epoch) || epoch != route.epoch ||
 		!header.read(snapshotSpace) || snapshotSpace != route.space || !header.read(destroyed) || destroyed ||
 		!header.skip(sizeof(bool) + sizeof(float) * 2 + sizeof(int8)) ||
-		!header.read(snapshotBase) || snapshotBase != baseID ||
+		!header.read(snapshotBase) || snapshotBase != baseID || !reserveCopies() ||
 		// 同一连接上也会重建 Ghost，旧快照不能把新副本转为 Real。
 		!space->boundaryGhosts().forgetHandoffTarget(id, route.source, channel->sessionEpoch(), generation))
 	{
@@ -3695,7 +3741,7 @@ void Cellapp::reqCellHandoff(Network::Channel* channel, MemoryStream& stream)
 	Entity::bufferCallback(true);
 	entity->removeFlags(ENTITY_FLAGS_BOUNDARY_GHOST);
 	entity->addFlags(ENTITY_FLAGS_INITING);
-	entity->beginCellHandoffTarget(route.source);
+	entity->beginCellHandoffTarget(route.source, std::move(reservation));
 	entity->changeToReal(0, stream, true);
 	entity->migrationRelayCell(route.source);
 	entity->setPositionAndDirection(pos, dir);

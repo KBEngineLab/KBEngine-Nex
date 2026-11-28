@@ -25,7 +25,7 @@ from performance.topology import build_local_cluster_components, platform_execut
 from runtime_console import RuntimeConsole
 from space_boundary_runtime import verify_boundary_move
 from space_partition_load import stop_demo_bot_actions, verify_partition_load
-from space_split_runtime import verify_space_merge, verify_space_split
+from space_split_runtime import LiveSpaceAdjustment, verify_space_merge, verify_space_split
 from space_layout_runtime import (
     NO_NAVIGATION_MAPPING, verify_boundary_ghosts, verify_fixed_layout, verify_ghost_source_change,
     verify_layout_removal, verify_rejected_layout_removal,
@@ -165,9 +165,25 @@ def verify_partitioning_rejection(entries, run_root, environment, args, output):
     print(f"SPACE_PARTITIONING_REJECTION_PASS result={output / 'result.json'}", flush=True)
 
 
+def demo_bot_count(args):
+    if args.check_adjustment_aoi:
+        # 显式传送移走一名玩家，调区的同一 Space 仍需要两名 Bot 互相观察。
+        return 3
+    return args.partition_load_bots + 1 if args.partition_load_bots else 2
+
+
 def verify_demo(entries, run_root, environment, args, output, password):
     sys.path.insert(0, str(args.repository_root / "kbe/tools/server"))
     from pycommon import Define, Machines
+
+    expected_server_errors = set()
+
+    def checked_server_logs():
+        logs = all_run_logs(entries, run_root)
+        if not expected_server_errors:
+            return logs
+        # 只排除缩容负例在指定源 Cell 实测到的那一条溢出诊断。
+        return "\n".join(line for line in logs.splitlines() if line.strip() not in expected_server_errors)
 
     token = resolve_management_admin_token(environment)
     wait_for_cluster_ready_for_login(
@@ -282,13 +298,17 @@ def verify_demo(entries, run_root, environment, args, output, password):
                     for cid, console in cells.items()
                 }
 
-            avatar_count = args.partition_load_bots + 1 if args.partition_load_bots else 2
+            avatar_count = demo_bot_count(args)
             initial = wait_until(
                 "本轮角色进入场景", snapshot,
                 lambda state: sum(e["type"] == "Avatar" and e["real"]
                                   for entities in state.values() for e in entities) == avatar_count,
                 timeout=90,
             )
+            adjustment_bots = None
+            if args.check_adjustment_aoi:
+                adjustment_bots = connect_bots_console()
+                stop_demo_bot_actions(adjustment_bots)
             load_bots_consoles = []
             if args.partition_load_bots:
                 for cid in bots_ids:
@@ -365,6 +385,7 @@ def verify_demo(entries, run_root, environment, args, output, password):
             verify_after_logout = None
             load_result = None
             load_passed = True
+            adjustment_passed = True
             if args.partition_load_bots:
                 players = {row["id"] for rows in final.values() for row in rows
                            if row["type"] == "Avatar" and row["real"] and row["space"] == source["space"]}
@@ -406,15 +427,24 @@ def verify_demo(entries, run_root, environment, args, output, password):
                     manager = infos[6000]
                     require(manager["pid"] == owned[6000]["process"].pid,
                             "发现的 CellAppMgr 不属于本次测试")
+                    live_checks = {}
+                    if adjustment_bots is not None:
+                        live_checks["live"] = LiveSpaceAdjustment(
+                            cells, consoles[7001], adjustment_bots, original_space["space"],
+                        )
                     layout_result["split"] = verify_space_split(
                         cells, layout_result, consoles[7001], args.repository_root,
                         f"{manager['host']}:{manager['internal_port']}", environment, output,
+                        **live_checks,
                     )
                     if args.merge_space:
                         layout_result["merge"] = verify_space_merge(
                             cells, layout_result, layout_result["split"], consoles[7001], args.repository_root,
                             f"{manager['host']}:{manager['internal_port']}", environment, output,
+                            expected_server_errors=expected_server_errors, **live_checks,
                         )
+                        if live_checks:
+                            adjustment_passed = layout_result["merge"]["live_adjustment"]["mutual_aoi_objects_preserved"]
                     verify_after_logout = None
                 elif args.handoff_destroy_timer:
                     layout_result["handoff_destroy_timer"] = verify_handoff_destroy_timer(
@@ -481,7 +511,7 @@ def verify_demo(entries, run_root, environment, args, output, password):
                     layout_result["rejected_layout_removed"] = True
             elif layout_result is not None:
                 layout_result["active_at_shutdown"] = True
-            require(not ERROR_PATTERN.search(all_run_logs(entries, run_root)),
+            require(not ERROR_PATTERN.search(checked_server_logs()),
                     "业务检查产生错误，请检查本次日志")
 
             for console in consoles.values():
@@ -509,7 +539,7 @@ def verify_demo(entries, run_root, environment, args, output, password):
                     exit_code = entry["process"].wait(timeout=60)
                     require(exit_code == 0, f"{name} 没有正常退出，退出码为 {exit_code}")
                     print(f"DEMO_COMPONENT_EXIT name={name} code={exit_code}", flush=True)
-            logs = all_run_logs(entries, run_root)
+            logs = checked_server_logs()
             logs += "".join(read_text(path) for path in bots_logs)
             logs += "".join(read_text(path) for path in (output / "logs").glob("*.log"))
             require(not ERROR_PATTERN.search(logs) and not DEFAULT_PATTERNS["error"].search(logs),
@@ -520,7 +550,8 @@ def verify_demo(entries, run_root, environment, args, output, password):
                 "辅助组件在测试控制器清理前已经退出",
             )
             result = {
-                "status": "PASS" if load_passed else "FAIL", "entity": eid, "source_cellapp": source["cid"],
+                "status": "PASS" if load_passed and adjustment_passed else "FAIL",
+                "entity": eid, "source_cellapp": source["cid"],
                 "space_partitioning_configuration": args.space_partitioning,
                 "space_partitioning_enabled": args.space_partitioning == "true",
                 "target_cellapp": target["cid"], "target_space": target["space"],
@@ -538,6 +569,8 @@ def verify_demo(entries, run_root, environment, args, output, password):
             )
             if not load_passed:
                 raise RuntimeError(f"客户端玩家 AOI 或 TCP 队列检查未通过，详见 {output / load_result}")
+            if not adjustment_passed:
+                raise RuntimeError(f"调区后客户端重建了仍应可见的玩家对象，详见 {output / 'result.json'}")
             print(f"DEMO_ASSETS_RUNTIME_PASS result={output / 'result.json'}", flush=True)
         finally:
             # 失败时仍只处理本次持有的子进程；清理不计入正常退出的通过结果。
@@ -576,6 +609,8 @@ def main():
                         help="验证运维新增 Cell、准备期间的资源更新和实体迁移")
     parser.add_argument("--merge-space", action="store_true",
                         help="扩容后验证合并、排空和再次扩容")
+    parser.add_argument("--check-adjustment-aoi", action="store_true",
+                        help="新增、调界和合并时验证两个在线玩家的 AOI、Real 和路由")
     parser.add_argument("--partition-load-bots", type=int, default=0,
                         help="使用指定数量的真实 TCP Bots 采样均匀和热点分布")
     parser.add_argument("--partition-bot-processes", type=int, choices=(1, 2, 4), default=1,
@@ -614,6 +649,7 @@ def main():
         and not (args.partition_rejection or args.move_space_boundary or args.handoff_destroy_timer)
     ), "扩容检查要求启动四个 CellApp，先启用双 Cell 固定布局")
     require(not args.merge_space or args.split_space, "缩容检查要求同时开启扩容检查")
+    require(not args.check_adjustment_aoi or args.merge_space, "调区 AOI 检查要求同时开启缩容检查")
     for name in ("repository_root", "assets_root", "binary_root", "config_overlay"):
         setattr(args, name, getattr(args, name).resolve())
     source = ET.parse(args.config_overlay / "server/kbengine.xml").getroot()
@@ -626,7 +662,7 @@ def main():
     output = args.binary_root / "Testing" / f"demo-assets-runtime-{uuid.uuid4().hex[:12]}"
     output.mkdir(parents=True, exist_ok=False)
     config_path = create_config_overlay(
-        args.assets_root, output, args.partition_load_bots + 1 if args.partition_load_bots else 2,
+        args.assets_root, output, demo_bot_count(args),
         database_host=database.findtext("host", "").strip(),
         database_port=int(database.findtext("port", "3306")),
         database_name=database_name,
@@ -637,10 +673,22 @@ def main():
         bots_transport="tcp", bots_allow_tcp_fallback=False,
     )
     runtime = ET.parse(config_path)
-    if args.coordinate_y is not None:
+    if args.check_adjustment_aoi or args.coordinate_y is not None:
         cell = runtime.getroot().find("cellapp")
         if cell is None:
             cell = ET.SubElement(runtime.getroot(), "cellapp")
+    if args.check_adjustment_aoi:
+        set_xml_value(cell, "ghostingMaxPerCheck", 4)
+        # 缩小测试连接的内核缓冲，让暂停读取的观察 Cell 确实在发送方产生用户态积压。
+        channel_common = runtime.getroot().find("channelCommon")
+        if channel_common is None:
+            channel_common = ET.SubElement(runtime.getroot(), "channelCommon")
+        for key in ("readBufferSize", "writeBufferSize"):
+            buffers = channel_common.find(key)
+            if buffers is None:
+                buffers = ET.SubElement(channel_common, key)
+            set_xml_value(buffers, "internal", 256 * 1024)
+    if args.coordinate_y is not None:
         coordinates = cell.find("coordinate_system")
         if coordinates is None:
             coordinates = ET.SubElement(cell, "coordinate_system")

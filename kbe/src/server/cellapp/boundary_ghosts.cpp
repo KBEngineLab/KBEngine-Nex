@@ -12,8 +12,9 @@
 namespace KBEngine {
 namespace
 {
-	constexpr size_t MAX_STATE_BYTES = 256 * 1024;
-	constexpr int32 MAX_PENDING_BYTES = 512 * 1024;
+	constexpr size_t MAX_STATE_BYTES = CellHandoff::CopyBudget::MAX_STATE;
+	constexpr int32 MAX_PENDING_BYTES = CellHandoff::CopyBudget::ORDINARY_BYTES;
+	constexpr size_t HEADER_ALLOWANCE = CellHandoff::CopyBudget::HEADER;
 
 	Network::Channel* peerChannel(COMPONENT_ID component)
 	{
@@ -84,6 +85,15 @@ bool BoundaryGhosts::isWitnessed(const Copies& copies)
 	return std::any_of(copies.begin(), copies.end(), [](const auto& copy) { return copy.second.witnessed; });
 }
 
+void BoundaryGhosts::sendMergeFence(Network::Channel& channel, const Space& space, CELL_ID target,
+	uint64 attempt, bool acknowledge)
+{
+	// 实体编号零保留给整条 Ghost 连接的确认。复用同一可靠发送队列，保证 MOVED/REMOVE 排在标记前。
+	MemoryStream payload;
+	payload << space.boundaryRevision();
+	send(channel, space, target, 0, attempt, acknowledge ? MERGE_FENCE_ACK : MERGE_FENCE, &payload);
+}
+
 const char* BoundaryGhosts::writeSnapshot(Entity& entity, const Pose& pose, MemoryStream& snapshot)
 {
 	snapshot << entity.pScriptModule()->getUType() << entity.routingEpoch();
@@ -101,6 +111,14 @@ const char* BoundaryGhosts::checkHandoffSnapshot(Entity& entity, COMPONENT_ID ta
 		return nullptr;
 	const Pose pose{entity.position(), entity.direction(), entity.layer(), entity.isOnGround()};
 	return writeSnapshot(entity, pose, snapshot);
+}
+
+void BoundaryGhosts::createCopy(Space& space, Entity& entity, const Neighbour& neighbour,
+	Network::Channel& channel, const Pose& pose, const MemoryStream& snapshot)
+{
+	const uint64 generation = ++generation_;
+	send(channel, space, neighbour.cell, entity.id(), generation, CREATE, &snapshot);
+	outgoing_[entity.id()][neighbour.component] = {channel.sessionEpoch(), generation, pose, neighbour.cell};
 }
 
 void BoundaryGhosts::refresh(Space& space, Entity& entity, SendTarget* targets, size_t count)
@@ -148,8 +166,7 @@ void BoundaryGhosts::refresh(Space& space, Entity& entity, SendTarget* targets, 
 			continue;
 		}
 
-		constexpr size_t headerAllowance = 64;
-		if (target.remaining <= headerAllowance)
+		if (target.remaining <= HEADER_ALLOWANCE)
 			continue;
 		if (exists)
 		{
@@ -157,10 +174,10 @@ void BoundaryGhosts::refresh(Space& space, Entity& entity, SendTarget* targets, 
 			{
 				MemoryStream data;
 				pose.write(data);
-				if (data.length() > target.remaining - headerAllowance)
+				if (data.length() > target.remaining - HEADER_ALLOWANCE)
 					continue;
 				send(*channel, space, copy->second.cell, entity.id(), copy->second.generation, POSE, &data);
-				target.remaining -= data.length() + headerAllowance;
+				target.remaining -= data.length() + HEADER_ALLOWANCE;
 				copy->second.pose = pose;
 			}
 			continue;
@@ -173,14 +190,12 @@ void BoundaryGhosts::refresh(Space& space, Entity& entity, SendTarget* targets, 
 		}
 		if (snapshotError && drainTarget && drainTarget->cellappID == neighbour.component)
 			space.reportCellMergeBlock(entity.id(), snapshotError);
-		if (snapshotError || snapshot->length() > target.remaining - headerAllowance)
+		if (snapshotError || snapshot->length() > target.remaining - HEADER_ALLOWANCE)
 			continue;
+		createCopy(space, entity, neighbour, *channel, pose, *snapshot);
 		if (entry == outgoing_.end())
-			entry = outgoing_.emplace(entity.id(), Copies()).first;
-		const uint64 generation = ++generation_;
-		send(*channel, space, neighbour.cell, entity.id(), generation, CREATE, &*snapshot);
-		target.remaining -= snapshot->length() + headerAllowance;
-		entry->second.emplace(neighbour.component, Copy{channel->sessionEpoch(), generation, pose, neighbour.cell});
+			entry = outgoing_.find(entity.id());
+		target.remaining -= snapshot->length() + HEADER_ALLOWANCE;
 	}
 
 	if (entry != outgoing_.end())
@@ -244,15 +259,24 @@ void BoundaryGhosts::update(Space& space)
 
 	auto& app = Cellapp::getSingleton();
 	const auto& config = g_kbeSrvConfig.getCellApp();
-	nextCheck_ = timestamp() + stampsPerSecond() / config.ghostUpdateHertz;
+	const auto now = timestamp();
+	nextCheck_ = now + stampsPerSecond() / config.ghostUpdateHertz;
 
 	for (auto it = incoming_.begin(); it != incoming_.end();)
 	{
-		const auto& copy = it->second;
+		auto& copy = it->second;
 		auto* channel = app.networkInterface().findChannel(copy.address);
 		if (channel && !channel->isDestroyed() && channel->condemn() == 0 &&
 			channel->sessionEpoch() == copy.session)
 		{
+			// 扫描或发送积压不能证明实体已离开。超时只向同一会话查询，按权威答复清理。
+			if (copy.nextHandoffCheck && now >= copy.nextHandoffCheck)
+			{
+				auto* entity = app.findEntity(it->first);
+				if (entity && channel->bundlesLength() < MAX_PENDING_BYTES)
+					send(*channel, space, copy.cell, it->first, entity->routingEpoch(), CHECK_HANDOFF_COPY);
+				copy.nextHandoffCheck = now + 5 * stampsPerSecond();
+			}
 			++it;
 			continue;
 		}
@@ -341,7 +365,18 @@ void BoundaryGhosts::forgetPeer(Space& space, COMPONENT_ID peer)
 	Entity::bufferCallback(false);
 }
 
-void BoundaryGhosts::remove(Space& space, Entity& entity, COMPONENT_ID keepTarget)
+CellHandoff::CopyPeers BoundaryGhosts::handoffPeers(ENTITY_ID id, COMPONENT_ID target) const
+{
+	CellHandoff::CopyPeers peers;
+	const auto entry = outgoing_.find(id);
+	if (entry != outgoing_.end())
+		for (const auto& [app, copy] : entry->second)
+			if (app != target)
+				peers.emplace_back(app, copy.cell);
+	return peers;
+}
+
+void BoundaryGhosts::remove(Space& space, Entity& entity, COMPONENT_ID successor)
 {
 	if (entity.isBoundaryGhost())
 	{
@@ -354,22 +389,111 @@ void BoundaryGhosts::remove(Space& space, Entity& entity, COMPONENT_ID keepTarge
 	const auto entry = outgoing_.find(entity.id());
 	if (entry == outgoing_.end())
 		return;
+	MemoryStream moved(0);
+	const auto* next = successor ? space.layout().cellForApp(successor) : nullptr;
+	if (next)
+		moved << successor << next->cellID << entity.routingEpoch();
 	for (const auto& copy : entry->second)
 	{
-		if (copy.first == keepTarget)
+		if (copy.first == successor)
 			continue;
 		auto* channel = peerChannel(copy.first);
 		if (channel && channel->sessionEpoch() == copy.second.session)
-			send(*channel, space, copy.second.cell, entity.id(), copy.second.generation, REMOVE);
+			send(*channel, space, copy.second.cell, entity.id(), copy.second.generation,
+				next ? HANDOFF_COPY_MOVED : REMOVE, next ? &moved : nullptr);
 	}
 	outgoing_.erase(entry);
 	entity.setBoundaryWitnessed(false);
 }
 
+bool BoundaryGhosts::retainHandoffSource(Space& space, Entity& entity, uint64 session)
+{
+	// 正在迁入的 Witness 可能尚未计入本地观察者，但客户端仍持有它的引用。
+	if (!intersects(space.localCellBounds(), entity.position(), g_kbeSrvConfig.getCellApp().ghostDistance))
+		return false;
+
+	const auto source = entity.realCell();
+	const auto* cell = space.layout().cellForApp(source);
+	const auto* channel = peerChannel(source);
+	if (!cell || !channel || channel->sessionEpoch() != session)
+		return false;
+
+	// 源已失去权威，只保留坐标节点和已有客户端关系。代次 0 不接受普通增量。
+	const auto inserted = incoming_.emplace(entity.id(), Incoming{source, channel->addr(), session, 0,
+		cell->cellID, timestamp() + 5 * stampsPerSecond()});
+	if (!inserted.second)
+		return false;
+	entity.retainCellHandoffGhost();
+	return true;
+}
+
+void BoundaryGhosts::prepareHandoffCopies(Space& space, Entity& entity, const CellHandoff::CopyPeers& peers)
+{
+	const Pose pose{entity.position(), entity.direction(), entity.layer(), entity.isOnGround()};
+	const float distance = g_kbeSrvConfig.getCellApp().ghostDistance;
+	std::optional<MemoryStream> snapshot;
+	const char* snapshotError = nullptr;
+	for (const auto& [app, cell] : peers)
+	{
+		const auto* member = space.layout().cellForApp(app);
+		auto* channel = peerChannel(app);
+		if (!channel || !member || member->cellID != cell || handoffCopyGeneration(entity.id(), app, channel->sessionEpoch()))
+			continue;
+
+		Neighbour neighbour{app, {}, cell};
+		// 继承的正式副本沿用退场滞回距离；源端占位按创建距离保留。
+		const float range = app == entity.migrationRelayCell() ? distance : distance + distance * 0.1f;
+		if (!space.layout().boundsForApp(app, neighbour.bounds) || !intersects(neighbour.bounds, pose.position, range))
+		{
+			send(*channel, space, cell, entity.id(), entity.routingEpoch(), HANDOFF_COPY_ABSENT);
+			continue;
+		}
+		if (!snapshot)
+		{
+			snapshot.emplace();
+			snapshotError = writeSnapshot(entity, pose, *snapshot);
+			if (snapshotError)
+				WARNING_MSG(fmt::format("BoundaryGhosts::prepareHandoffCopies: entity={}, {}.\n", entity.id(), snapshotError));
+		}
+		if (snapshotError)
+		{
+			// 已提交的目标无法回滚。脚本在迁入期间生成不可复制状态时，沿用普通 Ghost 的状态上限。
+			send(*channel, space, cell, entity.id(), entity.routingEpoch(), HANDOFF_COPY_ABSENT);
+			continue;
+		}
+		const auto queued = channel->bundlesLength();
+		if (queued + snapshot->length() + HEADER_ALLOWANCE > MAX_PENDING_BYTES)
+			INFO_MSG(fmt::format("BoundaryGhosts::prepareHandoffCopies: reserved send, entity={}, peer={}, queued={}.\n",
+				entity.id(), app, queued));
+		createCopy(space, entity, neighbour, *channel, pose, *snapshot);
+	}
+}
+
+void BoundaryGhosts::resolveHandoffCopy(Space& space, COMPONENT_ID previous, ENTITY_ID id, uint64 epoch)
+{
+	auto* channel = peerChannel(previous);
+	const auto* cell = space.layout().cellForApp(previous);
+	if (!channel || !cell || !space.canAcceptEntities() || space.layoutState() != SpaceLayout::ACTIVE ||
+		version_ != space.layoutVersion())
+		return;
+	auto* entity = Cellapp::getSingleton().findEntity(id);
+	if (entity && entity->spaceID() == space.id() && !entity->isDestroyed())
+	{
+		// 在途交接由提交端通知新权威。旧目标已变成 Ghost 时不能代替新 Real 撤回占位。
+		if (!entity->isReal() || entity->routingEpoch() != epoch || entity->hasFlags(ENTITY_FLAGS_TELEPORT_START))
+			return;
+		// 查询不占用已接纳交接的预留额度，余量不足时由占位端下一次查询重试。
+		if (channel->bundlesLength() <= MAX_PENDING_BYTES - static_cast<int32>(MAX_STATE_BYTES + HEADER_ALLOWANCE))
+			prepareHandoffCopies(space, *entity, {{previous, cell->cellID}});
+		return;
+	}
+	send(*channel, space, cell->cellID, id, epoch, HANDOFF_COPY_ABSENT);
+}
+
 bool BoundaryGhosts::forgetHandoffTarget(ENTITY_ID id, COMPONENT_ID source, uint64 session, uint64 generation)
 {
 	const auto entry = incoming_.find(id);
-	if (entry == incoming_.end() || entry->second.source != source ||
+	if (entry == incoming_.end() || generation == 0 || entry->second.source != source ||
 		entry->second.session != session || entry->second.generation != generation)
 		return false;
 	incoming_.erase(entry);
@@ -388,7 +512,7 @@ uint64 BoundaryGhosts::handoffCopyGeneration(ENTITY_ID id, COMPONENT_ID target, 
 void BoundaryGhosts::witnessed(Space& space, const Entity& entity, bool observed)
 {
 	const auto current = incoming_.find(entity.id());
-	if (current == incoming_.end())
+	if (current == incoming_.end() || current->second.generation == 0)
 		return;
 
 	const auto& copy = current->second;
@@ -405,7 +529,7 @@ void BoundaryGhosts::witnessed(Space& space, const Entity& entity, bool observed
 void BoundaryGhosts::sendToCopies(Space& space, const Entity& entity, Operation operation, const MemoryStream& data)
 {
 	const auto entry = outgoing_.find(entity.id());
-	if (entry == outgoing_.end() || data.length() > MAX_STATE_BYTES || !space.canAcceptEntities() ||
+	if (!entity.isReal() || entry == outgoing_.end() || data.length() > MAX_STATE_BYTES || !space.canAcceptEntities() ||
 		space.layoutState() != SpaceLayout::ACTIVE || version_ != space.layoutVersion())
 		return;
 
@@ -437,16 +561,30 @@ void BoundaryGhosts::receive(Space& space, COMPONENT_ID source, Network::Channel
 		uint8 operation = 0;
 		stream >> version >> sourceCell >> targetCell >> id >> generation >> operation;
 		const auto* sender = space.layout().cellForApp(source);
-		if (version != space.layoutVersion() || id <= 0 || generation == 0 ||
+		if (version != space.layoutVersion() || generation == 0 ||
 			stream.length() > MAX_STATE_BYTES || !sender || sender->cellID != sourceCell ||
 			!space.pCell() || space.pCell()->id() != targetCell)
+			return;
+
+		if (operation == MERGE_FENCE || operation == MERGE_FENCE_ACK)
+		{
+			uint64 revision;
+			if (id == 0 && stream.length() == sizeof(revision))
+			{
+				stream >> revision;
+				if (revision == space.boundaryRevision())
+					space.onCellMergeFence(channel, source, generation, operation == MERGE_FENCE_ACK);
+			}
+			return;
+		}
+		if (id <= 0)
 			return;
 
 		auto& app = Cellapp::getSingleton();
 		auto* entity = app.findEntity(id);
 		if (operation == WITNESSED)
 		{
-			if (!entity || !entity->isReal() || entity->spaceID() != space.id() ||
+			if (!entity || (!entity->isReal() && !entity->isCellHandoffSource()) || entity->spaceID() != space.id() ||
 				space.layoutState() != SpaceLayout::ACTIVE || version != version_ ||
 				stream.length() != sizeof(uint8))
 				return;
@@ -469,6 +607,25 @@ void BoundaryGhosts::receive(Space& space, COMPONENT_ID source, Network::Channel
 		}
 
 		const auto current = incoming_.find(id);
+		if (operation == CHECK_HANDOFF_COPY)
+		{
+			if (!stream.length())
+				resolveHandoffCopy(space, source, id, generation);
+			return;
+		}
+		if (operation == HANDOFF_COPY_ABSENT)
+		{
+			const auto* peer = peerChannel(source);
+			if (!stream.length() && entity && entity->isBoundaryGhost() && entity->spaceID() == space.id() &&
+				current != incoming_.end() && peer)
+			{
+				auto& copy = current->second;
+				if (copy.earlyAbsence.receive({source, sourceCell, peer->sessionEpoch(), generation},
+					{copy.source, copy.cell, copy.session, entity->routingEpoch()}, !copy.generation))
+					app.destroyEntity(id, false);
+			}
+			return;
+		}
 		if (operation == CREATE)
 		{
 			auto& last = sources_[source];
@@ -484,6 +641,7 @@ void BoundaryGhosts::receive(Space& space, COMPONENT_ID source, Network::Channel
 			if (!module || !module->hasCell() || routingEpoch == 0 || !pose.read(stream))
 				return;
 
+			HandoffCopyAbsence earlyAbsence;
 			if (entity)
 			{
 				if (!entity->isBoundaryGhost() || current == incoming_.end() || entity->spaceID() != space.id())
@@ -494,6 +652,17 @@ void BoundaryGhosts::receive(Space& space, COMPONENT_ID source, Network::Channel
 				if (routingEpoch < currentEpoch ||
 					(routingEpoch == currentEpoch && current->second.source != source))
 					return;
+				if (routingEpoch == currentEpoch && !current->second.generation)
+				{
+					// CREATE 已通过入站连接绑定；交接使用的连接也必须仍属于同一会话。
+					const auto* handoffChannel = peerChannel(source);
+					if (!handoffChannel || handoffChannel->sessionEpoch() != current->second.session ||
+						sourceCell != current->second.cell || module != entity->pScriptModule())
+						return;
+				}
+				// 中间一跳的 CREATE 也可能晚到，只保留比这份正式副本更新的缺席通告。
+				if (current->second.earlyAbsence.epoch > routingEpoch)
+					earlyAbsence = current->second.earlyAbsence;
 				app.destroyEntity(id, false);
 			}
 
@@ -510,7 +679,7 @@ void BoundaryGhosts::receive(Space& space, COMPONENT_ID source, Network::Channel
 				return;
 			}
 			last = {channel.sessionEpoch(), version, generation};
-			incoming_.emplace(id, Incoming{source, channel.addr(), channel.sessionEpoch(), generation, sourceCell});
+			incoming_.emplace(id, Incoming{source, channel.addr(), channel.sessionEpoch(), generation, sourceCell, 0, earlyAbsence});
 			entity->boundaryGhostSnapshot(++nextIncomingSnapshot_);
 			pose.apply(*entity, true);
 			Entity::bufferCallback(true);
@@ -526,6 +695,30 @@ void BoundaryGhosts::receive(Space& space, COMPONENT_ID source, Network::Channel
 
 		switch (operation)
 		{
+		case HANDOFF_COPY_MOVED:
+		{
+			COMPONENT_ID successor = 0;
+			CELL_ID nextCell = 0;
+			uint64 epoch = 0;
+			stream >> successor >> nextCell >> epoch;
+			const auto* member = space.layout().cellForApp(successor);
+			if (stream.length() || epoch <= entity->routingEpoch() || !member || member->cellID != nextCell)
+				break;
+			auto* next = peerChannel(successor);
+			const auto earlyAbsence = current->second.earlyAbsence;
+			if (!next || earlyAbsence.matches({successor, nextCell, next->sessionEpoch(), epoch}))
+			{
+				app.destroyEntity(id, false);
+				break;
+			}
+			// 这里未移除坐标节点；后到的旧来源消息须重新匹配来源和代次，不能覆盖新快照。
+			current->second = {successor, next->addr(), next->sessionEpoch(), 0, nextCell,
+				timestamp() + 5 * stampsPerSecond(), earlyAbsence.epoch > epoch ? earlyAbsence : HandoffCopyAbsence{}};
+			entity->setBoundaryGhost(successor);
+			entity->routingEpoch(epoch);
+			entity->boundaryGhostSnapshot(0);
+			break;
+		}
 		case REMOVE:
 			if (stream.length() == 0)
 				app.destroyEntity(id, false);

@@ -131,9 +131,11 @@ public:
 	bool isPendingSplitPeer(COMPONENT_ID cid) const;
 	bool needsSplitPeer(COMPONENT_ID cid) const;
 	void handleCellMerge(SpaceLayout::Packet& packet, Network::Channel& manager);
+	void onCellMergeFence(Network::Channel& channel, COMPONENT_ID peer, uint64 attempt, bool acknowledge);
 	bool isDrainingCell() const;
 	bool isCellMergeHandoffStopped() const;
 	void reportCellMergeBlock(ENTITY_ID entity, const char* error);
+	void noteCellMergeRollback(ENTITY_ID entity);
 	const SpaceLayout::Node* handoffDestination(float x, float z, COMPONENT_ID source) const;
 	bool isStagedSplitCell() const { return split_ && split_->candidate && !split_->applied; }
 	bool canReceiveSplitGhosts() const
@@ -207,6 +209,7 @@ protected:
 	void updateCellSplitMigration();
 	bool hasSplitSourceEntityToMigrate(Entity& entity, COMPONENT_ID target) const;
 	void updateCellMerge();
+	bool drainCellMergeGhosts();
 	bool hasMergePendingEntity(const Entity& entity) const;
 
 	void _clearGhosts();
@@ -302,6 +305,15 @@ protected:
 		uint64 nextCheck = 0;
 		std::string error;
 		bool errorSent = false;
+		std::map<ENTITY_ID, uint8> rollbacks;
+		struct GhostFence
+		{
+			enum State { Pending, Sent, Acknowledged };
+			uint64 session = 0;
+			State state = Pending;
+		};
+		std::map<COMPONENT_ID, GhostFence> ghostFences;
+		uint64 ghostFenceDeadline = 0;
 	};
 	std::optional<CellMerge> merge_;
 	SpaceLayout::State			layoutState_ = SpaceLayout::NONE;

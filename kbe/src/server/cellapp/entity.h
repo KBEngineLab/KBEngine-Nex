@@ -52,6 +52,7 @@ class Controller;
 class Controllers;
 class Space;
 class VolatileInfo;
+namespace CellHandoff { class CopyReservation; }
 
 namespace Network
 {
@@ -456,6 +457,7 @@ public:
 	void delWitnessed(Entity* entity);
 	void onDelWitnessed();
 	void setBoundaryWitnessed(bool observed);
+	void reconcileCellHandoffWitness();
 
 	/** 某个观察关系加入或完成待发送位姿时维护聚合计数。 */
 	/** Maintains the aggregate count while observer relations queue or complete pose delivery. */
@@ -614,9 +616,10 @@ public:
 		转变为ghost, 自身必须为real
 	*/
 	void changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s, uint64 epoch = 0, bool handoff = false);
+	void retainCellHandoffGhost();
 	bool isMigrationSource() const { return migrationSource_; }
 	bool isCellHandoffSource() const { return handoffSource_; }
-	void beginCellHandoffTarget(COMPONENT_ID source);
+	void beginCellHandoffTarget(COMPONENT_ID source, std::unique_ptr<CellHandoff::CopyReservation> copies);
 	void completeCellHandoff();
 	uint64 reserveRoutingEpoch();
 	uint64 cellHandoffEpoch() const { return cellHandoffEpoch_; }
@@ -666,11 +669,11 @@ public:
 	*/
 	bool bufferOrExeCallback(const char * funcName, PyObject * funcArgs,
 		bool notFoundIsOK = true, bool recordMigrationDispatchStages = false,
-		bool destroyAfterCallback = false);
+		bool finishHandoffAfterCallback = false);
 	static void bufferCallback(bool enable);
 
 private:
-	void finishCellHandoffDestroy();
+	void finishCellHandoffEntry();
 	void onFirstWitnessed();
 	/** 
 		发送teleport结果到base端
@@ -695,7 +698,7 @@ private:
 		// 迁移回调可能延迟到缓冲回放时执行，标记必须随调用保存才能记录真实耗时。
 		// Migration callbacks may execute during replay, so retain the flag to measure actual dispatch time.
 		bool			recordMigrationDispatchStages;
-		bool			destroyAfterCallback;
+		bool			finishHandoffAfterCallback;
 	};
 
 	typedef std::list<BufferedScriptCall*>					BufferedScriptCallArray;
@@ -734,6 +737,7 @@ protected:
 	bool												migrationSource_ = false;
 	bool												handoffSource_ = false;
 	bool												handoffTarget_ = false;
+	std::unique_ptr<CellHandoff::CopyReservation> handoffCopies_;
 	bool												destroyAfterCellHandoff_ = false;
 	uint64												cellHandoffEpoch_ = 0;
 	uint64												autoHandoffRetryAt_ = 0;
@@ -790,6 +794,7 @@ protected:
 	WITNESS_IDS										witnesses_;
 	size_t													witnesses_count_;
 	bool													boundaryWitnessed_ = false;
+	bool													witnessedCallbackActive_ = false;
 
 	uint32											witnessesVolatilePendingCount_;
 

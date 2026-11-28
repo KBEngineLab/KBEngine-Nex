@@ -261,6 +261,7 @@ void Entity::onCoordinateNodesDestroy(EntityCoordinateNode* pEntityCoordinateNod
 //-------------------------------------------------------------------------------------
 void Entity::onDestroy(bool callScript)
 {
+	handoffCopies_.reset();
 	if(callScript && isReal())
 	{
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
@@ -1338,7 +1339,7 @@ void Entity::addCellDataToStream(COMPONENT_TYPE sendTo, uint32 flags, MemoryStre
 	EntityDef::context().currComponentType = g_componentType;
 
 	addPositionAndDirectionToStream(*mstream, useAliasID);
-	PyObject* cellData = PyObject_GetAttrString(this, "__dict__");
+	PyObjectPtr cellData(PyObject_GetAttrString(this, "__dict__"), PyObjectPtr::STEAL_REF);
 
 	ScriptDefModule::PROPERTYDESCRIPTION_MAP& propertyDescrs =
 					pScriptModule_->getCellPropertyDescriptions();
@@ -1358,7 +1359,7 @@ void Entity::addCellDataToStream(COMPONENT_TYPE sendTo, uint32 flags, MemoryStre
 			}
 
 			// DEBUG_MSG(fmt::format("Entity::addCellDataToStream: {}.\n", propertyDescription->getName()));
-			PyObject* pyVal = PyDict_GetItemString(cellData, propertyDescription->getName());
+			PyObject* pyVal = PyDict_GetItemString(cellData.get(), propertyDescription->getName());
 
 			if(useAliasID && pScriptModule_->usePropertyDescrAlias())
 			{
@@ -1376,9 +1377,8 @@ void Entity::addCellDataToStream(COMPONENT_TYPE sendTo, uint32 flags, MemoryStre
 				ERROR_MSG(fmt::format("{}::addCellDataToStream: {}({}) not is ({})!\n", this->scriptName(), 
 					propertyDescription->getName(), (pyVal ? pyVal->ob_type->tp_name : "unknown"), propertyDescription->getDataType()->getName()));
 				
-				PyObject* pydefval = propertyDescription->parseDefaultStr("");
-				propertyDescription->addToStream(mstream, pydefval);
-				Py_DECREF(pydefval);
+				PyObjectPtr defaultValue(propertyDescription->parseDefaultStr(""), PyObjectPtr::STEAL_REF);
+				propertyDescription->addToStream(mstream, defaultValue.get());
 			}
 			else
 			{
@@ -1394,7 +1394,6 @@ void Entity::addCellDataToStream(COMPONENT_TYPE sendTo, uint32 flags, MemoryStre
 		}
 	}
 
-	Py_XDECREF(cellData);
 	SCRIPT_ERROR_CHECK();
 }
 
@@ -1535,7 +1534,7 @@ void Entity::onWriteToDB()
 
 //-------------------------------------------------------------------------------------
 bool Entity::bufferOrExeCallback(const char* funcName, PyObject* funcArgs,
-	bool notFoundIsOK, bool recordMigrationDispatchStages, bool destroyAfterCallback)
+	bool notFoundIsOK, bool recordMigrationDispatchStages, bool finishHandoffAfterCallback)
 {
 	// 同 Space 交接后的源端只转发旧路由消息，不再执行拆除 AOI 或控制器产生的回调。
 	if (isBoundaryGhost() || isCellHandoffSource())
@@ -1568,7 +1567,7 @@ bool Entity::bufferOrExeCallback(const char* funcName, PyObject* funcArgs,
 		pBufferedScriptCall->pyCallable = pyCallable;
 		pBufferedScriptCall->funcName = funcName;
 		pBufferedScriptCall->recordMigrationDispatchStages = recordMigrationDispatchStages;
-		pBufferedScriptCall->destroyAfterCallback = destroyAfterCallback;
+		pBufferedScriptCall->finishHandoffAfterCallback = finishHandoffAfterCallback;
 		_scriptCallbacksBuffer.push_back(pBufferedScriptCall);
 		++_scriptCallbacksBufferNum;
 		return hasEntityCallable;
@@ -1650,8 +1649,8 @@ bool Entity::bufferOrExeCallback(const char* funcName, PyObject* funcArgs,
 	if (funcArgs)
 		Py_DECREF(funcArgs);
 
-	if (destroyAfterCallback)
-		finishCellHandoffDestroy();
+	if (finishHandoffAfterCallback)
+		finishCellHandoffEntry();
 
 	Py_DECREF(this);
 
@@ -1754,8 +1753,8 @@ void Entity::bufferCallback(bool enable)
 				if (pBufferedScriptCall->pyFuncArgs)
 					Py_DECREF(pBufferedScriptCall->pyFuncArgs);
 
-				if (pBufferedScriptCall->destroyAfterCallback)
-					pBufferedScriptCall->entityPtr->finishCellHandoffDestroy();
+				if (pBufferedScriptCall->finishHandoffAfterCallback)
+					pBufferedScriptCall->entityPtr->finishCellHandoffEntry();
 
 				delete pBufferedScriptCall;
 			}
@@ -1791,7 +1790,7 @@ void Entity::addWitnessed(Entity* entity)
 
 	if (app.spacePartitioningEnabled())
 	{
-		if (!alreadyWitnessed && isReal())
+		if (!alreadyWitnessed && isReal() && !handoffCopies_)
 			onFirstWitnessed();
 	}
 	else
@@ -1812,9 +1811,12 @@ void Entity::onFirstWitnessed()
 {
 	// 延时结束前重新被观察，脚本还没收到 False，不再发送 True。
 	auto* timeout = Cellapp::getSingleton().pWitnessedTimeoutHandler();
-	if (timeout && timeout->delWitnessed(this))
+	if (timeout)
+		timeout->delWitnessed(this);
+	if (witnessedCallbackActive_)
 		return;
 
+	witnessedCallbackActive_ = true;
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	bufferOrExeCallback(const_cast<char*>("onWitnessed"),
 		Py_BuildValue(const_cast<char*>("(O)"), PyBool_FromLong(1)));
@@ -1826,13 +1828,29 @@ void Entity::setBoundaryWitnessed(bool observed)
 	const bool alreadyWitnessed = isWitnessed();
 	boundaryWitnessed_ = observed;
 	if (alreadyWitnessed == isWitnessed() || isDestroyed() || !isReal() ||
-		hasFlags(ENTITY_FLAGS_TELEPORT_START))
+		hasFlags(ENTITY_FLAGS_TELEPORT_START) || handoffCopies_)
 		return;
 
 	if (observed)
 		onFirstWitnessed();
 	else if (auto* timeout = Cellapp::getSingleton().pWitnessedTimeoutHandler())
 		timeout->addWitnessed(this);
+}
+
+//-------------------------------------------------------------------------------------
+void Entity::reconcileCellHandoffWitness()
+{
+	// 回滚复用同一个脚本对象。以已派发的状态为准，合并等待批准及降级期间的本地和远端变化。
+	if (!isReal() || isDestroyed())
+		return;
+	if (isWitnessed())
+		onFirstWitnessed();
+	else if (witnessedCallbackActive_)
+	{
+		auto* timeout = Cellapp::getSingleton().pWitnessedTimeoutHandler();
+		if (timeout && !timeout->hasPendingExit(id()))
+			timeout->addWitnessed(this);
+	}
 }
 
 //-------------------------------------------------------------------------------------
@@ -1881,7 +1899,7 @@ void Entity::delWitnessed(Entity* entity)
 	}
 
 	auto& app = Cellapp::getSingleton();
-	if (!app.spacePartitioningEnabled() || (!isDestroyed() && isReal() && !isWitnessed()))
+	if (!app.spacePartitioningEnabled() || (!isDestroyed() && isReal() && !isWitnessed() && !handoffCopies_))
 		if (auto* timeout = app.pWitnessedTimeoutHandler())
 			timeout->addWitnessed(this);
 }
@@ -1902,9 +1920,10 @@ void Entity::onWitnessVolatileDequeued()
 //-------------------------------------------------------------------------------------
 void Entity::onDelWitnessed()
 {
-	if (!isWitnessed() && !isBoundaryGhost() &&
-		(!Cellapp::getSingleton().spacePartitioningEnabled() || (isReal() && !isDestroyed())))
+	if (!isWitnessed() && !isBoundaryGhost() && !handoffCopies_ &&
+		(!Cellapp::getSingleton().spacePartitioningEnabled() || (isReal() && !isDestroyed() && witnessedCallbackActive_)))
 	{
+		witnessedCallbackActive_ = false;
 		SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
 		bufferOrExeCallback(const_cast<char*>("onWitnessed"),
@@ -4711,7 +4730,7 @@ void Entity::onEnteredCell()
 {
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 
-	bufferOrExeCallback("onEnteredCell", NULL, true, false, destroyAfterCellHandoff_);
+	bufferOrExeCallback("onEnteredCell", NULL, true, false, true);
 }
 
 //-------------------------------------------------------------------------------------
@@ -5035,11 +5054,12 @@ void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s, uin
 	handoffSource_ = handoff;
 	if (handoff)
 		realCell_ = realCell;
-	if (Cellapp::getSingleton().spacePartitioningEnabled())
+	// 交接提交前保留旧副本，回滚继续使用原代次；提交时源端再通知它们转向新 Real。
+	if (!handoff && Cellapp::getSingleton().spacePartitioningEnabled())
 	{
 		auto* space = Spaces::findSpace(spaceID());
 		if (space && space->hasManagedCell())
-			space->boundaryGhosts().remove(*space, *this, handoff ? realCell : 0);
+			space->boundaryGhosts().remove(*space, *this);
 	}
 
 	realCell_ = realCell;
@@ -5064,7 +5084,6 @@ void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s, uin
 
 	if (handoff)
 	{
-		boundaryWitnessed_ = false;
 		EntityEvents::clear(this);
 	}
 
@@ -5083,6 +5102,26 @@ void Entity::changeToGhost(COMPONENT_ID realCell, KBEngine::MemoryStream& s, uin
 
 	scriptTimers_.cancelAll();
 	pyCallbackMgr_.finalise();
+}
+
+//-------------------------------------------------------------------------------------
+void Entity::retainCellHandoffGhost()
+{
+	KBE_ASSERT(isCellHandoffSource() && isMigrationSource() && !isReal());
+
+	// 已提交的源副本不能回退成 Real，也不能持有 Base/客户端调用权限或阻塞 Space 退役。
+	setBoundaryGhost(realCell());
+	// 下次在本 Cell 晋升是新的脚本进入周期，旧 Real 的退场定时器不再拥有这个 ID。
+	witnessedCallbackActive_ = false;
+	if (auto* timeout = Cellapp::getSingleton().pWitnessedTimeoutHandler())
+		timeout->delWitnessed(this);
+	boundaryGhostSnapshot(0);
+	migrationSource_ = false;
+	handoffSource_ = false;
+	removeFlags(ENTITY_FLAGS_TELEPORT_START);
+	S_RELEASE(controlledBy_);
+	S_RELEASE(clientEntityCall_);
+	S_RELEASE(baseEntityCall_);
 }
 
 //-------------------------------------------------------------------------------------
@@ -5108,8 +5147,9 @@ void Entity::changeToReal(COMPONENT_ID ghostCell, KBEngine::MemoryStream& s, boo
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::beginCellHandoffTarget(COMPONENT_ID source)
+void Entity::beginCellHandoffTarget(COMPONENT_ID source, std::unique_ptr<CellHandoff::CopyReservation> copies)
 {
+	handoffCopies_ = std::move(copies);
 	handoffTarget_ = true;
 	destroyAfterCellHandoff_ = false;
 	migrationRelayCell(source);
@@ -5119,6 +5159,8 @@ void Entity::beginCellHandoffTarget(COMPONENT_ID source)
 //-------------------------------------------------------------------------------------
 void Entity::completeCellHandoff()
 {
+	if (auto* space = Spaces::findSpace(spaceID()))
+		space->boundaryGhosts().prepareHandoffCopies(*space, *this, handoffCopies_->peers);
 	handoffTarget_ = false;
 	// 有待执行的销毁时，先执行进入回调，但禁止回调发起下一轮迁移。
 	if (!destroyAfterCellHandoff_)
@@ -5127,12 +5169,19 @@ void Entity::completeCellHandoff()
 }
 
 //-------------------------------------------------------------------------------------
-void Entity::finishCellHandoffDestroy()
+void Entity::finishCellHandoffEntry()
 {
-	destroyAfterCellHandoff_ = false;
-	removeFlags(ENTITY_FLAGS_TELEPORT_START);
-	if (!isDestroyed())
-		destroyEntity();
+	handoffCopies_.reset();
+	if (destroyAfterCellHandoff_)
+	{
+		destroyAfterCellHandoff_ = false;
+		removeFlags(ENTITY_FLAGS_TELEPORT_START);
+		if (!isDestroyed())
+			destroyEntity();
+	}
+	// 快慢副本及本地 AOI 的变化合并到进入回调之后；销毁或已失去权威的实体无需激活。
+	else if (!isDestroyed() && isReal() && isWitnessed())
+		onFirstWitnessed();
 }
 
 //-------------------------------------------------------------------------------------

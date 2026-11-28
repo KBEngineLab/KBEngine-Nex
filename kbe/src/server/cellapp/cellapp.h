@@ -32,6 +32,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 #include "server/entity_app.h"
 #include "server/forward_messagebuffer.h"
 #include "server/cell_handoff.h"
+#include "cell_handoff_snapshot.h"
 #include "server/teleport_status.h"
 
 #include <memory>
@@ -324,6 +325,7 @@ protected:
 	void processCellHandoffs();
 	bool beginCellHandoff(ENTITY_ID id, bool automatic);
 	void dispatchCellHandoff(Entity& entity, OutgoingCellHandoff& pending);
+	void releaseCellHandoffSource(Entity& entity, const CellHandoff::Route& route, uint64 session);
 	void restoreCellHandoffSource(Entity& entity, OutgoingCellHandoff& pending);
 	void retryCellHandoffMessages();
 	void onPeerCellHandoff(Network::Channel& channel, ENTITY_ID id, uint8 action,
@@ -391,6 +393,7 @@ protected:
 		CellHandoff::Route route;
 		CellHandoff::PeerProcesses processes;
 	};
+	CellHandoff::CopyBudget handoffCopyBudget_;
 	std::map<ENTITY_ID, std::unique_ptr<OutgoingCellHandoff>> outgoingCellHandoffs_;
 	std::set<ENTITY_ID> admittedCellHandoffs_;
 	std::map<ENTITY_ID, IncomingPeerCellHandoff> incomingPeerCellHandoffs_;

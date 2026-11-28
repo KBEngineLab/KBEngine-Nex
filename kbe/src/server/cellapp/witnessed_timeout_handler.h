@@ -43,6 +43,10 @@ public:
 
 	void addWitnessed(Entity* pEntity);
 	bool delWitnessed(Entity* pEntity);
+	bool hasPendingExit(ENTITY_ID id) const
+	{
+		return witnessedEntityIDs_.count(id) || pendingExits_.count(id) || dispatchingExits_.count(id);
+	}
 	void dispatchPendingExits();
 
 private:

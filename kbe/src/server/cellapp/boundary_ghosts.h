@@ -5,6 +5,7 @@
 #include "math/math.h"
 #include "network/address.h"
 #include "server/space_layout.h"
+#include "cell_handoff_snapshot.h"
 
 namespace KBEngine {
 
@@ -12,12 +13,40 @@ class Entity;
 class Space;
 namespace Network { class Channel; }
 
+// 两个 Cell 的消息可交错。只有当前副本通过 MOVED 确认了同一归属，缺席通告才生效。
+struct HandoffCopyAbsence
+{
+	COMPONENT_ID source = 0;
+	CELL_ID cell = 0;
+	uint64 session = 0;
+	uint64 epoch = 0;
+
+	bool matches(const HandoffCopyAbsence& other) const
+	{
+		return epoch && epoch == other.epoch && source == other.source &&
+			cell == other.cell && session == other.session;
+	}
+
+	bool receive(const HandoffCopyAbsence& notice, const HandoffCopyAbsence& owner, bool placeholder)
+	{
+		if (notice.epoch > owner.epoch && notice.epoch >= epoch)
+			*this = notice;
+		return placeholder && notice.matches(owner);
+	}
+};
+
 class BoundaryGhosts
 {
 public:
 	void update(Space& space);
 	void forgetPeer(Space& space, COMPONENT_ID peer);
-	void remove(Space& space, Entity& entity, COMPONENT_ID keepTarget = 0);
+	static void sendMergeFence(Network::Channel& channel, const Space& space, CELL_ID target,
+		uint64 attempt, bool acknowledge);
+	void remove(Space& space, Entity& entity, COMPONENT_ID successor = 0);
+	CellHandoff::CopyPeers handoffPeers(ENTITY_ID id, COMPONENT_ID target) const;
+	void prepareHandoffCopies(Space& space, Entity& entity, const CellHandoff::CopyPeers& peers);
+	bool retainHandoffSource(Space& space, Entity& entity, uint64 session);
+	void resolveHandoffCopy(Space& space, COMPONENT_ID previous, ENTITY_ID id, uint64 epoch);
 	bool forgetHandoffTarget(ENTITY_ID id, COMPONENT_ID source, uint64 session, uint64 generation);
 	uint64 handoffCopyGeneration(ENTITY_ID id, COMPONENT_ID target, uint64 session) const;
 	const char* checkHandoffSnapshot(Entity& entity, COMPONENT_ID target, MemoryStream& snapshot) const;
@@ -28,7 +57,8 @@ public:
 	bool hasCopies(ENTITY_ID id) const { return outgoing_.count(id) != 0; }
 
 private:
-	enum Operation : uint8 { CREATE = 1, REMOVE, POSE, PROPERTY, BROADCAST, WITNESSED };
+	enum Operation : uint8 { CREATE = 1, REMOVE, POSE, PROPERTY, BROADCAST, WITNESSED,
+		CHECK_HANDOFF_COPY, HANDOFF_COPY_ABSENT, HANDOFF_COPY_MOVED, MERGE_FENCE, MERGE_FENCE_ACK };
 
 	struct Pose
 	{
@@ -59,6 +89,8 @@ private:
 		uint64 session;
 		uint64 generation;
 		CELL_ID cell;
+		uint64 nextHandoffCheck = 0;
+		HandoffCopyAbsence earlyAbsence;
 	};
 
 	struct Source
@@ -86,6 +118,8 @@ private:
 
 	static bool isWitnessed(const Copies& copies);
 	static const char* writeSnapshot(Entity& entity, const Pose& pose, MemoryStream& snapshot);
+	void createCopy(Space& space, Entity& entity, const Neighbour& neighbour, Network::Channel& channel,
+		const Pose& pose, const MemoryStream& snapshot);
 	void refresh(Space& space, Entity& entity, SendTarget* targets, size_t count);
 	void sendToCopies(Space& space, const Entity& entity, Operation operation, const MemoryStream& data);
 	void clearIncoming(Space& space);

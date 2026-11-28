@@ -410,6 +410,16 @@ void Space::reportCellMergeBlock(ENTITY_ID entity, const char* error)
 		merge_->error = fmt::format("entity {}: {}", entity, error);
 }
 
+void Space::noteCellMergeRollback(ENTITY_ID entity)
+{
+	// 接纳预算由目标的所有 Space 共用。短时争用可随下一轮重试恢复；
+	// 同一退役实体反复回滚时，沿用缩容取消流程等待其余在途交接结束。
+	constexpr uint8 maxRollbacks = 3;
+	if (merge_ && merge_->sourceLocal && merge_->stage == CellMerge::Draining && merge_->error.empty() &&
+		++merge_->rollbacks[entity] == maxRollbacks)
+		reportCellMergeBlock(entity, "target repeatedly rejected handoff before admission");
+}
+
 const SpaceLayout::Node* Space::handoffDestination(float x, float z, COMPONENT_ID source) const
 {
 	// 其他 Cell 在发布前继续按原 Layout 工作；只为退役 Cell 的迁出计算新归属。
@@ -516,6 +526,66 @@ bool Space::hasMergePendingEntity(const Entity& entity) const
 		entity.migrationRelayCell() == merge_->source;
 }
 
+bool Space::drainCellMergeGhosts()
+{
+	auto& merge = *merge_;
+	const auto now = timestamp();
+	if (!merge.ghostFenceDeadline)
+		merge.ghostFenceDeadline = now + 30 * stampsPerSecond();
+	bool complete = true;
+	for (const auto& node : layout_.nodes)
+	{
+		if (node.axis != SpaceLayout::LEAF || node.cellappID == g_componentID)
+			continue;
+		auto& fence = merge.ghostFences.at(node.cellappID);
+		if (fence.state == CellMerge::GhostFence::Acknowledged)
+			continue;
+		complete = false;
+		if (now >= merge.ghostFenceDeadline)
+		{
+			merge.error = fmt::format("timed out waiting for Ghost updates on CellApp {}", node.cellappID);
+			break;
+		}
+		auto* channel = Components::getSingleton().findComponentChannel(CELLAPP_TYPE, node.cellappID);
+		if (!channel || channel->isDestroyed() || channel->condemn() != 0)
+			continue;
+		// 新连接不能证明旧队列已经处理完，连接更换时走已提交实体可保留的缩容取消流程。
+		if (fence.session != channel->sessionEpoch())
+		{
+			merge.error = fmt::format("Ghost connection changed while draining CellApp {}", node.cellappID);
+			break;
+		}
+		if (fence.state == CellMerge::GhostFence::Pending)
+		{
+			fence.state = CellMerge::GhostFence::Sent;
+			BoundaryGhosts::sendMergeFence(*channel, *this, node.cellID, merge.attempt, false);
+			DEBUG_MSG(fmt::format("Space::cellMerge: sent Ghost fence, space={}, attempt={}, peer={}.\n",
+				id_, merge.attempt, node.cellappID));
+		}
+	}
+	return complete;
+}
+
+void Space::onCellMergeFence(Network::Channel& channel, COMPONENT_ID peer, uint64 attempt, bool acknowledge)
+{
+	if (!merge_ || merge_->attempt != attempt || layoutState_ != SpaceLayout::ACTIVE)
+		return;
+	auto& merge = *merge_;
+	if (acknowledge)
+	{
+		const auto fence = merge.ghostFences.find(peer);
+		if (merge.sourceLocal && merge.stage == CellMerge::Draining && fence != merge.ghostFences.end() &&
+			fence->second.state == CellMerge::GhostFence::Sent && fence->second.session == channel.sessionEpoch())
+			fence->second.state = CellMerge::GhostFence::Acknowledged;
+	}
+	else if (!merge.sourceLocal && peer == merge.source &&
+		(merge.stage == CellMerge::Ready || merge.stage == CellMerge::Receiving))
+	{
+		// 管理器的 DRAIN 可以晚于对端标记到达。READY 已绑定本次缩容及原布局。
+		BoundaryGhosts::sendMergeFence(channel, *this, layout_.cellForApp(peer)->cellID, attempt, true);
+	}
+}
+
 void Space::updateCellMerge()
 {
 	using namespace SpaceLayout;
@@ -573,6 +643,8 @@ void Space::updateCellMerge()
 			const auto* channel = components.findComponentChannel(CELLAPP_TYPE, node.cellappID);
 			if (!channel || channel->isDestroyed() || channel->condemn() != 0)
 				return;
+			if (merge.sourceLocal)
+				merge.ghostFences[node.cellappID].session = channel->sessionEpoch();
 		}
 		if (merge.sourceLocal)
 		{
@@ -626,6 +698,9 @@ void Space::updateCellMerge()
 			}
 		}
 		if (merge.cursor < entities_.size())
+			return;
+		// 发布会移除退役 Cell 的成员身份，此后观察端将拒收它仍在路上的换源消息。
+		if (merge.sourceLocal && (app.hasUnreleasedCellHandoff(id_, layoutVersion_) || !drainCellMergeGhosts()))
 			return;
 	}
 	if (send(preparing ? MERGE_READY : MERGE_DRAINED))

@@ -468,6 +468,11 @@ void Witness::onEnterView(ViewTrigger* pViewTrigger, Entity* pEntity)
 	const auto ref = viewEntities_map_.find(pEntity->id());
 	const uint32 flags = ref != viewEntities_map_.end() ? ref->second->flags() : ENTITYREF_FLAG_UNKONWN;
 	const bool handoff = (flags & ENTITYREF_FLAG_HANDOFF_PENDING) != 0;
+	// 迁入 Witness 带来的可见引用已经占用客户端别名，可以绑定占位节点等正式快照。
+	// 其他观察者须等新 Real 确认位置后才可建立关系。
+	if (pEntity->isBoundaryGhost() && !pEntity->boundaryGhostSnapshot() &&
+		!(handoff && (flags & ENTITYREF_FLAG_NORMAL)))
+		return;
 	if (pViewHysteresisAreaTrigger_ == pViewTrigger && !handoff)
 	{
 		// 外圈不能接纳新实体；只允许仍在客户端可见的旧 Ghost 被同 ID 的新 Ghost 替换。
